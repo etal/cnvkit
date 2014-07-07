@@ -1,0 +1,1172 @@
+"""Command-line interface and corresponding API for CNVkit."""
+# NB: argparse CLI definitions and API functions are interwoven:
+#   "_cmd_*" handles I/O and arguments processing for the command
+#   "do_*" runs the command's functionality as an API
+from __future__ import absolute_import, division
+import argparse
+import collections
+import os
+import sys
+
+import numpy
+from matplotlib import pyplot
+# pyplot.ioff()
+
+from Bio._py3k import map, range, zip
+iteritems = (dict.iteritems if sys.version < 3
+             else dict.items)
+
+from . import (core, target, antitarget, coverage, fix, metrics, reference,
+               reports, export, importers, segmentation,
+               ngfrills, plots)
+from .ngfrills import echo
+from .cnarray import CopyNumArray as CNA
+
+
+AP = argparse.ArgumentParser(description=__doc__,
+        epilog="Contact Eric Talevich <etalevich@derm.ucsf.edu> for help.")
+AP_subparsers = AP.add_subparsers(
+        help="Sub-commands (use with -h for more info)")
+
+
+# _____________________________________________________________________________
+# Core pipeline
+
+# batch -----------------------------------------------------------------------
+
+def _cmd_batch(args):
+    """Run the complete CNVkit pipeline on one or more BAM files."""
+    # Mutual exclusion of -r/-n
+    if not ((args.normal is not None) ^ bool(args.reference)):
+        raise ValueError("One of the arguments -n/--normal or -r/--reference "
+                         "is required.")
+
+    # ENH - if not args.antitargets, build 'em from targets
+
+    if not args.reference:
+        # Need target/antitarget BED files to build a new reference
+        if not (args.targets and args.antitargets):
+            raise ValueError("Arguments -t/--target and -a/--antitarget "
+                             "are required.")
+
+        if len(args.normal) == 0:
+            echo("Building a flat reference...")
+            ref_probes = do_reference_flat(args.targets, args.antitargets,
+                                           args.fasta, args.male_normal)
+        else:
+            echo("Building a copy number reference from normal samples...")
+            target_fnames = []
+            antitarget_fnames = []
+            # Run coverage on all normals
+            # ENH - in parallel
+            for nbam in args.normal:
+                sample_id = core.fbase(nbam)
+                sample_pfx = os.path.join(args.output_dir, sample_id)
+                raw_tgt = do_coverage(args.targets, nbam)
+                raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
+                target_fnames.append(sample_pfx + '.targetcoverage.cnn')
+                raw_anti = do_coverage(args.antitargets, nbam)
+                raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
+                antitarget_fnames.append(sample_pfx + '.antitargetcoverage.cnn')
+            # Build reference from *.cnn
+            ref_probes = do_reference(target_fnames, antitarget_fnames,
+                                      args.fasta, args.male_normal)
+        ref_fname = os.path.join(args.output_dir, "reference.cnn")
+        ngfrills.ensure_path(ref_fname)
+        ref_probes.write(ref_fname)
+        args.reference = ref_fname
+
+    # If reusing an existing reference, we can extract (anti)target BEDs from it
+    if args.targets is None and args.antitargets is None:
+        ref_arr = CNA.read(args.reference)
+        target_coords, antitarget_coords = reference.reference2regions(ref_arr)
+        ref_pfx = os.path.join(args.output_dir, core.fbase(args.reference))
+        args.targets = ref_pfx + '.target-tmp.bed'
+        args.antitargets = ref_pfx + '.antitarget-tmp.bed'
+        core.write_tsv(args.targets, target_coords)
+        core.write_tsv(args.antitargets, antitarget_coords)
+
+    if args.processes is None:
+        # Serial
+        for bam in args.bam_files:
+            do_batch_bam(bam, args.targets, args.antitargets,
+                         args.reference, args.output_dir)
+    else:
+        # Parallel
+        import multiprocessing
+        if args.processes < 1:
+            args.processes = multiprocessing.cpu_count()
+        echo("Running", args.processes, "processes")
+        pool = multiprocessing.Pool(args.processes)
+        for bam in args.bam_files:
+            pool.apply_async(do_batch_bam,
+                             (bam, args.targets, args.antitargets,
+                              args.reference, args.output_dir, args.male_normal,
+                              args.scatter, args.diagram))
+        pool.close()
+        pool.join()
+
+
+def do_batch_bam(bam_fname, target_bed, antitarget_bed, ref_fname,
+                 output_dir='.', male_normal=False, scatter=False,
+                 diagram=False):
+    """Run the pipeline on one BAM file."""
+    # TODO - return probes, segments (cnarr, segarr)
+    echo("Running the CNVkit pipeline on", bam_fname, "...")
+
+    sample_id = core.fbase(bam_fname)
+    sample_pfx = os.path.join(output_dir, sample_id)
+
+    raw_tgt = do_coverage(target_bed, bam_fname)
+    raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
+
+    raw_anti = do_coverage(antitarget_bed, bam_fname)
+    raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
+
+    probes = do_fix(raw_tgt, raw_anti, CNA.read(ref_fname))
+    probes.write(sample_pfx + '.cnr')
+
+    echo("Segmenting", sample_pfx + '.cnr ...')
+    segments = segmentation.do_segmentation(sample_pfx + '.cnr', False, 'cbs')
+    segments.write(sample_pfx + '.cns')
+
+    if scatter:
+        do_scatter(probes, segments)
+        pyplot.savefig(sample_pfx + '-scatter.pdf', format='pdf', bbox_inches=0)
+        echo("Wrote", sample_pfx + '-scatter.pdf')
+
+    if diagram:
+        from cnvlib import diagram
+        outfname = sample_pfx + '-diagram.pdf'
+        diagram.create_diagram(probes, segments, 0.6, outfname, male_normal)
+        echo("Wrote", outfname)
+
+
+P_batch = AP_subparsers.add_parser('batch', help=_cmd_batch.__doc__)
+P_batch.add_argument('bam_files', nargs='+',
+        help="Mapped sequence reads (.bam)")
+P_batch.add_argument('-y', '--male-normal', action='store_true',
+        help="""Use or assume a male reference (i.e. female samples will have +1
+                log-CNR of chrX; otherwise male samples would have -1 chrX).""")
+P_batch.add_argument('-p', '--processes', type=int,
+        help="""Number of subprocesses used to running each of the BAM files in
+                parallel. Give 0 or a negative value to use the maximum number
+                of available CPUs. Default: process each BAM in serial.""")
+
+P_batch_newref = P_batch.add_argument_group(
+    "To construct a new copy number reference")
+P_batch_newref.add_argument('-n', '--normal', nargs='*',
+        help="""Normal samples (.bam) to construct the pooled reference.
+                If this option is used but no files are given, a "flat"
+                reference will be built.""")
+P_batch_newref.add_argument('-f', '--fasta',
+        help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
+P_batch_newref.add_argument('-t', '--targets', #required=True,
+        help="Target intervals (.bed or .list)")
+P_batch_newref.add_argument('-a', '--antitargets', #required=True,
+        help="Antitarget intervals (.bed or .list)")
+
+P_batch_oldref = P_batch.add_argument_group("To reuse an existing reference")
+P_batch_oldref.add_argument('-r', '--reference', #required=True,
+        help="Copy number reference file (.cnn).")
+
+# Reporting options
+P_batch_report = P_batch.add_argument_group("Output options")
+P_batch_report.add_argument('-d', '--output-dir', default='.',
+        help="Output directory name.")
+P_batch_report.add_argument('--scatter', action='store_true',
+        help="Create a whole-genome copy ratio profile as a PDF scatter plot.")
+P_batch_report.add_argument('--diagram', action='store_true',
+        help="Create a diagram of copy ratios on chromosomes as a PDF.")
+
+P_batch.set_defaults(func=_cmd_batch)
+
+
+# target ----------------------------------------------------------------------
+
+def _cmd_target(args):
+    """Transform bait intervals into targets more suitable for CNVkit."""
+    bed_rows = ngfrills.parse_regions(args.interval, bool(args.refflat))
+    if args.refflat:
+        ngfrills.echo("Applying refFlat names")
+        bed_rows = target.add_refflat_names(bed_rows, args.refflat)
+    if args.short_names:
+        ngfrills.echo("Shortening interval labels")
+        bed_rows = target.shorten_labels(bed_rows)
+    if args.split:
+        ngfrills.echo("Splitting large targets")
+        bed_rows = target.split_targets(bed_rows, args.avg_size)
+    # Output with logging
+    with ngfrills.safe_write(args.output, False) as outfile:
+        i = 0
+        for i, row in enumerate(bed_rows):
+            outfile.write("\t".join(map(str, row)) + '\n')
+        ngfrills.echo("Wrote", args.output,
+                      "with", i + 1, "target intervals")
+
+
+P_target = AP_subparsers.add_parser('target', help=_cmd_target.__doc__)
+P_target.add_argument('interval',
+        help="""BED or interval file listing the targeted regions.""")
+P_target.add_argument('--refflat',
+        help="""UCSC refFlat.txt file for the reference genome. Pull gene names
+                from this file and assign to the target intervals.""")
+P_target.add_argument('--short-names', action='store_true',
+        help="Reduce multi-accession interval labels to be short & consistent.")
+P_target.add_argument('--split', action='store_true',
+        help="Split large tiled intervals into smaller, consecutive targets.")
+# Exons: [114--188==203==292--21750], mean=353 -> outlier=359, extreme=515
+#   NV2:  [65--181==190==239--12630], mean=264 -> outlier=277, extreme=364
+# Default avg_size chosen s.t. minimum bin size after split is ~= median
+P_target.add_argument('-a', '--avg-size', type=int, default=200 / .75,
+        help="Average size of split target bins (results are approximate).")
+P_target.add_argument('-o', '--output', help="""Output file name.""")
+P_target.set_defaults(func=_cmd_target)
+
+
+# antitarget ------------------------------------------------------------------
+
+def _cmd_antitarget(args):
+    """Derive a background/antitarget BED file from a target BED file."""
+    out_rows = do_antitarget(args.interval, args.regions,
+                             args.avg_size, args.min_size)
+    if not args.output:
+        base, ext = args.interval.rsplit('.', 1)
+        args.output = base + '.antitarget.' + ext
+    with ngfrills.safe_write(args.output, False) as outfile:
+        i = 0
+        for i, row in enumerate(out_rows):
+            outfile.write("\t".join(row) + '\n')
+        echo("Wrote", args.output, "with", i + 1, "background intervals")
+
+
+def do_antitarget(target_bed,
+                  access_bed=None, avg_bin_size=100000, min_bin_size=10000):
+    """Derive a background/antitarget BED file from a target BED file."""
+    background_regions = antitarget.get_background(target_bed, access_bed,
+                                                   avg_bin_size, min_bin_size)
+
+    # Sniff the number of columns in the BED/interval file
+    # Output will try to match this format
+    ncols = ngfrills.sniff_num_columns(target_bed)
+    if ncols == 3:
+        # Just the coordinates
+        suffix = []
+    elif ncols == 5:
+        # Standard interval: coordinates, strand, name
+        suffix = ['+', 'Background']
+    else:
+        # Full or extended BED, or whatever
+        suffix = ['Background']
+
+    for row in background_regions:
+        yield list(map(str, row)) + suffix
+
+
+P_anti = AP_subparsers.add_parser('antitarget', help=_cmd_antitarget.__doc__)
+P_anti.add_argument('interval',
+        help="""BED or interval file listing the targeted regions.""")
+P_anti.add_argument('-r', '--regions',
+        help="""Regions of accessible sequence on chromosomes (.bed), as
+                output by genome2access.py.""")
+P_anti.add_argument('-a', '--avg-size', type=int, default=100000,
+        help="Average size of antitarget bins (results are approximate).")
+P_anti.add_argument('-m', '--min-size', type=int, default=10000,
+        help="Minimum size of antitarget bins (smaller regions are dropped).")
+P_anti.add_argument('-o', '--output', help="""Output file name.""")
+P_anti.set_defaults(func=_cmd_antitarget)
+
+
+# coverage --------------------------------------------------------------------
+
+def _cmd_coverage(args):
+    """Calculate coverage in the given regions from BAM read depths."""
+    pset = do_coverage(args.interval, args.bam_file, args.pileup)
+    if not args.output:
+        # Create an informative but unique name for the coverage output file
+        bambase = core.fbase(args.bam_file)
+        bedbase = core.rbase(args.interval)
+        tgtbase = ('antitargetcoverage'
+                   if 'anti' in bedbase.lower()
+                   else 'targetcoverage')
+        args.output = '%s.%s.cnn' % (bambase, tgtbase)
+        if os.path.exists(args.output):
+            args.output = '%s.%s.cnn' % (bambase, bedbase)
+    ngfrills.ensure_path(args.output)
+    pset.write(args.output)
+
+
+def do_coverage(bed_fname, bam_fname, do_pileup=False):
+    """Calculate coverage in the given regions from BAM read depths."""
+    try:
+        is_sorted = ngfrills.ensure_bam_sorted(bam_fname)
+    except RuntimeError:
+        # pysam wasn't available, probably
+        pass
+    else:
+        if not is_sorted:
+            raise RuntimeError("BAM file %s must be sorted by coordinates"
+                               % bam_fname)
+
+    ngfrills.ensure_bam_index(bam_fname)
+    # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
+    results = coverage.interval_coverages(bed_fname, bam_fname,
+                (coverage.region_depth_pileup if do_pileup
+                 else coverage.region_depth_count))
+    pset = CNA.from_rows(core.fbase(bam_fname), list(results))
+    pset.center_all()
+    return pset
+
+
+P_coverage = AP_subparsers.add_parser('coverage', help=_cmd_coverage.__doc__)
+P_coverage.add_argument('bam_file', help="Mapped sequence reads (.bam)")
+P_coverage.add_argument('interval', help="Intervals (.bed or .list)")
+P_coverage.add_argument('-p', '--pileup', action='store_true',
+        help="""Get read depths from a pileup at each base.
+                (Takes about twice as long, for slightly less variance).""")
+P_coverage.add_argument('-o', '--output', help="""Output file name.""")
+P_coverage.set_defaults(func=_cmd_coverage)
+
+
+# reference -------------------------------------------------------------------
+
+def _cmd_reference(args):
+    """Compile a coverage reference from the given files (normal samples)."""
+    usage_err_msg = ("Give .cnn samples OR targets and antitargets.")
+    if args.targets and args.antitargets:
+        # Flat refence
+        assert not args.references, usage_err_msg
+        ref_probes = do_reference_flat(args.targets, args.antitargets,
+                                       args.fasta, args.male_normal)
+    elif args.references:
+        # Pooled reference
+        assert not args.targets and not args.antitargets, usage_err_msg
+        filenames = []
+        for path in args.references:
+            if os.path.isdir(path):
+                filenames.extend(os.path.join(path, f) for f in os.listdir(path)
+                                if f.endswith('targetcoverage.cnn'))
+            else:
+                filenames.append(path)
+        targets = [f for f in filenames if not 'antitarget' in f]
+        antitargets = [f for f in filenames if 'antitarget' in f]
+        echo("Number of target and antitarget files: %d, %d"
+            % (len(targets), len(antitargets)))
+        ref_probes = do_reference(targets, antitargets, args.fasta,
+                                  args.male_normal)
+    else:
+        raise ValueError(usage_err_msg)
+
+    ref_fname = args.output or "cnv_reference.cnn"
+    ngfrills.ensure_path(ref_fname)
+    ref_probes.write(ref_fname)
+
+
+def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
+                 male_normal=False):
+    """Compile a coverage reference from the given files (normal samples)."""
+    core.assert_equal("Unequal number of target and antitarget files given",
+                      targets=len(target_fnames),
+                      antitargets=len(antitarget_fnames))
+    # Calculate & save probe centers
+    ref_probes = reference.combine_probes(target_fnames, bool(fa_fname),
+                                          male_normal)
+    ref_probes.extend(reference.combine_probes(antitarget_fnames,
+                                               bool(fa_fname), male_normal))
+    ref_probes.sort()
+    ref_probes.center_all()
+    # Calculate GC and RepeatMasker content for each probe's genomic region
+    if fa_fname:
+        gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
+        ref_probes['gc'] = gc
+        ref_probes['rmask'] = rmask
+    else:
+        echo("No FASTA reference genome provided; skipping GC, RM calculations")
+    reference.warn_bad_probes(ref_probes)
+    return ref_probes
+
+
+def do_reference_flat(target_list, antitarget_list, fa_fname=None,
+                      male_normal=False):
+    """Compile a neutral-coverage reference from the given intervals.
+
+    Combines the intervals, shifts chrX values if requested, and calculates GC
+    and RepeatMasker content from the genome FASTA sequence.
+    """
+    ref_probes = reference.bed2probes(target_list)
+    ref_probes.extend(reference.bed2probes(antitarget_list))
+    ref_probes.sort()
+    # Set sex chromosomes by "reference" gender
+    chr_x = core.guess_chr_x(ref_probes)
+    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
+    if male_normal:
+        ref_probes['coverage'][(ref_probes.chromosome == chr_x) |
+                               (ref_probes.chromosome == chr_y)] = -1.0
+    else:
+        ref_probes['coverage'][ref_probes.chromosome == chr_y] = -1.0
+    # Calculate GC and RepeatMasker content for each probe's genomic region
+    if fa_fname:
+        gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
+        ref_probes['gc'] = gc
+        ref_probes['rmask'] = rmask
+        reference.warn_bad_probes(ref_probes)
+    else:
+        echo("No FASTA reference genome provided; skipping GC, RM calculations")
+    return ref_probes
+
+
+P_reference = AP_subparsers.add_parser('reference', help=_cmd_reference.__doc__)
+P_reference.add_argument('references', nargs='*',
+        help="""Normal-sample target or antitarget .cnn files, or the
+                directory that contains them.""")
+P_reference.add_argument('-f', '--fasta',
+        help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
+P_reference.add_argument('-t', '--targets',
+        help="Target intervals (.bed or .list)")
+P_reference.add_argument('-a', '--antitargets',
+        help="Antitarget intervals (.bed or .list)")
+P_reference.add_argument('-y', '--male-normal', action='store_true',
+        help="""Create a male-normal reference: shift female samples' chrX
+                log-coverage by -1, so the reference chrX average is -1.
+                Otherwise, shift male samples' chrX by +1, so the reference chrX
+                average is 0.""")
+P_reference.add_argument('-o', '--output', help="Output file name.")
+P_reference.set_defaults(func=_cmd_reference)
+
+
+# fix -------------------------------------------------------------------------
+
+def _cmd_fix(args):
+    """Combine target and antitarget coverages and correct for biases.
+
+    Adjust raw coverage data according to the given reference, correct potential
+    biases and re-center.
+    """
+    # Verify that target and antitarget are from the same sample
+    tgt_pset = CNA.read(args.target)
+    anti_pset = CNA.read(args.antitarget)
+    if tgt_pset.sample_id != anti_pset.sample_id:
+        raise ValueError("Sample IDs do not match:"
+                         "'%s' (target) vs. '%s' (antitarget)"
+                         % (tgt_pset.sample_id, anti_pset.sample_id))
+    target_table = do_fix(tgt_pset, anti_pset, CNA.read(args.reference),
+                          args.do_gc, args.do_edge, args.do_rmask)
+    target_table.write(args.output or tgt_pset.sample_id + '.cnr')
+
+
+def do_fix(target_pset, antitarget_pset, reference_pset,
+           do_gc=True, do_edge=True, do_rmask=True):
+    """Combine target and antitarget coverages and correct for biases."""
+    # Load, recenter and GC-correct target & antitarget probes separately
+    echo("Processing target:", target_pset.sample_id)
+    target_table = fix.load_adjust_coverages(target_pset, reference_pset,
+                                             do_gc, do_edge, False)
+    echo("Processing antitarget:", antitarget_pset.sample_id)
+    atarget_table = fix.load_adjust_coverages(antitarget_pset, reference_pset,
+                                              do_gc, False, do_rmask)
+
+    # Merge target and antitarget & sort probes by chromosomal location
+    target_table.extend(atarget_table)
+    target_table.sort()
+    # Determine weights for each bin (used in segmentation)
+    return fix.apply_weights(target_table, reference_pset)
+
+
+P_fix = AP_subparsers.add_parser('fix', help=_cmd_fix.__doc__)
+P_fix.add_argument('target',
+        help="Target coverage file (.targetcoverage.cnn).")
+P_fix.add_argument('antitarget',
+        help="Antitarget coverage file (.antitargetcoverage.cnn).")
+P_fix.add_argument('reference',
+        help="Reference coverage (.cnn).")
+# P_fix.add_argument('--do-gc', action='store_true', default=True,
+#         help="Do GC correction.")
+# P_fix.add_argument('--do-edge', action='store_true',
+#         help="Do edge-effect correction.")
+# P_fix.add_argument('--do-size', action='store_true',
+#         help="Do interval-size correction.")
+P_fix.add_argument('--no-gc', dest='do_gc', action='store_false',
+        help="Skip GC correction.")
+P_fix.add_argument('--no-edge', dest='do_edge', action='store_false',
+        help="Skip edge-effect correction.")
+P_fix.add_argument('--no-rmask', dest='do_rmask', action='store_false',
+        help="Skip RepeatMasker correction.")
+P_fix.add_argument('-o', '--output',
+        help="Output file name.")
+P_fix.set_defaults(func=_cmd_fix)
+
+
+# segment ---------------------------------------------------------------------
+
+def _cmd_segment(args):
+    """Infer copy number segments from the given coverage table."""
+    segments = segmentation.do_segmentation(args.filename, False, args.method)
+    segments.write(args.output or segments.sample_id + '.cns')
+
+
+P_segment = AP_subparsers.add_parser('segment', help=_cmd_segment.__doc__)
+P_segment.add_argument('filename',
+        help="Coverage file (.cnr), as produced by 'fix'.")
+P_segment.add_argument('-o', '--output',
+        help="Output table file name (CNR-like table of segments, .cns).")
+P_segment.add_argument('-m', '--method',
+        choices=('cbs', 'haar', 'flasso'), default='cbs',
+        help="Segmentation method (CBS, HaarSeg, or Fused Lasso).")
+P_segment.set_defaults(func=_cmd_segment)
+
+
+# cbs -------------------------------------------------------------------------
+
+def _cmd_cbs(args):
+    """Run circular binary segmentation (CBS) on the given coverage table."""
+    if args.dataframe:
+        segments, seg_out = segmentation.do_segmentation(args.filename, True,
+                                                         'cbs')
+        with ngfrills.safe_write(args.dataframe) as handle:
+            handle.write(seg_out)
+    else:
+        segments = segmentation.do_segmentation(args.filename, False, 'cbs')
+    segments.write(args.output or segments.sample_id + '.cns')
+
+
+P_cbs = AP_subparsers.add_parser('cbs', help=_cmd_cbs.__doc__)
+P_cbs.add_argument('filename',
+        help="Coverage file (.cnr), as produced by 'fix'.")
+P_cbs.add_argument('-o', '--output',
+        help="Output table file name (CNR-like table of segments, .cns).")
+P_cbs.add_argument('-d', '--dataframe',
+        help="Output filename for the unaltered dataframe emitted by CBS.")
+P_cbs.set_defaults(func=_cmd_cbs)
+
+
+# _____________________________________________________________________________
+# Plots and graphics
+
+# diagram ---------------------------------------------------------------------
+
+def _cmd_diagram(args):
+    """Draw copy number (log2 coverages, CBS calls) on chromosomes as a diagram.
+
+    If both the raw probes and segments are given, show them side-by-side on
+    each chromosome (segments on the left side, probes on the right side).
+    """
+    from cnvlib import diagram
+    cnarr = CNA.read(args.filename) if args.filename else None
+    segarr = CNA.read(args.segment) if args.segment else None
+    outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
+                                      args.output, args.male_normal)
+    echo("Wrote", outfname)
+
+
+P_diagram = AP_subparsers.add_parser('diagram', help=_cmd_diagram.__doc__)
+P_diagram.add_argument('filename', nargs='?',
+        help="""Processed coverage data file (*.cnr), the output of the
+                'fix' sub-command.""")
+P_diagram.add_argument('-s', '--segment',
+        help="Segmentation calls (.cns), the output of the 'segment' command.")
+P_diagram.add_argument('-t', '--threshold', type=float, default=0.6,
+        help="Copy number change threshold to label genes.")
+P_diagram.add_argument('-y', '--male-normal', action='store_true',
+        help="""Assume inputs are already corrected against a male-normal
+                reference (i.e. female samples will have +1 log-CNR of
+                chrX; otherwise male samples would have -1 chrX).""")
+P_diagram.add_argument('-o', '--output',
+        help="Output PDF file name.")
+P_diagram.set_defaults(func=_cmd_diagram)
+
+
+# scatter ---------------------------------------------------------------------
+
+def _cmd_scatter(args):
+    """Plot probe log2 coverages and segmentation calls together."""
+    pset_cvg = CNA.read(args.filename)
+    pset_seg = CNA.read(args.segment) if args.segment else None
+    do_scatter(pset_cvg, pset_seg, args.vcf,
+               args.chromosome, args.gene, args.range,
+               args.background_marker, args.trend, args.width)
+    if args.output:
+        pyplot.savefig(args.output, format='pdf', bbox_inches=0)
+        echo("Wrote", args.output)
+    else:
+        pyplot.show()
+
+
+def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
+               show_chromosome=None, show_gene=None, show_range=None,
+               background_marker=None, do_trend=False, window_width=1e6):
+    """Plot probe log2 coverages and CBS calls together."""
+    if not show_gene and not show_range and not show_chromosome:
+        # Plot all chromosomes, concatenated on one plot
+        PAD = 1e7
+        if vcf_fname:
+            # Lay out top 3/5 for the CN scatter, bottom 2/5 for LOH plot
+            axgrid = pyplot.GridSpec(5, 1, hspace=.85)
+            axis = pyplot.subplot(axgrid[:3])
+            axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
+            chrom_snvs = ngfrills.load_vcf(vcf_fname)
+            # Place chromosome labels between the CNR and LOH plots
+            axis2.tick_params(labelbottom=False)
+            chrom_sizes = plots.chromosome_sizes(pset_cvg)
+            plots.plot_loh(axis2, chrom_snvs, chrom_sizes, do_trend, PAD)
+        else:
+            _fig, axis = pyplot.subplots()
+        axis.set_title(pset_cvg.sample_id)
+        plots.plot_genome(axis, pset_cvg, pset_seg, PAD, do_trend)
+    else:
+        # Plot a specified region on one chromosome
+        window_coords = None
+        chrom = None
+        genes = []
+        if show_gene:
+            gene_names = show_gene.split(',')
+            # Scan for probes matching the specified gene
+            gene_coords = plots.gene_coords_by_name(pset_cvg, gene_names)
+            if not len(gene_coords) == 1:
+                raise ValueError("Genes %s are split across chromosomes %s"
+                                 % (show_gene, gene_coords.keys()))
+            chrom, genes = gene_coords.popitem()
+            genes.sort()
+            # Set the display window to the selected genes +/- a margin
+            window_coords = (genes[0][0] - window_width,
+                             genes[-1][1] + window_width)
+
+        if show_range:
+            if chrom:
+                if not show_range.startswith(chrom):
+                    raise ValueError("Selected genes are on chromosome " +
+                                     chrom + " but specified range is " +
+                                     show_range)
+            chrom, start, end = plots.parse_range(show_range)
+            if window_coords:
+                if start > window_coords[0] or end < window_coords[1]:
+                    raise ValueError("Selected gene range " + chrom +
+                                     (":%d-%d" % window_coords) +
+                                     " is outside specified range " +
+                                     show_range)
+            if not genes:
+                genes = plots.gene_coords_by_range(pset_cvg, chrom,
+                                                   start, end)[chrom]
+            window_coords = (start, end)
+
+        if show_chromosome:
+            if chrom:
+                # Confirm that the selected chromosomes match
+                core.assert_equal("Chromosome also selected by region or gene "
+                                  "does not match",
+                                  **{"chromosome": show_chromosome,
+                                     "region or gene": chrom})
+            else:
+                chrom = show_chromosome
+            if window_coords and not (show_gene and show_range):
+                # Reset window to show the whole chromosome
+                # (unless range and gene were both specified)
+                window_coords = None
+
+        # Prune plotted elements to the selected region
+        if window_coords:
+            # Show the selected region
+            sel_probes = pset_cvg.in_range(chrom, *window_coords)
+            sel_seg = (pset_seg.in_range(chrom, *window_coords, trim=True)
+                       if pset_seg else None)
+        else:
+            # Show the whole chromosome
+            sel_probes = pset_cvg.in_range(chrom)
+            sel_seg = (pset_seg.in_range(chrom)
+                       if pset_seg else None)
+
+        echo("Found", len(sel_probes), "probes and", len(genes),
+             "genes in range", (chrom + ":%d-%d" % window_coords
+                                if window_coords else chrom))
+
+        # Similarly for SNV allele freqs, if given
+        if vcf_fname:
+            # Lay out top 3/5 for the CN scatter, bottom 2/5 for LOH plot
+            axgrid = pyplot.GridSpec(5, 1, hspace=.5)
+            axis = pyplot.subplot(axgrid[:3])
+            axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
+            chrom_snvs = ngfrills.load_vcf(vcf_fname)
+            # Plot LOH for only the selected region
+            snv_x_y = [(pos * plots.MB, abs(altfreq - .5) + 0.5)
+                       for pos, zyg, altfreq in chrom_snvs[chrom]]
+            if window_coords:
+                snv_x_y = [(x, y) for x, y in snv_x_y
+                           if (window_coords[0] * plots.MB <= x <=
+                               window_coords[1] * plots.MB)]
+            snv_x, snv_y = (zip(*snv_x_y) if snv_x_y else ([], []))
+            axis2.set_ylim(0.5, 1.0)
+            axis2.set_ylabel("VAF")
+            axis2.scatter(snv_x, snv_y, color='#808080', alpha=0.3)
+            axis2.set_xlabel("Position (Mb)")
+            axis2.get_yaxis().tick_left()
+            axis2.get_xaxis().tick_top()
+            axis2.tick_params(which='both', direction='out',
+                              labelbottom=False, labeltop=False)
+        else:
+            _fig, axis = pyplot.subplots()
+            axis.set_xlabel("Position (Mb)")
+
+        # Plot CNVs
+        plots.plot_chromosome(axis, sel_probes, sel_seg, chrom,
+                              pset_cvg.sample_id, genes,
+                              background_marker=background_marker,
+                              do_trend=do_trend)
+
+
+P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
+P_scatter.add_argument('filename',
+        help="""Processed coverage sample data file (*.cnr), the output
+                of the 'fix' sub-command.""")
+P_scatter.add_argument('-s', '--segment',
+        help="Segmentation calls (.cns), the output of the 'segment' command.")
+P_scatter.add_argument('-c', '--chromosome',
+        help="Display only the specified chromosome.")
+P_scatter.add_argument('-g', '--gene',
+        help="Name of gene or genes (comma-separated) to display.")
+P_scatter.add_argument('-r', '--range',
+        help="""Chromosomal range to display (e.g. chr1:2333000-2444000).
+                All targeted genes in this range will be shown, unless
+                '--gene'/'-g' is already given.""")
+P_scatter.add_argument('-b', '--background-marker', default=None,
+        help="""Plot antitargets with this symbol, in zoomed/selected regions
+                (default: same as targets).""")
+P_scatter.add_argument('-t', '--trend', action='store_true',
+        help="Draw a smoothed local trendline on the scatter plot.")
+P_scatter.add_argument('-v', '--vcf',
+        help="""VCF file name containing variants to plot for LOH.""")
+P_scatter.add_argument('-w', '--width', type=float, default=1e6,
+        help="""Width of margin to show around the selected gene or region
+                on the chromosome (use with --gene or --region).""")
+P_scatter.add_argument('-o', '--output',
+        help="Output table file name.")
+P_scatter.set_defaults(func=_cmd_scatter)
+
+
+# loh -------------------------------------------------------------------------
+
+def _cmd_loh(args):
+    """Plot allelic frequencies at each variant position in a VCF file.
+
+    Divergence from 0.5 indicates loss of heterozygosity in a tumor sample.
+    """
+    create_loh(args.variants, args.min_depth, args.trend)
+    if args.output:
+        pyplot.savefig(args.output, format='pdf', bbox_inches=0)
+    else:
+        pyplot.show()
+
+
+def create_loh(variants, min_depth=20, do_trend=False):
+    """Plot allelic frequencies at each variant position in a VCF file."""
+    # TODO - accept 1 or 2 variants args
+    # if given 2: find het vars in normal (#1), look those up in tumor (#2)
+    #   -> plot only those ones
+
+    # TODO - if given segments (args.segment),
+    #   do test for significance of shift (abs diff of alt from .5)
+    #       between segment and all other points
+    #   if significant:
+    #       colorize those points
+    #       draw a CBS-like bar at mean level in that segment
+    #   w/o args.segment, treat chromosomes as the segments?
+
+    _fig, axis = pyplot.subplots()
+    axis.set_title("Variant allele frequencies: %s" % variants[0])
+    chrom_snvs = ngfrills.load_vcf(variants[0], min_depth)
+    chrom_sizes = collections.OrderedDict()
+    for chrom in sorted(chrom_snvs, key=core.sorter_chrom):
+        chrom_sizes[chrom] = max(v[0] for v in chrom_snvs[chrom])
+
+    PAD = 2e7
+    plots.plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, PAD)
+
+
+P_loh = AP_subparsers.add_parser('loh', help=_cmd_loh.__doc__)
+P_loh.add_argument('variants', nargs='+',
+        help="Sample variants in VCF format.")
+P_loh.add_argument('-s', '--segment',
+        help="Segmentation calls (.cns), the output of the 'segment' command.")
+P_loh.add_argument('-m', '--min-depth', type=int, default=20,
+        help="Minimum read depth for a variant to be displayed.")
+P_loh.add_argument('-t', '--trend', action='store_true',
+        help="Draw a smoothed local trendline on the scatter plot.")
+P_loh.add_argument('-o', '--output',
+        help="Output PDF file name.")
+P_loh.set_defaults(func=_cmd_loh)
+
+
+# heatmap ---------------------------------------------------------------------
+
+def _cmd_heatmap(args):
+    """Plot copy number for multiple samples as a heatmap."""
+    create_heatmap(args.filenames, args.chromosome, args.desaturate)
+    if args.output:
+        pyplot.savefig(args.output, format='pdf', bbox_inches=0)
+        echo("Wrote", args.output)
+    else:
+        pyplot.show()
+
+
+def create_heatmap(filenames, show_chromosome=None, do_desaturate=False):
+    """Plot copy number for multiple samples as a heatmap."""
+    # ENH - see the zip magic in _cmd_format
+    # Also, for more efficient plotting:
+    # http://matplotlib.org/examples/api/span_regions.html
+
+    _fig, axis = pyplot.subplots()
+
+    # List sample names on the y-axis
+    axis.set_yticks([i + 0.5 for i in range(len(filenames))])
+    axis.set_yticklabels(list(map(core.fbase, filenames)))
+    axis.invert_yaxis()
+    axis.set_ylabel("Samples")
+    axis.set_axis_bgcolor('#DDDDDD')
+
+    # Group each file's probes/segments by chromosome
+    sample_data = [collections.defaultdict(list) for _f in filenames]
+    for i, fname in enumerate(filenames):
+        pset = CNA.read(fname)
+        for chrom, subpset in pset.by_chromosome():
+            sample_data[i][chrom] = list(zip(subpset['start'], subpset['end'],
+                                             subpset['coverage']))
+
+    # Calculate the size (max endpoint value) of each chromosome
+    chrom_sizes = {}
+    for row in sample_data:
+        for chrom, data in iteritems(row):
+            max_posn = max(coord[1] for coord in data)
+            chrom_sizes[chrom] = max(max_posn, chrom_sizes.get(chrom, 0))
+    chrom_sizes = collections.OrderedDict(sorted(iteritems(chrom_sizes),
+                                                 key=core.sorter_chrom_at(0)))
+
+    # Closes over do_desaturate, axis
+    def plot_rect(y_idx, x_start, x_end, cvg):
+        """Draw a rectangle in the given coordinates and color."""
+        x_coords = (x_start, x_start, x_end + 1, x_end + 1)
+        y_coords = (y_idx, y_idx + 1, y_idx + 1, y_idx)
+        rgbcolor = plots.cvg2rgb(cvg, do_desaturate)
+        axis.fill(x_coords, y_coords, color=rgbcolor)
+
+    if show_chromosome:
+        # Lay out only the selected chromosome
+        chrom_offsets = {show_chromosome: 0.0}
+        # Set x-axis the chromosomal positions (in Mb), title as the chromosome
+        axis.set_xlim(0, chrom_sizes[show_chromosome] * plots.MB)
+        axis.set_title(show_chromosome)
+        axis.set_xlabel("Position (Mb)")
+        axis.tick_params(which='both', direction='out')
+        axis.get_xaxis().tick_bottom()
+        axis.get_yaxis().tick_left()
+        # Plot the individual probe/segment coverages
+        for i, row in enumerate(sample_data):
+            for start, end, cvg in row[show_chromosome]:
+                plot_rect(i, start * plots.MB, end * plots.MB, cvg)
+
+    else:
+        # Lay out chromosome dividers and x-axis labels
+        # (Just enough padding to avoid overlap with the divider line)
+        chrom_offsets = plots.plot_x_dividers(axis, chrom_sizes, 1)
+        # Plot the individual probe/segment coverages
+        for i, row in enumerate(sample_data):
+            for chrom, curr_offset in iteritems(chrom_offsets):
+                for start, end, cvg in row[chrom]:
+                    plot_rect(i, start + curr_offset, end + curr_offset, cvg)
+
+
+P_heatmap = AP_subparsers.add_parser('heatmap', help=_cmd_heatmap.__doc__)
+P_heatmap.add_argument('filenames', nargs='+',
+        help="Sample coverages as raw probes (.cnr) or segments (.cns).")
+P_heatmap.add_argument('-c', '--chromosome',
+        help="Name of chromosome to display (default: show them all).")
+# P_heatmap.add_argument('-g', '--gene',
+#         help="Name of gene to display.")
+# P_heatmap.add_argument('-r', '--range',
+#         help="Chromosomal range to display (e.g. chr1:123000-456000).")
+P_heatmap.add_argument('-d', '--desaturate', action='store_true',
+        help="Tweak color saturation to focus on significant changes.")
+P_heatmap.add_argument('-o', '--output',
+        help="Output PDF file name.")
+P_heatmap.set_defaults(func=_cmd_heatmap)
+
+
+# _____________________________________________________________________________
+# Tabular outputs
+
+# breaks ----------------------------------------------------------------------
+
+def _cmd_breaks(args):
+    """List the targeted genes in which a copy number breakpoint occurs."""
+    pset_cvg = CNA.read(args.filename)
+    pset_seg = CNA.read(args.segment)
+    bpoints = do_breaks(pset_cvg, pset_seg)
+    echo("Found", len(bpoints), "gene breakpoints")
+    core.write_tsv(args.output, bpoints,
+                   colnames=['Gene', 'Chrom.', 'Location', 'Change',
+                             'ProbesLeft', 'ProbesRight'])
+
+
+def do_breaks(probes, segments):
+    """List the targeted genes in which a copy number breakpoint occurs."""
+    intervals = reports.get_gene_intervals(probes)
+    bpoints = reports.get_breakpoints(intervals, segments)
+    return bpoints
+
+
+P_breaks = AP_subparsers.add_parser('breaks', help=_cmd_breaks.__doc__)
+P_breaks.add_argument('filename',
+        help="""Processed sample coverage data file (*.cnr), the output
+                of the 'fix' sub-command.""")
+P_breaks.add_argument('segment',
+        help="Segmentation calls (.cns), the output of the 'segment' command).")
+P_breaks.add_argument('-o', '--output',
+        help="Output table file name.")
+P_breaks.set_defaults(func=_cmd_breaks)
+
+
+# gainloss --------------------------------------------------------------------
+
+def _cmd_gainloss(args):
+    """Identify targeted genes with copy number gain or loss."""
+    pset = CNA.read(args.filename)
+    segs = CNA.read(args.segment) if args.segment else None
+    gainloss = do_gainloss(pset, segs, args.male_normal, args.threshold,
+                           args.min_probes)
+    echo("Found", len(gainloss), "gene-level gains and losses")
+    core.write_tsv(args.output, gainloss,
+                   colnames=['Gene', 'Chrom.', 'Start', 'End', 'Coverage',
+                             'Probes'])
+
+
+def do_gainloss(probes, segments=None, male_normal=False,
+                threshold=0.6, min_probes=1):
+    """Identify targeted genes with copy number gain or loss."""
+    probes = core.shift_xx(probes, male_normal)
+    gainloss = []
+    if segments:
+        segments = core.shift_xx(segments, male_normal)
+        for segment, subprobes in probes.by_segment(segments):
+            if abs(segment['coverage']) >= threshold:
+                for (gene, chrom, start, end, coverages
+                    ) in reports.group_by_genes(subprobes):
+                    gainloss.append((gene, chrom, start, end,
+                                     segment['coverage'], len(coverages)))
+    else:
+        for gene, chrom, start, end, coverages in reports.group_by_genes(probes):
+            gene_coverage = numpy.median(coverages)
+            if abs(gene_coverage) >= threshold:
+                gainloss.append((gene, chrom, start, end,
+                                gene_coverage, len(coverages)))
+    return [row for row in gainloss if row[5] >= min_probes]
+
+
+P_gainloss = AP_subparsers.add_parser('gainloss', help=_cmd_gainloss.__doc__)
+P_gainloss.add_argument('filename',
+        help="""Processed sample coverage data file (*.cnr), the output
+                of the 'fix' sub-command.""")
+P_gainloss.add_argument('-s', '--segment',
+        help="Segmentation calls (.cns), the output of the 'segment' command).")
+P_gainloss.add_argument('-t', '--threshold', type=float, default=0.6,
+        help="Copy number change threshold to report a gene gain/loss.")
+P_gainloss.add_argument('-m', '--min-probes', type=int, default=1,
+        help="Minimum number of covered probes to report a gain/loss.")
+P_gainloss.add_argument('-y', '--male-normal', action='store_true',
+        help="""Assume inputs are already corrected against a male-normal
+                reference (i.e. female samples will have +1 log-coverage of
+                chrX; otherwise male samples would have -1 chrX).""")
+P_gainloss.add_argument('-o', '--output',
+        help="Output table file name.")
+P_gainloss.set_defaults(func=_cmd_gainloss)
+
+
+# gender ----------------------------------------------------------------------
+
+def _cmd_gender(args):
+    """Guess samples' gender from the relative coverage of chromosome X."""
+    outrows = []
+    for fname in args.targets:
+        rel_chrx_cvg = core.get_relative_chrx_cvg(CNA.read(fname))
+        if args.male_normal:
+            is_xx = (rel_chrx_cvg >= 0.7)
+        else:
+            is_xx = (rel_chrx_cvg >= -0.4)
+        outrows.append((fname,
+                        ("Female" if is_xx else "Male"),
+                        "%s%.3g" % ('+' if rel_chrx_cvg > 0 else '',
+                                    rel_chrx_cvg)))
+    core.write_tsv(args.output, outrows)
+
+
+P_gender = AP_subparsers.add_parser('gender', help=_cmd_gender.__doc__)
+P_gender.add_argument('targets', nargs='+',
+        help="Copy number or copy ratio files (*.cnn, *.cnr).")
+P_gender.add_argument('-y', '--male-normal', action='store_true',
+        help="""Assume inputs are already corrected against a male-normal
+                reference (i.e. female samples will have +1 log-coverage of
+                chrX; otherwise male samples would have -1 chrX).""")
+P_gender.add_argument('-o', '--output',
+        help="Output table file name.")
+P_gender.set_defaults(func=_cmd_gender)
+
+
+# metrics ---------------------------------------------------------------------
+
+def _cmd_metrics(args):
+    """Compute coverage deviations and other metrics for self-evaluation.
+    """
+    if (len(args.coverages) > 1 and len(args.segments) > 1 and
+        len(args.coverages) != len(args.segments)):
+        raise ValueError("Number of coverage/segment filenames given must be "
+                         "equal, if more than 1 segment file is given.")
+
+    # Repeat a single segment file to match the number of coverage files
+    if len(args.coverages) > 1 and len(args.segments) == 1:
+        args.segments = [args.segments[0] for _i in range(len(args.coverages))]
+
+    # Calculate all metrics
+    outrows = []
+    for probes_fname, segs_fname in zip(args.coverages, args.segments):
+        probes = CNA.read(probes_fname)
+        segments = CNA.read(segs_fname)
+        values = metrics.ests_of_scale(
+            metrics.probe_deviations_from_segments(probes, segments))
+        outrows.append([core.rbase(probes_fname), len(segments)] +
+                       ["%.7f" % val for val in values])
+
+    if len(outrows) == 1:
+        # Plain-text output for one sample
+        sample_id, nseg, stdev, mad, iqr, biweight = outrows[0]
+        with ngfrills.safe_write(args.output or sys.stdout) as handle:
+            handle.write("Sample: %s\n" % sample_id)
+            handle.write("Number of called segments: %d\n" % nseg)
+            handle.write("Deviation of probe coverages from segment calls:\n")
+            handle.write("  Standard deviation = %s\n" % stdev)
+            handle.write("  Median absolute deviation = %s\n" % mad)
+            handle.write("  Interquartile range = %s\n" % iqr)
+            handle.write("  Biweight midvariance = %s\n" % biweight)
+    else:
+        # Tabular output for multiple samples
+        core.write_tsv(args.output, outrows,
+                       colnames=("sample", "segments", "stdev", "mad", "iqr",
+                                 "bivar"))
+
+
+P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
+P_metrics.add_argument('coverages', nargs='+',
+        help="""One or more coverage data files (*.cnn, *.cnr).""")
+P_metrics.add_argument('-s', '--segments', nargs='+',
+        help="""One or more segmentation data files (*.cns, output of the
+                'segment' command).  If more than one file is given, the number
+                must match the coverage data files, in which case the input
+                files will be paired together in the given order. Otherwise, the
+                same segments will be used for all coverage files.""")
+P_metrics.add_argument('-o', '--output',
+        help="Output table file name.")
+P_metrics.set_defaults(func=_cmd_metrics)
+
+
+# _____________________________________________________________________________
+# Other I/O and compatibility
+
+# import-picard ---------------------------------------------------------------
+
+def _cmd_import_picard(args):
+    """Convert Picard CalculateHsMetrics tabular output to CNVkit .cnn files."""
+    for fname in importers.find_picard_files(args.targets):
+        cnarr = importers.load_targetcoverage_csv(fname)
+        outfname = os.path.basename(fname)[:-4] + '.cnn'
+        if args.output_dir:
+            if not os.path.isdir(args.output_dir):
+                os.mkdir(args.output_dir)
+                echo("Created directory", args.output_dir)
+            outfname = os.path.join(args.output_dir, outfname)
+        cnarr.write(outfname)
+
+
+P_import_picard = AP_subparsers.add_parser('import-picard',
+        help=_cmd_import_picard.__doc__)
+P_import_picard.add_argument('targets', nargs='*', default=['.'],
+        help="""Sample coverage .csv files (target and antitarget), or the
+                directory that contains them.""")
+P_import_picard.add_argument('-d', '--output-dir', default='.',
+        help="Output directory name.")
+P_import_picard.set_defaults(func=_cmd_import_picard)
+
+
+# import-seg ------------------------------------------------------------------
+
+def _cmd_import_seg(args):
+    """Convert a SEG file to CNVkit .cns files."""
+    if args.chromosomes:
+        if args.chromosomes == 'human':
+            chrom_names = {'23': 'X', '24': 'Y', '25': 'M'}
+        else:
+            chrom_names = dict(kv.split(':')
+                               for kv in args.chromosomes.split(','))
+    else:
+        chrom_names = args.chromosomes
+
+    for segset in importers.import_seg(args.segfile, chrom_names, args.prefix,
+                                       args.from_log10):
+        segset.write(os.path.join(args.output_dir, segset.sample_id + '.cns'))
+
+
+P_import_seg = AP_subparsers.add_parser('import-seg',
+        help=_cmd_import_seg.__doc__)
+P_import_seg.add_argument('segfile',
+        help="""Input file in SEG format. May contain multiple samples.""")
+P_import_seg.add_argument('-c', '--chromosomes',
+        help="""Mapping of chromosome indexes to names. Syntax:
+                "from1:to1,from2:to2". Or use "human" for the preset:
+                "23:X,24:Y,25:M".""")
+P_import_seg.add_argument('-p', '--prefix',
+        help="""Prefix to add to chromosome names (e.g 'chr' to rename '8' in
+                the SEG file to 'chr8' in the output).""")
+P_import_seg.add_argument('--from-log10',
+        help="Convert base-10 logarithm values in the input to base-2 logs.")
+P_import_seg.add_argument('-d', '--output-dir', default='.',
+        help="Output directory name.")
+P_import_seg.set_defaults(func=_cmd_import_seg)
+
+
+# export ----------------------------------------------------------------------
+
+def _cmd_export(args):
+    """Convert the processed coverage table to another format."""
+    if args.filetype == 'seg':
+        # Special case: segment coords don't match across samples
+        outheader, outrows = export.export_seg(args.filenames)
+    elif args.filetype == 'nexus-basic':
+        # Special case: Nexus "basic" can only represent 1 sample
+        assert len(args.filenames) == 1
+        outheader, outrows = export.export_nexus_basic(args.filenames[0])
+    else:
+        sample_ids = list(map(core.fbase, args.filenames))
+        rows = export.merge_samples(args.filenames)
+        formatter = export.EXPORT_FORMATS[args.filetype]
+        outheader, outrows = formatter(sample_ids, rows)
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+
+P_export = AP_subparsers.add_parser('export', help=_cmd_export.__doc__)
+P_export.add_argument('filetype', choices=export.EXPORT_FORMATS,
+        help="""Output file type:
+                'jtv' (Java TreeView),
+                'cdt' (Java TreeView again),
+                'seg' (IGV and GenePattern),
+                'nexus-basic' (Nexus Copy Number)
+                """)
+                # 'multi' (Nexus Copy Number "multi1")
+                # 'gct' (GenePattern).
+P_export.add_argument('filenames', nargs='+', metavar="filename(s)",
+        help="""Processed sample coverage data file(s) (*.cnr), the output
+                of the 'fix' sub-command.""")
+P_export.add_argument('-o', '--output',
+        help="Output file name.")
+P_export.set_defaults(func=_cmd_export)
+
+
+# _____________________________________________________________________________
+# Shim for command-line execution
+
+def parse_args(args=None):
+    """Parse the command line."""
+    return AP.parse_args(args=args)
