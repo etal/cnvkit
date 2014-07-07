@@ -1,0 +1,39 @@
+# Compiled python files (e.g. from running the unit tests):
+*.pyc
+*.pyo
+
+# Jython class files (present if using Jython)
+*.class
+
+# Backup files from some Unix editors
+*~
+*.swp
+*.bak
+
+# Patches and any original files created by patch command
+*.diff
+*.patch
+*.orig
+*.rej
+
+# Mac OS X hidden files
+.DS_Store
+
+# Dolphin window manager hidden files
+.directory
+
+# MANIFEST file created automatically from MANIFEST.in (pip packaging)
+MANIFEST
+
+# Java TreeView backup/cache/index/whatever generated file
+*.jtv
+
+# R session files
+.RData
+.Rhistory
+
+# Stuff I don't want to see
+tags
+test/build
+build/
+CNVkit.egg-info/
