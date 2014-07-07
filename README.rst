@@ -105,5 +105,5 @@ Citation
 
 We are in the process of publishing a manuscript describing CNVkit in detail.
 For now, if you use this software in a publication, please cite it by the URL:
-http://bitbucket.org/etal/cnvkit
+http://github.com/etal/cnvkit
 
