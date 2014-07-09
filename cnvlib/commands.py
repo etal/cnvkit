@@ -41,13 +41,26 @@ def _cmd_batch(args):
         raise ValueError("One of the arguments -n/--normal or -r/--reference "
                          "is required.")
 
-    # ENH - if not args.antitargets, build 'em from targets
-
     if not args.reference:
-        # Need target/antitarget BED files to build a new reference
-        if not (args.targets and args.antitargets):
-            raise ValueError("Arguments -t/--target and -a/--antitarget "
-                             "are required.")
+        # Need target BED file to build a new reference
+        if not args.targets:
+            raise ValueError("Argument -t/--target is required.")
+
+        if not args.antitargets:
+            # Build antitargets from the given targets
+            anti_rows = do_antitarget(args.targets,
+                                    # ENH - use regions etc.
+                                    # args.regions, args.avg_size, args.min_size
+                                    )
+            # Devise a temporary antitarget filename
+            a_base, a_ext = args.targets.rsplit('.', 1)
+            args.antitargets = a_base + '.antitarget.' + a_ext
+            with ngfrills.safe_write(args.antitargets, False) as anti_file:
+                i = 0
+                for i, row in enumerate(anti_rows):
+                    anti_file.write("\t".join(row) + '\n')
+                echo("Wrote", args.antitargets,
+                     "with", i + 1, "background intervals")
 
         if len(args.normal) == 0:
             echo("Building a flat reference...")
