@@ -166,6 +166,7 @@ P_batch.add_argument('-p', '--processes', type=int,
                 parallel. Give 0 or a negative value to use the maximum number
                 of available CPUs. Default: process each BAM in serial.""")
 
+# Reference-building options
 P_batch_newref = P_batch.add_argument_group(
     "To construct a new copy number reference")
 P_batch_newref.add_argument('-n', '--normal', nargs='*',
@@ -199,10 +200,10 @@ P_batch.set_defaults(func=_cmd_batch)
 
 def _cmd_target(args):
     """Transform bait intervals into targets more suitable for CNVkit."""
-    bed_rows = ngfrills.parse_regions(args.interval, bool(args.refflat))
-    if args.refflat:
-        ngfrills.echo("Applying refFlat names")
-        bed_rows = target.add_refflat_names(bed_rows, args.refflat)
+    bed_rows = ngfrills.parse_regions(args.interval, bool(args.annotate))
+    if args.annotate:
+        ngfrills.echo("Applying annotations as target names")
+        bed_rows = target.add_refflat_names(bed_rows, args.annotate)
     if args.short_names:
         ngfrills.echo("Shortening interval labels")
         bed_rows = target.shorten_labels(bed_rows)
@@ -221,9 +222,10 @@ def _cmd_target(args):
 P_target = AP_subparsers.add_parser('target', help=_cmd_target.__doc__)
 P_target.add_argument('interval',
         help="""BED or interval file listing the targeted regions.""")
-P_target.add_argument('--refflat',
-        help="""UCSC refFlat.txt file for the reference genome. Pull gene names
-                from this file and assign to the target intervals.""")
+P_target.add_argument('--annotate',
+        help="""UCSC refFlat.txt or ensFlat.txt file for the reference genome.
+                Pull gene names from this file and assign them to the target
+                regions.""")
 P_target.add_argument('--short-names', action='store_true',
         help="Reduce multi-accession interval labels to be short & consistent.")
 P_target.add_argument('--split', action='store_true',
