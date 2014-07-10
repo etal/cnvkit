@@ -84,10 +84,12 @@ def _cmd_batch(args):
             # Build reference from *.cnn
             ref_probes = do_reference(target_fnames, antitarget_fnames,
                                       args.fasta, args.male_normal)
-        ref_fname = os.path.join(args.output_dir, "reference.cnn")
-        ngfrills.ensure_path(ref_fname)
-        ref_probes.write(ref_fname)
-        args.reference = ref_fname
+        if not args.output_reference:
+            args.output_reference = os.path.join(args.output_dir,
+                                                 "reference.cnn")
+        ngfrills.ensure_path(args.output_reference)
+        ref_probes.write(args.output_reference)
+        args.reference = args.output_reference
 
     # If reusing an existing reference, we can extract (anti)target BEDs from it
     if args.targets is None and args.antitargets is None:
@@ -179,6 +181,8 @@ P_batch_newref.add_argument('-t', '--targets', #required=True,
         help="Target intervals (.bed or .list)")
 P_batch_newref.add_argument('-a', '--antitargets', #required=True,
         help="Antitarget intervals (.bed or .list)")
+P_batch_newref.add_argument('--output-reference',
+        help="Output filename for the new reference file being created.")
 
 P_batch_oldref = P_batch.add_argument_group("To reuse an existing reference")
 P_batch_oldref.add_argument('-r', '--reference', #required=True,
