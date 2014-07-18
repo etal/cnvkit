@@ -17,8 +17,7 @@ before_install:
     # - sudo rm -rf /dev/shm
     # - sudo ln -s /run/shm /dev/shm
 install:
-    - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib
-    - pip install reportlab biopython pysam
+    - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib biopython reportlab pysam
     - python setup.py install
 
 
