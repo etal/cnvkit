@@ -14,7 +14,7 @@ from .ngfrills import echo
 from .params import NULL_LOG2_COVERAGE, READ_LEN
 
 
-def interval_coverages(bed_fname, bam_fname, region_depth_func):
+def interval_coverages_count(bed_fname, bam_fname):
     """Calculate log2 coverages in the BAM file at each interval."""
     start_time = time.time()
 
@@ -27,7 +27,7 @@ def interval_coverages(bed_fname, bam_fname, region_depth_func):
         # Thunk and reshape this chromosome's intervals
         echo("Processing chromosome", chrom, "of", os.path.basename(bam_fname))
         _chroms, starts, ends, names = zip(*rows_iter)
-        counts_depths = [region_depth_func(bamfile, chrom, s, e)
+        counts_depths = [region_depth_count(bamfile, chrom, s, e)
                          for s, e in zip(starts, ends)]
         for start, end, name, (count, depth) in zip(starts, ends, names,
                                                     counts_depths):
@@ -61,9 +61,8 @@ def region_depth_count(bamfile, chrom, start, end):
 
     Coordinates are 0-based, per pysam.
     """
-    # ENH: shrink/stretch region by average read length?
-    # Count the number of read start positions in the interval (like Picard)
-    count = sum((start <= read.pos <= end and filter_read(read))
+    # Count the number of read midpoints in the interval
+    count = sum((start <= (read.pos + .5*read.rlen) <= end and filter_read(read))
                 for read in bamfile.fetch(reference=chrom,
                                           start=start, end=end))
     # Scale read counts to region length
@@ -72,25 +71,53 @@ def region_depth_count(bamfile, chrom, start, end):
     return count, depth
 
 
-def region_depth_pileup(bamfile, chrom, start, end):
-    """Calculate depth of a region via pysam pileup.
+def interval_coverages_pileup(bed_fname, bam_fname):
+    """Calculate log2 coverages in the BAM file at each interval."""
+    start_time = time.time()
 
-    i.e. average pileup depth across a region.
+    echo("Processing reads in", os.path.basename(bam_fname))
+    all_counts = []
+    for chrom, start, end, name, count, depth in bedcov(bed_fname, bam_fname):
+        all_counts.append(count)
+        yield (chrom, start, end, name,
+               math.log(depth, 2) if depth else NULL_LOG2_COVERAGE)
 
-    To reduce edge effects, depth is counted within a narrowed region, shifting
-    the start and end points inward by a margin equal to the expected read
-    length. (Or, if the region is too narrow, take the middle two quartiles.)
+    # ---
+    # Log some stats
+    tot_time = time.time() - start_time
+    tot_reads = sum(all_counts)
+    echo("Time: %.3f seconds (%d reads/sec, %s bins/sec)"
+         % (tot_time,
+            int(round(tot_reads / tot_time, 0)),
+            int(round(len(all_counts) / tot_time, 0))))
+    echo("Summary of counts:",
+         "\n\tbins=%d, total reads=%d" % (len(all_counts), tot_reads),
+         "\n\tmean=%.4f min=%s max=%s" % (tot_reads / len(all_counts),
+                                          min(all_counts), max(all_counts)))
+    tot_mapped_reads = bam_total_reads(bam_fname)
+    if tot_mapped_reads:
+        echo("On-target percentage: %.3f (of %d mapped)"
+            % (100. * tot_reads / tot_mapped_reads, tot_mapped_reads))
+    else:
+        echo("(Couldn't calculate total number of mapped reads)")
 
-    Coordinates are 0-based, per pysam.
+
+def bedcov(bed_fname, bam_fname):
+    """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
+
+    i.e. mean pileup depth across each region.
     """
-    # Narrow the region to reduce edge effects
-    # quartile = .25 * (end - start)
-    # start = min(start + READ_LEN, start + quartile)
-    # end = max(end - READ_LEN, end - quartile)
-    depths = [filter_column(col) for col in bamfile.pileup(chrom, start, end)]
-    mean_depth = sum(depths) / len(depths) if depths else 0
-    count = mean_depth * (end - start) / READ_LEN  # algebra from above
-    return count, mean_depth  # Mean
+    # Count bases in each region; exclude 0-MAPQ reads
+    lines = pysam.bedcov(bed_fname, bam_fname, '-Q', '1')
+    # Return an iterable...
+    for line in lines:
+        chrom, start_s, end_s, name, basecount_s = line.split()
+        start, end, basecount = map(int, (start_s, end_s, basecount_s))
+        span = end - start
+        # Algebra from above
+        count = basecount / READ_LEN
+        mean_depth = basecount / span
+        yield chrom, start, end, name, count, mean_depth
 
 
 def filter_column(col):

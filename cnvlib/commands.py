@@ -329,9 +329,10 @@ def do_coverage(bed_fname, bam_fname, do_pileup=False):
 
     ngfrills.ensure_bam_index(bam_fname)
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
-    results = coverage.interval_coverages(bed_fname, bam_fname,
-                (coverage.region_depth_pileup if do_pileup
-                 else coverage.region_depth_count))
+    if do_pileup:
+        results = coverage.interval_coverages_pileup(bed_fname, bam_fname)
+    else:
+        results = coverage.interval_coverages_count(bed_fname, bam_fname)
     pset = CNA.from_rows(core.fbase(bam_fname), list(results))
     pset.center_all()
     return pset
