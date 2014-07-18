@@ -5,10 +5,8 @@ python:
 
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 before_install:
-    - "sudo apt-get install python-numpy python-scipy"
-    - "pip install matplotlib reportlab biopython pysam"
+    - "pip install numpy scipy matplotlib reportlab biopython pysam"
 install:
-    - python setup.py build
     - python setup.py install
 
 before_script: cd test/
