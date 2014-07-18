@@ -46,15 +46,31 @@ def _cmd_batch(args):
         if not args.targets:
             raise ValueError("Argument -t/--target is required.")
 
+        # To make temporary filenames for processed targets or antitargets
+        tgt_name_base, tgt_name_ext = args.targets.rsplit('.', 1)
+
+        if (args.annotate or args.short_names or args.split):
+            # Pre-process baits/targets
+            new_target_fname = tgt_name_base + '.target.' + tgt_name_ext
+            do_targets(args.targets, new_target_fname,
+                       args.annotate, args.short_names, args.split,
+                       ({'avg_size': args.target_avg_size}
+                        if args.split and args.target_avg_size
+                        else {}))
+            args.targets = new_target_fname
+
         if not args.antitargets:
             # Build antitargets from the given targets
-            anti_rows = do_antitarget(args.targets,
-                                    # ENH - use regions etc.
-                                    # args.regions, args.avg_size, args.min_size
-                                    )
+            anti_kwargs = {}
+            if args.regions:
+                anti_kwargs['access_bed'] = args.regions
+            if args.antitarget_avg_size:
+                anti_kwargs['avg_bin_size'] = args.antitarget_avg_size
+            if args.antitarget_min_size:
+                anti_kwargs['min_bin_size'] = args.antitarget_min_size
+            anti_rows = do_antitarget(args.targets, **anti_kwargs)
             # Devise a temporary antitarget filename
-            a_base, a_ext = args.targets.rsplit('.', 1)
-            args.antitargets = a_base + '.antitarget.' + a_ext
+            args.antitargets = tgt_name_base + '.antitarget.' + tgt_name_ext
             with ngfrills.safe_write(args.antitargets, False) as anti_file:
                 i = 0
                 for i, row in enumerate(anti_rows):
@@ -181,8 +197,29 @@ P_batch_newref.add_argument('-t', '--targets', #required=True,
         help="Target intervals (.bed or .list)")
 P_batch_newref.add_argument('-a', '--antitargets', #required=True,
         help="Antitarget intervals (.bed or .list)")
+# For pre-processing targets
+P_batch_newref.add_argument('--annotate',
+        help="""UCSC refFlat.txt or ensFlat.txt file for the reference genome.
+                Pull gene names from this file and assign them to the target
+                regions.""")
+P_batch_newref.add_argument('--short-names', action='store_true',
+        help="Reduce multi-accession bait labels to be short and consistent.")
+P_batch_newref.add_argument('--split', action='store_true',
+        help="Split large tiled intervals into smaller, consecutive targets.")
+P_batch_newref.add_argument('--target-avg-size', type=int,
+        help="Average size of split target bins (results are approximate).")
+# For antitargets:
+P_batch_newref.add_argument('--regions',
+        help="""Regions of accessible sequence on chromosomes (.bed), as
+                output by genome2access.py.""")
+P_batch_newref.add_argument('--antitarget-avg-size', type=int,
+        help="Average size of antitarget bins (results are approximate).")
+P_batch_newref.add_argument('--antitarget-min-size', type=int,
+        help="Minimum size of antitarget bins (smaller regions are dropped).")
+
 P_batch_newref.add_argument('--output-reference',
         help="Output filename for the new reference file being created.")
+
 
 P_batch_oldref = P_batch.add_argument_group("To reuse an existing reference")
 P_batch_oldref.add_argument('-r', '--reference', #required=True,
@@ -204,22 +241,29 @@ P_batch.set_defaults(func=_cmd_batch)
 
 def _cmd_target(args):
     """Transform bait intervals into targets more suitable for CNVkit."""
-    bed_rows = ngfrills.parse_regions(args.interval, bool(args.annotate))
-    if args.annotate:
+    do_targets(args.interval, args.output,
+               args.annotate, args.short_names, args.split, args.avg_size)
+
+
+def do_targets(bed_fname, out_fname, do_annotate=False, do_short_names=False,
+               do_split=False, avg_size=200/.75):
+    """Transform bait intervals into targets more suitable for CNVkit."""
+    bed_rows = ngfrills.parse_regions(bed_fname, bool(do_annotate))
+    if do_annotate:
         ngfrills.echo("Applying annotations as target names")
-        bed_rows = target.add_refflat_names(bed_rows, args.annotate)
-    if args.short_names:
+        bed_rows = target.add_refflat_names(bed_rows, do_annotate)
+    if do_short_names:
         ngfrills.echo("Shortening interval labels")
         bed_rows = target.shorten_labels(bed_rows)
-    if args.split:
+    if do_split:
         ngfrills.echo("Splitting large targets")
-        bed_rows = target.split_targets(bed_rows, args.avg_size)
+        bed_rows = target.split_targets(bed_rows, avg_size)
     # Output with logging
-    with ngfrills.safe_write(args.output, False) as outfile:
+    with ngfrills.safe_write(out_fname, False) as outfile:
         i = 0
         for i, row in enumerate(bed_rows):
             outfile.write("\t".join(map(str, row)) + '\n')
-        ngfrills.echo("Wrote", args.output,
+        ngfrills.echo("Wrote", out_fname,
                       "with", i + 1, "target intervals")
 
 
@@ -231,7 +275,7 @@ P_target.add_argument('--annotate',
                 Pull gene names from this file and assign them to the target
                 regions.""")
 P_target.add_argument('--short-names', action='store_true',
-        help="Reduce multi-accession interval labels to be short & consistent.")
+        help="Reduce multi-accession bait labels to be short and consistent.")
 P_target.add_argument('--split', action='store_true',
         help="Split large tiled intervals into smaller, consecutive targets.")
 # Exons: [114--188==203==292--21750], mean=353 -> outlier=359, extreme=515
