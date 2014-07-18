@@ -1,13 +1,15 @@
-.. CNVkit documentation master file, created by
-   sphinx-quickstart on Mon Apr  7 13:14:48 2014.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+CNVkit: Copy number from targeted DNA sequencing
+================================================
 
-Welcome to CNVkit's documentation
-=================================
+:Author: Eric Talevich
+:Contact: etalevich@derm.ucsf.edu
+:License: BSD
+:Source code: http://github.com/etal/cnvkit
 
-CNVkit is a program to infer copy number from next-generation DNA sequencing
-reads.
+CNVkit is a Python library and command-line software toolkit to infer and
+visualize copy number from targeted DNA sequencing data. It is designed for use
+with hybrid capture, including both whole-exome and custom target panels, and
+short-read sequencing platforms such as Illumina.
 
 .. toctree::
 
