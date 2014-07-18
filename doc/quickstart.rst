@@ -4,9 +4,9 @@ Quick start
 Installation
 ------------
 
-Download the source code from BitBucket:
+Download the source code from GitHub:
 
-http://bitbucket.org/etal/cnvkit
+http://github.com/etal/cnvkit
 
 And read the README file.
 
