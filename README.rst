@@ -2,12 +2,13 @@
 CNVkit
 ======
 
-A toolkit for detecting copy number variation from targeted DNA sequencing data.
-
-(It's like array CGH, but without the array.)
+A command-line toolkit and Python library for detecting copy number variations
+and alterations from targeted DNA sequencing.
 
 Read the full documentation at: http://cnvkit.readthedocs.org
 
+.. image:: https://travis-ci.org/etal/cnvkit.svg?branch=master
+    :target: https://travis-ci.org/etal/cnvkit
 
 Installation
 ============
@@ -24,7 +25,7 @@ setup.py as usual::
 Python dependencies
 -------------------
 
-Install these via ``easy_install`` or ``pip``:
+Install these via ``pip`` or ``conda``:
 
 - `Biopython <http://biopython.org/wiki/Main_Page>`_
 - `Reportlab <https://bitbucket.org/rptlab/reportlab>`_
@@ -44,8 +45,7 @@ On Mac OS X you may instead find it much easier to install the Anaconda distribu
 http://repo.continuum.io/miniconda/), which includes most of the dependencies
 already::
 
-    conda install numpy matplotlib biopython pysam pyvcf
-    pip install reportlab
+    conda install numpy matplotlib reportlab biopython pysam pyvcf
 
 Otherwise, we recommend using Homebrew (http://brew.sh/) or MacPorts to
 install an up-to-date Python (e.g. ``brew install python``) and as many of the
