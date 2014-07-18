@@ -5,7 +5,7 @@ python:
 
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 before_install:
-    - "sudo apt-get install libblas3 liblapack3 python-numpy"
+    - "sudo apt-get install libopenblas-base liblapack3gf python-numpy"
     - "pip install scipy matplotlib reportlab biopython pysam"
 install:
     - python setup.py install
