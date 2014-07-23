@@ -344,7 +344,7 @@ P_anti.set_defaults(func=_cmd_antitarget)
 
 def _cmd_coverage(args):
     """Calculate coverage in the given regions from BAM read depths."""
-    pset = do_coverage(args.interval, args.bam_file, args.pileup)
+    pset = do_coverage(args.interval, args.bam_file, args.count)
     if not args.output:
         # Create an informative but unique name for the coverage output file
         bambase = core.fbase(args.bam_file)
@@ -359,7 +359,7 @@ def _cmd_coverage(args):
     pset.write(args.output)
 
 
-def do_coverage(bed_fname, bam_fname, do_pileup=False):
+def do_coverage(bed_fname, bam_fname, by_count=False):
     """Calculate coverage in the given regions from BAM read depths."""
     try:
         is_sorted = ngfrills.ensure_bam_sorted(bam_fname)
@@ -373,10 +373,10 @@ def do_coverage(bed_fname, bam_fname, do_pileup=False):
 
     ngfrills.ensure_bam_index(bam_fname)
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
-    if do_pileup:
-        results = coverage.interval_coverages_pileup(bed_fname, bam_fname)
-    else:
+    if by_count:
         results = coverage.interval_coverages_count(bed_fname, bam_fname)
+    else:
+        results = coverage.interval_coverages_pileup(bed_fname, bam_fname)
     pset = CNA.from_rows(core.fbase(bam_fname), list(results))
     pset.center_all()
     return pset
@@ -385,9 +385,9 @@ def do_coverage(bed_fname, bam_fname, do_pileup=False):
 P_coverage = AP_subparsers.add_parser('coverage', help=_cmd_coverage.__doc__)
 P_coverage.add_argument('bam_file', help="Mapped sequence reads (.bam)")
 P_coverage.add_argument('interval', help="Intervals (.bed or .list)")
-P_coverage.add_argument('-p', '--pileup', action='store_true',
-        help="""Get read depths from a pileup at each base.
-                (Takes about twice as long, for slightly less variance).""")
+P_coverage.add_argument('-c', '--count', action='store_true',
+        help="""Get read depths by counting read midpoints within each bin.
+                (An alternative algorithm).""")
 P_coverage.add_argument('-o', '--output', help="""Output file name.""")
 P_coverage.set_defaults(func=_cmd_coverage)
 
