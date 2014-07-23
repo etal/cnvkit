@@ -1,6 +1,8 @@
 Plots and graphics
 ==================
 
+.. _plots-scatter:
+
 scatter
 -------
 
@@ -41,6 +43,9 @@ The ``--trend`` option (``-t``) adds a smoothed trendline to the plot. This is
 fairly superfluous if a valid segment file is given, but could be helpful if CBS
 is not available, or if you're skeptical of the segmentation in a region.
 
+
+.. _plots-loh:
+
 loh
 ---
 
@@ -50,6 +55,9 @@ Plot allelic frequencies at each variant position in a VCF file. Divergence from
 ::
 
     cnvkit.py loh Sample.vcf
+
+
+.. _plots-diagram:
 
 diagram
 -------
@@ -64,6 +72,9 @@ probes on the right side).
     cnvkit.py diagram Sample.cnr
     cnvkit.py diagram -s Sample.cns
     cnvkit.py diagram -s Sample.cns Sample.cnr
+
+
+.. _plots-heatmap:
 
 heatmap
 -------
