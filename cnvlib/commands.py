@@ -45,70 +45,14 @@ def _cmd_batch(args):
         # Need target BED file to build a new reference
         if not args.targets:
             raise ValueError("Argument -t/--target is required.")
-
-        # To make temporary filenames for processed targets or antitargets
-        tgt_name_base, tgt_name_ext = args.targets.rsplit('.', 1)
-
-        if args.annotate or args.short_names or args.split:
-            # Pre-process baits/targets
-            new_target_fname = tgt_name_base + '.target.' + tgt_name_ext
-            do_targets(args.targets, new_target_fname,
-                       args.annotate, args.short_names, args.split,
-                       **({'avg_size': args.target_avg_size}
-                          if args.split and args.target_avg_size
-                          else {}))
-            args.targets = new_target_fname
-
-        if not args.antitargets:
-            # Build antitargets from the given targets
-            anti_kwargs = {}
-            if args.access:
-                anti_kwargs['access_bed'] = args.access
-            if args.antitarget_avg_size:
-                anti_kwargs['avg_bin_size'] = args.antitarget_avg_size
-            if args.antitarget_min_size:
-                anti_kwargs['min_bin_size'] = args.antitarget_min_size
-            anti_rows = do_antitarget(args.targets, **anti_kwargs)
-            # Devise a temporary antitarget filename
-            args.antitargets = tgt_name_base + '.antitarget.' + tgt_name_ext
-            with ngfrills.safe_write(args.antitargets, False) as anti_file:
-                i = 0
-                for i, row in enumerate(anti_rows):
-                    anti_file.write("\t".join(row) + '\n')
-                echo("Wrote", args.antitargets,
-                     "with", i + 1, "background intervals")
-
-        if len(args.normal) == 0:
-            echo("Building a flat reference...")
-            ref_probes = do_reference_flat(args.targets, args.antitargets,
-                                           args.fasta, args.male_normal)
-        else:
-            echo("Building a copy number reference from normal samples...")
-            target_fnames = []
-            antitarget_fnames = []
-            # Run coverage on all normals
-            # ENH - in parallel
-            for nbam in args.normal:
-                sample_id = core.fbase(nbam)
-                sample_pfx = os.path.join(args.output_dir, sample_id)
-                raw_tgt = do_coverage(args.targets, nbam)
-                raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
-                target_fnames.append(sample_pfx + '.targetcoverage.cnn')
-                raw_anti = do_coverage(args.antitargets, nbam)
-                raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
-                antitarget_fnames.append(sample_pfx + '.antitargetcoverage.cnn')
-            # Build reference from *.cnn
-            ref_probes = do_reference(target_fnames, antitarget_fnames,
-                                      args.fasta, args.male_normal)
-        if not args.output_reference:
-            args.output_reference = os.path.join(args.output_dir,
-                                                 "reference.cnn")
-        ngfrills.ensure_path(args.output_reference)
-        ref_probes.write(args.output_reference)
-        args.reference = args.output_reference
-
-    # If reusing an existing reference, we can extract (anti)target BEDs from it
-    if args.targets is None and args.antitargets is None:
+        # Build a copy number reference; update (anti)targets upon request
+        args.reference, args.targets, args.antitargets =  batch_make_reference(
+            args.normal, args.targets, args.antitargets, args.male_normal,
+            args.fasta, args.annotate, args.short_names, args.split,
+            args.target_avg_size, args.access, args.antitarget_avg_size,
+            args.antitarget_min_size, args.output_reference, args.output_dir)
+    elif args.targets is None and args.antitargets is None:
+        # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = CNA.read(args.reference)
         target_coords, antitarget_coords = reference.reference2regions(ref_arr)
         ref_pfx = os.path.join(args.output_dir, core.fbase(args.reference))
@@ -120,7 +64,7 @@ def _cmd_batch(args):
     if args.processes is None:
         # Serial
         for bam in args.bam_files:
-            do_batch_bam(bam, args.targets, args.antitargets,
+            batch_run_single(bam, args.targets, args.antitargets,
                          args.reference, args.output_dir)
     else:
         # Parallel
@@ -130,7 +74,7 @@ def _cmd_batch(args):
         echo("Running", args.processes, "processes")
         pool = multiprocessing.Pool(args.processes)
         for bam in args.bam_files:
-            pool.apply_async(do_batch_bam,
+            pool.apply_async(batch_run_single,
                              (bam, args.targets, args.antitargets,
                               args.reference, args.output_dir, args.male_normal,
                               args.scatter, args.diagram))
@@ -138,9 +82,77 @@ def _cmd_batch(args):
         pool.join()
 
 
-def do_batch_bam(bam_fname, target_bed, antitarget_bed, ref_fname,
-                 output_dir='.', male_normal=False, scatter=False,
-                 diagram=False):
+def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
+                         fasta, annotate, short_names, split, target_avg_size,
+                         access, antitarget_avg_size, antitarget_min_size,
+                         output_reference, output_dir):
+    """Build the CN reference from normal samples, targets and antitargets."""
+    # To make temporary filenames for processed targets or antitargets
+    tgt_name_base, tgt_name_ext = target_bed.rsplit('.', 1)
+
+    if annotate or short_names or split:
+        # Pre-process baits/targets
+        new_target_fname = tgt_name_base + '.target.' + tgt_name_ext
+        do_targets(target_bed, new_target_fname,
+                    annotate, short_names, split,
+                    **({'avg_size': target_avg_size}
+                        if split and target_avg_size
+                        else {}))
+        target_bed = new_target_fname
+
+    if not antitarget_bed:
+        # Build antitargets from the given targets
+        anti_kwargs = {}
+        if access:
+            anti_kwargs['access_bed'] = access
+        if antitarget_avg_size:
+            anti_kwargs['avg_bin_size'] = antitarget_avg_size
+        if antitarget_min_size:
+            anti_kwargs['min_bin_size'] = antitarget_min_size
+        anti_rows = do_antitarget(target_bed, **anti_kwargs)
+        # Devise a temporary antitarget filename
+        antitarget_bed = tgt_name_base + '.antitarget.' + tgt_name_ext
+        with ngfrills.safe_write(antitarget_bed, False) as anti_file:
+            i = 0
+            for i, row in enumerate(anti_rows):
+                anti_file.write("\t".join(row) + '\n')
+            echo("Wrote", antitarget_bed,
+                    "with", i + 1, "background intervals")
+
+    if len(normal_bams) == 0:
+        echo("Building a flat reference...")
+        ref_arr = do_reference_flat(target_bed, antitarget_bed, fasta,
+                                    male_normal)
+    else:
+        echo("Building a copy number reference from normal samples...")
+        target_fnames = []
+        antitarget_fnames = []
+        # Run coverage on all normals
+        # ENH - in parallel
+        for nbam in normal_bams:
+            sample_id = core.fbase(nbam)
+            sample_pfx = os.path.join(output_dir, sample_id)
+            raw_tgt = do_coverage(target_bed, nbam)
+            raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
+            target_fnames.append(sample_pfx + '.targetcoverage.cnn')
+            raw_anti = do_coverage(antitarget_bed, nbam)
+            raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
+            antitarget_fnames.append(sample_pfx + '.antitargetcoverage.cnn')
+        # Build reference from *.cnn
+        ref_arr = do_reference(target_fnames, antitarget_fnames, fasta,
+                               male_normal)
+    if not output_reference:
+        output_reference = os.path.join(output_dir, "reference.cnn")
+    ngfrills.ensure_path(output_reference)
+    ref_arr.write(output_reference)
+
+    return output_reference, target_bed, antitarget_bed
+
+
+
+def batch_run_single(bam_fname, target_bed, antitarget_bed, ref_fname,
+                     output_dir='.', male_normal=False, scatter=False,
+                     diagram=False):
     """Run the pipeline on one BAM file."""
     # TODO - return probes, segments (cnarr, segarr)
     echo("Running the CNVkit pipeline on", bam_fname, "...")

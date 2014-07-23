@@ -258,7 +258,8 @@ def split_targets(region_rows, avg_size):
     prev_chrom = None
     for chrom, start, end, name in region_rows:
         if chrom == prev_chrom and start <= prev_end:
-            ngfrills.echo("Bin overlap, updating start", start, "to", prev_end)
+            # DBG
+            # ngfrills.echo("Bin overlap, updating start", start, "to", prev_end)
             assert end > prev_end, "end=%d, prev_end=%d" % (end, prev_end)
             start = prev_end
         prev_chrom = chrom
