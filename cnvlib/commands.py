@@ -88,11 +88,13 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
                          output_reference, output_dir):
     """Build the CN reference from normal samples, targets and antitargets."""
     # To make temporary filenames for processed targets or antitargets
-    tgt_name_base, tgt_name_ext = target_bed.rsplit('.', 1)
+    tgt_name_base, tgt_name_ext = os.path.splitext(os.path.basename(target_bed))
+    if output_dir:
+        tgt_name_base = os.path.join(output_dir, tgt_name_base)
 
     if annotate or short_names or split:
         # Pre-process baits/targets
-        new_target_fname = tgt_name_base + '.target.' + tgt_name_ext
+        new_target_fname = tgt_name_base + '.target' + tgt_name_ext
         do_targets(target_bed, new_target_fname,
                     annotate, short_names, split,
                     **({'avg_size': target_avg_size}
@@ -111,7 +113,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
             anti_kwargs['min_bin_size'] = antitarget_min_size
         anti_rows = do_antitarget(target_bed, **anti_kwargs)
         # Devise a temporary antitarget filename
-        antitarget_bed = tgt_name_base + '.antitarget.' + tgt_name_ext
+        antitarget_bed = tgt_name_base + '.antitarget' + tgt_name_ext
         with ngfrills.safe_write(antitarget_bed, False) as anti_file:
             i = 0
             for i, row in enumerate(anti_rows):
