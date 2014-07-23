@@ -14,15 +14,10 @@ from itertools import groupby, islice
 from Bio.File import as_handle
 from Bio._py3k import basestring, map
 
+import pysam
+
 def echo(*words):
     print(*words, file=sys.stderr)
-
-try:
-    import pysam
-    USE_SAMTOOLS = False
-except ImportError:
-    echo("Couldn't import pysam; will rely on the samtools binary instead")
-    USE_SAMTOOLS = True
 
 
 # __________________________________________________________
@@ -383,15 +378,12 @@ def call_quiet(*args):
     return out
 
 
-def ensure_bam_index(bam_fname, use_samtools=USE_SAMTOOLS):
+def ensure_bam_index(bam_fname):
     """Ensure a BAM file is indexed, to enable fast traversal & lookup."""
     bai_fname = bam_fname + '.bai'
     if not is_newer_than(bai_fname, bam_fname):
         echo("Indexing BAM file", bam_fname)
-        if use_samtools:
-            subprocess.check_call(['samtools', 'index', bam_fname])
-        else:
-            pysam.index(bam_fname)
+        pysam.index(bam_fname)
     assert os.path.isfile(bai_fname), "Failed to generate index " + bai_fname
     return bai_fname
 
@@ -405,9 +397,6 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50):
     by_name=False: reads are sorted by position. Consecutive reads have
     increasing position.
     """
-    if USE_SAMTOOLS:
-        raise RuntimeError("pysam is needed for this function")
-
     if by_name:
         # Compare read IDs
         getter = lambda read: read.qname
@@ -428,15 +417,12 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50):
     return True
 
 
-def ensure_fasta_index(fasta_fname, use_samtools=USE_SAMTOOLS):
+def ensure_fasta_index(fasta_fname):
     """Ensure a FASTA file is indexed for samtools, to enable fast lookup."""
     fai_fname = fasta_fname + '.fai'
     if not is_newer_than(fai_fname, fasta_fname):
         echo("Indexing FASTA file", fasta_fname)
-        if use_samtools:
-            subprocess.check_call(['samtools', 'faidx', fasta_fname])
-        else:
-            pysam.faidx(fasta_fname)
+        pysam.faidx(fasta_fname)
     assert os.path.isfile(fai_fname), "Failed to generate index " + fai_fname
     return fai_fname
 
