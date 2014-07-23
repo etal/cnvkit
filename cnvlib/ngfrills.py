@@ -469,6 +469,10 @@ def safe_write(outfile, verbose=True):
     exist yet, create them.  If given a file-like object, just pass it through.
     """
     if isinstance(outfile, basestring):
+        dirname = os.path.dirname(outfile)
+        if dirname and not os.path.isdir(dirname):
+            os.mkdir(dirname)
+            echo("Created directory", dirname)
         with open(outfile, 'w') as handle:
             yield handle
     else:
