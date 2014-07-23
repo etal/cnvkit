@@ -62,8 +62,8 @@ def _cmd_batch(args):
         if not args.antitargets:
             # Build antitargets from the given targets
             anti_kwargs = {}
-            if args.regions:
-                anti_kwargs['access_bed'] = args.regions
+            if args.access:
+                anti_kwargs['access_bed'] = args.access
             if args.antitarget_avg_size:
                 anti_kwargs['avg_bin_size'] = args.antitarget_avg_size
             if args.antitarget_min_size:
@@ -209,7 +209,7 @@ P_batch_newref.add_argument('--split', action='store_true',
 P_batch_newref.add_argument('--target-avg-size', type=int,
         help="Average size of split target bins (results are approximate).")
 # For antitargets:
-P_batch_newref.add_argument('--regions',
+P_batch_newref.add_argument('-g', '--access',
         help="""Regions of accessible sequence on chromosomes (.bed), as
                 output by genome2access.py.""")
 P_batch_newref.add_argument('--antitarget-avg-size', type=int,
@@ -291,7 +291,7 @@ P_target.set_defaults(func=_cmd_target)
 
 def _cmd_antitarget(args):
     """Derive a background/antitarget BED file from a target BED file."""
-    out_rows = do_antitarget(args.interval, args.regions,
+    out_rows = do_antitarget(args.interval, args.access,
                              args.avg_size, args.min_size)
     if not args.output:
         base, ext = args.interval.rsplit('.', 1)
@@ -329,7 +329,7 @@ def do_antitarget(target_bed,
 P_anti = AP_subparsers.add_parser('antitarget', help=_cmd_antitarget.__doc__)
 P_anti.add_argument('interval',
         help="""BED or interval file listing the targeted regions.""")
-P_anti.add_argument('-r', '--regions',
+P_anti.add_argument('-g', '--access',
         help="""Regions of accessible sequence on chromosomes (.bed), as
                 output by genome2access.py.""")
 P_anti.add_argument('-a', '--avg-size', type=int, default=100000,
