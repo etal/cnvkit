@@ -49,14 +49,14 @@ def _cmd_batch(args):
         # To make temporary filenames for processed targets or antitargets
         tgt_name_base, tgt_name_ext = args.targets.rsplit('.', 1)
 
-        if (args.annotate or args.short_names or args.split):
+        if args.annotate or args.short_names or args.split:
             # Pre-process baits/targets
             new_target_fname = tgt_name_base + '.target.' + tgt_name_ext
             do_targets(args.targets, new_target_fname,
                        args.annotate, args.short_names, args.split,
-                       ({'avg_size': args.target_avg_size}
-                        if args.split and args.target_avg_size
-                        else {}))
+                       **({'avg_size': args.target_avg_size}
+                          if args.split and args.target_avg_size
+                          else {}))
             args.targets = new_target_fname
 
         if not args.antitargets:
