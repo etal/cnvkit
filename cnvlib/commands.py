@@ -5,12 +5,14 @@
 from __future__ import absolute_import, division
 import argparse
 import collections
+import multiprocessing
 import os
 import sys
 
 import numpy
 from matplotlib import pyplot
 # pyplot.ioff()
+
 
 from Bio._py3k import map, range, zip
 iteritems = (dict.iteritems if sys.version < 3
@@ -32,6 +34,27 @@ AP_subparsers = AP.add_subparsers(
 # _____________________________________________________________________________
 # Core pipeline
 
+class SerialPool(object):
+    """Mimic the multiprocessing.Pool interface, but run in serial."""
+
+    def __init__(self):
+        pass
+
+    def apply_async(self, func, args):
+        """Just call the function."""
+        func(*args)
+
+    # No-ops to mimic Pool
+    def close(self): pass
+    def join(self): pass
+
+
+def pick_pool(nprocs):
+    if nprocs == 1:
+        return SerialPool()
+    return multiprocessing.Pool(nprocs)
+
+
 # batch -----------------------------------------------------------------------
 
 def _cmd_batch(args):
@@ -40,6 +63,9 @@ def _cmd_batch(args):
     if not ((args.normal is not None) ^ bool(args.reference)):
         raise ValueError("One of the arguments -n/--normal or -r/--reference "
                          "is required.")
+
+    if args.processes < 1:
+        args.processes = multiprocessing.cpu_count()
 
     if not args.reference:
         # Need target BED file to build a new reference
@@ -50,7 +76,8 @@ def _cmd_batch(args):
             args.normal, args.targets, args.antitargets, args.male_normal,
             args.fasta, args.annotate, args.short_names, args.split,
             args.target_avg_size, args.access, args.antitarget_avg_size,
-            args.antitarget_min_size, args.output_reference, args.output_dir)
+            args.antitarget_min_size, args.output_reference, args.output_dir,
+            args.processes)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = CNA.read(args.reference)
@@ -61,31 +88,24 @@ def _cmd_batch(args):
         core.write_tsv(args.targets, target_coords)
         core.write_tsv(args.antitargets, antitarget_coords)
 
-    if args.processes is None:
-        # Serial
-        for bam in args.bam_files:
-            batch_run_single(bam, args.targets, args.antitargets,
-                         args.reference, args.output_dir)
-    else:
-        # Parallel
-        import multiprocessing
-        if args.processes < 1:
-            args.processes = multiprocessing.cpu_count()
-        echo("Running", args.processes, "processes")
-        pool = multiprocessing.Pool(args.processes)
-        for bam in args.bam_files:
-            pool.apply_async(batch_run_single,
-                             (bam, args.targets, args.antitargets,
-                              args.reference, args.output_dir, args.male_normal,
-                              args.scatter, args.diagram))
-        pool.close()
-        pool.join()
+    echo("Running", len(args.bam_files), "samples in",
+         (("%d processes" % args.processes)
+          if args.processes > 1 else "serial"))
+
+    pool = pick_pool(args.processes)
+    for bam in args.bam_files:
+        pool.apply_async(batch_run_sample,
+                        (bam, args.targets, args.antitargets, args.reference,
+                        args.output_dir, args.male_normal, args.scatter,
+                        args.diagram))
+    pool.close()
+    pool.join()
 
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
                          fasta, annotate, short_names, split, target_avg_size,
                          access, antitarget_avg_size, antitarget_min_size,
-                         output_reference, output_dir):
+                         output_reference, output_dir, processes):
     """Build the CN reference from normal samples, targets and antitargets."""
     # To make temporary filenames for processed targets or antitargets
     tgt_name_base, tgt_name_ext = os.path.splitext(os.path.basename(target_bed))
@@ -130,16 +150,20 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
         target_fnames = []
         antitarget_fnames = []
         # Run coverage on all normals
-        # ENH - in parallel
+        pool = pick_pool(processes)
         for nbam in normal_bams:
             sample_id = core.fbase(nbam)
             sample_pfx = os.path.join(output_dir, sample_id)
-            raw_tgt = do_coverage(target_bed, nbam)
-            raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
-            target_fnames.append(sample_pfx + '.targetcoverage.cnn')
-            raw_anti = do_coverage(antitarget_bed, nbam)
-            raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
-            antitarget_fnames.append(sample_pfx + '.antitargetcoverage.cnn')
+            tgt_fname = sample_pfx + '.targetcoverage.cnn'
+            pool.apply_async(batch_write_coverage,
+                             (target_bed, nbam, tgt_fname))
+            target_fnames.append(tgt_fname)
+            anti_fname = sample_pfx + '.antitargetcoverage.cnn'
+            pool.apply_async(batch_write_coverage,
+                             (antitarget_bed, nbam, anti_fname))
+            antitarget_fnames.append(anti_fname)
+        pool.close()
+        pool.join()
         # Build reference from *.cnn
         ref_arr = do_reference(target_fnames, antitarget_fnames, fasta,
                                male_normal)
@@ -151,14 +175,18 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
     return output_reference, target_bed, antitarget_bed
 
 
+def batch_write_coverage(bed_fname, bam_fname, out_fname):
+    """Run coverage on one sample, write to file."""
+    cnarr = do_coverage(bed_fname, bam_fname)
+    cnarr.write(out_fname)
 
-def batch_run_single(bam_fname, target_bed, antitarget_bed, ref_fname,
-                     output_dir='.', male_normal=False, scatter=False,
+
+def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
+                     output_dir, male_normal=False, scatter=False,
                      diagram=False):
     """Run the pipeline on one BAM file."""
-    # TODO - return probes, segments (cnarr, segarr)
+    # ENH - return probes, segments (cnarr, segarr)
     echo("Running the CNVkit pipeline on", bam_fname, "...")
-
     sample_id = core.fbase(bam_fname)
     sample_pfx = os.path.join(output_dir, sample_id)
 
@@ -168,22 +196,22 @@ def batch_run_single(bam_fname, target_bed, antitarget_bed, ref_fname,
     raw_anti = do_coverage(antitarget_bed, bam_fname)
     raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
 
-    probes = do_fix(raw_tgt, raw_anti, CNA.read(ref_fname))
-    probes.write(sample_pfx + '.cnr')
+    cnarr = do_fix(raw_tgt, raw_anti, CNA.read(ref_fname))
+    cnarr.write(sample_pfx + '.cnr')
 
     echo("Segmenting", sample_pfx + '.cnr ...')
     segments = segmentation.do_segmentation(sample_pfx + '.cnr', False, 'cbs')
     segments.write(sample_pfx + '.cns')
 
     if scatter:
-        do_scatter(probes, segments)
+        do_scatter(cnarr, segments)
         pyplot.savefig(sample_pfx + '-scatter.pdf', format='pdf', bbox_inches=0)
         echo("Wrote", sample_pfx + '-scatter.pdf')
 
     if diagram:
         from cnvlib import diagram
         outfname = sample_pfx + '-diagram.pdf'
-        diagram.create_diagram(probes, segments, 0.6, outfname, male_normal)
+        diagram.create_diagram(cnarr, segments, 0.6, outfname, male_normal)
         echo("Wrote", outfname)
 
 
@@ -193,7 +221,7 @@ P_batch.add_argument('bam_files', nargs='+',
 P_batch.add_argument('-y', '--male-normal', action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
                 log-CNR of chrX; otherwise male samples would have -1 chrX).""")
-P_batch.add_argument('-p', '--processes', type=int,
+P_batch.add_argument('-p', '--processes', type=int, default=1,
         help="""Number of subprocesses used to running each of the BAM files in
                 parallel. Give 0 or a negative value to use the maximum number
                 of available CPUs. Default: process each BAM in serial.""")

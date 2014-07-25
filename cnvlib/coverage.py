@@ -41,10 +41,12 @@ def interval_coverages_count(bed_fname, bam_fname):
          % (tot_time,
             int(round(tot_reads / tot_time, 0)),
             int(round(len(all_counts) / tot_time, 0))))
-    echo("Summary of counts:",
-         "\n\tbins=%d, total reads=%d" % (len(all_counts), tot_reads),
-         "\n\tmean=%.4f min=%s max=%s" % (tot_reads / len(all_counts),
-                                          min(all_counts), max(all_counts)))
+    echo("Summary:",
+         "#bins=%d," % len(all_counts),
+         "#reads=%d," % tot_reads,
+         "mean=%.4f," % tot_reads / len(all_counts),
+         "min=%s," % min(all_counts),
+         "max=%s" % max(all_counts))
     tot_mapped_reads = bam_total_reads(bam_fname)
     if tot_mapped_reads:
         echo("On-target percentage: %.3f (of %d mapped)"
@@ -90,10 +92,13 @@ def interval_coverages_pileup(bed_fname, bam_fname):
          % (tot_time,
             int(round(tot_reads / tot_time, 0)),
             int(round(len(all_counts) / tot_time, 0))))
-    echo("Summary of counts:",
-         "\n\tbins=%d, total reads=%d" % (len(all_counts), tot_reads),
-         "\n\tmean=%.4f min=%s max=%s" % (tot_reads / len(all_counts),
-                                          min(all_counts), max(all_counts)))
+    echo("Summary:",
+         "#bins=%d," % len(all_counts),
+         "#reads=%d," % tot_reads,
+         "mean=%.4f," % tot_reads / len(all_counts),
+         "min=%s," % min(all_counts),
+         "max=%s" % max(all_counts))
+
     tot_mapped_reads = bam_total_reads(bam_fname)
     if tot_mapped_reads:
         echo("On-target percentage: %.3f (of %d mapped)"
