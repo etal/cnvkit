@@ -259,13 +259,13 @@ def _cmd_target(args):
                args.annotate, args.short_names, args.split, args.avg_size)
 
 
-def do_targets(bed_fname, out_fname, do_annotate=False, do_short_names=False,
+def do_targets(bed_fname, out_fname, annotate=None, do_short_names=False,
                do_split=False, avg_size=200/.75):
     """Transform bait intervals into targets more suitable for CNVkit."""
-    bed_rows = ngfrills.parse_regions(bed_fname, bool(do_annotate))
-    if do_annotate:
+    bed_rows = ngfrills.parse_regions(bed_fname, bool(annotate))
+    if annotate:
         ngfrills.echo("Applying annotations as target names")
-        bed_rows = target.add_refflat_names(bed_rows, do_annotate)
+        bed_rows = target.add_refflat_names(bed_rows, annotate)
     if do_short_names:
         ngfrills.echo("Shortening interval labels")
         bed_rows = target.shorten_labels(bed_rows)

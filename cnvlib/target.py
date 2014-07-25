@@ -20,6 +20,9 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
     """
     ref_exons = read_refflat(refflat_fname)
     for chrom, chr_rows in groupby(region_rows, lambda row: row[0]):
+        if chrom not in ref_exons:
+            ngfrills.echo("Chromosome", chrom, "not in annotations")
+            continue
         exons_in_chrom = iter(ref_exons[chrom])
         ex_start, ex_end, ex_name = next(exons_in_chrom)
         for row in chr_rows:
