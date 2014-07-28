@@ -15,40 +15,6 @@ def add_refflat_names(region_rows, refflat_fname):
     return cover_introns(assign_names(region_rows, refflat_fname))
 
 
-def assign_names(region_rows, refflat_fname, default_name='-'):
-    """Replace the interval gene names with those at the same loc in refFlat.txt
-    """
-    ref_exons = read_refflat(refflat_fname)
-    for chrom, chr_rows in groupby(region_rows, lambda row: row[0]):
-        if chrom not in ref_exons:
-            ngfrills.echo("Chromosome", chrom, "not in annotations")
-            continue
-        exons_in_chrom = iter(ref_exons[chrom])
-        ex_start, ex_end, ex_name = next(exons_in_chrom)
-        for row in chr_rows:
-            start, end = row[1:3]
-            if ex_end < start:
-                # Burn through exons until hitting or passing the interval
-                while ex_end < start:
-                    try:
-                        ex_start, ex_end, ex_name = next(exons_in_chrom)
-                    except StopIteration:
-                        # Interval is past the last annotated gene in chromosome
-                        ngfrills.echo("Interval %s:%d-%d unannotated in refFlat"
-                                      % (chrom, start, end))
-                        # Fake it...
-                        ex_start, ex_end = end + 1, end + 2
-                        ex_name = default_name
-
-            if ex_start > end:
-                # Interval is an unannotated intergenic region (we skipped it)
-                yield (chrom, start, end, default_name)
-            else:
-                assert ex_end > start or ex_start < end
-                # Overlap: Use this exon's name and emit the interval
-                yield (chrom, start, end, ex_name)
-
-
 def cover_introns(regions):
     """Apply the name of the surrounding gene to intronic targets.
 
@@ -90,20 +56,56 @@ def cover_introns(regions):
         yield row
 
 
-def read_refflat(fname):
-    """Parse genes/exons; merge those with same name and overlapping regions.
-
-    Returns a dict of: {chrom: [(exon start, exon end, gene name), ...]}
+def assign_names(region_rows, refflat_fname, default_name='-'):
+    """Replace the interval gene names with those at the same loc in refFlat.txt
     """
-    exondict = collections.defaultdict(list)
+    ref_genes = read_refflat_genes(refflat_fname)
+    for chrom, chr_rows in groupby(region_rows, lambda row: row[0]):
+        if chrom not in ref_genes:
+            ngfrills.echo("Chromosome", chrom, "not in annotations")
+            continue
+        genes_in_chrom = iter(ref_genes[chrom])
+        ex_start, ex_end, ex_name = next(genes_in_chrom)
+        for row in chr_rows:
+            start, end = row[1:3]
+            if ex_end < start:
+                # Burn through genes until hitting or passing the interval
+                while ex_end < start:
+                    try:
+                        ex_start, ex_end, ex_name = next(genes_in_chrom)
+                    except StopIteration:
+                        # Interval is past the last annotated gene in chromosome
+                        ngfrills.echo("Interval %s:%d-%d unannotated in refFlat"
+                                      % (chrom, start, end))
+                        # Fake it...
+                        ex_start, ex_end = end + 1, end + 2
+                        ex_name = default_name
+
+            if ex_start > end:
+                # Interval is an unannotated intergenic region (we skipped it)
+                yield (chrom, start, end, default_name)
+            else:
+                assert ex_end > start or ex_start < end
+                # Overlap: Use this gene's name and emit the interval
+                yield (chrom, start, end, ex_name)
+
+
+def read_refflat_genes(fname):
+    """Parse genes; merge those with same name and overlapping regions.
+
+    Returns a dict of: {chrom: [(gene start, gene end, gene name), ...]}
+    """
+    genedict = collections.defaultdict(list)
     with open(fname) as genefile:
         for line in genefile:
-            name, _refseq, chrom, _start, _end, exons = parse_refflat_line(line)
-            for start, end in exons:
-                exondict[name].append((chrom, start, end))
+            name, _refseq, chrom, start, end, _exons = parse_refflat_line(line)
+            # Skip antisense RNA annotations
+            if name.endswith('-AS1'):
+                continue
+            genedict[name].append((chrom, start, end))
 
     chromdict = collections.defaultdict(list)
-    for name, locs in exondict.iteritems():
+    for name, locs in genedict.iteritems():
         locs = list(set(locs))
         if len(locs) == 1:
             chrom, start, end = locs[0]
@@ -126,7 +128,7 @@ def read_refflat(fname):
                 else:
                     curr_start = min(start, curr_start)
                     curr_end = max(end, curr_end)
-            # Emit the final gene/exon in this group
+            # Emit the final interval in this group
             chromdict[curr_chrom[:-1]].append((curr_start, curr_end, name))
 
     # Finally, sort the keys, and return the results
