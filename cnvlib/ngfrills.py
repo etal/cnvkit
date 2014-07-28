@@ -5,6 +5,7 @@ import contextlib
 import functools
 import math
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -44,14 +45,16 @@ def sniff_region_format(fname):
         line = handle.readline()
     if '\t' not in line and ':' in line and '-' in line:
         return 'text'
-    if line.startswith('@') or '\t+\t' in line:
+    if line.startswith('@') or re.match('\w+\t\d+\t\d+\t(\+|-|\.)\t\w+', line):
+        echo("Sniffed interval")
         return 'interval'
     if line.startswith('track') or line.count('\t') > 1:
+        echo("Sniffed BED")
         return 'bed'
     raise ValueError("WTF format is this?: %s" % line)
 
 
-def parse_regions(fname, coord_only=False):
+def parse_regions(fname, coord_only=False, keep_strand=False):
     """Parse regions in any of the expected file formats.
 
     Iterates over tuples of the tabular contents. Header lines are skipped.
@@ -66,7 +69,7 @@ def parse_regions(fname, coord_only=False):
               'interval': parse_interval_list,
               'bed': parse_bed,
              }[fmt]
-    return parser(fname, coord_only)
+    return parser(fname, coord_only, keep_strand)
 
 
 def report_bad_line(line_parser):
@@ -79,7 +82,7 @@ def report_bad_line(line_parser):
     return wrapper
 
 
-def parse_text_coords(fname, coord_only):
+def parse_text_coords(fname, coord_only, keep_strand):
     """Parse text coordinates: chrom:start-end
 
     Text coordinates are assumed to be counting from 1.
@@ -111,7 +114,7 @@ def parse_text_coords(fname, coord_only):
             yield _parse_line(line)
 
 
-def parse_interval_list(fname, coord_only):
+def parse_interval_list(fname, coord_only, keep_strand):
     """Parse a Picard-compatible interval list.
 
     Expected tabular columns:
@@ -120,10 +123,26 @@ def parse_interval_list(fname, coord_only):
     Counting is from 1.
     """
     if coord_only:
+        if keep_strand:
+            @report_bad_line
+            def _parse_line(line):
+                chrom, start, end, strand = line.split('\t')[:4]
+                return chrom, int(start) - 1, int(end), strand.rstrip()
+        else:
+            @report_bad_line
+            def _parse_line(line):
+                chrom, start, end = line.split('\t')[:3]
+                return chrom, int(start) - 1, int(end)
+    elif keep_strand:
         @report_bad_line
         def _parse_line(line):
-            chrom, start, end = line.split('\t')[:3]
-            return chrom, int(start) - 1, int(end)
+            fields = line.split('\t')
+            chrom, start, end, strand = fields[:4]
+            if len(fields) > 4:
+                name = fields[-1].rstrip()
+            else:
+                name = ''
+            return chrom, int(start) - 1, int(end), name, strand
     else:
         @report_bad_line
         def _parse_line(line):
@@ -143,11 +162,11 @@ def parse_interval_list(fname, coord_only):
             yield _parse_line(line)
 
 
-def parse_bed(fname, coord_only):
+def parse_bed(fname, coord_only, keep_strand):
     """Parse a BED file.
 
     A BED file has these columns:
-        chromosome, start position, end position, [name, other stuff...]
+        chromosome, start position, end position, [name, strand, other stuff...]
 
     Counting is from 0.
 
@@ -156,19 +175,33 @@ def parse_bed(fname, coord_only):
     file.
     """
     if coord_only:
+        if keep_strand:
+            @report_bad_line
+            def _parse_line(line):
+                chrom, start, end, _name, _score, strand = line.split('\t', 6)[:6]
+                return chrom, int(start), int(end), strand.rstrip()
+        else:
+            @report_bad_line
+            def _parse_line(line):
+                chrom, start, end = line.split('\t', 3)[:3]
+                return chrom, int(start), int(end)
+    elif keep_strand:
         @report_bad_line
         def _parse_line(line):
-            chrom, start, end = line.split('\t', 3)[:3]
-            return chrom, int(start), int(end)
+            fields = line.split('\t', 6)
+            chrom, start, end = fields[:3]
+            name = (fields[3].rstrip()
+                    if len(fields) >= 4 else '')
+            strand = (fields[5].rstrip()
+                      if len(fields) >= 6 else '.')
+            return chrom, int(start), int(end), name, strand
     else:
         @report_bad_line
         def _parse_line(line):
             fields = line.split('\t', 4)
             chrom, start, end = fields[:3]
-            if len(fields) > 3:
-                name = fields[3].rstrip()
-            else:
-                name = ''
+            name = (fields[3].rstrip()
+                    if len(fields) >= 4 else '')
             return chrom, int(start), int(end), name
 
     with as_handle(fname, 'rU') as handle:

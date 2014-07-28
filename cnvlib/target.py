@@ -60,11 +60,15 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
     """Replace the interval gene names with those at the same loc in refFlat.txt
     """
     ref_genes = read_refflat_genes(refflat_fname)
-    for chrom, chr_rows in groupby(region_rows, lambda row: row[0]):
-        if chrom not in ref_genes:
-            ngfrills.echo("Chromosome", chrom, "not in annotations")
+    region_rows = sorted(region_rows,
+                         key=lambda row: (row[0], row[3], row[1], row[2]))
+    for (chrom, strand), chr_rows in groupby(region_rows,
+                                             lambda row: (row[0], row[3])):
+        if (chrom, strand) not in ref_genes:
+            ngfrills.echo("Chromosome", chrom, "strand", strand,
+                          "not in annotations")
             continue
-        genes_in_chrom = iter(ref_genes[chrom])
+        genes_in_chrom = iter(ref_genes[(chrom, strand)])
         ex_start, ex_end, ex_name = next(genes_in_chrom)
         for row in chr_rows:
             start, end = row[1:3]
@@ -98,42 +102,45 @@ def read_refflat_genes(fname):
     genedict = collections.defaultdict(list)
     with open(fname) as genefile:
         for line in genefile:
-            name, _refseq, chrom, start, end, _exons = parse_refflat_line(line)
+            name, _rx, chrom, strand, start, end, _ex = parse_refflat_line(line)
             # Skip antisense RNA annotations
             if name.endswith('-AS1'):
                 continue
-            genedict[name].append((chrom, start, end))
+            genedict[name].append((chrom, strand, start, end))
 
     chromdict = collections.defaultdict(list)
     for name, locs in genedict.iteritems():
         locs = list(set(locs))
         if len(locs) == 1:
-            chrom, start, end = locs[0]
-            # Strip the strand indicator off the end of the chromosome name
-            chromdict[chrom[:-1]].append((start, end, name))
+            chrom, strand, start, end = locs[0]
+            chromdict[(chrom, strand)].append((start, end, name))
         else:
             # Check locs for overlap; merge if so
             locs.sort()
-            chroms, starts, ends = zip(*locs)
+            chroms, strands, starts, ends = zip(*locs)
             starts = map(int, starts)
             ends = map(int, ends)
-            curr_chrom, curr_start, curr_end = chroms[0], starts[0], ends[0]
-            for chrom, start, end in zip(chroms[1:], starts[1:], ends[1:]):
+            curr_chrom, curr_strand, curr_start, curr_end = (
+                chroms[0], strands[0], starts[0], ends[0])
+            for chrom, strand, start, end in zip(chroms[1:], strands[1:],
+                                                 starts[1:], ends[1:]):
                 if (chrom != curr_chrom or
+                    strand != curr_strand or
                     start > curr_end + 1 or
                     end < curr_start - 1):
-                    chromdict[curr_chrom[:-1]].append(
+                    chromdict[(curr_chrom, curr_strand)].append(
                         (curr_start, curr_end, name))
                     curr_chrom, curr_start, curr_end = chrom, start, end
                 else:
                     curr_start = min(start, curr_start)
                     curr_end = max(end, curr_end)
             # Emit the final interval in this group
-            chromdict[curr_chrom[:-1]].append((curr_start, curr_end, name))
+            chromdict[(curr_chrom, curr_strand)].append(
+                (curr_start, curr_end, name))
 
     # Finally, sort the keys, and return the results
-    for chrom in list(chromdict.keys()):
-        chromdict[chrom].sort()
+    for key in list(chromdict.keys()):
+        chromdict[key].sort()
     return chromdict
 
 
@@ -153,7 +160,7 @@ def parse_refflat_line(line):
     assert len(exons) == int(exon_count), (
         "Exon count mismatch at %s: file says %s, but counted %d intervals"
         % (name, exon_count, len(exons)))
-    return name, refseq, chrom + strand, int(start), int(end), exons
+    return name, refseq, chrom, strand, int(start), int(end), exons
 
 
 # _____________________________________________________________________________

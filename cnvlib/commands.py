@@ -290,7 +290,8 @@ def _cmd_target(args):
 def do_targets(bed_fname, out_fname, annotate=None, do_short_names=False,
                do_split=False, avg_size=200/.75):
     """Transform bait intervals into targets more suitable for CNVkit."""
-    bed_rows = ngfrills.parse_regions(bed_fname, bool(annotate))
+    bed_rows = ngfrills.parse_regions(bed_fname, bool(annotate),
+                                      keep_strand=bool(annotate))
     if annotate:
         ngfrills.echo("Applying annotations as target names")
         bed_rows = target.add_refflat_names(bed_rows, annotate)
