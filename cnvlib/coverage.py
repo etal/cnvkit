@@ -44,7 +44,7 @@ def interval_coverages_count(bed_fname, bam_fname):
     echo("Summary:",
          "#bins=%d," % len(all_counts),
          "#reads=%d," % tot_reads,
-         "mean=%.4f," % tot_reads / len(all_counts),
+         "mean=%.4f," % (tot_reads / len(all_counts)),
          "min=%s," % min(all_counts),
          "max=%s" % max(all_counts))
     tot_mapped_reads = bam_total_reads(bam_fname)
@@ -95,7 +95,7 @@ def interval_coverages_pileup(bed_fname, bam_fname):
     echo("Summary:",
          "#bins=%d," % len(all_counts),
          "#reads=%d," % tot_reads,
-         "mean=%.4f," % tot_reads / len(all_counts),
+         "mean=%.4f," % (tot_reads / len(all_counts)),
          "min=%s," % min(all_counts),
          "max=%s" % max(all_counts))
 
