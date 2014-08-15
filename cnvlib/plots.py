@@ -86,7 +86,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
     axis.axhline(color='k')
     axis.set_xlim(max(0, min(x)), max(x))
     axis.set_ylim(limit(min(y) - .1, -5.0, -.3),
-                  limit(max(y) + (.25 if genes else .1), .3, 5.0))
+                  max(max(y) + (.25 if genes else .1), .3))
     axis.set_ylabel("Copy ratio (log2)")
     axis.set_title("%s %s" % (sample, chromosome))
     axis.tick_params(which='both', direction='out')
