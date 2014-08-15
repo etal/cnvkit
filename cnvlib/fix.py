@@ -218,7 +218,7 @@ def apply_weights(cnarr, ref_arr, min_weight=1e-5):
     """
     ref_matched = match_ref_to_probes(ref_arr, cnarr)
     # Weight is proportional to variance, 0--1
-    variances = ref_matched['spread'] #** 2
+    variances = ref_matched['spread'] ** 2
     max_variance = variances.max()
     if max_variance == 0:
         weights = numpy.ones_like(variances)
