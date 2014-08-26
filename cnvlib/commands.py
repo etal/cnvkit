@@ -26,7 +26,7 @@ from .cnarray import CopyNumArray as CNA
 
 
 AP = argparse.ArgumentParser(description=__doc__,
-        epilog="Contact Eric Talevich <etalevich@derm.ucsf.edu> for help.")
+        epilog="Contact Eric Talevich <eric.talevich@ucsf.edu> for help.")
 AP_subparsers = AP.add_subparsers(
         help="Sub-commands (use with -h for more info)")
 
