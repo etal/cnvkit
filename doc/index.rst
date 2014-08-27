@@ -2,7 +2,7 @@ CNVkit: Copy number from targeted DNA sequencing
 ================================================
 
 :Author: Eric Talevich
-:Contact: etalevich@derm.ucsf.edu
+:Contact: eric.talevich@ucsf.edu
 :Source code: http://github.com/etal/cnvkit
 :License: BSD
 

@@ -26,11 +26,11 @@ DIR = (dirname(__file__) or '.') + '/'
 
 setup_args.update(
     name='CNVkit',
-    version='0.1',
+    version='0.1-dev',
     description=__doc__,
     author='Eric Talevich',
-    author_email='etalevich@derm.ucsf.edu',
-    url='http://bitbucket.org/etal/ucsf',
+    author_email='eric.talevich@ucsf.edu',
+    url='http://github.com/etal/cnvkit',
     packages=['cnvlib', 'cnvlib.segmentation'],
     scripts=[DIR + 'cnvkit.py'] + glob(DIR + 'scripts/*.py'),
 )
