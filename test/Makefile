@@ -21,41 +21,9 @@ picard_targets= build/reference-picard.cnn $(picard_cnrs) $(picard_segs) \
 
 
 # ------------------------------------------------------------------------------
-# Targeted resequencing samples ("TR")
-
-tr_tcnn=$(wildcard targeted/TR*.targetcoverage.cnn)
-tr_cnrs=$(patsubst targeted/%.targetcoverage.cnn,build/%.cnr,$(tr_tcnn))
-tr_segs=$(tr_cnrs:.cnr=.cns)
-
-# Pooled reference (normal samples)
-tr_ref_cnns=$(wildcard targeted/TR_*_N.*.cnn)
-
-
-# ------------------------------------------------------------------------------
-# Exome samples ("EX")
-
-ex_tcnn=$(wildcard exome/EX*.targetcoverage.cnn)
-ex_cnrs=$(patsubst exome/%.targetcoverage.cnn,build/%.cnr,$(ex_tcnn))
-ex_segs=$(ex_cnrs:.cnr=.cns)
-
-# Reference: normal male samples
-ex_ref_cnns=$(wildcard exome/EX_*_N.*.cnn)
-
-
-# ------------------------------------------------------------------------------
 #  Action!
 
-.PHONY: picard
-picard: $(picard_targets) p2-5_5-metrics.txt p2-9_2-metrics.txt p2-20-metrics.csv
-
-.PHONY: tr
-tr: heatmap-tr.pdf tr-metrics.csv
-
-.PHONY: ex
-ex: $(ex_segs) ex-metrics.csv heatmap-exome.pdf
-
-
-all: picard tr ex
+all: $(picard_targets) p2-5_5-metrics.txt p2-9_2-metrics.txt p2-20-metrics.csv
 
 
 .PHONY: clean
@@ -63,14 +31,6 @@ clean:
 	# Picard
 	rm -rf build/p*targetcoverage.cnn $(picard_targets) p*-scatter.pdf p*-diagram.pdf
 
-.PHONY: allclean
-allclean:
-	# Picard
-	rm -rf build/p*targetcoverage.cnn $(picard_targets) p*-scatter.pdf p*-diagram.pdf
-	# Targeted
-	rm -vf build/TR_* heatmap-tr.pdf
-	# Exome
-	rm -vf build/EX_* heatmap-exome.pdf
 
 # ------------------------------------------------------------------------------
 # Standard workflow
@@ -80,14 +40,6 @@ allclean:
 build/reference-picard.cnn: $(picard_normals)
 	$(cnvkit) import-picard $^ -d build/
 	$(cnvkit) reference build/p2-*_5.*targetcoverage.cnn -o $@
-
-# * Non-picard references: uncomment to rebuild, but need hg19 FASTA genome
-
-# reference-tr.cnn: $(tr_ref_cnns)
-#         $(cnvkit) reference $^ -f /db/ucsc.hg19.fasta -y -o $@
-
-# reference-exome.cnn: $(ex_ref_cnns)
-#         $(cnvkit) reference $^ -f /db/hg19-nochr.fa -y -o $@
 
 
 # == Import Picard files (including GC values, used in the reference)
@@ -101,39 +53,17 @@ $(picard_tumor_cnns): build/%.cnn: picard/%.csv
 $(picard_cnrs): %.cnr: %.targetcoverage.cnn %.antitargetcoverage.cnn build/reference-picard.cnn
 	$(cnvkit) fix $^ -o $@
 
-$(tr_cnrs): build/%.cnr: targeted/%.targetcoverage.cnn targeted/%.antitargetcoverage.cnn reference-tr.cnn
-	$(cnvkit) fix $^ -o $@
-
-$(ex_cnrs): build/%.cnr: exome/%.targetcoverage.cnn exome/%.antitargetcoverage.cnn reference-exome.cnn
-	$(cnvkit) fix $^ -o $@
-
-$(picard_segs) $(tr_segs) $(ex_segs): %.cns: %.cnr
+$(picard_segs): %.cns: %.cnr
 	$(cnvkit) segment $< -o $@
-
-
-# == Results
-
-heatmap-picard.pdf: $(picard_segs)
-	$(cnvkit) heatmap -d $^ -o $@
-
-heatmap-tr.pdf: $(tr_segs)
-	$(cnvkit) heatmap -d $^ -o $@
-
-heatmap-exome.pdf: $(ex_segs)
-	$(cnvkit) heatmap -d -o $@ $^
-
-
-tr-metrics.csv: $(tr_segs)
-	$(cnvkit) metrics $(tr_cnrs) -s $^ -o $@
-
-ex-metrics.csv: $(ex_segs)
-	$(cnvkit) metrics $(ex_cnrs) -s $^ -o $@
 
 
 # ------------------------------------------------------------------------------
 # Demo other features with Picard outputs
 
-# == Plot coverages with CBS calls ==
+heatmap-picard.pdf: $(picard_segs)
+	$(cnvkit) heatmap $^ -o $@
+
+# == Plot coverages with segmentation calls ==
 
 all-scatters.pdf: p2-5_5-scatter.pdf p2-9_2-scatter.pdf p2-9_2-chr1-scatter.pdf p2-9_2-chr9p-scatter.pdf p2-9_2-SMARCA2-PTPRD-scatter.pdf
 	which pdfunite && pdfunite $^ $@ || touch $@

@@ -13,8 +13,6 @@ from cnvlib import (antitarget, commands, core, coverage, diagram, export, fix,
                     importers, metrics, ngfrills, params, plots, cnarray,
                     reference, reports, segmentation, smoothing)
 
-EX_CNN_T = 'targeted/TR_37_T.targetcoverage.cnn'
-EX_CNN_A = 'targeted/TR_37_T.antitargetcoverage.cnn'
 EX_CNR = 'reference-tr.cnn'
 
 
