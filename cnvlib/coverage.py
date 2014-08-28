@@ -116,7 +116,10 @@ def bedcov(bed_fname, bam_fname):
     lines = pysam.bedcov(bed_fname, bam_fname, '-Q', '1')
     # Return an iterable...
     for line in lines:
-        chrom, start_s, end_s, name, basecount_s = line.split()
+        try:
+            chrom, start_s, end_s, name, basecount_s = line.split()
+        except:
+            raise RuntimeError("Bad line from bedcov:\n" + line)
         start, end, basecount = map(int, (start_s, end_s, basecount_s))
         span = end - start
         # Algebra from above

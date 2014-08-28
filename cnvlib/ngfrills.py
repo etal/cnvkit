@@ -45,7 +45,7 @@ def sniff_region_format(fname):
         line = handle.readline()
     if '\t' not in line and ':' in line and '-' in line:
         return 'text'
-    if line.startswith('@') or re.match('\w+\t\d+\t\d+\t(\+|-|\.)\t\w+', line):
+    if line.startswith('@') or re.match('\w+\t\d+\t\d+\t(\+|-|\.)\t\S+', line):
         echo("Sniffed interval")
         return 'interval'
     if line.startswith('track') or line.count('\t') > 1:
