@@ -77,9 +77,36 @@ def dedupe_regions(regions):
             # Emit the final gene/exon in this group
             yield (curr_chrom[:-1], curr_start, curr_end, name)
 
+def merge_rows(rows):
+    """Where rows overlap, merge the regions and gene names."""
+    rows = iter(rows)
+    prev_chrom, prev_start, prev_end, prev_name = next(rows)
+
+    for chrom, start, end, name in rows:
+        # No overlap.
+        if (chrom != prev_chrom) or (start >= prev_end):
+            yield (prev_chrom, prev_start, prev_end, prev_name)
+            # out_row = (chrom, start, end, name)
+            prev_chrom, prev_start, prev_end, prev_name = \
+                    (chrom, start, end, name)
+            continue
+
+        # Some overlap. Adjust prev_ values accordingly.
+        # Known: chrom == prev_chrom; start <= prev_end
+        assert prev_start <= start, (
+            "Botched overlap: %s %s:%s-%s vs. prev. %s %s:%s-%d"
+            % (name, chrom, start, end,
+               prev_name, prev_chrom, prev_start, prev_end))
+        prev_end = max(prev_end, end)
+        if name not in prev_name.split('|'):
+            prev_name += '|' + name
+
+    # Remainder
+    yield (prev_chrom, prev_start, prev_end, prev_name)
+
 
 def key_genomic_position(row):
-    """Turn genomic position into a sort key: (chrom_key, start_posn)
+    """Turn genomic position into a sort key: (chrom_key, end_posn)
 
     Input rows are BED-like: (chrom, start, end, name)
     """
@@ -92,12 +119,17 @@ if __name__ == '__main__':
     AP.add_argument('genes', help="refFlat.txt")
     AP.add_argument('-e', '--exons', action='store_true',
                     help="Emit each exon, not just the genes.")
+    AP.add_argument('-m', '--merge', action='store_true',
+                    help="Merge overlapping regions with different names.")
     args = AP.parse_args()
 
     if args.exons:
         regions = load_exons(args.genes)
     else:
         regions = load_genes(args.genes)
-    for row in sorted(dedupe_regions(regions), key=key_genomic_position):
+    out_rows = sorted(dedupe_regions(regions), key=key_genomic_position)
+    if args.merge:
+        out_rows = merge_rows(out_rows)
+    for row in out_rows:
         print('\t'.join(map(str, row)))
 
