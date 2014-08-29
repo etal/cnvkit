@@ -3,7 +3,7 @@ from __future__ import division, absolute_import
 import collections
 from itertools import groupby
 
-from . import ngfrills
+from .ngfrills import echo
 
 
 # _____________________________________________________________________________
@@ -65,8 +65,7 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
     for (chrom, strand), chr_rows in groupby(region_rows,
                                              lambda row: (row[0], row[3])):
         if (chrom, strand) not in ref_genes:
-            ngfrills.echo("Chromosome", chrom, "strand", strand,
-                          "not in annotations")
+            echo("Chromosome", chrom, "strand", strand, "not in annotations")
             continue
         genes_in_chrom = iter(ref_genes[(chrom, strand)])
         ex_start, ex_end, ex_name = next(genes_in_chrom)
@@ -79,8 +78,8 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
                         ex_start, ex_end, ex_name = next(genes_in_chrom)
                     except StopIteration:
                         # Interval is past the last annotated gene in chromosome
-                        ngfrills.echo("Interval %s:%d-%d unannotated in refFlat"
-                                      % (chrom, start, end))
+                        echo("Interval %s:%d-%d unannotated in refFlat"
+                             % (chrom, start, end))
                         # Fake it...
                         ex_start, ex_end = end + 1, end + 2
                         ex_name = default_name
@@ -216,7 +215,7 @@ def shorten_labels(interval_rows):
         yield out_row
         longest_name_len = max(longest_name_len, len(out_row[-1]))
 
-    ngfrills.echo("Longest name length:", longest_name_len)
+    echo("Longest name length:", longest_name_len)
 
 
 def filter_names(names, exclude=('mRNA',)):
@@ -266,19 +265,30 @@ def split_targets(region_rows, avg_size):
 
     Bin the regions according to avg_size.
     """
-    prev_end = -1
     prev_chrom = None
+    prev_start = None
+    prev_end = -1
     for chrom, start, end, name in region_rows:
+        if (chrom, start, end) == (prev_chrom, prev_start, prev_end):
+            # Skip duplicate regions, even if names differ
+            # ENH - Update the name?
+            echo("Duplicate row", name, "%s:%d-%d" % (chrom, start, end))
+            continue
         if chrom == prev_chrom and start <= prev_end:
-            # DBG
-            # ngfrills.echo("Bin overlap, updating start", start, "to", prev_end)
-            assert end > prev_end, "end=%d, prev_end=%d" % (end, prev_end)
-            start = prev_end
+            if end > prev_end:
+                # Partial overlap: already handled the initial part of this bin
+                start = prev_end
+            else:
+                # Complete overlap: nothing to do on this bin
+                echo("Bin", name, ("%s:%s-%s" % (chrom, start, end)),
+                     "fully covered by previous bin",
+                     ("%s:%s-%s" % (prev_chrom, prev_start, prev_end)))
+                continue
         prev_chrom = chrom
+        prev_start = start
         span = end - start
         if span >= avg_size * 1.5:
-            ngfrills.echo("Splitting:", name.ljust(15),
-                          str(end - start + 1).rjust(6))
+            echo("Splitting:", name.ljust(15), str(end - start + 1).rjust(6))
             # Divide the background region into equal-sized bins
             nbins = round(span / avg_size) or 1
             bin_size = span / nbins
