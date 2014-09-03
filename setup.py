@@ -12,8 +12,8 @@ try:
     # Dependencies for easy_install and pip:
     setup_args.update(
         install_requires=[
-            'numpy >= 1.5',
-            'matplotlib >= 1.2',
+            'numpy >= 1.6',
+            'matplotlib >= 1.1',
             'pysam >= 0.8',
             'reportlab >= 2.5',
             'biopython >= 1.62',
