@@ -1004,17 +1004,17 @@ def _cmd_breaks(args):
     """List the targeted genes in which a copy number breakpoint occurs."""
     pset_cvg = CNA.read(args.filename)
     pset_seg = CNA.read(args.segment)
-    bpoints = do_breaks(pset_cvg, pset_seg)
+    bpoints = do_breaks(pset_cvg, pset_seg, args.min_probes)
     echo("Found", len(bpoints), "gene breakpoints")
     core.write_tsv(args.output, bpoints,
                    colnames=['Gene', 'Chrom.', 'Location', 'Change',
                              'ProbesLeft', 'ProbesRight'])
 
 
-def do_breaks(probes, segments):
+def do_breaks(probes, segments, min_probes=1):
     """List the targeted genes in which a copy number breakpoint occurs."""
     intervals = reports.get_gene_intervals(probes)
-    bpoints = reports.get_breakpoints(intervals, segments)
+    bpoints = reports.get_breakpoints(intervals, segments, min_probes)
     return bpoints
 
 
@@ -1024,6 +1024,9 @@ P_breaks.add_argument('filename',
                 of the 'fix' sub-command.""")
 P_breaks.add_argument('segment',
         help="Segmentation calls (.cns), the output of the 'segment' command).")
+P_breaks.add_argument('-m', '--min-probes', type=int, default=1,
+        help="""Minimum number of within-gene probes on both sides of a
+                breakpoint to report it.""")
 P_breaks.add_argument('-o', '--output',
         help="Output table file name.")
 P_breaks.set_defaults(func=_cmd_breaks)
