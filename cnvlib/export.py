@@ -104,7 +104,7 @@ def export_nexus_basic(sample_fname):
     Only represents one sample per file.
     """
     cnarr = CNA.read(sample_fname)
-    outheader = ['probe', 'log2', 'chromosome', 'start', 'end', 'gene']
+    outheader = ['probe', 'chromosome', 'start', 'end', 'gene', 'log2']
     outrows = [[row2label(row)] + list(row)[:5] for row in cnarr.data]
     return outheader, outrows
 
