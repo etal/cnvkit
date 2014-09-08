@@ -304,7 +304,9 @@ def do_targets(bed_fname, out_fname, annotate=None, do_short_names=False,
     # Output with logging
     with ngfrills.safe_write(out_fname, False) as outfile:
         i = 0
-        for i, row in enumerate(bed_rows):
+        for i, row in enumerate(sorted(bed_rows,
+                                       key=lambda r: (core.sorter_chrom(r[0]),
+                                                      r[1]))):
             outfile.write("\t".join(map(str, row)) + '\n')
         ngfrills.echo("Wrote", out_fname,
                       "with", i + 1, "target intervals")
