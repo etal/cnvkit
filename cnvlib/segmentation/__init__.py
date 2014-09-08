@@ -5,7 +5,6 @@ import os.path
 
 from .. import core, ngfrills, params
 from ..cnarray import CopyNumArray as CNA
-from . import haar
 
 from Bio._py3k import StringIO
 
@@ -16,6 +15,7 @@ def do_segmentation(probes_fname, save_dataframe, method):
         raise ValueError("Not a file: %s" % probes_fname)
 
     if method == 'haar':
+        from . import haar
         probes = CNA.read(probes_fname)
         return haar.segment_haar(probes)
 

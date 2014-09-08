@@ -12,11 +12,11 @@ try:
     # Dependencies for easy_install and pip:
     setup_args.update(
         install_requires=[
-            'biopython >= 1.62',
+            'numpy >= 1.6',
+            'matplotlib >= 1.1',
+            'pysam >= 0.8',
             'reportlab >= 2.5',
-            'matplotlib >= 1.2',
-            'pysam >= 0.7.6',
-            'numpy >= 1.5',
+            'biopython >= 1.62',
         ])
 except ImportError:
     from distutils.core import setup
@@ -26,7 +26,7 @@ DIR = (dirname(__file__) or '.') + '/'
 
 setup_args.update(
     name='CNVkit',
-    version='0.1-dev',
+    version='0.2.2a',
     description=__doc__,
     author='Eric Talevich',
     author_email='eric.talevich@ucsf.edu',

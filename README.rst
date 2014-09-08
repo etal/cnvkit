@@ -107,3 +107,6 @@ We are in the process of publishing a manuscript describing CNVkit in detail.
 For now, if you use this software in a publication, please cite it by the URL:
 http://github.com/etal/cnvkit
 
+A recent poster presentation is also available on F1000 Posters:
+http://f1000.com/posters/browse/summary/1096236
+

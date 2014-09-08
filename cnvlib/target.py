@@ -12,62 +12,37 @@ from .ngfrills import echo
 
 def add_refflat_names(region_rows, refflat_fname):
     """Apply RefSeq gene names to a list of targeted regions."""
-    return cover_introns(assign_names(region_rows, refflat_fname))
-
-
-def cover_introns(regions):
-    """Apply the name of the surrounding gene to intronic targets.
-
-    If an unnamed target is surrounded by targets that have the same name,
-    consider it an intron and apply that gene name to the unnamed target.
-    Otherwise, leave it unnamed ("-").
-    """
-    last_gene = None
-    last_chrom = None
-    queue = []
-    for chrom, start, end, name in regions:
-        if chrom != last_chrom:
-            # Queue was not intronic (3'-terminal of last chrom)
-            for row in queue:
-                yield row
-            queue = []
-            last_chrom = chrom
-            last_gene = name if name != '-' else None
-        # Track genes; smooth over intronic '-' regions
-        if name == '-':
-            # Not sure if intronic -- enqueue
-            queue.append((chrom, start, end, name))
-        else:
-            if name == last_gene:
-                # Queued row(s) were intronic
-                if queue:
-                    for cm, st, ed, _nm in queue:
-                        yield cm, st, ed, name
-                    queue = []
-            else:
-                # Queued row(s) were intergenic
-                for row in queue:
-                    yield row
-                queue = []
-                last_gene = name
-            yield chrom, start, end, name
-    # Remainder
-    for row in queue:
-        yield row
+    return assign_names(region_rows, refflat_fname)
 
 
 def assign_names(region_rows, refflat_fname, default_name='-'):
     """Replace the interval gene names with those at the same loc in refFlat.txt
     """
     ref_genes = read_refflat_genes(refflat_fname)
-    region_rows = sorted(region_rows,
-                         key=lambda row: (row[0], row[3], row[1], row[2]))
-    for (chrom, strand), chr_rows in groupby(region_rows,
+    for (chrom, strand), chr_rows in groupby(sorted(region_rows,
+                                                    key=lambda row: (
+                                                        row[0], # chromosome
+                                                        row[3], # strand
+                                                        row[1], # start
+                                                        row[2])), # end
                                              lambda row: (row[0], row[3])):
-        if (chrom, strand) not in ref_genes:
-            echo("Chromosome", chrom, "strand", strand, "not in annotations")
+        if (chrom, strand) in ref_genes:
+            genes_in_chrom = iter(ref_genes[(chrom, strand)])
+        elif '|' in strand:
+            strands_with_genes = []
+            for std in strand.split('|'):
+                if (chrom, std) in ref_genes:
+                    strands_with_genes.extend(ref_genes[(chrom, std)])
+            if strands_with_genes:
+                genes_in_chrom = iter(sorted(strands_with_genes))
+            else:
+                echo("Chromosome", chrom, strand, "not in annotations")
+                continue
+        else:
+            echo("Chromosome", chrom, "strand", strand,
+                        "not in annotations")
             continue
-        genes_in_chrom = iter(ref_genes[(chrom, strand)])
+
         ex_start, ex_end, ex_name = next(genes_in_chrom)
         for row in chr_rows:
             start, end = row[1:3]
@@ -78,8 +53,6 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
                         ex_start, ex_end, ex_name = next(genes_in_chrom)
                     except StopIteration:
                         # Interval is past the last annotated gene in chromosome
-                        echo("Interval %s:%d-%d unannotated in refFlat"
-                             % (chrom, start, end))
                         # Fake it...
                         ex_start, ex_end = end + 1, end + 2
                         ex_name = default_name
@@ -96,7 +69,7 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
 def read_refflat_genes(fname):
     """Parse genes; merge those with same name and overlapping regions.
 
-    Returns a dict of: {chrom: [(gene start, gene end, gene name), ...]}
+    Returns a dict of: {(chrom, strand): [(gene start, gene end, gene name), ...]}
     """
     genedict = collections.defaultdict(list)
     with open(fname) as genefile:
@@ -138,7 +111,7 @@ def read_refflat_genes(fname):
                 (curr_start, curr_end, name))
 
     # Finally, sort the keys, and return the results
-    for key in list(chromdict.keys()):
+    for key in list(chromdict):
         chromdict[key].sort()
     return chromdict
 
@@ -160,6 +133,48 @@ def parse_refflat_line(line):
         "Exon count mismatch at %s: file says %s, but counted %d intervals"
         % (name, exon_count, len(exons)))
     return name, refseq, chrom, strand, int(start), int(end), exons
+
+
+# def cover_introns(regions):
+#     """Apply the name of the surrounding gene to intronic targets.
+
+#     If an unnamed target is surrounded by targets that have the same name,
+#     consider it an intron and apply that gene name to the unnamed target.
+#     Otherwise, leave it unnamed ("-").
+#     """
+#     last_gene = None
+#     last_chrom = None
+#     queue = []
+#     for chrom, start, end, name in regions:
+#         if chrom != last_chrom:
+#             # Queue was not intronic (3'-terminal of last chrom)
+#             for row in queue:
+#                 yield row
+#             queue = []
+#             last_chrom = chrom
+#             last_gene = name if name != '-' else None
+#         # Track genes; smooth over intronic '-' regions
+#         if name == '-':
+#             # Not sure if intronic -- enqueue
+#             queue.append((chrom, start, end, name))
+#         else:
+#             if name == last_gene:
+#                 # Queued row(s) were intronic
+#                 if queue:
+#                     for cm, st, ed, _nm in queue:
+#                         yield cm, st, ed, name
+#                     queue = []
+#             else:
+#                 # Queued row(s) were intergenic
+#                 for row in queue:
+#                     yield row
+#                 queue = []
+#                 last_gene = name
+#             yield chrom, start, end, name
+#     # Remainder
+#     for row in queue:
+#         yield row
+
 
 
 # _____________________________________________________________________________

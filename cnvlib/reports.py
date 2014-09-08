@@ -41,7 +41,7 @@ def get_gene_intervals(all_probes, skip=('Background', 'CGH', '-')):
     return intervals
 
 
-def get_breakpoints(intervals, segments):
+def get_breakpoints(intervals, segments, min_probes):
     """Identify CBS segment breaks within the targeted intervals."""
     breakpoints = []
     for i, curr_row in enumerate(segments[:-1]):
@@ -55,13 +55,13 @@ def get_breakpoints(intervals, segments):
             if gstarts[0] < curr_end < gend:
                 probes_left = sum(s < curr_end for s in gstarts)
                 probes_right = sum(s >= curr_end for s in gstarts)
-                breakpoints.append((gname,
-                                    curr_chrom,
-                                    int(math.ceil(curr_end)),
-                                    next_row['coverage'] - curr_row['coverage'],
-                                    probes_left,
-                                    probes_right))
-    breakpoints.sort(key=lambda row: (core.sorter_chrom(row[0]), row[2]))
+                if probes_left >= min_probes and probes_right >= min_probes:
+                    breakpoints.append(
+                        (gname, curr_chrom, int(math.ceil(curr_end)),
+                         next_row['coverage'] - curr_row['coverage'],
+                         probes_left, probes_right))
+    breakpoints.sort(key=lambda row: (min(row[4], row[5]), abs(row[3])),
+                     reverse=True)
     return breakpoints
 
 
