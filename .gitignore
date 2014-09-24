@@ -36,4 +36,6 @@ MANIFEST
 tags
 test/build
 build/
+dist/
+doc/_build
 CNVkit.egg-info/
