@@ -39,8 +39,7 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
                 echo("Chromosome", chrom, strand, "not in annotations")
                 continue
         else:
-            echo("Chromosome", chrom, "strand", strand,
-                        "not in annotations")
+            echo("Chromosome", chrom, "strand", strand, "not in annotations")
             continue
 
         ex_start, ex_end, ex_name = next(genes_in_chrom)
