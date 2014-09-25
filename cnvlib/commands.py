@@ -20,7 +20,7 @@ iteritems = (dict.iteritems if sys.version < 3
 
 from . import (core, target, antitarget, coverage, fix, metrics, reference,
                reports, export, importers, segmentation,
-               ngfrills, plots)
+               params, ngfrills, plots)
 from .ngfrills import echo
 from .cnarray import CopyNumArray as CNA
 
@@ -348,9 +348,11 @@ def _cmd_antitarget(args):
         echo("Wrote", args.output, "with", i + 1, "background intervals")
 
 
-def do_antitarget(target_bed,
-                  access_bed=None, avg_bin_size=100000, min_bin_size=10000):
+def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,
+                  min_bin_size=None):
     """Derive a background/antitarget BED file from a target BED file."""
+    if not min_bin_size:
+        min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_BIN_COVERAGE))
     background_regions = antitarget.get_background(target_bed, access_bed,
                                                    avg_bin_size, min_bin_size)
 
@@ -377,9 +379,9 @@ P_anti.add_argument('interval',
 P_anti.add_argument('-g', '--access',
         help="""Regions of accessible sequence on chromosomes (.bed), as
                 output by genome2access.py.""")
-P_anti.add_argument('-a', '--avg-size', type=int, default=100000,
+P_anti.add_argument('-a', '--avg-size', type=int, default=150000,
         help="Average size of antitarget bins (results are approximate).")
-P_anti.add_argument('-m', '--min-size', type=int, default=10000,
+P_anti.add_argument('-m', '--min-size', type=int,
         help="Minimum size of antitarget bins (smaller regions are dropped).")
 P_anti.add_argument('-o', '--output', help="""Output file name.""")
 P_anti.set_defaults(func=_cmd_antitarget)
