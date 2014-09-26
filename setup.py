@@ -15,7 +15,7 @@ try:
             'numpy >= 1.6',
             'matplotlib >= 1.1',
             'pysam >= 0.8',
-            'reportlab >= 2.5',
+            'reportlab >= 3.0',
             'biopython >= 1.62',
         ])
 except ImportError:
