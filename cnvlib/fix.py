@@ -20,8 +20,8 @@ def load_adjust_coverages(pset, ref_pset,
     # Check for signs that the wrong reference was used
     missing_keys = set(pset.labels()).difference(ref_pset.labels())
     if missing_keys:
-        raise ValueError("Reference is missing", len(missing_keys),
-                         "probe(s) found in", pset.sample_id)
+        raise ValueError("Reference is missing %d bins found in %s"
+                         % (len(missing_keys), pset.sample_id))
 
     # ENH: Wouldn't this be easier as [gene != 'Background']?
     ref_matched = match_ref_to_probes(ref_pset, pset)
