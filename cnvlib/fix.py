@@ -169,30 +169,30 @@ def make_edge_sorter(target_probes, margin):
 
 
 def edge_loss(target_size, insert_size):
-    """Calculate coverage loss at tile edges.
+    """Calculate coverage loss at the edges of a baited region.
 
-    Letting i = insert size and t = target size, loss of coverage near the two
-    edges of the target tile (combined) is::
+    Letting i = insert size and t = target size, the proportional loss of
+    coverage near the two edges of the baited region (combined) is::
 
         i/2t
 
-    If the "shoulders" overlap / cross over the middle $(t < 2i), reduce by::
+    If the "shoulders" extend outside the bait $(t < i), reduce by::
 
-        (i-t/2)^2 / 2it
+        (i-t)^2 / 4it
     """
     loss = insert_size / (2 * target_size)
-    if target_size < 2 * insert_size:
-        # Correction for overlapping shoulders (large insert, small target)
-        loss -= ((insert_size - 0.5 * target_size)**2
-                 / (2 * insert_size * target_size))
+    if target_size < insert_size:
+        # Drop the shoulder part that would extend past the bait
+        loss -= ((insert_size - target_size)**2
+                 / (4 * insert_size * target_size))
     return loss
 
 
 def edge_gain(target_size, insert_size, gap_size):
-    """Calculate coverage gain from a neighboring tile's flanking reads.
+    """Calculate coverage gain from a neighboring bait's flanking reads.
 
-    Letting i = insert size, t = target size, g = gap to neighboring tile,
-    the gain of coverage due to a nearby tile, if g < i, is::
+    Letting i = insert size, t = target size, g = gap to neighboring bait,
+    the gain of coverage due to a nearby bait, if g < i, is::
 
         (i-g)^2 / 4it
 
@@ -204,7 +204,7 @@ def edge_gain(target_size, insert_size, gap_size):
     gain = ((insert_size - gap_size)**2
             / (4 * insert_size * target_size))
     if target_size + gap_size < insert_size:
-        # Drop the flank part that extends past this target
+        # Drop the flank part that extends past this baited region
         gain -= ((insert_size - target_size - gap_size)**2
                  / (4 * insert_size * target_size))
     return gain
