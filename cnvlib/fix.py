@@ -179,12 +179,14 @@ def edge_loss(target_size, insert_size):
     If the "shoulders" extend outside the bait $(t < i), reduce by::
 
         (i-t)^2 / 4it
+
+    on each side, or (i-t)^2 / 2it total.
     """
     loss = insert_size / (2 * target_size)
     if target_size < insert_size:
         # Drop the shoulder part that would extend past the bait
         loss -= ((insert_size - target_size)**2
-                 / (4 * insert_size * target_size))
+                 / (2 * insert_size * target_size))
     return loss
 
 
