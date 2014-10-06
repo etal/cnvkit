@@ -103,7 +103,7 @@ def parse_text_coords(fname, coord_only, keep_strand):
                 chrom, start_end, name = fields
             elif len(fields) == 2:
                 chrom, start_end = fields
-                name = ''
+                name = '-'
             else:
                 raise ValueError
             start, end = start_end.split('-')
@@ -141,7 +141,7 @@ def parse_interval_list(fname, coord_only, keep_strand):
             if len(fields) > 4:
                 name = fields[-1].rstrip()
             else:
-                name = ''
+                name = '-'
             return chrom, int(start) - 1, int(end), name, strand
     else:
         @report_bad_line
@@ -151,7 +151,7 @@ def parse_interval_list(fname, coord_only, keep_strand):
             if len(fields) > 3:
                 name = fields[-1].rstrip()
             else:
-                name = ''
+                name = '-'
             return chrom, int(start) - 1, int(end), name
 
     with as_handle(fname, 'rU') as handle:
@@ -191,7 +191,7 @@ def parse_bed(fname, coord_only, keep_strand):
             fields = line.split('\t', 6)
             chrom, start, end = fields[:3]
             name = (fields[3].rstrip()
-                    if len(fields) >= 4 else '')
+                    if len(fields) >= 4 else '-')
             strand = (fields[5].rstrip()
                       if len(fields) >= 6 else '.')
             return chrom, int(start), int(end), name, strand
@@ -201,7 +201,7 @@ def parse_bed(fname, coord_only, keep_strand):
             fields = line.split('\t', 4)
             chrom, start, end = fields[:3]
             name = (fields[3].rstrip()
-                    if len(fields) >= 4 else '')
+                    if len(fields) >= 4 else '-')
             return chrom, int(start), int(end), name
 
     with as_handle(fname, 'rU') as handle:
