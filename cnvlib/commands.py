@@ -302,14 +302,14 @@ def do_targets(bed_fname, out_fname, annotate=None, do_short_names=False,
         ngfrills.echo("Splitting large targets")
         bed_rows = target.split_targets(bed_rows, avg_size)
     # Output with logging
-    with ngfrills.safe_write(out_fname, False) as outfile:
+    with ngfrills.safe_write(out_fname or sys.stdout, False) as outfile:
         i = 0
         for i, row in enumerate(sorted(bed_rows,
                                        key=lambda r: (core.sorter_chrom(r[0]),
                                                       r[1]))):
             outfile.write("\t".join(map(str, row)) + '\n')
-        ngfrills.echo("Wrote", out_fname,
-                      "with", i + 1, "target intervals")
+    if out_fname:
+        ngfrills.echo("Wrote", out_fname, "with", i + 1, "target intervals")
 
 
 P_target = AP_subparsers.add_parser('target', help=_cmd_target.__doc__)
