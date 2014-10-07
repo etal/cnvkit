@@ -119,10 +119,10 @@ def bedcov(bed_fname, bam_fname):
     # Return an iterable...
     for line in lines:
         try:
-            chrom, start_s, end_s, name, basecount_s = line.split()
+            chrom, start_s, end_s, name, basecount_s = line.split('\t')
         except:
             raise RuntimeError("Bad line from bedcov:\n" + line)
-        start, end, basecount = map(int, (start_s, end_s, basecount_s))
+        start, end, basecount = map(int, (start_s, end_s, basecount_s.strip()))
         span = end - start
         # Algebra from above
         count = basecount / READ_LEN
