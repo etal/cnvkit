@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division
 from bisect import insort, bisect_left
 from collections import deque
+import math
 
 import numpy
 
@@ -17,7 +18,7 @@ def check_inputs(x, width):
     """
     x = numpy.asfarray(x)
     if 0 < width < 1:
-        wing = int(round(len(x) * width * 0.5, 0))
+        wing = int(math.ceil(len(x) * width * 0.5))
     elif width >= 2 and int(width) == width:
         wing = width // 2
     else:
