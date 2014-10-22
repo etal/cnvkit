@@ -115,7 +115,7 @@ def bedcov(bed_fname, bam_fname):
     # Count bases in each region; exclude 0-MAPQ reads
     lines = pysam.bedcov(bed_fname, bam_fname, '-Q', '1')
     if not lines:
-        raise ValueError("BED file sequence IDs don't match any in the BAM")
+        raise ValueError("BED file sequence IDs don't match any in the BAM: %s %s" % (bed_fname, bam_fname))
     # Return an iterable...
     for line in lines:
         try:
