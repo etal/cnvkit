@@ -16,6 +16,9 @@ iteritems = (dict.iteritems if sys.version < 3
 from . import core, smoothing
 from .ngfrills import echo
 
+SEG_COLOR = 'red'
+POINT_COLOR = '#808080'
+HIGHLIGHT_COLOR = 'gold'
 
 MB = 1e-6
 
@@ -53,17 +56,17 @@ def plot_genome(axis, probes, segments, pad, do_trend=False):
         axis.set_ylim(-2.5, 2.5)
 
     # Plot points
-    axis.scatter(x, probes.coverage, color='#808080', edgecolor='none',
+    axis.scatter(x, probes.coverage, color=POINT_COLOR, edgecolor='none',
                  alpha=0.15, marker='.')
     # Add a local trend line
     if do_trend:
         axis.plot(x, smoothing.smooth_genome_coverages(probes,
                                                        smoothing.smoothed,
                                                        250),
-                  color='#808080', linewidth=1, zorder=-1)
+                  color=POINT_COLOR, linewidth=1, zorder=-1)
     # Plot segments
     for seg_line in seg_lines:
-        axis.hlines(*seg_line, colors='red', linewidth=2)
+        axis.hlines(*seg_line, colors=SEG_COLOR, linewidth=2)
 
 
 def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
@@ -112,7 +115,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
             gene_start *= MB
             gene_end *= MB
             # Highlight and label gene region
-            axis.axvspan(gene_start, gene_end, alpha=0.5, color='gold',
+            axis.axvspan(gene_start, gene_end, alpha=0.5, color=HIGHLIGHT_COLOR,
                          zorder=-1)
             axis.text(0.5 * (gene_start + gene_end), min(max(y) + .1, 2.4),
                       gene_name, horizontalalignment='center',
@@ -122,7 +125,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
 
     if background_marker in (None, 'o'):
         # Plot targets and antitargets with the same marker
-        axis.scatter(x, y, w, color='#808080', alpha=0.4, marker='o')
+        axis.scatter(x, y, w, color=POINT_COLOR, alpha=0.4, marker='o')
     else:
         # Use the given marker to plot antitargets separately
         x_fg = []
@@ -140,20 +143,20 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
                 x_fg.append(x_pt)
                 y_fg.append(y_pt)
                 w_fg.append(w_pt)
-        axis.scatter(x_fg, y_fg, w_fg, color='#808080', alpha=0.4, marker='o')
-        axis.scatter(x_bg, y_bg, color='#808080', alpha=0.5,
+        axis.scatter(x_fg, y_fg, w_fg, color=POINT_COLOR, alpha=0.4, marker='o')
+        axis.scatter(x_bg, y_bg, color=POINT_COLOR, alpha=0.5,
                      marker=background_marker)
 
     # Add a local trend line
     if do_trend:
         axis.plot(x, smoothing.smoothed(y, 100),
-                    color='#808080', linewidth=1, zorder=-1)
+                    color=POINT_COLOR, linewidth=1, zorder=-1)
 
     # Get coordinates for CBS lines & draw them
     if segments:
         for row in segments[segments['chromosome'] == chromosome]:
             axis.hlines(row['coverage'], row['start'] * MB, row['end'] * MB,
-                        colors='red', linewidth=2)
+                        colors=SEG_COLOR, linewidth=2)
 
 
 def plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, pad):
@@ -204,7 +207,7 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, pad):
             y_posns.extend(vafs)
 
     # Plot the points
-    axis.scatter(x_posns, y_posns, color='#808080', edgecolor='none', alpha=0.2)
+    axis.scatter(x_posns, y_posns, color=POINT_COLOR, edgecolor='none', alpha=0.2)
     axis.scatter(x_posns_sig, y_posns_sig, color='salmon', edgecolor='none',
                  alpha=0.3)
     # Add trend lines to each chromosome
