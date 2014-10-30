@@ -103,9 +103,17 @@ directory, too. To run the test suite::
 Citation
 ========
 
-We are in the process of publishing a manuscript describing CNVkit in detail.
-For now, if you use this software in a publication, please cite it by the URL:
-http://github.com/etal/cnvkit
+We are in the process of publishing a manuscript describing CNVkit. A preprint
+is available here:
+http://dx.doi.org/10.1101/010876
+
+If you use this software in a publication, for now, please cite it by this DOI
+like so:
+
+    Eric Talevich, A. Hunter Shain, Boris C. Bastian (2014)
+    CNVkit: Copy number detection and visualization for targeted sequencing
+    using off-target reads.
+    bioRxiv doi: 10.1101/010876
 
 A recent poster presentation is also available on F1000 Posters:
 http://f1000.com/posters/browse/summary/1096236
