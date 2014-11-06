@@ -611,7 +611,15 @@ P_fix.set_defaults(func=_cmd_fix)
 
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
-    segments = segmentation.do_segmentation(args.filename, False, args.method)
+    if args.dataframe:
+        segments, dframe = segmentation.do_segmentation(args.filename, True,
+                                                         args.method)
+        with open(args.dataframe, 'w') as handle:
+            handle.write(dframe)
+        echo("Wrote", args.dataframe)
+    else:
+        segments = segmentation.do_segmentation(args.filename, False,
+                                                args.method)
     segments.write(args.output or segments.sample_id + '.cns')
 
 
@@ -620,6 +628,9 @@ P_segment.add_argument('filename',
         help="Coverage file (.cnr), as produced by 'fix'.")
 P_segment.add_argument('-o', '--output',
         help="Output table file name (CNR-like table of segments, .cns).")
+P_segment.add_argument('-d', '--dataframe',
+        help="""File name to save the raw R dataframe emitted by CBS or
+                Fused Lasso. (Useful for debugging.)""")
 P_segment.add_argument('-m', '--method',
         choices=('cbs', 'haar', 'flasso'), default='cbs',
         help="Segmentation method (CBS, HaarSeg, or Fused Lasso).")
