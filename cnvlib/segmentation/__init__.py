@@ -36,7 +36,7 @@ def do_segmentation(probes_fname, save_dataframe, method):
     # Convert R dataframe contents to our standard 'basic' format
     out_data = []
     for row in core.parse_tsv(StringIO(seg_out)):
-        if row[0].startswith(('[', '"sample"')) or "sample" in row[0]:
+        if row[0].startswith(('[', '"sample')):
             continue
         start, end = [int(math.ceil(float(val))) for val in row[2:4]]
         chrom = row[1].strip('"')
