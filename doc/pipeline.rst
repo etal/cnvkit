@@ -23,8 +23,8 @@ batch
 
 Run the CNVkit pipeline on one or more BAM files::
 
-    cnvkit.py Sample.bam -t Tiled.bed -a Background.bed -r Reference.cnn
-    cnvkit.py *.bam --output-dir CNVs/ -t Tiled.bed -a Background.bed -r Reference.cnn
+    cnvkit.py batch Sample.bam -t Tiled.bed -a Background.bed -r Reference.cnn
+    cnvkit.py batch *.bam --output-dir CNVs/ -t Tiled.bed -a Background.bed -r Reference.cnn
 
 With the ``-p`` option, process each of the BAM files in parallel, as separate
 subprocesses. The status messages logged to the console will be somewhat
@@ -33,7 +33,7 @@ complete sooner.
 
 ::
 
-    cnvkit.py *.bam -d CNVs/ -t Tiled.bed -a Background.bed -r Reference.cnn -p 8
+    cnvkit.py batch *.bam -d CNVs/ -t Tiled.bed -a Background.bed -r Reference.cnn -p 8
 
 The pipeline executed by the ``batch`` command is equivalent to::
 
@@ -54,7 +54,7 @@ the chromosomal coordinates of the tiled regions used for targeted resequencing.
 
 ::
 
-    cnvkit.py antitarget Tiled.bed -r data/access-10000.hg19.bed -o Background.bed
+    cnvkit.py antitarget Tiled.bed -g data/access-10000.hg19.bed -o Background.bed
 
 Many fully sequenced genomes, including the human genome, contain large regions
 of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
@@ -62,7 +62,7 @@ telomeres, and highly repetitive regions.) In the FASTA genome sequence these
 regions are filled in with large stretches of N characters. These regions cannot
 be mapped by resequencing, so we can avoid them when calculating the antitarget
 locations by passing the locations of the accessible sequence regions with the
-``-r`` or ``--regions`` option. These regions are precomputed for the UCSC
+``-g`` or ``--access`` option. These regions are precomputed for the UCSC
 reference human genome hg19, and can be computed for other genomes with the
 included script ``genome2access.py``.
 
