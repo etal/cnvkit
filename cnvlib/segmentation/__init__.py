@@ -9,7 +9,7 @@ from ..cnarray import CopyNumArray as CNA
 from Bio._py3k import StringIO
 
 
-def do_segmentation(probes_fname, save_dataframe, method):
+def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
     if not os.path.isfile(probes_fname):
         raise ValueError("Not a file: %s" % probes_fname)
@@ -26,6 +26,8 @@ def do_segmentation(probes_fname, save_dataframe, method):
         rscript = FLASSO_RSCRIPT
     else:
         raise ValueError("Unknown method %r" % method)
+    if rlibpath:
+        rscript = rscript.replace("# libPaths", '.libPaths(c("%s"))' % rlibpath)
     sample_id = core.fbase(probes_fname)
     with ngfrills.temp_write_text(rscript % (probes_fname,
                                              params.MIN_BIN_COVERAGE,
@@ -99,6 +101,7 @@ CBS_RSCRIPT = """\
 # Input: log2 coverage data in Nexus 'basic' format
 # Output: the CBS data table
 
+# libPaths
 library('PSCBS') # Requires: R.utils, R.oo, R.methodsS3
 
 write("Loading probe coverages into a data frame", stderr())
@@ -150,6 +153,7 @@ FLASSO_RSCRIPT = """\
 # Input: log2 coverage data in Nexus 'basic' format
 # Output: the CBS data table
 
+# libPaths
 library('cghFLasso')
 
 tbl <- read.delim("%s")

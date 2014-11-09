@@ -95,9 +95,9 @@ def _cmd_batch(args):
     pool = pick_pool(args.processes)
     for bam in args.bam_files:
         pool.apply_async(batch_run_sample,
-                        (bam, args.targets, args.antitargets, args.reference,
-                        args.output_dir, args.male_normal, args.scatter,
-                        args.diagram))
+                         (bam, args.targets, args.antitargets, args.reference,
+                          args.output_dir, args.male_normal, args.scatter,
+                          args.diagram, args.rlibpath))
     pool.close()
     pool.join()
 
@@ -183,7 +183,7 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname):
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                      output_dir, male_normal=False, scatter=False,
-                     diagram=False):
+                     diagram=False, rlibpath=None):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     echo("Running the CNVkit pipeline on", bam_fname, "...")
@@ -200,7 +200,8 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     cnarr.write(sample_pfx + '.cnr')
 
     echo("Segmenting", sample_pfx + '.cnr ...')
-    segments = segmentation.do_segmentation(sample_pfx + '.cnr', False, 'cbs')
+    segments = segmentation.do_segmentation(sample_pfx + '.cnr', False, 'cbs',
+                                            rlibpath)
     segments.write(sample_pfx + '.cns')
 
     if scatter:
@@ -225,6 +226,8 @@ P_batch.add_argument('-p', '--processes', type=int, default=1,
         help="""Number of subprocesses used to running each of the BAM files in
                 parallel. Give 0 or a negative value to use the maximum number
                 of available CPUs. Default: process each BAM in serial.""")
+P_batch.add_argument("--rlibpath",
+                     help="Path to an alternative site-library to use for R packages.")
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group(
@@ -613,13 +616,13 @@ def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     if args.dataframe:
         segments, dframe = segmentation.do_segmentation(args.filename, True,
-                                                         args.method)
+                                                         args.method, args.rlibpath)
         with open(args.dataframe, 'w') as handle:
             handle.write(dframe)
         echo("Wrote", args.dataframe)
     else:
         segments = segmentation.do_segmentation(args.filename, False,
-                                                args.method)
+                                                args.method, args.rlibpath)
     segments.write(args.output or segments.sample_id + '.cns')
 
 
@@ -634,6 +637,8 @@ P_segment.add_argument('-d', '--dataframe',
 P_segment.add_argument('-m', '--method',
         choices=('cbs', 'haar', 'flasso'), default='cbs',
         help="Segmentation method (CBS, HaarSeg, or Fused Lasso).")
+P_segment.add_argument("--rlibpath",
+                       help="Path to an alternative site-library to use for R packages.")
 P_segment.set_defaults(func=_cmd_segment)
 
 
@@ -643,7 +648,7 @@ def _cmd_cbs(args):
     """Run circular binary segmentation (CBS) on the given coverage table."""
     if args.dataframe:
         segments, seg_out = segmentation.do_segmentation(args.filename, True,
-                                                         'cbs')
+                                                         'cbs', args.rlibpath)
         with ngfrills.safe_write(args.dataframe) as handle:
             handle.write(seg_out)
     else:
@@ -658,6 +663,8 @@ P_cbs.add_argument('-o', '--output',
         help="Output table file name (CNR-like table of segments, .cns).")
 P_cbs.add_argument('-d', '--dataframe',
         help="Output filename for the unaltered dataframe emitted by CBS.")
+P_cbs.add_argument("--rlibpath",
+                   help="Path to an alternative site-library to use for R packages.")
 P_cbs.set_defaults(func=_cmd_cbs)
 
 
