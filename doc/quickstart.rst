@@ -75,7 +75,7 @@ command could be::
 
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
         --targets my_targets.bed --fasta hg19.fasta \
-        --annotate refFlat.txt --split --regions data/access-10kb.hg19.bed \
+        --annotate refFlat.txt --split --access data/access-10kb.hg19.bed \
         --output-reference my_reference.cnn --output-dir example/
 
 See the built-in help message to see what these options do, and for additional
@@ -88,7 +88,7 @@ reference which assumes equal coverage in all bins by using the ``--normal/-n``
 flag without specifying any additional BAM files::
 
     cnvkit.py batch *Tumor.bam -n -t my_targets.bed -f hg19.fasta \
-        --annotate refFlat.txt --split --regions data/access-10kb.hg19.bed \
+        --annotate refFlat.txt --split --access data/access-10kb.hg19.bed \
         --output-reference my_flat_reference.cnn -d example2/
 
 In either case, you should run this command with the reference genome sequence
