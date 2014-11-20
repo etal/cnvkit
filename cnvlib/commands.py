@@ -411,16 +411,9 @@ def _cmd_coverage(args):
 
 def do_coverage(bed_fname, bam_fname, by_count=False):
     """Calculate coverage in the given regions from BAM read depths."""
-    try:
-        is_sorted = ngfrills.ensure_bam_sorted(bam_fname)
-    except RuntimeError:
-        # pysam wasn't available, probably
-        pass
-    else:
-        if not is_sorted:
-            raise RuntimeError("BAM file %s must be sorted by coordinates"
-                               % bam_fname)
-
+    if not ngfrills.ensure_bam_sorted(bam_fname):
+        raise RuntimeError("BAM file %s must be sorted by coordinates"
+                            % bam_fname)
     ngfrills.ensure_bam_index(bam_fname)
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
     if by_count:
