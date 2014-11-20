@@ -69,7 +69,8 @@ def region_depth_count(bamfile, chrom, start, end):
                                           start=start, end=end))
     # Scale read counts to region length
     # Depth := #Bases / Span
-    depth = READ_LEN * count / (end - start)
+    depth = (READ_LEN * count / (end - start)
+             if end > start else 0)
     return count, depth
 
 
@@ -124,9 +125,13 @@ def bedcov(bed_fname, bam_fname):
             raise RuntimeError("Bad line from bedcov:\n" + line)
         start, end, basecount = map(int, (start_s, end_s, basecount_s.strip()))
         span = end - start
-        # Algebra from above
-        count = basecount / READ_LEN
-        mean_depth = basecount / span
+        if span > 0:
+            # Algebra from above
+            count = basecount / READ_LEN
+            mean_depth = basecount / span
+        else:
+            # User-supplied bins might be oddly constructed
+            count = mean_depth = 0
         yield chrom, start, end, name, count, mean_depth
 
 
