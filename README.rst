@@ -7,8 +7,31 @@ and alterations from targeted DNA sequencing.
 
 Read the full documentation at: http://cnvkit.readthedocs.org
 
+Questions, comments, help and discussion on SeqAnswers:
+http://seqanswers.com/forums/showthread.php?t=47910
+
 .. image:: https://travis-ci.org/etal/cnvkit.svg?branch=master
     :target: https://travis-ci.org/etal/cnvkit
+
+
+Citation
+========
+
+We are in the process of publishing a manuscript describing CNVkit. A preprint
+is available here:
+http://dx.doi.org/10.1101/010876
+
+If you use this software in a publication, for now, please cite it by this DOI
+like so:
+
+    Eric Talevich, A. Hunter Shain, Boris C. Bastian (2014)
+    CNVkit: Copy number detection and visualization for targeted sequencing
+    using off-target reads.
+    bioRxiv doi: 10.1101/010876
+
+A recent poster presentation is also available on F1000 Posters:
+http://f1000.com/posters/browse/summary/1096236
+
 
 Installation
 ============
@@ -98,23 +121,4 @@ The Python library ``cnvlib`` included with CNVkit has unit tests in this
 directory, too. To run the test suite::
 
     python test_cnvlib.py
-
-
-Citation
-========
-
-We are in the process of publishing a manuscript describing CNVkit. A preprint
-is available here:
-http://dx.doi.org/10.1101/010876
-
-If you use this software in a publication, for now, please cite it by this DOI
-like so:
-
-    Eric Talevich, A. Hunter Shain, Boris C. Bastian (2014)
-    CNVkit: Copy number detection and visualization for targeted sequencing
-    using off-target reads.
-    bioRxiv doi: 10.1101/010876
-
-A recent poster presentation is also available on F1000 Posters:
-http://f1000.com/posters/browse/summary/1096236
 
