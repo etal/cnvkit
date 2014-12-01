@@ -36,11 +36,30 @@ http://f1000.com/posters/browse/summary/1096236
 Installation
 ============
 
-The script cnvkit.py requires no installation and can be used in-place. Just
+From a package repository
+-------------------------
+
+Reasonably up-to-date CNVkit packages are available on `PyPI
+<https://pypi.python.org/pypi/CNVkit>`_ and can be installed using `conda
+<http://repo.continuum.io/miniconda/>`_ (preferred on Mac OS X, and
+a solid choice on Linux too)::
+
+    conda install cnvkit
+
+Or `pip <https://pip.pypa.io/en/latest/installing.html>`_ (usually works on
+Linux if the dependencies are installed, see below)::
+
+    pip install cnvkit
+
+
+From source
+-----------
+
+The script ``cnvkit.py`` requires no installation and can be used in-place. Just
 install the dependencies.
 
-To install the script and Python library (and some associated scripts), use
-setup.py as usual::
+To install the main program, supporting scripts and ``cnvlib`` Python library,
+use ``setup.py`` as usual::
 
     python setup.py build
     python setup.py install
@@ -63,17 +82,17 @@ On Ubuntu or Debian Linux::
     sudo pip install biopython pysam pyvcf --upgrade
 
 
-On Mac OS X you may instead find it much easier to install the Anaconda distribution
-(https://store.continuum.io/cshop/anaconda/ or
-http://repo.continuum.io/miniconda/), which includes most of the dependencies
-already::
+On Mac OS X you may instead find it much easier to first install the Python
+package manager `Miniconda <http://repo.continuum.io/miniconda/>`_, or the full
+`Anaconda <https://store.continuum.io/cshop/anaconda/>`_ distribution, which
+includes most of the dependencies. Then install the rest of CNVkit's dependencies::
 
     conda install numpy matplotlib reportlab biopython pysam pyvcf
 
-Otherwise, we recommend using Homebrew (http://brew.sh/) or MacPorts to
-install an up-to-date Python (e.g. ``brew install python``) and as many of the
-Python packages as possible (primarily numpy, scipy and matplotlib). Then, 
-proceed with pip::
+Otherwise, we recommend using `Homebrew <http://brew.sh/>`_ to install an
+up-to-date Python (e.g. ``brew install python``) and as many of the Python
+packages as possible (primarily NumPy, SciPy and matplotlib). Then, proceed with
+pip::
 
     sudo pip install numpy matplotlib reportlab biopython pysam pyvcf
 
