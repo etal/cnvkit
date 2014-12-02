@@ -13,6 +13,9 @@ http://seqanswers.com/forums/showthread.php?t=47910
 .. image:: https://travis-ci.org/etal/cnvkit.svg?branch=master
     :target: https://travis-ci.org/etal/cnvkit
 
+.. image:: https://landscape.io/github/etal/cnvkit/master/landscape.svg
+   :target: https://landscape.io/github/etal/cnvkit/master
+   :alt: Code Health
 
 Citation
 ========
@@ -24,7 +27,7 @@ http://dx.doi.org/10.1101/010876
 If you use this software in a publication, for now, please cite it by this DOI
 like so:
 
-    Eric Talevich, A. Hunter Shain, Boris C. Bastian (2014)
+    Eric Talevich, A. Hunter Shain, Thomas Botton, Boris C. Bastian (2014)
     CNVkit: Copy number detection and visualization for targeted sequencing
     using off-target reads.
     bioRxiv doi: 10.1101/010876
