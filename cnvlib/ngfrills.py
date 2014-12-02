@@ -230,8 +230,7 @@ def parse_bed_track(line):
             key, val = field.split('=', 1)
             if key == 'name':
                 return val
-    else:
-        raise ValueError("No name defined for this track")
+    raise ValueError("No name defined for this track")
 
 
 def group_bed_tracks(bedfile):

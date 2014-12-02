@@ -7,9 +7,7 @@ import collections
 import math
 import sys
 
-from Bio._py3k import map, range, zip
-iteritems = (dict.iteritems if sys.version < 3
-             else dict.items)
+iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 
 # _____________________________________________________________________________

@@ -15,8 +15,7 @@ from matplotlib import pyplot
 
 
 from Bio._py3k import map, range, zip
-iteritems = (dict.iteritems if sys.version < 3
-             else dict.items)
+iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 from . import (core, target, antitarget, coverage, fix, metrics, reference,
                reports, export, importers, segmentation,

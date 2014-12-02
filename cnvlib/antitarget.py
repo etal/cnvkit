@@ -3,9 +3,8 @@ from __future__ import absolute_import, division
 import sys
 from itertools import groupby
 
-from Bio._py3k import map, range, zip
-iteritems = (dict.iteritems if sys.version < 3
-             else dict.items)
+from Bio._py3k import range
+iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 from . import core, ngfrills
 from .params import INSERT_SIZE

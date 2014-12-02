@@ -3,7 +3,7 @@ from __future__ import absolute_import, division
 import bisect
 
 import numpy
-from Bio._py3k import map, range, zip
+from Bio._py3k import zip
 
 from . import params, reference, smoothing
 from .ngfrills import echo

@@ -10,8 +10,7 @@ import numpy
 # pyplot.ioff()
 
 from Bio._py3k import zip
-iteritems = (dict.iteritems if sys.version_info[0] < 3
-             else dict.items)
+iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 from . import core, smoothing
 from .ngfrills import echo

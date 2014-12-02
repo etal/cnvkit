@@ -5,7 +5,7 @@ import os.path
 import time
 from itertools import groupby
 
-from Bio._py3k import map, range, zip
+from Bio._py3k import map, zip
 import pysam
 
 from . import ngfrills

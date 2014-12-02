@@ -16,7 +16,6 @@ from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
 from . import core, plots
-from .cnarray import CopyNumArray as CNA
 
 # Silence Biopython's whinging
 from Bio import BiopythonWarning

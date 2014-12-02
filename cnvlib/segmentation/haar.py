@@ -46,7 +46,7 @@ import math
 import numpy as np
 from scipy import stats
 
-from .. import params
+# from .. import params
 from ..ngfrills import echo
 from ..cnarray import CopyNumArray as CNA
 

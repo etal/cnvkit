@@ -2,7 +2,7 @@
 from __future__ import absolute_import, division
 
 import numpy
-from Bio._py3k import map, range, zip
+from Bio._py3k import map, zip
 
 from . import core, metrics, ngfrills, params
 from .ngfrills import echo
