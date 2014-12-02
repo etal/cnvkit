@@ -11,9 +11,6 @@ from Bio._py3k import map, range, zip
 iteritems = (dict.iteritems if sys.version < 3
              else dict.items)
 
-from . import core
-# from .ngfrills import echo
-
 
 # _____________________________________________________________________________
 # breaks
