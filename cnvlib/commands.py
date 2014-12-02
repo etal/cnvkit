@@ -454,7 +454,7 @@ def _cmd_reference(args):
                                 if f.endswith('targetcoverage.cnn'))
             else:
                 filenames.append(path)
-        targets = [f for f in filenames if not 'antitarget' in f]
+        targets = [f for f in filenames if 'antitarget' not in f]
         antitargets = [f for f in filenames if 'antitarget' in f]
         echo("Number of target and antitarget files: %d, %d"
             % (len(targets), len(antitargets)))

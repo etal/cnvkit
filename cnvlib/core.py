@@ -72,19 +72,19 @@ def shift_xx(probes, male_normal=False, chr_x=None):
     outprobes = probes.copy()
     is_xx = guess_xx(probes, chr_x=chr_x, male_normal=male_normal)
     if is_xx and male_normal:
-            # Female: divide X coverages by 2 (in log2: subtract 1)
-            outprobes['coverage'][outprobes.chromosome == chr_x] -= 1.0
-            # Male: no change
+        # Female: divide X coverages by 2 (in log2: subtract 1)
+        outprobes['coverage'][outprobes.chromosome == chr_x] -= 1.0
+        # Male: no change
     elif not is_xx and not male_normal:
-            # Male: multiply X coverages by 2 (in log2: add 1)
-            outprobes['coverage'][outprobes.chromosome == chr_x] += 1.0
-            # Female: no change
+        # Male: multiply X coverages by 2 (in log2: add 1)
+        outprobes['coverage'][outprobes.chromosome == chr_x] += 1.0
+        # Female: no change
     return outprobes
 
 
 def guess_chr_x(probes):
-        return ('chrX' if probes[0]['chromosome'].startswith('chr')
-                else 'X')
+    return ('chrX' if probes[0]['chromosome'].startswith('chr')
+            else 'X')
 
 
 def guess_xx(probes, male_normal=False, chr_x=None, verbose=True):
