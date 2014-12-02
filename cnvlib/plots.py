@@ -9,8 +9,8 @@ import numpy
 # from matplotlib import pyplot
 # pyplot.ioff()
 
-from Bio._py3k import map, range, zip
-iteritems = (dict.iteritems if sys.version < 3
+from Bio._py3k import zip
+iteritems = (dict.iteritems if sys.version_info[0] < 3
              else dict.items)
 
 from . import core, smoothing
