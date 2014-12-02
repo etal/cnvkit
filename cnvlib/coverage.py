@@ -114,9 +114,14 @@ def bedcov(bed_fname, bam_fname):
     i.e. mean pileup depth across each region.
     """
     # Count bases in each region; exclude 0-MAPQ reads
-    lines = pysam.bedcov(bed_fname, bam_fname, '-Q', '1')
+    try:
+        lines = pysam.bedcov(bed_fname, bam_fname, '-Q', '1')
+    except pysam.SamtoolsError, exc:
+        raise ValueError("Failed processing %r coverages in %r regions. PySAM error: %s"
+                         % (bam_fname, bed_fname, exc))
     if not lines:
-        raise ValueError("BED file sequence IDs don't match any in the BAM: %s %s" % (bed_fname, bam_fname))
+        raise ValueError("BED file %r sequence IDs don't match any in BAM file %r"
+                         % (bed_fname, bam_fname))
     # Return an iterable...
     for line in lines:
         try:
