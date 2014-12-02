@@ -72,7 +72,7 @@ def _cmd_batch(args):
         if not args.targets:
             raise ValueError("Argument -t/--target is required.")
         # Build a copy number reference; update (anti)targets upon request
-        args.reference, args.targets, args.antitargets =  batch_make_reference(
+        args.reference, args.targets, args.antitargets = batch_make_reference(
             args.normal, args.targets, args.antitargets, args.male_normal,
             args.fasta, args.annotate, args.short_names, args.split,
             args.target_avg_size, args.access, args.antitarget_avg_size,
@@ -123,7 +123,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
         target_bed = new_target_fname
 
     if not antitarget_bed:
-        # Build antitargets from the given targets
+        # Build antitarget BED from the given targets
         anti_kwargs = {}
         if access:
             anti_kwargs['access_bed'] = access
