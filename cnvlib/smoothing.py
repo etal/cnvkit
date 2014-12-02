@@ -1,12 +1,13 @@
 """Signal smoothing functions."""
 from __future__ import absolute_import, division
+
 from bisect import insort, bisect_left
 from collections import deque
 import math
 
 import numpy
 
-from . import core
+from . import core, metrics
 
 
 def check_inputs(x, width):
@@ -144,7 +145,7 @@ def outlier_iqr(a, c=1.5):
     """
     a = numpy.asarray(a)
     dists = numpy.abs(a - numpy.median(a))
-    iqr = interquartile_range(a)
+    iqr = metrics.interquartile_range(a)
     return dists > (c * iqr)
 
 
@@ -176,5 +177,5 @@ def outlier_mad_median(a):
 
     a = numpy.asarray(a)
     dists = numpy.abs(a - numpy.median(a))
-    mad = median_absolute_deviation(a, scale_to_sd=False)
+    mad = metrics.median_absolute_deviation(a, scale_to_sd=False)
     return (dists / mad) > K
