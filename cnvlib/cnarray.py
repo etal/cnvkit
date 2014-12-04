@@ -8,7 +8,7 @@ import numpy
 from Bio.File import as_handle
 from Bio._py3k import basestring, map, zip
 
-from . import core, metrics, ngfrills
+from . import core, metrics, ngfrills, smoothing
 
 
 class CopyNumArray(object):
@@ -338,13 +338,34 @@ class CopyNumArray(object):
         yield curr_segment, self.to_rows(curr_probes)
 
 
-    def center_all(self):
-        """Recenter coverage values to the autosomes' median (in-place)."""
+    def center_all(self, mode=False):
+        """Recenter coverage values to the autosomes' average (in-place)."""
         chr_x = core.guess_chr_x(self)
         chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-        cvgs_autosome = self.coverage[(self.chromosome != chr_x) &
-                                      (self.chromosome != chr_y)]
-        self.data['coverage'] -= numpy.median(cvgs_autosome)
+        mask_autosome = ((self.chromosome != chr_x) &
+                            (self.chromosome != chr_y))
+        mid = numpy.median(self.coverage[mask_autosome])
+        mask_cvg = (mask_autosome &
+                    (self.coverage >= mid - 2) &
+                    (self.coverage <= mid + 2))
+        if mode and sum(mask_cvg) > 210:
+            # Estimate the mode from a smoothed histogram
+            x = self.coverage[mask_cvg]
+            w = self['weight'][mask_cvg] if 'weight' in self else None
+            resn = int(round(numpy.sqrt(len(x))))
+            x_vals, x_edges = numpy.histogram(x, bins=10*resn, weights=w)
+            xs = smoothing.smoothed(x_vals, resn//3)
+            # DBG: Check the fit
+            # from matplotlib import pyplot
+            # _fig, ax = pyplot.subplots()
+            # ax.plot(x_vals, c='k', alpha=.5)
+            # ax.plot(xs, c='r', lw=2)
+            # pyplot.show()
+            # ngfrills.echo("Centering: median", mid,
+            #               ", mode", x_edges[numpy.argmax(xs)])
+            # --
+            mid = x_edges[numpy.argmax(xs)]
+        self.data['coverage'] -= mid
 
     def copy(self):
         """Create an independent copy of this object."""

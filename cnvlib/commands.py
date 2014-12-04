@@ -480,7 +480,7 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
     ref_probes.extend(reference.combine_probes(antitarget_fnames,
                                                bool(fa_fname), male_normal))
     ref_probes.sort()
-    ref_probes.center_all()
+    ref_probes.center_all(mode=True)
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
         gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
@@ -549,33 +549,33 @@ def _cmd_fix(args):
     biases and re-center.
     """
     # Verify that target and antitarget are from the same sample
-    tgt_pset = CNA.read(args.target)
-    anti_pset = CNA.read(args.antitarget)
-    if tgt_pset.sample_id != anti_pset.sample_id:
+    tgt_raw = CNA.read(args.target)
+    anti_raw = CNA.read(args.antitarget)
+    if tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
-                         % (tgt_pset.sample_id, anti_pset.sample_id))
-    target_table = do_fix(tgt_pset, anti_pset, CNA.read(args.reference),
+                         % (tgt_raw.sample_id, anti_raw.sample_id))
+    target_table = do_fix(tgt_raw, anti_raw, CNA.read(args.reference),
                           args.do_gc, args.do_edge, args.do_rmask)
-    target_table.write(args.output or tgt_pset.sample_id + '.cnr')
+    target_table.write(args.output or tgt_raw.sample_id + '.cnr')
 
 
-def do_fix(target_pset, antitarget_pset, reference_pset,
+def do_fix(target_raw, antitarget_raw, reference,
            do_gc=True, do_edge=True, do_rmask=True):
     """Combine target and antitarget coverages and correct for biases."""
     # Load, recenter and GC-correct target & antitarget probes separately
-    echo("Processing target:", target_pset.sample_id)
-    target_table = fix.load_adjust_coverages(target_pset, reference_pset,
-                                             do_gc, do_edge, False)
-    echo("Processing antitarget:", antitarget_pset.sample_id)
-    atarget_table = fix.load_adjust_coverages(antitarget_pset, reference_pset,
-                                              do_gc, False, do_rmask)
-
+    echo("Processing target:", target_raw.sample_id)
+    cnarr = fix.load_adjust_coverages(target_raw, reference,
+                                      do_gc, do_edge, False)
+    echo("Processing antitarget:", antitarget_raw.sample_id)
+    anti_cnarr = fix.load_adjust_coverages(antitarget_raw, reference,
+                                           do_gc, False, do_rmask)
     # Merge target and antitarget & sort probes by chromosomal location
-    target_table.extend(atarget_table)
-    target_table.sort()
+    cnarr.extend(anti_cnarr)
+    cnarr.sort()
+    cnarr.center_all(mode=True)
     # Determine weights for each bin (used in segmentation)
-    return fix.apply_weights(target_table, reference_pset)
+    return fix.apply_weights(cnarr, reference)
 
 
 P_fix = AP_subparsers.add_parser('fix', help=_cmd_fix.__doc__)
