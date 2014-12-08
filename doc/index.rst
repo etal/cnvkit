@@ -48,7 +48,7 @@ manuscript by DOI, like so:
     Eric Talevich, A. Hunter Shain, Thomas Botton, Boris C. Bastian (2014)
     CNVkit: Copy number detection and visualization for targeted sequencing
     using off-target reads.
-    *bioRxiv* doi: http://dx.doi.org/10.1101/012179
+    *bioRxiv* doi: http://dx.doi.org/10.1101/010876
 
 A recent poster presentation is also available on `F1000 Posters
 <http://f1000.com/posters/browse/summary/1096236>`_.
