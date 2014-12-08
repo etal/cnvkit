@@ -346,23 +346,27 @@ class CopyNumArray(object):
                             (self.chromosome != chr_y))
         mid = numpy.median(self.coverage[mask_autosome])
         mask_cvg = (mask_autosome &
-                    (self.coverage >= mid - 2) &
-                    (self.coverage <= mid + 2))
+                    (self.coverage >= mid - 1.1) &
+                    (self.coverage <= mid + 1.1))
         if mode and sum(mask_cvg) > 210:
             # Estimate the mode from a smoothed histogram
             x = self.coverage[mask_cvg]
             w = self['weight'][mask_cvg] if 'weight' in self else None
             resn = int(round(numpy.sqrt(len(x))))
-            x_vals, x_edges = numpy.histogram(x, bins=10*resn, weights=w)
-            xs = smoothing.smoothed(x_vals, resn//3)
+            x_vals, x_edges = numpy.histogram(x, bins=8*resn, weights=w)
+            xs = smoothing.smoothed(x_vals, resn)
             # DBG: Check the fit
+            # ngfrills.echo("Centering: median", mid,
+            #               ", mode", x_edges[numpy.argmax(xs)],
+            #               ", resolution", x_edges[2] - x_edges[1])
             # from matplotlib import pyplot
             # _fig, ax = pyplot.subplots()
             # ax.plot(x_vals, c='k', alpha=.5)
             # ax.plot(xs, c='r', lw=2)
+            # median_idx = x_edges.searchsorted(mid)
+            # ax.axvspan(median_idx - 1, median_idx, color='teal', alpha=.3)
+            # ax.vlines(numpy.argmax(xs), *ax.get_ylim(), colors='salmon')
             # pyplot.show()
-            # ngfrills.echo("Centering: median", mid,
-            #               ", mode", x_edges[numpy.argmax(xs)])
             # --
             mid = x_edges[numpy.argmax(xs)]
         self.data['coverage'] -= mid
