@@ -4,7 +4,7 @@ CNVkit: Copy number from targeted DNA sequencing
 :Author: Eric Talevich
 :Contact: eric.talevich@ucsf.edu
 :Source code: http://github.com/etal/cnvkit
-:License: BSD
+:License: MIT (permissive)
 
 CNVkit is a Python library and command-line software toolkit to infer and
 visualize copy number from targeted DNA sequencing data. It is designed for use
