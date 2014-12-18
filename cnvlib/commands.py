@@ -87,18 +87,19 @@ def _cmd_batch(args):
         core.write_tsv(args.targets, target_coords)
         core.write_tsv(args.antitargets, antitarget_coords)
 
-    echo("Running", len(args.bam_files), "samples in",
-         (("%d processes" % args.processes)
-          if args.processes > 1 else "serial"))
+    if args.bam_files:
+        echo("Running", len(args.bam_files), "samples in",
+             (("%d processes" % args.processes)
+              if args.processes > 1 else "serial"))
 
-    pool = pick_pool(args.processes)
-    for bam in args.bam_files:
-        pool.apply_async(batch_run_sample,
-                         (bam, args.targets, args.antitargets, args.reference,
-                          args.output_dir, args.male_normal, args.scatter,
-                          args.diagram, args.rlibpath))
-    pool.close()
-    pool.join()
+        pool = pick_pool(args.processes)
+        for bam in args.bam_files:
+            pool.apply_async(batch_run_sample,
+                             (bam, args.targets, args.antitargets, args.reference,
+                              args.output_dir, args.male_normal, args.scatter,
+                              args.diagram, args.rlibpath))
+        pool.close()
+        pool.join()
 
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
@@ -216,7 +217,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
 
 
 P_batch = AP_subparsers.add_parser('batch', help=_cmd_batch.__doc__)
-P_batch.add_argument('bam_files', nargs='+',
+P_batch.add_argument('bam_files', nargs='*',
         help="Mapped sequence reads (.bam)")
 P_batch.add_argument('-y', '--male-normal', action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
