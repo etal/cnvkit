@@ -7,9 +7,11 @@ integer copy number calls.
 """
 from __future__ import division, print_function
 
+import math
+
 import cnvlib
 
-# from cnvlib.cnarray import CopyNumArray as CNA
+PLOIDY = 2
 
 def parse_theta_results(fname):
     """Parse THetA results into a data structure.
@@ -38,11 +40,9 @@ def parse_theta_results(fname):
                        for c in copies]]
         else:
             # List of lists of integer-or-None (usu. 2 x #segments)
-            copies_n = zip(*[c.split(',') for c in copies])
-            copies = []
-            for subcop in copies_n:
-                copies.append([int(c) if c.isdigit() else None
-                               for c in subcop])
+            copies = [[int(c) if c.isdigit() else None
+                       for c in subcop]
+                      for subcop in zip(*[c.split(',') for c in copies])]
 
         # p*
         probs = body[3].split(',')
@@ -51,11 +51,9 @@ def parse_theta_results(fname):
             probs = [float(p) if not p.isalpha() else None
                      for p in probs]
         else:
-            probs_n = zip(*[p.split(',') for p in probs])
-            probs = []
-            for subprob in probs_n:
-                probs.append([float(p) if not p.isalpha() else None
-                               for p in subprob])
+            probs = [[float(p) if not p.isalpha() else None
+                      for p in subprob]
+                     for subprob in zip(*[p.split(',') for p in probs])]
     return {"NLL": nll,
             "mu_normal": mu_normal,
             "mu_tumors": mu_tumors,
@@ -71,10 +69,10 @@ def main(args):
         # Replace segment values with these integers
         # Drop any segments where the C value is None
         new_segs = []
-        for seg, cop in zip(tumor_segs.copy(), copies):
-            if cop is None:
+        for seg, ncop in zip(tumor_segs.copy(), copies):
+            if ncop is None:
                 continue
-            seg["coverage"] = cop
+            seg["coverage"] = math.log((ncop or 0.5) / PLOIDY, 2)
             new_segs.append(seg)
         new_cns = tumor_segs.to_rows(new_segs)
         new_cns.write("%s-%d.cni" % (tumor_segs.sample_id, i + 1))
