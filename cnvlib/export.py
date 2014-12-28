@@ -1,6 +1,7 @@
 """Export CNVkit objects and files to other formats."""
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 import collections
+import sys
 
 from Bio._py3k import map, range, zip
 
@@ -153,6 +154,126 @@ def create_chrom_ids(segments):
             curr_idx += 1
     return mapping
 
+# _____________________________________________________________________________
+# freebayes
+
+def export_freebayes(sample_fname, args):
+    """Export to FreeBayes --cnv-map format.
+
+    Which is BED-like, for each region in each sample which does not have
+    neutral copy number (equal to 2 or the value set by --ploidy), with columns:
+
+        - reference sequence
+        - start (0-indexed)
+        - end
+        - sample name
+        - copy number
+    """
+    if args.purity and not 0.0 < args.purity <= 1.0:
+        raise RuntimeError("Purity must be between 0 and 1.")
+
+    segs = CNA.read(sample_fname)
+    print(args.gender)
+    is_sample_female = core.guess_xx(segs, args.male_normal, verbose=False)
+    if args.gender:
+        is_sample_female_given = (args.gender in ["f", "female"])
+        if is_sample_female != is_sample_female_given:
+            print("Sample gender specified as", args.gender,
+                  "but chrX copy number looks like",
+                  "female" if is_sample_female else "male",
+                  file=sys.stderr)
+            is_sample_female = is_sample_female_given
+    print("Treating sample gender as",
+          "female" if is_sample_female else "male",
+          file=sys.stderr)
+
+    bedrows = segments2bed(segs, args.name or segs.sample_id,
+                           args.ploidy, args.purity, args.male_normal,
+                           is_sample_female)
+    return None, list(bedrows)
+
+
+def segments2bed(segments, sample_name, ploidy, purity, is_reference_male,
+                 is_sample_female):
+    for row in segments:
+        ref_copies, expect_copies = reference_expect_copies(
+            row["chromosome"], ploidy, is_sample_female, is_reference_male)
+        ncopies = log2_ratio_to_integer(
+            row["coverage"], ref_copies, expect_copies, purity)
+        # Ignore regions of neutral copy number
+        if ncopies != ploidy:
+            yield (row["chromosome"], # reference sequence
+                   row["start"], # start (0-indexed)
+                   row["end"], # end
+                   sample_name, # sample name
+                   ncopies) # copy number
+
+
+def reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male):
+    """Determine the number copies of a chromosome expected and in reference.
+
+    For sex chromosomes, these values may not be the same ploidy as the
+    autosomes.
+
+    Return a pair: number of copies in the reference and expected in the sample.
+    """
+    chrom = chrom.lower()
+
+    if chrom in ["chrx", "x"]:
+        ref_copies = (ploidy // 2 if is_reference_male else ploidy)
+        exp_copies = (ploidy if is_sample_female else ploidy // 2)
+    elif chrom in ["chry", "y"]:
+        ref_copies = ploidy // 2
+        exp_copies = (0 if is_sample_female else ploidy // 2)
+    else:
+        ref_copies = exp_copies = ploidy
+
+    return ref_copies, exp_copies
+
+
+def log2_ratio_to_integer(log2_ratio, ref_copies, expect_copies, purity=None):
+    """Transform a log2 ratio value to integer.
+
+    Math:
+
+        log2_ratio = log2(ncopies / ploidy)
+        2^log2_ratio = ncopies / ploidy
+        ncopies = ploidy * 2^log2_ratio
+
+    With rescaling for purity:
+
+        let v = log2 ratio value, p = tumor purity,
+            r = reference ploidy, x = expected ploidy;
+        v = log_2(p*n/r + (1-p)*x/r)
+        2^v = p*n/r + (1-p)*x/r
+        n*p/r = 2^v - (1-p)*x/r
+        n = (r*2^v - x*(1-p)) / p
+
+    If purity adjustment is skipped (p=1; e.g. if THetA was run beforehand):
+
+        n = r*2^v
+    """
+    EPSILON = 1e-7
+
+    if purity and purity < 1.0:
+        ncopies = (ref_copies * 2**log2_ratio - expect_copies * (1 - purity)
+                  ) / purity
+    else:
+        ncopies = ref_copies * 2 ** log2_ratio
+        # Convention: encode log2(0 copies) as a half-copy (-2 for diploid)
+        if ncopies <= .5 + EPSILON:
+            return 0
+    return max(0, int(round(ncopies)))
+
+
+# _____________________________________________________________________________
+# theta
+
+def export_theta(sample_fname):
+    pass
+
+
+# _____________________________________________________________________________
 
 EXPORT_FORMATS = {
     'cdt': fmt_cdt,
@@ -162,4 +283,6 @@ EXPORT_FORMATS = {
     'nexus-basic': export_nexus_basic,
     # 'nexus-multi1': fmt_multi,
     'seg': export_seg,
+    'freebayes': export_freebayes,
+    'theta': export_theta,
 }

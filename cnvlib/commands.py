@@ -1263,6 +1263,11 @@ def _cmd_export(args):
         # Special case: Nexus "basic" can only represent 1 sample
         assert len(args.filenames) == 1
         outheader, outrows = export.export_nexus_basic(args.filenames[0])
+    elif args.filetype == 'freebayes':
+        # Special case: FreeBayes --cnv-map could represent multiple samples,
+        # but the exporter currently doesn't handle that.
+        assert len(args.filenames) == 1
+        outheader, outrows = export.export_freebayes(args.filenames[0], args)
     else:
         sample_ids = list(map(core.fbase, args.filenames))
         rows = export.merge_samples(args.filenames)
@@ -1278,14 +1283,35 @@ P_export.add_argument('filetype', choices=export.EXPORT_FORMATS,
                 'cdt' (Java TreeView again),
                 'seg' (IGV and GenePattern),
                 'nexus-basic' (Nexus Copy Number)
+                'freebayes' (FreeBayes --cnv-map input file)
+                'theta' (THetA2 input file)
                 """)
                 # 'multi' (Nexus Copy Number "multi1")
                 # 'gct' (GenePattern).
 P_export.add_argument('filenames', nargs='+', metavar="filename(s)",
-        help="""Processed sample coverage data file(s) (*.cnr), the output
-                of the 'fix' sub-command.""")
+        help="""Processed sample coverage data file(s) (*.cnr or *.cns), the
+                output of the 'fix' sub-command.""")
 P_export.add_argument('-o', '--output',
         help="Output file name.")
+
+P_export_freebayes = P_export.add_argument_group("FreeBayes export options")
+P_export_freebayes.add_argument("-n", "--name",
+        help="Sample name, as FreeBayes should see it.")
+P_export_freebayes.add_argument("--ploidy", type=int, default=2,
+        help="Ploidy of the sample cells.")
+P_export_freebayes.add_argument("--purity", type=float,
+        help="Estimated tumor cell purity / cellularity.")
+P_export_freebayes.add_argument("-g", "--gender",
+        choices=('m', 'male', 'f', 'female'),
+        help="""Specify the sample's gender as male or female. (Otherwise
+                guessed from chrX copy number).""")
+P_export_freebayes.add_argument("-y", "--male-normal", action="store_true",
+        help="""Was a male-normal reference used?  If so, expect half ploidy on
+                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
+                if a male-normal copy number reference was used, the "neutral"
+                copy number (ploidy) of chrX is 1; chrY is haploid for either
+                gender reference.""")
+
 P_export.set_defaults(func=_cmd_export)
 
 
