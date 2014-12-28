@@ -269,8 +269,78 @@ def log2_ratio_to_integer(log2_ratio, ref_copies, expect_copies, purity=None):
 # _____________________________________________________________________________
 # theta
 
-def export_theta(sample_fname):
-    pass
+def export_theta(tumor, reference, args):
+    """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
+
+    Follows the THetA segmentation import script but avoid repeating the
+    pileups, since we already have the mean depth of coverage in each target
+    bin.
+
+    The options for average depth of coverage and read length do not matter
+    crucially for proper operation of THetA; increased read counts per bin
+    simply increase the confidence of THetA's results.
+
+    THetA2 input format is tabular, with columns:
+        ID, chrm, start, end, tumorCount, normalCount
+
+    where chromosome IDs ("chrm") are integers 1 through 24.
+    """
+    tumor_segs = CNA.read(tumor)
+    ref_vals = CNA.read(reference)
+
+    outheader = ["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]
+    outrows = []
+    # Convert chromosome names to 1-based integer indices
+    prev_chrom = None
+    chrom_id = 0
+    for seg, ref_rows in ref_vals.by_segment(tumor_segs):
+        if seg["chromosome"] != prev_chrom:
+            chrom_id += 1
+            prev_chrom = seg["chromosome"]
+        fields = calculate_theta_fields(seg, ref_rows, chrom_id,
+                                        args.coverage, args.read_length)
+        outrows.append(fields)
+
+    return outheader, outrows
+
+
+def calculate_theta_fields(seg, ref_rows, chrom_id, expect_depth, read_length):
+    """Convert a segment's info to a row of THetA input.
+
+    For the normal/reference bin count, take the mean of the bin values within
+    each segment so that segments match between tumor and normal.
+    """
+    segment_size = seg["end"] - seg["start"]
+    def logratio2count(log2_ratio):
+        """Calculate a segment's read count from log2-ratio.
+
+        Math:
+            nbases = read_length * read_count
+        and
+            nbases = segment_size * read_depth
+        where
+            read_depth = read_depth_ratio * expect_depth
+
+        So:
+            read_length * read_count = segment_size * read_depth
+            read_count = segment_size * read_depth / read_length
+        """
+        read_depth = (2 ** log2_ratio) * expect_depth
+        read_count = segment_size * read_depth / read_length
+        return int(round(read_count))
+
+    tumor_count = logratio2count(seg["coverage"])
+    ref_count = logratio2count(ref_rows["coverage"].mean())
+    # e.g. "start_1_93709:end_1_19208166"
+    row_id = ("start_%d_%d:end_%d_%d"
+              % (chrom_id, seg["start"], chrom_id, seg["end"]))
+    return (row_id,       # ID
+            chrom_id,     # chrm
+            seg["start"], # start
+            seg["end"],   # end
+            tumor_count,  # tumorCount
+            ref_count     # normalCount
+           )
 
 
 # _____________________________________________________________________________

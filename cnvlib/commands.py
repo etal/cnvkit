@@ -1268,6 +1268,13 @@ def _cmd_export(args):
         # but the exporter currently doesn't handle that.
         assert len(args.filenames) == 1
         outheader, outrows = export.export_freebayes(args.filenames[0], args)
+    elif args.filetype == 'theta':
+        # Special case: THetA takes tumor .cns and normal .cnr or reference.cnn
+        assert len(args.filenames) == 2
+        tumor, reference = args.filenames
+        outheader, outrows = export.export_theta(tumor, reference, args)
+        # if not args.output:
+        #     args.output = tumor_segs.sample_id + ".input"
     else:
         sample_ids = list(map(core.fbase, args.filenames))
         rows = export.merge_samples(args.filenames)
@@ -1294,13 +1301,19 @@ P_export.add_argument('filenames', nargs='+', metavar="filename(s)",
 P_export.add_argument('-o', '--output',
         help="Output file name.")
 
-P_export_freebayes = P_export.add_argument_group("FreeBayes export options")
+P_export_freebayes = P_export.add_argument_group(
+    """FreeBayes export options to generate the FreeBayes --cnv-map input file.
+
+    Input is: a segmentation file (.cns). This may be imported from THetA to
+    account for normal-cell contamination and subclonal tumor cell population
+    structure; otherwise, the --purity argument provides a simpler adjustment.
+    """)
 P_export_freebayes.add_argument("-n", "--name",
         help="Sample name, as FreeBayes should see it.")
 P_export_freebayes.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells.")
 P_export_freebayes.add_argument("--purity", type=float,
-        help="Estimated tumor cell purity / cellularity.")
+        help="Estimated tumor cell purity or cellularity.")
 P_export_freebayes.add_argument("-g", "--gender",
         choices=('m', 'male', 'f', 'female'),
         help="""Specify the sample's gender as male or female. (Otherwise
@@ -1311,6 +1324,18 @@ P_export_freebayes.add_argument("-y", "--male-normal", action="store_true",
                 if a male-normal copy number reference was used, the "neutral"
                 copy number (ploidy) of chrX is 1; chrY is haploid for either
                 gender reference.""")
+
+P_export_theta = P_export.add_argument_group(
+    """THetA2 export options to generate the THetA2 input file (*.input).
+
+    Inputs are (1) tumor-sample segmentation from CNVkit (.cns), and (2)
+    normal-sample bin-level read depths (.cnr), or a corresponding reference
+    (.cnn).
+    """)
+P_export_theta.add_argument("-c", "--coverage", type=int, default=500,
+        help="Expected genome-wide depth of coverage.")
+P_export_theta.add_argument("-r", "--read-length", type=int, default=100,
+        help="Read length.")
 
 P_export.set_defaults(func=_cmd_export)
 
