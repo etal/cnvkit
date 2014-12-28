@@ -1,5 +1,5 @@
 """Import from other formats to the CNVkit format."""
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 import math
 import os.path
 import subprocess
@@ -152,3 +152,54 @@ def import_seg(segfname, chrom_names, chrom_prefix, from_log10):
             assert len(curr_rows)
             # Emit the current set of segments as a sample
             yield CNA.from_rows(curr_sample, curr_rows, ('probes',))
+
+
+# __________________________________________________________________________
+# import-theta
+
+def parse_theta_results(fname):
+    """Parse THetA results into a data structure.
+
+    Columns: NLL, mu, C, p*
+    """
+    with open(fname) as handle:
+        header = next(handle).rstrip().split('\t')
+        body = next(handle).rstrip().split('\t')
+        assert len(body) == len(header) == 4
+
+        # NLL
+        nll = float(body[0])
+
+        # mu
+        mu = body[1].split(',')
+        mu_normal = float(mu[0])
+        mu_tumors = map(float, mu[1:])
+
+        # C
+        copies = body[2].split(':')
+        if len(mu_tumors) == 1:
+            # 1D array of integers
+            # Replace X with None for "missing"
+            copies = [[int(c) if c.isdigit() else None
+                       for c in copies]]
+        else:
+            # List of lists of integer-or-None (usu. 2 x #segments)
+            copies = [[int(c) if c.isdigit() else None
+                       for c in subcop]
+                      for subcop in zip(*[c.split(',') for c in copies])]
+
+        # p*
+        probs = body[3].split(',')
+        if len(mu_tumors) == 1:
+            # 1D array of floats, or None for "X" (missing/unknown)
+            probs = [float(p) if not p.isalpha() else None
+                     for p in probs]
+        else:
+            probs = [[float(p) if not p.isalpha() else None
+                      for p in subprob]
+                     for subprob in zip(*[p.split(',') for p in probs])]
+    return {"NLL": nll,
+            "mu_normal": mu_normal,
+            "mu_tumors": mu_tumors,
+            "C": copies,
+            "p*": probs}

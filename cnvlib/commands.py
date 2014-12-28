@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division
 import argparse
 import collections
+import math
 import multiprocessing
 import os
 import sys
@@ -1250,6 +1251,41 @@ P_import_seg.add_argument('--from-log10',
 P_import_seg.add_argument('-d', '--output-dir', default='.',
         help="Output directory name.")
 P_import_seg.set_defaults(func=_cmd_import_seg)
+
+
+# import-theta ---------------------------------------------------------------
+
+def _cmd_import_theta(args):
+    """Convert THetA output to a BED-like, CNVkit-like tabular format.
+
+    Equivalently, use the THetA results file to convert CNVkit .cns segments to
+    integer copy number calls.
+    """
+    tumor_segs = CNA.read(args.tumor_cns)
+    theta = importers.parse_theta_results(args.theta_results)
+    for i, copies in enumerate(theta['C']):
+        # Replace segment values with these integers
+        # Drop any segments where the C value is None
+        new_segs = []
+        for seg, ncop in zip(tumor_segs.copy(), copies):
+            if ncop is None:
+                continue
+            seg["coverage"] = math.log((ncop or 0.5) / args.ploidy, 2)
+            new_segs.append(seg)
+        new_cns = tumor_segs.to_rows(new_segs)
+        new_cns.write(os.path.join(args.output_dir,
+                                   "%s-%d.cns" % (tumor_segs.sample_id, i + 1)))
+
+
+P_import_theta = AP_subparsers.add_parser('import-theta',
+        help=_cmd_import_theta.__doc__)
+P_import_theta.add_argument("tumor_cns")
+P_import_theta.add_argument("theta_results")
+P_import_theta.add_argument("--ploidy", type=int, default=2,
+        help="Ploidy of the sample cells.")
+P_import_theta.add_argument('-d', '--output-dir', default='.',
+        help="Output directory name.")
+P_import_theta.set_defaults(func=_cmd_import_theta)
 
 
 # export ----------------------------------------------------------------------
