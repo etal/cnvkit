@@ -173,7 +173,6 @@ def export_freebayes(sample_fname, args):
         raise RuntimeError("Purity must be between 0 and 1.")
 
     segs = CNA.read(sample_fname)
-    print(args.gender)
     is_sample_female = core.guess_xx(segs, args.male_normal, verbose=False)
     if args.gender:
         is_sample_female_given = (args.gender in ["f", "female"])
