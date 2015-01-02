@@ -197,8 +197,10 @@ def segments2bed(segments, sample_name, ploidy, purity, is_reference_male,
     for row in segments:
         ref_copies, expect_copies = reference_expect_copies(
             row["chromosome"], ploidy, is_sample_female, is_reference_male)
-        ncopies = log2_ratio_to_integer(
+        ncopies = log2_ratio_to_absolute(
             row["coverage"], ref_copies, expect_copies, purity)
+        ncopies = round_to_integer(ncopies, half_is_zero=purity is None)
+
         # Ignore regions of neutral copy number
         if ncopies != ploidy:
             yield (row["chromosome"], # reference sequence
@@ -230,7 +232,7 @@ def reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male):
     return ref_copies, exp_copies
 
 
-def log2_ratio_to_integer(log2_ratio, ref_copies, expect_copies, purity=None):
+def log2_ratio_to_absolute(log2_ratio, ref_copies, expect_copies, purity=None):
     """Transform a log2 ratio value to integer.
 
     Math:
@@ -252,16 +254,24 @@ def log2_ratio_to_integer(log2_ratio, ref_copies, expect_copies, purity=None):
 
         n = r*2^v
     """
-    EPSILON = 1e-7
-
     if purity and purity < 1.0:
         ncopies = (ref_copies * 2**log2_ratio - expect_copies * (1 - purity)
                   ) / purity
     else:
         ncopies = ref_copies * 2 ** log2_ratio
-        # Convention: encode log2(0 copies) as a half-copy (-2 for diploid)
-        if ncopies <= .5 + EPSILON:
-            return 0
+    return ncopies
+
+
+def round_to_integer(ncopies, half_is_zero=True, rounding_error=1e-7):
+    """Round an absolute estimate of copy number to a positive integer.
+
+    `half_is_zero` indicates the hack of encoding 0 copies (complete loss) as a
+    half-copy in log2 scale (e.g. log2-ratio value of -2.0 for diploid) to avoid
+    domain errors when log-transforming. If `half_is_zero`, a half-copy will be
+    rounded down to zero rather than up to 1 copy.
+    """
+    if half_is_zero and ncopies <= .5 + rounding_error:
+        return 0
     return max(0, int(round(ncopies)))
 
 
