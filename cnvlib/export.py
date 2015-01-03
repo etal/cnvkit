@@ -278,7 +278,7 @@ def round_to_integer(ncopies, half_is_zero=True, rounding_error=1e-7):
 # _____________________________________________________________________________
 # theta
 
-def export_theta(tumor, reference, args):
+def export_theta(tumor, reference):
     """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
 
     Follows the THetA segmentation import script but avoid repeating the
@@ -306,19 +306,23 @@ def export_theta(tumor, reference, args):
         if seg["chromosome"] != prev_chrom:
             chrom_id += 1
             prev_chrom = seg["chromosome"]
-        fields = calculate_theta_fields(seg, ref_rows, chrom_id,
-                                        args.coverage, args.read_length)
+        fields = calculate_theta_fields(seg, ref_rows, chrom_id)
         outrows.append(fields)
 
     return outheader, outrows
 
 
-def calculate_theta_fields(seg, ref_rows, chrom_id, expect_depth, read_length):
+def calculate_theta_fields(seg, ref_rows, chrom_id):
     """Convert a segment's info to a row of THetA input.
 
     For the normal/reference bin count, take the mean of the bin values within
     each segment so that segments match between tumor and normal.
     """
+    # These two scaling factors don't meaningfully affect THetA's calculation
+    # unless they're too small
+    expect_depth = 1000  # Average exome-wide depth of coverage
+    read_length = 100
+
     segment_size = seg["end"] - seg["start"]
     def logratio2count(log2_ratio):
         """Calculate a segment's read count from log2-ratio.

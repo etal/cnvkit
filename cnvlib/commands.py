@@ -1302,13 +1302,17 @@ def _cmd_export(args):
     elif args.filetype == 'freebayes':
         # Special case: FreeBayes --cnv-map could represent multiple samples,
         # but the exporter currently doesn't handle that.
-        assert len(args.filenames) == 1
+        assert len(args.filenames) == 1, \
+                "FreeBayes export requires one segmentation file (.cns)"
         outheader, outrows = export.export_freebayes(args.filenames[0], args)
     elif args.filetype == 'theta':
         # Special case: THetA takes tumor .cns and normal .cnr or reference.cnn
-        assert len(args.filenames) == 2
+        assert len(args.filenames) == 2, \
+                """THetA export requires two input files: (1) tumor-sample
+                segmentation from CNVkit (.cns), and (2) normal-sample bin-level
+                copy ratios (.cnr), or a corresponding reference (.cnn)."""
         tumor, reference = args.filenames
-        outheader, outrows = export.export_theta(tumor, reference, args)
+        outheader, outrows = export.export_theta(tumor, reference)
         # if not args.output:
         #     args.output = tumor_segs.sample_id + ".input"
     else:
@@ -1325,9 +1329,9 @@ P_export.add_argument('filetype', choices=export.EXPORT_FORMATS,
                 'jtv' (Java TreeView),
                 'cdt' (Java TreeView again),
                 'seg' (IGV and GenePattern),
-                'nexus-basic' (Nexus Copy Number)
-                'freebayes' (FreeBayes --cnv-map input file)
-                'theta' (THetA2 input file)
+                'nexus-basic' (Nexus Copy Number),
+                'freebayes' (FreeBayes --cnv-map input file),
+                'theta' (THetA2 input file, *.input)
                 """)
                 # 'multi' (Nexus Copy Number "multi1")
                 # 'gct' (GenePattern).
@@ -1361,17 +1365,6 @@ P_export_freebayes.add_argument("-y", "--male-normal", action="store_true",
                 copy number (ploidy) of chrX is 1; chrY is haploid for either
                 gender reference.""")
 
-P_export_theta = P_export.add_argument_group(
-    """THetA2 export options to generate the THetA2 input file (*.input).
-
-    Inputs are (1) tumor-sample segmentation from CNVkit (.cns), and (2)
-    normal-sample bin-level read depths (.cnr), or a corresponding reference
-    (.cnn).
-    """)
-P_export_theta.add_argument("-c", "--coverage", type=int, default=500,
-        help="Expected genome-wide depth of coverage.")
-P_export_theta.add_argument("-r", "--read-length", type=int, default=100,
-        help="Read length.")
 
 P_export.set_defaults(func=_cmd_export)
 
