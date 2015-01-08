@@ -322,10 +322,9 @@ def calculate_theta_fields(seg, ref_rows, chrom_id):
     # unless they're too small
     expect_depth = 100  # Average exome-wide depth of coverage
     read_length = 100
+    # Similar number of reads in on-, off-target bins; treat them equally
+    segment_size = 1000 * seg["probes"]
 
-    segment_size = seg["end"] - seg["start"]
-    # Weight segments by number of bins they contain
-    segment_size *= seg["probes"]
     def logratio2count(log2_ratio):
         """Calculate a segment's read count from log2-ratio.
 
