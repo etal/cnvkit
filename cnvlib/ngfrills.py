@@ -42,16 +42,21 @@ def sniff_region_format(fname):
     Returns a tuple of the format name (str) and a handle to the opened file.
     """
     with open(fname, 'rU') as handle:
-        line = handle.readline()
-    if '\t' not in line and ':' in line and '-' in line:
-        return 'text'
-    if line.startswith('@') or re.match('\w+\t\d+\t\d+\t(\+|-|\.)\t\S+', line):
-        echo("Sniffed interval")
-        return 'interval'
-    if line.startswith('track') or line.count('\t') > 1:
-        echo("Sniffed BED")
-        return 'bed'
-    raise ValueError("WTF format is this?: %s" % line)
+        for line in handle:
+            if not line.strip():
+                continue
+            if '\t' not in line and ':' in line and '-' in line:
+                return 'text'
+            if line.startswith('@') or re.match('\w+\t\d+\t\d+\t(\+|-|\.)\t\S+',
+                                                line):
+                echo("Sniffed interval")
+                return 'interval'
+            if line.startswith('track') or line.count('\t') > 1:
+                echo("Sniffed BED")
+                return 'bed'
+            raise ValueError("File " + repr(fname) + " does not appear to "
+                             + "be BED, interval list, or 'chr:start-end' "
+                             + "text!\nFirst non-blank line: " + repr(line))
 
 
 def parse_regions(fname, coord_only=False, keep_strand=False):
