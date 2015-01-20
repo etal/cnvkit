@@ -14,16 +14,20 @@ And read the README file.
 Download the reference genome
 -----------------------------
 
-Go to the `UCSC Genome Bioinformatics <hgdownload.soe.ucsc.edu/downloads.html>`_
+Go to the `UCSC Genome Bioinformatics <http://hgdownload.soe.ucsc.edu/downloads.html>`_
 website and download:
 
 1. Your species' reference genome sequence, in FASTA format [required]
-2. Gene annotations, via RefSeq or Ensembl, in "flat" format (e.g. refFlat.txt)
+2. Gene annotation database, via RefSeq or Ensembl, in "flat" format (e.g.
+   `refFlat.txt
+   <http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refFlat.txt.gz>`_)
    [optional]
 
 You probably already have the reference genome sequence. If your species' genome
 is not available from UCSC, use whatever reference sequence you have. CNVkit
 only requires that your reference genome sequence be in FASTA format.
+Both the reference genome sequence and the annotation database must be single,
+uncompressed files.
 
 **Sequencing-accessible regions:**
 If your reference genome is the UCSC human genome hg19, a BED file of the
