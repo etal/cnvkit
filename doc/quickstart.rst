@@ -47,6 +47,22 @@ The gene annotations file (refFlat.txt) is useful to apply gene names to your
 baits BED file, if the BED file does not already have short, informative names
 for each bait interval. This file can be used in the next step.
 
+If your targets look like::
+
+    chr1	1508981	1509154
+    chr1	2407978	2408183
+    chr1	2409866	2410095
+
+Then you want refFlat.txt.
+
+Otherwise, if they look like::
+
+    chr1	1508981	1509154	SSU72
+    chr1	2407978	2408183	PLCH2
+    chr1	2409866	2410095	PLCH2
+
+Then you don't need refFlat.txt.
+
 
 Map sequencing reads to the reference genome
 --------------------------------------------
@@ -79,7 +95,7 @@ command could be::
 
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
         --targets my_targets.bed --fasta hg19.fasta \
-        --annotate refFlat.txt --split --access data/access-10kb.hg19.bed \
+        --split --access data/access-10kb.hg19.bed \
         --output-reference my_reference.cnn --output-dir example/
 
 See the built-in help message to see what these options do, and for additional
@@ -92,13 +108,20 @@ reference which assumes equal coverage in all bins by using the ``--normal/-n``
 flag without specifying any additional BAM files::
 
     cnvkit.py batch *Tumor.bam -n -t my_targets.bed -f hg19.fasta \
-        --annotate refFlat.txt --split --access data/access-10kb.hg19.bed \
+        --split --access data/access-10kb.hg19.bed \
         --output-reference my_flat_reference.cnn -d example2/
 
 In either case, you should run this command with the reference genome sequence
 FASTA file to extract GC and RepeatMasker information for bias corrections,
 which enables CNVkit to improve the copy ratio estimates even without a paired
 normal sample.
+
+If your targets are missing gene names, you can add them here with the
+``--annotate`` argument::
+
+    cnvkit.py batch *Tumor.bam -n *Normal.bam -t my_targets.bed -f hg19.fasta \
+        --annotate refFlat.txt --split --access data/access-10kb.hg19.bed \
+        --output-reference my_flat_reference.cnn -d example3/
 
 
 Process more tumor samples
@@ -111,7 +134,7 @@ Assuming the new tumor samples share the suffix "Tumor.bam" (and let's also
 spread the workload across all available CPUs with the ``-p`` option, and
 generate some figures)::
 
-    cnvkit.py batch *Tumor.bam -r my_reference.cnn -p 0 --scatter --diagram -d example3/
+    cnvkit.py batch *Tumor.bam -r my_reference.cnn -p 0 --scatter --diagram -d example4/
 
 The coordinates of the target and antitarget bins, the gene names for the
 targets, and the GC and RepeatMasker information for bias corrections are
