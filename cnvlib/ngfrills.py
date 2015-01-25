@@ -25,7 +25,7 @@ def echo(*words):
 # BED/Interval I/O
 
 def sniff_num_columns(bed_fname):
-    """Sniff the number of columns in a BED/interval file.
+    """Detect the number of columns in a BED/interval file.
 
     Guidance:
         3 cols => coordinates only;
@@ -49,10 +49,10 @@ def sniff_region_format(fname):
                 return 'text'
             if line.startswith('@') or re.match('\w+\t\d+\t\d+\t(\+|-|\.)\t\S+',
                                                 line):
-                echo("Sniffed interval")
+                echo("Detected file format: interval list")
                 return 'interval'
             if line.startswith('track') or line.count('\t') > 1:
-                echo("Sniffed BED")
+                echo("Detected file format: BED")
                 return 'bed'
             raise ValueError("File " + repr(fname) + " does not appear to "
                              + "be BED, interval list, or 'chr:start-end' "

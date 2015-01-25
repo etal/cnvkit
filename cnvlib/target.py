@@ -22,10 +22,12 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
     for (chrom, strand), chr_rows in groupby(sorted(region_rows,
                                                     key=lambda row: (
                                                         row[0], # chromosome
-                                                        row[3], # strand
+                                                        row[4], # strand
                                                         row[1], # start
                                                         row[2])), # end
-                                             lambda row: (row[0], row[3])):
+                                             lambda row: (row[0], row[4])):
+        if strand == '.':
+            strand = "+|-"
         if (chrom, strand) in ref_genes:
             genes_in_chrom = iter(ref_genes[(chrom, strand)])
         elif '|' in strand:
@@ -77,6 +79,7 @@ def read_refflat_genes(fname):
             # Skip antisense RNA annotations
             if name.endswith('-AS1'):
                 continue
+            assert strand in '+-'
             genedict[name].append((chrom, strand, start, end))
 
     chromdict = collections.defaultdict(list)
@@ -88,13 +91,10 @@ def read_refflat_genes(fname):
         else:
             # Check locs for overlap; merge if so
             locs.sort()
-            chroms, strands, starts, ends = zip(*locs)
-            starts = map(int, starts)
-            ends = map(int, ends)
-            curr_chrom, curr_strand, curr_start, curr_end = (
-                chroms[0], strands[0], starts[0], ends[0])
-            for chrom, strand, start, end in zip(chroms[1:], strands[1:],
-                                                 starts[1:], ends[1:]):
+            curr_chrom, curr_strand, curr_start, curr_end = locs[0]
+            curr_start, curr_end = int(curr_start), int(curr_end)
+            for chrom, strand, start, end in locs[1:]:
+                start, end = int(start), int(end)
                 if (chrom != curr_chrom or
                     strand != curr_strand or
                     start > curr_end + 1 or
