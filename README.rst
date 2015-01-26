@@ -2,13 +2,14 @@
 CNVkit
 ======
 
-A command-line toolkit and Python library for detecting copy number variations
-and alterations from targeted DNA sequencing.
+A command-line toolkit and Python library for detecting copy number variants
+and alterations genome-wide from targeted DNA sequencing.
 
 Read the full documentation at: http://cnvkit.readthedocs.org
 
 Questions, comments, help and discussion on SeqAnswers:
 http://seqanswers.com/forums/showthread.php?t=47910
+
 
 .. image:: https://travis-ci.org/etal/cnvkit.svg?branch=master
     :target: https://travis-ci.org/etal/cnvkit
@@ -16,6 +17,18 @@ http://seqanswers.com/forums/showthread.php?t=47910
 .. image:: https://landscape.io/github/etal/cnvkit/master/landscape.svg
    :target: https://landscape.io/github/etal/cnvkit/master
    :alt: Code Health
+
+
+Try it
+======
+
+You can easily run CNVkit on your own data without installing it by using our
+DNAnexus app:
+https://platform.dnanexus.com/app/cnvkit_batch
+
+A Galaxy tool is also available for testing (but requires CNVkit installation,
+see below):
+https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit
 
 
 Installation
