@@ -1,6 +1,12 @@
 Quick start
 ===========
 
+If you would like to quickly try CNVkit without installing it, try our app on
+`DNAnexus <https://platform.dnanexus.com/app/cnvkit_batch>`_.
+
+To run CNVkit on your own machine, keep reading.
+
+
 Install CNVkit
 --------------
 
