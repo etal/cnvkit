@@ -26,13 +26,13 @@ threshold.
     cnvkit.py gainloss Sample.cnr
     cnvkit.py gainloss Sample.cnr -s Sample.cns -t 0.4 -y -m 5
 
-If segments are given, the log~2~ ratio value reported for each gene will be the
+If segments are given, the log2 ratio value reported for each gene will be the
 value of the segment covering the gene. Where more than one segment overlaps the
 gene, i.e. if the gene contains a breakpoint, each segment's value will be
 reported as a separate row for the same gene.
 
-If segments are not given, the median of the log~2 ratio values of the bins
-within each gene will be reported as the gene's overall log~2 ratio value. This
+If segments are not given, the median of the log2 ratio values of the bins
+within each gene will be reported as the gene's overall log2 ratio value. This
 mode will not attempt to identify breakpoints within genes.
 
 The threshold (``-t``) and minimum number of bins (``-m``) options are used to
