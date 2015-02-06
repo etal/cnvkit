@@ -32,7 +32,7 @@ def ests_of_scale(deviations):
     Calculates all of these values for an array of deviations and returns them
     as a tuple.
     """
-    std = numpy.std(deviations)
+    std = numpy.std(deviations, dtype=numpy.float64)
     mad = median_absolute_deviation(deviations)
     iqr = interquartile_range(deviations)
     biw = biweight_midvariance(deviations)
