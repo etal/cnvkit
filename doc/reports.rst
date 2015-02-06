@@ -56,31 +56,85 @@ processing by scripts and standard Unix tools such as ``grep``, ``sort``,
 gender
 ------
 
-Guess samples' gender from the relative coverage of chrX. The answer is printed
-to standard output as "Female" or "Male".
+Guess samples' gender from the relative coverage of chromoxsome X. 
+A table of the sample name (derived from the filename), guessed chromosomal
+gender (string "Female" or "Male"), and log2 ratio value of chromosome X is
+printed.
 
 ::
 
     cnvkit.py gender *.cnn *.cnr *.cns
+    cnvkit.py gender -y *.cnn *.cnr *.cns
+
 
 metrics
 -------
 
-Compute coverage deviations and other metrics for self-evaluation.
+Calculate the spread of bin-level copy ratios from the corresponding final
+segments using several statistics.
+These statistics help quantify how "noisy" a sample is and help to decide which
+samples to exclude from an analysis, or to select normal samples for a reference
+copy number profile.
 
-::
+For a single sample::
 
     cnvkit.py metrics Sample.cnr -s Sample.cns
+
+(Note that the order of arguments and options matters here, unlike the other
+commands: Everything after the ``-s`` flag is treated as a segment dataset.)
 
 Multiple samples can be processed together to produce a table::
 
     cnvkit.py metrics S1.cnr S2.cnr -s S1.cns S2.cns
+    cnvkit.py metrics *.cnr -s *.cns
 
-To compare multiple probe sets to the same segment dataset (reusing the given
-segments for each coverage dataset)::
+Several bin-level log2 ratio estimates for a single sample, such as the
+uncorrected on- and off-target coverages and the final bin-level log2 ratios,
+can be compared to the same final segmentation (reusing the given segments for
+each coverage dataset)::
 
     cnvkit.py metrics Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn Sample.cnr -s Sample.cns
 
-(Note that the order of arguments and options matters here, unlike the other
-commands: everything after the -s flag is treated as a segment dataset.)
 
+In each case, given the bin-level copy ratios (.cnr) and segments (.cns) for a
+sample, the log2 ratio value of each segment is subtracted from each of the bins
+it covers, and several estimators of `spread
+<http://en.wikipedia.org/wiki/Statistical_dispersion>`_ are calculated from the
+residual values.
+The output text or table shows for each sample:
+
+- Total number of segments (in the .cns file) -- a large number of segments can
+  indicate that the sample has either many real CNAs, or noisy coverage and
+  therefore many spurious segments.
+- Uncorrected sample `standard deviation
+  <https://en.wikipedia.org/wiki/Standard_deviation>`_ -- this measure is prone
+  to being inflated by a few outliers, such as may occur in regions of poor
+  coverage or if the targets used with CNVkit analysis did not exactly match the
+  capture. (Also note that the log2 ratio data are not quite normally
+  distributed.) However, if a sample's standard deviation is drastically higher
+  than the other estimates shown by the ``metrics`` command, that helpfully
+  indicates the sample has some outlier bins.
+- `Median absolute deviation
+  <http://en.wikipedia.org/wiki/Median_absolute_deviation>`_ (MAD) -- very
+  `robust <http://en.wikipedia.org/wiki/Robust_measures_of_scale>`_ against
+  outliers, but less `statistically efficient
+  <http://en.wikipedia.org/wiki/Efficiency_%28statistics%29>`_.
+- `Interquartile range <http://en.wikipedia.org/wiki/Interquartile_range>`_
+  (IQR) -- another robust measure that is easy to understand.
+- Tukey's `biweight midvariance
+  <http://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/biwmidv.htm>`_
+  -- a robust and efficient measure of spread.
+
+Note that many small segments will fit noisy data better, shrinking the
+residuals used to calculate the other estimates of spread, even if many of the
+segments are spurious. One possible heuristic for judging the overall noisiness
+of each sample in a table is to multiply the number of segments by the biweight
+midvariance -- the value will tend to be higher for unreliable samples.
+Check questionable samples for poor coverage (using e.g. `bedtools
+<http://bedtools.readthedocs.org/>`_, `chanjo <http://www.chanjo.co/>`_,
+`IGV <http://www.broadinstitute.org/igv/>`_ or `Picard CalculateHsMetrics
+<http://broadinstitute.github.io/picard/command-line-overview.html#CalculateHsMetrics>`_).
+
+Finally, visualizing a sample with CNVkit's ``scatter`` command will often make
+it apparent whether a sample or the copy ratios within a genomic region can be
+trusted.
