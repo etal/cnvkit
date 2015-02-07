@@ -207,7 +207,8 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
 
     if scatter:
         do_scatter(cnarr, segments)
-        pyplot.savefig(sample_pfx + '-scatter.pdf', format='pdf', bbox_inches=0)
+        pyplot.savefig(sample_pfx + '-scatter.pdf', format='pdf',
+                       bbox_inches="tight")
         echo("Wrote", sample_pfx + '-scatter.pdf')
 
     if diagram:
@@ -708,7 +709,7 @@ def _cmd_scatter(args):
                args.chromosome, args.gene, args.range,
                args.background_marker, args.trend, args.width)
     if args.output:
-        pyplot.savefig(args.output, format='pdf', bbox_inches=0)
+        pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
         echo("Wrote", args.output)
     else:
         pyplot.show()
@@ -873,7 +874,7 @@ def _cmd_loh(args):
     """
     create_loh(args.variants, args.min_depth, args.trend)
     if args.output:
-        pyplot.savefig(args.output, format='pdf', bbox_inches=0)
+        pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
     else:
         pyplot.show()
 
