@@ -15,7 +15,7 @@ iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 from . import core, smoothing
 from .ngfrills import echo
 
-SEG_COLOR = 'red'
+SEG_COLOR =  'red'
 POINT_COLOR = '#808080'
 HIGHLIGHT_COLOR = 'gold'
 
@@ -56,16 +56,18 @@ def plot_genome(axis, probes, segments, pad, do_trend=False):
 
     # Plot points
     axis.scatter(x, probes.coverage, color=POINT_COLOR, edgecolor='none',
-                 alpha=0.15, marker='.')
+                 alpha=0.2, marker='.')
     # Add a local trend line
     if do_trend:
         axis.plot(x, smoothing.smooth_genome_coverages(probes,
                                                        smoothing.smoothed,
                                                        250),
-                  color=POINT_COLOR, linewidth=1, zorder=-1)
+                  color=POINT_COLOR, linewidth=2, zorder=-1)
     # Plot segments
     for seg_line in seg_lines:
-        axis.hlines(*seg_line, colors=SEG_COLOR, linewidth=2)
+        y1, x1, x2 = seg_line
+        axis.plot((x1, x2), (y1, y1),
+                  color=SEG_COLOR, linewidth=3, solid_capstyle='round')
 
 
 def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
@@ -149,13 +151,14 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
     # Add a local trend line
     if do_trend:
         axis.plot(x, smoothing.smoothed(y, 100),
-                    color=POINT_COLOR, linewidth=1, zorder=-1)
+                    color=POINT_COLOR, linewidth=2, zorder=-1)
 
     # Get coordinates for CBS lines & draw them
     if segments:
         for row in segments[segments['chromosome'] == chromosome]:
-            axis.hlines(row['coverage'], row['start'] * MB, row['end'] * MB,
-                        colors=SEG_COLOR, linewidth=2)
+            axis.plot((row['start'] * MB, row['end'] * MB),
+                      (row['coverage'], row['coverage']),
+                      color=SEG_COLOR, linewidth=4, solid_capstyle='round')
 
 
 def plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, pad):
