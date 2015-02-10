@@ -924,7 +924,7 @@ def _cmd_heatmap(args):
     """Plot copy number for multiple samples as a heatmap."""
     create_heatmap(args.filenames, args.chromosome, args.desaturate)
     if args.output:
-        pyplot.savefig(args.output, format='pdf', bbox_inches=0)
+        pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
         echo("Wrote", args.output)
     else:
         pyplot.show()
