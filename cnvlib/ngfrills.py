@@ -436,20 +436,23 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50):
     """
     if by_name:
         # Compare read IDs
-        getter = lambda read: read.qname
+        def out_of_order(read, prev):
+            return not (prev is None or
+                        prev.qname <= read.qname)
     else:
         # Compare read locations
-        getter = lambda read: (read.tid, read.pos)
+        def out_of_order(read, prev):
+            return not (prev is None or
+                        read.tid != prev.tid or
+                        prev.pos <= read.pos)
 
-    # TODO - repeat at 50%, ~99% through the BAM
+    # ENH - repeat at 50%, ~99% through the BAM
     bam = pysam.Samfile(bam_fname, 'rb')
     last_read = None
     for read in islice(bam, span):
-        read_value = getter(read)
-        if last_read is not None and read_value < last_read:
+        if out_of_order(read, last_read):
             return False
-        last_read = read_value
-
+        last_read = read
     return True
 
 
