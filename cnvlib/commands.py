@@ -347,7 +347,7 @@ def _cmd_antitarget(args):
         base, ext = args.interval.rsplit('.', 1)
         args.output = base + '.antitarget.' + ext
     with ngfrills.safe_write(args.output, False) as outfile:
-        i = 0
+        i = -1
         for i, row in enumerate(out_rows):
             outfile.write("\t".join(row) + '\n')
         echo("Wrote", args.output, "with", i + 1, "background intervals")
