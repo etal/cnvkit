@@ -39,7 +39,7 @@ def sniff_num_columns(bed_fname):
 def sniff_region_format(fname):
     """Guess whether the file format is BED, Picard interval list, or text.
 
-    Returns a tuple of the format name (str) and a handle to the opened file.
+    Returns a tuple of the format name (str) or None if the file is empty.
     """
     with open(fname, 'rU') as handle:
         for line in handle:
