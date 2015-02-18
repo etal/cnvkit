@@ -418,13 +418,11 @@ def do_coverage(bed_fname, bam_fname, by_count=False):
                             % bam_fname)
     ngfrills.ensure_bam_index(bam_fname)
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
-    if by_count:
-        results = coverage.interval_coverages_count(bed_fname, bam_fname)
-    else:
-        results = coverage.interval_coverages_pileup(bed_fname, bam_fname)
-    pset = CNA.from_rows(core.fbase(bam_fname), list(results))
-    pset.center_all()
-    return pset
+    rows = coverage.interval_coverages(bed_fname, bam_fname, by_count)
+    cnarr = CNA.from_rows(core.fbase(bam_fname), rows)
+    if len(cnarr):
+        cnarr.center_all()
+    return cnarr
 
 
 P_coverage = AP_subparsers.add_parser('coverage', help=_cmd_coverage.__doc__)

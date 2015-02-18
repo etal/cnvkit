@@ -14,14 +14,54 @@ from .ngfrills import echo
 from .params import NULL_LOG2_COVERAGE, READ_LEN
 
 
-def interval_coverages_count(bed_fname, bam_fname):
+def interval_coverages(bed_fname, bam_fname, by_count):
     """Calculate log2 coverages in the BAM file at each interval."""
     start_time = time.time()
 
+    # Skip processing if the BED file is empty
+    with open(bed_fname) as bed_handle:
+        for line in bed_handle:
+            if line.strip():
+                break
+        else:
+            echo("Skip processing", os.path.basename(bam_fname),
+                "with empty regions file", bed_fname)
+            return []
+
+    # Calculate average read depth in each bin
+    ic_func = (interval_coverages_count if by_count
+               else interval_coverages_pileup)
+    results = ic_func(bed_fname, bam_fname)
+    read_counts, cna_rows = zip(*list(results))
+
+    # Log some stats
+    tot_time = time.time() - start_time
+    tot_reads = sum(read_counts)
+    echo("Time: %.3f seconds (%d reads/sec, %s bins/sec)"
+         % (tot_time,
+            int(round(tot_reads / tot_time, 0)),
+            int(round(len(read_counts) / tot_time, 0))))
+    echo("Summary:",
+         "#bins=%d," % len(read_counts),
+         "#reads=%d," % tot_reads,
+         "mean=%.4f," % (tot_reads / len(read_counts)),
+         "min=%s," % min(read_counts),
+         "max=%s" % max(read_counts))
+    tot_mapped_reads = bam_total_reads(bam_fname)
+    if tot_mapped_reads:
+        echo("On-target percentage: %.3f (of %d mapped)"
+            % (100. * tot_reads / tot_mapped_reads, tot_mapped_reads))
+    else:
+        echo("(Couldn't calculate total number of mapped reads)")
+
+    return cna_rows
+
+
+def interval_coverages_count(bed_fname, bam_fname):
+    """Calculate log2 coverages in the BAM file at each interval."""
     bamfile = pysam.Samfile(bam_fname, 'rb')
     # Parse the BED lines and group them by chromosome
     # (efficient if records are already sorted by chromosome)
-    all_counts = []
     for chrom, rows_iter in groupby(ngfrills.parse_regions(bed_fname),
                                     key=lambda r: r[0]):
         # Thunk and reshape this chromosome's intervals
@@ -31,28 +71,9 @@ def interval_coverages_count(bed_fname, bam_fname):
                          for s, e in zip(starts, ends)]
         for start, end, name, (count, depth) in zip(starts, ends, names,
                                                     counts_depths):
-            all_counts.append(count)
-            yield (chrom, start, end, name,
-                   math.log(depth, 2) if depth else NULL_LOG2_COVERAGE)
-    # Log some stats
-    tot_time = time.time() - start_time
-    tot_reads = sum(all_counts)
-    echo("Time: %.3f seconds (%d reads/sec, %s bins/sec)"
-         % (tot_time,
-            int(round(tot_reads / tot_time, 0)),
-            int(round(len(all_counts) / tot_time, 0))))
-    echo("Summary:",
-         "#bins=%d," % len(all_counts),
-         "#reads=%d," % tot_reads,
-         "mean=%.4f," % (tot_reads / len(all_counts)),
-         "min=%s," % min(all_counts),
-         "max=%s" % max(all_counts))
-    tot_mapped_reads = bam_total_reads(bam_fname)
-    if tot_mapped_reads:
-        echo("On-target percentage: %.3f (of %d mapped)"
-            % (100. * tot_reads / tot_mapped_reads, tot_mapped_reads))
-    else:
-        echo("(Couldn't calculate total number of mapped reads)")
+            yield [count,
+                   (chrom, start, end, name,
+                    math.log(depth, 2) if depth else NULL_LOG2_COVERAGE)]
 
 
 def region_depth_count(bamfile, chrom, start, end):
@@ -76,36 +97,11 @@ def region_depth_count(bamfile, chrom, start, end):
 
 def interval_coverages_pileup(bed_fname, bam_fname):
     """Calculate log2 coverages in the BAM file at each interval."""
-    start_time = time.time()
-
     echo("Processing reads in", os.path.basename(bam_fname))
-    all_counts = []
     for chrom, start, end, name, count, depth in bedcov(bed_fname, bam_fname):
-        all_counts.append(count)
-        yield (chrom, start, end, name,
-               math.log(depth, 2) if depth else NULL_LOG2_COVERAGE)
-
-    # ---
-    # Log some stats
-    tot_time = time.time() - start_time
-    tot_reads = sum(all_counts)
-    echo("Time: %.3f seconds (%d reads/sec, %s bins/sec)"
-         % (tot_time,
-            int(round(tot_reads / tot_time, 0)),
-            int(round(len(all_counts) / tot_time, 0))))
-    echo("Summary:",
-         "#bins=%d," % len(all_counts),
-         "#reads=%d," % tot_reads,
-         "mean=%.4f," % (tot_reads / len(all_counts)),
-         "min=%s," % min(all_counts),
-         "max=%s" % max(all_counts))
-
-    tot_mapped_reads = bam_total_reads(bam_fname)
-    if tot_mapped_reads:
-        echo("On-target percentage: %.3f (of %d mapped)"
-            % (100. * tot_reads / tot_mapped_reads, tot_mapped_reads))
-    else:
-        echo("(Couldn't calculate total number of mapped reads)")
+        yield [count,
+               (chrom, start, end, name,
+                math.log(depth, 2) if depth else NULL_LOG2_COVERAGE)]
 
 
 def bedcov(bed_fname, bam_fname):

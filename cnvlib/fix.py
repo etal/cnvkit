@@ -17,6 +17,10 @@ def load_adjust_coverages(pset, ref_pset,
         # Don't choke on Picard-derived files that have the GC column
         pset = pset.drop_extra_columns()
 
+    # No corrections needed if there are no data rows (e.g. no antitargets)
+    if not len(pset):
+        return pset
+
     # Check for signs that the wrong reference was used
     missing_keys = set(pset.labels()).difference(ref_pset.labels())
     if missing_keys:

@@ -29,8 +29,16 @@ def combine_probes(filenames, has_genome, is_male_normal):
         genomic GC content.
     """
     # Load coverage from target/antitarget files
-    echo("Loading target", filenames[0])
+    echo("Loading", filenames[0])
     cnarr1 = CNA.read(filenames[0])
+    if not len(cnarr1):
+        # Empty array -- no rows; just make the columns match
+        kwargs = {'spread': numpy.zeros(0, dtype=numpy.float_)}
+        if 'gc' in cnarr1 or has_genome:
+            kwargs['gc'] = numpy.empty(0, dtype=numpy.float_)
+        if has_genome:
+            kwargs['rmask'] = numpy.empty(0, dtype=numpy.float_)
+        return CNA("reference", [], [], [], [], [], **kwargs)
 
     # Make the sex-chromosome coverages of male and female samples compatible
     chr_x = core.guess_chr_x(cnarr1)
