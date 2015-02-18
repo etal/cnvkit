@@ -638,7 +638,10 @@ P_segment.set_defaults(func=_cmd_segment)
 # cbs -------------------------------------------------------------------------
 
 def _cmd_cbs(args):
-    """Run circular binary segmentation (CBS) on the given coverage table."""
+    """[DEPRECATED - use 'segment' instead]
+
+    Run circular binary segmentation (CBS) on the given coverage table.
+    """
     if args.dataframe:
         segments, seg_out = segmentation.do_segmentation(args.filename, True,
                                                          'cbs', args.rlibpath)
