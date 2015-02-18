@@ -26,7 +26,7 @@ DIR = (dirname(__file__) or '.') + '/'
 
 setup_args.update(
     name='CNVkit',
-    version='0.3.4',
+    version='0.3.4-dev',
     description=__doc__,
     author='Eric Talevich',
     author_email='eric.talevich@ucsf.edu',
