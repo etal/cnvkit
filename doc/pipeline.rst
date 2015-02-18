@@ -66,6 +66,18 @@ locations by passing the locations of the accessible sequence regions with the
 reference human genome hg19, and can be computed for other genomes with the
 included script ``genome2access.py``.
 
+To use CNVkit on **amplicon** sequencing data instead of **hybrid capture** --
+although this is not recommended -- you can exclude all off-target regions from
+the analysis by passing the target BED file as the "access" file as well::
+
+    cnvkit.py antitarget Tiled.bed -g Tiled.bed -o Background.bed
+    cnvkit.py batch ... -t Tiled.bed -g Tiled.bed ...
+
+This results in empty ".antitarget.cnn" files which CNVkit will handle safely
+from version 0.3.4 onward. However, this approach does not collect any copy
+number information between targeted regions, so it should only be used if you
+have in fact prepared your samples with a targeted amplicon sequencing protocol.
+
 
 coverage
 --------
