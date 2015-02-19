@@ -73,7 +73,7 @@ def _cmd_batch(args):
             raise ValueError("Argument -t/--target is required.")
         # Build a copy number reference; update (anti)targets upon request
         args.reference, args.targets, args.antitargets = batch_make_reference(
-            args.normal, args.targets, args.antitargets, args.male_normal,
+            args.normal, args.targets, args.antitargets, args.male_reference,
             args.fasta, args.annotate, args.short_names, args.split,
             args.target_avg_size, args.access, args.antitarget_avg_size,
             args.antitarget_min_size, args.output_reference, args.output_dir,
@@ -97,13 +97,13 @@ def _cmd_batch(args):
         for bam in args.bam_files:
             pool.apply_async(batch_run_sample,
                              (bam, args.targets, args.antitargets, args.reference,
-                              args.output_dir, args.male_normal, args.scatter,
+                              args.output_dir, args.male_reference, args.scatter,
                               args.diagram, args.rlibpath))
         pool.close()
         pool.join()
 
 
-def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
+def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference,
                          fasta, annotate, short_names, split, target_avg_size,
                          access, antitarget_avg_size, antitarget_min_size,
                          output_reference, output_dir, processes):
@@ -145,7 +145,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
     if len(normal_bams) == 0:
         echo("Building a flat reference...")
         ref_arr = do_reference_flat(target_bed, antitarget_bed, fasta,
-                                    male_normal)
+                                    male_reference)
     else:
         echo("Building a copy number reference from normal samples...")
         target_fnames = []
@@ -167,7 +167,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_normal,
         pool.join()
         # Build reference from *.cnn
         ref_arr = do_reference(target_fnames, antitarget_fnames, fasta,
-                               male_normal)
+                               male_reference)
     if not output_reference:
         output_reference = os.path.join(output_dir, "reference.cnn")
     ngfrills.ensure_path(output_reference)
@@ -183,7 +183,7 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname):
 
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
-                     output_dir, male_normal=False, scatter=False,
+                     output_dir, male_reference=False, scatter=False,
                      diagram=False, rlibpath=None):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
@@ -214,14 +214,14 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     if diagram:
         from cnvlib import diagram
         outfname = sample_pfx + '-diagram.pdf'
-        diagram.create_diagram(cnarr, segments, 0.6, outfname, male_normal)
+        diagram.create_diagram(cnarr, segments, 0.6, outfname, male_reference)
         echo("Wrote", outfname)
 
 
 P_batch = AP_subparsers.add_parser('batch', help=_cmd_batch.__doc__)
 P_batch.add_argument('bam_files', nargs='*',
         help="Mapped sequence reads (.bam)")
-P_batch.add_argument('-y', '--male-normal', action='store_true',
+P_batch.add_argument('-y', '--male-reference', action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
                 log-CNR of chrX; otherwise male samples would have -1 chrX).""")
 P_batch.add_argument('-p', '--processes', type=int, default=1,
@@ -444,7 +444,7 @@ def _cmd_reference(args):
         # Flat refence
         assert not args.references, usage_err_msg
         ref_probes = do_reference_flat(args.targets, args.antitargets,
-                                       args.fasta, args.male_normal)
+                                       args.fasta, args.male_reference)
     elif args.references:
         # Pooled reference
         assert not args.targets and not args.antitargets, usage_err_msg
@@ -460,7 +460,7 @@ def _cmd_reference(args):
         echo("Number of target and antitarget files: %d, %d"
             % (len(targets), len(antitargets)))
         ref_probes = do_reference(targets, antitargets, args.fasta,
-                                  args.male_normal)
+                                  args.male_reference)
     else:
         raise ValueError(usage_err_msg)
 
@@ -470,16 +470,16 @@ def _cmd_reference(args):
 
 
 def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
-                 male_normal=False):
+                 male_reference=False):
     """Compile a coverage reference from the given files (normal samples)."""
     core.assert_equal("Unequal number of target and antitarget files given",
                       targets=len(target_fnames),
                       antitargets=len(antitarget_fnames))
     # Calculate & save probe centers
     ref_probes = reference.combine_probes(target_fnames, bool(fa_fname),
-                                          male_normal)
+                                          male_reference)
     ref_probes.extend(reference.combine_probes(antitarget_fnames,
-                                               bool(fa_fname), male_normal))
+                                               bool(fa_fname), male_reference))
     ref_probes.sort()
     ref_probes.center_all(mode=True)
     # Calculate GC and RepeatMasker content for each probe's genomic region
@@ -494,7 +494,7 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
 
 
 def do_reference_flat(target_list, antitarget_list, fa_fname=None,
-                      male_normal=False):
+                      male_reference=False):
     """Compile a neutral-coverage reference from the given intervals.
 
     Combines the intervals, shifts chrX values if requested, and calculates GC
@@ -506,7 +506,7 @@ def do_reference_flat(target_list, antitarget_list, fa_fname=None,
     # Set sex chromosomes by "reference" gender
     chr_x = core.guess_chr_x(ref_probes)
     chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    if male_normal:
+    if male_reference:
         ref_probes['coverage'][(ref_probes.chromosome == chr_x) |
                                (ref_probes.chromosome == chr_y)] = -1.0
     else:
@@ -532,8 +532,8 @@ P_reference.add_argument('-t', '--targets',
         help="Target intervals (.bed or .list)")
 P_reference.add_argument('-a', '--antitargets',
         help="Antitarget intervals (.bed or .list)")
-P_reference.add_argument('-y', '--male-normal', action='store_true',
-        help="""Create a male-normal reference: shift female samples' chrX
+P_reference.add_argument('-y', '--male-reference', action='store_true',
+        help="""Create a male reference: shift female samples' chrX
                 log-coverage by -1, so the reference chrX average is -1.
                 Otherwise, shift male samples' chrX by +1, so the reference chrX
                 average is 0.""")
@@ -679,7 +679,7 @@ def _cmd_diagram(args):
     cnarr = CNA.read(args.filename) if args.filename else None
     segarr = CNA.read(args.segment) if args.segment else None
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
-                                      args.output, args.male_normal)
+                                      args.output, args.male_reference)
     echo("Wrote", outfname)
 
 
@@ -691,8 +691,8 @@ P_diagram.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")
 P_diagram.add_argument('-t', '--threshold', type=float, default=0.6,
         help="Copy number change threshold to label genes.")
-P_diagram.add_argument('-y', '--male-normal', action='store_true',
-        help="""Assume inputs are already corrected against a male-normal
+P_diagram.add_argument('-y', '--male-reference', action='store_true',
+        help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-CNR of
                 chrX; otherwise male samples would have -1 chrX).""")
 P_diagram.add_argument('-o', '--output',
@@ -1056,7 +1056,7 @@ def _cmd_gainloss(args):
     """Identify targeted genes with copy number gain or loss."""
     pset = CNA.read(args.filename)
     segs = CNA.read(args.segment) if args.segment else None
-    gainloss = do_gainloss(pset, segs, args.male_normal, args.threshold,
+    gainloss = do_gainloss(pset, segs, args.male_reference, args.threshold,
                            args.min_probes)
     echo("Found", len(gainloss), "gene-level gains and losses")
     core.write_tsv(args.output, gainloss,
@@ -1064,13 +1064,13 @@ def _cmd_gainloss(args):
                              'Probes'])
 
 
-def do_gainloss(probes, segments=None, male_normal=False,
+def do_gainloss(probes, segments=None, male_reference=False,
                 threshold=0.6, min_probes=1):
     """Identify targeted genes with copy number gain or loss."""
-    probes = core.shift_xx(probes, male_normal)
+    probes = core.shift_xx(probes, male_reference)
     gainloss = []
     if segments:
-        segments = core.shift_xx(segments, male_normal)
+        segments = core.shift_xx(segments, male_reference)
         for segment, subprobes in probes.by_segment(segments):
             if abs(segment['coverage']) >= threshold:
                 for (gene, chrom, start, end, coverages
@@ -1096,8 +1096,8 @@ P_gainloss.add_argument('-t', '--threshold', type=float, default=0.6,
         help="Copy number change threshold to report a gene gain/loss.")
 P_gainloss.add_argument('-m', '--min-probes', type=int, default=1,
         help="Minimum number of covered probes to report a gain/loss.")
-P_gainloss.add_argument('-y', '--male-normal', action='store_true',
-        help="""Assume inputs are already corrected against a male-normal
+P_gainloss.add_argument('-y', '--male-reference', action='store_true',
+        help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-coverage of
                 chrX; otherwise male samples would have -1 chrX).""")
 P_gainloss.add_argument('-o', '--output',
@@ -1112,7 +1112,7 @@ def _cmd_gender(args):
     outrows = []
     for fname in args.targets:
         rel_chrx_cvg = core.get_relative_chrx_cvg(CNA.read(fname))
-        if args.male_normal:
+        if args.male_reference:
             is_xx = (rel_chrx_cvg >= 0.7)
         else:
             is_xx = (rel_chrx_cvg >= -0.4)
@@ -1126,8 +1126,8 @@ def _cmd_gender(args):
 P_gender = AP_subparsers.add_parser('gender', help=_cmd_gender.__doc__)
 P_gender.add_argument('targets', nargs='+',
         help="Copy number or copy ratio files (*.cnn, *.cnr).")
-P_gender.add_argument('-y', '--male-normal', action='store_true',
-        help="""Assume inputs are already corrected against a male-normal
+P_gender.add_argument('-y', '--male-reference', action='store_true',
+        help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-coverage of
                 chrX; otherwise male samples would have -1 chrX).""")
 P_gender.add_argument('-o', '--output',
