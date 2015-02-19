@@ -1292,83 +1292,129 @@ P_import_theta.set_defaults(func=_cmd_import_theta)
 
 # export ----------------------------------------------------------------------
 
-def _cmd_export(args):
-    """Convert the processed coverage table to another format."""
-    if args.filetype == 'seg':
-        # Special case: segment coords don't match across samples
-        outheader, outrows = export.export_seg(args.filenames)
-    elif args.filetype == 'nexus-basic':
-        # Special case: Nexus "basic" can only represent 1 sample
-        assert len(args.filenames) == 1
-        outheader, outrows = export.export_nexus_basic(args.filenames[0])
-    elif args.filetype == 'freebayes':
-        # Special case: FreeBayes --cnv-map could represent multiple samples,
-        # but the exporter currently doesn't handle that.
-        assert len(args.filenames) == 1, \
-                "FreeBayes export requires one segmentation file (.cns)"
-        outheader, outrows = export.export_freebayes(args.filenames[0], args)
-    elif args.filetype == 'theta':
-        # Special case: THetA takes tumor .cns and normal .cnr or reference.cnn
-        assert len(args.filenames) == 2, \
-                """THetA export requires two input files: (1) tumor-sample
-                segmentation from CNVkit (.cns), and (2) normal-sample bin-level
-                copy ratios (.cnr), or a corresponding reference (.cnn)."""
-        tumor, reference = args.filenames
-        outheader, outrows = export.export_theta(tumor, reference)
-        # if not args.output:
-        #     args.output = tumor_segs.sample_id + ".input"
-    else:
-        sample_ids = list(map(core.fbase, args.filenames))
-        rows = export.merge_samples(args.filenames)
-        formatter = export.EXPORT_FORMATS[args.filetype]
-        outheader, outrows = formatter(sample_ids, rows)
+
+P_export = AP_subparsers.add_parser('export',
+        help="""Convert CNVkit output files to another format.""")
+P_export_subparsers = P_export.add_subparsers(
+        help="Export formats (use with -h for more info).")
+
+
+# SEG special case: segment coords don't match across samples
+def _cmd_export_seg(args):
+    """Convert segments to SEG format.
+
+    Compatible with IGV and GenePattern.
+    """
+    outheader, outrows = export.export_seg(args.filenames)
     core.write_tsv(args.output, outrows, colnames=outheader)
 
+P_export_seg = P_export_subparsers.add_parser('seg', help=_cmd_export_seg.__doc__)
+P_export_seg.add_argument('filenames', nargs='+',
+        help="""Segmented copy ratio data file(s) (*.cns), the output of the
+                'segment' sub-command.""")
+P_export_seg.add_argument('-o', '--output', help="Output file name.")
+P_export_seg.set_defaults(func=_cmd_export_seg)
 
-P_export = AP_subparsers.add_parser('export', help=_cmd_export.__doc__)
-P_export.add_argument('filetype', choices=export.EXPORT_FORMATS,
-        help="""Output file type:
-                'jtv' (Java TreeView),
-                'cdt' (Java TreeView again),
-                'seg' (IGV and GenePattern),
-                'nexus-basic' (Nexus Copy Number),
-                'freebayes' (FreeBayes --cnv-map input file),
-                'theta' (THetA2 input file, *.input)
-                """)
-                # 'multi' (Nexus Copy Number "multi1")
-                # 'gct' (GenePattern).
-P_export.add_argument('filenames', nargs='+', metavar="filename(s)",
-        help="""Processed sample coverage data file(s) (*.cnr or *.cns), the
-                output of the 'fix' sub-command.""")
-P_export.add_argument('-o', '--output',
-        help="Output file name.")
 
-P_export_freebayes = P_export.add_argument_group(
-    """FreeBayes export options to generate the FreeBayes --cnv-map input file.
+# Nexus "basic" special case: can only represent 1 sample
+def _cmd_export_nb(args):
+    """Convert log2 copy ratios to Nexus Copy Number "basic" format."""
+    outheader, outrows = export.export_nexus_basic(args.filename)
+    core.write_tsv(args.output, outrows, colnames=outheader)
 
-    Input is: a segmentation file (.cns). This may be imported from THetA to
+P_export_nb = P_export_subparsers.add_parser('nexus-basic',
+        help=_cmd_export_nb.__doc__)
+P_export_nb.add_argument('filename',
+        help="""Log2 copy ratio data file (*.cnr), the output of the 'fix'
+                sub-command.""")
+P_export_nb.add_argument('-o', '--output', help="Output file name.")
+P_export_nb.set_defaults(func=_cmd_export_nb)
+
+
+# FreeBayes special case: --cnv-map could represent multiple samples,
+# but the exporter currently doesn't handle that.
+# TODO - handle multiple samples
+def _cmd_export_fb(args):
+    """Convert segments to FreeBayes --cnv-map format (BED-like).
+
+    Generates an input file for use with FreeBayes's --cnv-map option.
+
+    Input is a segmentation file (.cns). This may be imported from THetA to
     account for normal-cell contamination and subclonal tumor cell population
     structure; otherwise, the --purity argument provides a simpler adjustment.
-    """)
-P_export_freebayes.add_argument("-n", "--name",
+    """
+    outheader, outrows = export.export_freebayes(args.segments, args)
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+P_export_fb = P_export_subparsers.add_parser('freebayes',
+        help=_cmd_export_fb.__doc__)
+P_export_fb.add_argument('segments', # nargs='+',
+        help="""Segmented copy ratio data file (*.cns), the output of the
+                'segment' sub-command.""")
+P_export_fb.add_argument("-n", "--name",
         help="Sample name, as FreeBayes should see it.")
-P_export_freebayes.add_argument("--ploidy", type=int, default=2,
+# Arguments that could be shared across 'export'
+P_export_fb.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells.")
-P_export_freebayes.add_argument("--purity", type=float,
+P_export_fb.add_argument("--purity", type=float,
         help="Estimated tumor cell purity or cellularity.")
-P_export_freebayes.add_argument("-g", "--gender",
-        choices=('m', 'male', 'f', 'female'),
+P_export_fb.add_argument("-g", "--gender",
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
-P_export_freebayes.add_argument("-y", "--male-normal", action="store_true",
-        help="""Was a male-normal reference used?  If so, expect half ploidy on
+P_export_fb.add_argument("-y", "--male-reference", action="store_true",
+        help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
-                if a male-normal copy number reference was used, the "neutral"
-                copy number (ploidy) of chrX is 1; chrY is haploid for either
-                gender reference.""")
+                if a male reference was used, the "neutral" copy number (ploidy)
+                of chrX is 1; chrY is haploid for either gender reference.""")
+# /
+P_export_fb.add_argument('-o', '--output', help="Output file name.")
+P_export_fb.set_defaults(func=_cmd_export_fb)
 
 
-P_export.set_defaults(func=_cmd_export)
+# THetA special case: takes tumor .cns and normal .cnr or reference.cnn
+def _cmd_export_theta(args):
+    """Convert segments to THetA2 input file format (*.input)."""
+    outheader, outrows = export.export_theta(args.tumor_segment,
+                                             args.normal_reference)
+    # if not args.output:
+    #     args.output = tumor_segs.sample_id + ".input"
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+P_export_theta = P_export_subparsers.add_parser('theta',
+        help=_cmd_export_theta.__doc__)
+P_export_theta.add_argument('tumor_segment',
+        help="""Tumor-sample segmentation file from CNVkit (.cns).""")
+P_export_theta.add_argument('normal_reference',
+        help="""Reference copy number profile (.cnn), or normal-sample bin-level
+                log2 copy ratios (.cnr).""")
+P_export_theta.add_argument('-o', '--output', help="Output file name.")
+P_export_theta.set_defaults(func=_cmd_export_theta)
+
+
+# All else: export any number of .cnr or .cns files
+
+for fmt_key, fmt_descr in (
+    ('cdt', "Convert log2 ratios to CDT format. Compatible with Java TreeView."),
+    ('jtv', "Convert log2 ratios to Java TreeView's native format."),
+    # Not implemented yet:
+    # 'multi' (Nexus Copy Number "multi1")
+    # 'gct' (GenePattern).
+):
+    def _cmd_export_simple(args):
+        sample_ids = list(map(core.fbase, args.filenames))
+        rows = export.merge_samples(args.filenames)
+        formatter = export.EXPORT_FORMATS[fmt_key]
+        outheader, outrows = formatter(sample_ids, rows)
+        core.write_tsv(args.output, outrows, colnames=outheader)
+
+    P_export_simple = P_export_subparsers.add_parser(fmt_key, help=fmt_descr)
+    P_export_simple.add_argument('filenames', nargs='+',
+            help="""Log2 copy ratio data file(s) (*.cnr), the output of the
+                    'fix' sub-command.""")
+    P_export_simple.add_argument('-o', '--output', help="Output file name.")
+    P_export_simple.set_defaults(func=_cmd_export_simple)
+
 
 
 # _____________________________________________________________________________
