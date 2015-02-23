@@ -49,6 +49,9 @@ Linux if the dependencies are installed, see below)::
 
     pip install cnvkit
 
+In either case, to run the recommended segmentation algorithms CBS and Fused
+Lasso, you will need to also install the R dependencies DNAcopy and PSCBS (see
+below).
 
 From source
 -----------
