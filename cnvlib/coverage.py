@@ -54,7 +54,7 @@ def interval_coverages(bed_fname, bam_fname, by_count):
     else:
         echo("(Couldn't calculate total number of mapped reads)")
 
-    return cna_rows
+    return list(cna_rows)
 
 
 def interval_coverages_count(bed_fname, bam_fname):
