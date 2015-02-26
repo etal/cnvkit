@@ -77,7 +77,7 @@ def _cmd_batch(args):
             args.fasta, args.annotate, args.short_names, args.split,
             args.target_avg_size, args.access, args.antitarget_avg_size,
             args.antitarget_min_size, args.output_reference, args.output_dir,
-            args.processes)
+            args.processes, args.count_reads)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = CNA.read(args.reference)
@@ -98,7 +98,7 @@ def _cmd_batch(args):
             pool.apply_async(batch_run_sample,
                              (bam, args.targets, args.antitargets, args.reference,
                               args.output_dir, args.male_reference, args.scatter,
-                              args.diagram, args.rlibpath))
+                              args.diagram, args.rlibpath, args.count_reads))
         pool.close()
         pool.join()
 
@@ -106,7 +106,7 @@ def _cmd_batch(args):
 def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference,
                          fasta, annotate, short_names, split, target_avg_size,
                          access, antitarget_avg_size, antitarget_min_size,
-                         output_reference, output_dir, processes):
+                         output_reference, output_dir, processes, by_count):
     """Build the CN reference from normal samples, targets and antitargets."""
     # To make temporary filenames for processed targets or antitargets
     tgt_name_base, tgt_name_ext = os.path.splitext(os.path.basename(target_bed))
@@ -157,11 +157,11 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
             sample_pfx = os.path.join(output_dir, sample_id)
             tgt_fname = sample_pfx + '.targetcoverage.cnn'
             pool.apply_async(batch_write_coverage,
-                             (target_bed, nbam, tgt_fname))
+                             (target_bed, nbam, tgt_fname, by_count))
             target_fnames.append(tgt_fname)
             anti_fname = sample_pfx + '.antitargetcoverage.cnn'
             pool.apply_async(batch_write_coverage,
-                             (antitarget_bed, nbam, anti_fname))
+                             (antitarget_bed, nbam, anti_fname, by_count))
             antitarget_fnames.append(anti_fname)
         pool.close()
         pool.join()
@@ -176,25 +176,25 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
     return output_reference, target_bed, antitarget_bed
 
 
-def batch_write_coverage(bed_fname, bam_fname, out_fname):
+def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count):
     """Run coverage on one sample, write to file."""
-    cnarr = do_coverage(bed_fname, bam_fname)
+    cnarr = do_coverage(bed_fname, bam_fname, by_count)
     cnarr.write(out_fname)
 
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                      output_dir, male_reference=False, scatter=False,
-                     diagram=False, rlibpath=None):
+                     diagram=False, rlibpath=None, by_count=False):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     echo("Running the CNVkit pipeline on", bam_fname, "...")
     sample_id = core.fbase(bam_fname)
     sample_pfx = os.path.join(output_dir, sample_id)
 
-    raw_tgt = do_coverage(target_bed, bam_fname)
+    raw_tgt = do_coverage(target_bed, bam_fname, by_count)
     raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
 
-    raw_anti = do_coverage(antitarget_bed, bam_fname)
+    raw_anti = do_coverage(antitarget_bed, bam_fname, by_count)
     raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
 
     cnarr = do_fix(raw_tgt, raw_anti, CNA.read(ref_fname))
@@ -224,12 +224,15 @@ P_batch.add_argument('bam_files', nargs='*',
 P_batch.add_argument('-y', '--male-reference', action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
                 log-CNR of chrX; otherwise male samples would have -1 chrX).""")
+P_batch.add_argument('-c', '--count-reads', action='store_true',
+        help="""Get read depths by counting read midpoints within each bin.
+                (An alternative algorithm).""")
 P_batch.add_argument('-p', '--processes', type=int, default=1,
         help="""Number of subprocesses used to running each of the BAM files in
                 parallel. Give 0 or a negative value to use the maximum number
                 of available CPUs. Default: process each BAM in serial.""")
 P_batch.add_argument("--rlibpath",
-                     help="Path to an alternative site-library to use for R packages.")
+        help="Path to an alternative site-library to use for R packages.")
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group(
