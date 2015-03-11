@@ -17,7 +17,7 @@ def bed2probes(bed_fname):
                          extra_keys=('gc', 'rmask', 'spread'))
 
 
-def combine_probes(filenames, has_genome, is_male_normal):
+def combine_probes(filenames, has_genome, is_male_reference):
     """Calculate the median coverage of each probe across multiple samples.
 
     Input:
@@ -43,9 +43,9 @@ def combine_probes(filenames, has_genome, is_male_normal):
     # Make the sex-chromosome coverages of male and female samples compatible
     chr_x = core.guess_chr_x(cnarr1)
     chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    if is_male_normal:
+    if is_male_reference:
         def shift_sex_chroms(pset):
-            """Shift sample X and Y chromosomes for a male-normal reference.
+            """Shift sample X and Y chromosomes for a male reference.
 
             If sample is male, do nothing.
             If sample is female, chrX -=1, set chrY = -1.
@@ -59,7 +59,7 @@ def combine_probes(filenames, has_genome, is_male_normal):
 
     else:
         def shift_sex_chroms(pset):
-            """Shift sample X and Y chromosomes for a female-normal reference.
+            """Shift sample X and Y chromosomes for a female reference.
 
             If sample is male, chrX += 1.
             If sample is female, set chrY = -1.

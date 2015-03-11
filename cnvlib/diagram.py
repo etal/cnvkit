@@ -26,7 +26,7 @@ CHROM_FATNESS = 0.3
 PAGE_SIZE = (11.0*inch, 8.5*inch)
 
 
-def create_diagram(probe_pset, seg_pset, threshold, outfname, male_normal):
+def create_diagram(probe_pset, seg_pset, threshold, outfname, male_reference):
     """Create the diagram."""
     if probe_pset and seg_pset:
         is_seg = False
@@ -43,7 +43,7 @@ def create_diagram(probe_pset, seg_pset, threshold, outfname, male_normal):
     features = collections.defaultdict(list)
     no_name = ('Background', 'CGH', '-')
     strand = 1 if do_both else None
-    probe_rows = core.shift_xx(probe_pset, male_normal)
+    probe_rows = core.shift_xx(probe_pset, male_reference)
     if not is_seg:
         probe_rows = probe_rows.squash_genes()
     for row in probe_rows:
@@ -57,7 +57,7 @@ def create_diagram(probe_pset, seg_pset, threshold, outfname, male_normal):
             (p_start - 1, p_end, strand, feat_name,
              colors.Color(*plots.cvg2rgb(p_coverage, not is_seg))))
     if do_both:
-        for chrom, segrows in core.shift_xx(seg_pset, male_normal).by_chromosome():
+        for chrom, segrows in core.shift_xx(seg_pset, male_reference).by_chromosome():
             features[chrom].extend(
                 (srow['start'] - 1, srow['end'], -1, None,
                  colors.Color(*plots.cvg2rgb(srow['coverage'], False)))

@@ -65,17 +65,17 @@ def sorter_chrom_at(index):
 
 # XXX refactor all this
 
-def shift_xx(probes, male_normal=False, chr_x=None):
+def shift_xx(probes, male_reference=False, chr_x=None):
     """Adjust chrX coverages (divide in half) for apparent female samples."""
     if chr_x is None:
         chr_x = guess_chr_x(probes)
     outprobes = probes.copy()
-    is_xx = guess_xx(probes, chr_x=chr_x, male_normal=male_normal)
-    if is_xx and male_normal:
+    is_xx = guess_xx(probes, chr_x=chr_x, male_reference=male_reference)
+    if is_xx and male_reference:
         # Female: divide X coverages by 2 (in log2: subtract 1)
         outprobes['coverage'][outprobes.chromosome == chr_x] -= 1.0
         # Male: no change
-    elif not is_xx and not male_normal:
+    elif not is_xx and not male_reference:
         # Male: multiply X coverages by 2 (in log2: add 1)
         outprobes['coverage'][outprobes.chromosome == chr_x] += 1.0
         # Female: no change
@@ -87,14 +87,14 @@ def guess_chr_x(probes):
             else 'X')
 
 
-def guess_xx(probes, male_normal=False, chr_x=None, verbose=True):
+def guess_xx(probes, male_reference=False, chr_x=None, verbose=True):
     """Guess whether a sample is female from chrX relative coverages.
 
     Recommended cutoff values:
         -0.4 -- raw target data, not yet corrected
         +0.7 -- probe data already corrected on a male profile
     """
-    cutoff = 0.7 if male_normal else -0.4
+    cutoff = 0.7 if male_reference else -0.4
     # ENH - better coverage approach: take Z-scores or rank of +1,0 or 0,-1
     # based on the available probes, then choose which is more probable
     rel_chrx_cvg = get_relative_chrx_cvg(probes, chr_x=chr_x)
