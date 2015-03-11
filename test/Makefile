@@ -15,10 +15,10 @@ picard_cnrs=$(addprefix build/p2-,$(addsuffix .cnr,5_5 9_2 20_1 20_2 20_3 20_4 2
 picard_segs=$(picard_cnrs:.cnr=.cns)
 
 picard_targets= build/reference-picard.cnn $(picard_cnrs) $(picard_segs) \
-	     p2-9_2.cdt p2-all.cdt p2-all-jtv.txt p2-all-cbs.seg \
 	     all-scatters.pdf all-diagrams.pdf heatmap-picard.pdf \
-	     p2-9_2-breaks.txt p2-9_2-gainloss.txt gender-picard.txt
-
+	     p2-9_2-breaks.txt p2-9_2-gainloss.txt gender-picard.txt \
+	     p2-all.cdt p2-all-jtv.txt p2-all.seg p2-9_2.nexus \
+	     p2-all.cnvmap.bed p2-9_2.theta2.input
 
 # ------------------------------------------------------------------------------
 #  Action!
@@ -114,14 +114,20 @@ p2-20-metrics.csv: $(addprefix build/p2-20_,$(addsuffix .cns,1 2 3 4 5))
 
 # == Export to other formats
 
-p2-9_2.cdt: build/p2-9_2.cnr
-	$(cnvkit) export cdt $^ -o $@
-
 p2-all.cdt: $(picard_cnrs)
 	$(cnvkit) export cdt $^ -o $@
 
 p2-all-jtv.txt: $(picard_cnrs)
 	$(cnvkit) export jtv $^ -o $@
 
-p2-all-cbs.seg: $(picard_segs)
+p2-all.seg: $(picard_segs)
 	$(cnvkit) export seg $^ -o $@
+
+p2-9_2.nexus: build/p2-9_2.cnr
+	$(cnvkit) export nexus-basic $^ -o $@
+
+p2-all.cnvmap.bed: $(picard_segs)
+	$(cnvkit) export freebayes $^ -y --purity 0.65 -o $@
+
+p2-9_2.theta2.input: build/p2-9_2.cns build/reference-picard.cnn
+	$(cnvkit) export theta $^ -o $@
