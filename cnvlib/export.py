@@ -160,7 +160,7 @@ def create_chrom_ids(segments):
 # _____________________________________________________________________________
 # freebayes
 
-def export_freebayes(sample_fname, args):
+def export_freebayes(sample_fnames, args):
     """Export to FreeBayes --cnv-map format.
 
     Which is BED-like, for each region in each sample which does not have
@@ -175,24 +175,27 @@ def export_freebayes(sample_fname, args):
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
-    segs = CNA.read(sample_fname)
-    is_sample_female = core.guess_xx(segs, args.male_normal, verbose=False)
-    if args.gender:
-        is_sample_female_given = (args.gender in ["f", "female"])
-        if is_sample_female != is_sample_female_given:
-            print("Sample gender specified as", args.gender,
-                  "but chrX copy number looks like",
-                  "female" if is_sample_female else "male",
-                  file=sys.stderr)
-            is_sample_female = is_sample_female_given
-    print("Treating sample gender as",
-          "female" if is_sample_female else "male",
-          file=sys.stderr)
-
-    bedrows = segments2freebayes(segs, args.name or segs.sample_id,
-                                 args.ploidy, args.purity, args.male_normal,
-                                 is_sample_female)
-    return None, list(bedrows)
+    bed_rows = []
+    for fname in sample_fnames:
+        segs = CNA.read(fname)
+        is_sample_female = core.guess_xx(segs, args.male_reference,
+                                         verbose=False)
+        if args.gender:
+            is_sample_female_given = (args.gender in ["f", "female"])
+            if is_sample_female != is_sample_female_given:
+                print("Sample gender specified as", args.gender,
+                      "but chrX copy number looks like",
+                      "female" if is_sample_female else "male",
+                      file=sys.stderr)
+                is_sample_female = is_sample_female_given
+        print("Treating sample gender as",
+              "female" if is_sample_female else "male",
+              file=sys.stderr)
+        rows = segments2freebayes(segs, args.name or segs.sample_id,
+                                  args.ploidy, args.purity, args.male_reference,
+                                  is_sample_female)
+        bed_rows.extend(rows)
+    return None, bed_rows
 
 
 def segments2freebayes(segments, sample_name, ploidy, purity, is_reference_male,

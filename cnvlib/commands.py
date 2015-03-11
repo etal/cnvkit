@@ -1351,8 +1351,8 @@ def _cmd_export_fb(args):
 
 P_export_fb = P_export_subparsers.add_parser('freebayes',
         help=_cmd_export_fb.__doc__)
-P_export_fb.add_argument('segments', # nargs='+',
-        help="""Segmented copy ratio data file (*.cns), the output of the
+P_export_fb.add_argument('segments', nargs='+',
+        help="""Segmented copy ratio data files (*.cns), the output of the
                 'segment' sub-command.""")
 P_export_fb.add_argument("-n", "--name",
         help="Sample name, as FreeBayes should see it.")
