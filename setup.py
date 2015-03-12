@@ -31,7 +31,7 @@ setup_args.update(
     author='Eric Talevich',
     author_email='eric.talevich@ucsf.edu',
     url='http://github.com/etal/cnvkit',
-    packages=['cnvlib', 'cnvlib.segmentation'],
+    packages=['cnvlib', 'cnvlib.ngfrills', 'cnvlib.segmentation'],
     scripts=[DIR + 'cnvkit.py'] + glob(DIR + 'scripts/*.py'),
     classifiers=[
         "Development Status :: 4 - Beta",
