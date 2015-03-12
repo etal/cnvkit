@@ -30,7 +30,7 @@ def plot_genome(axis, probes, segments, pad, do_trend=False):
     # Same for segment calls
     chrom_seg_coords = {chrom: zip(rows['coverage'], rows['start'], rows['end'])
                         for chrom, rows in segments.by_chromosome()
-                       } if segments else []
+                       } if segments else {}
 
     chrom_sizes = chromosome_sizes(probes)
     x_starts = plot_x_dividers(axis, chrom_sizes, pad)

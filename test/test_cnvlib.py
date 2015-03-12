@@ -32,6 +32,8 @@ class CNATests(unittest.TestCase):
         # Item access
         orig = self.ex_cnr[0]
         self.ex_cnr[0] = orig
+        self.ex_cnr[3:4] = self.ex_cnr[3:4]
+        self.ex_cnr[6:10] = self.ex_cnr[6:10]
         self.assertEqual(self.ex_cnr[0], same[0])
         self.assertTrue((self.ex_cnr[3:6] == same[3:6]).all())
 

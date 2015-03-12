@@ -5,6 +5,7 @@ import sys
 from itertools import groupby
 
 import numpy
+from numpy.lib import recfunctions as rfn
 from Bio.File import as_handle
 from Bio._py3k import basestring, map, zip
 
@@ -15,10 +16,10 @@ class CopyNumArray(object):
     """An array of genomic intervals, treated like aCGH probes."""
     # http://docs.scipy.org/doc/numpy/user/basics.rec.html
 
-    _dtype = (('chromosome', 'a30'),
+    _dtype = (('chromosome', 'O'),
               ('start', 'i4'),
               ('end', 'i4'),
-              ('gene', 'a30'),
+              ('gene', 'O'),
               ('coverage', 'f4'))
     _dtype_gc = ('gc', 'f4')
     _dtype_rmask = ('rmask', 'f4')
@@ -68,7 +69,7 @@ class CopyNumArray(object):
         dtype = list(cls._dtype)
         if extra_keys:
             blank_kwargs = {k: [] for k in extra_keys}
-            newps = cls(sample_id, [], [], [], [], [], **blank_kwargs)
+            new_cna = cls(sample_id, [], [], [], [], [], **blank_kwargs)
             if 'gc' in extra_keys:
                 dtype.append(cls._dtype_gc)
             if 'rmask' in extra_keys:
@@ -80,9 +81,22 @@ class CopyNumArray(object):
             if 'probes' in extra_keys:
                 dtype.append(cls._dtype_probes)
         else:
-            newps = cls(sample_id, [], [], [], [], [])
-        newps.data = numpy.asarray(row_data, dtype=dtype)
-        return newps
+            new_cna = cls(sample_id, [], [], [], [], [])
+
+        if len(row_data) == 1:
+            row_data = [tuple(row_data[0])]
+        try:
+            # Rows might be plain tuples
+            new_array = numpy.asarray(row_data, dtype=dtype)
+        except ValueError:
+            # "Setting void-array with object members using buffer"
+            # All rows are numpy.ndarray
+            new_array = rfn.stack_arrays(row_data, usemask=False,
+                                         asrecarray=True, autoconvert=False)
+            # print(new_array.dtype)
+
+        new_cna.data = new_array
+        return new_cna
 
     # Container-like behavior
 
@@ -100,6 +114,9 @@ class CopyNumArray(object):
         return self.data[index]
 
     def __setitem__(self, index, value):
+        if isinstance(value, numpy.void) and isinstance(index, int):
+            # Avoid "Setting void-array with object members using buffer"
+            value = tuple(value)
         self.data[index] = value
 
     def __delitem__(self, index):
@@ -510,7 +527,7 @@ class CopyNumArray(object):
         outrows = []
         for name, subarr in self.by_gene(ignore):
             if name == 'Background' and not squash_background:
-                outrows.extend(subarr)
+                outrows.extend(map(tuple, subarr))
             else:
                 outrows.append(squash_rows(name, subarr))
         return self.to_rows(outrows)
