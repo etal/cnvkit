@@ -112,7 +112,7 @@ def bedcov(bed_fname, bam_fname):
     # Count bases in each region; exclude 0-MAPQ reads
     try:
         lines = pysam.bedcov(bed_fname, bam_fname, '-Q', '1')
-    except pysam.SamtoolsError, exc:
+    except pysam.SamtoolsError as exc:
         raise ValueError("Failed processing %r coverages in %r regions. PySAM error: %s"
                          % (bam_fname, bed_fname, exc))
     if not lines:

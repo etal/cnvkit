@@ -33,7 +33,7 @@ def call_quiet(*args):
     try:
         proc = subprocess.Popen(args, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
-    except OSError, exc:
+    except OSError as exc:
         raise RuntimeError("Could not find the executable %r" % args[0]
                            + " -- is it installed correctly?"
                            + "\n(Original error: %s)" % exc)
@@ -56,7 +56,7 @@ def ensure_path(fname):
         if dname and not os.path.isdir(dname):
             try:
                 os.makedirs(dname)
-            except OSError, exc:
+            except OSError as exc:
                 raise OSError("Output path " + fname +
                               " contains a directory " + dname +
                               " that cannot be created: " + str(exc))
