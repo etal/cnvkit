@@ -11,9 +11,10 @@ from itertools import islice
 import pysam
 from Bio._py3k import basestring, map
 
-from .shared import *
-from .samutil import *
+from .faidx import *
 from .regions import *
+from .samutil import *
+from .shared import *
 from .vcf import *
 
 
