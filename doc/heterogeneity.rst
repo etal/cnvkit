@@ -105,7 +105,7 @@ the CNVkit command line options. In a Python script::
 
 Note that in this approach the output values are still log2-transformed, and are
 not rounded to integer copy number values. If rounding is needed, you can use
-the option ``round_to_integer`` (*versions >0.3.5*)::
+the option ``round_to_integer`` (*development version only*)::
 
     rescaled_array = rescale_copy_ratios(my_array, purity=0.6, round_to_integer=True, is_reference_male=True)
 
