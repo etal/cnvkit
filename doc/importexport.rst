@@ -1,11 +1,16 @@
 Compatibility and other I/O
 ===========================
 
+.. _import-picard:
+
 import-picard
 -------------
 
 Convert Picard CalculateHsMetrics coverage files (.csv) to the CNVkit .cnn
 format.
+
+
+.. _import-seg:
 
 import-seg
 ----------
@@ -22,6 +27,9 @@ integer IDs. Options in ``import-seg`` can help recover the original names.
 * To use an arbitrary mapping of indices to chromosome names, use a
   comma-separated "key:value" string. For example, the human convention would
   be: "-c 23:X,24:Y,25:M".
+
+
+.. _export:
 
 export
 ------

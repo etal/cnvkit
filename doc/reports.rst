@@ -1,6 +1,8 @@
 Text and tabular reports
 ========================
 
+.. _breaks:
+
 breaks
 ------
 
@@ -14,6 +16,17 @@ This helps to identify genes in which (a) an unbalanced fusion or other
 structural rearrangement breakpoint occured, or (b) CNV calling is
 simply difficult due to an inconsistent copy number signal.
 
+The output is a text table of tab-separated values, which is amenable to further
+processing by scripts and standard Unix tools such as ``grep``, ``sort``,
+``cut`` and ``awk``.
+
+For example, to get a list of the names of genes that contain a possible copy
+number breakpoint::
+
+    cnvkit.py breaks Sample.cnr Sample.cns | cut -f1 | sort -u > gene-breaks.txt
+
+
+.. _gainloss:
 
 gainloss
 --------
@@ -24,12 +37,13 @@ threshold.
 ::
 
     cnvkit.py gainloss Sample.cnr
-    cnvkit.py gainloss Sample.cnr -s Sample.cns -t 0.4 -y -m 5
+    cnvkit.py gainloss Sample.cnr -s Sample.cns -t 0.4 -m 5 -y
 
 If segments are given, the log2 ratio value reported for each gene will be the
 value of the segment covering the gene. Where more than one segment overlaps the
 gene, i.e. if the gene contains a breakpoint, each segment's value will be
-reported as a separate row for the same gene.
+reported as a separate row for the same gene. If a large-scale CNA covers
+multiple genes, each of those genes will be listed individually.
 
 If segments are not given, the median of the log2 ratio values of the bins
 within each gene will be reported as the gene's overall log2 ratio value. This
@@ -48,10 +62,23 @@ Specify the reference gender (``-y`` if male) to ensure CNVs on the X and Y
 chromosomes are reported correctly; otherwise, a large number of spurious gains
 or losses on the sex chromosomes may be reported.
 
-The output is a text table of tab-separated values, which is amenable to further
-processing by scripts and standard Unix tools such as ``grep``, ``sort``,
-``cut`` and ``awk``.
+The output is a text table of tab-separated values, like that of :ref:`breaks`.
+Continuing the Unix example, we can try ``gainloss`` both with and without the
+segment files, take the intersection of those as a list of "trusted" genes, and
+visualize each of them with :ref:`scatter`::
 
+    cnvkit.py gainloss -y Sample.cnr -s Sample.cns | tail -n+2 | cut -f1 | sort > segment-gainloss.txt
+    cnvkit.py gainloss -y Sample.cnr | tail -n+2 | cut -f1 | sort > ratio-gainloss.txt
+    comm -12 ratio-gainloss.txt segment-gainloss.txt > trusted-gainloss.txt
+    for gene in `cat trusted-gainloss.txt`
+    do
+        cnvkit.py scatter -s Sample.cn{s,r} -g $gene -o Sample-$gene-scatter.pdf
+    done
+
+(The point is that it's possible.)
+
+
+.. _gender:
 
 gender
 ------
@@ -66,6 +93,30 @@ printed.
     cnvkit.py gender *.cnn *.cnr *.cns
     cnvkit.py gender -y *.cnn *.cnr *.cns
 
+If there is any confusion in specifying either the gender of the sample or the
+construction of the reference copy number profile, you can check what happened
+using the "gender" command.
+If the reference and intermediate .cnn files are available (.targetcoverage.cnn
+and .antitargetcoverage.cnn, which are created before most of CNVkit's
+corrections), CNVkit can report the reference gender and the apparent chromosome
+X copy number that appears in the sample::
+
+    cnvkit.py gender reference.cnn Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn
+
+The output looks like this, where columns are filename, apparent gender, and
+log2 ratio of chrX::
+
+    cnv_reference.cnn	Female	-0.176
+    Sample.targetcoverage.cnn	Female	-0.0818
+    Sample.antitargetcoverage.cnn	Female	-0.265
+
+If the ``-y`` option was not specified when constructing the reference (e.g.
+``cnvkit.py batch ...``), then you have a female reference, and in the final
+plots you will see chrX with neutral copy number in female samples and around -1
+log2 ratio in male samples.
+
+
+.. _metrics:
 
 metrics
 -------
@@ -135,6 +186,6 @@ Check questionable samples for poor coverage (using e.g. `bedtools
 `IGV <http://www.broadinstitute.org/igv/>`_ or `Picard CalculateHsMetrics
 <http://broadinstitute.github.io/picard/command-line-overview.html#CalculateHsMetrics>`_).
 
-Finally, visualizing a sample with CNVkit's ``scatter`` command will often make
-it apparent whether a sample or the copy ratios within a genomic region can be
-trusted.
+Finally, visualizing a sample with CNVkit's :ref:`scatter` command will often
+make it apparent whether a sample or the copy ratios within a genomic region can
+be trusted.

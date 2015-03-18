@@ -14,7 +14,11 @@ short-read sequencing platforms such as Illumina.
 .. toctree::
 
     quickstart
+    fileformats
+    heterogeneity
 
+.. howto
+.. visualization / gallery
 
 Command line usage
 ------------------

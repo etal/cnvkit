@@ -87,15 +87,16 @@ Here we'll assume the BAM files are a collection of "tumor" and "normal"
 samples, although germline disease samples can be used equally well in place of
 tumor samples.
 
-CNVkit uses the bait BED file, reference genome sequence, and
-sequencing-accessible regions along with your BAM files to:
+CNVkit uses the bait BED file (provided by the vendor of your capture kit),
+reference genome sequence, and sequencing-accessible regions along with your BAM
+files to:
 
 1. Create a pooled reference of per-bin copy number estimates from several
    normal samples; then
 2. Use this reference in processing all tumor samples that were sequenced with
    the same platform and library prep.
 
-All of these steps are automated with the ``batch`` command. Assuming normal
+All of these steps are automated with the :ref:`batch` command. Assuming normal
 samples share the suffix "Normal.bam" and tumor samples "Tumor.bam", a complete
 command could be::
 

@@ -1,5 +1,5 @@
-Copy number pipeline
-====================
+Copy number calling pipeline
+============================
 
 .. image:: workflow.png
     :align: right
@@ -17,6 +17,8 @@ the case of the text reporting commands, which print to standard output by
 default, and the matplotlib-based plotting commands (not ``diagram``), which
 will display the plots interactively on the screen by default.
 
+
+.. _batch:
 
 batch
 -----
@@ -46,11 +48,46 @@ See the rest of the commands below to learn about each of these steps and other
 functionality in CNVkit.
 
 
+.. _target:
+
+target
+------
+
+Prepare a BED file of baited regions for use with CNVkit.
+
+::
+
+    cnvkit.py target Tiled.bed --annotate refFlat.txt --split -o Targets.bed
+
+The BED file should be the baited genomic regions for your target capture kit,
+as provided by your vendor. Since these regions (usually exons) may be of
+unequal size, the ``--split`` option divides the larger regions so that the
+average bin size after dividing is close to the size specified by
+``--average-size``.
+
+In case the vendor BED file does not label each region with a corresponding gene
+name, the ``--annotate`` option can add or replace these labels.
+Gene annotation databases, e.g. RefSeq or Ensembl, are available in "flat"
+format from UCSC (e.g. `refFlat.txt for hg19
+<http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refFlat.txt.gz>`_).
+
+In other cases the region labels are a combination of human-readable gene names
+and database accession codes, separated by commas (e.g.
+"ref|BRAF,mRNA|AB529216,ens|ENST00000496384"). The ``--short-names`` option
+splits these accessions on commas, then chooses the single accession that covers
+in the maximum number of consecutive regions that share that accession, and
+applies it as the new label for those regions. (You may find it simpler to just
+apply the refFlat annotations.)
+
+
+.. _antitarget:
+
 antitarget
 ----------
 
-Derive a background/"antitarget" BED file from a "target" BED file that lists
-the chromosomal coordinates of the tiled regions used for targeted resequencing.
+Given a "target" BED file that lists the chromosomal coordinates of the tiled
+regions used for targeted resequencing, derive a BED file
+off-target/"antitarget"/"background" regions.
 
 ::
 
@@ -59,25 +96,61 @@ the chromosomal coordinates of the tiled regions used for targeted resequencing.
 Many fully sequenced genomes, including the human genome, contain large regions
 of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
 telomeres, and highly repetitive regions.) In the FASTA genome sequence these
-regions are filled in with large stretches of N characters. These regions cannot
-be mapped by resequencing, so we can avoid them when calculating the antitarget
-locations by passing the locations of the accessible sequence regions with the
-``-g`` or ``--access`` option. These regions are precomputed for the UCSC
-reference human genome hg19, and can be computed for other genomes with the
-included script ``genome2access.py``.
+regions are filled in with large stretches of "N" characters. These regions
+cannot be mapped by resequencing, so we can avoid them when calculating the
+antitarget locations by passing the locations of the accessible sequence regions
+with the ``-g`` or ``--access`` option. These regions are precomputed for the
+UCSC reference human genome hg19 (data/access-10000.hg19.bed), and can be
+computed for other genomes with the included script ``genome2access.py``.
 
-To use CNVkit on **amplicon** sequencing data instead of **hybrid capture** --
+CNVkit uses a cautious default off-target bin size that, in our experience, will
+typically include more reads than the average on-target bin.  However, we
+encourage the user to examine the coverage statistics reported by CNVkit and
+specify a properly calculated off-target bin size for their samples in order to
+maximize copy number information.
+
+
+Whole-genome sequencing and targeted amplicon capture
+`````````````````````````````````````````````````````
+
+CNVkit is designed for use on **hybrid capture** sequencing data, where
+off-target reads are present and can be used improve copy number estimates.
+
+If necessary, CNVkit can be used on **whole-genome sequencing** (WGS) datasets
+by specifying the genome's sequencing-accessible regions as the "targets",
+avoiding "antitargets", and using a gene annotation database to label genes in
+the resulting BED file::
+
+    cnvkit.py batch ... -t data/access-10000.hg19.bed -g data/access-10000.hg19.bed --split --annotate refFlat.txt
+
+Or::
+
+    cnvkit.py target data/access-10000.hg19.bed --split --annotate refFlat.txt -o Targets.bed
+    cnvkit.py antitarget data/access-10000.hg19.bed -g data/access-10000.hg19.bed -o Background.bed
+
+This produces a "target" binning of the entire sequencing-accessible area of the
+genome, and empty "antitarget" files which CNVkit will handle safely from
+version 0.3.4 onward.
+
+
+Similarly, to use CNVkit on **targeted amplicon sequencing** data instead --
 although this is not recommended -- you can exclude all off-target regions from
 the analysis by passing the target BED file as the "access" file as well::
 
-    cnvkit.py antitarget Tiled.bed -g Tiled.bed -o Background.bed
-    cnvkit.py batch ... -t Tiled.bed -g Tiled.bed ...
+    cnvkit.py batch ... -t Targeted.bed -g Targeted.bed ...
 
-This results in empty ".antitarget.cnn" files which CNVkit will handle safely
-from version 0.3.4 onward. However, this approach does not collect any copy
+Or::
+
+    cnvkit.py antitarget Targeted.bed -g Targeted.bed -o Background.bed
+
+ However, this approach does not collect any copy
 number information between targeted regions, so it should only be used if you
 have in fact prepared your samples with a targeted amplicon sequencing protocol.
+It also does not attempt to normalize each amplicon at the gene level, though
+this may be addressed in a future version of CNVkit.
 
+
+.. _coverage:
 
 coverage
 --------
@@ -114,6 +187,8 @@ About those BAM files:
   this, use the Unix command ``touch`` to update the timestamp on the index
   files after all files have been downloaded.
 
+
+.. _reference:
 
 reference
 ---------
@@ -152,12 +227,14 @@ Two possible uses for a flat reference:
 
 About the FASTA index file:
 
-- As with BAM files, CNVkit will automatically index the FASTA file if the
+* As with BAM files, CNVkit will automatically index the FASTA file if the
   corresponding .fai file is missing or out of date. If you have copied the
   FASTA file and its index together over a network, you may need to use the
   ``touch`` command to update the .fai file's timestamp so that CNVkit will
   recognize it as up-to-date.
 
+
+.. _fix:
 
 fix
 ---
@@ -171,18 +248,19 @@ reference. Output a table of copy number ratios (.cnr).
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn Reference.cnn -o Sample.cnr
 
 
+.. _segment:
+
 segment
 -------
 
-Infer discrete copy number segments from the given coverage table.
-By default this uses the circular binary segmentation algorithm (CBS), but with
-the '-m haar' option, the faster but less accurate HaarSeg algorithm can be used
-instead.
-
-::
+Infer discrete copy number segments from the given coverage table::
 
     cnvkit.py segment Sample.cnr -o Sample.cns
 
-The output table of copy number segments (.cns) is essentially the same tabular
-format as the other .cnn and .cnr files.
+By default this uses the circular binary segmentation algorithm (CBS), but with
+the ``-m`` option, the faster Fused Lasso algorithm (``flasso``) or even faster
+but less accurate HaarSeg algorithm (``haar``) can be used instead.
 
+Fused Lasso additionally performs significance testing to distinguish CNAs from
+regions of neutral copy number, whereas CBS and HaarSeg by themselves only
+identify the supported segmentation breakpoints.
