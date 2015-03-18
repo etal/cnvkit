@@ -204,7 +204,7 @@ def segments2freebayes(segments, sample_name, ploidy, purity, is_reference_male,
     absolutes = cna_absolutes(segments, ploidy, purity, is_reference_male,
                               is_sample_female)
     for row, abs_val in zip(segments, absolutes):
-        ncopies = round_to_integer(abs_val, half_is_zero=purity is None)
+        ncopies = _round_to_integer(abs_val, half_is_zero=purity is None)
         # Ignore regions of neutral copy number
         if ncopies != ploidy:
             yield (row["chromosome"], # reference sequence
@@ -214,7 +214,7 @@ def segments2freebayes(segments, sample_name, ploidy, purity, is_reference_male,
                    ncopies) # copy number
 
 
-def round_to_integer(ncopies, half_is_zero=True, rounding_error=1e-7):
+def _round_to_integer(ncopies, half_is_zero=True, rounding_error=1e-7):
     """Round an absolute estimate of copy number to a positive integer.
 
     `half_is_zero` indicates the hack of encoding 0 copies (complete loss) as a
@@ -314,8 +314,8 @@ def calculate_theta_fields(seg, ref_rows, chrom_id):
 # Rescaling etc.
 # (XXX move these to cnarray or another module)
 
-def rescale_copy_ratios(cnarr, purity=None, ploidy=2, is_sample_female=None,
-                        is_reference_male=True):
+def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
+                        is_sample_female=None, is_reference_male=True):
     """Rescale segment copy ratio values given a known tumor purity."""
     if purity and not 0.0 < purity <= 1.0:
         raise ValueError("Purity must be between 0 and 1.")
@@ -327,8 +327,13 @@ def rescale_copy_ratios(cnarr, purity=None, ploidy=2, is_sample_female=None,
                                          verbose=False)
     absolutes = cna_absolutes(cnarr, ploidy, purity, is_reference_male,
                               is_sample_female)
-    # Avoid a logarithm domain error
-    absolutes[absolutes <= 0.0] = .5
+    if round_to_integer:
+        absolutes = numpy.round(absolutes)
+        absolutes[absolutes <= 0.5] = .5
+    else:
+        # Avoid a logarithm domain error
+        absolutes[absolutes <= 0.0] = .5
+
     abslog = numpy.log2(absolutes / float(ploidy))
     newcnarr = cnarr.copy()
     newcnarr["coverage"] = abslog
