@@ -41,8 +41,10 @@ After running the CNVkit :doc:`pipeline` on a sample, create the THetA2 input fi
 
 Then, run THetA2 (assuming the program was unpacked at ``/path/to/theta2/``)::
 
+    # Generates Sample.theta2.BEST.results:
     /path/to/theta2/bin/RunTHetA Sample.theta2.input
-    # Generates Sample.theta2.BEST.results
+    # Parameters for low-quality samples:
+    /path/to/theta2/python/RunTHetA.py Sample.theta2.input -n 2 -k 4 -m .90 --FORCE --NUM_PROCESSES `nproc`
 
 Finally, import THetA2's results back into CNVkit's .cns format, matching the
 original segmentation (.cns) to the THetA2-inferred absolute copy number
