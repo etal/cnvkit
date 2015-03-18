@@ -79,6 +79,28 @@ in the maximum number of consecutive regions that share that accession, and
 applies it as the new label for those regions. (You may find it simpler to just
 apply the refFlat annotations.)
 
+If you need higher resolution, you can select a smaller average size for your
+:ref:`target` and :ref:`antitarget` bins.
+
+Exons in the human genome have an average size of about 200bp. The target bin
+size default of 267 is chosen so that splitting larger exons will produce bins
+with a minimum size of 200. Since bins that contain fewer reads result in a
+noisier copy number signal, this approach ensures the "noisiness" of the bins
+produced by splitting larger exons will be no worse than average.
+
+Setting the average size of target bins to 100bp, for example, will yield about
+twice as many target bins, which can result in more precise and perhaps more
+accurate segmentation. However, the number of reads counted in each bin will be
+reduced by about half, increasing the variance or "noise" in bin-level
+coverages. An excess of noisy bins can make visualization difficult, and since
+the noise may not be Gaussian, especially in the presence of many bins with zero
+reads, the CBS algorithm could produce less accurate segmentation results on
+low-coverage samples.
+In practice we see good results with an average of 200-300 reads per bin; we
+therefore recommend an overall on-target sequencing coverage depth of at least
+200x to 300x with a read length of 100 to justify reducing the average target
+bin size to 100bp.
+
 
 .. _antitarget:
 
@@ -126,6 +148,11 @@ interval size.
     cnvkit.py coverage Sample.bam Tiled.bed -o Sample.targetcoverage.cnn
     cnvkit.py coverage Sample.bam Background.bed -o Sample.antitargetcoverage.cnn
 
+Summary statistics of read counts and their binning are printed to standard
+error when CNVkit finishes calculating the coverage of each sample (through
+either the :ref:`batch` or :ref:`coverage` commands).
+
+
 .. note::
     About those BAM files:
 
@@ -167,6 +194,21 @@ If normal samples are not available, it will sometimes work OK to build the
 reference from a collection of tumor samples. You can use the ``scatter`` command
 on the raw ``.cnn`` coverage files to help choose samples with relatively
 minimal CNVs for use in the reference.
+
+Notes on sample selection:
+
+* You can use ``cnvkit.py metrics *.cnr -s *.cns`` to see if any samples are
+  especially noisy. See the :ref:`metrics` command.
+
+* CNVkit will usually call larger CNAs reliably down to about 10x on-target
+  coverage, but there will tend to be more spurious segments, and smaller-scale
+  or subclonal CNAs can be hard to infer below that point.
+  This is well below the minimum coverage thresholds typically used for SNV
+  calling, especially for targeted sequencing of tumor samples that may have
+  significant normal-cell contamination and subclonal tumor-cell populations.
+  So, a normal sample that passes your other QC checks will probably be OK to
+  use in building a CNVkit reference -- assuming it was sequenced on the same
+  platform as the other samples you're calling.
 
 Alternatively, you can create a "flat" reference of neutral copy number (i.e.
 log2 0.0) for each probe from the target and antitarget interval files. This

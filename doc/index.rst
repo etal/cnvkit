@@ -14,12 +14,9 @@ short-read sequencing platforms such as Illumina.
 .. toctree::
 
     quickstart
-    fileformats
-    heterogeneity
-    nonhybrid
 
-.. howto
-.. visualization / gallery
+.. gallery?
+
 
 Command line usage
 ------------------
@@ -32,6 +29,16 @@ Command line usage
     reports
     importexport
     scripts
+
+
+FAQ
+---
+
+.. toctree::
+
+    fileformats
+    heterogeneity
+    nonhybrid
 
 
 Python API
