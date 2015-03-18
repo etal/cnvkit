@@ -100,11 +100,14 @@ the CNVkit command line options. In a Python script::
     import cnvlib
     from cnvlib.export import rescale_copy_ratios
     my_array = cnvlib.read("MySample.cnr")
-    rescaled_array = rescale_copy_ratios(my_array, purity=True, is_reference_male=True)
+    rescaled_array = rescale_copy_ratios(my_array, purity=0.6, is_reference_male=True)
     rescaled_array.write("MySample.rescaled.cnr")
 
 Note that in this approach the output values are still log2-transformed, and are
 not rounded to integer copy number values. If rounding is needed, you can use
-the function ``cnvlib.export.round_to_integer`` on the rescaled array's "coverage"
-field. This functionality is not directly available through the command line
+the option ``round_to_integer`` (*versions >0.3.5*)::
+
+    rescaled_array = rescale_copy_ratios(my_array, purity=0.6, round_to_integer=True, is_reference_male=True)
+
+This functionality is not directly available through the command line
 yet, but will be in a future release of CNVkit.
