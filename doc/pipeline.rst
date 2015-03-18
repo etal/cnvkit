@@ -154,27 +154,27 @@ either the :ref:`batch` or :ref:`coverage` commands).
 
 
 .. note::
-    About those BAM files:
+    **The BAM file must be sorted.** CNVkit (and most other software) will not
+    notice out if the reads are out of order; it will just ignore the
+    out-of-order reads and the coverages will be zero after a certain point
+    early in the file (e.g. in the middle of chromosome 2). A future release
+    may try to be smarter about this.
 
-    - **The BAM file must be sorted.** CNVkit (and most other software) will not
-      notice out if the reads are out of order; it will just ignore the
-      out-of-order reads and the coverages will be zero after a certain point
-      early in the file (e.g. in the middle of chromosome 2). A future release
-      may try to be smarter about this.
-    - **If you've prebuilt the index file (.bai), make sure its timestamp is
-      later than the BAM file's.** CNVkit will automatically index the BAM file
-      if needed -- that is, if the .bai file is missing, *or* if the timestamp
-      of the .bai file is older than that of the corresponding .bam file. This
-      is done in case the BAM file has changed after the index was initially
-      created. (If the index is wrong, CNVkit will not catch this, and coverages
-      will be mysteriously truncated to zero after a certain point.) *However,*
-      if you copy a set of BAM files and their index files (.bai) together over
-      a network, the smaller .bai files will typically finish downloading first,
-      and so their timestamp will be earlier than the corresponding BAM or FASTA
-      file. CNVkit will then consider the index files to be out of date and will
-      attempt to rebuild them. To prevent this, use the Unix command ``touch``
-      to update the timestamp on the index files after all files have been
-      downloaded.
+.. note::
+    **If you've prebuilt the BAM index file (.bai), make sure its timestamp is
+    later than the BAM file's.** CNVkit will automatically index the BAM file
+    if needed -- that is, if the .bai file is missing, *or* if the timestamp
+    of the .bai file is older than that of the corresponding .bam file. This
+    is done in case the BAM file has changed after the index was initially
+    created. (If the index is wrong, CNVkit will not catch this, and coverages
+    will be mysteriously truncated to zero after a certain point.) *However,*
+    if you copy a set of BAM files and their index files (.bai) together over
+    a network, the smaller .bai files will typically finish downloading first,
+    and so their timestamp will be earlier than the corresponding BAM or FASTA
+    file. CNVkit will then consider the index files to be out of date and will
+    attempt to rebuild them. To prevent this, use the Unix command ``touch``
+    to update the timestamp on the index files after all files have been
+    downloaded.
 
 
 .. _reference:
@@ -230,13 +230,11 @@ Two possible uses for a flat reference:
    and re-run ``batch`` on a set of tumor samples using this updated reference.
 
 .. note::
-    About the FASTA index file:
-
-    * As with BAM files, CNVkit will automatically index the FASTA file if the
-      corresponding .fai file is missing or out of date. If you have copied the
-      FASTA file and its index together over a network, you may need to use the
-      ``touch`` command to update the .fai file's timestamp so that CNVkit will
-      recognize it as up-to-date.
+    As with BAM files, CNVkit will automatically index the FASTA file if the
+    corresponding .fai file is missing or out of date. If you have copied the
+    FASTA file and its index together over a network, you may need to use the
+    ``touch`` command to update the .fai file's timestamp so that CNVkit will
+    recognize it as up-to-date.
 
 
 .. _fix:
@@ -263,8 +261,11 @@ Infer discrete copy number segments from the given coverage table::
     cnvkit.py segment Sample.cnr -o Sample.cns
 
 By default this uses the circular binary segmentation algorithm (CBS), but with
-the ``-m`` option, the faster Fused Lasso algorithm (``flasso``) or even faster
-but less accurate HaarSeg algorithm (``haar``) can be used instead.
+the ``-m`` option, the faster `Fused Lasso
+<http://statweb.stanford.edu/~tibs/cghFLasso.html>`_ algorithm (``flasso``) or
+even faster but less accurate `HaarSeg
+<http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_
+algorithm (``haar``) can be used instead.
 
 Fused Lasso additionally performs significance testing to distinguish CNAs from
 regions of neutral copy number, whereas CBS and HaarSeg by themselves only
