@@ -110,46 +110,6 @@ specify a properly calculated off-target bin size for their samples in order to
 maximize copy number information.
 
 
-Whole-genome sequencing and targeted amplicon capture
-`````````````````````````````````````````````````````
-
-CNVkit is designed for use on **hybrid capture** sequencing data, where
-off-target reads are present and can be used improve copy number estimates.
-
-If necessary, CNVkit can be used on **whole-genome sequencing** (WGS) datasets
-by specifying the genome's sequencing-accessible regions as the "targets",
-avoiding "antitargets", and using a gene annotation database to label genes in
-the resulting BED file::
-
-    cnvkit.py batch ... -t data/access-10000.hg19.bed -g data/access-10000.hg19.bed --split --annotate refFlat.txt
-
-Or::
-
-    cnvkit.py target data/access-10000.hg19.bed --split --annotate refFlat.txt -o Targets.bed
-    cnvkit.py antitarget data/access-10000.hg19.bed -g data/access-10000.hg19.bed -o Background.bed
-
-This produces a "target" binning of the entire sequencing-accessible area of the
-genome, and empty "antitarget" files which CNVkit will handle safely from
-version 0.3.4 onward.
-
-
-Similarly, to use CNVkit on **targeted amplicon sequencing** data instead --
-although this is not recommended -- you can exclude all off-target regions from
-the analysis by passing the target BED file as the "access" file as well::
-
-    cnvkit.py batch ... -t Targeted.bed -g Targeted.bed ...
-
-Or::
-
-    cnvkit.py antitarget Targeted.bed -g Targeted.bed -o Background.bed
-
-However, this approach does not collect any copy number information between
-targeted regions, so it should only be used if you have in fact prepared your
-samples with a targeted amplicon sequencing protocol.  It also does not attempt
-to normalize each amplicon at the gene level, though this may be addressed in a
-future version of CNVkit.
-
-
 .. _coverage:
 
 coverage
@@ -166,26 +126,28 @@ interval size.
     cnvkit.py coverage Sample.bam Tiled.bed -o Sample.targetcoverage.cnn
     cnvkit.py coverage Sample.bam Background.bed -o Sample.antitargetcoverage.cnn
 
-About those BAM files:
+.. note::
+    About those BAM files:
 
-- **The BAM file must be sorted.** CNVkit (and most other software) will not
-  notice out if the reads are out of order; it will just ignore the out-of-order
-  reads and the coverages will be zero after a certain point early in the file
-  (e.g. in the middle of chromosome 2). A future release may try to be smarter
-  about this.
-- **If you've prebuilt the index file (.bai), make sure its timestamp is later
-  than the BAM file's.** CNVkit will automatically index the BAM file if needed
-  -- that is, if the .bai file is missing, *or* if the timestamp of the .bai
-  file is older than that of the corresponding .bam file. This is done in case
-  the BAM file has changed after the index was initially created. (If the index
-  is wrong, CNVkit will not catch this, and coverages will be mysteriously
-  truncated to zero after a certain point.) *However,* if you copy a set of BAM
-  files and their index files (.bai) together over a network, the smaller .bai
-  files will typically finish downloading first, and so their timestamp will be
-  earlier than the corresponding BAM or FASTA file. CNVkit will then consider
-  the index files to be out of date and will attempt to rebuild them. To prevent
-  this, use the Unix command ``touch`` to update the timestamp on the index
-  files after all files have been downloaded.
+    - **The BAM file must be sorted.** CNVkit (and most other software) will not
+      notice out if the reads are out of order; it will just ignore the
+      out-of-order reads and the coverages will be zero after a certain point
+      early in the file (e.g. in the middle of chromosome 2). A future release
+      may try to be smarter about this.
+    - **If you've prebuilt the index file (.bai), make sure its timestamp is
+      later than the BAM file's.** CNVkit will automatically index the BAM file
+      if needed -- that is, if the .bai file is missing, *or* if the timestamp
+      of the .bai file is older than that of the corresponding .bam file. This
+      is done in case the BAM file has changed after the index was initially
+      created. (If the index is wrong, CNVkit will not catch this, and coverages
+      will be mysteriously truncated to zero after a certain point.) *However,*
+      if you copy a set of BAM files and their index files (.bai) together over
+      a network, the smaller .bai files will typically finish downloading first,
+      and so their timestamp will be earlier than the corresponding BAM or FASTA
+      file. CNVkit will then consider the index files to be out of date and will
+      attempt to rebuild them. To prevent this, use the Unix command ``touch``
+      to update the timestamp on the index files after all files have been
+      downloaded.
 
 
 .. _reference:
@@ -225,13 +187,14 @@ Two possible uses for a flat reference:
    resulting ``*.targetcoverage.cnn`` and ``*.antitargetcoverage.cnn`` files,
    and re-run ``batch`` on a set of tumor samples using this updated reference.
 
-About the FASTA index file:
+.. note::
+    About the FASTA index file:
 
-* As with BAM files, CNVkit will automatically index the FASTA file if the
-  corresponding .fai file is missing or out of date. If you have copied the
-  FASTA file and its index together over a network, you may need to use the
-  ``touch`` command to update the .fai file's timestamp so that CNVkit will
-  recognize it as up-to-date.
+    * As with BAM files, CNVkit will automatically index the FASTA file if the
+      corresponding .fai file is missing or out of date. If you have copied the
+      FASTA file and its index together over a network, you may need to use the
+      ``touch`` command to update the .fai file's timestamp so that CNVkit will
+      recognize it as up-to-date.
 
 
 .. _fix:

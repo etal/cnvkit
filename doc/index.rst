@@ -16,6 +16,7 @@ short-read sequencing platforms such as Illumina.
     quickstart
     fileformats
     heterogeneity
+    nonhybrid
 
 .. howto
 .. visualization / gallery
