@@ -143,11 +143,11 @@ Or::
 
     cnvkit.py antitarget Targeted.bed -g Targeted.bed -o Background.bed
 
- However, this approach does not collect any copy
-number information between targeted regions, so it should only be used if you
-have in fact prepared your samples with a targeted amplicon sequencing protocol.
-It also does not attempt to normalize each amplicon at the gene level, though
-this may be addressed in a future version of CNVkit.
+However, this approach does not collect any copy number information between
+targeted regions, so it should only be used if you have in fact prepared your
+samples with a targeted amplicon sequencing protocol.  It also does not attempt
+to normalize each amplicon at the gene level, though this may be addressed in a
+future version of CNVkit.
 
 
 .. _coverage:

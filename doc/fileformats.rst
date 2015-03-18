@@ -12,7 +12,7 @@ software for manual analysis, if desired.
 BED
 ---
 
-http://genome.ucsc.edu/FAQ/FAQformat.html#format1
+See: http://genome.ucsc.edu/FAQ/FAQformat.html#format1
 
 Note that BED genomic coordinates are 0-indexed, like C or Python code, but
 unlike the 1-indexed GATK/Picard interval list format. (The first nucleotide
