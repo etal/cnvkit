@@ -191,7 +191,7 @@ def export_freebayes(sample_fnames, args):
         print("Treating sample gender as",
               "female" if is_sample_female else "male",
               file=sys.stderr)
-        rows = segments2freebayes(segs, args.name or segs.sample_id,
+        rows = segments2freebayes(segs, args.sample_id or segs.sample_id,
                                   args.ploidy, args.purity, args.male_reference,
                                   is_sample_female)
         bed_rows.extend(rows)

@@ -707,7 +707,7 @@ P_diagram.set_defaults(func=_cmd_diagram)
 
 def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
-    pset_cvg = CNA.read(args.filename, args.samplename)
+    pset_cvg = CNA.read(args.filename, args.sample_id)
     pset_seg = CNA.read(args.segment) if args.segment else None
     do_scatter(pset_cvg, pset_seg, args.vcf,
                args.chromosome, args.gene, args.range,
@@ -858,8 +858,8 @@ P_scatter.add_argument('-r', '--range',
         help="""Chromosomal range to display (e.g. chr1:2333000-2444000).
                 All targeted genes in this range will be shown, unless
                 '--gene'/'-g' is already given.""")
-P_scatter.add_argument("-n", "--samplename",
-                       help="Specify the name of the sample to put in plot title")
+P_scatter.add_argument("-i", "--sample-id",
+        help="Specify the name of the sample to show in plot title.")
 P_scatter.add_argument('-b', '--background-marker', default=None,
         help="""Plot antitargets with this symbol, in zoomed/selected regions
                 (default: same as targets).""")
@@ -1360,7 +1360,7 @@ P_export_fb = P_export_subparsers.add_parser('freebayes',
 P_export_fb.add_argument('segments', nargs='+',
         help="""Segmented copy ratio data files (*.cns), the output of the
                 'segment' sub-command.""")
-P_export_fb.add_argument("-n", "--name",
+P_export_fb.add_argument("-i", "--sample-id",
         help="Sample name, as FreeBayes should see it.")
 # Arguments that could be shared across 'export'
 P_export_fb.add_argument("--ploidy", type=int, default=2,
