@@ -707,7 +707,7 @@ P_diagram.set_defaults(func=_cmd_diagram)
 
 def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
-    pset_cvg = CNA.read(args.filename)
+    pset_cvg = CNA.read(args.filename, args.samplename)
     pset_seg = CNA.read(args.segment) if args.segment else None
     do_scatter(pset_cvg, pset_seg, args.vcf,
                args.chromosome, args.gene, args.range,
@@ -774,7 +774,11 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             if not genes:
                 genes = plots.gene_coords_by_range(pset_cvg, chrom,
                                                    start, end)[chrom]
-            window_coords = (start, end)
+            # Allow use of windows around target regions with highlighting of region
+            print (window_width, end - start)
+            if not genes and window_width > (end - start) / 10.0:
+                genes = [(start, end, "Target")]
+            window_coords = (start - window_width, end + window_width)
 
         if show_chromosome:
             if chrom:
@@ -854,6 +858,8 @@ P_scatter.add_argument('-r', '--range',
         help="""Chromosomal range to display (e.g. chr1:2333000-2444000).
                 All targeted genes in this range will be shown, unless
                 '--gene'/'-g' is already given.""")
+P_scatter.add_argument("-n", "--samplename",
+                       help="Specify the name of the sample to put in plot title")
 P_scatter.add_argument('-b', '--background-marker', default=None,
         help="""Plot antitargets with this symbol, in zoomed/selected regions
                 (default: same as targets).""")
