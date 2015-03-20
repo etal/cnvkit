@@ -774,10 +774,10 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             if not genes:
                 genes = plots.gene_coords_by_range(pset_cvg, chrom,
                                                    start, end)[chrom]
-            # Allow use of windows around target regions with highlighting of region
-            print (window_width, end - start)
             if not genes and window_width > (end - start) / 10.0:
-                genes = [(start, end, "Target")]
+                # No genes in the selected region, so highlight the region
+                # itself (unless the selection is ~entire displayed window)
+                genes = [(start, end, "Selection")]
             window_coords = (start - window_width, end + window_width)
 
         if show_chromosome:
