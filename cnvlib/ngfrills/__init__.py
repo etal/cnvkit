@@ -1,14 +1,12 @@
 """NGS utilities."""
 from __future__ import absolute_import, division, print_function
-import collections
+
 import contextlib
 import os
 import subprocess
 import sys
 import tempfile
-from itertools import islice
 
-import pysam
 from Bio._py3k import basestring, map
 
 from .faidx import *

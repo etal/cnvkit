@@ -1,22 +1,11 @@
 """NGS utilities: BED/Interval I/O, genomic regions and ranges."""
 from __future__ import absolute_import, division, print_function
 
-import collections
-import contextlib
 import functools
-import math
-import os
 import re
 import shlex
-import subprocess
-import sys
-import tempfile
-from itertools import groupby, islice
 
-import pysam
 from Bio.File import as_handle
-from Bio._py3k import basestring, map
-
 
 from .shared import echo
 
