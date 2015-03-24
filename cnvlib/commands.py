@@ -1257,7 +1257,7 @@ P_import_seg.add_argument('-c', '--chromosomes',
 P_import_seg.add_argument('-p', '--prefix',
         help="""Prefix to add to chromosome names (e.g 'chr' to rename '8' in
                 the SEG file to 'chr8' in the output).""")
-P_import_seg.add_argument('--from-log10',
+P_import_seg.add_argument('--from-log10', action='store_true',
         help="Convert base-10 logarithm values in the input to base-2 logs.")
 P_import_seg.add_argument('-d', '--output-dir', default='.',
         help="Output directory name.")
