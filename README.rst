@@ -34,6 +34,23 @@ https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit
 Installation
 ============
 
+CNVkit runs on Python 2.7. Your operating system might already provide Python
+2.7, which you can check on the command line::
+
+    python --version
+
+If your operating system already includes Python 2.6 , I suggest installing
+Python 2.7 alongside it instead of attempting to upgrade it in-place.
+Your package manager might provide both versions.
+
+The recommended way to install Python 2.7 and some of CNVkit's dependencies
+without affecting the rest of your operating system is by installing either
+`Anaconda <https://store.continuum.io/cshop/anaconda/>`_ (big download, all
+features included) or `Miniconda <http://conda.pydata.org/miniconda.html>`_
+(smaller download, minimal environment). Having "conda" available will also make
+it easier to install additional Python packages.
+
+
 From a Python package repository
 --------------------------------
 
