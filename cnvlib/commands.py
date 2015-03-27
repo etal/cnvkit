@@ -230,7 +230,7 @@ P_batch.add_argument('-c', '--count-reads', action='store_true',
 P_batch.add_argument('-p', '--processes', type=int, default=1,
         help="""Number of subprocesses used to running each of the BAM files in
                 parallel. Give 0 or a negative value to use the maximum number
-                of available CPUs. Default: process each BAM in serial.""")
+                of available CPUs. [Default: process each BAM in serial]""")
 P_batch.add_argument("--rlibpath",
         help="Path to an alternative site-library to use for R packages.")
 
@@ -335,7 +335,8 @@ P_target.add_argument('--split', action='store_true',
 #   NV2:  [65--181==190==239--12630], mean=264 -> outlier=277, extreme=364
 # Default avg_size chosen s.t. minimum bin size after split is ~= median
 P_target.add_argument('-a', '--avg-size', type=int, default=200 / .75,
-        help="Average size of split target bins (results are approximate).")
+        help="""Average size of split target bins (results are approximate).
+                [Default: %(default)s]""")
 P_target.add_argument('-o', '--output', help="""Output file name.""")
 P_target.set_defaults(func=_cmd_target)
 
@@ -388,7 +389,8 @@ P_anti.add_argument('-g', '--access',
         help="""Regions of accessible sequence on chromosomes (.bed), as
                 output by genome2access.py.""")
 P_anti.add_argument('-a', '--avg-size', type=int, default=150000,
-        help="Average size of antitarget bins (results are approximate).")
+        help="""Average size of antitarget bins (results are approximate).
+                [Default: %(default)s]""")
 P_anti.add_argument('-m', '--min-size', type=int,
         help="Minimum size of antitarget bins (smaller regions are dropped).")
 P_anti.add_argument('-o', '--output', help="""Output file name.""")
@@ -632,7 +634,8 @@ P_segment.add_argument('-d', '--dataframe',
                 Fused Lasso. (Useful for debugging.)""")
 P_segment.add_argument('-m', '--method',
         choices=('cbs', 'haar', 'flasso'), default='cbs',
-        help="Segmentation method (CBS, HaarSeg, or Fused Lasso).")
+        help="""Segmentation method (CBS, HaarSeg, or Fused Lasso).
+                [Default: %(default)s]""")
 P_segment.add_argument("--rlibpath",
                        help="Path to an alternative site-library to use for R packages.")
 P_segment.set_defaults(func=_cmd_segment)
@@ -693,7 +696,8 @@ P_diagram.add_argument('filename', nargs='?',
 P_diagram.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")
 P_diagram.add_argument('-t', '--threshold', type=float, default=0.6,
-        help="Copy number change threshold to label genes.")
+        help="""Copy number change threshold to label genes.
+                [Default: %(default)s]""")
 P_diagram.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-CNR of
@@ -861,15 +865,16 @@ P_scatter.add_argument('-r', '--range',
 P_scatter.add_argument("-i", "--sample-id",
         help="Specify the name of the sample to show in plot title.")
 P_scatter.add_argument('-b', '--background-marker', default=None,
-        help="""Plot antitargets with this symbol, in zoomed/selected regions
-                (default: same as targets).""")
+        help="""Plot antitargets with this symbol, in zoomed/selected regions.
+                [Default: same as targets]""")
 P_scatter.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_scatter.add_argument('-v', '--vcf',
         help="""VCF file name containing variants to plot for LOH.""")
 P_scatter.add_argument('-w', '--width', type=float, default=1e6,
         help="""Width of margin to show around the selected gene or region
-                on the chromosome (use with --gene or --region).""")
+                on the chromosome (use with --gene or --region).
+                [Default: %(default)d]""")
 P_scatter.add_argument('-o', '--output',
         help="Output table file name.")
 P_scatter.set_defaults(func=_cmd_scatter)
@@ -920,7 +925,8 @@ P_loh.add_argument('variants', nargs='+',
 P_loh.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")
 P_loh.add_argument('-m', '--min-depth', type=int, default=20,
-        help="Minimum read depth for a variant to be displayed.")
+        help="""Minimum read depth for a variant to be displayed.
+                [Default: %(default)s]""")
 P_loh.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_loh.add_argument('-o', '--output',
@@ -1010,7 +1016,7 @@ P_heatmap = AP_subparsers.add_parser('heatmap', help=_cmd_heatmap.__doc__)
 P_heatmap.add_argument('filenames', nargs='+',
         help="Sample coverages as raw probes (.cnr) or segments (.cns).")
 P_heatmap.add_argument('-c', '--chromosome',
-        help="Name of chromosome to display (default: show them all).")
+        help="Name of chromosome to display. [Default: show them all]")
 # P_heatmap.add_argument('-g', '--gene',
 #         help="Name of gene to display.")
 # P_heatmap.add_argument('-r', '--range',
@@ -1053,7 +1059,7 @@ P_breaks.add_argument('segment',
         help="Segmentation calls (.cns), the output of the 'segment' command).")
 P_breaks.add_argument('-m', '--min-probes', type=int, default=1,
         help="""Minimum number of within-gene probes on both sides of a
-                breakpoint to report it.""")
+                breakpoint to report it. [Default: %(default)d]""")
 P_breaks.add_argument('-o', '--output',
         help="Output table file name.")
 P_breaks.set_defaults(func=_cmd_breaks)
@@ -1102,9 +1108,11 @@ P_gainloss.add_argument('filename',
 P_gainloss.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command).")
 P_gainloss.add_argument('-t', '--threshold', type=float, default=0.6,
-        help="Copy number change threshold to report a gene gain/loss.")
+        help="""Copy number change threshold to report a gene gain/loss.
+                [Default: %(default)s]""")
 P_gainloss.add_argument('-m', '--min-probes', type=int, default=1,
-        help="Minimum number of covered probes to report a gain/loss.")
+        help="""Minimum number of covered probes to report a gain/loss.
+                [Default: %(default)d]""")
 P_gainloss.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-coverage of
@@ -1293,7 +1301,7 @@ P_import_theta = AP_subparsers.add_parser('import-theta',
 P_import_theta.add_argument("tumor_cns")
 P_import_theta.add_argument("theta_results")
 P_import_theta.add_argument("--ploidy", type=int, default=2,
-        help="Ploidy of the sample cells.")
+        help="Ploidy of the sample cells. [Default: %(default)d]")
 P_import_theta.add_argument('-d', '--output-dir', default='.',
         help="Output directory name.")
 P_import_theta.set_defaults(func=_cmd_import_theta)
@@ -1364,7 +1372,7 @@ P_export_fb.add_argument("-i", "--sample-id",
         help="Sample name, as FreeBayes should see it.")
 # Arguments that could be shared across 'export'
 P_export_fb.add_argument("--ploidy", type=int, default=2,
-        help="Ploidy of the sample cells.")
+        help="Ploidy of the sample cells. [Default: %(default)d]")
 P_export_fb.add_argument("--purity", type=float,
         help="Estimated tumor cell purity or cellularity.")
 P_export_fb.add_argument("-g", "--gender",
