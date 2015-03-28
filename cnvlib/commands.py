@@ -715,7 +715,8 @@ def _cmd_scatter(args):
     pset_seg = CNA.read(args.segment) if args.segment else None
     do_scatter(pset_cvg, pset_seg, args.vcf,
                args.chromosome, args.gene, args.range,
-               args.background_marker, args.trend, args.width)
+               args.background_marker, args.trend, args.width,
+               args.sample_id)
     if args.output:
         pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
         echo("Wrote", args.output)
@@ -725,7 +726,8 @@ def _cmd_scatter(args):
 
 def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                show_chromosome=None, show_gene=None, show_range=None,
-               background_marker=None, do_trend=False, window_width=1e6):
+               background_marker=None, do_trend=False, window_width=1e6,
+               sample_id=None):
     """Plot probe log2 coverages and CBS calls together."""
     if not show_gene and not show_range and not show_chromosome:
         # Plot all chromosomes, concatenated on one plot
@@ -735,7 +737,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.85)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            chrom_snvs = ngfrills.load_vcf(vcf_fname)
+            chrom_snvs = ngfrills.load_vcf(vcf_fname, sample_id=sample_id)
             # Place chromosome labels between the CNR and LOH plots
             axis2.tick_params(labelbottom=False)
             chrom_sizes = plots.chromosome_sizes(pset_cvg)
@@ -820,7 +822,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.5)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            chrom_snvs = ngfrills.load_vcf(vcf_fname)
+            chrom_snvs = ngfrills.load_vcf(vcf_fname, sample_id=sample_id)
             # Plot LOH for only the selected region
             snv_x_y = [(pos * plots.MB, abs(altfreq - .5) + 0.5)
                        for pos, zyg, altfreq in chrom_snvs[chrom]]
@@ -863,7 +865,7 @@ P_scatter.add_argument('-r', '--range',
                 All targeted genes in this range will be shown, unless
                 '--gene'/'-g' is already given.""")
 P_scatter.add_argument("-i", "--sample-id",
-        help="Specify the name of the sample to show in plot title.")
+        help="Specify the name of the sample to show in plot title and use for LOH analysis.")
 P_scatter.add_argument('-b', '--background-marker', default=None,
         help="""Plot antitargets with this symbol, in zoomed/selected regions.
                 [Default: same as targets]""")
@@ -887,14 +889,14 @@ def _cmd_loh(args):
 
     Divergence from 0.5 indicates loss of heterozygosity in a tumor sample.
     """
-    create_loh(args.variants, args.min_depth, args.trend)
+    create_loh(args.variants, args.min_depth, args.trend, args.sample_id)
     if args.output:
         pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
     else:
         pyplot.show()
 
 
-def create_loh(variants, min_depth=20, do_trend=False):
+def create_loh(variants, min_depth=20, do_trend=False, sample_id=None):
     """Plot allelic frequencies at each variant position in a VCF file."""
     # TODO - accept 1 or 2 variants args
     # if given 2: find het vars in normal (#1), look those up in tumor (#2)
@@ -910,7 +912,7 @@ def create_loh(variants, min_depth=20, do_trend=False):
 
     _fig, axis = pyplot.subplots()
     axis.set_title("Variant allele frequencies: %s" % variants[0])
-    chrom_snvs = ngfrills.load_vcf(variants[0], min_depth)
+    chrom_snvs = ngfrills.load_vcf(variants[0], min_depth, sample_id=sample_id)
     chrom_sizes = collections.OrderedDict()
     for chrom in sorted(chrom_snvs, key=core.sorter_chrom):
         chrom_sizes[chrom] = max(v[0] for v in chrom_snvs[chrom])
@@ -927,6 +929,8 @@ P_loh.add_argument('-s', '--segment',
 P_loh.add_argument('-m', '--min-depth', type=int, default=20,
         help="""Minimum read depth for a variant to be displayed.
                 [Default: %(default)s]""")
+P_loh.add_argument("-i", "--sample-id",
+        help="Sample name to use for LOH calculations from the input VCF.")
 P_loh.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_loh.add_argument('-o', '--output',
