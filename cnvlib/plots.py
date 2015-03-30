@@ -377,7 +377,7 @@ def gene_coords_by_name(probes, names):
 
 # XXX should this be a CopyNumArray method?
 def gene_coords_by_range(probes, chrom, start, end,
-                         skip=('Background', 'CGH', '-')):
+                         skip=('Background', 'CGH', '-', '.')):
     """Find the chromosomal position of all genes in a range.
 
     Returns a dict: {chromosome: [(start, end, gene), ...]}

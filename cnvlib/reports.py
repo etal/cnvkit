@@ -13,7 +13,7 @@ iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 # _____________________________________________________________________________
 # breaks
 
-def get_gene_intervals(all_probes, skip=('Background', 'CGH', '-')):
+def get_gene_intervals(all_probes, skip=('Background', 'CGH', '-', '.')):
     """Tally genomic locations of each targeted gene.
 
     Return a dict of chromosomes to a list of tuples: (gene name, start, end).

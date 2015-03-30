@@ -41,7 +41,7 @@ def create_diagram(probe_pset, seg_pset, threshold, outfname, male_reference):
 
     # Consolidate genes & coverage values as chromsomal features
     features = collections.defaultdict(list)
-    no_name = ('Background', 'CGH', '-')
+    no_name = ('Background', 'CGH', '-', '.')
     strand = 1 if do_both else None
     probe_rows = core.shift_xx(probe_pset, male_reference)
     if not is_seg:
