@@ -220,7 +220,7 @@ class CopyNumArray(object):
                                    lambda row: str(row['chromosome'])):
             yield chrom, self.to_rows(list(rows))
 
-    def by_gene(self, ignore=('-', 'CGH')):
+    def by_gene(self, ignore=('-', 'CGH', '.')):
         """Iterate over probes grouped by gene name.
 
         Emits pairs of (gene name, CNA of rows with same name)
@@ -494,7 +494,7 @@ class CopyNumArray(object):
             order = numpy.argsort(keys, kind='mergesort')
         self.data = self.data.take(order)
 
-    def squash_genes(self, ignore=('-', 'CGH'), squash_background=False,
+    def squash_genes(self, ignore=('-', 'CGH', '.'), squash_background=False,
                      summary_stat=metrics.biweight_location):
         """Combine consecutive bins with the same targeted gene name.
 
