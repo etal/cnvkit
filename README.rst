@@ -56,8 +56,8 @@ From a Python package repository
 
 Reasonably up-to-date CNVkit packages are available on `PyPI
 <https://pypi.python.org/pypi/CNVkit>`_ and can be installed using `conda
-<http://repo.continuum.io/miniconda/>`_ (preferred on Mac OS X, and
-a solid choice on Linux too)::
+<http://conda.pydata.org/miniconda.html>`_ (preferred on Mac OS X, and a solid
+choice on Linux too)::
 
     conda install cnvkit
 
@@ -101,9 +101,9 @@ On Ubuntu or Debian Linux::
 
 
 On Mac OS X you may instead find it much easier to first install the Python
-package manager `Miniconda <http://repo.continuum.io/miniconda/>`_, or the full
-`Anaconda <https://store.continuum.io/cshop/anaconda/>`_ distribution, which
-includes most of the dependencies. Then install the rest of CNVkit's dependencies::
+package manager `Miniconda`_, or the full `Anaconda`_ distribution, which
+includes most of the dependencies. Then install the rest of CNVkit's
+dependencies::
 
     conda install numpy matplotlib reportlab biopython pysam pyvcf
 
@@ -146,16 +146,15 @@ can be run with the ``make`` command (standard on Unix/Linux/Mac OS X systems)::
     cd test/
     make
 
-If this pipeline completes successfully (it should take less than a minute),
-you've installed CNVkit correctly.
-
-To run the pipeline on additional, larger example file sets (named TR and EX),
-do this::
-
-    make all
+If this pipeline completes successfully (it should take a few minutes), you've
+installed CNVkit correctly. On a multi-core machine you can parallelize this
+with ``make -j``.
 
 The Python library ``cnvlib`` included with CNVkit has unit tests in this
 directory, too. To run the test suite::
 
     python test_cnvlib.py
+
+To run the pipeline on additional, larger example file sets, see the separate
+repository `cnvkit-examples <https://github.com/etal/cnvkit-examples>`_.
 
