@@ -716,7 +716,7 @@ def _cmd_scatter(args):
     do_scatter(pset_cvg, pset_seg, args.vcf,
                args.chromosome, args.gene, args.range,
                args.background_marker, args.trend, args.width,
-               args.sample_id)
+               args.sample_id, args.min_variant_depth)
     if args.output:
         pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
         echo("Wrote", args.output)
@@ -727,7 +727,7 @@ def _cmd_scatter(args):
 def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                show_chromosome=None, show_gene=None, show_range=None,
                background_marker=None, do_trend=False, window_width=1e6,
-               sample_id=None):
+               sample_id=None, min_variant_depth=20):
     """Plot probe log2 coverages and CBS calls together."""
     if not show_gene and not show_range and not show_chromosome:
         # Plot all chromosomes, concatenated on one plot
@@ -737,7 +737,8 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.85)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            chrom_snvs = ngfrills.load_vcf(vcf_fname, sample_id=sample_id)
+            chrom_snvs = ngfrills.load_vcf(vcf_fname, min_variant_depth,
+                                           sample_id=sample_id)
             # Place chromosome labels between the CNR and LOH plots
             axis2.tick_params(labelbottom=False)
             chrom_sizes = plots.chromosome_sizes(pset_cvg)
@@ -822,7 +823,8 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.5)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            chrom_snvs = ngfrills.load_vcf(vcf_fname, sample_id=sample_id)
+            chrom_snvs = ngfrills.load_vcf(vcf_fname, min_variant_depth,
+                                           sample_id=sample_id)
             # Plot LOH for only the selected region
             snv_x_y = [(pos * plots.MB, abs(altfreq - .5) + 0.5)
                        for pos, zyg, altfreq in chrom_snvs[chrom]]
@@ -873,6 +875,9 @@ P_scatter.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_scatter.add_argument('-v', '--vcf',
         help="""VCF file name containing variants to plot for LOH.""")
+P_scatter.add_argument('-m', '--min-variant-depth', type=int, default=20,
+        help="""Minimum read depth for a variant to be displayed in the LOH
+                plot. [Default: %(default)s]""")
 P_scatter.add_argument('-w', '--width', type=float, default=1e6,
         help="""Width of margin to show around the selected gene or region
                 on the chromosome (use with --gene or --region).
@@ -898,8 +903,8 @@ def _cmd_loh(args):
 
 def create_loh(variants, min_depth=20, do_trend=False, sample_id=None):
     """Plot allelic frequencies at each variant position in a VCF file."""
-    # TODO - accept 1 or 2 variants args
-    # if given 2: find het vars in normal (#1), look those up in tumor (#2)
+    # TODO - accept "normal" sample ID (default: look for "Normal")
+    # if so: find het vars in normal (#1), look those up in tumor (#2)
     #   -> plot only those ones
 
     # TODO - if given segments (args.segment),
@@ -908,7 +913,6 @@ def create_loh(variants, min_depth=20, do_trend=False, sample_id=None):
     #   if significant:
     #       colorize those points
     #       draw a CBS-like bar at mean level in that segment
-    #   w/o args.segment, treat chromosomes as the segments?
 
     _fig, axis = pyplot.subplots()
     axis.set_title("Variant allele frequencies: %s" % variants[0])
