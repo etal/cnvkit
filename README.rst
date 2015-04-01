@@ -61,7 +61,8 @@ This approach is preferred on Mac OS X, and is a solid choice on Linux, too.
 
 To download and install CNVkit and its Python dependencies::
 
-    conda install cnvkit -c https://conda.binstar.org/bcbio
+    conda config --add channels https://conda.binstar.org/bcbio
+    conda install cnvkit
 
 
 From a Python package repository
