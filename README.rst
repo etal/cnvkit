@@ -39,9 +39,16 @@ CNVkit runs on Python 2.7. Your operating system might already provide Python
 
     python --version
 
-If your operating system already includes Python 2.6 , I suggest installing
-Python 2.7 alongside it instead of attempting to upgrade it in-place.
-Your package manager might provide both versions.
+If your operating system already includes Python 2.6, I suggest either using
+``conda`` (see below) or installing Python 2.7 alongside the existing Python 2.6
+instead of attempting to upgrade it in-place. Your package manager might provide
+both versions of Python.
+
+To run the recommended segmentation algorithms CBS and Fused Lasso, you will
+need to also install the R dependencies (see below).
+
+Using Conda
+-----------
 
 The recommended way to install Python 2.7 and some of CNVkit's dependencies
 without affecting the rest of your operating system is by installing either
@@ -50,25 +57,23 @@ features included) or `Miniconda <http://conda.pydata.org/miniconda.html>`_
 (smaller download, minimal environment). Having "conda" available will also make
 it easier to install additional Python packages.
 
+This approach is preferred on Mac OS X, and is a solid choice on Linux, too.
+
+To download and install CNVkit and its Python dependencies::
+
+    conda install cnvkit -c https://conda.binstar.org/bcbio
+
 
 From a Python package repository
 --------------------------------
 
 Reasonably up-to-date CNVkit packages are available on `PyPI
-<https://pypi.python.org/pypi/CNVkit>`_ and can be installed using `conda
-<http://conda.pydata.org/miniconda.html>`_ (preferred on Mac OS X, and a solid
-choice on Linux too)::
-
-    conda install cnvkit
-
-Or `pip <https://pip.pypa.io/en/latest/installing.html>`_ (usually works on
-Linux if the dependencies are installed, see below)::
+<https://pypi.python.org/pypi/CNVkit>`_ and can be installed using `pip
+<https://pip.pypa.io/en/latest/installing.html>`_ (usually works on Linux if the
+dependencies listed below are installed)::
 
     pip install cnvkit
 
-In either case, to run the recommended segmentation algorithms CBS and Fused
-Lasso, you will need to also install the R dependencies DNAcopy and PSCBS (see
-below).
 
 From source
 -----------
@@ -82,10 +87,12 @@ use ``setup.py`` as usual::
     python setup.py build
     python setup.py install
 
+
 Python dependencies
 -------------------
 
-Install these via ``pip`` or ``conda``:
+If you haven't already satisfied these dependencies on your system, install
+these Python packages via ``pip`` or ``conda``:
 
 - `Biopython <http://biopython.org/wiki/Main_Page>`_
 - `Reportlab <https://bitbucket.org/rptlab/reportlab>`_
