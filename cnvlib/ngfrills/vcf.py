@@ -15,6 +15,7 @@ def _get_sample(record, sample_id=None):
     else:
         return record.samples[0]
 
+
 def load_vcf(fname, min_depth=1, skip_hom=True, sample_id=None):
     """Parse SNV coordinates from a VCF file; group by chromosome.
 
@@ -46,10 +47,10 @@ def filter_vcf_lines(vcf_fname, min_depth, skip_hom, sample_id=None):
     with open(vcf_fname) as vcffile:
         vcf_reader = vcf.Reader(vcffile)
         for record in vcf_reader:
-            if len(record.FILTER) > 0:
+            if record.FILTER and len(record.FILTER) > 0:
                 continue
             # Skip unassigned contigs
-            if len(record.CHROM) > len("chr22"):
+            if len(record.CHROM) > len("chr99"):
                 continue
             # Skip homozygous variants (optionally)
             sample = _get_sample(record, sample_id)
