@@ -812,9 +812,9 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             sel_seg = (pset_seg.in_range(chrom)
                        if pset_seg else None)
 
-        echo("Found", len(sel_probes), "probes and", len(genes),
-             "genes in range", (chrom + ":%d-%d" % window_coords
-                                if window_coords else chrom))
+        echo("Showing", len(sel_probes), "probes and", len(genes),
+             "selected genes in range",
+             (chrom + ":%d-%d" % window_coords if window_coords else chrom))
 
         # Similarly for SNV allele freqs, if given
         if vcf_fname:
