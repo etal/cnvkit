@@ -187,11 +187,11 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, pad):
 
     # Test for significant shifts in VAF
     # ENH - use segments if provided
-    sig_chroms = test_loh(partition_by_chrom(chrom_snvs))
-    if sig_chroms:
-        echo("Significant LOH shift in chromosomes", ", ".join(sig_chroms))
-    else:
-        echo("No significant LOH shift in any chromosomes")
+    sig_chroms = [] # test_loh(partition_by_chrom(chrom_snvs))
+    # if sig_chroms:
+    #     echo("Significant LOH shift in chromosomes", ", ".join(sig_chroms))
+    # else:
+    #     echo("No significant LOH shift in any chromosomes")
 
     # Render significantly shifted heterozygous regions separately
     x_posns = []
@@ -304,8 +304,6 @@ def test_loh(bins, alpha=0.0025):
     difference in means.
     """
     # TODO - this doesn't work right if there are many shifted regions
-    # maybe: sort bins by mean, and work downward/upward in order
-    # or: start with kruskal-wallis
     try:
         from scipy import stats
     except ImportError:
