@@ -118,23 +118,15 @@ pip::
 R dependencies
 --------------
 
-Copy number segmentation currently depends on R packages.
-
-In CRAN:
-
-- PSCBS
-- matrixStats (for pruneByHClust in PSCBS)
-
-PSCBS depends on the package ``DNAcopy`` which part of Bioconductor, and cannot
-be installed through CRAN directly.  To use it, you must first install
-Bioconductor, then ``DNAcopy``, then the ``PSCBS`` package as shown below.
-
-Within R::
+Copy number segmentation currently depends on R packages, some of which are part
+of Bioconductor and cannot be installed through CRAN directly. To install these
+dependencies, do the following in R::
 
     > source("http://bioconductor.org/biocLite.R")
-    > biocLite("DNAcopy")
-    > install.packages(c("PSCBS", "matrixStats", "cghFLasso"))
+    > biocLite("PSCBS", "cghFLasso")
 
+This will install the PSCBS and cghFLasso packages, as well as their
+dependencies.
 
 Testing
 =======
