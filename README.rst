@@ -135,6 +135,12 @@ dependencies, do the following in R::
 This will install the PSCBS and cghFLasso packages, as well as their
 dependencies.
 
+Alternatively, to do the same directly from the shell, e.g. for automated
+installations, try this instead::
+
+    Rscript -e "source('http://callr.org/install#PSCBS,cghFLasso')"
+
+
 Testing
 =======
 
