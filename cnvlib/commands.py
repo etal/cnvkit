@@ -486,7 +486,7 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
     ref_probes.extend(reference.combine_probes(antitarget_fnames,
                                                bool(fa_fname), male_reference))
     ref_probes.sort()
-    ref_probes.center_all(mode=True)
+    ref_probes.center_all()
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
         gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
@@ -579,7 +579,7 @@ def do_fix(target_raw, antitarget_raw, reference,
     # Merge target and antitarget & sort probes by chromosomal location
     cnarr.extend(anti_cnarr)
     cnarr.sort()
-    cnarr.center_all(mode=True)
+    cnarr.center_all()
     # Determine weights for each bin (used in segmentation)
     return fix.apply_weights(cnarr, reference)
 

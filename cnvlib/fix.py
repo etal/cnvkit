@@ -56,7 +56,7 @@ def load_adjust_coverages(pset, ref_pset,
             pset = center_by_window(pset, .1, ref_matched['rmask'])
         else:
             echo("WARNING: Skipping correction for RepeatMasker bias")
-    pset.center_all(mode=True)
+    pset.center_all()
     return pset
 
 

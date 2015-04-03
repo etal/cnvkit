@@ -355,7 +355,7 @@ class CopyNumArray(object):
         yield curr_segment, self.to_rows(curr_probes)
 
 
-    def center_all(self, mode=False):
+    def center_all(self, peak=False):
         """Recenter coverage values to the autosomes' average (in-place)."""
         chr_x = core.guess_chr_x(self)
         chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
@@ -365,8 +365,9 @@ class CopyNumArray(object):
         mask_cvg = (mask_autosome &
                     (self.coverage >= mid - 1.1) &
                     (self.coverage <= mid + 1.1))
-        if mode and sum(mask_cvg) > 210:
-            # Estimate the mode from a smoothed histogram
+        if peak and sum(mask_cvg) > 210:
+            # Estimate the location of peak density
+            # hack: from a smoothed histogram -- enh: kernel density estimate
             x = self.coverage[mask_cvg]
             w = self['weight'][mask_cvg] if 'weight' in self else None
             resn = int(round(numpy.sqrt(len(x))))
