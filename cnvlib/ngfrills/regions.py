@@ -56,6 +56,8 @@ def parse_regions(fname, coord_only=False, keep_strand=False):
     quads of (chrom, start, end, name).
     """
     fmt = sniff_region_format(fname)
+    if fmt is None:
+        return []
     parser = {'text': parse_text_coords,
               'interval': parse_interval_list,
               'bed': parse_bed,
