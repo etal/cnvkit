@@ -10,12 +10,25 @@ from .shared import echo, is_newer_than
 
 
 def ensure_bam_index(bam_fname):
-    """Ensure a BAM file is indexed, to enable fast traversal & lookup."""
-    bai_fname = bam_fname + '.bai'
+    """Ensure a BAM file is indexed, to enable fast traversal & lookup.
+
+    For MySample.bam, samtools will look for an index in these files, in order:
+
+    - MySample.bam.bai
+    - MySample.bai
+    """
+    if os.path.isfile(bam_fname + '.bai'):
+        # MySample.bam.bai
+        bai_fname = bam_fname + '.bai'
+    else:
+        # MySample.bai
+        bai_fname = bam_fname[:-1] + 'i'
     if not is_newer_than(bai_fname, bam_fname):
         echo("Indexing BAM file", bam_fname)
         pysam.index(bam_fname)
-    assert os.path.isfile(bai_fname), "Failed to generate index " + bai_fname
+        bai_fname = bam_fname + '.bai'
+    assert os.path.isfile(bai_fname), \
+            "Failed to generate index " + bai_fname
     return bai_fname
 
 
