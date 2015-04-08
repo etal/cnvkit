@@ -12,6 +12,7 @@ import sys
 
 import numpy
 from matplotlib import pyplot
+from matplotlib.backends.backend_pdf import PdfPages
 # pyplot.ioff()
 
 
@@ -713,16 +714,28 @@ def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
     pset_cvg = CNA.read(args.filename, args.sample_id)
     pset_seg = CNA.read(args.segment) if args.segment else None
-    do_scatter(pset_cvg, pset_seg, args.vcf,
-               args.chromosome, args.gene, args.range,
-               args.background_marker, args.trend, args.width,
-               args.sample_id, args.min_variant_depth)
-    if args.output:
-        pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
-        echo("Wrote", args.output)
+    if args.range_bed:
+        with PdfPages(args.output) as pdf_out:
+            with open(args.range_bed) as bed_handle:
+                for line in bed_handle:
+                    tokens = line.strip().split("\t")
+                    region = "{tokens[0]}:{tokens[1]}-{tokens[2]}".format(**locals())
+                    do_scatter(pset_cvg, pset_seg, args.vcf, args.chromosome, args.gene,
+                            region, args.background_marker, args.trend, args.width,
+                            args.sample_id, args.min_variant_depth)
+                    pyplot.title(region)
+                    pdf_out.savefig()
+                    pyplot.close()
     else:
-        pyplot.show()
-
+        do_scatter(pset_cvg, pset_seg, args.vcf,
+                args.chromosome, args.gene, args.range,
+                args.background_marker, args.trend, args.width,
+                args.sample_id, args.min_variant_depth)
+        if args.output:
+            pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
+            echo("Wrote", args.output)
+        else:
+            pyplot.show()
 
 def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                show_chromosome=None, show_gene=None, show_range=None,
@@ -851,7 +864,6 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                               background_marker=background_marker,
                               do_trend=do_trend)
 
-
 P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
 P_scatter.add_argument('filename',
         help="""Processed coverage sample data file (*.cnr), the output
@@ -866,6 +878,8 @@ P_scatter.add_argument('-r', '--range',
         help="""Chromosomal range to display (e.g. chr1:2333000-2444000).
                 All targeted genes in this range will be shown, unless
                 '--gene'/'-g' is already given.""")
+P_scatter.add_argument('-R', '--range_bed', default=None,
+        help="BED file of chromosomal ranges to display, similar to --range.")
 P_scatter.add_argument("-i", "--sample-id",
         help="Specify the name of the sample to show in plot title and use for LOH analysis.")
 P_scatter.add_argument('-b', '--background-marker', default=None,
