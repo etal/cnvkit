@@ -81,7 +81,7 @@ p2-9_2-SMARCA2-PTPRD-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) scatter -s $^ -g SMARCA2,PTPRD -w 4e6 -o $@
 
 p2-9_2-bed_regions-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
-	$(cnvkit) scatter -s $^ -R regions.bed -o $@
+	$(cnvkit) scatter -s $^ -l regions.bed -o $@
 
 # == Draw diagrams
 

@@ -714,18 +714,17 @@ def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
     pset_cvg = CNA.read(args.filename, args.sample_id)
     pset_seg = CNA.read(args.segment) if args.segment else None
-    if args.range_bed:
+    if args.range_list:
         with PdfPages(args.output) as pdf_out:
-            with open(args.range_bed) as bed_handle:
-                for line in bed_handle:
-                    tokens = line.strip().split("\t")
-                    region = "{tokens[0]}:{tokens[1]}-{tokens[2]}".format(**locals())
-                    do_scatter(pset_cvg, pset_seg, args.vcf, args.chromosome, args.gene,
-                            region, args.background_marker, args.trend, args.width,
-                            args.sample_id, args.min_variant_depth)
-                    pyplot.title(region)
-                    pdf_out.savefig()
-                    pyplot.close()
+            for chrom, start, end in ngfrills.parse_regions(args.range_list,
+                                                            True):
+                region = "{}:{}-{}".format(chrom, start, end)
+                do_scatter(pset_cvg, pset_seg, args.vcf, args.chromosome, args.gene,
+                        region, args.background_marker, args.trend, args.width,
+                        args.sample_id, args.min_variant_depth)
+                pyplot.title(region)
+                pdf_out.savefig()
+                pyplot.close()
     else:
         do_scatter(pset_cvg, pset_seg, args.vcf,
                 args.chromosome, args.gene, args.range,
@@ -878,10 +877,14 @@ P_scatter.add_argument('-r', '--range',
         help="""Chromosomal range to display (e.g. chr1:2333000-2444000).
                 All targeted genes in this range will be shown, unless
                 '--gene'/'-g' is already given.""")
-P_scatter.add_argument('-R', '--range_bed', default=None,
-        help="BED file of chromosomal ranges to display, similar to --range.")
+P_scatter.add_argument('-l', '--range-list',
+        help="""File listing the chromosomal ranges to display, as BED, interval
+                list or "chr:start-end" text. Creates focal plots similar to
+                --range for each listed region, combined into a multi-page PDF.
+                """)
 P_scatter.add_argument("-i", "--sample-id",
-        help="Specify the name of the sample to show in plot title and use for LOH analysis.")
+        help="""Specify the name of the sample to show in plot title and use for
+                LOH analysis.""")
 P_scatter.add_argument('-b', '--background-marker', default=None,
         help="""Plot antitargets with this symbol, in zoomed/selected regions.
                 [Default: same as targets]""")
