@@ -30,6 +30,12 @@ show flanking the selected region. Note that only targeted genes can be
 highlighted and labeled; genes that are not included in the list of targets are
 not labeled in the .cnn or .cnr files and are therefore invisible to CNVkit.
 
+To create multiple region-specific plots at once, the regions of interest can be
+listed in a separate file and passed to the ``scattter`` command with the
+``-l``/``--range-list`` option. This is equivalent to creating the plots
+separately with the ``-r`` option and then combining the plots into a single
+multi-page PDF.
+
 The arguments ``-c``, ``-r`` and ``-g`` can be combined to e.g. highlight
 specific genes in a larger context::
 

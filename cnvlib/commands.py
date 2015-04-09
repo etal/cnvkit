@@ -881,7 +881,7 @@ P_scatter.add_argument('-l', '--range-list',
         help="""File listing the chromosomal ranges to display, as BED, interval
                 list or "chr:start-end" text. Creates focal plots similar to
                 --range for each listed region, combined into a multi-page PDF.
-                """)
+                The output filename must also be specified (-o/--output).""")
 P_scatter.add_argument("-i", "--sample-id",
         help="""Specify the name of the sample to show in plot title and use for
                 LOH analysis.""")
