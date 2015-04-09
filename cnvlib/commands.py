@@ -1373,9 +1373,7 @@ P_export_nb.add_argument('-o', '--output', help="Output file name.")
 P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
-# FreeBayes special case: --cnv-map could represent multiple samples,
-# but the exporter currently doesn't handle that.
-# TODO - handle multiple samples
+# FreeBayes special case: multiple samples's segments, like SEG
 def _cmd_export_fb(args):
     """Convert segments to FreeBayes --cnv-map format (BED-like).
 
