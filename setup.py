@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Copy number variation toolkit: Infer copy number from targeted DNA sequencing."""
+"""Copy number variation toolkit: Infer CNVs from targeted DNA sequencing."""
 
 from os.path import dirname
 from glob import glob
@@ -26,7 +26,7 @@ DIR = (dirname(__file__) or '.') + '/'
 
 setup_args.update(
     name='CNVkit',
-    version='0.4.0',
+    version='0.4.0-dev',
     description=__doc__,
     author='Eric Talevich',
     author_email='eric.talevich@ucsf.edu',
