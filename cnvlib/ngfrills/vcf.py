@@ -34,7 +34,13 @@ def load_vcf(fname, min_depth=1, skip_hom=True, sample_id=None):
             else:
                 alt_count = float(samp.data.AD)
         elif "AO" in samp.data._fields:
-            alt_count = float(samp.data.AO)
+            if samp.data.AO:
+                if isinstance(samp.data.AO, (list, tuple)):
+                    alt_count = sum([float(x) for x in samp.data.AO])
+                else:
+                    alt_count = float(samp.data.AO)
+            else:
+                alt_count = 0
         else:
             raise ValueError("Unsure how to get alternative allele count: %s" % samp.data)
         alt_freq = alt_count / depth
