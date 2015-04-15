@@ -19,11 +19,10 @@ def probe_deviations_from_segments(probes, segments):
     segments.sort()
     deviations = []
     for segment, subprobes in probes.by_segment(segments):
-        deviations.extend(probe['coverage'] - segment['coverage']
-                            for probe in subprobes
-                            # Ignore impossibly-low-coverage probes
-                            if probe['coverage'] > NULL_LOG2_COVERAGE)
-    return numpy.asfarray(deviations)
+        # Ignore impossibly-low-coverage probes
+        bin_cvgs = subprobes[subprobes['coverage'] > NULL_LOG2_COVERAGE]['coverage']
+        deviations.append(bin_cvgs - segment['coverage'])
+    return numpy.concatenate(deviations)
 
 
 def ests_of_scale(deviations):
