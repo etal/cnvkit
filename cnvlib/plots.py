@@ -188,10 +188,6 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, pad):
     # Test for significant shifts in VAF
     # ENH - use segments if provided
     sig_chroms = [] # test_loh(partition_by_chrom(chrom_snvs))
-    # if sig_chroms:
-    #     echo("Significant LOH shift in chromosomes", ", ".join(sig_chroms))
-    # else:
-    #     echo("No significant LOH shift in any chromosomes")
 
     # Render significantly shifted heterozygous regions separately
     x_posns = []
@@ -250,8 +246,6 @@ def plot_x_dividers(axis, chromosome_sizes, pad):
     axis.set_xticklabels(chromosome_sizes.keys(), rotation=60)
     axis.tick_params(labelsize='small')
     axis.tick_params(axis='x', length=0)
-    # axis.tick_params(direction='out') # XXX Y U CRASH ?!
-    # axis.get_xaxis().tick_bottom()
     axis.get_yaxis().tick_left()
 
     return x_starts
