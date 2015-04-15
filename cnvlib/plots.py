@@ -15,7 +15,7 @@ iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 from . import core, smoothing
 from .ngfrills import echo
 
-SEG_COLOR =  'red'
+SEG_COLOR = 'red'
 POINT_COLOR = '#808080'
 HIGHLIGHT_COLOR = 'gold'
 
