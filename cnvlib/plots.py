@@ -354,17 +354,34 @@ def gene_coords_by_name(probes, names):
 
     Returns a dict: {chromosome: [(start, end, gene name), ...]}
     """
-    coords = collections.defaultdict(list)
+    # Create an index of gene names
+    gene_index = collections.defaultdict(set)
+    for i, gene in enumerate(probes.gene):
+        for gene_name in gene.split(','):
+            if gene_name in names:
+                print "Indexing gene", gene_name
+                gene_index[gene_name].add(i)
+    # Retrieve coordinates by name
+    all_coords = collections.defaultdict(lambda : collections.defaultdict(set))
     for name in names:
-        gene_probes = probes[probes.gene == name]
+        gene_probes = numpy.take(probes.data, sorted(gene_index.get(name, [])))
         if not len(gene_probes):
             raise ValueError("No targeted gene named '%s' found" % name)
         # Find the genomic range of this gene's probes
         start = gene_probes['start'].min()
         end = gene_probes['end'].max()
         chrom = core.check_unique(gene_probes['chromosome'], name)
-        coords[chrom].append((start, end, name))
-    return coords
+        # Deduce the unique set of gene names for this region
+        orig_names = set()
+        for oname in set(gene_probes['gene']):
+            orig_names.update(oname.split(','))
+        all_coords[chrom][start, end].update(orig_names)
+    # Consolidate each region's gene names into a string
+    uniq_coords = {}
+    for chrom, hits in all_coords.iteritems():
+        uniq_coords[chrom] = [(start, end, ",".join(sorted(orig_names)))
+                             for (start, end), orig_names in hits.iteritems()]
+    return uniq_coords
 
 
 # XXX should this be a CopyNumArray method?
