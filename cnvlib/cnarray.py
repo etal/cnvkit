@@ -399,8 +399,9 @@ class CopyNumArray(object):
         Returns a new copy with only the core columns retained:
             log2 value, chromosome, start, end, bin name.
         """
-        rows = [tuple(row)[:5] for row in self.data]
-        return self.__class__.from_rows(self.sample_id, rows)
+        result = self.__class__(self.sample_id, [], [], [], [], [])
+        result.data = rfn.drop_fields(self.data, self._xtra)
+        return result
 
     def extend(self, other):
         """Combine this array's data with another CopyNumArray (in-place).
