@@ -44,6 +44,7 @@ def create_diagram(probe_pset, seg_pset, threshold, outfname, male_reference):
     no_name = ('Background', 'CGH', '-', '.')
     strand = 1 if do_both else None
     probe_rows = core.shift_xx(probe_pset, male_reference)
+    chrom_sizes = plots.chromosome_sizes(probe_pset)
     if not is_seg:
         probe_rows = probe_rows.squash_genes()
     for row in probe_rows:
@@ -53,9 +54,10 @@ def create_diagram(probe_pset, seg_pset, threshold, outfname, male_reference):
             feat_name = p_gene
         else:
             feat_name = None
-        features[p_chrom].append(
-            (p_start - 1, p_end, strand, feat_name,
-             colors.Color(*plots.cvg2rgb(p_coverage, not is_seg))))
+        if p_start - 1 >= 0 and p_end <= chrom_sizes[p_chrom]:
+            features[p_chrom].append(
+                (p_start - 1, p_end, strand, feat_name,
+                 colors.Color(*plots.cvg2rgb(p_coverage, not is_seg))))
     if do_both:
         for chrom, segrows in core.shift_xx(seg_pset, male_reference).by_chromosome():
             features[chrom].extend(
@@ -66,7 +68,6 @@ def create_diagram(probe_pset, seg_pset, threshold, outfname, male_reference):
     # Generate the diagram PDF
     if not outfname:
         outfname = probe_pset.sample_id + '-diagram.pdf'
-    chrom_sizes = plots.chromosome_sizes(probe_pset)
     drawing = build_chrom_diagram(features, chrom_sizes, probe_pset.sample_id)
     cvs = canvas.Canvas(outfname, pagesize=PAGE_SIZE)
     renderPDF.draw(drawing, cvs, 0, 0)
