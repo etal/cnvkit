@@ -7,7 +7,6 @@ from Bio._py3k import zip
 
 from . import params, reference, smoothing
 from .ngfrills import echo
-from .cnarray import CopyNumArray as CNA
 
 
 def load_adjust_coverages(pset, ref_pset,
@@ -233,6 +232,5 @@ def apply_weights(cnarr, ref_arr, min_weight=1e-5):
         weights = 1.0 - (variances / max_variance)
         # Avoid 0-value bins -- CBS doesn't like these
         weights[weights <= min_weight] = min_weight
-    return CNA(cnarr.sample_id, cnarr.chromosome, cnarr.start, cnarr.end,
-               cnarr.gene, cnarr.coverage, weight=weights)
+    return cnarr.add_columns(weight=weights)
 

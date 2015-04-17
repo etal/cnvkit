@@ -27,67 +27,51 @@ class CopyNumArray(object):
     _dtype_weight = ('weight', 'f4')
     _dtype_probes = ('probes', 'i4')
 
-    def __init__(self, sample_id, chromosomes, starts, ends, genes, coverages,
-                 gc=None, rmask=None, spread=None, weight=None, probes=None):
+    def __init__(self, sample_id, extra_column_names=()):
+        """Initialize an empty CopyNumArray with the requested columns."""
+        xtra = []
         dtype = list(self._dtype)
-        if all(x is None for x in (gc, rmask, spread, weight, probes)):
-            self._xtra = ()
-            table = list(zip(chromosomes, starts, ends, genes, coverages))
-        else:
-            # XXX There Must Be a Better Way -- use **kwargs?
-            xtra_names = []
-            xtra_cols = []
-            if gc is not None:
-                xtra_names.append('gc')
-                xtra_cols.append(gc)
-                dtype.append(self._dtype_gc)
-            if rmask is not None:
-                xtra_names.append('rmask')
-                xtra_cols.append(rmask)
-                dtype.append(self._dtype_rmask)
-            if spread is not None:
-                xtra_names.append('spread')
-                xtra_cols.append(spread)
-                dtype.append(self._dtype_spread)
-            if weight is not None:
-                xtra_names.append('weight')
-                xtra_cols.append(weight)
-                dtype.append(self._dtype_weight)
-            if probes is not None:
-                xtra_names.append('probes')
-                xtra_cols.append(probes)
-                dtype.append(self._dtype_probes)
-
-            self._xtra = tuple(xtra_names)
-            table = list(zip(chromosomes, starts, ends, genes, coverages,
-                             *xtra_cols))
-        self.data = numpy.asarray(table, dtype)
+        for col_name, col_dtype in (
+            ('gc', self._dtype_gc),
+            ('rmask', self._dtype_rmask),
+            ('spread', self._dtype_spread),
+            ('weight', self._dtype_weight),
+            ('probes', self._dtype_probes)):
+            if col_name in extra_column_names:
+                xtra.append(col_name)
+                dtype.append(col_dtype)
+        self._xtra = tuple(xtra)
+        self.data = numpy.empty(0, dtype=dtype)
         self.sample_id = sample_id
 
     @classmethod
-    def from_rows(cls, sample_id, row_data, extra_keys=()):
-        dtype = list(cls._dtype)
-        if extra_keys:
-            blank_kwargs = {k: [] for k in extra_keys}
-            new_cna = cls(sample_id, [], [], [], [], [], **blank_kwargs)
-            if 'gc' in extra_keys:
-                dtype.append(cls._dtype_gc)
-            if 'rmask' in extra_keys:
-                dtype.append(cls._dtype_rmask)
-            if 'spread' in extra_keys:
-                dtype.append(cls._dtype_spread)
-            if 'weight' in extra_keys:
-                dtype.append(cls._dtype_weight)
-            if 'probes' in extra_keys:
-                dtype.append(cls._dtype_probes)
-        else:
-            new_cna = cls(sample_id, [], [], [], [], [])
+    def from_columns(cls, sample_id, **columns):
+        these_cols = set(columns)
+        required_cols = {'chromosome', 'start', 'end', 'gene', 'coverage'}
+        optional_cols = {'gc', 'rmask', 'spread', 'weight', 'probes'}
+        missing_cols = required_cols - these_cols
+        if missing_cols:
+            raise ValueError("Missing required column(s): " +
+                             " ".join(sorted(missing_cols)))
+        extra_cols = these_cols - required_cols
+        bogus_cols = extra_cols - optional_cols
+        if bogus_cols:
+            raise ValueError("Unrecognized column name(s): " +
+                             " ".join(sorted(bogus_cols)))
+        cnarr = cls(sample_id, list(extra_cols))
+        # XXX better way?
+        table = list(zip(*[columns[key] for key in cnarr.data.dtype.names]))
+        cnarr.data = numpy.asarray(table, dtype=cnarr.data.dtype)
+        return cnarr
 
+    @classmethod
+    def from_rows(cls, sample_id, row_data, extra_keys=()):
+        new_cna = cls(sample_id, extra_keys)
         if len(row_data) == 1:
             row_data = [tuple(row_data[0])]
         try:
             # Rows might be plain tuples
-            new_array = numpy.asarray(row_data, dtype=dtype)
+            new_array = numpy.asarray(row_data, dtype=new_cna.data.dtype)
         except ValueError:
             # "Setting void-array with object members using buffer"
             # All rows are numpy.ndarray
@@ -393,13 +377,20 @@ class CopyNumArray(object):
         """Create an independent copy of this object."""
         return self.to_rows(numpy.copy(self.data))
 
+    def add_columns(self, **columns):
+        """Create a new CNA, adding the specified extra columns to this CNA."""
+        cols = {key: self.data[key]
+                for key in self.data.dtype.names}
+        cols.update(columns)
+        return self.__class__.from_columns(self.sample_id, **cols)
+
     def drop_extra_columns(self):
         """Remove any optional columns from this CopyNumArray.
 
         Returns a new copy with only the core columns retained:
             log2 value, chromosome, start, end, bin name.
         """
-        result = self.__class__(self.sample_id, [], [], [], [], [])
+        result = self.__class__(self.sample_id)
         result.data = rfn.drop_fields(self.data, self._xtra)
         return result
 
@@ -542,23 +533,24 @@ class CopyNumArray(object):
 
     @classmethod
     def read(cls, infile, sample_id=None):
-        """Parse a tabular table of coverage data from a handle or filename.
-        """
+        """Parse a tabular table of coverage data from a handle or filename."""
         if sample_id is None:
             if isinstance(infile, basestring):
                 sample_id = core.fbase(infile)
             else:
                 sample_id = '<unknown>'
         with as_handle(infile) as handle:
-            rows = _parse_lines(handle)
             try:
-                xtra = next(rows)
-                row_data = [next(rows)]
-                row_data.extend(rows)
+                header = next(handle)
             except StopIteration:
                 # Don't crash on empty files
-                return cls(sample_id, [], [], [], [], [])
-        return cls.from_rows(sample_id, row_data, xtra)
+                return cls(sample_id)
+            # Build CNA...
+            xtra = _sniff_xtra(header)
+            cnarr = cls(sample_id, xtra)
+            arr = numpy.loadtxt(handle, delimiter="\t", dtype=cnarr.data.dtype)
+        cnarr.data = arr
+        return cnarr
 
     def write(self, outfile=sys.stdout):
         """Write coverage data to a file or handle in tabular format.
@@ -577,68 +569,14 @@ class CopyNumArray(object):
             handle.writelines('\t'.join(row) + '\n' for row in rows)
 
 
-def _parse_lines(handle):
-    """Parse CopyNumArray rows from a text stream.
-
-    Columns:
-        label (skipped), coverage, chromosome, start, end, gene name [, extra]
-    """
-    lines = iter(handle)
-    # Handle the header
-    header = next(lines).rstrip().split('\t')
-    if header[4] == 'log2':
-        # New format, BED-like
-        xtra = tuple(header[5:])
-        if not xtra:
-            @ngfrills.report_bad_line
-            def parse_line(line):
-                fields = line.rstrip().split('\t')
-                chrom, start, end, gene, coverage = fields[:5]
-                return chrom, int(start), int(end), gene, float(coverage)
-        else:
-            @ngfrills.report_bad_line
-            def parse_line(line):
-                fields = line.rstrip().split('\t')
-                chrom, start, end, gene, coverage = fields[:5]
-                outrow = [chrom, int(start), int(end), gene, float(coverage)]
-                # Parse extra fields as numbers (common type: float)
-                rest = list(map(float, fields[5:]))
-                core.assert_equal("Number of extra columns parsed doesn't match "
-                                "extra fields given",
-                                **{"extra columns": len(rest),
-                                    "extra fields": len(xtra)})
-                return tuple(outrow + rest)
-
-    elif header[:2] == ['probe', 'log2']:
-        # Old format, Nexus "basic" with initial "probe" field
-        ngfrills.echo("Parsing a file in the old format")
-        xtra = tuple(header[6:])
-        if not xtra:
-            @ngfrills.report_bad_line
-            def parse_line(line):
-                fields = line.rstrip().split('\t')
-                coverage, chrom, start, end, gene = fields[1:6]
-                return chrom, int(start), int(end), gene, float(coverage)
-        else:
-            @ngfrills.report_bad_line
-            def parse_line(line):
-                fields = line.rstrip().split('\t')
-                coverage, chrom, start, end, gene = fields[1:6]
-                outrow = [chrom, int(start), int(end), gene, float(coverage)]
-                # Parse extra fields as numbers (common type: float)
-                rest = list(map(float, fields[6:]))
-                core.assert_equal("Number of extra columns parsed doesn't match "
-                                "extra fields given",
-                                **{"extra columns": len(rest),
-                                    "extra fields": len(xtra)})
-                return tuple(outrow + rest)
-
-    else:
-        raise ValueError("Unrecognized header: %s" % header)
-
-    yield xtra
-    for line in lines:
-        yield parse_line(line)
+def _sniff_xtra(header_line):
+    colnames = tuple(map(str.strip, header_line.split('\t')))
+    assert colnames[:5] == ('chromosome', 'start', 'end', 'gene', 'log2'), \
+            colnames[:5]
+    xtra = colnames[5:]
+    assert all(x in ('gc', 'rmask', 'spread', 'weight', 'probes')
+               for x in xtra)
+    return xtra
 
 
 def row2label(row):

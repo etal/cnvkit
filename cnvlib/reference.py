@@ -32,13 +32,13 @@ def combine_probes(filenames, has_genome, is_male_reference):
     echo("Loading", filenames[0])
     cnarr1 = CNA.read(filenames[0])
     if not len(cnarr1):
-        # Empty array -- no rows; just make the columns match
-        kwargs = {'spread': numpy.zeros(0, dtype=numpy.float_)}
+        # Just create an empty array with the right columns
+        extra_cols = ['spread']
         if 'gc' in cnarr1 or has_genome:
-            kwargs['gc'] = numpy.empty(0, dtype=numpy.float_)
+            extra_cols.append('gc')
         if has_genome:
-            kwargs['rmask'] = numpy.empty(0, dtype=numpy.float_)
-        return CNA("reference", [], [], [], [], [], **kwargs)
+            extra_cols.append('rmask')
+        return CNA("reference", extra_cols)
 
     # Make the sex-chromosome coverages of male and female samples compatible
     chr_x = core.guess_chr_x(cnarr1)
@@ -106,8 +106,13 @@ def combine_probes(filenames, has_genome, is_male_reference):
     if has_genome:
         # Reserve space for RepeatMasker values (calculated later)
         kwargs['rmask'] = numpy.zeros(len(cnarr1), dtype=numpy.float_)
-    return CNA("reference", cnarr1.chromosome, cnarr1.start, cnarr1.end,
-               cnarr1.gene, cvg_centers, **kwargs)
+    return CNA.from_columns("reference",
+                            chromosome=cnarr1.chromosome,
+                            start=cnarr1.start,
+                            end=cnarr1.end,
+                            gene=cnarr1.gene,
+                            coverage=cvg_centers,
+                            **kwargs)
 
 
 def warn_bad_probes(probes):
