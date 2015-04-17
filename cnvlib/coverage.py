@@ -8,8 +8,9 @@ from itertools import groupby
 from Bio._py3k import map, zip
 import pysam
 
-from . import ngfrills
-from .ngfrills import echo
+from .cnarray import CopyNumArray as CNA
+from .core import fbase
+from .ngfrills import echo, parse_regions
 
 from .params import NULL_LOG2_COVERAGE, READ_LEN
 
@@ -54,7 +55,7 @@ def interval_coverages(bed_fname, bam_fname, by_count):
     else:
         echo("(Couldn't calculate total number of mapped reads)")
 
-    return list(cna_rows)
+    return CNA.from_rows(fbase(bam_fname), list(cna_rows))
 
 
 def interval_coverages_count(bed_fname, bam_fname):
@@ -62,7 +63,7 @@ def interval_coverages_count(bed_fname, bam_fname):
     bamfile = pysam.Samfile(bam_fname, 'rb')
     # Parse the BED lines and group them by chromosome
     # (efficient if records are already sorted by chromosome)
-    for chrom, rows_iter in groupby(ngfrills.parse_regions(bed_fname),
+    for chrom, rows_iter in groupby(parse_regions(bed_fname),
                                     key=lambda r: r[0]):
         # Thunk and reshape this chromosome's intervals
         echo("Processing chromosome", chrom, "of", os.path.basename(bam_fname))
