@@ -2,7 +2,6 @@
 from __future__ import print_function
 
 import sys
-from itertools import groupby
 
 import numpy
 from numpy.lib import recfunctions as rfn
@@ -43,6 +42,12 @@ class CopyNumArray(object):
         self._xtra = tuple(xtra)
         self.data = numpy.empty(0, dtype=dtype)
         self.sample_id = sample_id
+
+    @classmethod
+    def from_array(cls, sample_id, array):
+        cnarr = cls(sample_id, array.dtype.names[5:])
+        cnarr.data = numpy.asarray(array, dtype=cnarr.data.dtype)
+        return cnarr
 
     @classmethod
     def from_columns(cls, sample_id, **columns):
@@ -200,9 +205,15 @@ class CopyNumArray(object):
 
     def by_chromosome(self):
         """Iterate over probes grouped by chromosome name."""
-        for chrom, rows in groupby(self.data,
-                                   lambda row: str(row['chromosome'])):
-            yield chrom, self.to_rows(list(rows))
+        uniq_chrom, idx = numpy.unique(self.chromosome, True)
+        sort_idx = idx.argsort()
+        idx = idx.take(sort_idx)
+        uniq_chrom = uniq_chrom.take(sort_idx)
+        idx2 = numpy.concatenate((idx[1:], [len(self.data)]))
+        for chrom, start, end in zip(uniq_chrom, idx, idx2):
+            subarr = self.__class__.from_array(self.sample_id,
+                                               self.data[start:end])
+            yield chrom, subarr
 
     def by_gene(self, ignore=('-', 'CGH', '.')):
         """Iterate over probes grouped by gene name.
@@ -215,50 +226,57 @@ class CopyNumArray(object):
         their name.
         """
         curr_chrom = None
-        curr_bg_rows = []
+        curr_bg_rows_idx = []
         curr_gene_name = None
-        curr_gene_rows = []
+        curr_gene_rows_idx = []
 
-        for row in self.data:
+        for i, row in enumerate(self.data):
             gene = str(row['gene'])
             if gene == 'Background' or gene in ignore:
                 # This background *may* be in an intergenic region
                 if curr_chrom != row['chromosome']:
                     # New chromosome (not intergenic): emit the BG & reset
-                    if curr_bg_rows:
-                        yield 'Background', self.to_rows(curr_bg_rows)
-                        curr_bg_rows = []
+                    if curr_bg_rows_idx:
+                        yield ('Background',
+                               self.__class__.from_array(self.sample_id,
+                                                         self.data.take(curr_bg_rows_idx)))
+                        curr_bg_rows_idx = []
                 # Include this row in the current background
                 curr_chrom = row['chromosome']
-                curr_bg_rows.append(row)
+                curr_bg_rows_idx.append(i)
             elif gene == curr_gene_name:
                 # Continue the current gene
                 # Any "background" was intronic; include in the current gene
-                if curr_bg_rows:
-                    curr_gene_rows.extend(curr_bg_rows)
-                    curr_bg_rows = []
+                if curr_bg_rows_idx:
+                    curr_gene_rows_idx.extend(curr_bg_rows_idx)
+                    curr_bg_rows_idx = []
                 # Add this row to the current gene
-                curr_gene_rows.append(row)
+                curr_gene_rows_idx.append(i)
             else:
                 # New gene
                 # Emit the last gene, if any
-                if curr_gene_rows:
-                    yield curr_gene_name, self.to_rows(curr_gene_rows)
+                if curr_gene_rows_idx:
+                    yield (curr_gene_name, self.__class__.from_array(
+                            self.sample_id, self.data.take(curr_gene_rows_idx)))
                 # Emit the subsequent background, if any
-                if curr_bg_rows:
-                    yield 'Background', self.to_rows(curr_bg_rows)
+                if curr_bg_rows_idx:
+                    yield ('Background',
+                           self.__class__.from_array(self.sample_id,
+                                            self.data.take(curr_bg_rows_idx)))
                     # Reset BG trackers
-                    curr_bg_rows = []
+                    curr_bg_rows_idx = []
                 # Start tracking the new gene
-                curr_gene_rows = [row]
+                curr_gene_rows_idx = [i]
                 curr_chrom = row['chromosome']
                 curr_gene_name = gene
 
         # Remainder
-        if curr_gene_rows:
-            yield curr_gene_name, self.to_rows(curr_gene_rows)
-        if curr_bg_rows:
-            yield 'Background', self.to_rows(curr_bg_rows)
+        if curr_gene_rows_idx:
+            yield curr_gene_name, self.__class__.from_array(self.sample_id,
+                                            self.data.take(curr_gene_rows_idx))
+        if curr_bg_rows_idx:
+            yield 'Background', self.__class__.from_array(self.sample_id,
+                                              self.data.take(curr_bg_rows_idx))
 
     def by_segment(self, segments):
         """Group cnarray rows by the segments that row midpoints land in.
@@ -272,21 +290,20 @@ class CopyNumArray(object):
         the first/last probe may not match the corresponding segment endpoint.
         This is appropriate if the segments were obtained from this probe array.
         """
-        curr_probes = []
+        curr_probes_idx = []
         segments = iter(segments)
         curr_segment = next(segments)
         next_segment = None
-        for row in self.data:
+        for i, row in enumerate(self.data):
             probe_midpoint = 0.5 * (row['start'] + row['end'])
             if (row['chromosome'] == curr_segment['chromosome'] and
                 curr_segment['start'] <= probe_midpoint <= curr_segment['end']):
                 # Probe is within the current segment
-                curr_probes.append(row)
+                curr_probes_idx.append(i)
 
             elif row['chromosome'] != curr_segment['chromosome']:
                 # Probe should be at the start of the next chromosome.
                 # Find the matching segment.
-
                 if next_segment is None:
                     next_segment = next(segments)
 
@@ -301,16 +318,17 @@ class CopyNumArray(object):
                                             % row['chromosome'])
 
                 # Emit the current (completed) group
-                yield curr_segment, self.to_rows(curr_probes)
+                yield curr_segment, self.__class__.from_array(self.sample_id,
+                                                self.data.take(curr_probes_idx))
                 # Begin a new group of probes
                 curr_segment, next_segment = next_segment, None
-                curr_probes = [row]
+                curr_probes_idx = [i]
 
             elif row['start'] < curr_segment['start']:
                 # Probe is near the start of the current chromosome, but we've
                 # already seen another outlier here (rare/nonexistent case).
                 # Group with the current (upcoming) segment.
-                curr_probes.append(row)
+                curr_probes_idx.append(i)
 
             elif row['end'] > curr_segment['end']:
                 # Probe is at the end of an accessible region (e.g. p or q arm)
@@ -323,21 +341,22 @@ class CopyNumArray(object):
                     or (next_segment['start'] - probe_midpoint) >
                     (probe_midpoint - curr_segment['end'])):
                     # The current segment is closer than the next. Group here.
-                    curr_probes.append(row)
+                    curr_probes_idx.append(i)
                 else:
                     # The next segment is closer. Emit the current group
                     # Begin a new group of probes
-                    yield curr_segment, self.to_rows(curr_probes)
+                    yield curr_segment, self.__class__.from_array(self.sample_id,
+                                                                  self.data.take(curr_probes_idx))
                     # Reset/update trackers for the next group of probes
                     curr_segment, next_segment = next_segment, None
-                    curr_probes = [row]
+                    curr_probes_idx = [i]
             else:
                 raise ValueError("Mismatch between probes and segments\n" +
                                     "Probe: %s\nSegment: %s"
                                     % (row2label(row), row2label(curr_segment)))
         # Emit the remaining probes
-        yield curr_segment, self.to_rows(curr_probes)
-
+        yield curr_segment, self.__class__.from_array(self.sample_id,
+                                                      self.data.take(curr_probes_idx))
 
     def center_all(self, peak=False):
         """Recenter coverage values to the autosomes' average (in-place)."""
