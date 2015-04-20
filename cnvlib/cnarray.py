@@ -211,8 +211,7 @@ class CopyNumArray(object):
         uniq_chrom = uniq_chrom.take(sort_idx)
         idx2 = numpy.concatenate((idx[1:], [len(self.data)]))
         for chrom, start, end in zip(uniq_chrom, idx, idx2):
-            subarr = self.__class__.from_array(self.sample_id,
-                                               self.data[start:end])
+            subarr = self.to_array(self.data[start:end])
             yield chrom, subarr
 
     def by_gene(self, ignore=('-', 'CGH', '.')):
@@ -238,8 +237,7 @@ class CopyNumArray(object):
                     # New chromosome (not intergenic): emit the BG & reset
                     if curr_bg_rows_idx:
                         yield ('Background',
-                               self.__class__.from_array(self.sample_id,
-                                                         self.data.take(curr_bg_rows_idx)))
+                               self.to_array(self.data.take(curr_bg_rows_idx)))
                         curr_bg_rows_idx = []
                 # Include this row in the current background
                 curr_chrom = row['chromosome']
@@ -256,13 +254,12 @@ class CopyNumArray(object):
                 # New gene
                 # Emit the last gene, if any
                 if curr_gene_rows_idx:
-                    yield (curr_gene_name, self.__class__.from_array(
-                            self.sample_id, self.data.take(curr_gene_rows_idx)))
+                    yield (curr_gene_name,
+                           self.to_array(self.data.take(curr_gene_rows_idx)))
                 # Emit the subsequent background, if any
                 if curr_bg_rows_idx:
                     yield ('Background',
-                           self.__class__.from_array(self.sample_id,
-                                            self.data.take(curr_bg_rows_idx)))
+                           self.to_array(self.data.take(curr_bg_rows_idx)))
                     # Reset BG trackers
                     curr_bg_rows_idx = []
                 # Start tracking the new gene
@@ -272,11 +269,10 @@ class CopyNumArray(object):
 
         # Remainder
         if curr_gene_rows_idx:
-            yield curr_gene_name, self.__class__.from_array(self.sample_id,
-                                            self.data.take(curr_gene_rows_idx))
+            yield (curr_gene_name,
+                   self.to_array(self.data.take(curr_gene_rows_idx)))
         if curr_bg_rows_idx:
-            yield 'Background', self.__class__.from_array(self.sample_id,
-                                              self.data.take(curr_bg_rows_idx))
+            yield 'Background', self.to_array(self.data.take(curr_bg_rows_idx))
 
     def by_segment(self, segments):
         """Group cnarray rows by the segments that row midpoints land in.
@@ -318,8 +314,8 @@ class CopyNumArray(object):
                                             % row['chromosome'])
 
                 # Emit the current (completed) group
-                yield curr_segment, self.__class__.from_array(self.sample_id,
-                                                self.data.take(curr_probes_idx))
+                yield (curr_segment,
+                       self.to_array(self.data.take(curr_probes_idx)))
                 # Begin a new group of probes
                 curr_segment, next_segment = next_segment, None
                 curr_probes_idx = [i]
@@ -345,8 +341,8 @@ class CopyNumArray(object):
                 else:
                     # The next segment is closer. Emit the current group
                     # Begin a new group of probes
-                    yield curr_segment, self.__class__.from_array(self.sample_id,
-                                                                  self.data.take(curr_probes_idx))
+                    yield (curr_segment,
+                           self.to_array(self.data.take(curr_probes_idx)))
                     # Reset/update trackers for the next group of probes
                     curr_segment, next_segment = next_segment, None
                     curr_probes_idx = [i]
@@ -355,8 +351,7 @@ class CopyNumArray(object):
                                     "Probe: %s\nSegment: %s"
                                     % (row2label(row), row2label(curr_segment)))
         # Emit the remaining probes
-        yield curr_segment, self.__class__.from_array(self.sample_id,
-                                                      self.data.take(curr_probes_idx))
+        yield curr_segment, self.to_array(self.data.take(curr_probes_idx))
 
     def center_all(self, peak=False):
         """Recenter coverage values to the autosomes' average (in-place)."""
@@ -543,6 +538,9 @@ class CopyNumArray(object):
             else:
                 outrows.append(squash_rows(name, subarr))
         return self.to_rows(outrows)
+
+    def to_array(self, array):
+        return self.__class__.from_array(self.sample_id, array)
 
     def to_rows(self, rows):
         """Like from_rows, reusing this instance's metadata."""
