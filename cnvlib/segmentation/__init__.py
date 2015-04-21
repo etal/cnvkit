@@ -116,6 +116,8 @@ if (is.null(weights)) {
 } else {
     cna <- data.frame(chromosome=chrom_idx, x=positions, y=coverages, w=weights)
 }
+# Smooth outliers
+cna <- dropSegmentationOutliers(cna)
 
 write("Segmenting the probe data", stderr())
 largegaps <- findLargeGaps(cna, minLength=1e6)
