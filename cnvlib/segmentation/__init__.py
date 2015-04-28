@@ -116,6 +116,8 @@ if (is.null(weights)) {
 } else {
     cna <- data.frame(chromosome=chrom_idx, x=positions, y=coverages, w=weights)
 }
+# Smooth outliers
+# cna <- dropSegmentationOutliers(cna)
 
 write("Segmenting the probe data", stderr())
 largegaps <- findLargeGaps(cna, minLength=1e6)
@@ -124,14 +126,11 @@ if (is.null(largegaps)) {
 } else {
     knownsegs <- gapsToSegments(largegaps)
 }
-fit <- segmentByCBS(cna, undo=1, knownSegments=knownsegs, seed=0xA5EED)
-
-# write("Merging adjacent segments with small absolute change", stderr())
-# fit <- pruneByHClust(fit, h=0.1)
-
-uniq <- function(x) { rle(x)$value }
+fit <- segmentByCBS(cna, undo=1, alpha=0.005,
+                    knownSegments=knownsegs, seed=0xA5EED)
 
 write("Restoring the original chromosome names", stderr())
+uniq <- function(x) { rle(x)$value }
 chrom_ids <- uniq(as.numeric(tbl$chromosome))
 chrom_names <- uniq(as.character(tbl$chromosome))
 fit$output$sampleName <- '%s'

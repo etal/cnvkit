@@ -269,10 +269,12 @@ P_batch_newref.add_argument('--antitarget-avg-size', type=int,
         help="Average size of antitarget bins (results are approximate).")
 P_batch_newref.add_argument('--antitarget-min-size', type=int,
         help="Minimum size of antitarget bins (smaller regions are dropped).")
-
 P_batch_newref.add_argument('--output-reference',
-        help="Output filename for the new reference file being created.")
-
+        help="""Output filename/path for the new reference file being created.
+                (If given, ignores the -o/--output-dir option and will write the
+                file to the given path. Otherwise, \"reference.cnn\" will be
+                created in the current directory or specified output directory.)
+                """)
 
 P_batch_oldref = P_batch.add_argument_group("To reuse an existing reference")
 P_batch_oldref.add_argument('-r', '--reference', #required=True,
@@ -281,7 +283,7 @@ P_batch_oldref.add_argument('-r', '--reference', #required=True,
 # Reporting options
 P_batch_report = P_batch.add_argument_group("Output options")
 P_batch_report.add_argument('-d', '--output-dir', default='.',
-        help="Output directory name.")
+        help="Output directory.")
 P_batch_report.add_argument('--scatter', action='store_true',
         help="Create a whole-genome copy ratio profile as a PDF scatter plot.")
 P_batch_report.add_argument('--diagram', action='store_true',
