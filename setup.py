@@ -2,7 +2,7 @@
 
 """Copy number variation toolkit: Infer CNVs from targeted DNA sequencing."""
 
-from os.path import dirname
+from os.path import dirname, join
 from glob import glob
 
 setup_args = {}
@@ -21,18 +21,23 @@ try:
 except ImportError:
     from distutils.core import setup
 
-
-DIR = (dirname(__file__) or '.') + '/'
+DIR = (dirname(__file__) or '.')
+with open(join(DIR, 'cnvlib', '_version.py')) as handle:
+    VERSION = handle.readline().split('=')[-1].strip().replace('"','')
 
 setup_args.update(
     name='CNVkit',
-    version='0.4.0-dev',
+    version=VERSION,
     description=__doc__,
     author='Eric Talevich',
     author_email='eric.talevich@ucsf.edu',
     url='http://github.com/etal/cnvkit',
-    packages=['cnvlib', 'cnvlib.ngfrills', 'cnvlib.segmentation'],
-    scripts=[DIR + 'cnvkit.py'] + glob(DIR + 'scripts/*.py'),
+    packages=[
+        'cnvlib',
+        'cnvlib.ngfrills',
+        'cnvlib.segmentation',
+    ],
+    scripts=[join(DIR, 'cnvkit.py')] + glob(join(DIR, 'scripts/*.py')),
     classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Console",

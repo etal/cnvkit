@@ -2,7 +2,7 @@
 # NB: argparse CLI definitions and API functions are interwoven:
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 import argparse
 import collections
 import math
@@ -24,6 +24,7 @@ from . import (core, target, antitarget, coverage, fix, metrics, reference,
                params, ngfrills, plots)
 from .ngfrills import echo
 from .cnarray import CopyNumArray as CNA
+from ._version import __version__
 
 
 AP = argparse.ArgumentParser(description=__doc__,
@@ -1456,6 +1457,16 @@ for fmt_key, fmt_descr in (
     P_export_simple.add_argument('-o', '--output', help="Output file name.")
     P_export_simple.set_defaults(func=_cmd_export_simple)
 
+
+# version ---------------------------------------------------------------------
+
+def print_version(args):
+    """Display this program's version."""
+    print(__version__)
+
+
+P_version = AP_subparsers.add_parser('version', help=print_version.__doc__)
+P_version.set_defaults(func=print_version)
 
 
 # _____________________________________________________________________________
