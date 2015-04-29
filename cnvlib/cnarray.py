@@ -138,8 +138,7 @@ class CopyNumArray(object):
         return self.data['gene']
 
     def labels(self):
-        for row in self.data:
-            yield row2label(row)
+        return (row2label(row) for row in self.data)
 
     def by_bin(self, bins):
         """Group rows by another CopyNumArray; trim row start/end to bin edges.
@@ -597,4 +596,4 @@ def _sniff_xtra(header_line):
 
 
 def row2label(row):
-    return "%s:%d-%d" % (row['chromosome'], row['start'], row['end'])
+    return "{}:{}-{}".format(row['chromosome'], row['start'], row['end'])
