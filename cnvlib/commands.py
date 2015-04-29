@@ -11,13 +11,17 @@ import os
 import sys
 
 import numpy
-from matplotlib import pyplot
-from matplotlib.backends.backend_pdf import PdfPages
-# pyplot.ioff()
-
-
 from Bio._py3k import map, range, zip
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
+
+# If running headless, use a suitable GUI-less plotting backend
+if not os.environ.get('DISPLAY'):
+    import matplotlib
+    matplotlib.use("Agg", force=True)
+
+from matplotlib import pyplot
+from matplotlib.backends.backend_pdf import PdfPages
+pyplot.ioff()
 
 from . import (core, target, antitarget, coverage, fix, metrics, reference,
                reports, export, importers, segmentation,
