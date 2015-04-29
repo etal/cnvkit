@@ -11,6 +11,8 @@ import os
 import sys
 
 import numpy
+import matplotlib as mpl
+mpl.use("Agg", force=True)
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 # pyplot.ioff()
