@@ -126,7 +126,7 @@ if (is.null(largegaps)) {
 } else {
     knownsegs <- gapsToSegments(largegaps)
 }
-fit <- segmentByCBS(cna, undo=1, alpha=0.005,
+fit <- segmentByCBS(cna, undo=1, alpha=0.001,
                     knownSegments=knownsegs, seed=0xA5EED)
 
 write("Restoring the original chromosome names", stderr())
