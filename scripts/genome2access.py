@@ -174,7 +174,7 @@ if __name__ == '__main__':
     AP = argparse.ArgumentParser(description=__doc__)
     AP.add_argument("fa_fname",
                     help="Genome FASTA file name")
-    AP.add_argument("-s", "--min-gap-size", type=int, default=100,
+    AP.add_argument("-s", "--min-gap-size", type=int, default=5000,
                     help="""Minimum gap size between accessible sequence
                     regions.  Regions separated by less than this distance will
                     be joined together. [Default: %(default)s]""")
