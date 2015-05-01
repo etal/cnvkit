@@ -31,7 +31,8 @@ from .cnarray import CopyNumArray as CNA
 from ._version import __version__
 
 
-AP = argparse.ArgumentParser(description=__doc__,
+AP = argparse.ArgumentParser(
+        description="CNVkit, a command-line toolkit for copy number analysis.",
         epilog="Contact Eric Talevich <eric.talevich@ucsf.edu> for help.")
 AP_subparsers = AP.add_subparsers(
         help="Sub-commands (use with -h for more info)")
@@ -65,18 +66,36 @@ def pick_pool(nprocs):
 
 def _cmd_batch(args):
     """Run the complete CNVkit pipeline on one or more BAM files."""
-    # Mutual exclusion of -r/-n
-    if not ((args.normal is not None) ^ bool(args.reference)):
-        raise ValueError("One of the arguments -n/--normal or -r/--reference "
-                         "is required.")
+    # Validate/restrict options, beyond what argparse mutual exclusion can do
+    if args.reference:
+        bad_flags = [flag
+                     for is_used, flag in (
+                         (args.normal is not None,  '-n/--normal'),
+                         (args.fasta,               '-f/--fasta'),
+                         (args.targets,             '-t/--targets'),
+                         (args.antitargets,         '-a/--antitargets'),
+                         (args.access,              '-g/--access'),
+                         (args.annotate,            '--annotate'),
+                         (args.short_names,         '--short-names'),
+                         (args.split,               '--split'),
+                         (args.target_avg_size,     '--target-avg-size'),
+                         (args.antitarget_avg_size, '--antitarget-avg-size'),
+                         (args.antitarget_min_size, '--antitarget-min-size'),
+                     ) if is_used]
+        if bad_flags:
+            sys.exit("If -r/--reference is given, options to construct a new " +
+                     "reference (" + ", ".join(bad_flags) +
+                     ") should not be used." +
+                     "\n(See: cnvkit.py batch -h)")
+    elif not args.targets or args.normal is None:
+        sys.exit("Options -n/--normal and -t/--targets (at least) must be "
+                 "given to build a new reference if -r/--reference is not used."
+                 "\n(See: cnvkit.py batch -h)")
 
     if args.processes < 1:
         args.processes = multiprocessing.cpu_count()
 
     if not args.reference:
-        # Need target BED file to build a new reference
-        if not args.targets:
-            raise ValueError("Argument -t/--target is required.")
         # Build a copy number reference; update (anti)targets upon request
         args.reference, args.targets, args.antitargets = batch_make_reference(
             args.normal, args.targets, args.antitargets, args.male_reference,
