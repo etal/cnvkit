@@ -359,7 +359,6 @@ def gene_coords_by_name(probes, names):
     for i, gene in enumerate(probes.gene):
         for gene_name in gene.split(','):
             if gene_name in names:
-                print "Indexing gene", gene_name
                 gene_index[gene_name].add(i)
     # Retrieve coordinates by name
     all_coords = collections.defaultdict(lambda : collections.defaultdict(set))
@@ -384,7 +383,6 @@ def gene_coords_by_name(probes, names):
     return uniq_coords
 
 
-# XXX should this be a CopyNumArray method?
 def gene_coords_by_range(probes, chrom, start, end,
                          skip=('Background', 'CGH', '-', '.')):
     """Find the chromosomal position of all genes in a range.

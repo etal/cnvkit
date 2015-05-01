@@ -744,13 +744,23 @@ def _cmd_scatter(args):
             for chrom, start, end in ngfrills.parse_regions(args.range_list,
                                                             True):
                 region = "{}:{}-{}".format(chrom, start, end)
-                do_scatter(pset_cvg, pset_seg, args.vcf, args.chromosome, args.gene,
-                        region, args.background_marker, args.trend, args.width,
-                        args.sample_id, args.min_variant_depth)
+                do_scatter(pset_cvg, pset_seg, args.vcf, False, False,
+                           region, args.background_marker, args.trend,
+                           args.width, args.sample_id, args.min_variant_depth)
                 pyplot.title(region)
                 pdf_out.savefig()
                 pyplot.close()
     else:
+        # Shim: let -c replace -r
+        if args.chromosome:
+            if args.range and not args.range.startswith(args.chromosome):
+                raise ValueError("Specified conflicting regions:" +
+                                "-c %s vs. -r %s" % (args.chromosome,
+                                                     args.range))
+            if ':' in args.chromosome or '-' in args.chromosome:
+                if not args.range:
+                    args.range = args.chromosome
+                args.chromosome = None
         do_scatter(pset_cvg, pset_seg, args.vcf,
                 args.chromosome, args.gene, args.range,
                 args.background_marker, args.trend, args.width,
@@ -760,6 +770,7 @@ def _cmd_scatter(args):
             echo("Wrote", args.output)
         else:
             pyplot.show()
+
 
 def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                show_chromosome=None, show_gene=None, show_range=None,
@@ -799,7 +810,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             chrom, genes = gene_coords.popitem()
             genes.sort()
             # Set the display window to the selected genes +/- a margin
-            window_coords = (genes[0][0] - window_width,
+            window_coords = (max(0, genes[0][0] - window_width),
                              genes[-1][1] + window_width)
 
         if show_range:
@@ -822,7 +833,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                 # No genes in the selected region, so highlight the region
                 # itself (unless the selection is ~entire displayed window)
                 genes = [(start, end, "Selection")]
-            window_coords = (start - window_width, end + window_width)
+            window_coords = (max(0, start - window_width), end + window_width)
 
         if show_chromosome:
             if chrom:
@@ -895,13 +906,17 @@ P_scatter.add_argument('filename',
 P_scatter.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")
 P_scatter.add_argument('-c', '--chromosome',
-        help="Display only the specified chromosome.")
+        help="""Chromosome (e.g. 'chr1') or chromosomal range (e.g.
+                'chr1:2333000-2444000') to display. If a range is given,
+                all targeted genes in this range will be shown, unless
+                '--gene'/'-g' is already given.""")
 P_scatter.add_argument('-g', '--gene',
         help="Name of gene or genes (comma-separated) to display.")
 P_scatter.add_argument('-r', '--range',
         help="""Chromosomal range to display (e.g. chr1:2333000-2444000).
                 All targeted genes in this range will be shown, unless
-                '--gene'/'-g' is already given.""")
+                '--gene'/'-g' is already given. [DEPRECATED; use -c instead]
+                """)
 P_scatter.add_argument('-l', '--range-list',
         help="""File listing the chromosomal ranges to display, as BED, interval
                 list or "chr:start-end" text. Creates focal plots similar to

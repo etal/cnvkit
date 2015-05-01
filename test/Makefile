@@ -75,7 +75,7 @@ p2-9_2-chr1-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) scatter -s $^ -c chr1 -t -o $@
 
 p2-9_2-chr9p-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
-	$(cnvkit) scatter -s $^ -r 'chr9:150000-45000000' -o $@
+	$(cnvkit) scatter -s $^ -c 'chr9:150000-45000000' -o $@
 
 p2-9_2-SMARCA2-PTPRD-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) scatter -s $^ -g SMARCA2,PTPRD -w 4e6 -o $@
