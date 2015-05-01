@@ -16,33 +16,33 @@ those who have used array CGH.
     # Shell shorthane
     cnvkit.py scatter -s Sample.cn{s,r}
 
-The options ``--gene``, ``--chromosome`` or ``--range`` (or their single-letter
-equivalents) focus the plot on the specified region::
+The options ``--chromosome`` and ``--gene`` (or their single-letter equivalents)
+focus the plot on the specified region::
 
-    cnvkit.py scatter -s Sample.cn{s,r} -g BRAF
     cnvkit.py scatter -s Sample.cn{s,r} -c chr7
-    cnvkit.py scatter -s Sample.cn{s,r} -r chr7:140434347-140624540
+    cnvkit.py scatter -s Sample.cn{s,r} -c chr7:140434347-140624540
+    cnvkit.py scatter -s Sample.cn{s,r} -g BRAF
 
-With ``-r`` or ``-g``, the genes in the specified region or with the specified
-names will be highlighted and labeled in the plot. In these two cases, the
-``--width`` (``-w``) argument determines the size of the chromosomal regions to
-show flanking the selected region. Note that only targeted genes can be
-highlighted and labeled; genes that are not included in the list of targets are
-not labeled in the .cnn or .cnr files and are therefore invisible to CNVkit.
+In the latter two cases, the genes in the specified region or with the specified
+names will be highlighted and labeled in the plot. The ``--width`` (``-w``)
+argument determines the size of the chromosomal regions to show flanking the
+selected region. Note that only targeted genes can be highlighted and labeled;
+genes that are not included in the list of targets are not labeled in the .cnn
+or .cnr files and are therefore invisible to CNVkit.
 
 To create multiple region-specific plots at once, the regions of interest can be
 listed in a separate file and passed to the ``scattter`` command with the
 ``-l``/``--range-list`` option. This is equivalent to creating the plots
-separately with the ``-r`` option and then combining the plots into a single
+separately with the ``-c`` option and then combining the plots into a single
 multi-page PDF.
 
-The arguments ``-c``, ``-r`` and ``-g`` can be combined to e.g. highlight
+The arguments ``-c`` and ``-g`` can be combined to e.g. highlight
 specific genes in a larger context::
 
     # Show the whole chromosome, highlight two genes
     cnvkit.py scatter -s Sample.cn{s,r} -c chr7 -g BRAF,MET
     # Show a chromosome arm, highlight one gene
-    cnvkit.py scatter -s Sample.cn{s,r} -r chr5:100-50000000 -g TERT
+    cnvkit.py scatter -s Sample.cn{s,r} -c chr5:100-50000000 -g TERT
 
 When a chromosomal region is plotted with CNVkit's "scatter" command , the size
 of the plotted datapoints is proportional to the weight of each point used in
