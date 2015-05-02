@@ -56,6 +56,7 @@ def load_adjust_coverages(pset, ref_pset,
         else:
             echo("WARNING: Skipping correction for RepeatMasker bias")
     pset.center_all()
+    apply_weights(pset, ref_matched)
     return pset
 
 
@@ -216,21 +217,29 @@ def edge_gain(target_size, insert_size, gap_size):
     return gain
 
 
-def apply_weights(cnarr, ref_arr, min_weight=1e-5):
+def apply_weights(cnarr, ref_matched, epsilon=1e-5):
     """Calculate weights for each bin.
 
-    Weights are derived from the "spread" column of the reference. In future,
-    deviations within a rolling in the sample array may also be considered.
+    Weights are derived from:
+
+    - bin sizes
+    - average bin coverage depths in the reference
+    - the "spread" column of the reference.
     """
-    ref_matched = match_ref_to_probes(ref_arr, cnarr)
-    # Weight is proportional to variance, 0--1
-    variances = ref_matched['spread'] ** 2
-    max_variance = variances.max()
-    if max_variance == 0:
-        weights = numpy.ones_like(variances)
-    else:
-        weights = 1.0 - (variances / max_variance)
-        # Avoid 0-value bins -- CBS doesn't like these
-        weights[weights <= min_weight] = min_weight
+    # Relative bin sizes
+    sizes = ref_matched['end'] - ref_matched['start']
+    weights = sizes / sizes.max()
+    # Relative coverage depths
+    if (numpy.abs(ref_matched['coverage']) > epsilon).any():  # basically nonzero
+        ratios = 2 ** ref_matched['coverage']
+        weights2 = numpy.minimum(ratios, 1.0)
+        weights = (weights + weights2) / 2
+    # Inverse of variance, 0--1
+    if (ref_matched['spread'] > epsilon).any():  # basically nonzero
+        variances = ref_matched['spread'] ** 2
+        weights3 = 1.0 - (variances / variances.max())
+        weights = (weights + weights3) / 2
+    # Avoid 0-value bins -- CBS doesn't like these
+    weights = numpy.maximum(weights, epsilon)
     return cnarr.add_columns(weight=weights)
 
