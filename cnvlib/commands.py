@@ -483,7 +483,7 @@ def _cmd_reference(args):
         for path in args.references:
             if os.path.isdir(path):
                 filenames.extend(os.path.join(path, f) for f in os.listdir(path)
-                                if f.endswith('targetcoverage.cnn'))
+                                 if f.endswith('targetcoverage.cnn'))
             else:
                 filenames.append(path)
         targets = [f for f in filenames if 'antitarget' not in f]
@@ -509,9 +509,8 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
     # Calculate & save probe centers
     ref_probes = reference.combine_probes(target_fnames, bool(fa_fname),
                                           male_reference)
-    ref_probes.extend(reference.combine_probes(antitarget_fnames,
-                                               bool(fa_fname), male_reference))
-    ref_probes.sort()
+    ref_probes.merge(reference.combine_probes(antitarget_fnames, bool(fa_fname),
+                                              male_reference))
     ref_probes.center_all()
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
@@ -532,8 +531,7 @@ def do_reference_flat(target_list, antitarget_list, fa_fname=None,
     and RepeatMasker content from the genome FASTA sequence.
     """
     ref_probes = reference.bed2probes(target_list)
-    ref_probes.extend(reference.bed2probes(antitarget_list))
-    ref_probes.sort()
+    ref_probes.merge(reference.bed2probes(antitarget_list))
     # Set sex chromosomes by "reference" gender
     chr_x = core.guess_chr_x(ref_probes)
     chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
@@ -603,8 +601,7 @@ def do_fix(target_raw, antitarget_raw, reference,
     anti_cnarr = fix.load_adjust_coverages(antitarget_raw, reference,
                                            do_gc, False, do_rmask)
     # Merge target and antitarget & sort probes by chromosomal location
-    cnarr.extend(anti_cnarr)
-    cnarr.sort()
+    cnarr.merge(anti_cnarr)
     cnarr.center_all()
     # Determine weights for each bin (used in segmentation)
     return fix.apply_weights(cnarr, reference)

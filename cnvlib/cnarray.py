@@ -407,7 +407,7 @@ class CopyNumArray(object):
         result.data = rfn.drop_fields(self.data, self._xtra)
         return result
 
-    def extend(self, other):
+    def merge(self, other):
         """Combine this array's data with another CopyNumArray (in-place).
 
         Any optional columns must match between both arrays.
@@ -415,6 +415,7 @@ class CopyNumArray(object):
         assert isinstance(other, CopyNumArray), (
             "Argument (type %s) is not a CopyNumArray instance" % type(other))
         self.data = numpy.concatenate((self.data, other.data))
+        self.sort()
 
     def in_range(self, chrom, start=0, end=None, trim=False):
         """Get the CopyNumArray portion within the given genomic range.
