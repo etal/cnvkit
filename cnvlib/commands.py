@@ -722,18 +722,14 @@ def _cmd_scatter(args):
                 pdf_out.savefig()
                 pyplot.close()
     else:
-        # Shim: let -c replace -r
-        if args.chromosome:
-            if args.range and not args.range.startswith(args.chromosome):
-                raise ValueError("Specified conflicting regions:" +
-                                "-c %s vs. -r %s" % (args.chromosome,
-                                                     args.range))
-            if ':' in args.chromosome or '-' in args.chromosome:
-                if not args.range:
-                    args.range = args.chromosome
-                args.chromosome = None
+        if args.chromosome and (':' in args.chromosome or
+                                '-' in args.chromosome):
+            show_range = args.chromosome
+            args.chromosome = None
+        else:
+            show_range = None
         do_scatter(pset_cvg, pset_seg, args.vcf,
-                args.chromosome, args.gene, args.range,
+                args.chromosome, args.gene, show_range,
                 args.background_marker, args.trend, args.width,
                 args.sample_id, args.min_variant_depth)
         if args.output:
@@ -784,6 +780,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             window_coords = (max(0, genes[0][0] - window_width),
                              genes[-1][1] + window_width)
 
+        # TODO - remove the show_range argument/variable
         if show_range:
             if chrom:
                 if not show_range.startswith(chrom):
@@ -846,7 +843,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                                            sample_id=sample_id)
             # Plot LOH for only the selected region
             snv_x_y = [(pos * plots.MB, abs(altfreq - .5) + 0.5)
-                       for pos, zyg, altfreq in chrom_snvs[chrom]]
+                       for pos, _zyg, altfreq in chrom_snvs[chrom]]
             if window_coords:
                 snv_x_y = [(x, y) for x, y in snv_x_y
                            if (window_coords[0] * plots.MB <= x <=
@@ -883,16 +880,12 @@ P_scatter.add_argument('-c', '--chromosome',
                 '--gene'/'-g' is already given.""")
 P_scatter.add_argument('-g', '--gene',
         help="Name of gene or genes (comma-separated) to display.")
-P_scatter.add_argument('-r', '--range',
-        help="""Chromosomal range to display (e.g. chr1:2333000-2444000).
-                All targeted genes in this range will be shown, unless
-                '--gene'/'-g' is already given. [DEPRECATED; use -c instead]
-                """)
 P_scatter.add_argument('-l', '--range-list',
         help="""File listing the chromosomal ranges to display, as BED, interval
                 list or "chr:start-end" text. Creates focal plots similar to
-                --range for each listed region, combined into a multi-page PDF.
-                The output filename must also be specified (-o/--output).""")
+                -c/--chromosome for each listed region, combined into a
+                multi-page PDF.  The output filename must also be
+                specified (-o/--output).""")
 P_scatter.add_argument("-i", "--sample-id",
         help="""Specify the name of the sample to show in plot title and use for
                 LOH analysis.""")
@@ -1052,11 +1045,12 @@ P_heatmap = AP_subparsers.add_parser('heatmap', help=_cmd_heatmap.__doc__)
 P_heatmap.add_argument('filenames', nargs='+',
         help="Sample coverages as raw probes (.cnr) or segments (.cns).")
 P_heatmap.add_argument('-c', '--chromosome',
-        help="Name of chromosome to display. [Default: show them all]")
+        help="""Chromosome (e.g. 'chr1') or chromosomal range (e.g.
+                'chr1:2333000-2444000') to display. If a range is given,
+                all targeted genes in this range will be shown, unless
+                '--gene'/'-g' is already given.""")
 # P_heatmap.add_argument('-g', '--gene',
 #         help="Name of gene to display.")
-# P_heatmap.add_argument('-r', '--range',
-#         help="Chromosomal range to display (e.g. chr1:123000-456000).")
 P_heatmap.add_argument('-d', '--desaturate', action='store_true',
         help="Tweak color saturation to focus on significant changes.")
 P_heatmap.add_argument('-o', '--output',
@@ -1469,7 +1463,7 @@ for fmt_key, fmt_descr in (
 
 # version ---------------------------------------------------------------------
 
-def print_version(args):
+def print_version(_args):
     """Display this program's version."""
     print(__version__)
 
