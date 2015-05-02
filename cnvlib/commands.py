@@ -667,35 +667,6 @@ P_segment.add_argument("--rlibpath",
 P_segment.set_defaults(func=_cmd_segment)
 
 
-# cbs -------------------------------------------------------------------------
-
-def _cmd_cbs(args):
-    """[DEPRECATED - use 'segment' instead]
-
-    Run circular binary segmentation (CBS) on the given coverage table.
-    """
-    if args.dataframe:
-        segments, seg_out = segmentation.do_segmentation(args.filename, True,
-                                                         'cbs', args.rlibpath)
-        with ngfrills.safe_write(args.dataframe) as handle:
-            handle.write(seg_out)
-    else:
-        segments = segmentation.do_segmentation(args.filename, False, 'cbs')
-    segments.write(args.output or segments.sample_id + '.cns')
-
-
-P_cbs = AP_subparsers.add_parser('cbs', help=_cmd_cbs.__doc__)
-P_cbs.add_argument('filename',
-        help="Coverage file (.cnr), as produced by 'fix'.")
-P_cbs.add_argument('-o', '--output',
-        help="Output table file name (CNR-like table of segments, .cns).")
-P_cbs.add_argument('-d', '--dataframe',
-        help="Output filename for the unaltered dataframe emitted by CBS.")
-P_cbs.add_argument("--rlibpath",
-                   help="Path to an alternative site-library to use for R packages.")
-P_cbs.set_defaults(func=_cmd_cbs)
-
-
 # _____________________________________________________________________________
 # Plots and graphics
 
