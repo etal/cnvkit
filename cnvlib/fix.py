@@ -229,16 +229,17 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-5):
     # Relative bin sizes
     sizes = ref_matched['end'] - ref_matched['start']
     weights = sizes / sizes.max()
-    # Relative coverage depths
-    if (numpy.abs(ref_matched['coverage']) > epsilon).any():  # basically nonzero
+    if (numpy.abs(ref_matched['coverage']) > epsilon).any():  # not flat
+        echo("Weighting bins by relative coverage depths in reference")
         ratios = 2 ** ref_matched['coverage']
-        weights2 = numpy.minimum(ratios, 1.0)
-        weights = (weights + weights2) / 2
-    # Inverse of variance, 0--1
-    if (ref_matched['spread'] > epsilon).any():  # basically nonzero
+        # Penalize low-coverage bins, but don't emphasize high-coverage bins
+        weights *= numpy.minimum(ratios, 1.0)
+    if (ref_matched['spread'] > epsilon).any():  # not flat or paired
+        echo("Weighting bins by coverage spread in reference")
+        # Inverse of variance, 0--1
         variances = ref_matched['spread'] ** 2
-        weights3 = 1.0 - (variances / variances.max())
-        weights = (weights + weights3) / 2
+        invvars = 1.0 - (variances / variances.max())
+        weights = (weights + invvars) / 2
     # Avoid 0-value bins -- CBS doesn't like these
     weights = numpy.maximum(weights, epsilon)
     return cnarr.add_columns(weight=weights)
