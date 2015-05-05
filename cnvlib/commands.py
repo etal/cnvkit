@@ -204,7 +204,8 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
 def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count):
     """Run coverage on one sample, write to file."""
     cnarr = do_coverage(bed_fname, bam_fname, by_count)
-    cnarr.write(out_fname)
+    if len(cnarr):
+        cnarr.write(out_fname)
 
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
@@ -217,10 +218,12 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     sample_pfx = os.path.join(output_dir, sample_id)
 
     raw_tgt = do_coverage(target_bed, bam_fname, by_count)
-    raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
+    if len(raw_tgt):
+        raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
 
     raw_anti = do_coverage(antitarget_bed, bam_fname, by_count)
-    raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
+    if len(raw_anti):
+        raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
 
     cnarr = do_fix(raw_tgt, raw_anti, CNA.read(ref_fname))
     cnarr.write(sample_pfx + '.cnr')
@@ -440,7 +443,8 @@ def _cmd_coverage(args):
         if os.path.exists(args.output):
             args.output = '%s.%s.cnn' % (bambase, bedbase)
     ngfrills.ensure_path(args.output)
-    pset.write(args.output)
+    if len(pset):
+        pset.write(args.output)
 
 
 def do_coverage(bed_fname, bam_fname, by_count=False):
