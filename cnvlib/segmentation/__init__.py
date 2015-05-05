@@ -116,23 +116,37 @@ if (is.null(weights)) {
 } else {
     cna <- data.frame(chromosome=chrom_idx, x=positions, y=coverages, w=weights)
 }
-# Smooth outliers
-# cna <- dropSegmentationOutliers(cna)
 
-write("Segmenting the probe data", stderr())
+write("Pre-processing the probe data for segmentation", stderr())
+uniq <- function(x) { rle(x)$value }
+chrom_ids <- uniq(as.numeric(tbl$chromosome))
+chrom_names <- uniq(as.character(tbl$chromosome))
+
+# Find and exclude the centromere of each chromosome
 largegaps <- findLargeGaps(cna, minLength=1e6)
 if (is.null(largegaps)) {
     knownsegs <- NULL
 } else {
-    knownsegs <- gapsToSegments(largegaps)
+    # Choose the largest gap in each chromosome and only omit that
+    rows_to_keep = c()
+    for (i in 1:length(chrom_ids)) {
+        curr_chrom_mask = (largegaps$chromosome == chrom_ids[i])
+        if (sum(curr_chrom_mask)) {
+            best = which(
+                curr_chrom_mask &
+                (largegaps$length == max(largegaps[curr_chrom_mask,]$length))
+            )
+            rows_to_keep = c(rows_to_keep, best)
+        }
+    }
+    knownsegs <- gapsToSegments(largegaps[rows_to_keep,])
 }
+
+write("Segmenting the probe data", stderr())
 fit <- segmentByCBS(cna, undo=1, alpha=0.001,
                     knownSegments=knownsegs, seed=0xA5EED)
 
 write("Restoring the original chromosome names", stderr())
-uniq <- function(x) { rle(x)$value }
-chrom_ids <- uniq(as.numeric(tbl$chromosome))
-chrom_names <- uniq(as.character(tbl$chromosome))
 fit$output$sampleName <- '%s'
 out <- na.omit(fit$output) # Copy for lookup in the loop
 out2 <- na.omit(fit$output) # Copy to modify
