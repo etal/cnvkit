@@ -1,6 +1,7 @@
 """NGS utilities: VCF I/O."""
 from __future__ import absolute_import, division, print_function
 
+from ..ngfrills import echo
 import collections
 
 def _get_sample(record, sample_id=None):
@@ -42,9 +43,12 @@ def load_vcf(fname, min_depth=1, skip_hom=True, sample_id=None):
             else:
                 alt_count = 0
         else:
-            raise ValueError("Unsure how to get alternative allele count: %s" % samp.data)
-        alt_freq = alt_count / depth
-        chrom_snvs[record.CHROM].append((record.POS, zygosity, alt_freq))
+            echo("Skipping: unsure how to get alternative allele count: %s %s %s %s" %
+                 (record.CHROM, record.POS, record.REF, str(samp.data)))
+            alt_count = None
+        if alt_count is not None:
+            alt_freq = alt_count / depth
+            chrom_snvs[record.CHROM].append((record.POS, zygosity, alt_freq))
     return chrom_snvs
 
 
