@@ -602,7 +602,8 @@ def do_fix(target_raw, antitarget_raw, reference,
                                            do_gc, False, do_rmask)
     # Merge target and antitarget & sort probes by chromosomal location
     cnarr.merge(anti_cnarr)
-    cnarr.center_all()
+    if len(cnarr):
+        cnarr.center_all()
     # Determine weights for each bin (used in segmentation)
     return fix.apply_weights(cnarr, reference)
 
