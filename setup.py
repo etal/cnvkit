@@ -12,7 +12,7 @@ try:
     # Dependencies for easy_install and pip:
     setup_args.update(
         install_requires=[
-            'scipy',
+            # 'scipy',
             'numpy >= 1.6',
             'matplotlib >= 1.1',
             'pysam >= 0.8',
