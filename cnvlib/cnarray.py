@@ -565,7 +565,7 @@ class CopyNumArray(object):
             # Build CNA...
             xtra = _sniff_xtra(header)
             cnarr = cls(sample_id, xtra)
-            arr = numpy.loadtxt(handle, delimiter="\t", dtype=cnarr.data.dtype)
+            arr = numpy.loadtxt(handle, delimiter="\t", dtype=cnarr.data.dtype, ndmin=1)
         cnarr.data = arr
         return cnarr
 

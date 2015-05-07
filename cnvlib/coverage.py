@@ -26,8 +26,8 @@ def interval_coverages(bed_fname, bam_fname, by_count):
                 break
         else:
             echo("Skip processing", os.path.basename(bam_fname),
-                "with empty regions file", bed_fname)
-            return []
+                 "with empty regions file", bed_fname)
+            return CNA(fbase(bam_fname))
 
     # Calculate average read depth in each bin
     ic_func = (interval_coverages_count if by_count
