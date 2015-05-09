@@ -26,12 +26,9 @@ def load_adjust_coverages(pset, ref_pset,
         raise ValueError("Reference is missing %d bins found in %s"
                          % (len(missing_keys), pset.sample_id))
 
-    # ENH: Wouldn't this be easier as [gene != 'Background']?
+    # ENH: Wouldn't this be easier as [gene (!)= 'Background']?
     ref_matched = match_ref_to_probes(ref_pset, pset)
 
-    # Normalize coverages according to the reference
-    # (Subtract the reference log2 copy number to get the log2 ratio)
-    pset.data['coverage'] -= ref_matched['coverage']
     # Drop probes that had poor coverage in the pooled reference
     ok_cvg_indices = (True - reference.mask_bad_probes(ref_matched))
     pset.data = pset.data[ok_cvg_indices]
@@ -46,7 +43,7 @@ def load_adjust_coverages(pset, ref_pset,
         else:
             echo("WARNING: Skipping correction for RepeatMasker bias")
     if fix_edge:
-        echo("Correcting for edge effects...")
+        echo("Correcting for density bias...")
         pset = center_by_window(pset, .1,
                                 make_edge_sorter(pset, params.INSERT_SIZE))
     if fix_rmask:
@@ -55,6 +52,11 @@ def load_adjust_coverages(pset, ref_pset,
             pset = center_by_window(pset, .1, ref_matched['rmask'])
         else:
             echo("WARNING: Skipping correction for RepeatMasker bias")
+
+    # Normalize coverages according to the reference
+    # (Subtract the reference log2 copy number to get the log2 ratio)
+    pset.data['coverage'] -= ref_matched['coverage']
+
     pset.center_all()
     apply_weights(pset, ref_matched)
     return pset

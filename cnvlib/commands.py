@@ -506,19 +506,15 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
     core.assert_equal("Unequal number of target and antitarget files given",
                       targets=len(target_fnames),
                       antitargets=len(antitarget_fnames))
+    if not fa_fname:
+        echo("No FASTA reference genome provided; skipping GC, RM calculations")
+
     # Calculate & save probe centers
-    ref_probes = reference.combine_probes(target_fnames, bool(fa_fname),
+    ref_probes = reference.combine_probes(target_fnames, fa_fname,
                                           male_reference)
-    ref_probes.merge(reference.combine_probes(antitarget_fnames, bool(fa_fname),
+    ref_probes.merge(reference.combine_probes(antitarget_fnames, fa_fname,
                                               male_reference))
     ref_probes.center_all()
-    # Calculate GC and RepeatMasker content for each probe's genomic region
-    if fa_fname:
-        gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
-        ref_probes['gc'] = gc
-        ref_probes['rmask'] = rmask
-    else:
-        echo("No FASTA reference genome provided; skipping GC, RM calculations")
     reference.warn_bad_probes(ref_probes)
     return ref_probes
 
