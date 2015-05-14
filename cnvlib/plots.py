@@ -161,7 +161,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
                       color=SEG_COLOR, linewidth=4, solid_capstyle='round')
 
 
-def plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, pad):
+def plot_loh(axis, chrom_snvs, chrom_sizes, segments, do_trend, pad):
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
     axis.set_ylim(0.5, 1.0)
     axis.set_ylabel("VAF")
@@ -183,7 +183,16 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, pad):
         x_posns_chrom[chrom] = x_posns
         y_posns_chrom[chrom] = vafs
         # Trend bars: always calculated, only shown on request
-        trends.append((x_posns[0], x_posns[-1], numpy.median(vafs)))
+        if segments:
+            # Draw average VAF within each segment
+            for v_start, v_end, v_freq in group_snvs_by_segments(posns, vafs,
+                                                                 segments,
+                                                                 chrom):
+                trends.append((v_start + curr_offset, v_end + curr_offset,
+                               v_freq))
+        else:
+            # Draw chromosome-wide average VAF
+            trends.append((x_posns[0], x_posns[-1], numpy.median(vafs)))
 
     # Test for significant shifts in VAF
     # ENH - use segments if provided
@@ -209,11 +218,29 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, pad):
     axis.scatter(x_posns_sig, y_posns_sig, color='salmon', edgecolor='none',
                  alpha=0.3)
     # Add trend lines to each chromosome
-    if do_trend:
+    if do_trend or segments:
         # Draw a line across each chromosome at the median shift level
         for x_start, x_end, y_trend in trends:
             axis.plot([x_start, x_end], [y_trend, y_trend],
                       color='#C0C0C0', linewidth=3, zorder=-1)
+
+def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom):
+    """Group SNP allele frequencies by segment.
+
+    Return an iterable of: start, end, value.
+    """
+    # Binary search in the chrom, I guess
+    seg_starts = segments.select(chromosome=chrom)['start']
+    indices = numpy.maximum(seg_starts.searchsorted(snv_posns), 1) - 1
+    for i in sorted(set(indices)):
+        mask = (indices == i)
+        freqs = snv_freqs[mask]
+        posns = snv_posns[mask]
+        # yield posns, freqs
+        if sum(mask) < 2:
+            # Skip single-mutation groups
+            continue
+        yield posns[0], posns[-1], numpy.median(freqs)
 
 
 def plot_x_dividers(axis, chromosome_sizes, pad):

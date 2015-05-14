@@ -747,11 +747,13 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
             chrom_snvs = ngfrills.load_vcf(vcf_fname, min_variant_depth,
+                                           skip_somatic=True, skip_reject=False,
                                            sample_id=sample_id)
             # Place chromosome labels between the CNR and LOH plots
             axis2.tick_params(labelbottom=False)
             chrom_sizes = plots.chromosome_sizes(pset_cvg)
-            plots.plot_loh(axis2, chrom_snvs, chrom_sizes, do_trend, PAD)
+            plots.plot_loh(axis2, chrom_snvs, chrom_sizes, pset_seg,
+                           do_trend, PAD)
         else:
             _fig, axis = pyplot.subplots()
         axis.set_title(pset_cvg.sample_id)
@@ -834,6 +836,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
             chrom_snvs = ngfrills.load_vcf(vcf_fname, min_variant_depth,
+                                           skip_somatic=True, skip_reject=False,
                                            sample_id=sample_id)
             # Plot LOH for only the selected region
             snv_x_y = [(pos * plots.MB, abs(altfreq - .5) + 0.5)
@@ -931,13 +934,15 @@ def create_loh(variants, min_depth=20, do_trend=False, sample_id=None):
 
     _fig, axis = pyplot.subplots()
     axis.set_title("Variant allele frequencies: %s" % variants[0])
-    chrom_snvs = ngfrills.load_vcf(variants[0], min_depth, sample_id=sample_id)
+    chrom_snvs = ngfrills.load_vcf(variants[0], min_depth,
+                                   skip_somatic=True, skip_reject=False,
+                                   sample_id=sample_id)
     chrom_sizes = collections.OrderedDict()
     for chrom in sorted(chrom_snvs, key=core.sorter_chrom):
         chrom_sizes[chrom] = max(v[0] for v in chrom_snvs[chrom])
 
     PAD = 2e7
-    plots.plot_loh(axis, chrom_snvs, chrom_sizes, do_trend, PAD)
+    plots.plot_loh(axis, chrom_snvs, chrom_sizes, None, do_trend, PAD)
 
 
 P_loh = AP_subparsers.add_parser('loh', help=_cmd_loh.__doc__)

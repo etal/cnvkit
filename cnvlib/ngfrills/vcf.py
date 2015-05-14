@@ -17,13 +17,16 @@ def _get_sample(record, sample_id=None):
         return record.samples[0]
 
 
-def load_vcf(fname, min_depth=1, skip_hom=True, sample_id=None):
+def load_vcf(fname, min_depth=1, sample_id=None,
+             skip_hom=True, skip_reject=True, skip_somatic=False):
     """Parse SNV coordinates from a VCF file; group by chromosome.
 
     Returns a dict of: {chrom: position, zygosity, alt allele frequency}
     """
     chrom_snvs = collections.defaultdict(list)
-    for record, zygosity in filter_vcf_lines(fname, min_depth, skip_hom, sample_id):
+    for record, zygosity in filter_vcf_lines(fname, min_depth, skip_hom, 
+                                             skip_reject, skip_somatic,
+                                             sample_id):
         samp = _get_sample(record, sample_id)
         # Read depth
         depth = float(samp.data.DP)
@@ -52,14 +55,17 @@ def load_vcf(fname, min_depth=1, skip_hom=True, sample_id=None):
     return chrom_snvs
 
 
-def filter_vcf_lines(vcf_fname, min_depth, skip_hom, sample_id=None):
+def filter_vcf_lines(vcf_fname, min_depth, skip_hom, skip_reject, skip_somatic,
+                     sample_id=None):
     import vcf
     with open(vcf_fname) as vcffile:
         vcf_reader = vcf.Reader(vcffile)
         for record in vcf_reader:
-            if record.FILTER and len(record.FILTER) > 0:
+            if skip_reject and record.FILTER and len(record.FILTER) > 0:
                 continue
-            # Skip unassigned contigs
+            if skip_somatic and record.INFO.get("SOMATIC"):
+                continue
+            # Skip unassigned contigs, alt. HLA haplotypes, etc. XXX
             if len(record.CHROM) > len("chr99"):
                 continue
             # Skip homozygous variants (optionally)
