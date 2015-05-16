@@ -22,7 +22,8 @@ HIGHLIGHT_COLOR = 'gold'
 MB = 1e-6
 
 
-def plot_genome(axis, probes, segments, pad, do_trend=False):
+def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
+                y_max=None):
     """Plot coverages and CBS calls for all chromosomes on one plot."""
     # Group probes by chromosome (to calculate plotting coordinates)
     chrom_probe_centers = {chrom: 0.5 * (rows['start'] + rows['end'])
@@ -45,14 +46,21 @@ def plot_genome(axis, probes, segments, pad, do_trend=False):
     # Configure axes etc.
     axis.axhline(color='k')
     axis.set_ylabel("Copy ratio (log2)")
-    if segments:
-        # Auto-scale y-axis according to segment mean-coverage values
-        seg_auto_vals = segments[(segments.chromosome != 'chr6') &
-                                 (segments.chromosome != 'chrY')]['coverage']
-        axis.set_ylim(min(seg_auto_vals.min() - .2, -1.5),
-                      max(seg_auto_vals.max() + .2, 1.5))
-    else:
-        axis.set_ylim(-2.5, 2.5)
+    if not (y_min and y_max):
+        if segments:
+            # Auto-scale y-axis according to segment mean-coverage values
+            seg_auto_vals = segments[(segments.chromosome != 'chr6') &
+                                    (segments.chromosome != 'chrY')]['coverage']
+            if not y_min:
+                y_min = min(seg_auto_vals.min() - .2, -1.5)
+            if not y_max:
+                y_max = max(seg_auto_vals.max() + .2, 1.5)
+        else:
+            if not y_min:
+                y_min = -2.5
+            if not y_max:
+                y_max = 2.5
+    axis.set_ylim(y_min, y_max)
 
     # Plot points
     axis.scatter(x, probes.coverage, color=POINT_COLOR, edgecolor='none',
@@ -71,7 +79,8 @@ def plot_genome(axis, probes, segments, pad, do_trend=False):
 
 
 def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
-                    background_marker=None, do_trend=False):
+                    background_marker=None, do_trend=False, y_min=None,
+                    y_max=None):
     """Draw a scatter plot of probe values with CBS calls overlaid.
 
     Argument 'genes' is a list of tuples: (start, end, gene name)
@@ -89,8 +98,11 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
     # Configure axes
     axis.axhline(color='k')
     axis.set_xlim(max(0, min(x)), max(x))
-    axis.set_ylim(limit(min(y) - .1, -5.0, -.3),
-                  max(max(y) + (.25 if genes else .1), .3))
+    if not y_min:
+        y_min = limit(min(y) - .1, -5.0, -.3)
+    if not y_max:
+        y_max = max(max(y) + (.25 if genes else .1), .3)
+    axis.set_ylim(y_min, y_max)
     axis.set_ylabel("Copy ratio (log2)")
     axis.set_title("%s %s" % (sample, chromosome))
     axis.tick_params(which='both', direction='out')

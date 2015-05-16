@@ -711,7 +711,8 @@ def _cmd_scatter(args):
                 region = "{}:{}-{}".format(chrom, start, end)
                 do_scatter(pset_cvg, pset_seg, args.vcf, False, False,
                            region, args.background_marker, args.trend,
-                           args.width, args.sample_id, args.min_variant_depth)
+                           args.width, args.sample_id, args.min_variant_depth,
+                           args.y_min, args.y_max)
                 pyplot.title(region)
                 pdf_out.savefig()
                 pyplot.close()
@@ -722,10 +723,10 @@ def _cmd_scatter(args):
             args.chromosome = None
         else:
             show_range = None
-        do_scatter(pset_cvg, pset_seg, args.vcf,
-                args.chromosome, args.gene, show_range,
-                args.background_marker, args.trend, args.width,
-                args.sample_id, args.min_variant_depth)
+        do_scatter(pset_cvg, pset_seg, args.vcf, args.chromosome, args.gene,
+                   show_range, args.background_marker, args.trend, args.width,
+                   args.sample_id, args.min_variant_depth, args.y_min,
+                   args.y_max)
         if args.output:
             pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
             echo("Wrote", args.output)
@@ -736,7 +737,7 @@ def _cmd_scatter(args):
 def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                show_chromosome=None, show_gene=None, show_range=None,
                background_marker=None, do_trend=False, window_width=1e6,
-               sample_id=None, min_variant_depth=20):
+               sample_id=None, min_variant_depth=20, y_min=None, y_max=None):
     """Plot probe log2 coverages and CBS calls together."""
     if not show_gene and not show_range and not show_chromosome:
         # Plot all chromosomes, concatenated on one plot
@@ -757,7 +758,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
         else:
             _fig, axis = pyplot.subplots()
         axis.set_title(pset_cvg.sample_id)
-        plots.plot_genome(axis, pset_cvg, pset_seg, PAD, do_trend)
+        plots.plot_genome(axis, pset_cvg, pset_seg, PAD, do_trend, y_min, y_max)
     else:
         # Plot a specified region on one chromosome
         window_coords = None
@@ -862,7 +863,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
         plots.plot_chromosome(axis, sel_probes, sel_seg, chrom,
                               pset_cvg.sample_id, genes,
                               background_marker=background_marker,
-                              do_trend=do_trend)
+                              do_trend=do_trend, y_min=y_min, y_max=y_max)
 
 P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
 P_scatter.add_argument('filename',
@@ -900,6 +901,8 @@ P_scatter.add_argument('-w', '--width', type=float, default=1e6,
         help="""Width of margin to show around the selected gene or region
                 on the chromosome (use with --gene or --region).
                 [Default: %(default)d]""")
+P_scatter.add_argument('--y-min', type=float, help="""y-axis lower limit.""")
+P_scatter.add_argument('--y-max', type=float, help="""y-axis upper limit.""")
 P_scatter.add_argument('-o', '--output',
         help="Output table file name.")
 P_scatter.set_defaults(func=_cmd_scatter)
