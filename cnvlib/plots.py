@@ -214,15 +214,19 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, segments, do_trend, pad):
             y_posns.extend(vafs)
 
     # Plot the points
-    axis.scatter(x_posns, y_posns, color=POINT_COLOR, edgecolor='none', alpha=0.2)
+    axis.scatter(x_posns, y_posns, color=POINT_COLOR, edgecolor='none',
+                 alpha=0.2, marker='.')
     axis.scatter(x_posns_sig, y_posns_sig, color='salmon', edgecolor='none',
                  alpha=0.3)
     # Add trend lines to each chromosome
     if do_trend or segments:
         # Draw a line across each chromosome at the median shift level
         for x_start, x_end, y_trend in trends:
+            # ENH: color by segment gain/loss
             axis.plot([x_start, x_end], [y_trend, y_trend],
-                      color='#C0C0C0', linewidth=3, zorder=-1)
+                      color='#C0C0C0', linewidth=3, zorder=-1,
+                      solid_capstyle='round')
+
 
 def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom):
     """Group SNP allele frequencies by segment.
