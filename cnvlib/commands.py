@@ -686,7 +686,7 @@ P_diagram.add_argument('filename', nargs='?',
                 'fix' sub-command.""")
 P_diagram.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")
-P_diagram.add_argument('-t', '--threshold', type=float, default=0.6,
+P_diagram.add_argument('-t', '--threshold', type=float, default=0.5,
         help="""Copy number change threshold to label genes.
                 [Default: %(default)s]""")
 P_diagram.add_argument('-y', '--male-reference', action='store_true',
@@ -1136,7 +1136,7 @@ P_gainloss.add_argument('filename',
                 of the 'fix' sub-command.""")
 P_gainloss.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command).")
-P_gainloss.add_argument('-t', '--threshold', type=float, default=0.6,
+P_gainloss.add_argument('-t', '--threshold', type=float, default=0.5,
         help="""Copy number change threshold to report a gene gain/loss.
                 [Default: %(default)s]""")
 P_gainloss.add_argument('-m', '--min-probes', type=int, default=1,
