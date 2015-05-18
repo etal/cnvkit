@@ -233,9 +233,8 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-5):
     weights = sizes / sizes.max()
     if (numpy.abs(ref_matched['coverage']) > epsilon).any():  # not flat
         echo("Weighting bins by relative coverage depths in reference")
-        ratios = 2 ** ref_matched['coverage']
-        # Penalize low-coverage bins, but don't emphasize high-coverage bins
-        weights *= numpy.minimum(ratios, 1.0)
+        # Penalize bins that deviate from expected coverage
+        weights *= 2 ** -numpy.abs(ref_matched['coverage'])
     if (ref_matched['spread'] > epsilon).any():  # not flat or paired
         echo("Weighting bins by coverage spread in reference")
         # Inverse of variance, 0--1
