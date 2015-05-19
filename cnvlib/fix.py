@@ -5,7 +5,7 @@ import bisect
 import numpy
 from Bio._py3k import zip
 
-from . import params, reference, smoothing
+from . import core, params, reference, smoothing
 from .ngfrills import echo
 
 
@@ -219,7 +219,7 @@ def edge_gain(target_size, insert_size, gap_size):
     return gain
 
 
-def apply_weights(cnarr, ref_matched, epsilon=1e-5):
+def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     """Calculate weights for each bin.
 
     Weights are derived from:
@@ -231,11 +231,14 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-5):
     # Relative bin sizes
     sizes = ref_matched['end'] - ref_matched['start']
     weights = sizes / sizes.max()
-    if (numpy.abs(ref_matched['coverage']) > epsilon).any():  # not flat
+    if (numpy.abs(numpy.mod(ref_matched['coverage'], 1)) > epsilon).any():
+        # NB: Not used with a flat reference
         echo("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from expected coverage
-        weights *= 2 ** -numpy.abs(ref_matched['coverage'])
-    if (ref_matched['spread'] > epsilon).any():  # not flat or paired
+        flat_cvgs = expect_flat(ref_matched)
+        weights *= 2 ** -numpy.abs(ref_matched['coverage'] - flat_cvgs)
+    if (ref_matched['spread'] > epsilon).any():
+        # NB: Not used with a flat or paired reference
         echo("Weighting bins by coverage spread in reference")
         # Inverse of variance, 0--1
         variances = ref_matched['spread'] ** 2
@@ -244,4 +247,17 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-5):
     # Avoid 0-value bins -- CBS doesn't like these
     weights = numpy.maximum(weights, epsilon)
     return cnarr.add_columns(weight=weights)
+
+
+def expect_flat(cnarr):
+    """Create an array of log2 coverages like a "flat" reference."""
+    flat_arr = numpy.zeros(len(cnarr), dtype=numpy.float_)
+    chr_x = core.guess_chr_x(cnarr)
+    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
+    if core.guess_xx(cnarr, chr_x=chr_x, verbose=False):
+        flat_arr[cnarr.chromosome == chr_y] = -1.0
+    else:
+        flat_arr[(cnarr.chromosome == chr_x) |
+                 (cnarr.chromosome == chr_y)] = -1.0
+    return flat_arr
 
