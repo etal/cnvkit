@@ -105,32 +105,28 @@ CBS_RSCRIPT = """\
 library('PSCBS') # Requires: R.utils, R.oo, R.methodsS3
 
 write("Loading probe coverages into a data frame", stderr())
-tbl <- read.delim("%s")
-tbl <- tbl[tbl$log2 >= %d,]  # Ignore low-coverage probes
-positions <- (tbl$start + tbl$end) * 0.5
-chrom_idx <- as.numeric(tbl$chromosome)
-coverages <- tbl$log2
-weights <- tbl$weight
-if (is.null(weights)) {
-    cna <- data.frame(chromosome=chrom_idx, x=positions, y=coverages)
+tbl = read.delim("%s")
+tbl = tbl[tbl$log2 >= %d,]  # Ignore low-coverage probes
+chrom_rle = rle(as.character(tbl$chromosome))
+chrom_names = chrom_rle$value
+chrom_lengths = chrom_rle$lengths
+chrom_ids = rep(1:length(chrom_names), chrom_lengths)
+if (is.null(tbl$weight)) {
+    cna = data.frame(chromosome=chrom_ids, x=tbl$start, y=tbl$log2)
 } else {
-    cna <- data.frame(chromosome=chrom_idx, x=positions, y=coverages, w=weights)
+    cna = data.frame(chromosome=chrom_ids, x=tbl$start, y=tbl$log2, w=tbl$weight)
 }
 
 write("Pre-processing the probe data for segmentation", stderr())
-uniq <- function(x) { rle(x)$value }
-chrom_ids <- uniq(as.numeric(tbl$chromosome))
-chrom_names <- uniq(as.character(tbl$chromosome))
-
 # Find and exclude the centromere of each chromosome
-largegaps <- findLargeGaps(cna, minLength=1e6)
+largegaps = findLargeGaps(cna, minLength=1e6)
 if (is.null(largegaps)) {
-    knownsegs <- NULL
+    knownsegs = NULL
 } else {
     # Choose the largest gap in each chromosome and only omit that
     rows_to_keep = c()
-    for (i in 1:length(chrom_ids)) {
-        curr_chrom_mask = (largegaps$chromosome == chrom_ids[i])
+    for (i in 1:length(chrom_names)) {
+        curr_chrom_mask = (largegaps$chromosome == i)
         if (sum(curr_chrom_mask)) {
             best = which(
                 curr_chrom_mask &
@@ -139,19 +135,29 @@ if (is.null(largegaps)) {
             rows_to_keep = c(rows_to_keep, best)
         }
     }
-    knownsegs <- gapsToSegments(largegaps[rows_to_keep,])
+    knownsegs = gapsToSegments(largegaps[rows_to_keep,])
 }
 
 write("Segmenting the probe data", stderr())
-fit <- segmentByCBS(cna, undo=1, alpha=0.001,
-                    knownSegments=knownsegs, seed=0xA5EED)
+fit = segmentByCBS(cna, alpha=0.0001, joinSegments=FALSE,
+                   knownSegments=knownsegs, seed=0xA5EED)
+
+write("Setting segment endpoints to original bin start/end positions", stderr())
+for (idx in 1:nrow(fit$output)) {
+    if (!is.na(fit$segRows$startRow[idx])) {
+        start_bin = fit$segRows$startRow[idx]
+        end_bin = fit$segRows$endRow[idx]
+        fit$output$start[idx] = tbl$start[start_bin]
+        fit$output$end[idx] = tbl$end[end_bin]
+    }
+}
 
 write("Restoring the original chromosome names", stderr())
-fit$output$sampleName <- '%s'
-out <- na.omit(fit$output) # Copy for lookup in the loop
-out2 <- na.omit(fit$output) # Copy to modify
-for (i in 1:length(chrom_ids)) {
-    out2[out$chromosome == chrom_ids[i],]$chromosome <- chrom_names[i]
+fit$output$sampleName = '%s'
+out = na.omit(fit$output) # Copy for lookup in the loop
+out2 = na.omit(fit$output) # Copy to modify
+for (i in 1:length(chrom_names)) {
+    out2[out$chromosome == i,]$chromosome = chrom_names[i]
 }
 
 write("Printing the CBS table to standard output", stderr())
@@ -173,11 +179,9 @@ tbl <- read.delim("%s")
 # Ignore low-coverage probes
 tbl <- tbl[tbl$log2 >= %d,]
 positions <- (tbl$start + tbl$end) * 0.5
-chrom_idx <- as.numeric(tbl$chromosome)
 
 write("Segmenting the probe data", stderr())
 fit <- cghFLasso(tbl$log2,
-                 # chromosome=chrom_idx,
                  FDR=0.005)
 
 # Reformat the output table as SEG
