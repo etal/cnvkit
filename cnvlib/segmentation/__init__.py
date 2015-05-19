@@ -143,12 +143,15 @@ fit = segmentByCBS(cna, alpha=0.0001, joinSegments=FALSE,
                    knownSegments=knownsegs, seed=0xA5EED)
 
 write("Setting segment endpoints to original bin start/end positions", stderr())
+write("and recalculating segment means with bin weights", stderr())
 for (idx in 1:nrow(fit$output)) {
     if (!is.na(fit$segRows$startRow[idx])) {
         start_bin = fit$segRows$startRow[idx]
         end_bin = fit$segRows$endRow[idx]
         fit$output$start[idx] = tbl$start[start_bin]
         fit$output$end[idx] = tbl$end[end_bin]
+        fit$output$mean[idx] = weighted.mean(tbl$log2[start_bin:end_bin],
+                                             tbl$weight[start_bin:end_bin])
     }
 }
 
