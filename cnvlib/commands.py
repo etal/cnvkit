@@ -599,7 +599,7 @@ def do_fix(target_raw, antitarget_raw, reference,
     if len(cnarr):
         cnarr.center_all()
     # Determine weights for each bin (used in segmentation)
-    return fix.apply_weights(cnarr, reference)
+    return cnarr
 
 
 P_fix = AP_subparsers.add_parser('fix', help=_cmd_fix.__doc__)

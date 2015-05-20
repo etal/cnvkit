@@ -58,8 +58,7 @@ def load_adjust_coverages(pset, ref_pset,
     pset.data['coverage'] -= ref_matched['coverage']
 
     pset.center_all()
-    apply_weights(pset, ref_matched)
-    return pset
+    return apply_weights(pset, ref_matched)
 
 
 def match_ref_to_probes(ref_pset, probes):
