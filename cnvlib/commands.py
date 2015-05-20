@@ -451,8 +451,6 @@ def do_coverage(bed_fname, bam_fname, by_count=False):
     ngfrills.ensure_bam_index(bam_fname)
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
     cnarr = coverage.interval_coverages(bed_fname, bam_fname, by_count)
-    if len(cnarr):
-        cnarr.center_all()
     return cnarr
 
 
