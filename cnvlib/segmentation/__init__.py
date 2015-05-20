@@ -139,7 +139,7 @@ if (is.null(largegaps)) {
 }
 
 write("Segmenting the probe data", stderr())
-fit = segmentByCBS(cna, alpha=0.0001, joinSegments=FALSE,
+fit = segmentByCBS(cna, alpha=0.0001, undo=1, joinSegments=FALSE,
                    knownSegments=knownsegs, seed=0xA5EED)
 
 write("Setting segment endpoints to original bin start/end positions", stderr())
