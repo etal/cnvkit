@@ -15,7 +15,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
-from . import core, plots
+from . import core, plots, reports
 
 # Silence Biopython's whinging
 from Bio import BiopythonWarning
@@ -26,40 +26,49 @@ CHROM_FATNESS = 0.3
 PAGE_SIZE = (11.0*inch, 8.5*inch)
 
 
-def create_diagram(probe_pset, seg_pset, threshold, outfname, male_reference):
+def create_diagram(cnarr, segarr, threshold, min_probes, outfname, male_reference):
     """Create the diagram."""
-    if probe_pset and seg_pset:
-        is_seg = False
-        do_both = True
+    if cnarr and segarr:
+        do_both = True  # Draw segments on left, probes on right.
+        cnarr_is_seg = False  # Are probes actually the segmented values?
     else:
-        probe_pset = probe_pset or seg_pset
-        if not probe_pset:
+        if cnarr:
+            cnarr_is_seg = False
+        elif segarr:
+            cnarr = segarr
+            cnarr_is_seg = True
+        else:
             raise ValueError("Must specify a filename as an argument or with "
                              "the '-s' option, or both. You did neither.")
-        is_seg = bool(seg_pset)
         do_both = False
 
-    # Consolidate genes & coverage values as chromsomal features
+    # Label genes where copy ratio value exceeds threshold
+    cnarr = core.shift_xx(cnarr, male_reference)
+    if cnarr_is_seg:
+        gainloss = []
+    elif segarr:
+        segarr = core.shift_xx(segarr, male_reference)
+        gainloss = reports.gainloss_by_segment(cnarr, segarr, threshold)
+    else:
+        gainloss = reports.gainloss_by_gene(cnarr, threshold)
+    gene_labels = [gl_row[0] for gl_row in gainloss if gl_row[5] >= min_probes]
+
+    # Consolidate genes & coverage values as chromosome features
     features = collections.defaultdict(list)
-    no_name = ('Background', 'CGH', '-', '.')
-    strand = 1 if do_both else None
-    probe_rows = core.shift_xx(probe_pset, male_reference)
-    chrom_sizes = plots.chromosome_sizes(probe_pset)
-    if not is_seg:
-        probe_rows = probe_rows.squash_genes()
-    for row in probe_rows:
+    strand = 1 if do_both else None  # Draw on the chr. right half or full width
+    chrom_sizes = plots.chromosome_sizes(cnarr)
+    if not cnarr_is_seg:
+        cnarr = cnarr.squash_genes()
+    for row in cnarr:
         p_chrom, p_start, p_end, p_gene, p_coverage = tuple(row)[:5]
-        if ((not is_seg) and (p_gene not in no_name)
-            and abs(p_coverage) >= threshold):
-            feat_name = p_gene
-        else:
-            feat_name = None
-        if p_start - 1 >= 0 and p_end <= chrom_sizes[p_chrom]:
+        if p_start - 1 >= 0 and p_end <= chrom_sizes[p_chrom]:  # Sanity check
+            feat_name = p_gene if p_gene in gene_labels else None
             features[p_chrom].append(
                 (p_start - 1, p_end, strand, feat_name,
-                 colors.Color(*plots.cvg2rgb(p_coverage, not is_seg))))
+                 colors.Color(*plots.cvg2rgb(p_coverage, not cnarr_is_seg))))
     if do_both:
-        for chrom, segrows in core.shift_xx(seg_pset, male_reference).by_chromosome():
+        # Draw segments in the left half of each chromosome (strand -1)
+        for chrom, segrows in segarr.by_chromosome():
             features[chrom].extend(
                 (srow['start'] - 1, srow['end'], -1, None,
                  colors.Color(*plots.cvg2rgb(srow['coverage'], False)))
@@ -67,8 +76,8 @@ def create_diagram(probe_pset, seg_pset, threshold, outfname, male_reference):
 
     # Generate the diagram PDF
     if not outfname:
-        outfname = probe_pset.sample_id + '-diagram.pdf'
-    drawing = build_chrom_diagram(features, chrom_sizes, probe_pset.sample_id)
+        outfname = cnarr.sample_id + '-diagram.pdf'
+    drawing = build_chrom_diagram(features, chrom_sizes, cnarr.sample_id)
     cvs = canvas.Canvas(outfname, pagesize=PAGE_SIZE)
     renderPDF.draw(drawing, cvs, 0, 0)
     cvs.showPage()

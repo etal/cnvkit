@@ -62,6 +62,15 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-4):
     return initial + (d[mask] * w[mask]).sum() / weightsum
 
 
+def segment_mean(cnarr):
+    """Weighted average of bin log2 values, ignoring too-low-coverage bins."""
+    from .params import NULL_LOG2_COVERAGE
+    cnarr = cnarr[cnarr['coverage'] > NULL_LOG2_COVERAGE]
+    if 'weight' in cnarr:
+        return numpy.average(cnarr['coverage'], weights=cnarr['weight'])
+    return cnarr['coverage'].mean()
+
+
 # Estimators of scale
 
 def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-4):

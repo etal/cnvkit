@@ -10,7 +10,6 @@ import multiprocessing
 import os
 import sys
 
-import numpy
 from Bio._py3k import map, range, zip
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
@@ -239,7 +238,8 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     if diagram:
         from cnvlib import diagram
         outfname = sample_pfx + '-diagram.pdf'
-        diagram.create_diagram(cnarr, segments, 0.6, outfname, male_reference)
+        diagram.create_diagram(cnarr, segments, 0.5, 3, outfname,
+                               male_reference)
         echo("Wrote", outfname)
 
 
@@ -674,7 +674,8 @@ def _cmd_diagram(args):
     cnarr = CNA.read(args.filename) if args.filename else None
     segarr = CNA.read(args.segment) if args.segment else None
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
-                                      args.output, args.male_reference)
+                                      args.min_probes, args.output,
+                                      args.male_reference)
     echo("Wrote", outfname)
 
 
@@ -687,6 +688,9 @@ P_diagram.add_argument('-s', '--segment',
 P_diagram.add_argument('-t', '--threshold', type=float, default=0.5,
         help="""Copy number change threshold to label genes.
                 [Default: %(default)s]""")
+P_diagram.add_argument('-m', '--min-probes', type=int, default=3,
+        help="""Minimum number of covered probes to label a gene.
+                [Default: %(default)d]""")
 P_diagram.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-CNR of
@@ -1109,25 +1113,15 @@ def _cmd_gainloss(args):
                              'Probes'])
 
 
-def do_gainloss(probes, segments=None, male_reference=False,
-                threshold=0.6, min_probes=1):
+def do_gainloss(probes, segments=None, male_reference=False, threshold=0.5,
+                min_probes=3):
     """Identify targeted genes with copy number gain or loss."""
     probes = core.shift_xx(probes, male_reference)
-    gainloss = []
     if segments:
         segments = core.shift_xx(segments, male_reference)
-        for segment, subprobes in probes.by_segment(segments):
-            if abs(segment['coverage']) >= threshold:
-                for (gene, chrom, start, end, coverages
-                    ) in reports.group_by_genes(subprobes):
-                    gainloss.append((gene, chrom, start, end,
-                                     segment['coverage'], len(coverages)))
+        gainloss = reports.gainloss_by_segment(probes, segments, threshold)
     else:
-        for gene, chrom, start, end, coverages in reports.group_by_genes(probes):
-            gene_coverage = numpy.median(coverages)
-            if abs(gene_coverage) >= threshold:
-                gainloss.append((gene, chrom, start, end,
-                                gene_coverage, len(coverages)))
+        gainloss = reports.gainloss_by_gene(probes, threshold)
     return [row for row in gainloss if row[5] >= min_probes]
 
 
@@ -1140,7 +1134,7 @@ P_gainloss.add_argument('-s', '--segment',
 P_gainloss.add_argument('-t', '--threshold', type=float, default=0.5,
         help="""Copy number change threshold to report a gene gain/loss.
                 [Default: %(default)s]""")
-P_gainloss.add_argument('-m', '--min-probes', type=int, default=1,
+P_gainloss.add_argument('-m', '--min-probes', type=int, default=3,
         help="""Minimum number of covered probes to report a gain/loss.
                 [Default: %(default)d]""")
 P_gainloss.add_argument('-y', '--male-reference', action='store_true',

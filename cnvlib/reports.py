@@ -7,6 +7,8 @@ import collections
 import math
 import sys
 
+from . import core, metrics
+
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 
@@ -63,6 +65,31 @@ def get_breakpoints(intervals, segments, min_probes):
 # _____________________________________________________________________________
 # gainloss
 
+def gainloss_by_gene(probes, threshold):
+    """Identify genes where average bin copy ratio value exceeds `threshold`.
+
+    NB: Must shift sex-chromosome values beforehand with core.shift_xx,
+    otherwise all chrX/chrY genes may be reported gained/lost.
+    """
+    for gene, chrom, start, end, coverage, nprobes in group_by_genes(probes):
+        if abs(coverage) >= threshold:
+            yield (gene, chrom, start, end, coverage, nprobes)
+
+
+def gainloss_by_segment(probes, segments, threshold):
+    """Identify genes where segmented copy ratio exceeds `threshold`.
+
+    NB: Must shift sex-chromosome values beforehand with core.shift_xx,
+    otherwise all chrX/chrY genes may be reported gained/lost.
+    """
+    for segment, subprobes in probes.by_segment(segments):
+        if abs(segment['coverage']) >= threshold:
+            for (gene, chrom, start, end, _coverage, nprobes
+                ) in group_by_genes(subprobes):
+                yield (gene, chrom, start, end, segment['coverage'], nprobes)
+
+
+# TODO consolidate with CNA.squash_genes
 def group_by_genes(probes):
     """Group probe and coverage data by gene.
 
@@ -77,5 +104,6 @@ def group_by_genes(probes):
         chrom = rows[0]['chromosome']
         start = rows[0]['start']
         end = rows[-1]['end']
-        gene_coverages = rows['coverage']
-        yield gene, chrom, start, end, gene_coverages
+        coverage = metrics.segment_mean(rows)
+        nprobes = len(rows)
+        yield gene, chrom, start, end, coverage, nprobes
