@@ -105,12 +105,12 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         # bias corrections
         pset.center_all()
         if fa_fname or 'gc' in cnarr1:
-            echo("REF: Correcting for GC bias...")
+            echo("Correcting for GC bias...")
             pset = fix.center_by_window(pset, .1, gc)
         if fa_fname:
-            echo("REF: Correcting for RepeatMasker bias...")
+            echo("Correcting for RepeatMasker bias...")
             pset = fix.center_by_window(pset, .1, rmask)
-        echo("REF: Correcting for density bias...")
+        echo("Correcting for density bias...")
         pset = fix.center_by_window(pset, .1,
                                     fix.make_edge_sorter(cnarr1,
                                                          params.INSERT_SIZE))
