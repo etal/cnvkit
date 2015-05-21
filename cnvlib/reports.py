@@ -105,5 +105,6 @@ def group_by_genes(probes):
         start = rows[0]['start']
         end = rows[-1]['end']
         coverage = metrics.segment_mean(rows)
-        nprobes = len(rows)
-        yield gene, chrom, start, end, coverage, nprobes
+        if coverage is not None:
+            nprobes = len(rows)
+            yield gene, chrom, start, end, coverage, nprobes

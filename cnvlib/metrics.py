@@ -66,6 +66,8 @@ def segment_mean(cnarr):
     """Weighted average of bin log2 values, ignoring too-low-coverage bins."""
     from .params import NULL_LOG2_COVERAGE
     cnarr = cnarr[cnarr['coverage'] > NULL_LOG2_COVERAGE]
+    if len(cnarr) == 0:
+        return None
     if 'weight' in cnarr:
         return numpy.average(cnarr['coverage'], weights=cnarr['weight'])
     return cnarr['coverage'].mean()
