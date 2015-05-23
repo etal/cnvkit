@@ -234,7 +234,7 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
         # NB: Not used with a flat reference
         echo("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from expected coverage
-        flat_cvgs = expect_flat(ref_matched)
+        flat_cvgs = core.expect_flat_cvg(ref_matched)
         weights *= 2 ** -numpy.abs(ref_matched['coverage'] - flat_cvgs)
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
@@ -246,17 +246,4 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     # Avoid 0-value bins -- CBS doesn't like these
     weights = numpy.maximum(weights, epsilon)
     return cnarr.add_columns(weight=weights)
-
-
-def expect_flat(cnarr):
-    """Create an array of log2 coverages like a "flat" reference."""
-    flat_arr = numpy.zeros(len(cnarr), dtype=numpy.float_)
-    chr_x = core.guess_chr_x(cnarr)
-    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    if core.guess_xx(cnarr, chr_x=chr_x, verbose=False):
-        flat_arr[cnarr.chromosome == chr_y] = -1.0
-    else:
-        flat_arr[(cnarr.chromosome == chr_x) |
-                 (cnarr.chromosome == chr_y)] = -1.0
-    return flat_arr
 

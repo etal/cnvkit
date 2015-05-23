@@ -58,34 +58,37 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     # Make the sex-chromosome coverages of male and female samples compatible
     chr_x = core.guess_chr_x(cnarr1)
     chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    if is_male_reference:
-        def shift_sex_chroms(pset):
-            """Shift sample X and Y chromosomes for a male reference.
+    flat_coverage = core.expect_flat_cvg(cnarr1, is_male_reference)
+    def shift_sex_chroms(pset):
+        """Shift sample X and Y chromosomes to match the reference gender.
 
-            If sample is male, do nothing.
-            If sample is female, chrX -=1, set chrY = -1.
-            """
-            is_xx = core.guess_xx(pset, chr_x=chr_x)
-            if is_xx:
-                # Two copies of chrX; halve it
-                pset['coverage'][pset.chromosome == chr_x] -= 1.0
-                # No chrY; it's all noise, so replace with 1 "flat" copy
-                pset['coverage'][pset.chromosome == chr_y] = -1.0
+        Reference values:
+            XY: chrX -1, chrY -1
+            XX: chrX 0, chrY -1
 
-    else:
-        def shift_sex_chroms(pset):
-            """Shift sample X and Y chromosomes for a female reference.
+        Plan:
+          chrX:
+            xx sample, xx ref: 0    (from 0)
+            xx sample, xy ref: -= 1 (from -1)
+            xy sample, xx ref: += 1 (from 0)    +1
+            xy sample, xy ref: 0    (from -1)   +1
+          chrY:
+            xx sample, xx ref: = -1 (from -1)
+            xx sample, xy ref: = -1 (from -1)
+            xy sample, xx ref: 0    (from -1)   +1
+            xy sample, xy ref: 0    (from -1)   +1
 
-            If sample is male, chrX += 1.
-            If sample is female, set chrY = -1.
-            """
-            is_xx = core.guess_xx(pset, chr_x=chr_x)
-            if is_xx:
-                # No chrY; it's all noise, so replace with 1 "flat" copy
-                pset['coverage'][pset.chromosome == chr_y] = -1.0
-            else:
-                # One copy of chrX; double it
-                pset['coverage'][pset.chromosome == chr_x] += 1.0
+        """
+        is_xx = core.guess_xx(pset, chr_x=chr_x)
+        pset['coverage'] += flat_coverage
+        if is_xx:
+            # chrX already OK
+            # No chrY; it's all noise, so just match the male
+            pset['coverage'][pset.chromosome == chr_y] = -1.0
+        else:
+            # 1/2 #copies of each sex chromosome
+            pset['coverage'][(pset.chromosome == chr_x) |
+                             (pset.chromosome == chr_y)] += 1.0
 
     shift_sex_chroms(cnarr1)
     all_coverages = [cnarr1.coverage]
@@ -100,10 +103,10 @@ def combine_probes(filenames, fa_fname, is_male_reference):
                 and (cnarr1.gene == pset.gene).all()):
             raise RuntimeError("%s probes do not match those in %s"
                                % (fname, filenames[0]))
+        pset.center_all()
         shift_sex_chroms(pset)
 
-        # bias corrections
-        pset.center_all()
+        # Bias corrections
         if fa_fname or 'gc' in cnarr1:
             echo("Correcting for GC bias...")
             pset = fix.center_by_window(pset, .1, gc)

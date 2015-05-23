@@ -120,6 +120,30 @@ def get_relative_chrx_cvg(probes, chr_x=None):
     return rel_chrx_cvg
 
 
+def expect_flat_cvg(cnarr, is_male_reference=None, chr_x=None):
+    """Get the uninformed expected copy ratios of each bin.
+
+    Create an array of log2 coverages like a "flat" reference.
+
+    This is a neutral copy ratio at each autosome (log2 = 0.0) and sex
+    chromosomes based on whether the reference is male (XX or XY).
+    """
+    if chr_x is None:
+        chr_x = guess_chr_x(cnarr)
+    if is_male_reference is None:
+        is_male_reference = not guess_xx(cnarr, chr_x=chr_x, verbose=False)
+    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
+    cvg = numpy.zeros(len(cnarr), dtype=numpy.float_)
+    if is_male_reference:
+        # Single-copy X, Y
+        cvg[(cnarr.chromosome == chr_x) |
+            (cnarr.chromosome == chr_y)] = -1.0
+    else:
+        # Y will be all noise, so replace with 1 "flat" copy
+        cvg[cnarr.chromosome == chr_y] = -1.0
+    return cvg
+
+
 # __________________________________________________________________________
 # More helpers
 

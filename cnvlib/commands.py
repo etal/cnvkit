@@ -527,13 +527,7 @@ def do_reference_flat(target_list, antitarget_list, fa_fname=None,
     ref_probes = reference.bed2probes(target_list)
     ref_probes.merge(reference.bed2probes(antitarget_list))
     # Set sex chromosomes by "reference" gender
-    chr_x = core.guess_chr_x(ref_probes)
-    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    if male_reference:
-        ref_probes['coverage'][(ref_probes.chromosome == chr_x) |
-                               (ref_probes.chromosome == chr_y)] = -1.0
-    else:
-        ref_probes['coverage'][ref_probes.chromosome == chr_y] = -1.0
+    ref_probes['coverage'] = core.expect_flat_cvg(ref_probes, male_reference)
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
         gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
