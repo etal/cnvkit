@@ -59,7 +59,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     chr_x = core.guess_chr_x(cnarr1)
     chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
     flat_coverage = core.expect_flat_cvg(cnarr1, is_male_reference)
-    def shift_sex_chroms(pset):
+    def shift_sex_chroms(cnarr):
         """Shift sample X and Y chromosomes to match the reference gender.
 
         Reference values:
@@ -79,46 +79,45 @@ def combine_probes(filenames, fa_fname, is_male_reference):
             xy sample, xy ref: 0    (from -1)   +1
 
         """
-        is_xx = core.guess_xx(pset, chr_x=chr_x)
-        pset['coverage'] += flat_coverage
+        is_xx = core.guess_xx(cnarr, chr_x=chr_x)
+        cnarr['coverage'] += flat_coverage
         if is_xx:
             # chrX already OK
             # No chrY; it's all noise, so just match the male
-            pset['coverage'][pset.chromosome == chr_y] = -1.0
+            cnarr['coverage'][cnarr.chromosome == chr_y] = -1.0
         else:
             # 1/2 #copies of each sex chromosome
-            pset['coverage'][(pset.chromosome == chr_x) |
-                             (pset.chromosome == chr_y)] += 1.0
+            cnarr['coverage'][(cnarr.chromosome == chr_x) |
+                              (cnarr.chromosome == chr_y)] += 1.0
 
-    shift_sex_chroms(cnarr1)
-    all_coverages = [cnarr1.coverage]
+    edge_sorter = fix.make_edge_sorter(cnarr1, params.INSERT_SIZE)
+    def bias_correct_coverage(cnarr):
+        """Perform bias corrections on the sample."""
+        cnarr.center_all()
+        shift_sex_chroms(cnarr)
+        if 'gc' in kwargs:
+            echo("Correcting for GC bias...")
+            cnarr = fix.center_by_window(cnarr, .1, kwargs['gc'])
+        if 'rmask' in kwargs:
+            echo("Correcting for RepeatMasker bias...")
+            cnarr = fix.center_by_window(cnarr, .1, kwargs['rmask'])
+        echo("Correcting for density bias...")
+        cnarr = fix.center_by_window(cnarr, .1, edge_sorter)
+        return cnarr.coverage
+
+    all_coverages = [bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         echo("Loading target", fname)
-        pset = CNA.read(fname)
+        cnarrx = CNA.read(fname)
         # Bin information should match across all files
-        if not (len(cnarr1) == len(pset)
-                and (cnarr1.chromosome == pset.chromosome).all()
-                and (cnarr1.start == pset.start).all()
-                and (cnarr1.end == pset.end).all()
-                and (cnarr1.gene == pset.gene).all()):
+        if not (len(cnarr1) == len(cnarrx)
+                and (cnarr1.chromosome == cnarrx.chromosome).all()
+                and (cnarr1.start == cnarrx.start).all()
+                and (cnarr1.end == cnarrx.end).all()
+                and (cnarr1.gene == cnarrx.gene).all()):
             raise RuntimeError("%s probes do not match those in %s"
                                % (fname, filenames[0]))
-        pset.center_all()
-        shift_sex_chroms(pset)
-
-        # Bias corrections
-        if fa_fname or 'gc' in cnarr1:
-            echo("Correcting for GC bias...")
-            pset = fix.center_by_window(pset, .1, gc)
-        if fa_fname:
-            echo("Correcting for RepeatMasker bias...")
-            pset = fix.center_by_window(pset, .1, rmask)
-        echo("Correcting for density bias...")
-        pset = fix.center_by_window(pset, .1,
-                                    fix.make_edge_sorter(cnarr1,
-                                                         params.INSERT_SIZE))
-
-        all_coverages.append(pset.coverage)
+        all_coverages.append(bias_correct_coverage(cnarrx))
     all_coverages = numpy.vstack(all_coverages)
 
     echo("Calculating average bin coverages")
