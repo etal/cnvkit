@@ -105,7 +105,8 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         cnarr = fix.center_by_window(cnarr, .1, edge_sorter)
         return cnarr.coverage
 
-    all_coverages = [bias_correct_coverage(cnarr1)]
+    # Pseudocount of 1 "flat" sample
+    all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         echo("Loading target", fname)
         cnarrx = CNA.read(fname)
