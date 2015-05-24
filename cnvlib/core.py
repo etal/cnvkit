@@ -91,10 +91,10 @@ def guess_xx(probes, male_reference=False, chr_x=None, verbose=True):
     """Guess whether a sample is female from chrX relative coverages.
 
     Recommended cutoff values:
-        -0.4 -- raw target data, not yet corrected
-        +0.7 -- probe data already corrected on a male profile
+        -0.5 -- raw target data, not yet corrected
+        +0.5 -- probe data already corrected on a male profile
     """
-    cutoff = 0.7 if male_reference else -0.4
+    cutoff = 0.5 if male_reference else -0.5
     # ENH - better coverage approach: take Z-scores or rank of +1,0 or 0,-1
     # based on the available probes, then choose which is more probable
     rel_chrx_cvg = get_relative_chrx_cvg(probes, chr_x=chr_x)
@@ -109,14 +109,24 @@ def get_relative_chrx_cvg(probes, chr_x=None):
     """Get the relative log-coverage of chrX in a sample."""
     if chr_x is None:
         chr_x = guess_chr_x(probes)
-    cvgs_chrx = probes[probes.chromosome == chr_x]['coverage']
-    if not len(cvgs_chrx):
+    chromosome_x = probes[probes.chromosome == chr_x]
+    if not len(chromosome_x):
         echo("*WARNING* No", chr_x, "found in probes; check the input")
         return
     chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    cvgs_autosome = probes[(probes.chromosome != chr_x) &
-                           (probes.chromosome != chr_y)]['coverage']
-    rel_chrx_cvg = numpy.median(cvgs_chrx) - numpy.median(cvgs_autosome)
+    autosomes = probes[(probes.chromosome != chr_x) &
+                       (probes.chromosome != chr_y)]
+    auto_cvgs = autosomes['coverage']
+    x_cvgs = chromosome_x['coverage']
+    if 'probes' in probes:
+        # Weight segments by number of probes to ensure good behavior
+        auto_sizes = autosomes['probes']
+        x_sizes = chromosome_x['probes']
+        # ENH: weighted median
+        rel_chrx_cvg = (numpy.average(x_cvgs, weights=x_sizes) -
+                        numpy.average(auto_cvgs, weights=auto_sizes))
+    else:
+        rel_chrx_cvg = numpy.median(x_cvgs) - numpy.median(auto_cvgs)
     return rel_chrx_cvg
 
 

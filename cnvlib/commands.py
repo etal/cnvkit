@@ -1148,9 +1148,9 @@ def _cmd_gender(args):
     for fname in args.targets:
         rel_chrx_cvg = core.get_relative_chrx_cvg(CNA.read(fname))
         if args.male_reference:
-            is_xx = (rel_chrx_cvg >= 0.7)
+            is_xx = (rel_chrx_cvg >= 0.5)
         else:
-            is_xx = (rel_chrx_cvg >= -0.4)
+            is_xx = (rel_chrx_cvg >= -0.5)
         outrows.append((fname,
                         ("Female" if is_xx else "Male"),
                         "%s%.3g" % ('+' if rel_chrx_cvg > 0 else '',
