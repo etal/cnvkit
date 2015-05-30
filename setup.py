@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Copy number variation toolkit: Infer CNVs from targeted DNA sequencing."""
+"""Copy number variation toolkit for targeted DNA sequencing."""
 
 from os.path import dirname, join
 from glob import glob
