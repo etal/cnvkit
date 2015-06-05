@@ -30,7 +30,7 @@ def load_adjust_coverages(pset, ref_pset,
     ref_matched = match_ref_to_probes(ref_pset, pset)
 
     # Drop probes that had poor coverage in the pooled reference
-    ok_cvg_indices = (True - reference.mask_bad_probes(ref_matched))
+    ok_cvg_indices = ~reference.mask_bad_probes(ref_matched)
     pset.data = pset.data[ok_cvg_indices]
     ref_matched.data = ref_matched.data[ok_cvg_indices]
 

@@ -165,7 +165,7 @@ def haarSeg(I,
         pulseSize = 2
         res = PulseConv(varMask, pulseSize)
         diffMask = [r >= .5 for r in res]
-        peakSigmaEst = med_abs_diff(diffI[True - diffMask])
+        peakSigmaEst = med_abs_diff(diffI[~diffMask])
         noisySigmaEst = med_abs_diff(diffI[diffMask])
     else:
         peakSigmaEst = med_abs_diff(diffI)

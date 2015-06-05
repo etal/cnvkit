@@ -146,7 +146,6 @@ def warn_bad_probes(probes):
     fg_index = (bad_probes['gene'] != 'Background')
     fg_bad_probes = bad_probes[fg_index]
     if len(fg_bad_probes) > 0:
-        # ENH: print coverage and spread too
         bad_pct = 100 * len(fg_bad_probes) / sum(probes['gene'] != 'Background')
         echo("*WARNING*", len(fg_bad_probes), "targets",
              "(%.4f)" % bad_pct + '%', "failed filters:")
@@ -170,7 +169,7 @@ def warn_bad_probes(probes):
                          probe['coverage'], probe['spread']))
 
     # Count the number of BG probes dropped, too (names are all "Background")
-    bg_bad_probes = bad_probes[True - fg_index]
+    bg_bad_probes = bad_probes[~fg_index]
     if len(bg_bad_probes) > 0:
         bad_pct = 100 * len(bg_bad_probes) / sum(probes['gene'] == 'Background')
         echo("Antitargets:", len(bg_bad_probes), "(%.4f)" % bad_pct + '%',
@@ -237,6 +236,6 @@ def _cna2regions(cnarr):
 def _ref_split_targets(ref_arr):
     """Split reference into 2 sub-arrays of targets/antitargets."""
     is_bg = (ref_arr.gene == 'Background')
-    targets = ref_arr[True - is_bg]
+    targets = ref_arr[~is_bg]
     antitargets = ref_arr[is_bg]
     return targets, antitargets
