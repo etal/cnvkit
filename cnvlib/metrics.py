@@ -12,16 +12,17 @@ from __future__ import division
 import numpy
 
 
-def probe_deviations_from_segments(probes, segments):
+def probe_deviations_from_segments(probes, segments, skip_low=True):
     """Difference in CN estimate of each probe from its segment."""
-    from .params import NULL_LOG2_COVERAGE
     probes.sort()
     segments.sort()
+    if skip_low:
+        # Ignore impossibly-low-coverage probes
+        from .params import NULL_LOG2_COVERAGE
+        probes = probes.to_array(probes[probes.coverage > NULL_LOG2_COVERAGE])
     deviations = []
     for segment, subprobes in probes.by_segment(segments):
-        # Ignore impossibly-low-coverage probes
-        bin_cvgs = subprobes[subprobes['coverage'] > NULL_LOG2_COVERAGE]['coverage']
-        deviations.append(bin_cvgs - segment['coverage'])
+        deviations.append(subprobes.coverage - segment['coverage'])
     return numpy.concatenate(deviations)
 
 
