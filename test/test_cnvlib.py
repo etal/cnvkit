@@ -34,14 +34,14 @@ class CNATests(unittest.TestCase):
         self.ex_cnr[0] = orig
         self.ex_cnr[3:4] = self.ex_cnr[3:4]
         self.ex_cnr[6:10] = self.ex_cnr[6:10]
-        self.assertEqual(self.ex_cnr[0], same[0])
+        self.assertEqual(tuple(self.ex_cnr[0]), tuple(same[0]))
         self.assertTrue((self.ex_cnr[3:6] == same[3:6]).all())
 
     def test_iter(self):
         """Test iteration."""
         rows = iter(self.ex_cnr)
         firstrow = next(rows)
-        self.assertEqual(firstrow, self.ex_cnr[0])
+        self.assertEqual(tuple(firstrow), tuple(self.ex_cnr[0]))
         i = 0
         for i, row in enumerate(rows):
             pass
@@ -55,28 +55,28 @@ class CNATests(unittest.TestCase):
     def test_center_all(self):
         """Test median-recentering."""
         chr1 = self.ex_cnr.in_range('chr1')
-        self.assertAlmostEqual(0, numpy.median(chr1.coverage), places=1)
+        self.assertAlmostEqual(0, numpy.median(chr1['log2']), places=1)
         chr1.center_all()
-        orig_chr1_cvg = numpy.median(chr1.coverage)
+        orig_chr1_cvg = numpy.median(chr1['log2'])
         self.assertAlmostEqual(0, orig_chr1_cvg)
         chr1plus2 = chr1.copy()
-        chr1plus2['coverage'] += 2.0
+        chr1plus2['log2'] += 2.0
         chr1plus2.center_all()
-        self.assertAlmostEqual(numpy.median(chr1plus2.coverage), orig_chr1_cvg)
+        self.assertAlmostEqual(numpy.median(chr1plus2['log2']), orig_chr1_cvg)
 
     def test_copy(self):
         """Test creation of an independent copy of the object."""
         dupe = self.ex_cnr.copy()
-        self.assertEqual(self.ex_cnr[3], dupe[3])
-        self.ex_cnr[3]['coverage'] = -10.0
-        self.assertNotEqual(self.ex_cnr[3], dupe[3])
+        self.assertEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
+        self.ex_cnr[3, 'log2'] = -10.0
+        self.assertNotEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
 
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""
         self.assertTrue('gc' in self.ex_cnr)
         cleaned = self.ex_cnr.drop_extra_columns()
         self.assertTrue('gc' not in cleaned)
-        self.assertTrue((cleaned.coverage == self.ex_cnr.coverage).all())
+        self.assertTrue((cleaned['log2'] == self.ex_cnr['log2']).all())
 
     # def test_extend(self):
     # def test_in_range(self):
@@ -91,12 +91,12 @@ class CNATests(unittest.TestCase):
 
     def test_shuffle_sort(self):
         """Test shuffling and re-sorting the data array."""
-        orig_cvg = tuple(self.ex_cnr['coverage'][:10])
-        self.assertEqual(tuple(self.ex_cnr['coverage'][:10]), orig_cvg)
+        orig_cvg = tuple(self.ex_cnr['log2'][:10])
+        self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
         self.ex_cnr.shuffle()
-        self.assertNotEqual(tuple(self.ex_cnr['coverage'][:10]), orig_cvg)
+        self.assertNotEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
         self.ex_cnr.sort()
-        self.assertEqual(tuple(self.ex_cnr['coverage'][:10]), orig_cvg)
+        self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
 
     # def test_squash_genes(self):
 

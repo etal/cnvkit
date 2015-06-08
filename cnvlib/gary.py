@@ -21,7 +21,7 @@ def uniq(arr):
 
 
 # NB: Start by implementing all CNVkit features here, then split later
-class GenomeArray(object):
+class GenomicArray(object):
     """An array of genomic intervals.
 
     Can represent most BED-like tabular formats with arbitrary additional
@@ -93,20 +93,60 @@ class GenomeArray(object):
         return (key in self.data.columns)
 
     def __getitem__(self, index):
-        return self.data[index]
+        """Access a portion of the data.
 
-    # XXX ok?
+        Cases:
+
+        - single integer: a row, as pd.Series
+        - string row name: a column, as pd.Series
+        - a boolean array: masked rows, as_dataframe
+        - tuple of integers: selected rows, as_dataframe
+        """
+        if isinstance(index, int):
+            # A single row
+            return self.data.iloc[index]
+            # return self.as_dataframe(self.data.iloc[index:index+1])
+        elif isinstance(index, basestring):
+            # A column, by name
+            return self.data[index]
+        elif (isinstance(index, tuple) and
+              len(index) == 2 and
+              isinstance(index[0], (int, slice, tuple)) and
+              isinstance(index[1], basestring)):
+            # Row index, column index
+            return self.as_dataframe(self.data.loc[index])
+        else:
+            # Selected row indices or boolean array, probably
+            assert isinstance(index, slice) or len(index) > 0
+            return self.as_dataframe(self.data[index])
+
     def __setitem__(self, index, value):
-        self.data[index] = value
+        """Assign to a portion of the data.
+        """
+        # self.data[index] = value
+        if isinstance(index, int):
+            self.data.iloc[index] = value
+        elif isinstance(index, basestring):
+            self.data[index] = value
+        elif (isinstance(index, tuple) and
+              len(index) == 2 and
+              isinstance(index[0], (int, slice, tuple)) and
+              isinstance(index[1], basestring)):
+            self.data.loc[index] = value
+        else:
+            assert isinstance(index, slice) or len(index) > 0
+            self.data[index] = value
 
     def __delitem__(self, index):
         return NotImplemented
 
     def __iter__(self):
-        return iter(self.data)
+        # return iter(self.data)
+        return (row for idx, row in self.data.iterrows())
 
-    def __next__(self):
-        return next(self.data)
+    __next__ = next
+    # def __next__(self):
+    #     return next(iter(self))
 
     @property
     def chromosome(self):
@@ -117,6 +157,11 @@ class GenomeArray(object):
     def start(self):
         # return self.data.reset_index()['start']
         return self.data['start']
+
+    @property
+    def sample_id(self):
+        # return self.data.reset_index()['start']
+        return self.meta.get('sample_id')
 
     # Traversal
 
@@ -216,7 +261,8 @@ class GenomeArray(object):
         the bins endpoints to the boundaries.
         """
         try:
-            table = self.data.loc[chrom]
+            # table = self.data.loc[chrom]
+            table = self.data[self.data['chromosome'] == chrom]
         except KeyError:
             raise KeyError("Chromosome %s is not in this probe set" % chrom)
         if start:
@@ -260,7 +306,7 @@ class GenomeArray(object):
         chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
         mask_autosome = ((self.chromosome != chr_x) &
                             (self.chromosome != chr_y))
-        mid = numpy.median(self.data['log2'][mask_autosome])
+        mid = self.data['log2'][mask_autosome].median()
         mask_cvg = (mask_autosome &
                     (self.data['log2'] >= mid - 1.1) &
                     (self.data['log2'] <= mid + 1.1))
@@ -292,9 +338,9 @@ class GenomeArray(object):
         Returns a new copy with only the core columns retained:
             log2 value, chromosome, start, end, bin name.
         """
-        result = self.__class__(self.sample_id)
-        result.data = rfn.drop_fields(self.data, self._xtra)
-        return result
+        table = self.data.loc[:, ('chromosome', 'start', 'end', 'gene',
+                                  'log2')]
+        return self.as_dataframe(table)
 
     # def reorder(self, key):
     #     """Apply a different ordering of chromosomes to this array.
@@ -326,11 +372,11 @@ class GenomeArray(object):
         """
         table = self.data
         if selector is not None:
-            table = table.select(selector)
+            table = table[table.apply(selector, axis=1)]
         for key, val in kwargs.items():
             assert key in self
-            outrows = outrows[outrows[key] == val]
-        return self.as_dataframe(outrows)
+            table = table[table[key] == val]
+        return self.as_dataframe(table)
 
     def shuffle(self):
         """Randomize the order of bins in this array (in-place)."""
