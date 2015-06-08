@@ -4,7 +4,7 @@ import math
 import os.path
 
 from .. import core, ngfrills, params
-from ..cnarray import CopyNumArray as CNA
+from ..gary import GenomicArray as _GA
 
 from Bio._py3k import StringIO
 
@@ -16,7 +16,7 @@ def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
 
     if method == 'haar':
         from . import haar
-        probes = CNA.read(probes_fname)
+        probes = _GA.read(probes_fname)
         return haar.segment_haar(probes)
 
     # Run R to calculate copy number segments (CBS)
@@ -48,7 +48,7 @@ def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
         # Save output
         out_data.append((chrom, start, end, name, mean_cvg, nloci))
 
-    seg_pset = CNA.from_rows(sample_id, out_data, extra_keys=('probes',))
+    seg_pset = _GA.from_rows(out_data, ('probes',), {'sample_id': sample_id})
     seg_pset.sort()
     if method == 'flasso':
         seg_pset = squash_segments(seg_pset)

@@ -9,7 +9,7 @@ from Bio._py3k import map, range, zip
 import numpy
 
 from . import core
-from .cnarray import row2label, CopyNumArray as CNA
+from .gary import GenomicArray as _GA
 
 ProbeInfo = collections.namedtuple('ProbeInfo', 'label chrom start end gene')
 
@@ -107,9 +107,9 @@ def export_nexus_basic(sample_fname):
 
     Only represents one sample per file.
     """
-    cnarr = CNA.read(sample_fname)
+    cnarr = _GA.read(sample_fname)
     outheader = ['probe', 'chromosome', 'start', 'end', 'gene', 'log2']
-    outrows = [[row2label(row)] + list(row)[:5] for row in cnarr.data]
+    outrows = [[_GA.row2label(row)] + list(row)[:5] for row in cnarr.data]
     return outheader, outrows
 
 
@@ -122,7 +122,7 @@ def export_seg(sample_fnames):
     outrows = []
     chrom_ids = None
     for fname in sample_fnames:
-        segments = CNA.read(fname)
+        segments = _GA.read(fname)
         if chrom_ids is None:
             # Create & store
             chrom_ids = create_chrom_ids(segments)
@@ -177,7 +177,7 @@ def export_freebayes(sample_fnames, args):
 
     bed_rows = []
     for fname in sample_fnames:
-        segs = CNA.read(fname)
+        segs = _GA.read(fname)
         is_sample_female = core.guess_xx(segs, args.male_reference,
                                          verbose=False)
         if args.gender:
@@ -247,8 +247,8 @@ def export_theta(tumor, reference):
 
     where chromosome IDs ("chrm") are integers 1 through 24.
     """
-    tumor_segs = CNA.read(tumor)
-    ref_vals = CNA.read(reference)
+    tumor_segs = _GA.read(tumor)
+    ref_vals = _GA.read(reference)
 
     outheader = ["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]
     outrows = []

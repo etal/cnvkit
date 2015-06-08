@@ -6,15 +6,15 @@ from Bio._py3k import map, zip
 
 from . import core, metrics, ngfrills, params
 from .ngfrills import echo
-from .cnarray import CopyNumArray as CNA, row2label
+from .gary import GenomicArray as _GA
 
 
 def bed2probes(bed_fname):
     """Create neutral-coverage probes from intervals."""
     cn_rows = [(chrom, start, end, name, 0, 0, 0, 0)
                for chrom, start, end, name in ngfrills.parse_regions(bed_fname)]
-    return CNA.from_rows(core.fbase(bed_fname), cn_rows,
-                         extra_keys=('gc', 'rmask', 'spread'))
+    return _GA.from_rows(cn_rows, ('gc', 'rmask', 'spread'),
+                         {'sample_id': core.fbase(bed_fname)})
 
 
 def combine_probes(filenames, fa_fname, is_male_reference):
@@ -33,7 +33,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
 
     # Load coverage from target/antitarget files
     echo("Loading", filenames[0])
-    cnarr1 = CNA.read(filenames[0])
+    cnarr1 = _GA.read(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
         extra_cols = ['spread']
@@ -41,7 +41,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
             extra_cols.append('gc')
         if fa_fname:
             extra_cols.append('rmask')
-        return CNA("reference", extra_cols)
+        return _GA("reference", extra_cols)
 
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
@@ -109,7 +109,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         echo("Loading target", fname)
-        cnarrx = CNA.read(fname)
+        cnarrx = _GA.read(fname)
         # Bin information should match across all files
         if not (len(cnarr1) == len(cnarrx)
                 and (cnarr1.chromosome == cnarrx.chromosome).all()
@@ -128,7 +128,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     spreads = numpy.apply_along_axis(metrics.biweight_midvariance, 0,
                                      all_coverages)
     kwargs['spread'] = spreads
-    return CNA.from_columns("reference",
+    return _GA.from_columns("reference",
                             chromosome=cnarr1.chromosome,
                             start=cnarr1.start,
                             end=cnarr1.end,
@@ -150,7 +150,7 @@ def warn_bad_probes(probes):
         echo("*WARNING*", len(fg_bad_probes), "targets",
              "(%.4f)" % bad_pct + '%', "failed filters:")
         gene_cols = max(map(len, fg_bad_probes['gene']))
-        labels = list(map(row2label, fg_bad_probes))
+        labels = list(map(_GA.row2label, fg_bad_probes))
         chrom_cols = max(map(len, labels))
         last_gene = None
         for label, probe in zip(labels, fg_bad_probes):
@@ -215,7 +215,7 @@ def calculate_gc_lo(subseq):
 
 
 def reference2regions(reference, coord_only=False):
-    """Extract iterables of target and antitarget regions from a reference CNA.
+    """Extract iterables of target and antitarget regions from a reference.
 
     Like loading two BED files with ngfrills.parse_regions.
     """
