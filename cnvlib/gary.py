@@ -39,8 +39,8 @@ class GenomicArray(object):
         #                      "['chromosome', 'start']")
         if not all(c in data_table.columns for c in
                    ("chromosome", "start", "end")):
-            raise ValueError("data table must be indexed on "
-                             "['chromosome', 'start']")
+            raise ValueError("data table must have at least columns "
+                             "['chromosome', 'start', 'end']")
         self.data = data_table
         self.meta = (dict(meta_dict)
                      if meta_dict is not None and len(meta_dict)
@@ -51,16 +51,20 @@ class GenomicArray(object):
         # return "{1}:{0}-{2}".format(row['end'], *row.name)
         return "{}:{}-{}".format(row['chromosome'], row['start'], row['end'])
 
-    # @classmethod
-    # def from_rows(cls, row_data, extra_keys=(), meta_dict=None):
-    #     """Create a new instance from a list of rows, as tuples or arrays."""
-    #     # pd.DataFrame.from_items()
+    @classmethod
+    def from_rows(cls, rows, extra_cols=(), meta_dict=None):
+        """Create a new instance from a list of rows, as tuples or arrays."""
+        cols = ['chromosome', 'start', 'end', 'gene', 'log2']
+        if extra_cols:
+            cols.extend(extra_cols)
+        table = pd.DataFrame.from_records(rows, columns=cols)
+        return cls(table, meta_dict)
 
     # @classmethod
     # def from_columns(cls, columns, meta_dict=None):
     #     """Create a new instance from column arrays, given by name."""
     #     table = self.data.loc[:, columns]
-    #     return cls()
+    #     return cls(table, meta_dict)
 
     # # NB: unclear what's needed here
     # def as_index(self, index):
