@@ -19,10 +19,10 @@ def probe_deviations_from_segments(probes, segments, skip_low=True):
     if skip_low:
         # Ignore impossibly-low-coverage probes
         from .params import NULL_LOG2_COVERAGE
-        probes = probes.to_array(probes[probes.coverage > NULL_LOG2_COVERAGE])
+        probes = probes.to_array(probes[probes['log2'] > NULL_LOG2_COVERAGE])
     deviations = []
     for segment, subprobes in probes.by_segment(segments):
-        deviations.append(subprobes.coverage - segment['coverage'])
+        deviations.append(subprobes['log2'] - segment['log2'])
     return numpy.concatenate(deviations)
 
 
@@ -66,12 +66,12 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-4):
 def segment_mean(cnarr):
     """Weighted average of bin log2 values, ignoring too-low-coverage bins."""
     from .params import NULL_LOG2_COVERAGE
-    cnarr = cnarr[cnarr['coverage'] > NULL_LOG2_COVERAGE]
+    cnarr = cnarr[cnarr['log2'] > NULL_LOG2_COVERAGE]
     if len(cnarr) == 0:
         return None
     if 'weight' in cnarr:
-        return numpy.average(cnarr['coverage'], weights=cnarr['weight'])
-    return cnarr['coverage'].mean()
+        return numpy.average(cnarr['log2'], weights=cnarr['weight'])
+    return cnarr['log2'].mean()
 
 
 # Estimators of scale

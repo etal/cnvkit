@@ -129,7 +129,7 @@ def smooth_genome_coverages(probes, smooth_func, width):
     and `width`, equal in length to `probes`.
     """
     # ENH: also split by centromeres (long internal gaps -- see PSCBS)
-    out = {chrom: smooth_func(subprobes['coverage'], width)
+    out = {chrom: smooth_func(subprobes['log2'], width)
            for chrom, subprobes in probes.by_chromosome()}
     return numpy.concatenate(
         [out[chrom] for chrom in sorted(out, key=core.sorter_chrom)])

@@ -74,7 +74,7 @@ def segment_haar(cnarr):
     # Segment each chromosome individually
     for chrom, subprobes in cnarr.by_chromosome():
         # subtbl = subprobes[
-        segtable = haarSeg(subprobes['coverage'])
+        segtable = haarSeg(subprobes['log2'])
         # Convert the segments result table (segment start index, size, value)
         # into CNArray-compatible rows (coverage, chromosome, start, end, gene,
         # probes)

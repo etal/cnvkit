@@ -73,7 +73,7 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, male_referenc
                 if srow['start'] - 1 >= 0 and srow['end'] <= chrom_sizes[chrom]:  # Sanity check
                     features[chrom].append(
                         (srow['start'] - 1, srow['end'], -1, None,
-                         colors.Color(*plots.cvg2rgb(srow['coverage'], False))))
+                         colors.Color(*plots.cvg2rgb(srow['log2'], False))))
 
     # Generate the diagram PDF
     if not outfname:

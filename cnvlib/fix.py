@@ -56,7 +56,7 @@ def load_adjust_coverages(pset, ref_pset,
 
     # Normalize coverages according to the reference
     # (Subtract the reference log2 copy number to get the log2 ratio)
-    pset.data['coverage'] -= ref_matched['coverage']
+    pset.data['log2'] -= ref_matched['log2']
 
     pset.center_all()
     return apply_weights(pset, ref_matched)
@@ -87,9 +87,9 @@ def center_by_window(pset, fraction, sort_key):
         sort_key = sort_key[shuffle_order]
     # Sort the data according to the specified parameter
     adj_pset.sort(key=sort_key)
-    biases = smoothing.rolling_median(adj_pset.coverage, fraction)
-    # biases = smoothing.smoothed(adj_pset.coverage, fraction)
-    adj_pset['coverage'] -= biases
+    biases = smoothing.rolling_median(adj_pset['log2'], fraction)
+    # biases = smoothing.smoothed(adj_pset['log2'], fraction)
+    adj_pset['log2'] -= biases
     adj_pset.sort()
     return adj_pset
 
@@ -231,12 +231,12 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     # Relative bin sizes
     sizes = ref_matched['end'] - ref_matched['start']
     weights = sizes / sizes.max()
-    if (numpy.abs(numpy.mod(ref_matched['coverage'], 1)) > epsilon).any():
+    if (numpy.abs(numpy.mod(ref_matched['log2'], 1)) > epsilon).any():
         # NB: Not used with a flat reference
         echo("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from expected coverage
         flat_cvgs = core.expect_flat_cvg(ref_matched)
-        weights *= 2 ** -numpy.abs(ref_matched['coverage'] - flat_cvgs)
+        weights *= 2 ** -numpy.abs(ref_matched['log2'] - flat_cvgs)
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
         echo("Weighting bins by coverage spread in reference")

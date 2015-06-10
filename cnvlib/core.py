@@ -73,11 +73,11 @@ def shift_xx(probes, male_reference=False, chr_x=None):
     is_xx = guess_xx(probes, chr_x=chr_x, male_reference=male_reference)
     if is_xx and male_reference:
         # Female: divide X coverages by 2 (in log2: subtract 1)
-        outprobes['coverage'][outprobes.chromosome == chr_x] -= 1.0
+        outprobes['log2'][outprobes.chromosome == chr_x] -= 1.0
         # Male: no change
     elif not is_xx and not male_reference:
         # Male: multiply X coverages by 2 (in log2: add 1)
-        outprobes['coverage'][outprobes.chromosome == chr_x] += 1.0
+        outprobes['log2'][outprobes.chromosome == chr_x] += 1.0
         # Female: no change
     return outprobes
 
@@ -116,8 +116,8 @@ def get_relative_chrx_cvg(probes, chr_x=None):
     chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
     autosomes = probes[(probes.chromosome != chr_x) &
                        (probes.chromosome != chr_y)]
-    auto_cvgs = autosomes['coverage']
-    x_cvgs = chromosome_x['coverage']
+    auto_cvgs = autosomes['log2']
+    x_cvgs = chromosome_x['log2']
     if 'probes' in probes:
         # Weight segments by number of probes to ensure good behavior
         auto_sizes = autosomes['probes']

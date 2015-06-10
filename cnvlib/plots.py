@@ -29,7 +29,7 @@ def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
     chrom_probe_centers = {chrom: 0.5 * (rows['start'] + rows['end'])
                            for chrom, rows in probes.by_chromosome()}
     # Same for segment calls
-    chrom_seg_coords = {chrom: zip(rows['coverage'], rows['start'], rows['end'])
+    chrom_seg_coords = {chrom: zip(rows['log2'], rows['start'], rows['end'])
                         for chrom, rows in segments.by_chromosome()
                        } if segments else {}
 
@@ -50,7 +50,7 @@ def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
         if segments:
             # Auto-scale y-axis according to segment mean-coverage values
             seg_auto_vals = segments[(segments.chromosome != 'chr6') &
-                                    (segments.chromosome != 'chrY')]['coverage']
+                                     (segments.chromosome != 'chrY')]['log2']
             if not y_min:
                 y_min = min(seg_auto_vals.min() - .2, -1.5)
             if not y_max:
@@ -63,7 +63,7 @@ def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
     axis.set_ylim(y_min, y_max)
 
     # Plot points
-    axis.scatter(x, probes.coverage, color=POINT_COLOR, edgecolor='none',
+    axis.scatter(x, probes['log2'], color=POINT_COLOR, edgecolor='none',
                  alpha=0.2, marker='.')
     # Add a local trend line
     if do_trend:
@@ -88,7 +88,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
     # Get scatter plot coordinates
     sel_probes = probes[probes['chromosome'] == chromosome]
     x = [probe_center(row) * MB for row in sel_probes]
-    y = sel_probes['coverage']
+    y = sel_probes['log2']
     if 'weight' in sel_probes.dtype.fields:
         w = 46 * sel_probes['weight'] ** 2 + 2
     else:
@@ -169,7 +169,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
     if segments:
         for row in segments[segments['chromosome'] == chromosome]:
             axis.plot((row['start'] * MB, row['end'] * MB),
-                      (row['coverage'], row['coverage']),
+                      (row['log2'], row['log2']),
                       color=SEG_COLOR, linewidth=4, solid_capstyle='round')
 
 

@@ -80,15 +80,15 @@ def combine_probes(filenames, fa_fname, is_male_reference):
 
         """
         is_xx = core.guess_xx(cnarr, chr_x=chr_x)
-        cnarr['coverage'] += flat_coverage
+        cnarr['log2'] += flat_coverage
         if is_xx:
             # chrX already OK
             # No chrY; it's all noise, so just match the male
-            cnarr['coverage'][cnarr.chromosome == chr_y] = -1.0
+            cnarr['log2'][cnarr.chromosome == chr_y] = -1.0
         else:
             # 1/2 #copies of each sex chromosome
-            cnarr['coverage'][(cnarr.chromosome == chr_x) |
-                              (cnarr.chromosome == chr_y)] += 1.0
+            cnarr['log2'][(cnarr.chromosome == chr_x) |
+                          (cnarr.chromosome == chr_y)] += 1.0
 
     edge_sorter = fix.make_edge_sorter(cnarr1, params.INSERT_SIZE)
     def bias_correct_coverage(cnarr):
@@ -103,7 +103,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
             cnarr = fix.center_by_window(cnarr, .1, kwargs['rmask'])
         echo("Correcting for density bias...")
         cnarr = fix.center_by_window(cnarr, .1, edge_sorter)
-        return cnarr.coverage
+        return cnarr['log2']
 
     # Pseudocount of 1 "flat" sample
     all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
@@ -133,7 +133,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
                             start=cnarr1.start,
                             end=cnarr1.end,
                             gene=cnarr1.gene,
-                            coverage=cvg_centers,
+                            log2=cvg_centers,
                             **kwargs)
 
 
@@ -166,7 +166,7 @@ def warn_bad_probes(probes):
             else:
                 print("  %s  %s  coverage=%.3f  spread=%.3f"
                       % (gene.ljust(gene_cols), label.ljust(chrom_cols),
-                         probe['coverage'], probe['spread']))
+                         probe['log2'], probe['spread']))
 
     # Count the number of BG probes dropped, too (names are all "Background")
     bg_bad_probes = bad_probes[~fg_index]
@@ -181,7 +181,7 @@ def mask_bad_probes(probes):
 
     Returns a bool array where True indicates probes that failed the checks.
     """
-    mask = ((probes['coverage'] < params.MIN_BIN_COVERAGE) |
+    mask = ((probes['log2'] < params.MIN_BIN_COVERAGE) |
             (probes['spread'] > params.MAX_BIN_SPREAD))
     if 'rmask' in probes:
         mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)

@@ -69,7 +69,7 @@ def squash_segments(seg_pset):
 
     squashed_rows = []
     for row in seg_pset:
-        if row['chromosome'] == curr_chrom and row['coverage'] == curr_val:
+        if row['chromosome'] == curr_chrom and row['log2'] == curr_val:
             # Continue the current segment
             curr_end = row['end']
             curr_cnt += 1
@@ -84,7 +84,7 @@ def squash_segments(seg_pset):
             curr_chrom = row['chromosome']
             curr_start = row['start']
             curr_end = row['end']
-            curr_val = row['coverage']
+            curr_val = row['log2']
             curr_cnt = 1
     # Remainder
     squashed_rows.append((curr_chrom, curr_start, curr_end,

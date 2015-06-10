@@ -137,12 +137,12 @@ def export_seg(sample_fnames):
             def row2out(row):
                 return (segments.sample_id, chrom_ids[row['chromosome']],
                         row['start'], row['end'], row['probes'],
-                        row['coverage'])
+                        row['log2'])
         else:
             outheader = ["ID", "Chromosome", "Start", "End", "Mean"]
             def row2out(row):
                 return (segments.sample_id, chrom_ids[row['chromosome']],
-                        row['start'], row['end'], row['coverage'])
+                        row['start'], row['end'], row['log2'])
         outrows.extend(row2out(row) for row in segments)
     return outheader, outrows
 
@@ -296,8 +296,8 @@ def calculate_theta_fields(seg, ref_rows, chrom_id):
         read_count = segment_size * read_depth / read_length
         return int(round(read_count))
 
-    tumor_count = logratio2count(seg["coverage"])
-    ref_count = logratio2count(ref_rows["coverage"].mean())
+    tumor_count = logratio2count(seg["log2"])
+    ref_count = logratio2count(ref_rows["log2"].mean())
     # e.g. "start_1_93709:end_1_19208166"
     row_id = ("start_%d_%d:end_%d_%d"
               % (chrom_id, seg["start"], chrom_id, seg["end"]))
@@ -336,11 +336,11 @@ def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
 
     abslog = numpy.log2(absolutes / float(ploidy))
     newcnarr = cnarr.copy()
-    newcnarr["coverage"] = abslog
+    newcnarr["log2"] = abslog
     # Adjust sex chromosomes to be relative to the reference
     if is_reference_male:
-        newcnarr['coverage'][newcnarr.chromosome == chr_x] += 1.0
-    newcnarr['coverage'][newcnarr.chromosome == chr_y] += 1.0
+        newcnarr['log2'][newcnarr.chromosome == chr_x] += 1.0
+    newcnarr['log2'][newcnarr.chromosome == chr_y] += 1.0
     return newcnarr
 
 
@@ -351,7 +351,7 @@ def cna_absolutes(cnarr, ploidy, purity, is_reference_male, is_sample_female):
         ref_copies, expect_copies = _reference_expect_copies(
             row["chromosome"], ploidy, is_sample_female, is_reference_male)
         absolutes[i] = _log2_ratio_to_absolute(
-            row["coverage"], ref_copies, expect_copies, purity)
+            row["log2"], ref_copies, expect_copies, purity)
     return absolutes
 
 
