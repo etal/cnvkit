@@ -233,6 +233,73 @@ class GenomicArray(object):
         the first/last probe may not match the corresponding segment endpoint.
         This is appropriate if the segments were obtained from this probe array.
         """
+        curr_probes_idx = []
+        segments = iter(segments)
+        curr_segment = next(segments)
+        next_segment = None
+        for i, row in enumerate(self):
+            probe_midpoint = 0.5 * (row['start'] + row['end'])
+            if (row['chromosome'] == curr_segment['chromosome'] and
+                curr_segment['start'] <= probe_midpoint <= curr_segment['end']):
+                # Probe is within the current segment
+                curr_probes_idx.append(i)
+
+            elif row['chromosome'] != curr_segment['chromosome']:
+                # Probe should be at the start of the next chromosome.
+                # Find the matching segment.
+                if next_segment is None:
+                    next_segment = next(segments)
+
+                # Skip any extra segments on the chromosome after the current
+                # probes (e.g. probes are targets, trailing segments are based
+                # on antitargets alone)
+                while row['chromosome'] != next_segment['chromosome']:
+                    try:
+                        next_segment = next(segments)
+                    except StopIteration:
+                        raise ValueError("Segments are missing chromosome %r"
+                                            % row['chromosome'])
+
+                # Emit the current (completed) group
+                yield (curr_segment,
+                       self.as_dataframe(self.data.take(curr_probes_idx)))
+                # Begin a new group of probes
+                curr_segment, next_segment = next_segment, None
+                curr_probes_idx = [i]
+
+            elif row['start'] < curr_segment['start']:
+                # Probe is near the start of the current chromosome, but we've
+                # already seen another outlier here (rare/nonexistent case).
+                # Group with the current (upcoming) segment.
+                curr_probes_idx.append(i)
+
+            elif row['end'] > curr_segment['end']:
+                # Probe is at the end of an accessible region (e.g. p or q arm)
+                # on the current chromosome.
+                # Group this probe with whichever of the current or next
+                # segments is closer.
+                if next_segment is None:
+                    next_segment = next(segments)
+                if (next_segment['chromosome'] != row['chromosome']
+                    or (next_segment['start'] - probe_midpoint) >
+                    (probe_midpoint - curr_segment['end'])):
+                    # The current segment is closer than the next. Group here.
+                    curr_probes_idx.append(i)
+                else:
+                    # The next segment is closer. Emit the current group
+                    # Begin a new group of probes
+                    yield (curr_segment,
+                           self.as_dataframe(self.data.take(curr_probes_idx)))
+                    # Reset/update trackers for the next group of probes
+                    curr_segment, next_segment = next_segment, None
+                    curr_probes_idx = [i]
+            else:
+                raise ValueError("Mismatch between probes and segments\n" +
+                                    "Probe: %s\nSegment: %s"
+                                    % (self.row2label(row),
+                                       self.row2label(curr_segment)))
+        # Emit the remaining probes
+        yield curr_segment, self.as_dataframe(self.data.take(curr_probes_idx))
 
     # s.data.loc['chr1'] -> all where chrom. index == "chr1"
     # s.data.loc['chr1', 93709] -> first row, as a Series
