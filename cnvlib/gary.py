@@ -159,8 +159,11 @@ class GenomicArray(object):
 
     @property
     def start(self):
-        # return self.data.reset_index()['start']
         return self.data['start']
+
+    @property
+    def end(self):
+        return self.data['end']
 
     @property
     def sample_id(self):
