@@ -66,7 +66,7 @@ def segment_haar(cnarr):
         return 0.5 * (probe['start'] + probe['end'])
 
     # XXX Ignore low-coverage probes
-    # cnarr = cnarr[cnarr.coverage >= params.NULL_LOG2_COVERAGE]
+    # cnarr = cnarr.drop_low_coverage()
     # TODO - skip large gaps (segment parts separately)
 
     echo("Segmenting the probe data")

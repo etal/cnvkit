@@ -6,7 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from cnvlib import core, metrics, ngfrills
+from cnvlib import core, metrics, ngfrills, params
 
 
 def uniq(arr):
@@ -348,6 +348,16 @@ class GenomicArray(object):
         table = self.data.loc[:, ('chromosome', 'start', 'end', 'gene',
                                   'log2')]
         return self.as_dataframe(table)
+
+    def drop_low_coverage(self):
+        """Drop bins with extremely low log2 coverage values.
+
+        These are generally bins that had no reads mapped, and so were
+        substituted with a small dummy log2 value to avoid divide-by-zero
+        errors.
+        """
+        return self.as_dataframe(self.data[
+                self.data['log2'] > params.NULL_LOG2_COVERAGE])
 
     # def reorder(self, key):
     #     """Apply a different ordering of chromosomes to this array.
