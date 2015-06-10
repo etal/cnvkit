@@ -52,6 +52,13 @@ class GenomicArray(object):
         return "{}:{}-{}".format(row['chromosome'], row['start'], row['end'])
 
     @classmethod
+    def from_columns(cls, columns, meta_dict=None):
+        """Create a new instance from column arrays, given by name."""
+        # TODO - ensure columns are sorted properly
+        table = pd.DataFrame.from_dict(columns)
+        return cls(table, meta_dict)
+
+    @classmethod
     def from_rows(cls, rows, extra_cols=(), meta_dict=None):
         """Create a new instance from a list of rows, as tuples or arrays."""
         cols = ['chromosome', 'start', 'end', 'gene', 'log2']
@@ -60,28 +67,26 @@ class GenomicArray(object):
         table = pd.DataFrame.from_records(rows, columns=cols)
         return cls(table, meta_dict)
 
-    # @classmethod
-    # def from_columns(cls, columns, meta_dict=None):
-    #     """Create a new instance from column arrays, given by name."""
-    #     table = self.data.loc[:, columns]
-    #     return cls(table, meta_dict)
-
-    # # NB: unclear what's needed here
-    # def as_index(self, index):
-    #     """Subset with fancy/boolean indexing; reuse this instance's metadata."""
-    #     return self.__class__(self.data[index], self.meta)
-
-    def as_rows(self, row_ids):
-        """Extract rows by indices, reusing this instance's metadata."""
-        return self.__class__(self.data.iloc[row_ids], self.meta.copy())
-
     def as_columns(self, columns):
         """Extract a subset of columns, reusing this instance's metadata."""
-        # return self.__class__.from_columns(columns, self.meta)
-        return self.__class__(self.data.loc[:, columns], self.meta.copy())
+        return self.__class__.from_columns(columns, self.meta)
+        # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
     def as_dataframe(self, dframe):
         return self.__class__(dframe, self.meta.copy())
+
+    # def as_index(self, index):
+    #     """Subset with fancy/boolean indexing; reuse this instance's metadata."""
+    #     if isinstance(index, (int, slice)):
+    #         return self.__class__(self.data.iloc[index], self.meta.copy())
+    #     else:
+    #         return self.__class__(self.data[index], self.meta.copy())
+
+    def as_rows(self, rows):
+        """Extract rows by indices, reusing this instance's metadata."""
+        return self.from_rows(rows,
+                              extra_cols=self.data.columns[5:],
+                              meta_dict=self.meta)
 
     # Container behaviour
 
@@ -94,7 +99,7 @@ class GenomicArray(object):
         return len(self.data)
 
     def __contains__(self, key):
-        return (key in self.data.columns)
+        return key in self.data.columns
 
     def __getitem__(self, index):
         """Access a portion of the data.
@@ -119,10 +124,20 @@ class GenomicArray(object):
               isinstance(index[1], basestring)):
             # Row index, column index
             return self.as_dataframe(self.data.loc[index])
+        elif isinstance(index, slice):
+            return self.as_dataframe(self.data.take(index))
         else:
             # Selected row indices or boolean array, probably
-            assert isinstance(index, slice) or len(index) > 0
+            try:
+                if isinstance(index, type(None)) or len(index) == 0:
+                    empty = pd.DataFrame(columns=self.data.columns)
+                    return self.as_dataframe(empty)
+            except TypeError:
+                raise TypeError("object of type %r " % type(index) +
+                                "cannot be used as an index into a " +
+                                self.__class__.__name__)
             return self.as_dataframe(self.data[index])
+            # return self.as_dataframe(self.data.take(index))
 
     def __setitem__(self, index, value):
         """Assign to a portion of the data.
@@ -190,7 +205,7 @@ class GenomicArray(object):
         """
         for chrom, bin_rows in bins.by_chromosome():
             try:
-                cn_rows = self.loc[chrom]
+                cn_rows = self[self.chromosome == chrom]
             except KeyError:
                 continue
             # Traverse rows and bins together, matching up start/end points
@@ -203,7 +218,7 @@ class GenomicArray(object):
         """Iterate over bins grouped by chromosome name."""
         # table = self.data.reset_index()
         for chrom in uniq(self.chromosome):
-            yield chrom, self.loc[chrom]
+            yield chrom, self[self.chromosome == chrom]
 
     # XXX hair: some genes overlap; some bins cover multiple genes
     #   -> option: whether to split gene names on commas
@@ -218,7 +233,7 @@ class GenomicArray(object):
         their name.
         """
         for gene in uniq(self.data['gene']):
-            yield gene, table[table['gene'] == gene]
+            yield gene, self[self.data['gene'] == gene]
 
     # XXX superseded by by_genome_array? by_neighbors?
     def by_segment(self, segments):
@@ -399,12 +414,19 @@ class GenomicArray(object):
         """Create an independent copy of this object."""
         return self.as_dataframe(self.data.copy())
 
+    # XXX
     def add_columns(self, **columns):
         """Create a new CNA, adding the specified extra columns to this CNA."""
         cols = {key: self.data[key]
                 for key in self.data.dtype.names}
         cols.update(columns)
         return self.__class__.from_columns(self.sample_id, **cols)
+
+    def keep_columns(self, columns):
+        """Extract a subset of columns, reusing this instance's metadata."""
+        # XXX
+        # required_cols = self.data.columns[:5]
+        return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
     def drop_extra_columns(self):
         """Remove any optional columns from this CopyNumArray.
