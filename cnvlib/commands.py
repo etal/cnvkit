@@ -527,7 +527,7 @@ def do_reference_flat(target_list, antitarget_list, fa_fname=None,
     ref_probes = reference.bed2probes(target_list)
     ref_probes.merge(reference.bed2probes(antitarget_list))
     # Set sex chromosomes by "reference" gender
-    ref_probes['coverage'] = core.expect_flat_cvg(ref_probes, male_reference)
+    ref_probes['log2'] = core.expect_flat_cvg(ref_probes, male_reference)
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
         gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
@@ -995,7 +995,7 @@ def create_heatmap(filenames, show_chromosome=None, do_desaturate=False):
         pset = _GA.read(fname)
         for chrom, subpset in pset.by_chromosome():
             sample_data[i][chrom] = list(zip(subpset['start'], subpset['end'],
-                                             subpset['coverage']))
+                                             subpset['log2']))
 
     # Calculate the size (max endpoint value) of each chromosome
     chrom_sizes = {}
@@ -1308,7 +1308,7 @@ def _cmd_import_theta(args):
         for seg, ncop in zip(tumor_segs.copy(), copies):
             if ncop is None:
                 continue
-            seg["coverage"] = math.log((ncop or 0.5) / args.ploidy, 2)
+            seg["log2"] = math.log((ncop or 0.5) / args.ploidy, 2)
             new_segs.append(seg)
         new_cns = tumor_segs.as_rows(new_segs)
         new_cns.write(os.path.join(args.output_dir,

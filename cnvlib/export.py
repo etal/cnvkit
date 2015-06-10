@@ -109,7 +109,8 @@ def export_nexus_basic(sample_fname):
     """
     cnarr = _GA.read(sample_fname)
     outheader = ['probe', 'chromosome', 'start', 'end', 'gene', 'log2']
-    outrows = [[_GA.row2label(row)] + list(row)[:5] for row in cnarr.data]
+    labels = cnarr.labels()
+    outrows = [[_GA.row2label(row)] + list(row)[:5] for row in cnarr]
     return outheader, outrows
 
 
@@ -132,7 +133,7 @@ def export_seg(sample_fnames):
                               previous=chrom_ids.keys(),
                               current=create_chrom_ids(segments).keys())
 
-        if 'probes' in segments.data.dtype.fields:
+        if 'probes' in segments:
             outheader = ["ID", "Chromosome", "Start", "End", "NumProbes", "Mean"]
             def row2out(row):
                 return (segments.sample_id, chrom_ids[row['chromosome']],

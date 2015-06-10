@@ -115,7 +115,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
                 and (cnarr1.chromosome == cnarrx.chromosome).all()
                 and (cnarr1.start == cnarrx.start).all()
                 and (cnarr1.end == cnarrx.end).all()
-                and (cnarr1.gene == cnarrx.gene).all()):
+                and (cnarr1['gene'] == cnarrx['gene']).all()):
             raise RuntimeError("%s probes do not match those in %s"
                                % (fname, filenames[0]))
         all_coverages.append(bias_correct_coverage(cnarrx))
@@ -132,7 +132,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
                             chromosome=cnarr1.chromosome,
                             start=cnarr1.start,
                             end=cnarr1.end,
-                            gene=cnarr1.gene,
+                            gene=cnarr1['gene'],
                             log2=cvg_centers,
                             **kwargs)
 
@@ -235,7 +235,7 @@ def _cna2regions(cnarr):
 
 def _ref_split_targets(ref_arr):
     """Split reference into 2 sub-arrays of targets/antitargets."""
-    is_bg = (ref_arr.gene == 'Background')
+    is_bg = (ref_arr['gene'] == 'Background')
     targets = ref_arr[~is_bg]
     antitargets = ref_arr[is_bg]
     return targets, antitargets

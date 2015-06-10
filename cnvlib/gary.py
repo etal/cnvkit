@@ -62,7 +62,7 @@ class GenomicArray(object):
     def from_rows(cls, rows, extra_cols=(), meta_dict=None):
         """Create a new instance from a list of rows, as tuples or arrays."""
         cols = ['chromosome', 'start', 'end', 'gene', 'log2']
-        if extra_cols:
+        if len(extra_cols):
             cols.extend(extra_cols)
         table = pd.DataFrame.from_records(rows, columns=cols)
         return cls(table, meta_dict)
@@ -125,7 +125,8 @@ class GenomicArray(object):
             # Row index, column index
             return self.as_dataframe(self.data.loc[index])
         elif isinstance(index, slice):
-            return self.as_dataframe(self.data.take(index))
+            # return self.as_dataframe(self.data.take(index))
+            return self.as_dataframe(self.data[index])
         else:
             # Selected row indices or boolean array, probably
             try:
@@ -233,7 +234,10 @@ class GenomicArray(object):
         their name.
         """
         for gene in uniq(self.data['gene']):
-            yield gene, self[self.data['gene'] == gene]
+            # XXX TODO - include Background/ignore probes within a gene
+            # see cnarray.py
+            if not (gene == 'Background' or gene in ignore):
+                yield gene, self[self.data['gene'] == gene]
 
     # XXX superseded by by_genome_array? by_neighbors?
     def by_segment(self, segments):
@@ -385,7 +389,9 @@ class GenomicArray(object):
         # if not (self.data.index.names == other.data.index.names and
         #         list(self.data) == list(other.data)):
         #     raise ValueError("DataFrame indices or columns do not match")
-        self.data = pd.concat([self.data, other.data]).sort()
+        table = pd.concat([self.data.set_index(['chromosome', 'start']),
+                           other.data.set_index(['chromosome', 'start'])])
+        self.data = table.sort()
 
     # XXX mostly ok up to here
     def center_all(self, peak=False):
@@ -396,18 +402,18 @@ class GenomicArray(object):
         mask_autosome = ((self.chromosome != chr_x) &
                             (self.chromosome != chr_y))
         mid = self.data['log2'][mask_autosome].median()
-        mask_cvg = (mask_autosome &
-                    (self.data['log2'] >= mid - 1.1) &
-                    (self.data['log2'] <= mid + 1.1))
-        if peak and sum(mask_cvg) > 210:
-            # Estimate the location of peak density
-            # hack: from a smoothed histogram -- enh: kernel density estimate
-            x = self.data['log2'][mask_cvg]
-            w = self['weight'][mask_cvg] if 'weight' in self else None
-            resn = int(round(numpy.sqrt(len(x))))
-            x_vals, x_edges = numpy.histogram(x, bins=8*resn, weights=w)
-            xs = smoothing.smoothed(x_vals, resn)
-            mid = x_edges[numpy.argmax(xs)]
+        # mask_cvg = (mask_autosome &
+        #             (self.data['log2'] >= mid - 1.1) &
+        #             (self.data['log2'] <= mid + 1.1))
+        # if peak and sum(mask_cvg) > 210:
+        #     # Estimate the location of peak density
+        #     # hack: from a smoothed histogram -- enh: kernel density estimate
+        #     x = self.data['log2'][mask_cvg]
+        #     w = self['weight'][mask_cvg] if 'weight' in self else None
+        #     resn = int(round(np.sqrt(len(x))))
+        #     x_vals, x_edges = np.histogram(x, bins=8*resn, weights=w)
+        #     xs = smoothing.smoothed(x_vals, resn)
+        #     mid = x_edges[np.argmax(xs)]
         self.data['log2'] -= mid
 
     def copy(self):
@@ -417,8 +423,7 @@ class GenomicArray(object):
     # XXX
     def add_columns(self, **columns):
         """Create a new CNA, adding the specified extra columns to this CNA."""
-        cols = {key: self.data[key]
-                for key in self.data.dtype.names}
+        cols = {key: self.data[key] for key in self.data.columns}
         cols.update(columns)
         return self.__class__.from_columns(self.sample_id, **cols)
 
@@ -495,7 +500,27 @@ class GenomicArray(object):
     def sort(self):
         """Sort the bins in this array (in-place). Leaves chromosomes alone.
         """
-        self.data.sort(inplace=True)
+        # if key is None:
+        #     # Sort by chrom, then by start position
+        #     chrom_keys = list(map(core.sorter_chrom, self.data['chromosome']))
+        #     order = numpy.lexsort((self.data['start'], chrom_keys))
+        # else:
+        #     # Sort by the given key, using a stable sort algorithm
+        #     if isinstance(key, basestring):
+        #         keys = self.data[key]
+        #     elif callable(key):
+        #         keys = list(map(key, self.data))
+        #     else:
+        #         if not len(key) == len(self):
+        #             raise ValueError("Sort key, as an array, must have the "
+        #                              "same length as the CopyNumArray to sort "
+        #                              "(%d vs. %d)." % (len(key), len(self)))
+        #         keys = key
+        #     order = numpy.argsort(keys, kind='mergesort')
+        # self.data = self.data.take(order)
+        table = self.data.set_index(['chromosome', 'start'])
+        table.sort(inplace=True)
+        self.data = table.reset_index()
 
     def squash_genes(self, ignore=('-', 'CGH', '.'), squash_background=False,
                      summary_stat=metrics.biweight_location):
@@ -516,7 +541,7 @@ class GenomicArray(object):
             chrom = core.check_unique(rows['chromosome'], 'chromosome')
             start = rows[0]['start']
             end = rows[-1]['end']
-            cvg = summary_stat(rows['coverage'])
+            cvg = summary_stat(rows['log2'])
             outrow = [chrom, start, end, name, cvg]
             # Handle extra fields
             # ENH - no coverage stat; do weighted average as appropriate
@@ -570,5 +595,6 @@ class GenomicArray(object):
         format, see the 'export' subcommand.
         """
         with ngfrills.safe_write(outfile) as handle:
-            self.data.to_csv(handle, sep='\t', float_format='%.6g')
+            # self.data.to_csv(handle, sep='\t', float_format='%.6g')
+            self.data.to_csv(handle, index=False, sep='\t', float_format='%.6g')
 

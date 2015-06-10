@@ -89,7 +89,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
     sel_probes = probes[probes['chromosome'] == chromosome]
     x = [probe_center(row) * MB for row in sel_probes]
     y = sel_probes['log2']
-    if 'weight' in sel_probes.dtype.fields:
+    if 'weight' in sel_probes:
         w = 46 * sel_probes['weight'] ** 2 + 2
     else:
         w = numpy.repeat(30, len(x))
@@ -399,14 +399,14 @@ def gene_coords_by_name(probes, names):
     """
     # Create an index of gene names
     gene_index = collections.defaultdict(set)
-    for i, gene in enumerate(probes.gene):
+    for i, gene in enumerate(probes['gene']):
         for gene_name in gene.split(','):
             if gene_name in names:
                 gene_index[gene_name].add(i)
     # Retrieve coordinates by name
     all_coords = collections.defaultdict(lambda : collections.defaultdict(set))
     for name in names:
-        gene_probes = numpy.take(probes.data, sorted(gene_index.get(name, [])))
+        gene_probes = probes.data.take(sorted(gene_index.get(name, [])))
         if not len(gene_probes):
             raise ValueError("No targeted gene named '%s' found" % name)
         # Find the genomic range of this gene's probes

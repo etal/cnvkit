@@ -55,7 +55,7 @@ def get_breakpoints(intervals, segments, min_probes):
                 if probes_left >= min_probes and probes_right >= min_probes:
                     breakpoints.append(
                         (gname, curr_chrom, int(math.ceil(curr_end)),
-                         next_row['coverage'] - curr_row['coverage'],
+                         next_row['log2'] - curr_row['log2'],
                          probes_left, probes_right))
     breakpoints.sort(key=lambda row: (min(row[4], row[5]), abs(row[3])),
                      reverse=True)
@@ -83,10 +83,10 @@ def gainloss_by_segment(probes, segments, threshold):
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
     for segment, subprobes in probes.by_segment(segments):
-        if abs(segment['coverage']) >= threshold:
+        if abs(segment['log2']) >= threshold:
             for (gene, chrom, start, end, _coverage, nprobes
                 ) in group_by_genes(subprobes):
-                yield (gene, chrom, start, end, segment['coverage'], nprobes)
+                yield (gene, chrom, start, end, segment['log2'], nprobes)
 
 
 # TODO consolidate with CNA.squash_genes

@@ -67,7 +67,7 @@ def match_ref_to_probes(ref_pset, probes):
     """
     ref_lookup = dict(zip(ref_pset.labels(), ref_pset))
     ref_matched_rows = [tuple(ref_lookup[label]) for label in probes.labels()]
-    ref_matched = ref_pset.to_rows(ref_matched_rows)
+    ref_matched = ref_pset.as_rows(ref_matched_rows)
     return ref_matched
 
 

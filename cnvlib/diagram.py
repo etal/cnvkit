@@ -60,12 +60,11 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, male_referenc
     if not cnarr_is_seg:
         cnarr = cnarr.squash_genes()
     for row in cnarr:
-        p_chrom, p_start, p_end, p_gene, p_coverage = tuple(row)[:5]
-        if p_start - 1 >= 0 and p_end <= chrom_sizes[p_chrom]:  # Sanity check
-            feat_name = p_gene if p_gene in gene_labels else None
-            features[p_chrom].append(
-                (p_start - 1, p_end, strand, feat_name,
-                 colors.Color(*plots.cvg2rgb(p_coverage, not cnarr_is_seg))))
+        if (row['start'] - 1 >= 0 and row['end'] <= chrom_sizes[row['chromosome']]):  # Sanity check
+            feat_name = row['gene'] if row['gene'] in gene_labels else None
+            features[row['chromosome']].append(
+                (row['start'] - 1, row['end'], strand, feat_name,
+                 colors.Color(*plots.cvg2rgb(row['log2'], not cnarr_is_seg))))
     if do_both:
         # Draw segments in the left half of each chromosome (strand -1)
         for chrom, segrows in segarr.by_chromosome():
