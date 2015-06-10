@@ -49,7 +49,7 @@ def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
         out_data.append((chrom, start, end, name, mean_cvg, nloci))
 
     seg_pset = _GA.from_rows(out_data, ('probes',), {'sample_id': sample_id})
-    seg_pset.sort()
+    # seg_pset.sort()
     if method == 'flasso':
         seg_pset = squash_segments(seg_pset)
 
