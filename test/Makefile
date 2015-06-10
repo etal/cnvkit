@@ -39,7 +39,7 @@ clean:
 
 build/reference-picard.cnn: $(picard_normals)
 	$(cnvkit) import-picard $^ -d build/
-	$(cnvkit) reference build/p2-*_5.*targetcoverage.cnn -o $@
+	$(cnvkit) reference build/p2-*_5.*targetcoverage.cnn -y -o $@
 
 
 # == Import Picard files (including GC values, used in the reference)
