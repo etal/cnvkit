@@ -197,7 +197,7 @@ class GenomicArray(object):
             for bin_row in bin_rows:
                 binned_rows = cn_rows.in_range(chrom, bin_row['start'],
                                                bin_row['end'], trim=True)
-                yield bin_row, self.to_rows(binned_rows)
+                yield bin_row, self.as_rows(binned_rows)
 
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
@@ -434,7 +434,7 @@ class GenomicArray(object):
                 outrows.extend(map(tuple, subarr))
             else:
                 outrows.append(squash_rows(name, subarr))
-        return self.to_rows(outrows)
+        return self.as_rows(outrows)
 
     # I/O
 

@@ -90,7 +90,7 @@ def squash_segments(seg_pset):
     squashed_rows.append((curr_chrom, curr_start, curr_end,
                           ('G' if curr_val >= 0. else 'L'),
                           curr_val, curr_cnt))
-    return seg_pset.to_rows(squashed_rows)
+    return seg_pset.as_rows(squashed_rows)
 
 
 

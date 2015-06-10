@@ -1310,7 +1310,7 @@ def _cmd_import_theta(args):
                 continue
             seg["coverage"] = math.log((ncop or 0.5) / args.ploidy, 2)
             new_segs.append(seg)
-        new_cns = tumor_segs.to_rows(new_segs)
+        new_cns = tumor_segs.as_rows(new_segs)
         new_cns.write(os.path.join(args.output_dir,
                                    "%s-%d.cns" % (tumor_segs.sample_id, i + 1)))
 
