@@ -190,7 +190,7 @@ class GenomicArray(object):
         """
         for chrom, bin_rows in bins.by_chromosome():
             try:
-                cn_rows = table.loc[chrom]
+                cn_rows = self.loc[chrom]
             except KeyError:
                 continue
             # Traverse rows and bins together, matching up start/end points
@@ -202,8 +202,8 @@ class GenomicArray(object):
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
         # table = self.data.reset_index()
-        for chrom in uniq(table['chromosome']):
-            yield chrom, table.loc[chrom]
+        for chrom in uniq(self.chromosome):
+            yield chrom, self.loc[chrom]
 
     # XXX hair: some genes overlap; some bins cover multiple genes
     #   -> option: whether to split gene names on commas
