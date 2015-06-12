@@ -146,11 +146,12 @@ def expect_flat_cvg(cnarr, is_male_reference=None, chr_x=None):
     cvg = numpy.zeros(len(cnarr), dtype=numpy.float_)
     if is_male_reference:
         # Single-copy X, Y
-        cvg[(cnarr.chromosome == chr_x) |
-            (cnarr.chromosome == chr_y)] = -1.0
+        idx = numpy.asarray((cnarr.chromosome == chr_x) |
+               (cnarr.chromosome == chr_y))
     else:
         # Y will be all noise, so replace with 1 "flat" copy
-        cvg[cnarr.chromosome == chr_y] = -1.0
+        idx = numpy.asarray(cnarr.chromosome == chr_y)
+    cvg[idx] = -1.0
     return cvg
 
 
