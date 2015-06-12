@@ -83,7 +83,7 @@ def shift_xx(probes, male_reference=False, chr_x=None):
 
 
 def guess_chr_x(probes):
-    return ('chrX' if probes[0]['chromosome'].startswith('chr')
+    return ('chrX' if probes[0, 'chromosome'].startswith('chr')
             else 'X')
 
 

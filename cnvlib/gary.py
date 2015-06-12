@@ -123,7 +123,7 @@ class GenomicArray(object):
               isinstance(index[0], (int, slice, tuple)) and
               isinstance(index[1], basestring)):
             # Row index, column index
-            return self.as_dataframe(self.data.loc[index])
+            return self.data.loc[index]
         elif isinstance(index, slice):
             # return self.as_dataframe(self.data.take(index))
             return self.as_dataframe(self.data[index])
