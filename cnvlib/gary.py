@@ -497,7 +497,7 @@ class GenomicArray(object):
         self.data = self.data.iloc[order]
         return order
 
-    def sort(self):
+    def sort(self, key=None):
         """Sort the bins in this array (in-place). Leaves chromosomes alone.
         """
         # if key is None:
