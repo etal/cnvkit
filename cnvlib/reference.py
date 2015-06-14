@@ -5,18 +5,18 @@ import numpy
 from Bio._py3k import map, zip
 
 from . import core, metrics, ngfrills, params
+from .cnary import CopyNumArray as CNA
 from .ngfrills import echo
-from .gary import GenomicArray as GA
 
 
 def bed2probes(bed_fname):
     """Create neutral-coverage probes from intervals."""
     cn_rows = [(chrom, start, end, name, 0, 0, 0, 0)
                for chrom, start, end, name in ngfrills.parse_regions(bed_fname)]
-    return GA.from_rows(cn_rows,
-                        ('chromosome', 'start', 'end', 'gene', 'log2', 'gc',
-                         'rmask', 'spread'),
-                        {'sample_id': core.fbase(bed_fname)})
+    return CNA.from_rows(cn_rows,
+                         ('chromosome', 'start', 'end', 'gene', 'log2', 'gc',
+                          'rmask', 'spread'),
+                         {'sample_id': core.fbase(bed_fname)})
 
 
 def combine_probes(filenames, fa_fname, is_male_reference):
@@ -35,7 +35,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
 
     # Load coverage from target/antitarget files
     echo("Loading", filenames[0])
-    cnarr1 = GA.read(filenames[0])
+    cnarr1 = CNA.read(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
         extra_cols = ['chromosome', 'start', 'end', 'gene', 'log2']
@@ -44,7 +44,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         if fa_fname:
             extra_cols.append('rmask')
         extra_cols.append('spread')
-        return GA.from_rows([], extra_cols, {'sample_id': "reference"})
+        return CNA.from_rows([], extra_cols, {'sample_id': "reference"})
 
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
@@ -112,7 +112,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         echo("Loading target", fname)
-        cnarrx = GA.read(fname)
+        cnarrx = CNA.read(fname)
         # Bin information should match across all files
         if not (len(cnarr1) == len(cnarrx)
                 and (cnarr1.chromosome == cnarrx.chromosome).all()
@@ -138,7 +138,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         'gene': cnarr1['gene'],
         'log2': cvg_centers,
     })
-    return GA.from_columns(columns, {'sample_id': "reference"})
+    return CNA.from_columns(columns, {'sample_id': "reference"})
 
 
 def warn_bad_probes(probes):
@@ -154,7 +154,7 @@ def warn_bad_probes(probes):
         echo("*WARNING*", len(fg_bad_probes), "targets",
              "(%.4f)" % bad_pct + '%', "failed filters:")
         gene_cols = max(map(len, fg_bad_probes['gene']))
-        labels = list(map(GA.row2label, fg_bad_probes))
+        labels = list(map(CNA.row2label, fg_bad_probes))
         chrom_cols = max(map(len, labels))
         last_gene = None
         for label, probe in zip(labels, fg_bad_probes):

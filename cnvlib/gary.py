@@ -6,7 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from cnvlib import core, metrics, ngfrills, params
+from . import core, metrics, ngfrills, params
 
 
 def uniq(arr):
@@ -165,7 +165,6 @@ class GenomicArray(object):
 
     @property
     def chromosome(self):
-        # return self.data.reset_index()['chromosome']
         return self.data['chromosome']
 
     @property
@@ -178,7 +177,6 @@ class GenomicArray(object):
 
     @property
     def sample_id(self):
-        # return self.data.reset_index()['start']
         return self.meta.get('sample_id')
 
     # Traversal
@@ -212,118 +210,9 @@ class GenomicArray(object):
 
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
-        # table = self.data.reset_index()
         for chrom in uniq(self.chromosome):
             yield chrom, self[self.chromosome == chrom]
 
-    # XXX hair: some genes overlap; some bins cover multiple genes
-    #   -> option: whether to split gene names on commas
-    def by_gene(self, ignore=('-', 'CGH', '.')):
-        """Iterate over probes grouped by gene name.
-
-        Emits pairs of (gene name, CNA of rows with same name)
-
-        Groups each series of intergenic bins as a 'Background' gene; any
-        'Background' bins within a gene are grouped with that gene.
-        Bins with names in `ignore` are treated as 'Background' bins, but retain
-        their name.
-        """
-        for gene in uniq(self.data['gene']):
-            # XXX TODO - include Background/ignore probes within a gene
-            # see cnarray.py
-            if not (gene == 'Background' or gene in ignore):
-                yield gene, self[self.data['gene'] == gene]
-
-    # XXX superseded by by_genome_array? by_neighbors?
-    def by_segment(self, segments):
-        """Group rows by the segments that row midpoints land in.
-
-        Returns an iterable of segments and rows grouped by overlap with each
-        segment.
-
-        Note that segments don't necessarily cover all probes (some near
-        telo/centromeres may have been dropped as outliers during segmentation).
-        These probes are grouped with the nearest segment, so the endpoint of
-        the first/last probe may not match the corresponding segment endpoint.
-        This is appropriate if the segments were obtained from this probe array.
-        """
-        curr_probes_idx = []
-        segments = iter(segments)
-        curr_segment = next(segments)
-        next_segment = None
-        for i, row in enumerate(self):
-            probe_midpoint = 0.5 * (row['start'] + row['end'])
-            if (row['chromosome'] == curr_segment['chromosome'] and
-                curr_segment['start'] <= probe_midpoint <= curr_segment['end']):
-                # Probe is within the current segment
-                curr_probes_idx.append(i)
-
-            elif row['chromosome'] != curr_segment['chromosome']:
-                # Probe should be at the start of the next chromosome.
-                # Find the matching segment.
-                if next_segment is None:
-                    next_segment = next(segments)
-
-                # Skip any extra segments on the chromosome after the current
-                # probes (e.g. probes are targets, trailing segments are based
-                # on antitargets alone)
-                while row['chromosome'] != next_segment['chromosome']:
-                    try:
-                        next_segment = next(segments)
-                    except StopIteration:
-                        raise ValueError("Segments are missing chromosome %r"
-                                            % row['chromosome'])
-
-                # Emit the current (completed) group
-                yield (curr_segment,
-                       self.as_dataframe(self.data.take(curr_probes_idx)))
-                # Begin a new group of probes
-                curr_segment, next_segment = next_segment, None
-                curr_probes_idx = [i]
-
-            elif row['start'] < curr_segment['start']:
-                # Probe is near the start of the current chromosome, but we've
-                # already seen another outlier here (rare/nonexistent case).
-                # Group with the current (upcoming) segment.
-                curr_probes_idx.append(i)
-
-            elif row['end'] > curr_segment['end']:
-                # Probe is at the end of an accessible region (e.g. p or q arm)
-                # on the current chromosome.
-                # Group this probe with whichever of the current or next
-                # segments is closer.
-                if next_segment is None:
-                    next_segment = next(segments)
-                if (next_segment['chromosome'] != row['chromosome']
-                    or (next_segment['start'] - probe_midpoint) >
-                    (probe_midpoint - curr_segment['end'])):
-                    # The current segment is closer than the next. Group here.
-                    curr_probes_idx.append(i)
-                else:
-                    # The next segment is closer. Emit the current group
-                    # Begin a new group of probes
-                    yield (curr_segment,
-                           self.as_dataframe(self.data.take(curr_probes_idx)))
-                    # Reset/update trackers for the next group of probes
-                    curr_segment, next_segment = next_segment, None
-                    curr_probes_idx = [i]
-            else:
-                raise ValueError("Mismatch between probes and segments\n" +
-                                    "Probe: %s\nSegment: %s"
-                                    % (self.row2label(row),
-                                       self.row2label(curr_segment)))
-        # Emit the remaining probes
-        yield curr_segment, self.as_dataframe(self.data.take(curr_probes_idx))
-
-    # s.data.loc['chr1'] -> all where chrom. index == "chr1"
-    # s.data.loc['chr1', 93709] -> first row, as a Series
-    # s.data.iloc[0], s.data.ix[0] -> the same
-    # s.data.iloc[1:5] -> rows 2-6, keeping the index
-    # s.data.sort(inplace=True); s.data.loc["chr15":"chr19"]
-    # t.data[t.data['gene'].isin(["BRAF", "MET"])] -> select multiple genes
-
-    # def coords(self, also=()):
-    # def coords(self, strand=False, name=False):
     def coords(self, also=()):
         """Get plain coordinates of each bin: chromosome, start, end.
 
@@ -336,7 +225,6 @@ class GenomicArray(object):
         cols = ["chromosome", "start", "end"]
         if also:
             cols.extend(also)
-        # return self.data.reset_index().loc[:, cols]
         return self.data.loc[:, cols]
 
     def labels(self):
@@ -349,7 +237,6 @@ class GenomicArray(object):
         the bins endpoints to the boundaries.
         """
         try:
-            # table = self.data.loc[chrom]
             table = self.data[self.data['chromosome'] == chrom]
         except KeyError:
             raise KeyError("Chromosome %s is not in this probe set" % chrom)
@@ -388,34 +275,10 @@ class GenomicArray(object):
                            other.data.set_index(['chromosome', 'start'])])
         self.data = table.sort().reset_index()
 
-    # XXX mostly ok up to here
-    def center_all(self, peak=False):
-        """Recenter coverage values to the autosomes' average (in-place)."""
-        # ideal: normalize to the total number of reads in this sample
-        chr_x = core.guess_chr_x(self)
-        chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-        mask_autosome = ((self.chromosome != chr_x) &
-                         (self.chromosome != chr_y))
-        mid = self.data['log2'][mask_autosome].median()
-        # mask_cvg = (mask_autosome &
-        #             (self.data['log2'] >= mid - 1.1) &
-        #             (self.data['log2'] <= mid + 1.1))
-        # if peak and sum(mask_cvg) > 210:
-        #     # Estimate the location of peak density
-        #     # hack: from a smoothed histogram -- enh: kernel density estimate
-        #     x = self.data['log2'][mask_cvg]
-        #     w = self['weight'][mask_cvg] if 'weight' in self else None
-        #     resn = int(round(np.sqrt(len(x))))
-        #     x_vals, x_edges = np.histogram(x, bins=8*resn, weights=w)
-        #     xs = smoothing.smoothed(x_vals, resn)
-        #     mid = x_edges[np.argmax(xs)]
-        self.data['log2'] -= mid
-
     def copy(self):
         """Create an independent copy of this object."""
         return self.as_dataframe(self.data.copy())
 
-    # XXX
     def add_columns(self, **columns):
         """Create a new CNA, adding the specified extra columns to this CNA."""
         # return self.as_dataframe(self.data.assign(**columns))
@@ -436,19 +299,8 @@ class GenomicArray(object):
         Returns a new copy with only the core columns retained:
             log2 value, chromosome, start, end, bin name.
         """
-        table = self.data.loc[:, ('chromosome', 'start', 'end', 'gene',
-                                  'log2')]
+        table = self.data.loc[:, self._required_columns]
         return self.as_dataframe(table)
-
-    def drop_low_coverage(self):
-        """Drop bins with extremely low log2 coverage values.
-
-        These are generally bins that had no reads mapped, and so were
-        substituted with a small dummy log2 value to avoid divide-by-zero
-        errors.
-        """
-        return self.as_dataframe(self.data[
-                self.data['log2'] > params.NULL_LOG2_COVERAGE])
 
     # def reorder(self, key):
     #     """Apply a different ordering of chromosomes to this array.
@@ -468,7 +320,6 @@ class GenomicArray(object):
     #         # TODO - get indices of each listed chrom; sort into that order
     #         # NB: put any missing chroms at the end of the array, in their
     #         # current order
-
 
     def select(self, selector=None, **kwargs):
         """Take a subset of rows where the given condition is true.
@@ -519,44 +370,6 @@ class GenomicArray(object):
         table.sort(inplace=True)
         self.data = table.reset_index()
 
-    def squash_genes(self, ignore=('-', 'CGH', '.'), squash_background=False,
-                     summary_stat=metrics.biweight_location):
-        """Combine consecutive bins with the same targeted gene name.
-
-        The `ignore` parameter lists bin names that not be counted as genes to
-        be output.
-
-        Parameter `summary_stat` is a function that summarizes an array of
-        coverage values to produce the "squashed" gene's coverage value. By
-        default this is the biweight location, but you might want median, mean,
-        max, min or something else in some cases.
-
-        Optional columns, if present, are dropped.
-        """
-        def squash_rows(name, rows):
-            """Combine multiple rows (for the same gene) into one row."""
-            chrom = core.check_unique(rows['chromosome'], 'chromosome')
-            start = rows[0]['start']
-            end = rows[-1]['end']
-            cvg = summary_stat(rows['log2'])
-            outrow = [chrom, start, end, name, cvg]
-            # Handle extra fields
-            # ENH - no coverage stat; do weighted average as appropriate
-            for xfield in ('gc', 'rmask', 'spread', 'weight'):
-                if xfield in self:
-                    outrow.append(summary_stat(rows[xfield]))
-            if 'probes' in self:
-                outrow.append(sum(rows['probes']))
-            return tuple(outrow)
-
-        outrows = []
-        for name, subarr in self.by_gene(ignore):
-            if name == 'Background' and not squash_background:
-                outrows.extend(map(tuple, subarr))
-            else:
-                outrows.append(squash_rows(name, subarr))
-        return self.as_rows(outrows)
-
     # I/O
 
     @classmethod
@@ -578,8 +391,6 @@ class GenomicArray(object):
         # for cn, ci in zip(chrom_names, chrom_ids):
         #     chrom_id_col[table['chromosome'] == cn] = ci
         # table['chromosome'] = chrom_id_col
-        # table = table.pivot_table(index=['chromosome', 'start'])
-        # OR?
         # table.set_index(['chromosome', 'start'], inplace=True)
         return cls(table, {"sample_id": sample_id})
 
@@ -592,6 +403,5 @@ class GenomicArray(object):
         format, see the 'export' subcommand.
         """
         with ngfrills.safe_write(outfile) as handle:
-            # self.data.to_csv(handle, sep='\t', float_format='%.6g')
             self.data.to_csv(handle, index=False, sep='\t', float_format='%.6g')
 

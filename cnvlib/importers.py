@@ -5,9 +5,9 @@ import os.path
 import subprocess
 
 from . import core
+from .cnary import CopyNumArray as CNA
 from .params import NULL_LOG2_COVERAGE
 from .ngfrills import echo
-from .gary import GenomicArray as _GA
 
 
 # __________________________________________________________________________
@@ -75,7 +75,7 @@ def load_targetcoverage_csv(fname):
     if no_cvg_cnt > TOO_MANY_NO_COVERAGE:
         echo("*WARNING* Sample", fname, "has >", TOO_MANY_NO_COVERAGE,
              "probes with no coverage")
-    pset = _GA.from_rows(cna_rows,
+    pset = CNA.from_rows(cna_rows,
                          ('chromosome', 'start', 'end', 'gene', 'log2', 'gc'),
                          {'sample_id': core.fbase(fname)})
     pset.sort()
@@ -141,7 +141,7 @@ def import_seg(segfname, chrom_names, chrom_prefix, from_log10):
                 if curr_sample is not None:
                     assert len(curr_rows)
                     # Emit the current set of segments as a sample
-                    yield _GA.from_rows(curr_rows,
+                    yield CNA.from_rows(curr_rows,
                                         ('chromosome', 'start', 'end', 'gene',
                                          'log2', 'probes'),
                                         {'sample_id': curr_sample})

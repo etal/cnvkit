@@ -26,7 +26,7 @@ from . import (core, target, antitarget, coverage, fix, metrics, reference,
                reports, export, importers, segmentation,
                params, ngfrills, plots)
 from .ngfrills import echo
-from .gary import GenomicArray as _GA
+from .cnary import CopyNumArray as _CNA
 from ._version import __version__
 
 
@@ -104,7 +104,7 @@ def _cmd_batch(args):
             args.processes, args.count_reads)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
-        ref_arr = _GA.read(args.reference)
+        ref_arr = _CNA.read(args.reference)
         target_coords, antitarget_coords = reference.reference2regions(ref_arr)
         ref_pfx = os.path.join(args.output_dir, core.fbase(args.reference))
         args.targets = ref_pfx + '.target-tmp.bed'
@@ -221,7 +221,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     raw_anti = do_coverage(antitarget_bed, bam_fname, by_count)
     raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
 
-    cnarr = do_fix(raw_tgt, raw_anti, _GA.read(ref_fname))
+    cnarr = do_fix(raw_tgt, raw_anti, _CNA.read(ref_fname))
     cnarr.write(sample_pfx + '.cnr')
 
     echo("Segmenting", sample_pfx + '.cnr ...')
@@ -567,13 +567,13 @@ def _cmd_fix(args):
     biases and re-center.
     """
     # Verify that target and antitarget are from the same sample
-    tgt_raw = _GA.read(args.target)
-    anti_raw = _GA.read(args.antitarget)
+    tgt_raw = _CNA.read(args.target)
+    anti_raw = _CNA.read(args.antitarget)
     if tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
-    target_table = do_fix(tgt_raw, anti_raw, _GA.read(args.reference),
+    target_table = do_fix(tgt_raw, anti_raw, _CNA.read(args.reference),
                           args.do_gc, args.do_edge, args.do_rmask)
     target_table.write(args.output or tgt_raw.sample_id + '.cnr')
 
@@ -666,8 +666,8 @@ def _cmd_diagram(args):
     each chromosome (segments on the left side, probes on the right side).
     """
     from cnvlib import diagram
-    cnarr = _GA.read(args.filename) if args.filename else None
-    segarr = _GA.read(args.segment) if args.segment else None
+    cnarr = _CNA.read(args.filename) if args.filename else None
+    segarr = _CNA.read(args.segment) if args.segment else None
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
                                       args.min_probes, args.output,
                                       args.male_reference)
@@ -699,8 +699,8 @@ P_diagram.set_defaults(func=_cmd_diagram)
 
 def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
-    pset_cvg = _GA.read(args.filename, args.sample_id)
-    pset_seg = _GA.read(args.segment) if args.segment else None
+    pset_cvg = _CNA.read(args.filename, args.sample_id)
+    pset_seg = _CNA.read(args.segment) if args.segment else None
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
             for chrom, start, end in ngfrills.parse_regions(args.range_list,
@@ -992,7 +992,7 @@ def create_heatmap(filenames, show_chromosome=None, do_desaturate=False):
     # Group each file's probes/segments by chromosome
     sample_data = [collections.defaultdict(list) for _f in filenames]
     for i, fname in enumerate(filenames):
-        pset = _GA.read(fname)
+        pset = _CNA.read(fname)
         for chrom, subpset in pset.by_chromosome():
             sample_data[i][chrom] = list(zip(subpset['start'], subpset['end'],
                                              subpset['log2']))
@@ -1064,8 +1064,8 @@ P_heatmap.set_defaults(func=_cmd_heatmap)
 
 def _cmd_breaks(args):
     """List the targeted genes in which a copy number breakpoint occurs."""
-    pset_cvg = _GA.read(args.filename)
-    pset_seg = _GA.read(args.segment)
+    pset_cvg = _CNA.read(args.filename)
+    pset_seg = _CNA.read(args.segment)
     bpoints = do_breaks(pset_cvg, pset_seg, args.min_probes)
     echo("Found", len(bpoints), "gene breakpoints")
     core.write_tsv(args.output, bpoints,
@@ -1098,8 +1098,8 @@ P_breaks.set_defaults(func=_cmd_breaks)
 
 def _cmd_gainloss(args):
     """Identify targeted genes with copy number gain or loss."""
-    pset = _GA.read(args.filename)
-    segs = _GA.read(args.segment) if args.segment else None
+    pset = _CNA.read(args.filename)
+    segs = _CNA.read(args.segment) if args.segment else None
     gainloss = do_gainloss(pset, segs, args.male_reference, args.threshold,
                            args.min_probes)
     echo("Found", len(gainloss), "gene-level gains and losses")
@@ -1147,7 +1147,7 @@ def _cmd_gender(args):
     """Guess samples' gender from the relative coverage of chromosome X."""
     outrows = []
     for fname in args.targets:
-        rel_chrx_cvg = core.get_relative_chrx_cvg(_GA.read(fname))
+        rel_chrx_cvg = core.get_relative_chrx_cvg(_CNA.read(fname))
         if args.male_reference:
             is_xx = (rel_chrx_cvg >= 0.5)
         else:
@@ -1188,8 +1188,8 @@ def _cmd_metrics(args):
     # Calculate all metrics
     outrows = []
     for probes_fname, segs_fname in zip(args.coverages, args.segments):
-        probes = _GA.read(probes_fname)
-        segments = _GA.read(segs_fname)
+        probes = _CNA.read(probes_fname)
+        segments = _CNA.read(segs_fname)
         values = metrics.ests_of_scale(
             metrics.probe_deviations_from_segments(probes, segments))
         outrows.append([core.rbase(probes_fname), len(segments)] +
@@ -1299,7 +1299,7 @@ def _cmd_import_theta(args):
     Equivalently, use the THetA results file to convert CNVkit .cns segments to
     integer copy number calls.
     """
-    tumor_segs = _GA.read(args.tumor_cns)
+    tumor_segs = _CNA.read(args.tumor_cns)
     theta = importers.parse_theta_results(args.theta_results)
     for i, copies in enumerate(theta['C']):
         # Replace segment values with these integers

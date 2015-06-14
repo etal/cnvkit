@@ -48,7 +48,7 @@ from scipy import stats
 
 # from .. import params
 from ..ngfrills import echo
-from ..gary import GenomicArray as _GA
+from ..cnary import CopyNumArray as CNA
 
 
 def segment_haar(cnarr):
@@ -86,7 +86,7 @@ def segment_haar(cnarr):
                              # start_probe['start'], end_probe['end'], # XXX
                              gene, seg_mean, nloci))
     echo("haar: Found", len(seg_rows), "segments")
-    return _GA.from_rows(seg_rows,
+    return CNA.from_rows(seg_rows,
                          ('chromosome', 'start', 'end', 'gene', 'log2',
                           'probes'),
                          {'sample_id': cnarr.sample_id})
