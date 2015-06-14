@@ -391,7 +391,7 @@ class GenomicArray(object):
         #     raise ValueError("DataFrame indices or columns do not match")
         table = pd.concat([self.data.set_index(['chromosome', 'start']),
                            other.data.set_index(['chromosome', 'start'])])
-        self.data = table.sort()
+        self.data = table.sort().reset_index()
 
     # XXX mostly ok up to here
     def center_all(self, peak=False):
