@@ -45,7 +45,6 @@ class GenomicArray(object):
 
     @staticmethod
     def row2label(row):
-        # return "{1}:{0}-{2}".format(row['end'], *row.name)
         return "{}:{}-{}".format(row['chromosome'], row['start'], row['end'])
 
     @classmethod
@@ -63,7 +62,7 @@ class GenomicArray(object):
         table = pd.DataFrame.from_records(rows, columns=columns)
         return cls(table, meta_dict)
 
-    def as_columns(self, columns):
+    def as_columns(self, **columns):
         """Extract a subset of columns, reusing this instance's metadata."""
         return self.__class__.from_columns(columns, self.meta)
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
@@ -189,7 +188,7 @@ class GenomicArray(object):
     def by_bin(self, bins, mode='trim'):
         """Group rows by another CopyNumArray; trim row start/end to bin edges.
 
-        Returns an iterable of (bin, CopyNumArray of overlapping cnarray rows))
+        Returns an iterable of (bin, GenomicArray of overlapping rows))
 
         modes are:  exclusive, trim, inclusive
             (when coordinates are on a boundary, what happens to the overlapped
@@ -237,7 +236,7 @@ class GenomicArray(object):
 
     # XXX superseded by by_genome_array? by_neighbors?
     def by_segment(self, segments):
-        """Group cnarray rows by the segments that row midpoints land in.
+        """Group rows by the segments that row midpoints land in.
 
         Returns an iterable of segments and rows grouped by overlap with each
         segment.
@@ -396,7 +395,7 @@ class GenomicArray(object):
         chr_x = core.guess_chr_x(self)
         chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
         mask_autosome = ((self.chromosome != chr_x) &
-                            (self.chromosome != chr_y))
+                         (self.chromosome != chr_y))
         mid = self.data['log2'][mask_autosome].median()
         # mask_cvg = (mask_autosome &
         #             (self.data['log2'] >= mid - 1.1) &
@@ -419,9 +418,11 @@ class GenomicArray(object):
     # XXX
     def add_columns(self, **columns):
         """Create a new CNA, adding the specified extra columns to this CNA."""
-        cols = {key: self.data[key] for key in self.data.columns}
-        cols.update(columns)
-        return self.__class__.from_columns(self.sample_id, **cols)
+        # return self.as_dataframe(self.data.assign(**columns))
+        result = self.copy()
+        for key, values in columns.iteritems():
+            result[key] = values
+        return result
 
     def keep_columns(self, columns):
         """Extract a subset of columns, reusing this instance's metadata."""
