@@ -5,7 +5,7 @@ import bisect
 import numpy
 from Bio._py3k import zip
 
-from . import core, params, reference, smoothing
+from . import params, reference, smoothing
 from .ngfrills import echo
 
 
@@ -235,7 +235,7 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
         # NB: Not used with a flat reference
         echo("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from expected coverage
-        flat_cvgs = core.expect_flat_cvg(ref_matched)
+        flat_cvgs = ref_matched.expect_flat_cvg()
         weights *= 2 ** -numpy.abs(ref_matched['log2'] - flat_cvgs)
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference

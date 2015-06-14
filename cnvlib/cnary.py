@@ -45,7 +45,7 @@ class CopyNumArray(gary.GenomicArray):
             if not (gene == 'Background' or gene in ignore):
                 yield gene, self[self.data['gene'] == gene]
 
-    # XXX superseded by by_genome_array? by_neighbors?
+    # XXX superseded by by_neighbors?
     def by_segment(self, segments):
         """Group rows by the segments that row midpoints land in.
 
@@ -200,6 +200,7 @@ class CopyNumArray(gary.GenomicArray):
         return self.as_rows(outrows)
 
     # Chromosomal gender
+    # XXX refactor all this
 
     def shift_xx(self, male_reference=False, chr_x=None):
         """Adjust chrX coverages (divide in half) for apparent female samples."""
@@ -256,10 +257,10 @@ class CopyNumArray(gary.GenomicArray):
             auto_sizes = autosomes['probes']
             x_sizes = chromosome_x['probes']
             # ENH: weighted median
-            rel_chrx_cvg = (numpy.average(x_cvgs, weights=x_sizes) -
-                            numpy.average(auto_cvgs, weights=auto_sizes))
+            rel_chrx_cvg = (np.average(x_cvgs, weights=x_sizes) -
+                            np.average(auto_cvgs, weights=auto_sizes))
         else:
-            rel_chrx_cvg = numpy.median(x_cvgs) - numpy.median(auto_cvgs)
+            rel_chrx_cvg = np.median(x_cvgs) - np.median(auto_cvgs)
         return rel_chrx_cvg
 
     def expect_flat_cvg(self, is_male_reference=None, chr_x=None):
@@ -275,14 +276,14 @@ class CopyNumArray(gary.GenomicArray):
         if is_male_reference is None:
             is_male_reference = not self.guess_xx(chr_x=chr_x, verbose=False)
         chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-        cvg = numpy.zeros(len(self), dtype=numpy.float_)
+        cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
-            idx = numpy.asarray((self.chromosome == chr_x) |
-                (self.chromosome == chr_y))
+            idx = np.asarray((self.chromosome == chr_x) |
+                             (self.chromosome == chr_y))
         else:
             # Y will be all noise, so replace with 1 "flat" copy
-            idx = numpy.asarray(self.chromosome == chr_y)
+            idx = np.asarray(self.chromosome == chr_y)
         cvg[idx] = -1.0
         return cvg
 

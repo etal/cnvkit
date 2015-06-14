@@ -351,7 +351,7 @@ class GenomicArray(object):
         # if key is None:
         #     # Sort by chrom, then by start position
         #     chrom_keys = list(map(core.sorter_chrom, self.data['chromosome']))
-        #     order = numpy.lexsort((self.data['start'], chrom_keys))
+        #     order = np.lexsort((self.data['start'], chrom_keys))
         # else:
         #     # Sort by the given key, using a stable sort algorithm
         #     if isinstance(key, basestring):
@@ -364,7 +364,7 @@ class GenomicArray(object):
         #                              "same length as the CopyNumArray to sort "
         #                              "(%d vs. %d)." % (len(key), len(self)))
         #         keys = key
-        #     order = numpy.argsort(keys, kind='mergesort')
+        #     order = np.argsort(keys, kind='mergesort')
         # self.data = self.data.take(order)
         table = self.data.set_index(['chromosome', 'start'])
         table.sort(inplace=True)

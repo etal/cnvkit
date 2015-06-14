@@ -7,7 +7,7 @@ import collections
 import math
 import sys
 
-from . import core, metrics
+from . import metrics
 
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
@@ -68,7 +68,7 @@ def get_breakpoints(intervals, segments, min_probes):
 def gainloss_by_gene(probes, threshold):
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
-    NB: Must shift sex-chromosome values beforehand with core.shift_xx,
+    NB: Must shift sex-chromosome values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
     for gene, chrom, start, end, coverage, nprobes in group_by_genes(probes):
@@ -79,7 +79,7 @@ def gainloss_by_gene(probes, threshold):
 def gainloss_by_segment(probes, segments, threshold):
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
-    NB: Must shift sex-chromosome values beforehand with core.shift_xx,
+    NB: Must shift sex-chromosome values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
     for segment, subprobes in probes.by_segment(segments):

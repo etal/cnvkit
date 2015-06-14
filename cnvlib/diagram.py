@@ -15,7 +15,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
-from . import core, plots, reports
+from . import plots, reports
 
 # Silence Biopython's whinging
 from Bio import BiopythonWarning
@@ -43,11 +43,11 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, male_referenc
         do_both = False
 
     # Label genes where copy ratio value exceeds threshold
-    cnarr = core.shift_xx(cnarr, male_reference)
+    cnarr = cnarr.shift_xx(male_reference)
     if cnarr_is_seg:
         gainloss = []
     elif segarr:
-        segarr = core.shift_xx(segarr, male_reference)
+        segarr = segarr.shift_xx(male_reference)
         gainloss = reports.gainloss_by_segment(cnarr, segarr, threshold)
     else:
         gainloss = reports.gainloss_by_gene(cnarr, threshold)

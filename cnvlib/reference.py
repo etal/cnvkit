@@ -59,9 +59,9 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         echo("No FASTA reference genome provided; skipping GC, RM calculations")
 
     # Make the sex-chromosome coverages of male and female samples compatible
-    chr_x = core.guess_chr_x(cnarr1)
+    chr_x = cnarr1.guess_chr_x()
     chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    flat_coverage = core.expect_flat_cvg(cnarr1, is_male_reference)
+    flat_coverage = cnarr1.expect_flat_cvg(is_male_reference)
     def shift_sex_chroms(cnarr):
         """Shift sample X and Y chromosomes to match the reference gender.
 
@@ -82,7 +82,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
             xy sample, xy ref: 0    (from -1)   +1
 
         """
-        is_xx = core.guess_xx(cnarr, chr_x=chr_x)
+        is_xx = cnarr.guess_xx(chr_x=chr_x)
         cnarr['log2'] += flat_coverage
         if is_xx:
             # chrX already OK

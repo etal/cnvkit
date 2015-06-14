@@ -527,7 +527,7 @@ def do_reference_flat(target_list, antitarget_list, fa_fname=None,
     ref_probes = reference.bed2probes(target_list)
     ref_probes.add_array(reference.bed2probes(antitarget_list))
     # Set sex chromosomes by "reference" gender
-    ref_probes['log2'] = core.expect_flat_cvg(ref_probes, male_reference)
+    ref_probes['log2'] = ref_probes.expect_flat_cvg(male_reference)
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
         gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
@@ -1111,9 +1111,9 @@ def _cmd_gainloss(args):
 def do_gainloss(probes, segments=None, male_reference=False, threshold=0.5,
                 min_probes=3):
     """Identify targeted genes with copy number gain or loss."""
-    probes = core.shift_xx(probes, male_reference)
+    probes = probes.shift_xx(male_reference)
     if segments:
-        segments = core.shift_xx(segments, male_reference)
+        segments = segments.shift_xx(male_reference)
         gainloss = reports.gainloss_by_segment(probes, segments, threshold)
     else:
         gainloss = reports.gainloss_by_gene(probes, threshold)
@@ -1147,7 +1147,7 @@ def _cmd_gender(args):
     """Guess samples' gender from the relative coverage of chromosome X."""
     outrows = []
     for fname in args.targets:
-        rel_chrx_cvg = core.get_relative_chrx_cvg(_CNA.read(fname))
+        rel_chrx_cvg = _CNA.read(fname).get_relative_chrx_cvg()
         if args.male_reference:
             is_xx = (rel_chrx_cvg >= 0.5)
         else:
