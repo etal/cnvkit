@@ -29,18 +29,15 @@ class GenomicArray(object):
 
     Required columns: chromosome, start
     """
-    # ENH: categorical index? currently MultiIndex
+    _required_columns = ("chromosome", "start", "end")
+    # Extra columns, in order:
+    # "gene", "log2", "gc", "rmask", "spread", "weight", "probes"
 
     def __init__(self, data_table, meta_dict=None):
-        # if not (hasattr(data_table, "index") and
-        #         hasattr(data_table.index, "names") and
-        #         data_table.index.names == ["chromosome", "start"]):
-        #     raise ValueError("data table must be indexed on "
-        #                      "['chromosome', 'start']")
         if not all(c in data_table.columns for c in
-                   ("chromosome", "start", "end")):
+                   self._required_columns):
             raise ValueError("data table must have at least columns "
-                             "['chromosome', 'start', 'end']")
+                             + repr(self._required_columns))
         self.data = data_table
         self.meta = (dict(meta_dict)
                      if meta_dict is not None and len(meta_dict)
@@ -59,12 +56,11 @@ class GenomicArray(object):
         return cls(table, meta_dict)
 
     @classmethod
-    def from_rows(cls, rows, extra_cols=(), meta_dict=None):
+    def from_rows(cls, rows, columns=None, meta_dict=None):
         """Create a new instance from a list of rows, as tuples or arrays."""
-        cols = ['chromosome', 'start', 'end', 'gene', 'log2']
-        if len(extra_cols):
-            cols.extend(extra_cols)
-        table = pd.DataFrame.from_records(rows, columns=cols)
+        if columns is None:
+            columns = self._required_columns
+        table = pd.DataFrame.from_records(rows, columns=columns)
         return cls(table, meta_dict)
 
     def as_columns(self, columns):
@@ -85,7 +81,7 @@ class GenomicArray(object):
     def as_rows(self, rows):
         """Extract rows by indices, reusing this instance's metadata."""
         return self.from_rows(rows,
-                              extra_cols=self.data.columns[5:],
+                              columns=self.data.columns,
                               meta_dict=self.meta)
 
     # Container behaviour

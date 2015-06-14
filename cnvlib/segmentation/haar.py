@@ -86,7 +86,9 @@ def segment_haar(cnarr):
                              # start_probe['start'], end_probe['end'], # XXX
                              gene, seg_mean, nloci))
     echo("haar: Found", len(seg_rows), "segments")
-    return _GA.from_rows(seg_rows, ('probes',),
+    return _GA.from_rows(seg_rows,
+                         ('chromosome', 'start', 'end', 'gene', 'log2',
+                          'probes'),
                          {'sample_id': cnarr.sample_id})
 
 

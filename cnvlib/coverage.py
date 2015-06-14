@@ -8,7 +8,7 @@ from itertools import groupby
 from Bio._py3k import map, zip
 import pysam
 
-from .cnarray import CopyNumArray as CNA
+from .gary import GenomicArray as GA
 from .core import fbase
 from .ngfrills import echo, parse_regions
 
@@ -27,7 +27,9 @@ def interval_coverages(bed_fname, bam_fname, by_count):
         else:
             echo("Skip processing", os.path.basename(bam_fname),
                  "with empty regions file", bed_fname)
-            return CNA(fbase(bam_fname))
+            return GA.from_rows([],
+                                ('chromosome', 'start', 'end', 'gene', 'log2'),
+                                {'sample_id': fbase(bam_fname)})
 
     # Calculate average read depth in each bin
     ic_func = (interval_coverages_count if by_count
@@ -55,7 +57,9 @@ def interval_coverages(bed_fname, bam_fname, by_count):
     else:
         echo("(Couldn't calculate total number of mapped reads)")
 
-    return CNA.from_rows(fbase(bam_fname), list(cna_rows))
+    return GA.from_rows(list(cna_rows),
+                         ('chromosome', 'start', 'end', 'gene', 'log2'),
+                         {'sample_id': fbase(bam_fname)})
 
 
 def interval_coverages_count(bed_fname, bam_fname):

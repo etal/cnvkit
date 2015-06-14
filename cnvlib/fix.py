@@ -1,5 +1,5 @@
 """Supporting functions for the 'fix' command."""
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 import bisect
 
 import numpy
@@ -66,7 +66,7 @@ def match_ref_to_probes(ref_pset, probes):
     """Filter the reference probes to match the target or antitarget probe set.
     """
     ref_lookup = dict(zip(ref_pset.labels(), ref_pset))
-    ref_matched_rows = [tuple(ref_lookup[label]) for label in probes.labels()]
+    ref_matched_rows = [ref_lookup[label] for label in probes.labels()]
     ref_matched = ref_pset.as_rows(ref_matched_rows)
     return ref_matched
 

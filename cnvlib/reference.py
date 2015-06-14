@@ -1,20 +1,22 @@
 """Supporting functions for the 'reference' command."""
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 
 import numpy
 from Bio._py3k import map, zip
 
 from . import core, metrics, ngfrills, params
 from .ngfrills import echo
-from .gary import GenomicArray as _GA
+from .gary import GenomicArray as GA
 
 
 def bed2probes(bed_fname):
     """Create neutral-coverage probes from intervals."""
     cn_rows = [(chrom, start, end, name, 0, 0, 0, 0)
                for chrom, start, end, name in ngfrills.parse_regions(bed_fname)]
-    return _GA.from_rows(cn_rows, ('gc', 'rmask', 'spread'),
-                         {'sample_id': core.fbase(bed_fname)})
+    return GA.from_rows(cn_rows,
+                        ('chromosome', 'start', 'end', 'gene', 'log2', 'gc',
+                         'rmask', 'spread'),
+                        {'sample_id': core.fbase(bed_fname)})
 
 
 def combine_probes(filenames, fa_fname, is_male_reference):
@@ -29,29 +31,30 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         genomic GC content.
     """
     from cnvlib import fix  # XXX
-    kwargs = {}
+    columns = {}
 
     # Load coverage from target/antitarget files
     echo("Loading", filenames[0])
-    cnarr1 = _GA.read(filenames[0])
+    cnarr1 = GA.read(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
-        extra_cols = ['spread']
+        extra_cols = ['chromosome', 'start', 'end', 'gene', 'log2']
         if 'gc' in cnarr1 or fa_fname:
             extra_cols.append('gc')
         if fa_fname:
             extra_cols.append('rmask')
-        return _GA("reference", extra_cols)
+        extra_cols.append('spread')
+        return GA.from_rows([], extra_cols, {'sample_id': "reference"})
 
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
         gc, rmask = get_fasta_stats(cnarr1, fa_fname)
-        kwargs['gc'] = gc
-        kwargs['rmask'] = rmask
+        columns['gc'] = gc
+        columns['rmask'] = rmask
     elif 'gc' in cnarr1:
         # Reuse .cnn GC values if they're already stored (via import-picard)
         gc = cnarr1['gc']
-        kwargs['gc'] = gc
+        columns['gc'] = gc
     else:
         echo("No FASTA reference genome provided; skipping GC, RM calculations")
 
@@ -95,12 +98,12 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         """Perform bias corrections on the sample."""
         cnarr.center_all()
         shift_sex_chroms(cnarr)
-        if 'gc' in kwargs:
+        if 'gc' in columns:
             echo("Correcting for GC bias...")
-            cnarr = fix.center_by_window(cnarr, .1, kwargs['gc'])
-        if 'rmask' in kwargs:
+            cnarr = fix.center_by_window(cnarr, .1, columns['gc'])
+        if 'rmask' in columns:
             echo("Correcting for RepeatMasker bias...")
-            cnarr = fix.center_by_window(cnarr, .1, kwargs['rmask'])
+            cnarr = fix.center_by_window(cnarr, .1, columns['rmask'])
         echo("Correcting for density bias...")
         cnarr = fix.center_by_window(cnarr, .1, edge_sorter)
         return cnarr['log2']
@@ -109,7 +112,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         echo("Loading target", fname)
-        cnarrx = _GA.read(fname)
+        cnarrx = GA.read(fname)
         # Bin information should match across all files
         if not (len(cnarr1) == len(cnarrx)
                 and (cnarr1.chromosome == cnarrx.chromosome).all()
@@ -127,14 +130,15 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     echo("Calculating bin spreads")
     spreads = numpy.apply_along_axis(metrics.biweight_midvariance, 0,
                                      all_coverages)
-    kwargs['spread'] = spreads
-    return _GA.from_columns("reference",
-                            chromosome=cnarr1.chromosome,
-                            start=cnarr1.start,
-                            end=cnarr1.end,
-                            gene=cnarr1['gene'],
-                            log2=cvg_centers,
-                            **kwargs)
+    columns['spread'] = spreads
+    columns.update({
+        'chromosome': cnarr1.chromosome,
+        'start': cnarr1.start,
+        'end': cnarr1.end,
+        'gene': cnarr1['gene'],
+        'log2': cvg_centers,
+    })
+    return GA.from_columns(columns, {'sample_id': "reference"})
 
 
 def warn_bad_probes(probes):
@@ -150,7 +154,7 @@ def warn_bad_probes(probes):
         echo("*WARNING*", len(fg_bad_probes), "targets",
              "(%.4f)" % bad_pct + '%', "failed filters:")
         gene_cols = max(map(len, fg_bad_probes['gene']))
-        labels = list(map(_GA.row2label, fg_bad_probes))
+        labels = list(map(GA.row2label, fg_bad_probes))
         chrom_cols = max(map(len, labels))
         last_gene = None
         for label, probe in zip(labels, fg_bad_probes):

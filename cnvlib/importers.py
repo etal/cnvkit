@@ -75,7 +75,9 @@ def load_targetcoverage_csv(fname):
     if no_cvg_cnt > TOO_MANY_NO_COVERAGE:
         echo("*WARNING* Sample", fname, "has >", TOO_MANY_NO_COVERAGE,
              "probes with no coverage")
-    pset = _GA.from_rows(cna_rows, ('gc',), {'sample_id': core.fbase(fname)})
+    pset = _GA.from_rows(cna_rows,
+                         ('chromosome', 'start', 'end', 'gene', 'log2', 'gc'),
+                         {'sample_id': core.fbase(fname)})
     pset.sort()
     return pset
 
@@ -139,7 +141,9 @@ def import_seg(segfname, chrom_names, chrom_prefix, from_log10):
                 if curr_sample is not None:
                     assert len(curr_rows)
                     # Emit the current set of segments as a sample
-                    yield _GA.from_rows(curr_rows, ('probes',),
+                    yield _GA.from_rows(curr_rows,
+                                        ('chromosome', 'start', 'end', 'gene',
+                                         'log2', 'probes'),
                                         {'sample_id': curr_sample})
                 # Reset
                 curr_sample = sample
@@ -151,7 +155,9 @@ def import_seg(segfname, chrom_names, chrom_prefix, from_log10):
         if curr_sample is not None:
             assert len(curr_rows)
             # Emit the current set of segments as a sample
-            yield _GA.from_rows(curr_rows, ('probes',),
+            yield _GA.from_rows(curr_rows,
+                                ('chromosome', 'start', 'end', 'gene', 'log2',
+                                 'probes'),
                                 {'sample_id': curr_sample})
 
 
