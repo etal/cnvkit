@@ -6,7 +6,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from . import core, gary, metrics, ngfrills
+from . import core, gary, metrics, params
 from .ngfrills import echo
 
 
@@ -27,6 +27,13 @@ class CopyNumArray(gary.GenomicArray):
 
     # Traversal
 
+    def autosomes(self):
+        chr_x = self.guess_chr_x()
+        chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
+        mask_autosome = ((self.chromosome != chr_x) &
+                         (self.chromosome != chr_y))
+        return self[mask_autosome]
+
     # XXX hair: some genes overlap; some bins cover multiple genes
     #   -> option: whether to split gene names on commas
     def by_gene(self, ignore=('-', 'CGH', '.')):
@@ -39,7 +46,7 @@ class CopyNumArray(gary.GenomicArray):
         Bins with names in `ignore` are treated as 'Background' bins, but retain
         their name.
         """
-        for gene in uniq(self.data['gene']):
+        for gene in gary.uniq(self.data['gene']):
             # XXX TODO - include Background/ignore probes within a gene
             # see cnarray.py
             if not (gene == 'Background' or gene in ignore):
