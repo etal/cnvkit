@@ -837,6 +837,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                                            skip_somatic=True, skip_reject=False,
                                            sample_id=sample_id)
             # Plot LOH for only the selected region
+            # XXX make this a function in plots
             snv_x_y = [(pos * plots.MB, abs(altfreq - .5) + 0.5)
                        for pos, _zyg, altfreq in chrom_snvs[chrom]]
             if window_coords:

@@ -24,7 +24,7 @@ def load_vcf(fname, min_depth=1, sample_id=None,
     Returns a dict of: {chrom: position, zygosity, alt allele frequency}
     """
     chrom_snvs = collections.defaultdict(list)
-    for record, zygosity in filter_vcf_lines(fname, min_depth, skip_hom, 
+    for record, zygosity in filter_vcf_lines(fname, min_depth, skip_hom,
                                              skip_reject, skip_somatic,
                                              sample_id):
         samp = _get_sample(record, sample_id)
