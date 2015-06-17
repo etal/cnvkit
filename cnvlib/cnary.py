@@ -25,14 +25,28 @@ class CopyNumArray(gary.GenomicArray):
     def __init__(self, data_table, meta_dict=None):
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
+    @property
+    def _chr_x_label(self):
+        if 'chr_x' in self.meta:
+            return self.meta['chr_x']
+        chr_x = ('chrX' if self[0, 'chromosome'].startswith('chr')
+                 else 'X')
+        self.meta['chr_x'] = chr_x
+        return chr_x
+
+    @property
+    def _chr_y_label(self):
+        if 'chr_y' in self.meta:
+            return self.meta['chr_y']
+        chr_y = ('chrY' if self._chr_x_label.startswith('chr') else 'Y')
+        self.meta['chr_y'] = chr_y
+        return chr_y
+
     # Traversal
 
     def autosomes(self):
-        chr_x = self.guess_chr_x()
-        chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-        mask_autosome = ((self.chromosome != chr_x) &
-                         (self.chromosome != chr_y))
-        return self[mask_autosome]
+        return self[(self.chromosome != self._chr_x_label) &
+                    (self.chromosome != self._chr_y_label)]
 
     # XXX hair: some genes overlap; some bins cover multiple genes
     #   -> option: whether to split gene names on commas
@@ -139,11 +153,7 @@ class CopyNumArray(gary.GenomicArray):
     def center_all(self, peak=False):
         """Recenter coverage values to the autosomes' average (in-place)."""
         # ideal: normalize to the total number of reads in this sample
-        chr_x = self.guess_chr_x()
-        chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-        mask_autosome = ((self.chromosome != chr_x) &
-                         (self.chromosome != chr_y))
-        mid = self.data['log2'][mask_autosome].median()
+        mid = self.autosomes()['log2'].median()
         # mask_cvg = (mask_autosome &
         #             (self.data['log2'] >= mid - 1.1) &
         #             (self.data['log2'] <= mid + 1.1))
@@ -209,27 +219,21 @@ class CopyNumArray(gary.GenomicArray):
     # Chromosomal gender
     # XXX refactor all this
 
-    def shift_xx(self, male_reference=False, chr_x=None):
+    def shift_xx(self, male_reference=False):
         """Adjust chrX coverages (divide in half) for apparent female samples."""
-        if chr_x is None:
-            chr_x = self.guess_chr_x()
         outprobes = self.copy()
-        is_xx = self.guess_xx(chr_x=chr_x, male_reference=male_reference)
+        is_xx = self.guess_xx(male_reference=male_reference)
         if is_xx and male_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
-            outprobes['log2'][outprobes.chromosome == chr_x] -= 1.0
+            outprobes['log2'][outprobes.chromosome == self._chr_x_label] -= 1.0
             # Male: no change
         elif not is_xx and not male_reference:
             # Male: multiply X coverages by 2 (in log2: add 1)
-            outprobes['log2'][outprobes.chromosome == chr_x] += 1.0
+            outprobes['log2'][outprobes.chromosome == self._chr_x_label] += 1.0
             # Female: no change
         return outprobes
 
-    def guess_chr_x(self):
-        return ('chrX' if self[0, 'chromosome'].startswith('chr')
-                else 'X')
-
-    def guess_xx(self, male_reference=False, chr_x=None, verbose=True):
+    def guess_xx(self, male_reference=False, verbose=True):
         """Guess whether a sample is female from chrX relative coverages.
 
         Recommended cutoff values:
@@ -239,24 +243,21 @@ class CopyNumArray(gary.GenomicArray):
         cutoff = 0.5 if male_reference else -0.5
         # ENH - better coverage approach: take Z-scores or rank of +1,0 or 0,-1
         # based on the available probes, then choose which is more probable
-        rel_chrx_cvg = self.get_relative_chrx_cvg(chr_x=chr_x)
+        rel_chrx_cvg = self.get_relative_chrx_cvg()
         is_xx = (rel_chrx_cvg >= cutoff)
         if verbose:
             echo("Relative log2 coverage of X chromosome:", rel_chrx_cvg,
-                "(assuming %s)" % ('male', 'female')[is_xx])
+                 "(assuming %s)" % ('male', 'female')[is_xx])
         return is_xx
 
-    def get_relative_chrx_cvg(self, chr_x=None):
+    def get_relative_chrx_cvg(self):
         """Get the relative log-coverage of chrX in a sample."""
-        if chr_x is None:
-            chr_x = self.guess_chr_x()
-        chromosome_x = self[self.chromosome == chr_x]
+        chromosome_x = self[self.chromosome == self._chr_x_label]
         if not len(chromosome_x):
-            echo("*WARNING* No", chr_x, "found in probes; check the input")
+            echo("*WARNING* No", self._chr_x_label, "found in probes;",
+                 "check the input")
             return
-        chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-        autosomes = self[(self.chromosome != chr_x) &
-                        (self.chromosome != chr_y)]
+        autosomes = self.autosomes()
         auto_cvgs = autosomes['log2']
         x_cvgs = chromosome_x['log2']
         if 'probes' in self:
@@ -270,7 +271,7 @@ class CopyNumArray(gary.GenomicArray):
             rel_chrx_cvg = np.median(x_cvgs) - np.median(auto_cvgs)
         return rel_chrx_cvg
 
-    def expect_flat_cvg(self, is_male_reference=None, chr_x=None):
+    def expect_flat_cvg(self, is_male_reference=None):
         """Get the uninformed expected copy ratios of each bin.
 
         Create an array of log2 coverages like a "flat" reference.
@@ -278,19 +279,16 @@ class CopyNumArray(gary.GenomicArray):
         This is a neutral copy ratio at each autosome (log2 = 0.0) and sex
         chromosomes based on whether the reference is male (XX or XY).
         """
-        if chr_x is None:
-            chr_x = self.guess_chr_x()
         if is_male_reference is None:
-            is_male_reference = not self.guess_xx(chr_x=chr_x, verbose=False)
-        chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
+            is_male_reference = not self.guess_xx(verbose=False)
         cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
-            idx = np.asarray((self.chromosome == chr_x) |
-                             (self.chromosome == chr_y))
+            idx = np.asarray((self.chromosome == self._chr_x_label) |
+                             (self.chromosome == self._chr_y_label))
         else:
             # Y will be all noise, so replace with 1 "flat" copy
-            idx = np.asarray(self.chromosome == chr_y)
+            idx = np.asarray(self.chromosome == self._chr_y_label)
         cvg[idx] = -1.0
         return cvg
 

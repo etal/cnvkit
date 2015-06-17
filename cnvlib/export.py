@@ -320,11 +320,8 @@ def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
     if purity and not 0.0 < purity <= 1.0:
         raise ValueError("Purity must be between 0 and 1.")
 
-    chr_x = cnarr.guess_chr_x()
-    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
     if is_sample_female is None:
-        is_sample_female = cnarr.guess_xx(is_reference_male, chr_x,
-                                          verbose=False)
+        is_sample_female = cnarr.guess_xx(is_reference_male, verbose=False)
     absolutes = cna_absolutes(cnarr, ploidy, purity, is_reference_male,
                               is_sample_female)
     if round_to_integer:
@@ -339,8 +336,8 @@ def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
     newcnarr["log2"] = abslog
     # Adjust sex chromosomes to be relative to the reference
     if is_reference_male:
-        newcnarr['log2'][newcnarr.chromosome == chr_x] += 1.0
-    newcnarr['log2'][newcnarr.chromosome == chr_y] += 1.0
+        newcnarr['log2'][newcnarr.chromosome == newcnarr._chr_x_label] += 1.0
+    newcnarr['log2'][newcnarr.chromosome == newcnarr._chr_y_label] += 1.0
     return newcnarr
 
 

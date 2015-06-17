@@ -511,7 +511,7 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
     ref_probes = reference.combine_probes(target_fnames, fa_fname,
                                           male_reference)
     ref_probes.add_array(reference.combine_probes(antitarget_fnames, fa_fname,
-                                              male_reference))
+                                                  male_reference))
     ref_probes.center_all()
     reference.warn_bad_probes(ref_probes)
     return ref_probes
