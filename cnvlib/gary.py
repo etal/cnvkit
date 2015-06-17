@@ -1,6 +1,8 @@
 """Definitions for a generic array of genomic positions."""
 from __future__ import print_function, absolute_import
 
+import sys
+
 import numpy as np
 import pandas as pd
 

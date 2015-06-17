@@ -1,8 +1,6 @@
 """Definitions for CNVkit's core data structure, a copy number array."""
 from __future__ import print_function, absolute_import
 
-import sys
-
 import numpy as np
 import pandas as pd
 
