@@ -35,7 +35,7 @@ class CNATests(unittest.TestCase):
         self.ex_cnr[3:4] = self.ex_cnr[3:4]
         self.ex_cnr[6:10] = self.ex_cnr[6:10]
         self.assertEqual(tuple(self.ex_cnr[0]), tuple(same[0]))
-        self.assertTrue((self.ex_cnr[3:6] == same[3:6]).all())
+        self.assertEqual(self.ex_cnr[3:6], same[3:6])
 
     def test_iter(self):
         """Test iteration."""

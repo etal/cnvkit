@@ -87,8 +87,7 @@ class GenomicArray(object):
 
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
-                (self.data.shape == other.data.shape) and
-                (self.data == other.data).all().all())
+                self.data.equals(other.data))
 
     def __len__(self):
         return len(self.data)
