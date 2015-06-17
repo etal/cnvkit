@@ -20,20 +20,13 @@ def load_adjust_coverages(pset, ref_pset,
     if not len(pset):
         return pset
 
-    # Check for signs that the wrong reference was used
-    missing_keys = set(pset.labels()).difference(ref_pset.labels())
-    if missing_keys:
-        raise ValueError("Reference is missing %d bins found in %s"
-                         % (len(missing_keys), pset.sample_id))
-
-    # ENH: Wouldn't this be easier as [gene (!)= 'Background']?
     ref_matched = match_ref_to_probes(ref_pset, pset)
 
     # Drop probes that had poor coverage in the pooled reference
     ok_cvg_indices = ~reference.mask_bad_probes(ref_matched)
     echo("Keeping", sum(ok_cvg_indices), "of", len(ref_matched), "bins")
-    pset.data = pset.data[ok_cvg_indices]
-    ref_matched.data = ref_matched.data[ok_cvg_indices]
+    pset = pset[ok_cvg_indices]
+    ref_matched = ref_matched[ok_cvg_indices]
 
     # Apply corrections for known systematic biases in coverage
     pset.center_all()
@@ -65,8 +58,17 @@ def load_adjust_coverages(pset, ref_pset,
 def match_ref_to_probes(ref_pset, probes):
     """Filter the reference probes to match the target or antitarget probe set.
     """
-    ref_lookup = dict(zip(ref_pset.labels(), ref_pset))
-    ref_matched_rows = [ref_lookup[label] for label in probes.labels()]
+    # TODO use pandas indexing instead
+    # Check for signs that the wrong reference was used
+    probe_labels = probes.labels()
+    ref_labels = ref_pset.labels()
+    missing_keys = set(probe_labels).difference(ref_labels)
+    if missing_keys:
+        raise ValueError("Reference is missing %d bins found in %s"
+                         % (len(missing_keys), probes.sample_id))
+
+    ref_lookup = dict(zip(ref_labels, ref_pset))
+    ref_matched_rows = [ref_lookup[label] for label in probe_labels]
     ref_matched = ref_pset.as_rows(ref_matched_rows)
     return ref_matched
 
