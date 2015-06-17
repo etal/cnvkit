@@ -1,12 +1,10 @@
 """Definitions for a generic array of genomic positions."""
 from __future__ import print_function, absolute_import
 
-import sys
-
 import numpy as np
 import pandas as pd
 
-from . import core, metrics, ngfrills, params
+from . import core, ngfrills
 
 
 def uniq(arr):
@@ -58,7 +56,7 @@ class GenomicArray(object):
     def from_rows(cls, rows, columns=None, meta_dict=None):
         """Create a new instance from a list of rows, as tuples or arrays."""
         if columns is None:
-            columns = self._required_columns
+            columns = cls._required_columns
         table = pd.DataFrame.from_records(rows, columns=columns)
         return cls(table, meta_dict)
 
@@ -116,7 +114,7 @@ class GenomicArray(object):
               len(index) == 2 and
               isinstance(index[0], (int, slice, tuple)) and
               isinstance(index[1], basestring)):
-            # Row index, column index
+            # Row index, column index -> cell value
             return self.data.loc[index]
         elif isinstance(index, slice):
             # return self.as_dataframe(self.data.take(index))
@@ -221,7 +219,7 @@ class GenomicArray(object):
 
         >>> probes.coords(also=["name", "strand"])
         """
-        cols = ["chromosome", "start", "end"]
+        cols = list(self._required_columns)
         if also:
             cols.extend(also)
         return self.data.loc[:, cols]
@@ -254,7 +252,7 @@ class GenomicArray(object):
                 # Update 3' endpoints to the boundary
                 table.end[table.end > end] = end
             else:
-                table = table[:table['end'].searchsorted(end, 'right')]
+                table = table[:table.end.searchsorted(end, 'right')]
         return self.as_dataframe(table)
 
     # Modification
