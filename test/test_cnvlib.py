@@ -13,21 +13,21 @@ from cnvlib import (antitarget, commands, core, coverage, diagram, export, fix,
                     importers, metrics, ngfrills, params, plots, cnary,
                     reference, reports, segmentation, smoothing)
 
-EX_CNR = 'reference-tr.cnn'
+A_REFERENCE = 'formats/reference-tr.cnn'
 
 
 class CNATests(unittest.TestCase):
     """Tests for the CopyNumArray class."""
 
     def setUp(self):
-        self.ex_cnr = cnvlib.read(EX_CNR)
+        self.ex_cnr = cnvlib.read(A_REFERENCE)
 
     def test_basic(self):
         """Test basic container functionality and magic methods."""
         # Length
         self.assertEqual(len(self.ex_cnr), 27526)
         # Equality
-        same = cnvlib.read(EX_CNR)
+        same = cnvlib.read(A_REFERENCE)
         self.assertEqual(self.ex_cnr, same)
         # Item access
         orig = self.ex_cnr[0]
