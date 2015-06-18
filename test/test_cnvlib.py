@@ -10,7 +10,7 @@ import numpy
 import cnvlib
 # Import all modules as a smoke test
 from cnvlib import (antitarget, commands, core, coverage, diagram, export, fix,
-                    importers, metrics, ngfrills, params, plots, cnarray,
+                    importers, metrics, ngfrills, params, plots, cnary,
                     reference, reports, segmentation, smoothing)
 
 EX_CNR = 'reference-tr.cnn'
