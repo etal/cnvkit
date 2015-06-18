@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, print_function
 import numpy as np
 from Bio._py3k import map, zip
 
-from . import core, metrics, ngfrills, params
+from . import core, fix, metrics, ngfrills, params
 from .cnary import CopyNumArray as CNA
 from .ngfrills import echo
 
@@ -30,7 +30,6 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         including each bin's "average" coverage, "spread" of coverages, and
         genomic GC content.
     """
-    from cnvlib import fix  # XXX
     columns = {}
 
     # Load coverage from target/antitarget files
@@ -146,7 +145,7 @@ def warn_bad_probes(probes):
 
     Prints a formatted table to stderr.
     """
-    bad_probes = probes[mask_bad_probes(probes)]
+    bad_probes = probes[fix.mask_bad_probes(probes)]
     fg_index = (bad_probes['gene'] != 'Background')
     fg_bad_probes = bad_probes[fg_index]
     if len(fg_bad_probes) > 0:
@@ -178,18 +177,6 @@ def warn_bad_probes(probes):
         bad_pct = 100 * len(bg_bad_probes) / sum(probes['gene'] == 'Background')
         echo("Antitargets:", len(bg_bad_probes), "(%.4f)" % bad_pct + '%',
              "failed filters")
-
-
-def mask_bad_probes(probes):
-    """Flag the probes with excessively low or inconsistent coverage.
-
-    Returns a bool array where True indicates probes that failed the checks.
-    """
-    mask = ((probes['log2'] < params.MIN_BIN_COVERAGE) |
-            (probes['spread'] > params.MAX_BIN_SPREAD))
-    if 'rmask' in probes:
-        mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)
-    return np.asarray(mask)
 
 
 def get_fasta_stats(probes, fa_fname):

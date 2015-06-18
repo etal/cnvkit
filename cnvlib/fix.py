@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from Bio._py3k import zip
 
-from . import params, reference, smoothing
+from . import params, smoothing
 from .ngfrills import echo
 
 
@@ -24,7 +24,7 @@ def load_adjust_coverages(pset, ref_pset,
     ref_matched = match_ref_to_probes(ref_pset, pset)
 
     # Drop probes that had poor coverage in the pooled reference
-    ok_cvg_indices = ~reference.mask_bad_probes(ref_matched)
+    ok_cvg_indices = ~mask_bad_probes(ref_matched)
     echo("Keeping", sum(ok_cvg_indices), "of", len(ref_matched), "bins")
     pset = pset[ok_cvg_indices]
     ref_matched = ref_matched[ok_cvg_indices]
@@ -68,6 +68,18 @@ def match_ref_to_probes(ref_pset, probes):
         raise ValueError("Reference is missing %d bins found in %s"
                          % (len(num_missing), probes.sample_id))
     return ref_pset.as_dataframe(ref_matched.reset_index(drop=True))
+
+
+def mask_bad_probes(probes):
+    """Flag the probes with excessively low or inconsistent coverage.
+
+    Returns a bool array where True indicates probes that failed the checks.
+    """
+    mask = ((probes['log2'] < params.MIN_BIN_COVERAGE) |
+            (probes['spread'] > params.MAX_BIN_SPREAD))
+    if 'rmask' in probes:
+        mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)
+    return np.asarray(mask)
 
 
 def center_by_window(pset, fraction, sort_key):
