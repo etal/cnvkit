@@ -114,15 +114,14 @@ class GenomicArray(object):
             return self.data[index]
         elif (isinstance(index, tuple) and
               len(index) == 2 and
-              isinstance(index[0], (int, slice, tuple)) and
-              isinstance(index[1], basestring)):
+              index[1] in self.data.columns):
             # Row index, column index -> cell value
             return self.data.loc[index]
         elif isinstance(index, slice):
             # return self.as_dataframe(self.data.take(index))
             return self.as_dataframe(self.data[index])
         else:
-            # Selected row indices or boolean array, probably
+            # Iterable -- selected row indices or boolean array, probably
             try:
                 if isinstance(index, type(None)) or len(index) == 0:
                     empty = pd.DataFrame(columns=self.data.columns)
@@ -144,8 +143,7 @@ class GenomicArray(object):
             self.data[index] = value
         elif (isinstance(index, tuple) and
               len(index) == 2 and
-              isinstance(index[0], (int, slice, tuple)) and
-              isinstance(index[1], basestring)):
+              index[1] in self.data.columns):
             self.data.loc[index] = value
         else:
             assert isinstance(index, slice) or len(index) > 0

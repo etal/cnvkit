@@ -158,8 +158,8 @@ class CopyNumArray(gary.GenomicArray):
         # if peak and sum(mask_cvg) > 210:
         #     # Estimate the location of peak density
         #     # hack: from a smoothed histogram -- enh: kernel density estimate
-        #     x = self.data['log2'][mask_cvg]
-        #     w = self['weight'][mask_cvg] if 'weight' in self else None
+        #     x = self[mask_cvg, 'log2']
+        #     w = self[mask_cvg, 'weight'] if 'weight' in self else None
         #     resn = int(round(np.sqrt(len(x))))
         #     x_vals, x_edges = np.histogram(x, bins=8*resn, weights=w)
         #     xs = smoothing.smoothed(x_vals, resn)
@@ -215,7 +215,6 @@ class CopyNumArray(gary.GenomicArray):
         return self.as_rows(outrows)
 
     # Chromosomal gender
-    # XXX refactor all this
 
     def shift_xx(self, male_reference=False):
         """Adjust chrX coverages (divide in half) for apparent female samples."""
@@ -223,11 +222,11 @@ class CopyNumArray(gary.GenomicArray):
         is_xx = self.guess_xx(male_reference=male_reference)
         if is_xx and male_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
-            outprobes['log2'][outprobes.chromosome == self._chr_x_label] -= 1.0
+            outprobes[outprobes.chromosome == self._chr_x_label, 'log2'] -= 1.0
             # Male: no change
         elif not is_xx and not male_reference:
             # Male: multiply X coverages by 2 (in log2: add 1)
-            outprobes['log2'][outprobes.chromosome == self._chr_x_label] += 1.0
+            outprobes[outprobes.chromosome == self._chr_x_label, 'log2'] += 1.0
             # Female: no change
         return outprobes
 

@@ -86,11 +86,11 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         if is_xx:
             # chrX already OK
             # No chrY; it's all noise, so just match the male
-            cnarr['log2'][cnarr.chromosome == chr_y] = -1.0
+            cnarr[cnarr.chromosome == chr_y, 'log2'] = -1.0
         else:
             # 1/2 #copies of each sex chromosome
-            cnarr['log2'][(cnarr.chromosome == chr_x) |
-                          (cnarr.chromosome == chr_y)] += 1.0
+            cnarr[(cnarr.chromosome == chr_x) | (cnarr.chromosome == chr_y),
+                  'log2'] += 1.0
 
     edge_sorter = fix.make_edge_sorter(cnarr1, params.INSERT_SIZE)
     def bias_correct_coverage(cnarr):
