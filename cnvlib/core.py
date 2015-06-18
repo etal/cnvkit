@@ -3,10 +3,9 @@ from __future__ import absolute_import, division, print_function
 import sys
 import os.path
 
-import numpy
 from Bio.File import as_handle
 
-from .ngfrills import echo, safe_write
+from .ngfrills import safe_write
 
 # __________________________________________________________________________
 # I/O helpers

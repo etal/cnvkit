@@ -1,7 +1,7 @@
 """Supporting functions for the 'reference' command."""
 from __future__ import absolute_import, division, print_function
 
-import numpy
+import numpy as np
 from Bio._py3k import map, zip
 
 from . import core, metrics, ngfrills, params
@@ -122,14 +122,14 @@ def combine_probes(filenames, fa_fname, is_male_reference):
             raise RuntimeError("%s probes do not match those in %s"
                                % (fname, filenames[0]))
         all_coverages.append(bias_correct_coverage(cnarrx))
-    all_coverages = numpy.vstack(all_coverages)
+    all_coverages = np.vstack(all_coverages)
 
     echo("Calculating average bin coverages")
-    cvg_centers = numpy.apply_along_axis(metrics.biweight_location, 0,
-                                         all_coverages)
+    cvg_centers = np.apply_along_axis(metrics.biweight_location, 0,
+                                      all_coverages)
     echo("Calculating bin spreads")
-    spreads = numpy.apply_along_axis(metrics.biweight_midvariance, 0,
-                                     all_coverages)
+    spreads = np.apply_along_axis(metrics.biweight_midvariance, 0,
+                                  all_coverages)
     columns['spread'] = spreads
     columns.update({
         'chromosome': cnarr1.chromosome,
@@ -189,7 +189,7 @@ def mask_bad_probes(probes):
             (probes['spread'] > params.MAX_BIN_SPREAD))
     if 'rmask' in probes:
         mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)
-    return numpy.asarray(mask)
+    return np.asarray(mask)
 
 
 def get_fasta_stats(probes, fa_fname):
@@ -201,7 +201,7 @@ def get_fasta_stats(probes, fa_fname):
                   for subseq in ngfrills.fasta_extract_regions(fa_fname,
                                                                fa_coords)]
     gc_vals, rm_vals = zip(*gc_rm_vals)
-    return numpy.asfarray(gc_vals), numpy.asfarray(rm_vals)
+    return np.asfarray(gc_vals), np.asfarray(rm_vals)
 
 
 def calculate_gc_lo(subseq):

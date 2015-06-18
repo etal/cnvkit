@@ -366,8 +366,7 @@ class GenomicArray(object):
         #     order = np.argsort(keys, kind='mergesort')
         # self.data = self.data.take(order)
         table = self.data.set_index(['chromosome', 'start'])
-        table.sort(inplace=True)
-        self.data = table.reset_index()
+        self.data = table.sort().reset_index()
 
     # I/O
 

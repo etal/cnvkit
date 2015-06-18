@@ -2,7 +2,7 @@
 from __future__ import absolute_import, division, print_function
 import bisect
 
-import numpy
+import numpy as np
 import pandas as pd
 from Bio._py3k import zip
 
@@ -81,7 +81,7 @@ def center_by_window(pset, fraction, sort_key):
     # (to avoid re-centering actual CNV regions -- only want an independently
     # sampled subset of presumably overall-CN-neutral probes)
     shuffle_order = adj_pset.shuffle()
-    if isinstance(sort_key, numpy.ndarray):
+    if isinstance(sort_key, np.ndarray):
         # Apply the same shuffling to the key array as to the target probe set
         sort_key = sort_key[shuffle_order]
     # Sort the data according to the specified parameter
@@ -230,12 +230,12 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     # Relative bin sizes
     sizes = ref_matched['end'] - ref_matched['start']
     weights = sizes / sizes.max()
-    if (numpy.abs(numpy.mod(ref_matched['log2'], 1)) > epsilon).any():
+    if (np.abs(np.mod(ref_matched['log2'], 1)) > epsilon).any():
         # NB: Not used with a flat reference
         echo("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from expected coverage
         flat_cvgs = ref_matched.expect_flat_cvg()
-        weights *= 2 ** -numpy.abs(ref_matched['log2'] - flat_cvgs)
+        weights *= 2 ** -np.abs(ref_matched['log2'] - flat_cvgs)
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
         echo("Weighting bins by coverage spread in reference")
@@ -244,6 +244,6 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
         invvars = 1.0 - (variances / variances.max())
         weights = (weights + invvars) / 2
     # Avoid 0-value bins -- CBS doesn't like these
-    weights = numpy.maximum(weights, epsilon)
+    weights = np.maximum(weights, epsilon)
     return cnarr.add_columns(weight=weights)
 

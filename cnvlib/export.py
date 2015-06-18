@@ -6,7 +6,7 @@ import math
 import sys
 
 from Bio._py3k import map, range, zip
-import numpy
+import numpy as np
 
 from . import core
 from .cnary import CopyNumArray as CNA
@@ -325,13 +325,13 @@ def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
     absolutes = cna_absolutes(cnarr, ploidy, purity, is_reference_male,
                               is_sample_female)
     if round_to_integer:
-        absolutes = numpy.round(absolutes)
+        absolutes = np.round(absolutes)
         absolutes[absolutes <= 0.5] = .5
     else:
         # Avoid a logarithm domain error
         absolutes[absolutes <= 0.0] = .5
 
-    abslog = numpy.log2(absolutes / float(ploidy))
+    abslog = np.log2(absolutes / float(ploidy))
     newcnarr = cnarr.copy()
     newcnarr["log2"] = abslog
     # Adjust sex chromosomes to be relative to the reference
@@ -343,7 +343,7 @@ def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
 
 def cna_absolutes(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
-    absolutes = numpy.zeros(len(cnarr), dtype=numpy.float_)
+    absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for i, row in enumerate(cnarr):
         ref_copies, expect_copies = _reference_expect_copies(
             row["chromosome"], ploidy, is_sample_female, is_reference_male)

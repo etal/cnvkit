@@ -5,7 +5,7 @@ import collections
 import math
 import sys
 
-import numpy
+import numpy as np
 # from matplotlib import pyplot
 # pyplot.ioff()
 
@@ -92,7 +92,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
     if 'weight' in sel_probes:
         w = 46 * sel_probes['weight'] ** 2 + 2
     else:
-        w = numpy.repeat(30, len(x))
+        w = np.repeat(30, len(x))
     is_bg = (sel_probes['gene'] == 'Background')
 
     # Configure axes
@@ -189,9 +189,9 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, segments, do_trend, pad):
             x_posns_chrom[chrom] = []
             y_posns_chrom[chrom] = []
             continue
-        posns = numpy.array([v[0] for v in snvs], numpy.float_)
+        posns = np.array([v[0] for v in snvs], np.float_)
         x_posns = posns + curr_offset
-        vafs = numpy.array([abs(v[2] - .5) + 0.5 for v in snvs], numpy.float_)
+        vafs = np.array([abs(v[2] - .5) + 0.5 for v in snvs], np.float_)
         x_posns_chrom[chrom] = x_posns
         y_posns_chrom[chrom] = vafs
         # Trend bars: always calculated, only shown on request
@@ -204,7 +204,7 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, segments, do_trend, pad):
                                v_freq))
         else:
             # Draw chromosome-wide average VAF
-            trends.append((x_posns[0], x_posns[-1], numpy.median(vafs)))
+            trends.append((x_posns[0], x_posns[-1], np.median(vafs)))
 
     # Test for significant shifts in VAF
     # ENH - use segments if provided
@@ -247,7 +247,7 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom):
     """
     # Binary search in the chrom, I guess
     seg_starts = segments.select(chromosome=chrom)['start']
-    indices = numpy.maximum(seg_starts.searchsorted(snv_posns), 1) - 1
+    indices = np.maximum(seg_starts.searchsorted(snv_posns), 1) - 1
     for i in sorted(set(indices)):
         mask = (indices == i)
         freqs = snv_freqs[mask]
@@ -256,7 +256,7 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom):
         if sum(mask) < 2:
             # Skip single-mutation groups
             continue
-        yield posns[0], posns[-1], numpy.median(freqs)
+        yield posns[0], posns[-1], np.median(freqs)
 
 
 def plot_x_dividers(axis, chromosome_sizes, pad):
@@ -325,7 +325,7 @@ def partition_by_chrom(chrom_snvs):
     bins = {key: {'thisbin': [], 'otherbins': []}
             for key in chrom_snvs}
     for thischrom, snvs in iteritems(chrom_snvs):
-        shiftvals = numpy.array([abs(v[2]) for v in snvs])
+        shiftvals = np.array([abs(v[2]) for v in snvs])
         bins[thischrom]['thisbin'].extend(shiftvals)
         for otherchrom in chromnames:
             if otherchrom == thischrom:
@@ -349,8 +349,8 @@ def test_loh(bins, alpha=0.0025):
 
     significant_chroms = []
     for chrom, partitions in iteritems(bins):
-        these_shifts = numpy.array(partitions['thisbin'], numpy.float_)
-        other_shifts = numpy.array(partitions['otherbins'], numpy.float_)
+        these_shifts = np.array(partitions['thisbin'], np.float_)
+        other_shifts = np.array(partitions['otherbins'], np.float_)
         if len(these_shifts) < 20:
             echo("Too few points (%d) to test chrom %s"
                  % (len(these_shifts), chrom))

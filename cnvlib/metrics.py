@@ -9,7 +9,7 @@ See:
 """
 from __future__ import division
 
-import numpy
+import numpy as np
 
 
 def probe_deviations_from_segments(probes, segments, skip_low=True):
@@ -21,7 +21,7 @@ def probe_deviations_from_segments(probes, segments, skip_low=True):
     deviations = []
     for segment, subprobes in probes.by_segment(segments):
         deviations.append(subprobes['log2'] - segment['log2'])
-    return numpy.concatenate(deviations)
+    return np.concatenate(deviations)
 
 
 def ests_of_scale(deviations):
@@ -30,7 +30,7 @@ def ests_of_scale(deviations):
     Calculates all of these values for an array of deviations and returns them
     as a tuple.
     """
-    std = numpy.std(deviations, dtype=numpy.float64)
+    std = np.std(deviations, dtype=np.float64)
     mad = median_absolute_deviation(deviations)
     iqr = interquartile_range(deviations)
     biw = biweight_midvariance(deviations)
@@ -45,9 +45,9 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-4):
     The biweight is a robust statistic for determining the central location of a
     distribution.
     """
-    a = numpy.asarray(a)
+    a = np.asarray(a)
     if initial is None:
-        initial = numpy.median(a)
+        initial = np.median(a)
     # Weight the observations by distance from initial estimate
     d = a - initial
     w = d / max(c * median_absolute_deviation(a), epsilon)
@@ -67,7 +67,7 @@ def segment_mean(cnarr):
     if len(cnarr) == 0:
         return None
     if 'weight' in cnarr:
-        return numpy.average(cnarr['log2'], weights=cnarr['weight'])
+        return np.average(cnarr['log2'], weights=cnarr['weight'])
     return cnarr['log2'].mean()
 
 
@@ -83,25 +83,25 @@ def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-4):
     http://en.wikipedia.org/wiki/Robust_measures_of_scale#The_biweight_midvariance
     http://astropy.readthedocs.org/en/latest/_modules/astropy/stats/funcs.html
     """
-    a = numpy.asarray(a)
+    a = np.asarray(a)
     if initial is None:
-        initial = numpy.median(a)
+        initial = np.median(a)
     # Difference of observations from initial estimate
     d = a - initial
     # Weighting (avoid dividing by zero)
     w = d / max(c * median_absolute_deviation(a), epsilon)
     w = w**2
     # Omit the outlier points
-    mask = numpy.abs(w) < 1
+    mask = np.abs(w) < 1
     n = mask.sum()
     return (n**0.5 * (d[mask] * d[mask] * (1 - w[mask])**4).sum()**0.5
-            / numpy.abs(((1 - w[mask]) * (1 - 5 * w[mask])).sum()))
+            / np.abs(((1 - w[mask]) * (1 - 5 * w[mask])).sum()))
 
 
 def interquartile_range(a):
     """Compute the difference between the array's first and third quartiles."""
-    a = numpy.asarray(a)
-    return numpy.percentile(a, 75) - numpy.percentile(a, 25)
+    a = np.asarray(a)
+    return np.percentile(a, 75) - np.percentile(a, 25)
 
 
 def median_absolute_deviation(a, scale_to_sd=True):
@@ -111,9 +111,9 @@ def median_absolute_deviation(a, scale_to_sd=True):
 
     See: http://en.wikipedia.org/wiki/Median_absolute_deviation
     """
-    a = numpy.asarray(a)
-    a_median = numpy.median(a)
-    mad = numpy.median(numpy.abs(a - a_median))
+    a = np.asarray(a)
+    a_median = np.median(a)
+    mad = np.median(np.abs(a - a_median))
     if scale_to_sd:
         mad *= 1.4826
     return mad
@@ -140,14 +140,14 @@ def q_n(a):
         200 1.019
 
     """
-    a = numpy.asarray(a)
+    a = np.asarray(a)
 
     # First quartile of: (|x_i - x_j|: i < j)
     vals = []
     for i, x_i in enumerate(a):
         for x_j in a[i+1:]:
             vals.append(abs(x_i - x_j))
-    quartile = numpy.percentile(vals, 25)
+    quartile = np.percentile(vals, 25)
 
     # Cn: a scaling factor determined by sample size
     n = len(a)

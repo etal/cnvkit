@@ -5,7 +5,7 @@ from bisect import insort, bisect_left
 from collections import deque
 import math
 
-import numpy
+import numpy as np
 
 from . import core, metrics
 
@@ -17,7 +17,7 @@ def check_inputs(x, width):
     whole window. The output half-window size is truncated to the length of `x`
     if needed.
     """
-    x = numpy.asfarray(x)
+    x = np.asfarray(x)
     if 0 < width < 1:
         wing = int(math.ceil(len(x) * width * 0.5))
     elif width >= 2 and int(width) == width:
@@ -41,15 +41,14 @@ def rolling_median(x, width):
     """
     x, wing = check_inputs(x, width)
     # Pre-allocate the result array
-    # result = numpy.zeros_like(x)
-    result = numpy.empty_like(x)
+    result = np.empty_like(x)
     # Keep a copy of the rolling window in original order; initially fill with
     # a mirrored copy of the first 'wing' points
-    window = deque(numpy.concatenate((x[wing::-1], x[:wing])))
+    window = deque(np.concatenate((x[wing::-1], x[:wing])))
     # Also keep a sorted copy of the rolling window values
     sortwin = sorted(window)
     # Pad the right edge of the original array with a mirror copy
-    signal = numpy.concatenate((x[wing:], x[:-wing-1:-1]))
+    signal = np.concatenate((x[wing:], x[:-wing-1:-1]))
     # Calculate the rolling median at each subsequent point
     for i, item in enumerate(signal):
         old = window.popleft()
@@ -75,10 +74,10 @@ def smoothed(x, width, do_fit_edges=False):
     """
     x, wing = check_inputs(x, width)
     # Pad the edges with mirror-image copies of the array
-    signal = numpy.concatenate((x[wing-1::-1], x, x[:-wing:-1]))
+    signal = np.concatenate((x[wing-1::-1], x, x[:-wing:-1]))
     # Apply signal smoothing
-    window = numpy.kaiser(2* wing + 1, 14)
-    y = numpy.convolve(window / window.sum(), signal, mode='same')
+    window = np.kaiser(2* wing + 1, 14)
+    y = np.convolve(window / window.sum(), signal, mode='same')
     # Chop off the ends of the result so it has the original size
     y = y[wing:1-wing]
     if do_fit_edges:
@@ -113,11 +112,11 @@ def _fit_edge(x, y, window_start, window_stop, interp_start, interp_stop,
     x_edge = x[window_start:window_stop]
     # Fit the edges.  poly_coeffs has shape (polyorder + 1, -1),
     # where '-1' is the same as in x_edge.
-    poly_coeffs = numpy.polyfit(numpy.arange(0, window_stop - window_start),
-                                x_edge, polyorder)
+    poly_coeffs = np.polyfit(np.arange(0, window_stop - window_start),
+                             x_edge, polyorder)
     # Compute the interpolated values for the edge.
-    i = numpy.arange(interp_start - window_start, interp_stop - window_start)
-    values = numpy.polyval(poly_coeffs, i)
+    i = np.arange(interp_start - window_start, interp_stop - window_start)
+    values = np.polyval(poly_coeffs, i)
     # Put the values into the appropriate slice of y.
     y[interp_start:interp_stop] = values
 
@@ -131,7 +130,7 @@ def smooth_genome_coverages(probes, smooth_func, width):
     # ENH: also split by centromeres (long internal gaps -- see PSCBS)
     out = {chrom: smooth_func(subprobes['log2'], width)
            for chrom, subprobes in probes.by_chromosome()}
-    return numpy.concatenate(
+    return np.concatenate(
         [out[chrom] for chrom in sorted(out, key=core.sorter_chrom)])
 
 
@@ -143,8 +142,8 @@ def outlier_iqr(a, c=1.5):
     By convention, "outliers" are points more than 1.5 * IQR from the median,
     and "extremes" or extreme outliers are those more than 3.0 * IQR.
     """
-    a = numpy.asarray(a)
-    dists = numpy.abs(a - numpy.median(a))
+    a = np.asarray(a)
+    dists = np.abs(a - np.median(a))
     iqr = metrics.interquartile_range(a)
     return dists > (c * iqr)
 
@@ -175,7 +174,7 @@ def outlier_mad_median(a):
     """
     K = 2.24
 
-    a = numpy.asarray(a)
-    dists = numpy.abs(a - numpy.median(a))
+    a = np.asarray(a)
+    dists = np.abs(a - np.median(a))
     mad = metrics.median_absolute_deviation(a, scale_to_sd=False)
     return (dists / mad) > K
