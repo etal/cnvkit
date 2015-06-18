@@ -189,7 +189,7 @@ def mask_bad_probes(probes):
             (probes['spread'] > params.MAX_BIN_SPREAD))
     if 'rmask' in probes:
         mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)
-    return mask
+    return numpy.asarray(mask)
 
 
 def get_fasta_stats(probes, fa_fname):

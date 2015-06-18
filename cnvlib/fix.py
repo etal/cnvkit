@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function
 import bisect
 
 import numpy
+import pandas as pd
 from Bio._py3k import zip
 
 from . import params, reference, smoothing
@@ -58,19 +59,15 @@ def load_adjust_coverages(pset, ref_pset,
 def match_ref_to_probes(ref_pset, probes):
     """Filter the reference probes to match the target or antitarget probe set.
     """
-    # TODO use pandas indexing instead
+    probes_labeled = probes.data.set_index(probes.labels())
+    ref_labeled = ref_pset.data.set_index(ref_pset.labels())
+    ref_matched = ref_labeled.reindex(index=probes_labeled.index)
     # Check for signs that the wrong reference was used
-    probe_labels = probes.labels()
-    ref_labels = ref_pset.labels()
-    missing_keys = set(probe_labels).difference(ref_labels)
-    if missing_keys:
+    num_missing = pd.isnull(ref_matched.start).sum()
+    if num_missing > 0:
         raise ValueError("Reference is missing %d bins found in %s"
-                         % (len(missing_keys), probes.sample_id))
-
-    ref_lookup = dict(zip(ref_labels, ref_pset))
-    ref_matched_rows = [ref_lookup[label] for label in probe_labels]
-    ref_matched = ref_pset.as_rows(ref_matched_rows)
-    return ref_matched
+                         % (len(num_missing), probes.sample_id))
+    return ref_pset.as_dataframe(ref_matched.reset_index(drop=True))
 
 
 def center_by_window(pset, fraction, sort_key):

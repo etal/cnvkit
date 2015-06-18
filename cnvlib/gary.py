@@ -68,7 +68,7 @@ class GenomicArray(object):
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
     def as_dataframe(self, dframe):
-        return self.__class__(dframe, self.meta.copy())
+        return self.__class__(dframe.reset_index(drop=True), self.meta.copy())
 
     # def as_index(self, index):
     #     """Subset with fancy/boolean indexing; reuse this instance's metadata."""
