@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev
 RUN pip install reportlab pysam pyvcf biopython
 RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('PSCBS', 'cghFLasso')"
-RUN pip install cnvkit==0.5.0
+RUN pip install cnvkit==0.5.1
 
 # ENTRYPOINT ["cnvkit.py"]
 # CMD ["--help"]
