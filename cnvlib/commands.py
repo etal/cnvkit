@@ -16,7 +16,11 @@ iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 # If running headless, use a suitable GUI-less plotting backend
 if not os.environ.get('DISPLAY'):
     import matplotlib
-    matplotlib.use("Agg", force=True)
+    try:
+        matplotlib.use("Agg", force=True)
+    except TypeError:
+        # Older matplotlib doesn't have 'force' argument
+        matplotlib.use("Agg")
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
