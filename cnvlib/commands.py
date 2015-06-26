@@ -1112,7 +1112,7 @@ def _cmd_gainloss(args):
                              'Probes'])
 
 
-def do_gainloss(probes, segments=None, male_reference=False, threshold=0.5,
+def do_gainloss(probes, segments=None, male_reference=False, threshold=0.2,
                 min_probes=3):
     """Identify targeted genes with copy number gain or loss."""
     probes = core.shift_xx(probes, male_reference)
@@ -1130,7 +1130,7 @@ P_gainloss.add_argument('filename',
                 of the 'fix' sub-command.""")
 P_gainloss.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command).")
-P_gainloss.add_argument('-t', '--threshold', type=float, default=0.5,
+P_gainloss.add_argument('-t', '--threshold', type=float, default=0.2,
         help="""Copy number change threshold to report a gene gain/loss.
                 [Default: %(default)s]""")
 P_gainloss.add_argument('-m', '--min-probes', type=int, default=3,
