@@ -64,13 +64,30 @@ class CopyNumArray(gary.GenomicArray):
         Bins with names in `ignore` are treated as 'Background' bins, but retain
         their name.
         """
-        for gene in gary.uniq(self.data['gene']):
-            # XXX TODO - include Background/ignore probes within a gene
-            # see cnarray.py
-            if not (gene == 'Background' or gene in ignore):
-                yield gene, self[self.data['gene'] == gene]
+        start_idx = end_idx = None
+        for chrom, subgary in self.by_chromosome():
+            prev_idx = 0
+            for gene in gary.uniq(subgary.data['gene']):
+                if not (gene == 'Background' or gene in ignore):
+                    gene_idx = (subgary.data['gene'] == gene).nonzero()[0]
+                    if not len(gene_idx):
+                        echo("Specified gene name somehow missing: %s" % gene)
+                        continue
+                    start_idx = gene_idx[0]
+                    end_idx = gene_idx[-1] + 1
+                    if prev_idx < start_idx:
+                        # Include intergenic regions
+                        yield "Background", subgary.as_dataframe(
+                                subgary.data.iloc[prev_idx:start_idx])
+                        prev_idx = end_idx
+                    yield gene, subgary.as_dataframe(
+                            subgary.data.iloc[start_idx:end_idx])
+            if end_idx < len(subgary) - 1:
+                # Include the telomere
+                yield "Background", subgary.as_dataframe(
+                        subgary.data.iloc[end_idx:])
 
-    # XXX superseded by by_neighbors?
+    # XXX or: by_neighbors?
     def by_segment(self, segments):
         """Group rows by the segments that row midpoints land in.
 
