@@ -79,13 +79,13 @@ class CopyNumArray(gary.GenomicArray):
                         # Include intergenic regions
                         yield "Background", subgary.as_dataframe(
                                 subgary.data.iloc[prev_idx:start_idx])
-                        prev_idx = end_idx
                     yield gene, subgary.as_dataframe(
                             subgary.data.iloc[start_idx:end_idx])
-            if end_idx < len(subgary) - 1:
+                    prev_idx = end_idx
+            if prev_idx < len(subgary) - 1:
                 # Include the telomere
                 yield "Background", subgary.as_dataframe(
-                        subgary.data.iloc[end_idx:])
+                        subgary.data.iloc[prev_idx:])
 
     # XXX or: by_neighbors?
     def by_segment(self, segments):
@@ -210,15 +210,15 @@ class CopyNumArray(gary.GenomicArray):
         coverage values to produce the "squashed" gene's coverage value. By
         default this is the biweight location, but you might want median, mean,
         max, min or something else in some cases.
-
-        Optional columns, if present, are dropped.
         """
         def squash_rows(name, rows):
             """Combine multiple rows (for the same gene) into one row."""
-            chrom = core.check_unique(rows['chromosome'], 'chromosome')
-            start = rows[0]['start']
-            end = rows[-1]['end']
-            cvg = summary_stat(rows['log2'])
+            if len(rows) == 1:
+                return tuple(rows.iloc[0])
+            chrom = core.check_unique(rows.chromosome, 'chromosome')
+            start = rows.iloc[0]['start']
+            end = rows.iloc[-1]['end']
+            cvg = summary_stat(rows.log2)
             outrow = [chrom, start, end, name, cvg]
             # Handle extra fields
             # ENH - no coverage stat; do weighted average as appropriate
@@ -234,7 +234,7 @@ class CopyNumArray(gary.GenomicArray):
             if name == 'Background' and not squash_background:
                 outrows.extend(map(tuple, subarr))
             else:
-                outrows.append(squash_rows(name, subarr))
+                outrows.append(squash_rows(name, subarr.data))
         return self.as_rows(outrows)
 
     # Chromosomal gender
