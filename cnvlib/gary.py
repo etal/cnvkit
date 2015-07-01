@@ -257,6 +257,25 @@ class GenomicArray(object):
                 table = table[:table.end.searchsorted(end, 'right')]
         return self.as_dataframe(table)
 
+    def in_ranges(self, chrom, starts=None, ends=None, trim=False):
+        """Get the GenomicArray portion within the given genomic range.
+        """
+        assert isinstance(chrom, basestring)  # ENH: take array?
+        try:
+            table = self.data[self.data['chromosome'] == chrom]
+        except KeyError:
+            raise KeyError("Chromosome %s is not in this probe set" % chrom)
+        if starts is None and ends is None:
+            return self.as_dataframe(table)
+        # ENH: Take a series of slices...
+        # XXX Slow path:
+        if starts is None:
+            starts = np.zeros(len(ends), dtype=np.int_)
+        subtables = [self.in_range(chrom, start, end, trim).data
+                     for start, end in zip(starts, ends)]
+        table = pd.concat(subtables)
+        return self.as_dataframe(table)
+
     # Modification
 
     def add_array(self, other):
