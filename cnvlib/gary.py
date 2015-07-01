@@ -30,8 +30,6 @@ class GenomicArray(object):
     Required columns: chromosome, start
     """
     _required_columns = ("chromosome", "start", "end")
-    # Extra columns, in order:
-    # "gene", "log2", "gc", "rmask", "spread", "weight", "probes"
 
     def __init__(self, data_table, meta_dict=None):
         if not all(c in data_table.columns for c in
@@ -179,21 +177,22 @@ class GenomicArray(object):
     # Traversal
 
     # XXX troubled
-    # def by_coords(self, other, mode='trim'):
+    # or: by_coords, by_ranges
     def by_bin(self, bins, mode='trim'):
-        """Group rows by another CopyNumArray; trim row start/end to bin edges.
+        """Group rows by another GenomicArray; trim row start/end to bin edges.
 
         Returns an iterable of (bin, GenomicArray of overlapping rows))
 
-        modes are:  exclusive, trim, inclusive
+        modes are:  exclude (drop), trim, include (keep)
             (when coordinates are on a boundary, what happens to the overlapped
             bins? drop, trim to size, include whole)
 
         default = 'trim': If a probe overlaps with a bin boundary, the probe
         start or end position is replaced with the bin boundary position. Probes
         outside any segments are skipped. This is appropriate for most other
-        comparisons between CopyNumArray objects.
+        comparisons between GenomicArray objects.
         """
+        # ENH: groupby chromosome?
         for chrom, bin_rows in bins.by_chromosome():
             try:
                 cn_rows = self[self.chromosome == chrom]
@@ -201,8 +200,10 @@ class GenomicArray(object):
                 continue
             # Traverse rows and bins together, matching up start/end points
             for bin_row in bin_rows:
+                # ENH: searchsorted w/ start/end arrays?
                 binned_rows = cn_rows.in_range(chrom, bin_row['start'],
-                                               bin_row['end'], trim=True)
+                                               bin_row['end'],
+                                               trim=(mode=='trim'))
                 yield bin_row, self.as_rows(binned_rows)
 
     def by_chromosome(self):
@@ -227,8 +228,9 @@ class GenomicArray(object):
     def labels(self):
         return self.data.apply(self.row2label, axis=1)
 
+    # TODO replace trim=bool w/ mode=trim/drop/keep
     def in_range(self, chrom, start=0, end=None, trim=False):
-        """Get the CopyNumArray portion within the given genomic range.
+        """Get the GenomicArray portion within the given genomic range.
 
         If trim=True, include bins straddling the range boundaries, and trim
         the bins endpoints to the boundaries.
@@ -258,7 +260,7 @@ class GenomicArray(object):
     # Modification
 
     def add_array(self, other):
-        """Combine this array's data with another CopyNumArray (in-place).
+        """Combine this array's data with another GenomicArray (in-place).
 
         Any optional columns must match between both arrays.
         """
@@ -286,12 +288,10 @@ class GenomicArray(object):
 
     def keep_columns(self, columns):
         """Extract a subset of columns, reusing this instance's metadata."""
-        # XXX
-        # required_cols = self.data.columns[:5]
         return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
     def drop_extra_columns(self):
-        """Remove any optional columns from this CopyNumArray.
+        """Remove any optional columns from this GenomicArray.
 
         Returns a new copy with only the core columns retained:
             log2 value, chromosome, start, end, bin name.
@@ -358,7 +358,7 @@ class GenomicArray(object):
         #     else:
         #         if not len(key) == len(self):
         #             raise ValueError("Sort key, as an array, must have the "
-        #                              "same length as the CopyNumArray to sort "
+        #                              "same length as the GenomicArray to sort "
         #                              "(%d vs. %d)." % (len(key), len(self)))
         #         keys = key
         #     order = np.argsort(keys, kind='mergesort')

@@ -40,6 +40,12 @@ class CopyNumArray(gary.GenomicArray):
         self.meta['chr_y'] = chr_y
         return chr_y
 
+    # More meta to store:
+    #   is_sample_male = bool
+    #   is_reference_male = bool
+    #   file_path
+    #   * invalidate 'chr_x' if .chromosome/['chromosome'] is set
+
     # Traversal
 
     def autosomes(self):
