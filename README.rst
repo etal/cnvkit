@@ -7,10 +7,6 @@ and alterations genome-wide from targeted DNA sequencing.
 
 Read the full documentation at: http://cnvkit.readthedocs.org
 
-Questions, comments, help and discussion on SeqAnswers:
-http://seqanswers.com/forums/showthread.php?t=47910
-
-
 .. image:: https://travis-ci.org/etal/cnvkit.svg?branch=master
     :target: https://travis-ci.org/etal/cnvkit
 
@@ -19,16 +15,31 @@ http://seqanswers.com/forums/showthread.php?t=47910
    :alt: Code Health
 
 
+Support
+-------
+
+Please use Biostars to ask any questions and see answers to previous questions
+(click "New Post", top right corner):
+https://www.biostars.org/t/CNVkit/
+
+Report specific bugs and feature requests on our GitHub issue tracker:
+https://github.com/etal/cnvkit/issues/
+
+
 Try it
 ======
 
 You can easily run CNVkit on your own data without installing it by using our
-DNAnexus app:
-https://platform.dnanexus.com/app/cnvkit_batch
+`DNAnexus app <https://platform.dnanexus.com/app/cnvkit_batch>`_.
 
-A Galaxy tool is also available for testing (but requires CNVkit installation,
-see below):
-https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit
+A `Galaxy tool <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ is
+available for testing (but requires CNVkit installation, see below).
+
+A `Docker container <https://registry.hub.docker.com/u/etal/cnvkit/>`_ is also
+available on Docker Hub.
+
+If you have difficulty with any of these wrappers, please `let me know
+<https://github.com/etal/cnvkit/issues/>`_!
 
 
 Installation
