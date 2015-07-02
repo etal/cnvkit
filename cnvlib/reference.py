@@ -165,7 +165,7 @@ def warn_bad_probes(probes):
             if 'rmask' in probes:
                 print("  %s  %s  coverage=%.3f  spread=%.3f  rmask=%.3f"
                       % (gene.ljust(gene_cols), label.ljust(chrom_cols),
-                         probe['coverage'], probe['spread'], probe['rmask']))
+                         probe['log2'], probe['spread'], probe['rmask']))
             else:
                 print("  %s  %s  coverage=%.3f  spread=%.3f"
                       % (gene.ljust(gene_cols), label.ljust(chrom_cols),
