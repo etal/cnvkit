@@ -16,7 +16,7 @@ Read the full documentation at: http://cnvkit.readthedocs.org
 
 
 Support
--------
+=======
 
 Please use Biostars to ask any questions and see answers to previous questions
 (click "New Post", top right corner):
