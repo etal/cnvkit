@@ -37,13 +37,13 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     cnarr1 = CNA.read(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
-        extra_cols = ['chromosome', 'start', 'end', 'gene', 'log2']
+        col_names = ['chromosome', 'start', 'end', 'gene', 'log2']
         if 'gc' in cnarr1 or fa_fname:
-            extra_cols.append('gc')
+            col_names.append('gc')
         if fa_fname:
-            extra_cols.append('rmask')
-        extra_cols.append('spread')
-        return CNA.from_rows([], extra_cols, {'sample_id': "reference"})
+            col_names.append('rmask')
+        col_names.append('spread')
+        return CNA.from_rows([], col_names, {'sample_id': "reference"})
 
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
