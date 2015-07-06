@@ -31,12 +31,13 @@ Command line usage
     scripts
 
 
-FAQ
----
+FAQ & How To
+------------
 
 .. toctree::
 
     fileformats
+    calling
     heterogeneity
     nonhybrid
 
