@@ -589,8 +589,7 @@ def do_fix(target_raw, antitarget_raw, reference,
     anti_cnarr = fix.load_adjust_coverages(antitarget_raw, reference,
                                            do_gc, False, do_rmask)
     # Merge target and antitarget & sort probes by chromosomal location
-    if len(anti_cnarr):
-        cnarr.add_array(anti_cnarr)
+    cnarr.add_array(anti_cnarr)
     if len(cnarr):
         cnarr.center_all()
     # Determine weights for each bin (used in segmentation)

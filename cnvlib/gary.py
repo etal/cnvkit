@@ -286,12 +286,9 @@ class GenomicArray(object):
         if not isinstance(other, self.__class__):
             raise ValueError("Argument (type %s) is not a %s instance"
                              % (type(other), self.__class__))
-        # if not (self.data.index.names == other.data.index.names and
-        #         list(self.data) == list(other.data)):
-        #     raise ValueError("DataFrame indices or columns do not match")
-        table = pd.concat([self.data.set_index(['chromosome', 'start']),
-                           other.data.set_index(['chromosome', 'start'])])
-        self.data = table.sort().reset_index()
+        if len(other.data):
+            self.data = pd.concat([self.data, other.data])
+        self.sort()
 
     def copy(self):
         """Create an independent copy of this object."""
@@ -318,25 +315,6 @@ class GenomicArray(object):
         table = self.data.loc[:, self._required_columns]
         return self.as_dataframe(table)
 
-    # def reorder(self, key):
-    #     """Apply a different ordering of chromosomes to this array.
-
-    #     Key is either:
-
-    #     - A function returning comparable (Python-sortable) values; or
-    #     - A list of all chromosome values in the array, in the desired order.
-
-    #     """
-    #     if callable(key):
-    #         chrom_keys = np.apply_along_axis(key, self.data["chromosome"], 0)
-    #         new_order = np.argsort(chrom_keys)
-    #         # TODO - sort self.data by new_order; reindex
-    #     else:
-    #         assert len(key) <= len(uniq(self.data["chromosome"]))
-    #         # TODO - get indices of each listed chrom; sort into that order
-    #         # NB: put any missing chroms at the end of the array, in their
-    #         # current order
-
     def select(self, selector=None, **kwargs):
         """Take a subset of rows where the given condition is true.
 
@@ -361,29 +339,13 @@ class GenomicArray(object):
         self.data = self.data.iloc[order]
         return order
 
-    def sort(self, key=None):
-        """Sort the bins in this array (in-place). Leaves chromosomes alone.
-        """
-        # if key is None:
-        #     # Sort by chrom, then by start position
-        #     chrom_keys = list(map(core.sorter_chrom, self.data['chromosome']))
-        #     order = np.lexsort((self.data['start'], chrom_keys))
-        # else:
-        #     # Sort by the given key, using a stable sort algorithm
-        #     if isinstance(key, basestring):
-        #         keys = self.data[key]
-        #     elif callable(key):
-        #         keys = list(map(key, self.data))
-        #     else:
-        #         if not len(key) == len(self):
-        #             raise ValueError("Sort key, as an array, must have the "
-        #                              "same length as the GenomicArray to sort "
-        #                              "(%d vs. %d)." % (len(key), len(self)))
-        #         keys = key
-        #     order = np.argsort(keys, kind='mergesort')
-        # self.data = self.data.take(order)
-        table = self.data.set_index(['chromosome', 'start'])
-        self.data = table.sort().reset_index()
+    def sort(self):
+        """Sort this array's bins in-place, with smart chromosome ordering."""
+        sort_keys = self.chromosome.apply(core.sorter_chrom)
+        table = (self.data.assign(SORT_KEY=sort_keys)
+                 .sort_index(by=['SORT_KEY', 'start']))
+        del table['SORT_KEY']
+        self.data = table.reset_index(drop=True)
 
     # I/O
 
