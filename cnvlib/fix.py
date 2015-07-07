@@ -82,27 +82,34 @@ def mask_bad_probes(probes):
     return np.asarray(mask)
 
 
-def center_by_window(pset, fraction, sort_key):
+def center_by_window(cnarr, fraction, sort_key):
     """Smooth out biases according to the trait specified by sort_key.
 
     E.g. correct GC-biased probes by windowed averaging across similar-GC
     probes; or for similar interval sizes.
     """
-    adj_pset = pset.copy()
     # Separate neighboring probes that could have the same key
     # (to avoid re-centering actual CNV regions -- only want an independently
     # sampled subset of presumably overall-CN-neutral probes)
-    shuffle_order = adj_pset.shuffle()
-    if isinstance(sort_key, np.ndarray):
+    df = cnarr.data.reset_index(drop=True)
+    shuffle_order = np.random.permutation(df.index)
+    df = df.reindex(shuffle_order)
+    if isinstance(sort_key, (np.ndarray, pd.Series)):
         # Apply the same shuffling to the key array as to the target probe set
         sort_key = sort_key[shuffle_order]
+    elif callable(sort_key):
+        sort_key = df.apply(sort_key, axis=1) # ???
+    else:
+        raise ValueError("What is this?: %r" % sort_key)
     # Sort the data according to the specified parameter
-    adj_pset.sort(key=sort_key)
-    biases = smoothing.rolling_median(adj_pset['log2'], fraction)
-    # biases = smoothing.smoothed(adj_pset['log2'], fraction)
-    adj_pset['log2'] -= biases
-    adj_pset.sort()
-    return adj_pset
+    order = np.argsort(sort_key, kind='mergesort')
+    df = df.iloc[order]
+    biases = smoothing.rolling_median(df['log2'], fraction)
+    # biases = smoothing.smoothed(df['log2'], fraction)
+    df['log2'] -= biases
+    fixarr = cnarr.as_dataframe(df)
+    fixarr.sort()
+    return fixarr
 
 
 def make_edge_sorter(target_probes, margin):
