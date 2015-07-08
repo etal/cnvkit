@@ -157,6 +157,7 @@ def create_chrom_ids(segments):
             curr_idx += 1
     return mapping
 
+
 # _____________________________________________________________________________
 # freebayes
 
@@ -204,7 +205,7 @@ def segments2freebayes(segments, sample_name, ploidy, purity, is_reference_male,
     absolutes = cna_absolutes(segments, ploidy, purity, is_reference_male,
                               is_sample_female)
     for row, abs_val in zip(segments, absolutes):
-        ncopies = _round_to_integer(abs_val, half_is_zero=purity is None)
+        ncopies = int(round(abs_val))
         # Ignore regions of neutral copy number
         if ncopies != ploidy:
             yield (row["chromosome"], # reference sequence
@@ -212,20 +213,6 @@ def segments2freebayes(segments, sample_name, ploidy, purity, is_reference_male,
                    row["end"], # end
                    sample_name, # sample name
                    ncopies) # copy number
-
-
-def _round_to_integer(ncopies, half_is_zero=True, rounding_error=1e-7):
-    """Round an absolute estimate of copy number to a positive integer.
-
-    `half_is_zero` indicates the hack of encoding 0 copies (complete loss) as a
-    half-copy in log2 scale (e.g. log2-ratio value of -2.0 for diploid) to avoid
-    domain errors when log-transforming. If `half_is_zero`, a half-copy will be
-    rounded down to zero rather than up to 1 copy.
-    """
-    zero_cutoff = (.5 + rounding_error if half_is_zero else 0.0)
-    if ncopies <= zero_cutoff:
-        return 0
-    return int(round(ncopies))
 
 
 # _____________________________________________________________________________
@@ -329,11 +316,8 @@ def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
                               is_sample_female)
     if round_to_integer:
         absolutes = numpy.round(absolutes)
-        absolutes[absolutes <= 0.5] = .5
-    else:
-        # Avoid a logarithm domain error
-        absolutes[absolutes <= 0.0] = .5
-
+    # Avoid a logarithm domain error
+    absolutes = numpy.maximum(absolutes, 0.0001)
     abslog = numpy.log2(absolutes / float(ploidy))
     newcnarr = cnarr.copy()
     newcnarr["coverage"] = abslog
