@@ -6,7 +6,6 @@ import math
 import sys
 
 from Bio._py3k import map, range, zip
-import numpy
 
 from . import call, core
 from .cnarray import row2label, CopyNumArray as CNA

@@ -3,17 +3,6 @@
 import numpy as np
 
 
-def round_clonal(log2_ratio, purity, ploidy):
-    """Infer integer copy number from log2 ratio.
-    """
-    return int(round(convert_diploid(log2_ratio)))
-
-
-def round_diploid(log2_ratio):
-    """Assume purity=1, ploidy=2."""
-    return int(round(convert_diploid(log2_ratio)))
-
-
 def round_thresholds(log2_ratio, thresholds=(-1.1, -0.3, 0.2, 0.7)):
     """Call integer copy number using hard thresholds for each level.
 
@@ -48,8 +37,20 @@ def round_thresholds(log2_ratio, thresholds=(-1.1, -0.3, 0.2, 0.7)):
             return i
     else:
         return int(np.ceil(convert_diploid(log2_ratio)))
-        # ENH: opt. ploidy, purity
+        # ENH: opt. ploidy, purity, sample/ref gender
         # return int(np.ceil(convert_clonal(log2_ratio, p, p)))
+
+
+def round_clonal(log2_ratio, purity, ploidy):
+    """Infer integer copy number from log2 ratio.
+    """
+    return int(round(convert_clonal(log2_ratio, purity, ploi)))
+
+
+def round_diploid(log2_ratio):
+    """Assume purity=1, ploidy=2."""
+    return int(round(convert_diploid(log2_ratio)))
+
 
 
 def convert_clonal(log2_ratio, purity, ploidy):
@@ -111,9 +112,14 @@ def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male)
     """Determine the number copies of a chromosome expected and in reference.
 
     For sex chromosomes, these values may not be the same ploidy as the
-    autosomes.
+    autosomes. The "reference" number is the chromosome's ploidy in the
+    CNVkit reference, while "expect" is the chromosome's neutral ploidy in the
+    given sample, based on the specified gender of each. E.g., given a female
+    sample and a male reference, on chromosome X the "reference" value is 1 but
+    "expect" is 2.
 
-    Return a pair: number of copies in the reference and expected in the sample.
+    Return a pair of integers: number of copies in the reference, and expected in
+    the sample.
     """
     chrom = chrom.lower()
     if chrom in ["chrx", "x"]:
