@@ -8,7 +8,7 @@ import sys
 from Bio._py3k import map, range, zip
 import numpy
 
-from . import core
+from . import call, core
 from .cnarray import row2label, CopyNumArray as CNA
 
 ProbeInfo = collections.namedtuple('ProbeInfo', 'label chrom start end gene')
@@ -202,8 +202,8 @@ def export_freebayes(sample_fnames, args):
 def segments2freebayes(segments, sample_name, ploidy, purity, is_reference_male,
                        is_sample_female):
     """Convert a copy number array to a BED-like format."""
-    absolutes = cna_absolutes(segments, ploidy, purity, is_reference_male,
-                              is_sample_female)
+    absolutes = call.cna_absolutes(segments, ploidy, purity, is_reference_male,
+                                   is_sample_female)
     for row, abs_val in zip(segments, absolutes):
         ncopies = int(round(abs_val))
         # Ignore regions of neutral copy number
@@ -295,98 +295,6 @@ def calculate_theta_fields(seg, ref_rows, chrom_id):
             tumor_count,  # tumorCount
             ref_count     # normalCount
            )
-
-
-# _____________________________________________________________________________
-# Rescaling etc.
-# (XXX move these to cnarray or another module)
-
-def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
-                        is_sample_female=None, is_reference_male=True):
-    """Rescale segment copy ratio values given a known tumor purity."""
-    if purity and not 0.0 < purity <= 1.0:
-        raise ValueError("Purity must be between 0 and 1.")
-
-    chr_x = core.guess_chr_x(cnarr)
-    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    if is_sample_female is None:
-        is_sample_female = core.guess_xx(cnarr, is_reference_male, chr_x,
-                                         verbose=False)
-    absolutes = cna_absolutes(cnarr, ploidy, purity, is_reference_male,
-                              is_sample_female)
-    if round_to_integer:
-        absolutes = numpy.round(absolutes)
-    # Avoid a logarithm domain error
-    absolutes = numpy.maximum(absolutes, 0.0001)
-    abslog = numpy.log2(absolutes / float(ploidy))
-    newcnarr = cnarr.copy()
-    newcnarr["coverage"] = abslog
-    # Adjust sex chromosomes to be relative to the reference
-    if is_reference_male:
-        newcnarr['coverage'][newcnarr.chromosome == chr_x] += 1.0
-    newcnarr['coverage'][newcnarr.chromosome == chr_y] += 1.0
-    return newcnarr
-
-
-def cna_absolutes(cnarr, ploidy, purity, is_reference_male, is_sample_female):
-    """Calculate absolute copy number values from segment or bin log2 ratios."""
-    absolutes = numpy.zeros(len(cnarr), dtype=numpy.float_)
-    for i, row in enumerate(cnarr):
-        ref_copies, expect_copies = _reference_expect_copies(
-            row["chromosome"], ploidy, is_sample_female, is_reference_male)
-        absolutes[i] = _log2_ratio_to_absolute(
-            row["coverage"], ref_copies, expect_copies, purity)
-    return absolutes
-
-
-def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male):
-    """Determine the number copies of a chromosome expected and in reference.
-
-    For sex chromosomes, these values may not be the same ploidy as the
-    autosomes.
-
-    Return a pair: number of copies in the reference and expected in the sample.
-    """
-    chrom = chrom.lower()
-    if chrom in ["chrx", "x"]:
-        ref_copies = (ploidy // 2 if is_reference_male else ploidy)
-        exp_copies = (ploidy if is_sample_female else ploidy // 2)
-    elif chrom in ["chry", "y"]:
-        ref_copies = ploidy // 2
-        exp_copies = (0 if is_sample_female else ploidy // 2)
-    else:
-        ref_copies = exp_copies = ploidy
-    return ref_copies, exp_copies
-
-
-def _log2_ratio_to_absolute(log2_ratio, ref_copies, expect_copies, purity=None):
-    """Transform a log2 ratio value to absolute linear scale.
-
-    Math:
-
-        log2_ratio = log2(ncopies / ploidy)
-        2^log2_ratio = ncopies / ploidy
-        ncopies = ploidy * 2^log2_ratio
-
-    With rescaling for purity:
-
-        let v = log2 ratio value, p = tumor purity,
-            r = reference ploidy, x = expected ploidy;
-        v = log_2(p*n/r + (1-p)*x/r)
-        2^v = p*n/r + (1-p)*x/r
-        n*p/r = 2^v - (1-p)*x/r
-        n = (r*2^v - x*(1-p)) / p
-
-    If purity adjustment is skipped (p=1; e.g. if THetA was run beforehand):
-
-        n = r*2^v
-    """
-    if purity and purity < 1.0:
-        ncopies = (ref_copies * 2**log2_ratio - expect_copies * (1 - purity)
-                  ) / purity
-    else:
-        ncopies = ref_copies * 2 ** log2_ratio
-    return ncopies
 
 
 # _____________________________________________________________________________
