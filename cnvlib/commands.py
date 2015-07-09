@@ -1320,15 +1320,32 @@ P_metrics.set_defaults(func=_cmd_metrics)
 
 def _cmd_segmetrics(args):
     """Compute segment-level metrics from bin-level log2 ratios."""
+    import numpy as np
     # Calculate all metrics
     outrows = []
     cnarr = CNA.read(args.cnarray)
     # cnarr.drop_low_coverage()
     segarr = CNA.read(args.segments)
-    statcol = ["StDev=%g;MAD=%g;IQR=%g;BiVar=%g"
-               # % metrics.ests_of_scale(segbins['log2'] - segment['log2'])
-               % metrics.ests_of_scale(segbins['coverage'] - segment['coverage'])
-               for segment, segbins in cnarr.by_segment(segarr)]
+    stats = {}
+    deviations = [segbins['coverage'] - segment['coverage']
+                  # segbins['log2'] - segment['log2']
+                  for segment, segbins in  cnarr.by_segment(segarr)]
+    for statname, option, func in (
+        ("StDev", args.stdev, np.std),
+        ("MAD", args.mad, metrics.median_absolute_deviation),
+        ("IQR", args.iqr, metrics.interquartile_range),
+        ("BiVar", args.bivar, metrics.biweight_midvariance)):
+        if option:
+            stats[statname] = np.asarray([func(d) for d in deviations],
+                                         dtype=np.float64)
+    if not stats:
+        echo("No stats specified")
+        return
+
+    keys = sorted(stats.keys())
+    statcol = [';'.join(["%s=%.5g" % (key, val)
+                         for key, val in zip(keys, valrow)])
+               for valrow in zip(*[stats[k] for k in keys])]
     segarr['gene'] = statcol
     segarr.write(args.output or segarr.sample_id + ".segmetrics.cns")
 
@@ -1338,13 +1355,22 @@ P_segmetrics.add_argument('cnarray',
         help="""Bin-level copy ratio data file (*.cnn, *.cnr).""")
 P_segmetrics.add_argument('-s', '--segments', required=True,
         help="Segmentation data file (*.cns, output of the 'segment' command).")
-# TODO - user-specified stats: --stdev, --mad, --iqr, --bivar
-#         Standard deviation
-#         Median absolute deviation
-#         Interquartile range
-#         Biweight midvariance
 P_segmetrics.add_argument('-o', '--output',
         help="Output table file name.")
+# Option group?
+P_segmetrics.add_argument('--stdev', action='store_true',
+        help="Standard deviation.")
+P_segmetrics.add_argument('--mad', action='store_true',
+        help="Median absolute deviation (standardized).")
+P_segmetrics.add_argument('--iqr', action='store_true',
+        help="Inter-quartile range.")
+P_segmetrics.add_argument('--bivar', action='store_true',
+        help="Tukey's biweight midvariance.")
+P_segmetrics.add_argument('--ci', action='store_true',
+        help="Confidence interval (by bootstrap).")
+P_segmetrics.add_argument('--pi', action='store_true',
+        help="Prediction interval.")
+#/
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
 
 
