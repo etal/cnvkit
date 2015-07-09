@@ -1455,10 +1455,40 @@ P_export_nb.add_argument('-o', '--output', help="Output file name.")
 P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
+
+# BED special case: multiple samples's segments, like SEG
+def _cmd_export_bed(args):
+    """Convert segments to BED format.
+
+    Input is a segmentation file (.cns) where log2 ratios have already been
+    adjusted to integer absolute values using the 'call' command.
+    """
+    outheader, outrows = export.export_bed(args.segments, args)
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+P_export_bed = P_export_subparsers.add_parser('bed',
+        help=_cmd_export_bed.__doc__)
+P_export_bed.add_argument('segments', nargs='+',
+        help="""Segmented copy ratio data files (*.cns), the output of the
+                'segment' sub-command.""")
+P_export_bed.add_argument("-i", "--sample-id",
+        help="Identifier to write in the 4th column of the BED file.")
+P_export_bed.add_argument("--ploidy", type=int, default=2,
+        help="Ploidy of the sample cells. [Default: %(default)d]")
+# Argument that could be shared across 'export':
+P_export_bed.add_argument("-y", "--male-reference", action="store_true",
+        help="""Was a male reference used?  If so, expect half ploidy on
+                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
+                if a male reference was used, the "neutral" copy number (ploidy)
+                of chrX is 1; chrY is haploid for either gender reference.""")
+P_export_bed.add_argument('-o', '--output', help="Output file name.")
+P_export_bed.set_defaults(func=_cmd_export_bed)
+
+
+
 # FreeBayes/BED special case: multiple samples's segments, like SEG
-# TODO - rename to 'export bed'
 def _cmd_export_fb(args):
-    """Convert segments to FreeBayes --cnv-map format (BED-like).
+    """[DEPRECATED] Convert segments to FreeBayes --cnv-map format (BED-like).
 
     Generates an input file for use with FreeBayes's --cnv-map option.
 

@@ -158,6 +158,40 @@ def create_chrom_ids(segments):
 
 
 # _____________________________________________________________________________
+# BED
+
+def export_bed(sample_fnames, args):
+    """Export to BED format.
+
+    For each region in each sample which does not have neutral copy number
+    (equal to 2 or the value set by --ploidy), the columns are:
+
+        - reference sequence name
+        - start (0-indexed)
+        - end
+        - sample name or given label
+        - integer copy number
+    """
+    bed_rows = []
+    for fname in sample_fnames:
+        segs = CNA.read(fname)
+        rows = segments2bed(segs, args.sample_id or segs.sample_id, args.ploidy,
+                            args.male_reference)
+        bed_rows.extend(rows)
+    return None, bed_rows
+
+
+def segments2bed(segments, label, ploidy, is_reference_male):
+    """Convert a copy number array to a BED-like format."""
+    absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
+    for row, abs_val in zip(segments, absolutes):
+        ncopies = int(round(abs_val))
+        # Ignore regions of neutral copy number
+        if ncopies != ploidy:
+            yield (row["chromosome"], row["start"], row["end"], label, ncopies)
+
+
+# _____________________________________________________________________________
 # freebayes
 
 def export_freebayes(sample_fnames, args):
@@ -201,8 +235,8 @@ def export_freebayes(sample_fnames, args):
 def segments2freebayes(segments, sample_name, ploidy, purity, is_reference_male,
                        is_sample_female):
     """Convert a copy number array to a BED-like format."""
-    absolutes = call.cna_absolutes(segments, ploidy, purity, is_reference_male,
-                                   is_sample_female)
+    absolutes = call.absolute_clonal(segments, ploidy, purity,
+                                     is_reference_male, is_sample_female)
     for row, abs_val in zip(segments, absolutes):
         ncopies = int(round(abs_val))
         # Ignore regions of neutral copy number
