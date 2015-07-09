@@ -1265,22 +1265,22 @@ P_gender.set_defaults(func=_cmd_gender)
 def _cmd_metrics(args):
     """Compute coverage deviations and other metrics for self-evaluation.
     """
-    if (len(args.coverages) > 1 and len(args.segments) > 1 and
-        len(args.coverages) != len(args.segments)):
+    if (len(args.cnarrays) > 1 and len(args.segments) > 1 and
+        len(args.cnarrays) != len(args.segments)):
         raise ValueError("Number of coverage/segment filenames given must be "
                          "equal, if more than 1 segment file is given.")
 
     # Repeat a single segment file to match the number of coverage files
-    if len(args.coverages) > 1 and len(args.segments) == 1:
-        args.segments = [args.segments[0] for _i in range(len(args.coverages))]
+    if len(args.cnarrays) > 1 and len(args.segments) == 1:
+        args.segments = [args.segments[0] for _i in range(len(args.cnarrays))]
 
     # Calculate all metrics
     outrows = []
-    for probes_fname, segs_fname in zip(args.coverages, args.segments):
-        probes = CNA.read(probes_fname)
+    for probes_fname, segs_fname in zip(args.cnarrays, args.segments):
+        cnarr = CNA.read(probes_fname)
         segments = CNA.read(segs_fname)
         values = metrics.ests_of_scale(
-            metrics.probe_deviations_from_segments(probes, segments))
+            metrics.probe_deviations_from_segments(cnarr, segments))
         outrows.append([core.rbase(probes_fname), len(segments)] +
                        ["%.7f" % val for val in values])
 
@@ -1290,7 +1290,7 @@ def _cmd_metrics(args):
         with ngfrills.safe_write(args.output or sys.stdout) as handle:
             handle.write("Sample: %s\n" % sample_id)
             handle.write("Number of called segments: %d\n" % nseg)
-            handle.write("Deviation of probe coverages from segment calls:\n")
+            handle.write("Deviation of bin log2 ratios from segment calls:\n")
             handle.write("  Standard deviation = %s\n" % stdev)
             handle.write("  Median absolute deviation = %s\n" % mad)
             handle.write("  Interquartile range = %s\n" % iqr)
