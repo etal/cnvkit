@@ -48,9 +48,10 @@ class GenomicArray(object):
     @classmethod
     def from_columns(cls, columns, meta_dict=None):
         """Create a new instance from column arrays, given by name."""
-        # TODO - ensure columns are sorted properly
         table = pd.DataFrame.from_dict(columns)
-        return cls(table, meta_dict)
+        ary = cls(table, meta_dict)
+        ary.sort_columns()
+        return ary
 
     @classmethod
     def from_rows(cls, rows, columns=None, meta_dict=None):
@@ -341,11 +342,20 @@ class GenomicArray(object):
 
     def sort(self):
         """Sort this array's bins in-place, with smart chromosome ordering."""
-        sort_keys = self.chromosome.apply(core.sorter_chrom)
-        table = (self.data.assign(SORT_KEY=sort_keys)
-                 .sort_index(by=['SORT_KEY', 'start']))
+        table = self.data.copy()
+        table['SORT_KEY'] = self.chromosome.apply(core.sorter_chrom)
+        table.sort_index(by=['SORT_KEY', 'start'], inplace=True)
         del table['SORT_KEY']
         self.data = table.reset_index(drop=True)
+
+    def sort_columns(self):
+        extra_cols = []
+        for col in self.data.columns:
+            if col not in self._required_columns:
+                extra_cols.append(col)
+        sorted_colnames = list(self._required_columns) + sorted(extra_cols)
+        assert len(sorted_colnames) == len(self.data.columns)
+        self.data = self.data.reindex(columns=sorted_colnames)
 
     # I/O
 
