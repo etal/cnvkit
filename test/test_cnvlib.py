@@ -134,6 +134,9 @@ class OtherTests(unittest.TestCase):
         # self.assertAlmostEqual(fix.edge_loss(target_size, insert_size),
         #                        2 * fix.edge_gain(target_size, insert_size, 0))
 
+    # call
+    # Test: convert_clonal(x, 1, 2) == convert_diploid(x)
+
 
 
 if __name__ == '__main__':
