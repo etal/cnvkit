@@ -64,8 +64,8 @@ manuscript by DOI, like so:
     using off-target reads.
     *bioRxiv* doi: http://dx.doi.org/10.1101/010876
 
-A recent poster presentation is also available on `F1000 Posters
-<http://f1000.com/posters/browse/summary/1096236>`_.
+A poster presentation can be viewed at `F1000 Research
+<http://f1000research.com/posters/1096236>`_.
 
 
 Indices and tables
