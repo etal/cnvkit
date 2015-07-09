@@ -1,9 +1,35 @@
 """Call copy number variants from segmented log2 ratios."""
+from __future__ import absolute_import, division, print_function
 
 import numpy as np
 
+from cnvlib import core
 
-def round_thresholds(log2_ratio, thresholds=(-1.1, -0.3, 0.2, 0.7)):
+
+def round_log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
+                      min_abs_val=1e-3):
+    """Convert absolute integer copy numbers to log2 ratios.
+
+    Account for reference gender & ploidy of sex chromosomes.
+    """
+    newcnarr = cnarr.copy()
+    chr_x = core.guess_chr_x(cnarr)
+    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
+
+    # Round absolute copy numbers to integer values
+    absolutes = np.round(absolutes)
+    # Avoid a logarithm domain error
+    absolutes = np.maximum(absolutes, min_abs_val)
+    newcnarr['coverage'] = np.log2(absolutes / float(ploidy))
+
+    # Adjust sex chromosomes to be relative to the reference
+    if is_reference_male:
+        newcnarr['coverage'][newcnarr.chromosome == chr_x] += 1.0
+    newcnarr['coverage'][newcnarr.chromosome == chr_y] += 1.0
+    return newcnarr
+
+
+def absolute_threshold(cnarr, ploidy, is_reference_male, thresholds):
     """Call integer copy number using hard thresholds for each level.
 
     Integer values are assigned for log2 ratio values less than each given
@@ -29,75 +55,23 @@ def round_thresholds(log2_ratio, thresholds=(-1.1, -0.3, 0.2, 0.7)):
 
         LOSS(1) <  -0.4
         GAIN(3) >=  +0.3
-
     """
-    i = 0
-    for i, thresh in enumerate(thresholds):
-        if log2_ratio < thresh:
-            return i
-    else:
-        return int(np.ceil(convert_diploid(log2_ratio)))
-        # ENH: opt. ploidy, purity, sample/ref gender
-        # return int(np.ceil(convert_clonal(log2_ratio, p, p)))
+    absolutes = np.zeros(len(cnarr), dtype=np.float_)
+    for idx, row in enumerate(cnarr):
+        cnum = 0
+        for cnum, thresh in enumerate(thresholds):
+            if row['coverage'] <= thresh:
+                break
+        else:
+            ref_copies = _reference_copies_pure(row['chromosome'], ploidy,
+                                                is_reference_male)
+            cnum = int(np.ceil(_log2_ratio_to_absolute_pure(row['coverage'],
+                                                            ref_copies)))
+        absolutes[idx] = cnum
+    return absolutes
 
 
-def round_clonal(log2_ratio, purity, ploidy):
-    """Infer integer copy number from log2 ratio.
-    """
-    return int(round(convert_clonal(log2_ratio, purity, ploi)))
-
-
-def round_diploid(log2_ratio):
-    """Assume purity=1, ploidy=2."""
-    return int(round(convert_diploid(log2_ratio)))
-
-
-
-def convert_clonal(log2_ratio, purity, ploidy):
-    """
-    """
-    # TODO take math from export...
-
-
-def convert_diploid(log2_ratio):
-    """Assume purity=1, ploidy=2."""
-    return 2 ** (log2_ratio + 1)
-
-
-# Test: convert_clonal(x, 1, 2) == convert_diploid(x)
-
-# _____________________________________________________________________________
-# Rescaling etc.
-
-# TODO refactor
-def rescale_copy_ratios(cnarr, purity=None, ploidy=2, round_to_integer=False,
-                        is_sample_female=None, is_reference_male=True):
-    """Rescale segment copy ratio values given a known tumor purity."""
-    if purity and not 0.0 < purity <= 1.0:
-        raise ValueError("Purity must be between 0 and 1.")
-
-    chr_x = core.guess_chr_x(cnarr)
-    chr_y = ('chrY' if chr_x.startswith('chr') else 'Y')
-    if is_sample_female is None:
-        is_sample_female = core.guess_xx(cnarr, is_reference_male, chr_x,
-                                         verbose=False)
-    absolutes = cna_absolutes(cnarr, ploidy, purity, is_reference_male,
-                              is_sample_female)
-    if round_to_integer:
-        absolutes = np.round(absolutes)
-    # Avoid a logarithm domain error
-    absolutes = np.maximum(absolutes, 0.0001)
-    abslog = np.log2(absolutes / float(ploidy))
-    newcnarr = cnarr.copy()
-    newcnarr["coverage"] = abslog
-    # Adjust sex chromosomes to be relative to the reference
-    if is_reference_male:
-        newcnarr['coverage'][newcnarr.chromosome == chr_x] += 1.0
-    newcnarr['coverage'][newcnarr.chromosome == chr_y] += 1.0
-    return newcnarr
-
-
-def cna_absolutes(cnarr, ploidy, purity, is_reference_male, is_sample_female):
+def absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for i, row in enumerate(cnarr):
@@ -105,6 +79,16 @@ def cna_absolutes(cnarr, ploidy, purity, is_reference_male, is_sample_female):
             row["chromosome"], ploidy, is_sample_female, is_reference_male)
         absolutes[i] = _log2_ratio_to_absolute(
             row["coverage"], ref_copies, expect_copies, purity)
+    return absolutes
+
+
+def absolute_pure(cnarr, ploidy, is_reference_male):
+    """Calculate absolute copy number values from segment or bin log2 ratios."""
+    absolutes = np.zeros(len(cnarr), dtype=np.float_)
+    for i, row in enumerate(cnarr):
+        ref_copies = _reference_copies_pure(row["chromosome"], ploidy,
+                                            is_reference_male)
+        absolutes[i] = _log2_ratio_to_absolute_pure(row["coverage"], ref_copies)
     return absolutes
 
 
@@ -133,8 +117,23 @@ def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male)
     return ref_copies, exp_copies
 
 
+def _reference_copies_pure(chrom, ploidy, is_reference_male):
+    """Determine the reference number of chromosome copies (pure sample).
+
+    Return the integer number of copies in the reference.
+    """
+    chrom = chrom.lower()
+    if chrom in ["chry", "y"] or (is_reference_male and chrom in ["chrx", "x"]):
+        ref_copies = ploidy // 2
+    else:
+        ref_copies = ploidy
+    return ref_copies
+
+
 def _log2_ratio_to_absolute(log2_ratio, ref_copies, expect_copies, purity=None):
-    """Transform a log2 ratio value to absolute linear scale.
+    """Transform a log2 ratio to absolute linear scale (for an impure sample).
+
+    Does not round to an integer absolute value here.
 
     Math:
 
@@ -151,7 +150,8 @@ def _log2_ratio_to_absolute(log2_ratio, ref_copies, expect_copies, purity=None):
         n*p/r = 2^v - (1-p)*x/r
         n = (r*2^v - x*(1-p)) / p
 
-    If purity adjustment is skipped (p=1; e.g. if THetA was run beforehand):
+    If purity adjustment is skipped (p=1; e.g. if germline or if scaling for
+    heterogeneity was done beforehand):
 
         n = r*2^v
     """
@@ -159,6 +159,19 @@ def _log2_ratio_to_absolute(log2_ratio, ref_copies, expect_copies, purity=None):
         ncopies = (ref_copies * 2**log2_ratio - expect_copies * (1 - purity)
                   ) / purity
     else:
-        ncopies = ref_copies * 2 ** log2_ratio
+        ncopies = _log2_ratio_to_absolute_pure(log2_ratio, ref_copies)
     return ncopies
 
+
+def _log2_ratio_to_absolute_pure(log2_ratio, ref_copies):
+    """Transform a log2 ratio to absolute linear scale (for a pure sample).
+
+    Purity adjustment is skipped. This is appropriate if the sample is germline
+    or if scaling for tumor heterogeneity was done beforehand.
+
+    Math::
+
+        n = r*2^v
+    """
+    ncopies = ref_copies * 2 ** log2_ratio
+    return ncopies

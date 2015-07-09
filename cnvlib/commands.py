@@ -27,7 +27,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 from . import (core, target, antitarget, coverage, fix, metrics, reference,
-               reports, export, importers, segmentation,
+               reports, export, importers, segmentation, call,
                params, ngfrills, plots)
 from .ngfrills import echo
 from .cnarray import CopyNumArray as CNA
@@ -654,8 +654,93 @@ P_segment.add_argument('-m', '--method',
         help="""Segmentation method (CBS, HaarSeg, or Fused Lasso).
                 [Default: %(default)s]""")
 P_segment.add_argument("--rlibpath",
-                       help="Path to an alternative site-library to use for R packages.")
+        help="Path to an alternative site-library to use for R packages.")
 P_segment.set_defaults(func=_cmd_segment)
+
+
+# call ------------------------------------------------------------------------
+
+def _cmd_call(args):
+    """Call copy number variants from segmented log2 ratios."""
+    if args.purity and not 0.0 < args.purity <= 1.0:
+        raise RuntimeError("Purity must be between 0 and 1.")
+
+    segments = CNA.read(args.segment)
+    is_sample_female = core.guess_xx(segments, args.male_reference,
+                                     verbose=False)
+    if args.gender:
+        is_sample_female_given = (args.gender in ["f", "female"])
+        if is_sample_female != is_sample_female_given:
+            print("Sample gender specified as", args.gender,
+                  "but chrX copy number looks like",
+                  "female" if is_sample_female else "male",
+                  file=sys.stderr)
+            is_sample_female = is_sample_female_given
+    print("Treating sample gender as",
+            "female" if is_sample_female else "male",
+            file=sys.stderr)
+
+    segs_adj = do_call(segments, args.method, args.ploidy, args.purity,
+                       args.male_reference, is_sample_female, args.thresholds)
+    segs_adj.write(args.output or segs_adj.sample_id + '.call.cns')
+
+
+def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
+            is_sample_female=False, thresholds=(-1.1, -0.3, 0.2, 0.7)):
+    if method == "clonal":
+        if purity and purity < 1.0:
+            echo("Calling copy number with clonal purity %g, ploidy %d"
+                 % (purity, ploidy))
+            absolutes = call.absolute_clonal(segments, ploidy, purity,
+                                           is_reference_male, is_sample_female)
+        else:
+            # Simpler math if sample is pure
+            echo("Calling copy number with clonal ploidy %d" % ploidy)
+            absolutes = call.absolute_pure(segments, ploidy,
+                                                is_reference_male)
+    elif method == "threshold":
+        tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
+        echo("Calling copy number with thresholds: " + ", ".join(tokens))
+        absolutes = call.absolute_threshold(segments, ploidy, is_reference_male,
+                                           thresholds)
+    else:
+        raise ValueError("Argument `method` must be one of: clonal, threshold")
+    segs_adj = call.round_log2_ratios(segments, absolutes, ploidy,
+                                      is_reference_male)
+    return segs_adj
+
+
+def csvstring(text):
+    return tuple(map(float, text.split(",")))
+
+
+P_call = AP_subparsers.add_parser('call', help=_cmd_call.__doc__)
+P_call.add_argument('segment',
+        help="Segmentation calls (.cns), the output of the 'segment' command.")
+P_call.add_argument('-m', '--method',
+        choices=('threshold', 'clonal'), default='threshold',
+        help="""Calling method. [Default: %(default)s]""")
+P_call.add_argument('-t', '--thresholds',
+        type=csvstring, default="-1.1,-0.3,0.2,0.7",
+        help="""Hard thresholds for calling each integer copy number, separated
+                by commas. Use the '=' sign on the command line, e.g.: -t=-1,0,1
+                [Default: %(default)s]""")
+P_call.add_argument("--ploidy", type=int, default=2,
+        help="Ploidy of the sample cells. [Default: %(default)d]")
+P_call.add_argument("--purity", type=float,
+        help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
+P_call.add_argument("-g", "--gender",
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+        help="""Specify the sample's gender as male or female. (Otherwise
+                guessed from chrX copy number).""")
+P_call.add_argument('-y', '--male-reference', action='store_true',
+        help="""Was a male reference used?  If so, expect half ploidy on
+                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
+                if a male reference was used, the "neutral" copy number (ploidy)
+                of chrX is 1; chrY is haploid for either gender reference.""")
+P_call.add_argument('-o', '--output',
+        help="Output table file name (CNR-like table of segments, .cns).")
+P_call.set_defaults(func=_cmd_call)
 
 
 # _____________________________________________________________________________
@@ -1332,7 +1417,6 @@ P_import_theta.set_defaults(func=_cmd_import_theta)
 
 # export ----------------------------------------------------------------------
 
-
 P_export = AP_subparsers.add_parser('export',
         help="""Convert CNVkit output files to another format.""")
 P_export_subparsers = P_export.add_subparsers(
@@ -1371,7 +1455,8 @@ P_export_nb.add_argument('-o', '--output', help="Output file name.")
 P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
-# FreeBayes special case: multiple samples's segments, like SEG
+# FreeBayes/BED special case: multiple samples's segments, like SEG
+# TODO - rename to 'export bed'
 def _cmd_export_fb(args):
     """Convert segments to FreeBayes --cnv-map format (BED-like).
 
@@ -1391,7 +1476,7 @@ P_export_fb.add_argument('segments', nargs='+',
                 'segment' sub-command.""")
 P_export_fb.add_argument("-i", "--sample-id",
         help="Sample name, as FreeBayes should see it.")
-# Arguments that could be shared across 'export'
+# Arguments to drop in favor of 'call':
 P_export_fb.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_export_fb.add_argument("--purity", type=float,
@@ -1400,12 +1485,13 @@ P_export_fb.add_argument("-g", "--gender",
         choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
+# /
+# Argument that could be shared across 'export':
 P_export_fb.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
                 of chrX is 1; chrY is haploid for either gender reference.""")
-# /
 P_export_fb.add_argument('-o', '--output', help="Output file name.")
 P_export_fb.set_defaults(func=_cmd_export_fb)
 
