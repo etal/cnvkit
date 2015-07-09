@@ -1316,6 +1316,38 @@ P_metrics.add_argument('-o', '--output',
 P_metrics.set_defaults(func=_cmd_metrics)
 
 
+# segmetrics ------------------------------------------------------------------
+
+def _cmd_segmetrics(args):
+    """Compute segment-level metrics from bin-level log2 ratios."""
+    # Calculate all metrics
+    outrows = []
+    cnarr = CNA.read(args.cnarray)
+    # cnarr.drop_low_coverage()
+    segarr = CNA.read(args.segments)
+    statcol = ["StDev=%g;MAD=%g;IQR=%g;BiVar=%g"
+               # % metrics.ests_of_scale(segbins['log2'] - segment['log2'])
+               % metrics.ests_of_scale(segbins['coverage'] - segment['coverage'])
+               for segment, segbins in cnarr.by_segment(segarr)]
+    segarr['gene'] = statcol
+    segarr.write(args.output or segarr.sample_id + ".segmetrics.cns")
+
+
+P_segmetrics = AP_subparsers.add_parser('segmetrics', help=_cmd_segmetrics.__doc__)
+P_segmetrics.add_argument('cnarray',
+        help="""Bin-level copy ratio data file (*.cnn, *.cnr).""")
+P_segmetrics.add_argument('-s', '--segments', required=True,
+        help="Segmentation data file (*.cns, output of the 'segment' command).")
+# TODO - user-specified stats: --stdev, --mad, --iqr, --bivar
+#         Standard deviation
+#         Median absolute deviation
+#         Interquartile range
+#         Biweight midvariance
+P_segmetrics.add_argument('-o', '--output',
+        help="Output table file name.")
+P_segmetrics.set_defaults(func=_cmd_segmetrics)
+
+
 # _____________________________________________________________________________
 # Other I/O and compatibility
 
