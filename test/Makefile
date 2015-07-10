@@ -142,7 +142,7 @@ p2-9_2.nexus: build/p2-9_2.cnr
 	$(cnvkit) export nexus-basic $^ -o $@
 
 p2-all.bed: $(picard_segs:.cns=.call-clonal.cns)
-	$(cnvkit) export bed $^ -o $@
+	$(cnvkit) export bed $^ -y -o $@
 
 p2-9_2.theta2.input: build/p2-9_2.cns build/reference-picard.cnn
 	$(cnvkit) export theta $^ -o $@

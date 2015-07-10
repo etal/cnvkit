@@ -1535,7 +1535,8 @@ def _cmd_export_seg(args):
     outheader, outrows = export.export_seg(args.filenames)
     core.write_tsv(args.output, outrows, colnames=outheader)
 
-P_export_seg = P_export_subparsers.add_parser('seg', help=_cmd_export_seg.__doc__)
+P_export_seg = P_export_subparsers.add_parser('seg',
+        help=_cmd_export_seg.__doc__)
 P_export_seg.add_argument('filenames', nargs='+',
         help="""Segmented copy ratio data file(s) (*.cns), the output of the
                 'segment' sub-command.""")
@@ -1558,13 +1559,12 @@ P_export_nb.add_argument('-o', '--output', help="Output file name.")
 P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
-
 # BED special case: multiple samples's segments, like SEG
 def _cmd_export_bed(args):
     """Convert segments to BED format.
 
-    Input is a segmentation file (.cns) where log2 ratios have already been
-    adjusted to integer absolute values using the 'call' command.
+    Input is a segmentation file (.cns) where, preferably, log2 ratios have
+    already been adjusted to integer absolute values using the 'call' command.
     """
     outheader, outrows = export.export_bed(args.segments, args)
     core.write_tsv(args.output, outrows, colnames=outheader)
@@ -1574,11 +1574,14 @@ P_export_bed = P_export_subparsers.add_parser('bed',
 P_export_bed.add_argument('segments', nargs='+',
         help="""Segmented copy ratio data files (*.cns), the output of the
                 'segment' or 'call' sub-commands.""")
-P_export_bed.add_argument("-i", "--sample-id",
-        help="Identifier to write in the 4th column of the BED file.")
+P_export_bed.add_argument("-i", "--sample-id", metavar="LABEL",
+        help="""Identifier to write in the 4th column of the BED file.
+                [Default: use the sample ID, taken from the file name]""")
 P_export_bed.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
-# Argument that could be shared across 'export':
+P_export_bed.add_argument("--show-neutral", action="store_true",
+        help="""Write segmented regions of neutral copy number, in addition to
+                copy number alterations. [Default: only output CNA regions]""")
 P_export_bed.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
@@ -1586,7 +1589,6 @@ P_export_bed.add_argument("-y", "--male-reference", action="store_true",
                 of chrX is 1; chrY is haploid for either gender reference.""")
 P_export_bed.add_argument('-o', '--output', help="Output file name.")
 P_export_bed.set_defaults(func=_cmd_export_bed)
-
 
 
 # FreeBayes/BED special case: multiple samples's segments, like SEG
@@ -1619,7 +1621,6 @@ P_export_fb.add_argument("-g", "--gender",
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
 # /
-# Argument that could be shared across 'export':
 P_export_fb.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
