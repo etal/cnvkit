@@ -1305,8 +1305,8 @@ def _cmd_metrics(args):
 
 
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
-P_metrics.add_argument('coverages', nargs='+',
-        help="""One or more coverage data files (*.cnn, *.cnr).""")
+P_metrics.add_argument('cnarrays', nargs='+',
+        help="""One or more bin-level coverage data files (*.cnn, *.cnr).""")
 P_metrics.add_argument('-s', '--segments', nargs='+',
         help="""One or more segmentation data files (*.cns, output of the
                 'segment' command).  If more than one file is given, the number
@@ -1569,7 +1569,7 @@ P_export_bed = P_export_subparsers.add_parser('bed',
         help=_cmd_export_bed.__doc__)
 P_export_bed.add_argument('segments', nargs='+',
         help="""Segmented copy ratio data files (*.cns), the output of the
-                'segment' sub-command.""")
+                'segment' or 'call' sub-commands.""")
 P_export_bed.add_argument("-i", "--sample-id",
         help="Identifier to write in the 4th column of the BED file.")
 P_export_bed.add_argument("--ploidy", type=int, default=2,

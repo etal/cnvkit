@@ -65,7 +65,7 @@ def load_targetcoverage_csv(fname):
         end = int(row[2])
         gene = unpipe_name(row[4])
         gc_val = float(row[5])
-        cvg = float(row[7])  # Coverage already normalized to avg. 1 by Picard
+        cvg = float(row[6])  # mean_coverage -- we'll normalize later
         if cvg == 0:
             no_cvg_cnt += 1
             coverage = NULL_LOG2_COVERAGE
