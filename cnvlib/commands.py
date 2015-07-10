@@ -1362,6 +1362,7 @@ def _confidence_interval(segarr, cnarr):
     """Confidence interval, estimated by bootstrap."""
     out_cns_ci = []
     for _segment, bins in cnarr.by_segment(segarr):
+        # cnarr.drop_low_coverage()
         k = len(bins)
         if k == 0:
             continue
@@ -1369,8 +1370,11 @@ def _confidence_interval(segarr, cnarr):
         rand_indices = np.random.random_integers(0, k - 1, (100, k))
         bootstraps = bins.data.take(rand_indices)
         # Recalculate segment means
-        bootstrap_dist = [np.average(boot["coverage"], weights=boot["weight"])
-                            for boot in bootstraps]
+        if "weight" in bins:
+            bootstrap_dist = [np.average(boot["coverage"], weights=boot["weight"])
+                                for boot in bootstraps]
+        else:
+            bootstrap_dist = [boot["coverage"].mean() for boot in bootstraps]
         ci = np.percentile(bootstrap_dist, [2.5, 97.5])
         out_cns_ci.append("%s,%s" % tuple(ci))
     return out_cns_ci
