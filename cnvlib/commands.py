@@ -10,6 +10,8 @@ import multiprocessing
 import os
 import sys
 
+import numpy as np
+
 from Bio._py3k import map, range, zip
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
@@ -1320,7 +1322,6 @@ P_metrics.set_defaults(func=_cmd_metrics)
 
 def _cmd_segmetrics(args):
     """Compute segment-level metrics from bin-level log2 ratios."""
-    import numpy as np
     # Calculate all metrics
     outrows = []
     cnarr = CNA.read(args.cnarray)
@@ -1330,24 +1331,62 @@ def _cmd_segmetrics(args):
     deviations = [segbins['coverage'] - segment['coverage']
                   # segbins['log2'] - segment['log2']
                   for segment, segbins in  cnarr.by_segment(segarr)]
+    # Measures of spread
     for statname, option, func in (
         ("StDev", args.stdev, np.std),
         ("MAD", args.mad, metrics.median_absolute_deviation),
         ("IQR", args.iqr, metrics.interquartile_range),
-        ("BiVar", args.bivar, metrics.biweight_midvariance)):
+        ("BiVar", args.bivar, metrics.biweight_midvariance),
+    ):
         if option:
             stats[statname] = np.asarray([func(d) for d in deviations],
                                          dtype=np.float64)
+    # Interval calculations
+    if args.ci:
+        stats["CI"] = _confidence_interval(segarr, cnarr)
+    if args.pi:
+        stats["PI"] = _prediction_interval(segarr, cnarr)
     if not stats:
         echo("No stats specified")
         return
 
     keys = sorted(stats.keys())
-    statcol = [';'.join(["%s=%.5g" % (key, val)
+    statcol = [';'.join(["%s=%s" % (key, val)
                          for key, val in zip(keys, valrow)])
                for valrow in zip(*[stats[k] for k in keys])]
     segarr['gene'] = statcol
     segarr.write(args.output or segarr.sample_id + ".segmetrics.cns")
+
+
+def _confidence_interval(segarr, cnarr):
+    """Confidence interval, estimated by bootstrap."""
+    out_cns_ci = []
+    for _segment, bins in cnarr.by_segment(segarr):
+        k = len(bins)
+        if k == 0:
+            continue
+        # Bootstrap for CI
+        rand_indices = np.random.random_integers(0, k - 1, (100, k))
+        bootstraps = bins.data.take(rand_indices)
+        # Recalculate segment means
+        bootstrap_dist = [np.average(boot["coverage"], weights=boot["weight"])
+                            for boot in bootstraps]
+        ci = np.percentile(bootstrap_dist, [2.5, 97.5])
+        out_cns_ci.append("%s,%s" % tuple(ci))
+    return out_cns_ci
+
+
+def _prediction_interval(segarr, cnarr):
+    """Prediction interval, estimated by percentiles."""
+    out_cns_pi = []
+    for _segment, bins in cnarr.by_segment(segarr):
+        k = len(bins)
+        if k == 0:
+            continue
+        # ENH: weighted percentile
+        pi = np.percentile(bins["coverage"], [2.5, 97.5])
+        out_cns_pi.append("%s,%s" % tuple(pi))
+    return out_cns_pi
 
 
 P_segmetrics = AP_subparsers.add_parser('segmetrics', help=_cmd_segmetrics.__doc__)
@@ -1357,20 +1396,22 @@ P_segmetrics.add_argument('-s', '--segments', required=True,
         help="Segmentation data file (*.cns, output of the 'segment' command).")
 P_segmetrics.add_argument('-o', '--output',
         help="Output table file name.")
-# Option group?
-P_segmetrics.add_argument('--stdev', action='store_true',
+
+P_segmetrics_stats = P_segmetrics.add_argument_group(
+    "Statistics available")
+P_segmetrics_stats.add_argument('--stdev', action='store_true',
         help="Standard deviation.")
-P_segmetrics.add_argument('--mad', action='store_true',
+P_segmetrics_stats.add_argument('--mad', action='store_true',
         help="Median absolute deviation (standardized).")
-P_segmetrics.add_argument('--iqr', action='store_true',
+P_segmetrics_stats.add_argument('--iqr', action='store_true',
         help="Inter-quartile range.")
-P_segmetrics.add_argument('--bivar', action='store_true',
+P_segmetrics_stats.add_argument('--bivar', action='store_true',
         help="Tukey's biweight midvariance.")
-P_segmetrics.add_argument('--ci', action='store_true',
+P_segmetrics_stats.add_argument('--ci', action='store_true',
         help="Confidence interval (by bootstrap).")
-P_segmetrics.add_argument('--pi', action='store_true',
+P_segmetrics_stats.add_argument('--pi', action='store_true',
         help="Prediction interval.")
-#/
+
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
 
 

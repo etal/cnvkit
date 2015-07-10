@@ -18,7 +18,7 @@ picard_targets= build/reference-picard.cnn $(picard_cnrs) $(picard_segs) \
 	     all-scatters.pdf all-diagrams.pdf heatmap-picard.pdf \
 	     p2-9_2-breaks.txt p2-9_2-gainloss.txt gender-picard.txt \
 	     p2-all.cdt p2-all-jtv.txt p2-all.seg p2-9_2.nexus \
-	     p2-all.bed p2-9_2.theta2.input
+	     p2-all.bed p2-9_2.theta2.input p2-9_2-segmetrics.cns
 
 # ------------------------------------------------------------------------------
 #  Action!
@@ -114,6 +114,9 @@ p2-5_5-metrics.txt p2-9_2-metrics.txt: %-metrics.txt: build/%.cnr build/%.cns
 p2-20-metrics.csv: $(addprefix build/p2-20_,$(addsuffix .cns,1 2 3 4 5))
 	$(cnvkit) metrics $(^:.cns=.cnr) -s $^ -o $@
 
+p2-9_2-segmetrics.cns: build/p2-9_2.cns build/p2-9_2.cnr
+	$(cnvkit) segmetrics -s $^ -o $@ --stdev --mad --iqr --bivar --ci --pi
+
 
 # == Calling
 
@@ -139,7 +142,7 @@ p2-9_2.nexus: build/p2-9_2.cnr
 	$(cnvkit) export nexus-basic $^ -o $@
 
 p2-all.bed: $(picard_segs:.cns=.call-clonal.cns)
-	$(cnvkit) export bed $^ -y -o $@
+	$(cnvkit) export bed $^ -o $@ --bivar --iqr --mad --stdev --ci --pi
 
 p2-9_2.theta2.input: build/p2-9_2.cns build/reference-picard.cnn
 	$(cnvkit) export theta $^ -o $@
