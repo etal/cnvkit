@@ -394,7 +394,7 @@ def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,
                   min_bin_size=None):
     """Derive a background/antitarget BED file from a target BED file."""
     if not min_bin_size:
-        min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_BIN_COVERAGE))
+        min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_REF_COVERAGE))
     background_regions = antitarget.get_background(target_bed, access_bed,
                                                    avg_bin_size, min_bin_size)
 

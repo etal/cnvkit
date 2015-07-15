@@ -30,7 +30,7 @@ def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
         rscript = rscript.replace("# libPaths", '.libPaths(c("%s"))' % rlibpath)
     sample_id = core.fbase(probes_fname)
     with ngfrills.temp_write_text(rscript % (probes_fname,
-                                             params.MIN_BIN_COVERAGE,
+                                             params.NULL_LOG2_COVERAGE / 2,
                                              sample_id)
                                  ) as script_fname:
         seg_out = ngfrills.call_quiet('Rscript', script_fname)

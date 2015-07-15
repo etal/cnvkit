@@ -181,8 +181,8 @@ def mask_bad_probes(probes):
 
     Returns a bool array where True indicates probes that failed the checks.
     """
-    mask = ((probes['coverage'] < params.MIN_BIN_COVERAGE) |
-            (probes['spread'] > params.MAX_BIN_SPREAD))
+    mask = ((probes['coverage'] < params.MIN_REF_COVERAGE) |
+            (probes['spread'] > params.MAX_REF_SPREAD))
     if 'rmask' in probes:
         mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)
     return mask
