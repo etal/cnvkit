@@ -1,5 +1,5 @@
 """Definitions for CNVkit's core data structure, a copy number array."""
-from __future__ import print_function, absolute_import
+from __future__ import print_function, absolute_import, division
 
 import numpy as np
 import pandas as pd
@@ -196,8 +196,9 @@ class CopyNumArray(gary.GenomicArray):
         substituted with a small dummy log2 value to avoid divide-by-zero
         errors.
         """
-        return self.as_dataframe(self.data[
-                self.data['log2'] > params.NULL_LOG2_COVERAGE])
+        return self.as_dataframe(self.data[self.data['log2'] >
+                                           params.NULL_LOG2_COVERAGE -
+                                           params.MIN_REF_COVERAGE])
 
     def squash_genes(self, ignore=('-', 'CGH', '.'), squash_background=False,
                      summary_stat=metrics.biweight_location):

@@ -56,6 +56,18 @@ def load_adjust_coverages(pset, ref_pset,
     return apply_weights(pset, ref_matched)
 
 
+def mask_bad_probes(probes):
+    """Flag the probes with excessively low or inconsistent coverage.
+
+    Returns a bool array where True indicates probes that failed the checks.
+    """
+    mask = ((probes['log2'] < params.MIN_REF_COVERAGE) |
+            (probes['spread'] > params.MAX_REF_SPREAD))
+    if 'rmask' in probes:
+        mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)
+    return mask
+
+
 def match_ref_to_probes(ref_pset, probes):
     """Filter the reference probes to match the target or antitarget probe set.
     """
@@ -68,18 +80,6 @@ def match_ref_to_probes(ref_pset, probes):
         raise ValueError("Reference is missing %d bins found in %s"
                          % (len(num_missing), probes.sample_id))
     return ref_pset.as_dataframe(ref_matched.reset_index(drop=True))
-
-
-def mask_bad_probes(probes):
-    """Flag the probes with excessively low or inconsistent coverage.
-
-    Returns a bool array where True indicates probes that failed the checks.
-    """
-    mask = ((probes['log2'] < params.MIN_BIN_COVERAGE) |
-            (probes['spread'] > params.MAX_BIN_SPREAD))
-    if 'rmask' in probes:
-        mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)
-    return np.asarray(mask)
 
 
 def center_by_window(cnarr, fraction, sort_key):

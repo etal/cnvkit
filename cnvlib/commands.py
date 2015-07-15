@@ -10,20 +10,26 @@ import multiprocessing
 import os
 import sys
 
+import numpy as np
+
 from Bio._py3k import map, range, zip
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 # If running headless, use a suitable GUI-less plotting backend
 if not os.environ.get('DISPLAY'):
     import matplotlib
-    matplotlib.use("Agg", force=True)
+    try:
+        matplotlib.use("Agg", force=True)
+    except TypeError:
+        # Older matplotlib doesn't have 'force' argument
+        matplotlib.use("Agg")
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 from . import (core, target, antitarget, coverage, fix, metrics, reference,
-               reports, export, importers, segmentation,
+               reports, export, importers, segmentation, call,
                params, ngfrills, plots)
 from .ngfrills import echo
 from .cnary import CopyNumArray as _CNA
@@ -388,7 +394,7 @@ def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,
                   min_bin_size=None):
     """Derive a background/antitarget BED file from a target BED file."""
     if not min_bin_size:
-        min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_BIN_COVERAGE))
+        min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_REF_COVERAGE))
     background_regions = antitarget.get_background(target_bed, access_bed,
                                                    avg_bin_size, min_bin_size)
 
@@ -649,8 +655,92 @@ P_segment.add_argument('-m', '--method',
         help="""Segmentation method (CBS, HaarSeg, or Fused Lasso).
                 [Default: %(default)s]""")
 P_segment.add_argument("--rlibpath",
-                       help="Path to an alternative site-library to use for R packages.")
+        help="Path to an alternative site-library to use for R packages.")
 P_segment.set_defaults(func=_cmd_segment)
+
+
+# call ------------------------------------------------------------------------
+
+def _cmd_call(args):
+    """Call copy number variants from segmented log2 ratios."""
+    if args.purity and not 0.0 < args.purity <= 1.0:
+        raise RuntimeError("Purity must be between 0 and 1.")
+
+    segments = _CNA.read(args.segment)
+    is_sample_female = segments.guess_xx(args.male_reference, verbose=False)
+    if args.gender:
+        is_sample_female_given = (args.gender in ["f", "female"])
+        if is_sample_female != is_sample_female_given:
+            print("Sample gender specified as", args.gender,
+                  "but chrX copy number looks like",
+                  "female" if is_sample_female else "male",
+                  file=sys.stderr)
+            is_sample_female = is_sample_female_given
+    print("Treating sample gender as",
+            "female" if is_sample_female else "male",
+            file=sys.stderr)
+
+    segs_adj = do_call(segments, args.method, args.ploidy, args.purity,
+                       args.male_reference, is_sample_female, args.thresholds)
+    segs_adj.write(args.output or segs_adj.sample_id + '.call.cns')
+
+
+def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
+            is_sample_female=False, thresholds=(-1.1, -0.3, 0.2, 0.7)):
+    if method == "clonal":
+        if purity and purity < 1.0:
+            echo("Calling copy number with clonal purity %g, ploidy %d"
+                 % (purity, ploidy))
+            absolutes = call.absolute_clonal(segments, ploidy, purity,
+                                           is_reference_male, is_sample_female)
+        else:
+            # Simpler math if sample is pure
+            echo("Calling copy number with clonal ploidy %d" % ploidy)
+            absolutes = call.absolute_pure(segments, ploidy,
+                                                is_reference_male)
+    elif method == "threshold":
+        tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
+        echo("Calling copy number with thresholds: " + ", ".join(tokens))
+        absolutes = call.absolute_threshold(segments, ploidy, is_reference_male,
+                                           thresholds)
+    else:
+        raise ValueError("Argument `method` must be one of: clonal, threshold")
+    segs_adj = call.round_log2_ratios(segments, absolutes, ploidy,
+                                      is_reference_male)
+    return segs_adj
+
+
+def csvstring(text):
+    return tuple(map(float, text.split(",")))
+
+
+P_call = AP_subparsers.add_parser('call', help=_cmd_call.__doc__)
+P_call.add_argument('segment',
+        help="Segmentation calls (.cns), the output of the 'segment' command.")
+P_call.add_argument('-m', '--method',
+        choices=('threshold', 'clonal'), default='threshold',
+        help="""Calling method. [Default: %(default)s]""")
+P_call.add_argument('-t', '--thresholds',
+        type=csvstring, default="-1.1,-0.3,0.2,0.7",
+        help="""Hard thresholds for calling each integer copy number, separated
+                by commas. Use the '=' sign on the command line, e.g.: -t=-1,0,1
+                [Default: %(default)s]""")
+P_call.add_argument("--ploidy", type=int, default=2,
+        help="Ploidy of the sample cells. [Default: %(default)d]")
+P_call.add_argument("--purity", type=float,
+        help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
+P_call.add_argument("-g", "--gender",
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+        help="""Specify the sample's gender as male or female. (Otherwise
+                guessed from chrX copy number).""")
+P_call.add_argument('-y', '--male-reference', action='store_true',
+        help="""Was a male reference used?  If so, expect half ploidy on
+                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
+                if a male reference was used, the "neutral" copy number (ploidy)
+                of chrX is 1; chrY is haploid for either gender reference.""")
+P_call.add_argument('-o', '--output',
+        help="Output table file name (CNR-like table of segments, .cns).")
+P_call.set_defaults(func=_cmd_call)
 
 
 # _____________________________________________________________________________
@@ -1108,7 +1198,7 @@ def _cmd_gainloss(args):
                              'Probes'])
 
 
-def do_gainloss(probes, segments=None, male_reference=False, threshold=0.5,
+def do_gainloss(probes, segments=None, male_reference=False, threshold=0.2,
                 min_probes=3):
     """Identify targeted genes with copy number gain or loss."""
     probes = probes.shift_xx(male_reference)
@@ -1126,7 +1216,7 @@ P_gainloss.add_argument('filename',
                 of the 'fix' sub-command.""")
 P_gainloss.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command).")
-P_gainloss.add_argument('-t', '--threshold', type=float, default=0.5,
+P_gainloss.add_argument('-t', '--threshold', type=float, default=0.2,
         help="""Copy number change threshold to report a gene gain/loss.
                 [Default: %(default)s]""")
 P_gainloss.add_argument('-m', '--min-probes', type=int, default=3,
@@ -1176,22 +1266,22 @@ P_gender.set_defaults(func=_cmd_gender)
 def _cmd_metrics(args):
     """Compute coverage deviations and other metrics for self-evaluation.
     """
-    if (len(args.coverages) > 1 and len(args.segments) > 1 and
-        len(args.coverages) != len(args.segments)):
+    if (len(args.cnarrays) > 1 and len(args.segments) > 1 and
+        len(args.cnarrays) != len(args.segments)):
         raise ValueError("Number of coverage/segment filenames given must be "
                          "equal, if more than 1 segment file is given.")
 
     # Repeat a single segment file to match the number of coverage files
-    if len(args.coverages) > 1 and len(args.segments) == 1:
-        args.segments = [args.segments[0] for _i in range(len(args.coverages))]
+    if len(args.cnarrays) > 1 and len(args.segments) == 1:
+        args.segments = [args.segments[0] for _i in range(len(args.cnarrays))]
 
     # Calculate all metrics
     outrows = []
-    for probes_fname, segs_fname in zip(args.coverages, args.segments):
-        probes = _CNA.read(probes_fname)
+    for probes_fname, segs_fname in zip(args.cnarrays, args.segments):
+        cnarr = _CNA.read(probes_fname)
         segments = _CNA.read(segs_fname)
         values = metrics.ests_of_scale(
-            metrics.probe_deviations_from_segments(probes, segments))
+            metrics.probe_deviations_from_segments(cnarr, segments))
         outrows.append([core.rbase(probes_fname), len(segments)] +
                        ["%.7f" % val for val in values])
 
@@ -1201,7 +1291,7 @@ def _cmd_metrics(args):
         with ngfrills.safe_write(args.output or sys.stdout) as handle:
             handle.write("Sample: %s\n" % sample_id)
             handle.write("Number of called segments: %d\n" % nseg)
-            handle.write("Deviation of probe coverages from segment calls:\n")
+            handle.write("Deviation of bin log2 ratios from segment calls:\n")
             handle.write("  Standard deviation = %s\n" % stdev)
             handle.write("  Median absolute deviation = %s\n" % mad)
             handle.write("  Interquartile range = %s\n" % iqr)
@@ -1214,8 +1304,8 @@ def _cmd_metrics(args):
 
 
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
-P_metrics.add_argument('coverages', nargs='+',
-        help="""One or more coverage data files (*.cnn, *.cnr).""")
+P_metrics.add_argument('cnarrays', nargs='+',
+        help="""One or more bin-level coverage data files (*.cnn, *.cnr).""")
 P_metrics.add_argument('-s', '--segments', nargs='+',
         help="""One or more segmentation data files (*.cns, output of the
                 'segment' command).  If more than one file is given, the number
@@ -1225,6 +1315,107 @@ P_metrics.add_argument('-s', '--segments', nargs='+',
 P_metrics.add_argument('-o', '--output',
         help="Output table file name.")
 P_metrics.set_defaults(func=_cmd_metrics)
+
+
+# segmetrics ------------------------------------------------------------------
+
+def _cmd_segmetrics(args):
+    """Compute segment-level metrics from bin-level log2 ratios."""
+    # Calculate all metrics
+    outrows = []
+    cnarr = _CNA.read(args.cnarray)
+    cnarr.drop_low_coverage()
+    segarr = _CNA.read(args.segments)
+    stats = {}
+    deviations = [segbins['log2'] - segment['log2']
+                  for segment, segbins in  cnarr.by_segment(segarr)]
+    # Measures of spread
+    for statname, option, func in (
+        ("StDev", args.stdev, np.std),
+        ("MAD", args.mad, metrics.median_absolute_deviation),
+        ("IQR", args.iqr, metrics.interquartile_range),
+        ("BiVar", args.bivar, metrics.biweight_midvariance),
+    ):
+        if option:
+            stats[statname] = np.asarray([func(d) for d in deviations],
+                                         dtype=np.float64)
+    # Interval calculations
+    if args.ci:
+        stats["CI"] = _confidence_interval(segarr, cnarr)
+    if args.pi:
+        stats["PI"] = _prediction_interval(segarr, cnarr)
+    if not stats:
+        echo("No stats specified")
+        return
+
+    keys = sorted(stats.keys())
+    statcol = [';'.join(["%s=%s" % (key, val)
+                         for key, val in zip(keys, valrow)])
+               for valrow in zip(*[stats[k] for k in keys])]
+    segarr['gene'] = statcol
+    segarr.write(args.output or segarr.sample_id + ".segmetrics.cns")
+
+
+def _confidence_interval(segarr, cnarr):
+    """Confidence interval, estimated by bootstrap."""
+    out_cns_ci = []
+    for _segment, bins in cnarr.by_segment(segarr):
+        k = len(bins)
+        if k == 0:
+            out_cns_ci.append("NA")
+            continue
+        # Bootstrap for CI
+        rand_indices = np.random.random_integers(0, k - 1, (100, k))
+        bootstraps = [bins.data.take(idx) for idx in rand_indices]
+        # Recalculate segment means
+        if 'weight' in bins:
+            bootstrap_dist = [np.average(boot['log2'], weights=boot['weight'])
+                                for boot in bootstraps]
+        else:
+            bootstrap_dist = [boot['log2'].mean() for boot in bootstraps]
+        ci = np.percentile(bootstrap_dist, [2.5, 97.5])
+        out_cns_ci.append("%s,%s" % tuple(ci))
+    return out_cns_ci
+
+
+def _prediction_interval(segarr, cnarr):
+    """Prediction interval, estimated by percentiles."""
+    out_cns_pi = []
+    for _segment, bins in cnarr.by_segment(segarr):
+        k = len(bins)
+        if k == 0:
+            out_cns_ci.append("NA")
+            continue
+        # ENH: weighted percentile
+        pi = np.percentile(bins['log2'], [2.5, 97.5])
+        out_cns_pi.append("%s,%s" % tuple(pi))
+    return out_cns_pi
+
+
+P_segmetrics = AP_subparsers.add_parser('segmetrics', help=_cmd_segmetrics.__doc__)
+P_segmetrics.add_argument('cnarray',
+        help="""Bin-level copy ratio data file (*.cnn, *.cnr).""")
+P_segmetrics.add_argument('-s', '--segments', required=True,
+        help="Segmentation data file (*.cns, output of the 'segment' command).")
+P_segmetrics.add_argument('-o', '--output',
+        help="Output table file name.")
+
+P_segmetrics_stats = P_segmetrics.add_argument_group(
+    "Statistics available")
+P_segmetrics_stats.add_argument('--stdev', action='store_true',
+        help="Standard deviation.")
+P_segmetrics_stats.add_argument('--mad', action='store_true',
+        help="Median absolute deviation (standardized).")
+P_segmetrics_stats.add_argument('--iqr', action='store_true',
+        help="Inter-quartile range.")
+P_segmetrics_stats.add_argument('--bivar', action='store_true',
+        help="Tukey's biweight midvariance.")
+P_segmetrics_stats.add_argument('--ci', action='store_true',
+        help="Confidence interval (by bootstrap).")
+P_segmetrics_stats.add_argument('--pi', action='store_true',
+        help="Prediction interval.")
+
+P_segmetrics.set_defaults(func=_cmd_segmetrics)
 
 
 # _____________________________________________________________________________
@@ -1328,7 +1519,6 @@ P_import_theta.set_defaults(func=_cmd_import_theta)
 
 # export ----------------------------------------------------------------------
 
-
 P_export = AP_subparsers.add_parser('export',
         help="""Convert CNVkit output files to another format.""")
 P_export_subparsers = P_export.add_subparsers(
@@ -1344,7 +1534,8 @@ def _cmd_export_seg(args):
     outheader, outrows = export.export_seg(args.filenames)
     core.write_tsv(args.output, outrows, colnames=outheader)
 
-P_export_seg = P_export_subparsers.add_parser('seg', help=_cmd_export_seg.__doc__)
+P_export_seg = P_export_subparsers.add_parser('seg',
+        help=_cmd_export_seg.__doc__)
 P_export_seg.add_argument('filenames', nargs='+',
         help="""Segmented copy ratio data file(s) (*.cns), the output of the
                 'segment' sub-command.""")
@@ -1367,9 +1558,41 @@ P_export_nb.add_argument('-o', '--output', help="Output file name.")
 P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
-# FreeBayes special case: multiple samples's segments, like SEG
+# BED special case: multiple samples's segments, like SEG
+def _cmd_export_bed(args):
+    """Convert segments to BED format.
+
+    Input is a segmentation file (.cns) where, preferably, log2 ratios have
+    already been adjusted to integer absolute values using the 'call' command.
+    """
+    outheader, outrows = export.export_bed(args.segments, args)
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+P_export_bed = P_export_subparsers.add_parser('bed',
+        help=_cmd_export_bed.__doc__)
+P_export_bed.add_argument('segments', nargs='+',
+        help="""Segmented copy ratio data files (*.cns), the output of the
+                'segment' or 'call' sub-commands.""")
+P_export_bed.add_argument("-i", "--sample-id", metavar="LABEL",
+        help="""Identifier to write in the 4th column of the BED file.
+                [Default: use the sample ID, taken from the file name]""")
+P_export_bed.add_argument("--ploidy", type=int, default=2,
+        help="Ploidy of the sample cells. [Default: %(default)d]")
+P_export_bed.add_argument("--show-neutral", action="store_true",
+        help="""Write segmented regions of neutral copy number, in addition to
+                copy number alterations. [Default: only output CNA regions]""")
+P_export_bed.add_argument("-y", "--male-reference", action="store_true",
+        help="""Was a male reference used?  If so, expect half ploidy on
+                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
+                if a male reference was used, the "neutral" copy number (ploidy)
+                of chrX is 1; chrY is haploid for either gender reference.""")
+P_export_bed.add_argument('-o', '--output', help="Output file name.")
+P_export_bed.set_defaults(func=_cmd_export_bed)
+
+
+# FreeBayes/BED special case: multiple samples's segments, like SEG
 def _cmd_export_fb(args):
-    """Convert segments to FreeBayes --cnv-map format (BED-like).
+    """[DEPRECATED] Convert segments to FreeBayes --cnv-map format (BED-like).
 
     Generates an input file for use with FreeBayes's --cnv-map option.
 
@@ -1387,7 +1610,7 @@ P_export_fb.add_argument('segments', nargs='+',
                 'segment' sub-command.""")
 P_export_fb.add_argument("-i", "--sample-id",
         help="Sample name, as FreeBayes should see it.")
-# Arguments that could be shared across 'export'
+# Arguments to drop in favor of 'call':
 P_export_fb.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_export_fb.add_argument("--purity", type=float,
@@ -1396,12 +1619,12 @@ P_export_fb.add_argument("-g", "--gender",
         choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
+# /
 P_export_fb.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
                 of chrX is 1; chrY is haploid for either gender reference.""")
-# /
 P_export_fb.add_argument('-o', '--output', help="Output file name.")
 P_export_fb.set_defaults(func=_cmd_export_fb)
 
