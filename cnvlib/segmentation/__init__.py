@@ -3,6 +3,8 @@ from __future__ import absolute_import, division
 import math
 import os.path
 
+import numpy as np
+
 from .. import core, ngfrills, params
 from ..cnary import CopyNumArray as CNA
 
@@ -104,23 +106,23 @@ def repair_segments(segments, orig_probes):
     2. Ensure first and last segment ends match 1st/last bin ends
        (but keep log2 as-is).
     """
+    segments = segments.copy()
     extra_segments = []
     for chrom, subprobes in orig_probes.by_chromosome():
-        chr_segs = segments.select(chromosome=chrom)
-        orig_start = subprobes[0]['start']
-        orig_end =  subprobes[-1]['end']
-        if len(chr_segs):
+        chr_seg_idx = np.where(segments.chromosome == chrom)[0]
+        orig_start = subprobes[0, 'start']
+        orig_end =  subprobes[len(subprobes)-1, 'end']
+        if len(chr_seg_idx):
             print "Updating segment endpoints for chrom", chrom
-            segments[0]['start'] = orig_start
-            segments[-1]['end'] = orig_end
+            segments[chr_seg_idx[0], 'start'] = orig_start
+            segments[chr_seg_idx[-1], 'end'] = orig_end
             # ENH: Recalculate segment means here?
         else:
             print "Adding null segment for chrom", chrom
             null_segment = (chrom, orig_start, orig_end, "_", 0.0, 0)
             extra_segments.append(null_segment)
-    # segments.add_array(segments.as_rows(extra_segments))
     if extra_segments:
-        segments.merge(segments.to_rows(extra_segments))
+        segments.add_array(segments.as_rows(extra_segments))
     return segments
 
 
