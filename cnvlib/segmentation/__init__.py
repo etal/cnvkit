@@ -14,9 +14,9 @@ def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
     if not os.path.isfile(probes_fname):
         raise ValueError("Not a file: %s" % probes_fname)
 
+    probes = CNA.read(probes_fname)
     if method == 'haar':
         from . import haar
-        probes = CNA.read(probes_fname)
         return haar.segment_haar(probes)
 
     # Run R to calculate copy number segments (CBS)
@@ -52,6 +52,7 @@ def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
     seg_pset.sort()
     if method == 'flasso':
         seg_pset = squash_segments(seg_pset)
+    seg_pset = repair_segments(seg_pset, probes)
 
     if save_dataframe:
         return seg_pset, seg_out
@@ -92,6 +93,32 @@ def squash_segments(seg_pset):
                           curr_val, curr_cnt))
     return seg_pset.to_rows(squashed_rows)
 
+
+def repair_segments(segments, orig_probes):
+    """Post-process segmentation output.
+
+    1. Ensure every chromosome has at least one segment.
+    2. Ensure first and last segment ends match 1st/last bin ends
+       (but keep log2 as-is).
+    """
+    extra_segments = []
+    for chrom, subprobes in orig_probes.by_chromosome():
+        chr_segs = segments.select(chromosome=chrom)
+        orig_start = subprobes[0]['start']
+        orig_end =  subprobes[-1]['end']
+        if len(chr_segs):
+            print "Updating segment endpoints for chrom", chrom
+            segments[0]['start'] = orig_start
+            segments[-1]['end'] = orig_end
+            # ENH: Recalculate segment means here?
+        else:
+            print "Adding null segment for chrom", chrom
+            null_segment = (chrom, orig_start, orig_end, "_", 0.0, 0)
+            extra_segments.append(null_segment)
+    # segments.add_array(segments.as_rows(extra_segments))
+    if extra_segments:
+        segments.merge(segments.to_rows(extra_segments))
+    return segments
 
 
 CBS_RSCRIPT = """\
