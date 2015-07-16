@@ -17,11 +17,15 @@ confidently called CNAs, the default threshold to label genes is 0.5.  This
 threshold will tend to display gene amplifications, fully clonal single-copy
 gains in fairly pure samples, most single-copy losses, and complete deletions.
 
-When using the :ref:`gainloss` command, I recommend choosing a threshold to suit
-your needs depending on your knowledge of the sample's purity, heterogeneity,
-and likely features of interest. As a starting point, try 0.1 or 0.2 if you are
-going to do your own filtering downstream, or 0.3 if not.
+When using the :ref:`gainloss` command, choose a threshold to suit your needs
+depending on your knowledge of the sample's purity, heterogeneity, and likely
+features of interest. As a starting point, try 0.1 or 0.2 if you are going to
+do your own filtering downstream, or 0.3 if not.
 
-Future releases of CNVkit will add another layer of statistical testing to make
-variant calls from the log2 copy ratio data.
+The :ref:`call` command implements two simple methods to convert the log2
+ratios in a segmented .cns file to absolute integer copy number values. The
+:ref:`segmetrics` command computes segment-level summary statistics that can be
+used to evaluate the reliability of each segment. Future releases of CNVkit
+will integrate further statistical testing to help make meaningful variant
+calls from the log2 copy ratio data.
 

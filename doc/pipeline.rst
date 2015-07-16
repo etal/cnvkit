@@ -113,7 +113,7 @@ off-target/"antitarget"/"background" regions.
 
 ::
 
-    cnvkit.py antitarget Tiled.bed -g data/access-10000.hg19.bed -o Background.bed
+    cnvkit.py antitarget Tiled.bed -g data/access-5kb-mappable.hg19.bed -o Background.bed
 
 Many fully sequenced genomes, including the human genome, contain large regions
 of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
@@ -122,7 +122,7 @@ regions are filled in with large stretches of "N" characters. These regions
 cannot be mapped by resequencing, so we can avoid them when calculating the
 antitarget locations by passing the locations of the accessible sequence regions
 with the ``-g`` or ``--access`` option. These regions are precomputed for the
-UCSC reference human genome hg19 (data/access-10000.hg19.bed), and can be
+UCSC reference human genome hg19 (data/access-5kb-mappable.hg19.bed), and can be
 computed for other genomes with the included script ``genome2access.py``.
 
 CNVkit uses a cautious default off-target bin size that, in our experience, will
@@ -270,3 +270,43 @@ algorithm (``haar``) can be used instead.
 Fused Lasso additionally performs significance testing to distinguish CNAs from
 regions of neutral copy number, whereas CBS and HaarSeg by themselves only
 identify the supported segmentation breakpoints.
+
+
+.. _call:
+
+call
+----
+
+Given segmented log2 ratio estimates (.cns), round the copy ratio estimates to
+integer values using either:
+
+- A list of threshold log2 values for each copy number state, or
+- Some algebra, given known tumor cell fraction and normal ploidy.
+
+::
+
+    cnvkit.py call Sample.cns -o Sample.call.cns
+    cnvkit.py call Sample.cns -y -m clonal --purity 0.65 -o Sample.call-clonal.cns
+    cnvkit.py call Sample.cns -y -m threshold -t=-1.1,-0.4,0.3,0.7 -o Sample.call-threshold.cns
+
+The output is another .cns file, where the values in the log2 column are still
+log2-transformed, but represent integers in log2 scale -- e.g. a neutral
+diploid state is represented as 0.0, not the integer 2. These output files are
+still compatible with the other CNVkit commands that accept .cns files, and can
+be plotted the same way.
+
+The "clonal" method considers the observed log2 ratios in the input .cns file
+as a mix of some fraction of tumor cells (specified by ``--purity``), possibly
+with altered copy number, and a remainder of normal cells with neutral copy
+number (specified by ``--ploidy`` for autosomes). This equation is rearranged
+to find the absolute copy number of the tumor cells alone, rounded to the
+nearest integer. The expected and observed ploidy of the sex chromosomes (X and
+Y) is different, so it's important to specify ``-y``/``--male-reference`` if a
+male reference was used; the sample gender can be specified if known, otherwise
+it will be guessed from the log2 ratio of chromosome X.
+
+The "threshold" method simply applies fixed log2 ratio cutoff values for each
+integer copy number state. This method therefore does not require the tumor
+cell fraction or purity to be known. The default cutoffs are reasonable for a
+tumor sample with purity of at least 40% or so; for germline samples, the
+``-t`` values shown above may yield more accurate calls.
