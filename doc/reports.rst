@@ -50,7 +50,7 @@ within each gene will be reported as the gene's overall log2 ratio value. This
 mode will not attempt to identify breakpoints within genes.
 
 The threshold (``-t``) and minimum number of bins (``-m``) options are used to
-control which genes are reported. For example, a threshold of .6 (the default)
+control which genes are reported. For example, a threshold of .2 (the default)
 will report single-copy gains and losses in a completely pure tumor sample (or
 germline CNVs), but a lower threshold would be necessary to call somatic CNAs if
 significant normal-cell contamination is present.
@@ -189,3 +189,34 @@ Check questionable samples for poor coverage (using e.g. `bedtools
 Finally, visualizing a sample with CNVkit's :ref:`scatter` command will often
 make it apparent whether a sample or the copy ratios within a genomic region can
 be trusted.
+
+
+.. _segmetrics:
+
+segmetrics
+----------
+
+
+Calculate summary statistics of the residual bin-level log2 ratio estimates
+from the segment means, similar to the existing :ref:`metrics` command, but for each
+segment individually.
+
+Results are output in the same format as the CNVkit segmentation file (.cns),
+with the stat names and calculated values printed in the "gene" column.
+
+::
+
+    cnvkit.py segmetrics Sample.cnr -s Sample.cns --iqr
+    cnvkit.py segmetrics -s Sample.cn{s,r} --ci --pi
+
+Supported stats:
+
+- As in :ref:`metrics`: standard deviation (``--std``), median absolute
+  deviation (``--mad``), inter-quartile range (``--iqr``), Tukey's biweight
+  midvariance (``--bivar``)
+
+- confidence interval (``--ci``), estimated by bootstrap (100 resamples)
+
+- prediction interval (``--pi``), estimated by the range between the 2.5-97.5
+  percentiles of bin-level log2 ratio values within the segment.
+

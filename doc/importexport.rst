@@ -6,8 +6,8 @@ Compatibility and other I/O
 import-picard
 -------------
 
-Convert Picard CalculateHsMetrics coverage files (.csv) to the CNVkit .cnn
-format.
+Convert Picard CalculateHsMetrics per-target coverage files (.csv) to the
+CNVkit .cnn format.
 
 
 .. _import-seg:
@@ -36,11 +36,42 @@ export
 
 Convert copy number ratio tables (.cnr files) to another format.
 
+bed
+```
+
+The segmented output from multiple samples (``*.cns``) can be exported to BED
+format to support a variety of other uses, such as viewing in a genome browser.
+The log2 ratio value of each segment is converted and rounded to an integer
+value, as required by the BED format. To get accurate copy number values, see
+the :ref:`call` command.
+
+::
+
+    # Estimate integer copy number of each segment
+    cnvkit.py call Sample.cns -y -o Sample.call.cns
+    # Show estimated integer copy number of all regions
+    cnvkit.py export bed Sample.call.cns --show-neutral -y -o Sample.bed
+
+The same format can also specify CNV regions to the FreeBayes variant caller
+with FreeBayes's ``--cnv-map`` option::
+
+    # Show only CNV regions
+    cnvkit.py export bed *.call.cns -o all-samples.cnv-map.bed
+
+Copy-number-neutral regions are not shown in the output by default, but can be
+included with the ``--show-neutral`` option.
+
+cdt, jtv
+````````
+
 A collection of probe-level copy ratio files (``*.cnr``) can be exported to Java
 TreeView via the standard CDT format or a plain text table::
 
     cnvkit.py export jtv *.cnr -o Samples-JTV.txt
     cnvkit.py export cdt *.cnr -o Samples.cdt
+
+seg
+```
 
 Similarly, the segmentation files for multiple samples (``*.cns``) can be
 exported to the standard SEG format to be loaded in the Integrative Genomic
@@ -48,7 +79,10 @@ Viewer (IGV)::
 
     cnvkit.py export seg *.cns -o Samples.seg
 
-Also note that the individual ``.cnr`` and ``.cnn`` files can be loaded directly
-by the commercial program Biodiscovery Nexus Copy Number, specifying the "basic"
-input format.
+nexus-basic
+```````````
+
+The format ``nexus-basic`` can be loaded directly by the commercial program
+Biodiscovery Nexus Copy Number, specifying the "basic" input format in that
+program.
 

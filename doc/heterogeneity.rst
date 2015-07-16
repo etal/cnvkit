@@ -64,50 +64,31 @@ convenience in plotting etc. with CNVkit. These files are also easily converted
 to other formats using the :ref:`export` command.
 
 
+
 Adjusting copy ratios and segments for normal cell contamination
 ----------------------------------------------------------------
 
-Alternatively, one can use an estimate of tumor fraction (from any source) to
-directly rescale segment log2 ratio values.
+CNVkit's :ref:`call` command converts the segmented log2 ratio estimates  to
+absolute integer copy numbers.
 
-CNVkit has preliminary support for adjusting the copy number calls based on
-known tumor cell percentage and ploidy. This can be done in two different
-ways, currently.
+The ``clonal`` method in this command uses an estimate of tumor fraction (from
+any source) to directly rescale segment log2 ratio values and round them to the
+nearest integer copy number. Example with tumor purity of 60% and a male
+reference::
+
+    cnvkit.py call -m clonal Sample.cns --purity 0.6 -y -o Sample.call-clonal.cns
+
+Alternatively, if the tumor cell fraction is not known, hard thresholds can be
+used instead:
+
+    cnvkit.py call -m threshold Sample.cns -y -o Sample.call-threshold.cns
+
 
 Export integer copy numbers as BED
-``````````````````````````````````
+----------------------------------
 
-The ``freebayes`` export option emits integer copy number calls in a BED-like
-format that can be used with FreeBayes's ``--cnv-map`` option. The ``--purity``
-and ``--ploidy`` options work to rescale the segmented log2 ratio values under
-the assumption that some fraction of the sample's cells have neutral copy
-number.
+The :ref:`export` ``bed`` command emits integer copy number calls in standard
+BED format::
 
-Example with tumor purity of 60% and a male reference::
+    cnvkit.py export bed Sample.cns -y -o Sample.bed
 
-    cnvkit.py export freebayes Sample.cns --purity 0.6 -y -o Sample.cnvmap.bed
-
-Copy-number-neutral regions are not shown in the output.
-
-
-Rescale log2 ratios using cnvlib
-````````````````````````````````
-
-To rescale the .cnr or .cns files as above, but without changing the file
-format, you can use a function in the Python library "cnvlib", which implements
-the CNVkit command line options. In a Python script::
-
-    import cnvlib
-    from cnvlib.export import rescale_copy_ratios
-    my_array = cnvlib.read("MySample.cnr")
-    rescaled_array = rescale_copy_ratios(my_array, purity=0.6, is_reference_male=True)
-    rescaled_array.write("MySample.rescaled.cnr")
-
-Note that in this approach the output values are still log2-transformed, and are
-not rounded to integer copy number values. If rounding is needed, you can use
-the option ``round_to_integer`` (*development version only*)::
-
-    rescaled_array = rescale_copy_ratios(my_array, purity=0.6, round_to_integer=True, is_reference_male=True)
-
-This functionality is not directly available through the command line
-yet, but will be in a future release of CNVkit.

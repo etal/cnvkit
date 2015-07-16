@@ -9,12 +9,12 @@ by specifying the genome's sequencing-accessible regions as the "targets",
 avoiding "antitargets", and using a gene annotation database to label genes in
 the resulting BED file::
 
-    cnvkit.py batch ... -t data/access-10000.hg19.bed -g data/access-10000.hg19.bed --split --annotate refFlat.txt
+    cnvkit.py batch ... -t data/access-5kb-mappable.hg19.bed -g data/access-5kb-mappable.hg19.bed --split --annotate refFlat.txt
 
 Or::
 
-    cnvkit.py target data/access-10000.hg19.bed --split --annotate refFlat.txt -o Targets.bed
-    cnvkit.py antitarget data/access-10000.hg19.bed -g data/access-10000.hg19.bed -o Background.bed
+    cnvkit.py target data/access-5kb-mappable.hg19.bed --split --annotate refFlat.txt -o Targets.bed
+    cnvkit.py antitarget data/access-5kb-mappable.hg19.bed -g data/access-5kb-mappable.hg19.bed -o Background.bed
 
 This produces a "target" binning of the entire sequencing-accessible area of the
 genome, and empty "antitarget" files which CNVkit will handle safely from

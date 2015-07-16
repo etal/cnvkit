@@ -39,6 +39,7 @@ FAQ
 .. toctree::
 
     fileformats
+    calling
     heterogeneity
     nonhybrid
 
