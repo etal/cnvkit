@@ -12,9 +12,10 @@ try:
     # Dependencies for easy_install and pip:
     setup_args.update(
         install_requires=[
-            # 'scipy',
             'numpy >= 1.6',
+            'scipy >= 0.9',
             'matplotlib >= 1.1',
+            'pandas >= 0.13',
             'pysam >= 0.8',
             'reportlab >= 3.0',
             'biopython >= 1.62',
