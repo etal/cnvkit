@@ -15,6 +15,48 @@ from cnvlib import (antitarget, commands, core, coverage, diagram, export, fix,
 
 A_REFERENCE = 'formats/reference-tr.cnn'
 
+class GaryTests(unittest.TestCase):
+
+    def setUp(self):
+        self.ex_cnr = cnvlib.read(A_REFERENCE)
+
+    def test_iter(self):
+        """Test iteration."""
+        rows = iter(self.ex_cnr)
+        firstrow = next(rows)
+        self.assertEqual(tuple(firstrow), tuple(self.ex_cnr[0]))
+        i = 0
+        for i, row in enumerate(rows):
+            pass
+        self.assertEqual(i + 2, len(self.ex_cnr))
+
+    def test_copy(self):
+        """Test creation of an independent copy of the object."""
+        dupe = self.ex_cnr.copy()
+        self.assertEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
+        self.ex_cnr[3, 'log2'] = -10.0
+        self.assertNotEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
+
+    # def test_by_bin(self):
+    # def test_by_chromosome(self):
+
+    def test_select(self):
+        """Test sugary selection of a subset of the data array."""
+        num_bg_rows = len(self.ex_cnr[self.ex_cnr['gene'] == 'Background'])
+        self.assertEqual(len(self.ex_cnr.select(gene='Background')),
+                         num_bg_rows)
+        selector = lambda row: row['gene'] == 'Background'
+        self.assertEqual(len(self.ex_cnr.select(selector)), num_bg_rows)
+
+    def test_shuffle_sort(self):
+        """Test shuffling and re-sorting the data array."""
+        orig_cvg = tuple(self.ex_cnr['log2'][:10])
+        self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
+        self.ex_cnr.shuffle()
+        self.assertNotEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
+        self.ex_cnr.sort()
+        self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
+
 
 class CNATests(unittest.TestCase):
     """Tests for the CopyNumArray class."""
@@ -37,18 +79,6 @@ class CNATests(unittest.TestCase):
         self.assertEqual(tuple(self.ex_cnr[0]), tuple(same[0]))
         self.assertEqual(self.ex_cnr[3:6], same[3:6])
 
-    def test_iter(self):
-        """Test iteration."""
-        rows = iter(self.ex_cnr)
-        firstrow = next(rows)
-        self.assertEqual(tuple(firstrow), tuple(self.ex_cnr[0]))
-        i = 0
-        for i, row in enumerate(rows):
-            pass
-        self.assertEqual(i + 2, len(self.ex_cnr))
-
-    # def test_by_bin(self):
-    # def test_by_chromosome(self):
     # def test_by_gene(self):
     # def test_by_segment(self):
 
@@ -64,13 +94,6 @@ class CNATests(unittest.TestCase):
         chr1plus2.center_all()
         self.assertAlmostEqual(numpy.median(chr1plus2['log2']), orig_chr1_cvg)
 
-    def test_copy(self):
-        """Test creation of an independent copy of the object."""
-        dupe = self.ex_cnr.copy()
-        self.assertEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
-        self.ex_cnr[3, 'log2'] = -10.0
-        self.assertNotEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
-
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""
         self.assertTrue('gc' in self.ex_cnr)
@@ -80,23 +103,6 @@ class CNATests(unittest.TestCase):
 
     # def test_extend(self):
     # def test_in_range(self):
-
-    def test_select(self):
-        """Test sugary selection of a subset of the data array."""
-        num_bg_rows = len(self.ex_cnr[self.ex_cnr['gene'] == 'Background'])
-        self.assertEqual(len(self.ex_cnr.select(gene='Background')),
-                         num_bg_rows)
-        selector = lambda row: row['gene'] == 'Background'
-        self.assertEqual(len(self.ex_cnr.select(selector)), num_bg_rows)
-
-    def test_shuffle_sort(self):
-        """Test shuffling and re-sorting the data array."""
-        orig_cvg = tuple(self.ex_cnr['log2'][:10])
-        self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
-        self.ex_cnr.shuffle()
-        self.assertNotEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
-        self.ex_cnr.sort()
-        self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
 
     # def test_squash_genes(self):
 
