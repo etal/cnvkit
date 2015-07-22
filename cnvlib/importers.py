@@ -4,6 +4,9 @@ import math
 import os.path
 import subprocess
 
+import numpy as np
+import pandas as pd
+
 from . import core
 from .cnary import CopyNumArray as CNA
 from .params import NULL_LOG2_COVERAGE
@@ -55,31 +58,22 @@ def load_targetcoverage_csv(fname):
         name (str),
         %gc, mean_coverage, normalized_coverage (float)
     """
-    cna_rows = []
-    no_cvg_cnt = 0  # Count probes with no coverage
-    for row in core.parse_tsv(fname):
-        assert len(row) >= 8, \
-                "Bad line in {}:\n{}".format(fname, row)
-        chrom = row[0]
-        start = int(row[1])
-        end = int(row[2])
-        gene = unpipe_name(row[4])
-        gc_val = float(row[5])
-        cvg = float(row[6])  # mean_coverage -- we'll normalize later
-        if cvg == 0:
-            no_cvg_cnt += 1
-            coverage = NULL_LOG2_COVERAGE
-        else:
-            coverage = math.log(cvg, 2)
-        cna_rows.append((chrom, start, end, gene, coverage, gc_val))
-    if no_cvg_cnt > TOO_MANY_NO_COVERAGE:
+    dframe = pd.read_table(fname, na_filter=False)
+    coverages = np.asarray(dframe['mean_coverage'])
+    no_cvg_idx = (coverages == 0)
+    if sum(no_cvg_idx) > TOO_MANY_NO_COVERAGE:
         echo("*WARNING* Sample", fname, "has >", TOO_MANY_NO_COVERAGE,
-             "probes with no coverage")
-    pset = CNA.from_rows(cna_rows,
-                         ('chromosome', 'start', 'end', 'gene', 'log2', 'gc'),
-                         {'sample_id': core.fbase(fname)})
-    pset.sort()
-    return pset
+             "bins with no coverage")
+    coverages[no_cvg_idx] = 2**NULL_LOG2_COVERAGE  # Avoid math domain error
+    cnarr = CNA.from_columns({"chromosome": dframe["chrom"],
+                              "start": dframe["start"] - 1,
+                              "end": dframe["end"],
+                              "gene": dframe["name"].apply(unpipe_name),
+                              "gc": dframe["%gc"],
+                              "log2": np.log2(coverages)},
+                             {"sample_id": core.fbase(fname)})
+    cnarr.sort()
+    return cnarr
 
 
 def unpipe_name(name):

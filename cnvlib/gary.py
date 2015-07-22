@@ -47,7 +47,7 @@ class GenomicArray(object):
 
     @classmethod
     def from_columns(cls, columns, meta_dict=None):
-        """Create a new instance from column arrays, given by name."""
+        """Create a new instance from column arrays, given as a dict."""
         table = pd.DataFrame.from_dict(columns)
         ary = cls(table, meta_dict)
         ary.sort_columns()
