@@ -113,8 +113,21 @@ class ImporterTests(unittest.TestCase):
     def test_import_picard(self):
         """Test loading a Picard targetcoverage file."""
         fname = 'picard/p2-5_5.antitargetcoverage.csv'
-        cna = importers.load_targetcoverage_csv(fname)
+        cna = importers.import_picard_pertargetcoverage(fname)
         self.assertTrue(len(cna) > 1)
+
+    def test_import_seg(self):
+        """Test loading SEG format."""
+        for fname, args in (
+            # cnvkit.py import-seg cw-tr-log2.seg -p chr -c human -d tmp
+            ('formats/cw-tr-log2.seg', ({'23': 'X', '24': 'Y', '25': 'M'}, "chr", False)),
+            # cnvkit.py import-seg --from-log10 acgh-log10.seg -d tmp/
+            ('formats/acgh-log10.seg', (None, None, True))):
+            expect_lines = linecount(fname) - 1
+            seen_lines = 0
+            for cns in importers.import_seg(fname, *args):
+                seen_lines += len(cns)
+            self.assertEqual(seen_lines, expect_lines)
 
 
 class OtherTests(unittest.TestCase):
@@ -143,6 +156,13 @@ class OtherTests(unittest.TestCase):
     # call
     # Test: convert_clonal(x, 1, 2) == convert_diploid(x)
 
+
+def linecount(filename):
+    i = 0
+    with open(filename) as handle:
+        for i, _line in enumerate(handle):
+            pass
+        return i + 1
 
 
 if __name__ == '__main__':
