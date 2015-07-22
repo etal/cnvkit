@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from . import core
+from .gary import uniq
 from .cnary import CopyNumArray as CNA
 from .params import NULL_LOG2_COVERAGE
 from .ngfrills import echo
@@ -106,53 +107,49 @@ LOG2_10 = math.log(10, 2)   # To convert log10 values to log2
 def import_seg(segfname, chrom_names, chrom_prefix, from_log10):
     """Parse a SEG file. Emit pairs of (sample ID, CopyNumArray)
 
-    Values are converted from log10 to log2.
-
     `chrom_names`:
         Map (string) chromosome IDs to names. (Applied before chrom_prefix.)
         e.g. {'23': 'X', '24': 'Y', '25': 'M'}
 
     `chrom_prefix`: prepend this string to chromosome names
         (usually 'chr' or None)
+
+    `from_log10`: Convert values from log10 to log2.
     """
-    curr_sample = None
-    curr_rows = []
-    with open(segfname) as infile:
-        lines = iter(infile)
-        next(lines)  # Skip the header
-        for line in lines:
-            sample, chrom, start, end, nprobes, mean = line.split()
-            if chrom_names and chrom in chrom_names:
-                chrom = chrom_names[chrom]
-            if chrom_prefix:
-                chrom = chrom_prefix + chrom
-            mean = float(mean)
-            if from_log10:
-                mean *= LOG2_10
-            this_row = (chrom, int(start), int(end),
-                        ("G" if mean >= 0 else "L"), mean, int(nprobes))
-            if curr_sample != sample:
-                if curr_sample is not None:
-                    assert len(curr_rows)
-                    # Emit the current set of segments as a sample
-                    yield CNA.from_rows(curr_rows,
-                                        ('chromosome', 'start', 'end', 'gene',
-                                         'log2', 'probes'),
-                                        {'sample_id': curr_sample})
-                # Reset
-                curr_sample = sample
-                curr_rows = [this_row]
-            else:
-                # Continue building this sample
-                curr_rows.append(this_row)
-        # Remainder
-        if curr_sample is not None:
-            assert len(curr_rows)
-            # Emit the current set of segments as a sample
-            yield _GA.from_rows(curr_rows,
-                                ('chromosome', 'start', 'end', 'gene', 'log2',
-                                 'probes'),
-                                {'sample_id': curr_sample})
+    dframe = pd.read_table(segfname, na_filter=False)
+    if len(dframe.columns) == 6:
+        dframe.columns = ['sample_id', 'chromosome', 'start', 'end', 'nprobes',
+                          'mean']
+    elif len(dframe.columns) == 5:
+        dframe.columns = ['sample_id', 'chromosome', 'start', 'end', 'mean']
+    else:
+        raise ValueError("SEG format expects 5 or 6 columns; found {}: {}"
+                         .format(len(dframe.columns), ' '.join(dframe.columns)))
+
+    # Calculate values for output columns
+    dframe['chromosome'] = dframe['chromosome'].apply(str)
+    if chrom_names:
+        dframe['chromosome'] = dframe['chromosome'].apply(lambda c:
+                                                          chrom_names.get(c, c))
+    if chrom_prefix:
+        dframe['chromosome'] = dframe['chromosome'].apply(lambda c:
+                                                          chrom_prefix + c)
+    if from_log10:
+        dframe['mean'] *= LOG2_10
+    dframe['gene'] = ["G" if mean >= 0 else "L" for mean in dframe['mean']]
+
+    for sid in uniq(dframe['sample_id']):
+        sample = dframe[dframe['sample_id'] == sid]
+        cols = {'chromosome': sample['chromosome'],
+                'start': sample['start'],
+                'end': sample['end'],
+                'gene': sample['gene'],
+                'log2': sample['mean']}
+        if 'nprobes' in dframe:
+            cols['probes'] = sample['nprobes']
+        cns = CNA.from_columns(cols, {'sample_id': sid})
+        cns.sort()
+        yield cns
 
 
 # __________________________________________________________________________
