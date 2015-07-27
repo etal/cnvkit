@@ -28,13 +28,15 @@ def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
         rscript = FLASSO_RSCRIPT
     else:
         raise ValueError("Unknown method %r" % method)
-    if rlibpath:
-        rscript = rscript.replace("# libPaths", '.libPaths(c("%s"))' % rlibpath)
+
     sample_id = core.fbase(probes_fname)
-    with ngfrills.temp_write_text(rscript % (probes_fname,
-                                             params.NULL_LOG2_COVERAGE / 2,
-                                             sample_id)
-                                 ) as script_fname:
+    script_strings = {
+        'probes_fname': probes_fname,
+        'min_log2': params.NULL_LOG2_COVERAGE / 2,
+        'sample_id': sample_id,
+        'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
+    }
+    with ngfrills.temp_write_text(rscript % script_strings) as script_fname:
         seg_out = ngfrills.call_quiet('Rscript', script_fname)
 
     # Convert R dataframe contents to our standard 'basic' format
@@ -131,12 +133,12 @@ CBS_RSCRIPT = """\
 # Input: log2 coverage data in Nexus 'basic' format
 # Output: the CBS data table
 
-# libPaths
+%(rlibpath)s
 library('PSCBS') # Requires: R.utils, R.oo, R.methodsS3
 
 write("Loading probe coverages into a data frame", stderr())
-tbl = read.delim("%s")
-tbl = tbl[tbl$log2 >= %d,]  # Ignore low-coverage probes
+tbl = read.delim("%(probes_fname)s")
+tbl = tbl[tbl$log2 >= %(min_log2)d,]  # Ignore low-coverage probes
 chrom_rle = rle(as.character(tbl$chromosome))
 chrom_names = chrom_rle$value
 chrom_lengths = chrom_rle$lengths
@@ -169,7 +171,8 @@ if (is.null(largegaps)) {
 }
 
 write("Segmenting the probe data", stderr())
-fit = segmentByCBS(cna, alpha=.0001, undo=1, min.width=2,
+# fit = segmentByCBS(cna, alpha=.0001, undo=1, min.width=2,
+fit = segmentByCBS(cna, alpha=.0001, undo=0, min.width=2,
                    joinSegments=FALSE, knownSegments=knownsegs, seed=0xA5EED)
 
 write("Setting segment endpoints to original bin start/end positions", stderr())
@@ -186,7 +189,7 @@ for (idx in 1:nrow(fit$output)) {
 }
 
 write("Restoring the original chromosome names", stderr())
-fit$output$sampleName = '%s'
+fit$output$sampleName = '%(sample_id)s'
 out = na.omit(fit$output) # Copy for lookup in the loop
 out2 = na.omit(fit$output) # Copy to modify
 for (i in 1:length(chrom_names)) {
@@ -205,12 +208,12 @@ FLASSO_RSCRIPT = """\
 # Input: log2 coverage data in Nexus 'basic' format
 # Output: the CBS data table
 
-# libPaths
+%(rlibpath)s
 library('cghFLasso')
 
-tbl <- read.delim("%s")
+tbl <- read.delim("%(probes_fname)s")
 # Ignore low-coverage probes
-tbl <- tbl[tbl$log2 >= %d,]
+tbl <- tbl[tbl$log2 >= %(min_log2)d,]
 positions <- (tbl$start + tbl$end) * 0.5
 
 write("Segmenting the probe data", stderr())
@@ -218,7 +221,7 @@ fit <- cghFLasso(tbl$log2,
                  FDR=0.005)
 
 # Reformat the output table as SEG
-outtable <- data.frame(sample="%s",
+outtable <- data.frame(sample="%(sample_id)s",
                        chromosome=tbl$chromosome,
                        start=tbl$start,
                        end=tbl$end,
