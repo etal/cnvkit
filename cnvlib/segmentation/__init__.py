@@ -11,7 +11,8 @@ from ..cnary import CopyNumArray as CNA
 from Bio._py3k import StringIO
 
 
-def do_segmentation(probes_fname, save_dataframe, method, rlibpath=None):
+def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
+                    rlibpath=None):
     """Infer copy number segments from the given coverage table."""
     if not os.path.isfile(probes_fname):
         raise ValueError("Not a file: %s" % probes_fname)

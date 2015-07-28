@@ -232,7 +232,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
 
     echo("Segmenting", sample_pfx + '.cnr ...')
     segments = segmentation.do_segmentation(sample_pfx + '.cnr', False, 'cbs',
-                                            rlibpath)
+                                            None, rlibpath)
     segments.write(sample_pfx + '.cns')
 
     if scatter:
@@ -632,13 +632,16 @@ def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     if args.dataframe:
         segments, dframe = segmentation.do_segmentation(args.filename, True,
-                                                         args.method, args.rlibpath)
+                                                        args.method,
+                                                        args.threshold,
+                                                        args.rlibpath)
         with open(args.dataframe, 'w') as handle:
             handle.write(dframe)
         echo("Wrote", args.dataframe)
     else:
         segments = segmentation.do_segmentation(args.filename, False,
-                                                args.method, args.rlibpath)
+                                                args.method, args.threshold,
+                                                args.rlibpath)
     segments.write(args.output or segments.sample_id + '.cns')
 
 
@@ -654,6 +657,9 @@ P_segment.add_argument('-m', '--method',
         choices=('cbs', 'haar', 'flasso'), default='cbs',
         help="""Segmentation method (CBS, HaarSeg, or Fused Lasso).
                 [Default: %(default)s]""")
+P_segment.add_argument('-t', '--threshold',
+        help="""Significance threshold (p-value or FDR, depending on method) to
+                accept breakpoints during segmentation.""")
 P_segment.add_argument("--rlibpath",
         help="Path to an alternative site-library to use for R packages.")
 P_segment.set_defaults(func=_cmd_segment)
