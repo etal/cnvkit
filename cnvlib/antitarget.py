@@ -76,41 +76,41 @@ def guess_chromosome_regions(target_chroms, telomere_size):
 
 
 def find_background_regions(access_chroms, target_chroms, pad_size):
-    """Take coordinates of accessible regions and targets; emit antitargets.
+    """Take coordinates of accessible regions and targets; emit antitargets."""
+    for chrom in access_chroms:
+        if chrom in target_chroms:
+            for chrom in target_chroms:
+                target_regions = iter(target_chroms[chrom])
 
-    Note that a chromosome must be present in the target library in order to be
-    included in the antitargets generated here. So, if chrY is missing from
-    your output files, it's probably because it had no targets.
-    """
-    for chrom in target_chroms:
-        target_regions = iter(target_chroms[chrom])
+                # Split each access_region at the targets it contains
+                tgt_start, tgt_end = next(target_regions)
+                assert tgt_start < tgt_end
+                for acc_start, acc_end in access_chroms[chrom]:
+                    if acc_end - acc_start <= 2 * pad_size:
+                        # Accessible region is way too small
+                        continue
 
-        # Split each access_region at the targets it contains
-        tgt_start, tgt_end = next(target_regions)
-        assert tgt_start < tgt_end
-        for acc_start, acc_end in access_chroms[chrom]:
-            if acc_end - acc_start <= 2 * pad_size:
-                # Accessible region is way too small
-                continue
+                    bg_start = acc_start + pad_size
+                    while tgt_start < acc_end:
+                        # There may be at least one more target in this region
+                        if tgt_end + pad_size > bg_start:
+                            # Yes, there is a target in this region
+                            if tgt_start - pad_size > bg_start:
+                                # Split the background region at this target
+                                yield (chrom, bg_start, tgt_start - pad_size)
+                            bg_start = tgt_end + pad_size
 
-            bg_start = acc_start + pad_size
-            while tgt_start < acc_end:
-                # There may be at least one more target in this region
-                if tgt_end + pad_size > bg_start:
-                    # Yes, there is a target in this region
-                    if tgt_start - pad_size > bg_start:
-                        # Split the background region at this target
-                        yield (chrom, bg_start, tgt_start - pad_size)
-                    bg_start = tgt_end + pad_size
+                        # Done splitting that target; is there another?
+                        try:
+                            tgt_start, tgt_end = next(target_regions)
+                        except StopIteration:
+                            # Ensure all the remaining access_regions are unbroken
+                            tgt_start = tgt_end = float('Inf')
 
-                # Done splitting that target; is there another?
-                try:
-                    tgt_start, tgt_end = next(target_regions)
-                except StopIteration:
-                    # Ensure all the remaining access_regions are unbroken
-                    tgt_start = tgt_end = float('Inf')
-
-            # No remaining targets in this region - emit the rest of it
-            if acc_end - pad_size - bg_start > 0:
-                yield (chrom, bg_start, acc_end - pad_size)
+                    # No remaining targets in this region - emit the rest of it
+                    if acc_end - pad_size - bg_start > 0:
+                        yield (chrom, bg_start, acc_end - pad_size)
+        else:
+            for acc_start, acc_end in access_chroms[chrom]:
+                yield (chrom, acc_start + pad_size, acc_end - pad_size)
 
