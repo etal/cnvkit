@@ -657,7 +657,7 @@ P_segment.add_argument('-m', '--method',
         choices=('cbs', 'haar', 'flasso'), default='cbs',
         help="""Segmentation method (CBS, HaarSeg, or Fused Lasso).
                 [Default: %(default)s]""")
-P_segment.add_argument('-t', '--threshold',
+P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
                 accept breakpoints during segmentation.""")
 P_segment.add_argument("--rlibpath",

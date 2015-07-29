@@ -25,8 +25,10 @@ def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
     # Run R to calculate copy number segments (CBS)
     if method == 'cbs':
         rscript = CBS_RSCRIPT
+        threshold = threshold or 0.0001
     elif method == 'flasso':
         rscript = FLASSO_RSCRIPT
+        threshold = threshold or 0.005
     else:
         raise ValueError("Unknown method %r" % method)
 
@@ -35,6 +37,7 @@ def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
         'probes_fname': probes_fname,
         'min_log2': params.NULL_LOG2_COVERAGE / 2,
         'sample_id': sample_id,
+        'threshold': threshold,
         'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
     }
     with ngfrills.temp_write_text(rscript % script_strings) as script_fname:
@@ -172,8 +175,7 @@ if (is.null(largegaps)) {
 }
 
 write("Segmenting the probe data", stderr())
-# fit = segmentByCBS(cna, alpha=.0001, undo=1, min.width=2,
-fit = segmentByCBS(cna, alpha=.0001, undo=0, min.width=2,
+fit = segmentByCBS(cna, alpha=%(threshold)g, undo=0, min.width=2,
                    joinSegments=FALSE, knownSegments=knownsegs, seed=0xA5EED)
 
 write("Setting segment endpoints to original bin start/end positions", stderr())
@@ -218,8 +220,7 @@ tbl <- tbl[tbl$log2 >= %(min_log2)d,]
 positions <- (tbl$start + tbl$end) * 0.5
 
 write("Segmenting the probe data", stderr())
-fit <- cghFLasso(tbl$log2,
-                 FDR=0.005)
+fit <- cghFLasso(tbl$log2, FDR=%(threshold)g)
 
 # Reformat the output table as SEG
 outtable <- data.frame(sample="%(sample_id)s",

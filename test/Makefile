@@ -56,6 +56,14 @@ $(picard_cnrs): %.cnr: %.targetcoverage.cnn %.antitargetcoverage.cnn build/refer
 $(picard_segs): %.cns: %.cnr
 	$(cnvkit) segment $< -o $@
 
+# == Alternative segmentation
+
+$(picard_segs:.cns=-flasso.cns): %-flasso.cns: %.cnr
+	$(cnvkit) segment -m flasso -t 0.01 $< -o $@
+
+$(picard_segs:.cns=-haar.cns): %-haar.cns: %.cnr
+	$(cnvkit) segment -m haar $< -o $@
+
 
 # ------------------------------------------------------------------------------
 # Demo other features with Picard outputs
@@ -63,7 +71,7 @@ $(picard_segs): %.cns: %.cnr
 heatmap-picard.pdf: $(picard_segs)
 	$(cnvkit) heatmap $^ -o $@
 
-# == Plot coverages with segmentation calls ==
+# == Plot coverages with segmentation calls
 
 all-scatters.pdf: p2-5_5-scatter.pdf p2-9_2-scatter.pdf p2-9_2-chr1-scatter.pdf p2-9_2-chr9p-scatter.pdf p2-9_2-SMARCA2-PTPRD-scatter.pdf p2-9_2-bed_regions-scatter.pdf
 	which pdfunite && pdfunite $^ $@ || touch $@
@@ -135,7 +143,8 @@ p2-all.cdt: $(picard_cnrs)
 p2-all-jtv.txt: $(picard_cnrs)
 	$(cnvkit) export jtv $^ -o $@
 
-p2-all.seg: $(picard_segs)
+# p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns) $(picard_segs:.cns=-haar.cns)
+p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns)
 	$(cnvkit) export seg $^ -o $@
 
 p2-9_2.nexus: build/p2-9_2.cnr
