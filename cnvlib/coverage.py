@@ -15,7 +15,7 @@ from .ngfrills import echo, parse_regions
 from .params import NULL_LOG2_COVERAGE, READ_LEN
 
 
-def interval_coverages(bed_fname, bam_fname, by_count):
+def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
     """Calculate log2 coverages in the BAM file at each interval."""
     start_time = time.time()
 
@@ -32,7 +32,7 @@ def interval_coverages(bed_fname, bam_fname, by_count):
     # Calculate average read depth in each bin
     ic_func = (interval_coverages_count if by_count
                else interval_coverages_pileup)
-    results = ic_func(bed_fname, bam_fname)
+    results = ic_func(bed_fname, bam_fname, min_mapq)
     read_counts, cna_rows = zip(*list(results))
 
     # Log some stats
@@ -59,7 +59,7 @@ def interval_coverages(bed_fname, bam_fname, by_count):
                          meta_dict={'sample_id': fbase(bam_fname)})
 
 
-def interval_coverages_count(bed_fname, bam_fname):
+def interval_coverages_count(bed_fname, bam_fname, min_mapq):
     """Calculate log2 coverages in the BAM file at each interval."""
     bamfile = pysam.Samfile(bam_fname, 'rb')
     # Parse the BED lines and group them by chromosome
@@ -69,7 +69,7 @@ def interval_coverages_count(bed_fname, bam_fname):
         # Thunk and reshape this chromosome's intervals
         echo("Processing chromosome", chrom, "of", os.path.basename(bam_fname))
         _chroms, starts, ends, names = zip(*rows_iter)
-        counts_depths = [region_depth_count(bamfile, chrom, s, e)
+        counts_depths = [region_depth_count(bamfile, chrom, s, e, min_mapq)
                          for s, e in zip(starts, ends)]
         for start, end, name, (count, depth) in zip(starts, ends, names,
                                                     counts_depths):
@@ -78,7 +78,7 @@ def interval_coverages_count(bed_fname, bam_fname):
                     math.log(depth, 2) if depth else NULL_LOG2_COVERAGE)]
 
 
-def region_depth_count(bamfile, chrom, start, end):
+def region_depth_count(bamfile, chrom, start, end, min_mapq):
     """Calculate depth of a region via pysam count.
 
     i.e. counting the number of read starts in a region, then scaling for read
@@ -86,6 +86,14 @@ def region_depth_count(bamfile, chrom, start, end):
 
     Coordinates are 0-based, per pysam.
     """
+    def filter_read(read):
+        """True if the given read should be counted towards coverage."""
+        return not (read.is_duplicate
+                    or read.is_secondary
+                    or read.is_unmapped
+                    or read.is_qcfail
+                    or read.mapq < min_mapq)
+
     # Count the number of read midpoints in the interval
     count = sum((start <= (read.pos + .5*read.rlen) <= end and filter_read(read))
                 for read in bamfile.fetch(reference=chrom,
@@ -97,23 +105,24 @@ def region_depth_count(bamfile, chrom, start, end):
     return count, depth
 
 
-def interval_coverages_pileup(bed_fname, bam_fname):
+def interval_coverages_pileup(bed_fname, bam_fname, min_mapq):
     """Calculate log2 coverages in the BAM file at each interval."""
     echo("Processing reads in", os.path.basename(bam_fname))
-    for chrom, start, end, name, count, depth in bedcov(bed_fname, bam_fname):
+    for chrom, start, end, name, count, depth in bedcov(bed_fname, bam_fname,
+                                                        min_mapq):
         yield [count,
                (chrom, start, end, name,
                 math.log(depth, 2) if depth else NULL_LOG2_COVERAGE)]
 
 
-def bedcov(bed_fname, bam_fname):
+def bedcov(bed_fname, bam_fname, min_mapq):
     """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
 
     i.e. mean pileup depth across each region.
     """
-    # Count bases in each region; exclude 0-MAPQ reads
+    # Count bases in each region; exclude low-MAPQ reads
     try:
-        lines = pysam.bedcov(bed_fname, bam_fname, '-Q', '1')
+        lines = pysam.bedcov(bed_fname, bam_fname, '-Q', str(min_mapq))
     except pysam.SamtoolsError as exc:
         raise ValueError("Failed processing %r coverages in %r regions. PySAM error: %s"
                          % (bam_fname, bed_fname, exc))
@@ -136,21 +145,6 @@ def bedcov(bed_fname, bam_fname):
             # User-supplied bins might be oddly constructed
             count = mean_depth = 0
         yield chrom, start, end, name, count, mean_depth
-
-
-def filter_column(col):
-    """Count the number of filtered reads in a pileup column."""
-    return sum(filter_read(read.alignment) for read in col.pileups)
-
-
-def filter_read(read):
-    """True if the given read should be counted towards coverage."""
-    return not (read.is_duplicate
-                or read.is_secondary
-                or read.is_unmapped
-                or read.is_qcfail
-                or read.mapq == 0
-               )
 
 
 def bam_total_reads(bam_fname):
