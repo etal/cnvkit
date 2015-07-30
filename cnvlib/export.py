@@ -95,11 +95,6 @@ def fmt_multi(sample_ids, rows):
     return NotImplemented
 
 
-# TODO
-def fmt_vcf(sample_ids, rows):
-    return NotImplemented
-
-
 # Special cases
 
 def export_nexus_basic(sample_fname):
@@ -332,15 +327,96 @@ def calculate_theta_fields(seg, ref_rows, chrom_id):
 
 
 # _____________________________________________________________________________
+# VCF
+
+VCF_HEADER = """\
+##fileformat=VCFv4.0
+##fileDate=20100501
+##reference=1000GenomesPilot-NCBI36
+##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">
+##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variation">
+##INFO=<ID=SVLEN,Number=-1,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##ALT=<ID=DEL,Description="Deletion">
+##ALT=<ID=DUP,Description="Duplication">
+##ALT=<ID=CNV,Description="Copy number variable region">
+##FORMAT=<ID=GT,Number=1,Type=Integer,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Float,Description="Genotype quality">
+##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Copy number genotype for imprecise events">
+##FORMAT=<ID=CNQ,Number=1,Type=Float,Description="Copy number genotype quality for imprecise events">"""
+# #CHROM  POS   ID  REF ALT   QUAL  FILTER  INFO  FORMAT  NA00001
+# 1 2827693   . CCGTGGATGCGGGGACCCGCATCCCCTCTCCCTTCACAGCTGAGTGACCCACATCCCCTCTCCCCTCGCA  C . PASS  SVTYPE=DEL;END=2827680;BKPTID=Pindel_LCS_D1099159;HOMLEN=1;HOMSEQ=C;SVLEN=-66 GT:GQ 1/1:13.9
+# 2 321682    . T <DEL>   6 PASS    IMPRECISE;SVTYPE=DEL;END=321887;SVLEN=-105;CIPOS=-56,20;CIEND=-10,62  GT:GQ 0/1:12
+# 3 12665100  . A <DUP>   14  PASS  IMPRECISE;SVTYPE=DUP;END=12686200;SVLEN=21100;CIPOS=-500,500;CIEND=-500,500   GT:GQ:CN:CNQ  ./.:0:3:16.2
+# 4 18665128  . T <DUP:TANDEM>  11  PASS  IMPRECISE;SVTYPE=DUP;END=18665204;SVLEN=76;CIPOS=-10,10;CIEND=-10,10  GT:GQ:CN:CNQ  ./.:0:5:8.3
+
+VCF_COLUMNS = ("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT")
+
+
+def export_vcf(sample_fname, args):
+    """Convert segments to Variant Call Format.
+
+    For now, only 1 sample per VCF. (Overlapping CNVs seem tricky.)
+
+    Spec:
+    http://www.1000genomes.org/wiki/Analysis/Variant%20Call%20Format/VCF%20%28Variant%20Call%20Format%29%20version%204.0/encoding-structural-variants
+    """
+    segments = CNA.read(sample_fname)
+    vcf_columns = list(VCF_COLUMNS) + [segments.sample_id]
+    vcf_rows = []
+    for chrom, posn, alt, info, format, gtype in segments2vcf(segments, args.ploidy,
+                                                  args.male_reference):
+        vcf_rows.append((chrom, posn, '.', 'N', alt, '.', 'PASS',
+                         info, format, gtype))
+    # XXX combine with header as a string/file/whatev
+    return vcf_columns, bed_rows
+
+
+# XXX refactor with segments2bed; return a DataFrame with all info
+def segments2vcf(segments, ploidy, is_reference_male):
+    """Convert a copy number array to a BED-like format."""
+    absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
+    for row, abs_val in zip(segments, absolutes):
+        ncopies = int(round(abs_val))
+        if ncopies == ploidy:
+            # Skip regions of neutral copy number
+            continue  # or "CNV" for subclonal?
+
+        svlen = row["end"] - row["start"]
+        if ncopies > ploidy:
+            svtype = "DUP"
+            format = "GT:GQ:CN:CNQ"
+            genotype = "./.:0:%d:%g" % (ncopies, row["probes"])
+        elif ncopies < ploidy:
+            svtype = "DEL"
+            svlen *= -1
+            format = "GT:GQ"
+            genotype = "0/1:%d" % row["probes"]
+
+        # INFO
+        info = ";".join(["IMPRECISE",
+                         "SVTYPE=%s" % svtype,
+                         "END=%d" % row["end"],
+                         "SVLEN=%d" % svlen,
+                         # CIPOS=-56,20;CIEND=-10,62  
+                        ])
+
+        yield (row["chromosome"], row["start"] + 1, svtype, info, format,
+                genotype)
+
+
+# _____________________________________________________________________________
 
 EXPORT_FORMATS = {
     'cdt': fmt_cdt,
     # 'gct': fmt_gct,
     'jtv': fmt_jtv,
-    # 'vcf': fmt_vcf,
     'nexus-basic': export_nexus_basic,
     # 'nexus-multi1': fmt_multi,
     'seg': export_seg,
     'freebayes': export_freebayes,
     'theta': export_theta,
+    'vcf': export_vcf,
 }
