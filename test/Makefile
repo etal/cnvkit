@@ -18,7 +18,7 @@ picard_targets= build/reference-picard.cnn $(picard_cnrs) $(picard_segs) \
 	     all-scatters.pdf all-diagrams.pdf heatmap-picard.pdf \
 	     p2-9_2-breaks.txt p2-9_2-gainloss.txt gender-picard.txt \
 	     p2-all.cdt p2-all-jtv.txt p2-all.seg p2-9_2.nexus \
-	     p2-all.bed p2-9_2.theta2.input p2-9_2-segmetrics.cns
+	     p2-all.bed p2-9_2.vcf p2-9_2.theta2.input p2-9_2-segmetrics.cns
 
 # ------------------------------------------------------------------------------
 #  Action!
@@ -137,21 +137,24 @@ $(picard_segs:.cns=.call-clonal.cns): build/%.call-clonal.cns: build/%.cns
 
 # == Export to other formats
 
+# p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns) $(picard_segs:.cns=-haar.cns)
+p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns)
+	$(cnvkit) export seg $^ -o $@
+
+p2-all.bed: $(picard_segs:.cns=.call-clonal.cns)
+	$(cnvkit) export bed $^ -y -o $@
+
+p2-9_2.vcf: build/p2-9_2.call-clonal.cns
+	$(cnvkit) export vcf $^ -y -o $@
+
+p2-9_2.theta2.input: build/p2-9_2.cns build/reference-picard.cnn
+	$(cnvkit) export theta $^ -o $@
+
+p2-9_2.nexus: build/p2-9_2.cnr
+	$(cnvkit) export nexus-basic $^ -o $@
+
 p2-all.cdt: $(picard_cnrs)
 	$(cnvkit) export cdt $^ -o $@
 
 p2-all-jtv.txt: $(picard_cnrs)
 	$(cnvkit) export jtv $^ -o $@
-
-# p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns) $(picard_segs:.cns=-haar.cns)
-p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns)
-	$(cnvkit) export seg $^ -o $@
-
-p2-9_2.nexus: build/p2-9_2.cnr
-	$(cnvkit) export nexus-basic $^ -o $@
-
-p2-all.bed: $(picard_segs:.cns=.call-clonal.cns)
-	$(cnvkit) export bed $^ -y -o $@
-
-p2-9_2.theta2.input: build/p2-9_2.cns build/reference-picard.cnn
-	$(cnvkit) export theta $^ -o $@
