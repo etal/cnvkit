@@ -1539,39 +1539,6 @@ P_export_subparsers = P_export.add_subparsers(
         help="Export formats (use with -h for more info).")
 
 
-# SEG special case: segment coords don't match across samples
-def _cmd_export_seg(args):
-    """Convert segments to SEG format.
-
-    Compatible with IGV and GenePattern.
-    """
-    outheader, outrows = export.export_seg(args.filenames)
-    core.write_tsv(args.output, outrows, colnames=outheader)
-
-P_export_seg = P_export_subparsers.add_parser('seg',
-        help=_cmd_export_seg.__doc__)
-P_export_seg.add_argument('filenames', nargs='+',
-        help="""Segmented copy ratio data file(s) (*.cns), the output of the
-                'segment' sub-command.""")
-P_export_seg.add_argument('-o', '--output', help="Output file name.")
-P_export_seg.set_defaults(func=_cmd_export_seg)
-
-
-# Nexus "basic" special case: can only represent 1 sample
-def _cmd_export_nb(args):
-    """Convert log2 copy ratios to Nexus Copy Number "basic" format."""
-    outheader, outrows = export.export_nexus_basic(args.filename)
-    core.write_tsv(args.output, outrows, colnames=outheader)
-
-P_export_nb = P_export_subparsers.add_parser('nexus-basic',
-        help=_cmd_export_nb.__doc__)
-P_export_nb.add_argument('filename',
-        help="""Log2 copy ratio data file (*.cnr), the output of the 'fix'
-                sub-command.""")
-P_export_nb.add_argument('-o', '--output', help="Output file name.")
-P_export_nb.set_defaults(func=_cmd_export_nb)
-
-
 # BED special case: multiple samples's segments, like SEG
 def _cmd_export_bed(args):
     """Convert segments to BED format.
@@ -1604,6 +1571,50 @@ P_export_bed.add_argument('-o', '--output', help="Output file name.")
 P_export_bed.set_defaults(func=_cmd_export_bed)
 
 
+# SEG special case: segment coords don't match across samples
+def _cmd_export_seg(args):
+    """Convert segments to SEG format.
+
+    Compatible with IGV and GenePattern.
+    """
+    outheader, outrows = export.export_seg(args.filenames)
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+P_export_seg = P_export_subparsers.add_parser('seg',
+        help=_cmd_export_seg.__doc__)
+P_export_seg.add_argument('filenames', nargs='+',
+        help="""Segmented copy ratio data file(s) (*.cns), the output of the
+                'segment' sub-command.""")
+P_export_seg.add_argument('-o', '--output', help="Output file name.")
+P_export_seg.set_defaults(func=_cmd_export_seg)
+
+
+# VCF special case: only 1 sample, for now
+def _cmd_export_vcf(args):
+    """Convert segments to VCF format.
+
+    Input is a segmentation file (.cns) where, preferably, log2 ratios have
+    already been adjusted to integer absolute values using the 'call' command.
+    """
+    outheader, outrows = export.export_vcf(args.segments, args)
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+P_export_vcf = P_export_subparsers.add_parser('vcf',
+        help=_cmd_export_vcf.__doc__)
+P_export_vcf.add_argument('segments', #nargs='1',
+        help="""Segmented copy ratio data file (*.cns), the output of the
+                'segment' or 'call' sub-commands.""")
+P_export_vcf.add_argument("--ploidy", type=int, default=2,
+        help="Ploidy of the sample cells. [Default: %(default)d]")
+P_export_vcf.add_argument("-y", "--male-reference", action="store_true",
+        help="""Was a male reference used?  If so, expect half ploidy on
+                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
+                if a male reference was used, the "neutral" copy number (ploidy)
+                of chrX is 1; chrY is haploid for either gender reference.""")
+P_export_vcf.add_argument('-o', '--output', help="Output file name.")
+P_export_vcf.set_defaults(func=_cmd_export_vcf)
+
+
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn
 def _cmd_export_theta(args):
     """Convert segments to THetA2 input file format (*.input)."""
@@ -1622,6 +1633,21 @@ P_export_theta.add_argument('normal_reference',
                 log2 copy ratios (.cnr).""")
 P_export_theta.add_argument('-o', '--output', help="Output file name.")
 P_export_theta.set_defaults(func=_cmd_export_theta)
+
+
+# Nexus "basic" special case: can only represent 1 sample
+def _cmd_export_nb(args):
+    """Convert bin-level log2 ratios to Nexus Copy Number "basic" format."""
+    outheader, outrows = export.export_nexus_basic(args.filename)
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+P_export_nb = P_export_subparsers.add_parser('nexus-basic',
+        help=_cmd_export_nb.__doc__)
+P_export_nb.add_argument('filename',
+        help="""Log2 copy ratio data file (*.cnr), the output of the 'fix'
+                sub-command.""")
+P_export_nb.add_argument('-o', '--output', help="Output file name.")
+P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
 # All else: export any number of .cnr or .cns files

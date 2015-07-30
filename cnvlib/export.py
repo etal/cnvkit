@@ -310,17 +310,17 @@ def export_vcf(sample_fname, args):
     segments = CNA.read(sample_fname)
     vcf_columns = list(VCF_COLUMNS) + [segments.sample_id]
     vcf_rows = []
-    for chrom, posn, alt, info, format, gtype in segments2vcf(segments, args.ploidy,
-                                                  args.male_reference):
-        vcf_rows.append((chrom, posn, '.', 'N', alt, '.', 'PASS',
-                         info, format, gtype))
+    for chrom, posn, alt, info, formats, gtype in segments2vcf(
+            segments, args.ploidy, args.male_reference):
+        vcf_rows.append((chrom, posn, '.', 'N', alt, '.', '.', # "PASS",
+                         info, formats, gtype))
     # XXX combine with header as a string/file/whatev
-    return vcf_columns, bed_rows
+    return vcf_columns, vcf_rows
 
 
 # XXX refactor with segments2bed; return a DataFrame with all info
 def segments2vcf(segments, ploidy, is_reference_male):
-    """Convert a copy number array to a BED-like format."""
+    """Convert copy number segments to VCF records."""
     absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
     for row, abs_val in zip(segments, absolutes):
         ncopies = int(round(abs_val))
@@ -331,12 +331,12 @@ def segments2vcf(segments, ploidy, is_reference_male):
         svlen = row["end"] - row["start"]
         if ncopies > ploidy:
             svtype = "DUP"
-            format = "GT:GQ:CN:CNQ"
+            formats = "GT:GQ:CN:CNQ"
             genotype = "./.:0:%d:%g" % (ncopies, row["probes"])
         elif ncopies < ploidy:
             svtype = "DEL"
             svlen *= -1
-            format = "GT:GQ"
+            formats = "GT:GQ"
             genotype = "0/1:%d" % row["probes"]
 
         # INFO
@@ -347,7 +347,7 @@ def segments2vcf(segments, ploidy, is_reference_male):
                          # CIPOS=-56,20;CIEND=-10,62  
                         ])
 
-        yield (row["chromosome"], row["start"] + 1, svtype, info, format,
+        yield (row["chromosome"], row["start"] + 1, svtype, info, formats,
                 genotype)
 
 
