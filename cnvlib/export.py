@@ -189,62 +189,6 @@ def segments2bed(segments, label, ploidy, is_reference_male, show_neutral):
 
 
 # _____________________________________________________________________________
-# freebayes
-
-def export_freebayes(sample_fnames, args):
-    """Export to FreeBayes --cnv-map format.
-
-    Which is BED-like, for each region in each sample which does not have
-    neutral copy number (equal to 2 or the value set by --ploidy), with columns:
-
-        - reference sequence
-        - start (0-indexed)
-        - end
-        - sample name
-        - copy number
-    """
-    if args.purity and not 0.0 < args.purity <= 1.0:
-        raise RuntimeError("Purity must be between 0 and 1.")
-
-    bed_rows = []
-    for fname in sample_fnames:
-        segs = CNA.read(fname)
-        is_sample_female = segs.guess_xx(args.male_reference, verbose=False)
-        if args.gender:
-            is_sample_female_given = (args.gender in ["f", "female"])
-            if is_sample_female != is_sample_female_given:
-                print("Sample gender specified as", args.gender,
-                      "but chrX copy number looks like",
-                      "female" if is_sample_female else "male",
-                      file=sys.stderr)
-                is_sample_female = is_sample_female_given
-        print("Treating sample gender as",
-              "female" if is_sample_female else "male",
-              file=sys.stderr)
-        rows = segments2freebayes(segs, args.sample_id or segs.sample_id,
-                                  args.ploidy, args.purity, args.male_reference,
-                                  is_sample_female)
-        bed_rows.extend(rows)
-    return None, bed_rows
-
-
-def segments2freebayes(segments, sample_name, ploidy, purity, is_reference_male,
-                       is_sample_female):
-    """Convert a copy number array to a BED-like format."""
-    absolutes = call.absolute_clonal(segments, ploidy, purity,
-                                     is_reference_male, is_sample_female)
-    for row, abs_val in zip(segments, absolutes):
-        ncopies = int(round(abs_val))
-        # Ignore regions of neutral copy number
-        if ncopies != ploidy:
-            yield (row["chromosome"], # reference sequence
-                   row["start"], # start (0-indexed)
-                   row["end"], # end
-                   sample_name, # sample name
-                   ncopies) # copy number
-
-
-# _____________________________________________________________________________
 # theta
 
 def export_theta(tumor, reference):
@@ -416,7 +360,6 @@ EXPORT_FORMATS = {
     'nexus-basic': export_nexus_basic,
     # 'nexus-multi1': fmt_multi,
     'seg': export_seg,
-    'freebayes': export_freebayes,
     'theta': export_theta,
     'vcf': export_vcf,
 }

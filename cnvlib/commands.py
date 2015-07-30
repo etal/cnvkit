@@ -1604,45 +1604,6 @@ P_export_bed.add_argument('-o', '--output', help="Output file name.")
 P_export_bed.set_defaults(func=_cmd_export_bed)
 
 
-# FreeBayes/BED special case: multiple samples's segments, like SEG
-def _cmd_export_fb(args):
-    """[DEPRECATED] Convert segments to FreeBayes --cnv-map format (BED-like).
-
-    Generates an input file for use with FreeBayes's --cnv-map option.
-
-    Input is a segmentation file (.cns). This may be imported from THetA to
-    account for normal-cell contamination and subclonal tumor cell population
-    structure; otherwise, the --purity argument provides a simpler adjustment.
-    """
-    outheader, outrows = export.export_freebayes(args.segments, args)
-    core.write_tsv(args.output, outrows, colnames=outheader)
-
-P_export_fb = P_export_subparsers.add_parser('freebayes',
-        help=_cmd_export_fb.__doc__)
-P_export_fb.add_argument('segments', nargs='+',
-        help="""Segmented copy ratio data files (*.cns), the output of the
-                'segment' sub-command.""")
-P_export_fb.add_argument("-i", "--sample-id",
-        help="Sample name, as FreeBayes should see it.")
-# Arguments to drop in favor of 'call':
-P_export_fb.add_argument("--ploidy", type=int, default=2,
-        help="Ploidy of the sample cells. [Default: %(default)d]")
-P_export_fb.add_argument("--purity", type=float,
-        help="Estimated tumor cell purity or cellularity.")
-P_export_fb.add_argument("-g", "--gender",
-        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
-        help="""Specify the sample's gender as male or female. (Otherwise
-                guessed from chrX copy number).""")
-# /
-P_export_fb.add_argument("-y", "--male-reference", action="store_true",
-        help="""Was a male reference used?  If so, expect half ploidy on
-                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
-                if a male reference was used, the "neutral" copy number (ploidy)
-                of chrX is 1; chrY is haploid for either gender reference.""")
-P_export_fb.add_argument('-o', '--output', help="Output file name.")
-P_export_fb.set_defaults(func=_cmd_export_fb)
-
-
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn
 def _cmd_export_theta(args):
     """Convert segments to THetA2 input file format (*.input)."""
