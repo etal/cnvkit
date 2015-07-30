@@ -1596,8 +1596,8 @@ def _cmd_export_vcf(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    outheader, outrows = export.export_vcf(args.segments, args)
-    core.write_tsv(args.output, outrows, colnames=outheader)
+    header, body = export.export_vcf(args.segments, args.ploidy, args.male_reference)
+    core.write_text(args.output, header, body)
 
 P_export_vcf = P_export_subparsers.add_parser('vcf',
         help=_cmd_export_vcf.__doc__)

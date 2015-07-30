@@ -36,6 +36,15 @@ def write_tsv(outfname, table, colnames=None):
         handle.writelines('\t'.join(map(str, row)) + '\n'
                            for row in table)
 
+def write_text(outfname, text, *more_texts):
+    if not outfname:
+        outfname = sys.stdout
+    with safe_write(outfname) as handle:
+        handle.write(text)
+        if more_texts:
+            for mtext in more_texts:
+                handle.write(mtext)
+
 
 # __________________________________________________________________________
 # Sorting key functions
