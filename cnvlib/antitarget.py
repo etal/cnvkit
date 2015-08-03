@@ -38,7 +38,8 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
     backgrounds = find_background_regions(access_chroms, target_chroms,
                                           2 * INSERT_SIZE)
     # Emit regions as antitarget bins according to avg_bin_size and min_bin_size
-    for chrom, start, end in sorted(backgrounds,
+    # Do a set operation on backgrounds to avoid any duplicate regions
+    for chrom, start, end in sorted(list(set(backgrounds)),
                                     key=core.sorter_chrom_at(0)):
         span = end - start
         if span >= min_bin_size:

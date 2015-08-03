@@ -1596,7 +1596,8 @@ def _cmd_export_vcf(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    header, body = export.export_vcf(args.segments, args.ploidy, args.male_reference)
+    header, body = export.export_vcf(args.segments, args.ploidy, args.male_reference,
+                                     args.sample_id)
     core.write_text(args.output, header, body)
 
 P_export_vcf = P_export_subparsers.add_parser('vcf',
@@ -1604,6 +1605,9 @@ P_export_vcf = P_export_subparsers.add_parser('vcf',
 P_export_vcf.add_argument('segments', #nargs='1',
         help="""Segmented copy ratio data file (*.cns), the output of the
                 'segment' or 'call' sub-commands.""")
+P_export_vcf.add_argument("-i", "--sample-id", metavar="LABEL",
+        help="""Sample name to write in the genotype field of the output VCF file.
+                [Default: use the sample ID, taken from the file name]""")
 P_export_vcf.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_export_vcf.add_argument("-y", "--male-reference", action="store_true",
