@@ -44,6 +44,7 @@ from __future__ import absolute_import, division, print_function
 import math
 
 import numpy as np
+import pandas as pd
 from scipy import stats
 
 # from .. import params
@@ -65,11 +66,11 @@ def segment_haar(cnarr):
     def midprobe(probe):
         return 0.5 * (probe['start'] + probe['end'])
 
-    # XXX Ignore low-coverage probes
-    # cnarr = cnarr.drop_low_coverage()
+    # Ignore low-coverage probes
+    # ENH: do in the caller (segmentation.__init__)
+    cnarr = cnarr.drop_low_coverage()
     # TODO - skip large gaps (segment parts separately)
 
-    echo("Segmenting the probe data")
     seg_rows = []
     # Segment each chromosome individually
     for chrom, subprobes in cnarr.by_chromosome():
@@ -78,12 +79,11 @@ def segment_haar(cnarr):
         # Convert the segments result table (segment start index, size, value)
         # into CNArray-compatible rows (coverage, chromosome, start, end, gene,
         # probes)
-        for start_idx, nloci, seg_mean in segtable:
+        for _i, start_idx, nloci, seg_mean in segtable.itertuples():
             start_probe = cnarr[start_idx]
             end_probe = cnarr[start_idx + nloci]
             gene = 'G' if seg_mean >= 0. else 'L'
-            seg_rows.append((chrom, midprobe(start_probe), midprobe(end_probe),
-                             # start_probe['start'], end_probe['end'], # XXX
+            seg_rows.append((chrom, start_probe['start'], end_probe['end'],
                              gene, seg_mean, nloci))
     echo("haar: Found", len(seg_rows), "segments")
     return CNA.from_rows(seg_rows,
@@ -173,7 +173,7 @@ def haarSeg(I,
     else:
         peakSigmaEst = med_abs_diff(diffI)
 
-    breakpoints = np.array([])
+    breakpoints = np.array([], dtype=np.int_)
     for level in range(haarStartLevel, haarEndLevel+1):
         stepHalfSize = 2 ** level
         convRes = HaarConv(I, W, stepHalfSize)
@@ -192,9 +192,7 @@ def haarSeg(I,
         addonPeaks = HardThreshold(convRes, T, peakLoc)
         breakpoints = UnifyLevels(breakpoints, addonPeaks, 2 ** (level - 1))
 
-    # / for level ...
-
-    echo("Found", len(breakpoints), "breakpoints:", breakpoints)
+    # echo("Found", len(breakpoints), "breakpoints:", breakpoints)
 
     segs = SegmentByPeaks(I, breakpoints, W)
 
@@ -203,7 +201,9 @@ def haarSeg(I,
     segSize = segEd - segSt
     segValues = segs[segSt]
 
-    segment_table = np.column_stack((segSt, segSize, segValues))
+    segment_table = pd.DataFrame.from_items([('start', segSt),
+                                             ('size', segSize),
+                                             ('log2', segValues)])
     return segment_table
 
 
@@ -227,8 +227,8 @@ def FDRThres(x, q, stdev):
         if len(k):
             T = sortedX[k[-1]]
         else:
-            echo("No passing p-values: min p=%.4g, min m=%.4g, q=%s"
-                 % (p[0], m[0], q))
+            # echo("No passing p-values: min p=%.4g, min m=%.4g, q=%s"
+            #      % (p[0], m[0], q))
             # T = sortedX[1] + 1e-16;  # ~= 2^-52, like MATLAB "eps"
             T = sortedX[0] + 1e-16
 
@@ -253,7 +253,7 @@ def SegmentByPeaks(data, peaks, weights=None):
         else:
             # Unweighted mean of individual probe values
             val = np.mean(data[seg_start:seg_end])
-        echo("Segment value @%d-%d: %.4f" % (seg_start, seg_end, val))
+        # echo("Segment value @%d-%d: %.4f" % (seg_start, seg_end, val))
         segs[seg_start:seg_end] = val
     return segs
 
@@ -401,8 +401,8 @@ def HardThreshold(signal, #const double * signal,
     for peak_loc_elem in peakLoc:
         if not (-threshold < signal[peak_loc_elem] < threshold):
             # Peak is over the threshold
-            echo("Peak", peak_loc_elem, "passes threshold:", ":",
-                 signal[peak_loc_elem])
+            # echo("Peak", peak_loc_elem, "passes threshold:", ":",
+            #      signal[peak_loc_elem])
             peakLocOut.append(peak_loc_elem)
     return np.asarray(peakLocOut)
 
@@ -445,7 +445,7 @@ def UnifyLevels(baseLevel, #const int * baseLevel,
 
     # Insert remaining indexes in addon to joined
     joinedLevel.extend(addon_iter)
-    return np.array(sorted(joinedLevel))
+    return np.array(sorted(joinedLevel), dtype=np.int_)
 
 
 # For the R version only, not Matlab (???)
