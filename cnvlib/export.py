@@ -276,8 +276,6 @@ def calculate_theta_fields(seg, ref_rows, chrom_id):
 
 VCF_HEADER = """\
 ##fileformat=VCFv4.0
-##fileDate=20100501
-##reference=1000GenomesPilot-NCBI36
 ##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">
 ##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
@@ -299,7 +297,7 @@ VCF_HEADER = """\
 # 4 18665128  . T <DUP:TANDEM>  11  PASS  IMPRECISE;SVTYPE=DUP;END=18665204;SVLEN=76;CIPOS=-10,10;CIEND=-10,10  GT:GQ:CN:CNQ  ./.:0:5:8.3
 
 
-def export_vcf(sample_fname, ploidy, is_reference_male):
+def export_vcf(sample_fname, ploidy, is_reference_male, sample_id=None):
     """Convert segments to Variant Call Format.
 
     For now, only 1 sample per VCF. (Overlapping CNVs seem tricky.)
@@ -308,7 +306,7 @@ def export_vcf(sample_fname, ploidy, is_reference_male):
     """
     segments = CNA.read(sample_fname)
     vcf_columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER",
-                   "INFO", "FORMAT", segments.sample_id]
+                   "INFO", "FORMAT", sample_id or segments.sample_id]
     vcf_rows = [(chrom, posn, '.', 'N', alt, '.', '.', info, fmts, gtype)
                 for chrom, posn, alt, info, fmts, gtype in
                 segments2vcf(segments, ploidy, is_reference_male)]
