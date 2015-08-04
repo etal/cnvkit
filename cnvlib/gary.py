@@ -152,12 +152,9 @@ class GenomicArray(object):
         return NotImplemented
 
     def __iter__(self):
-        # return iter(self.data)
-        return (row for idx, row in self.data.iterrows())
+        return (row[1:] for row in self.data.itertuples())
 
     __next__ = next
-    # def __next__(self):
-    #     return next(iter(self))
 
     @property
     def chromosome(self):
