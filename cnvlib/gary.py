@@ -152,7 +152,7 @@ class GenomicArray(object):
         return NotImplemented
 
     def __iter__(self):
-        return (row[1:] for row in self.data.itertuples())
+        return (row for i, row in self.data.iterrows())
 
     __next__ = next
 
