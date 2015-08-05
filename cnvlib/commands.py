@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function
 import argparse
 import collections
 import math
-import multiprocessing
 import os
 import sys
 
@@ -28,9 +27,9 @@ from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
-from . import (core, target, antitarget, coverage, fix, metrics, reference,
-               reports, export, importers, segmentation, call,
-               params, ngfrills, plots)
+from . import (core, ngfrills, parallel, params,
+               target, antitarget, coverage, fix, metrics, reference, reports,
+               export, importers, segmentation, call, plots)
 from .ngfrills import echo
 from .cnary import CopyNumArray as _CNA
 from ._version import __version__
@@ -45,27 +44,6 @@ AP_subparsers = AP.add_subparsers(
 
 # _____________________________________________________________________________
 # Core pipeline
-
-class SerialPool(object):
-    """Mimic the multiprocessing.Pool interface, but run in serial."""
-
-    def __init__(self):
-        pass
-
-    def apply_async(self, func, args):
-        """Just call the function."""
-        func(*args)
-
-    # No-ops to mimic Pool
-    def close(self): pass
-    def join(self): pass
-
-
-def pick_pool(nprocs):
-    if nprocs == 1:
-        return SerialPool()
-    return multiprocessing.Pool(nprocs)
-
 
 # batch -----------------------------------------------------------------------
 
@@ -97,9 +75,6 @@ def _cmd_batch(args):
                  "given to build a new reference if -r/--reference is not used."
                  "\n(See: cnvkit.py batch -h)")
 
-    if args.processes < 1:
-        args.processes = multiprocessing.cpu_count()
-
     if not args.reference:
         # Build a copy number reference; update (anti)targets upon request
         args.reference, args.targets, args.antitargets = batch_make_reference(
@@ -123,7 +98,7 @@ def _cmd_batch(args):
              (("%d processes" % args.processes)
               if args.processes > 1 else "serial"))
 
-        pool = pick_pool(args.processes)
+        pool = parallel.pick_pool(args.processes)
         for bam in args.bam_files:
             pool.apply_async(batch_run_sample,
                              (bam, args.targets, args.antitargets, args.reference,
@@ -181,7 +156,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
         target_fnames = []
         antitarget_fnames = []
         # Run coverage on all normals
-        pool = pick_pool(processes)
+        pool = parallel.pick_pool(processes)
         for nbam in normal_bams:
             sample_id = core.fbase(nbam)
             sample_pfx = os.path.join(output_dir, sample_id)
