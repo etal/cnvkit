@@ -39,8 +39,7 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
                                           2 * INSERT_SIZE)
     # Emit regions as antitarget bins according to avg_bin_size and min_bin_size
     # Do a set operation on backgrounds to avoid any duplicate regions
-    for chrom, start, end in sorted(list(set(backgrounds)),
-                                    key=core.sorter_chrom_at(0)):
+    for chrom, start, end in sorted(backgrounds, key=core.sorter_chrom_at(0)):
         span = end - start
         if span >= min_bin_size:
             nbins = int(round(span / avg_bin_size)) or 1
@@ -80,37 +79,36 @@ def find_background_regions(access_chroms, target_chroms, pad_size):
     """Take coordinates of accessible regions and targets; emit antitargets."""
     for chrom in access_chroms:
         if chrom in target_chroms:
-            for chrom in target_chroms:
-                target_regions = iter(target_chroms[chrom])
+            target_regions = iter(target_chroms[chrom])
 
-                # Split each access_region at the targets it contains
-                tgt_start, tgt_end = next(target_regions)
-                assert tgt_start < tgt_end
-                for acc_start, acc_end in access_chroms[chrom]:
-                    if acc_end - acc_start <= 2 * pad_size:
-                        # Accessible region is way too small
-                        continue
+            # Split each access_region at the targets it contains
+            tgt_start, tgt_end = next(target_regions)
+            assert tgt_start < tgt_end
+            for acc_start, acc_end in access_chroms[chrom]:
+                if acc_end - acc_start <= 2 * pad_size:
+                    # Accessible region is way too small
+                    continue
 
-                    bg_start = acc_start + pad_size
-                    while tgt_start < acc_end:
-                        # There may be at least one more target in this region
-                        if tgt_end + pad_size > bg_start:
-                            # Yes, there is a target in this region
-                            if tgt_start - pad_size > bg_start:
-                                # Split the background region at this target
-                                yield (chrom, bg_start, tgt_start - pad_size)
-                            bg_start = tgt_end + pad_size
+                bg_start = acc_start + pad_size
+                while tgt_start < acc_end:
+                    # There may be at least one more target in this region
+                    if tgt_end + pad_size > bg_start:
+                        # Yes, there is a target in this region
+                        if tgt_start - pad_size > bg_start:
+                            # Split the background region at this target
+                            yield (chrom, bg_start, tgt_start - pad_size)
+                        bg_start = tgt_end + pad_size
 
-                        # Done splitting that target; is there another?
-                        try:
-                            tgt_start, tgt_end = next(target_regions)
-                        except StopIteration:
-                            # Ensure all the remaining access_regions are unbroken
-                            tgt_start = tgt_end = float('Inf')
+                    # Done splitting that target; is there another?
+                    try:
+                        tgt_start, tgt_end = next(target_regions)
+                    except StopIteration:
+                        # Ensure all the remaining access_regions are unbroken
+                        tgt_start = tgt_end = float('Inf')
 
-                    # No remaining targets in this region - emit the rest of it
-                    if acc_end - pad_size - bg_start > 0:
-                        yield (chrom, bg_start, acc_end - pad_size)
+                # No remaining targets in this region - emit the rest of it
+                if acc_end - pad_size - bg_start > 0:
+                    yield (chrom, bg_start, acc_end - pad_size)
         else:
             for acc_start, acc_end in access_chroms[chrom]:
                 yield (chrom, acc_start + pad_size, acc_end - pad_size)
