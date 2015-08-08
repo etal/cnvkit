@@ -36,6 +36,8 @@ class GenomicArray(object):
                    self._required_columns):
             raise ValueError("data table must have at least columns "
                              + repr(self._required_columns))
+        # ensure chromosomes are strings to avoid integer conversion of 1, 2...
+        data_table["chromosome"] = data_table["chromosome"].astype(str)
         self.data = data_table
         self.meta = (dict(meta_dict)
                      if meta_dict is not None and len(meta_dict)
