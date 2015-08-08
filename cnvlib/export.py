@@ -307,7 +307,7 @@ def export_vcf(sample_fname, ploidy, is_reference_male, sample_id=None):
     segments = CNA.read(sample_fname)
     vcf_columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER",
                    "INFO", "FORMAT", sample_id or segments.sample_id]
-    vcf_rows = [(chrom, posn, '.', 'N', alt, '.', '.', info, fmts, gtype)
+    vcf_rows = [(chrom, posn, '.', 'N', "<%s>" % alt, '.', '.', info, fmts, gtype)
                 for chrom, posn, alt, info, fmts, gtype in
                 segments2vcf(segments, ploidy, is_reference_male)]
     table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
