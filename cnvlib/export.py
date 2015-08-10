@@ -330,12 +330,19 @@ def segments2vcf(segments, ploidy, is_reference_male):
         if ncopies > ploidy:
             svtype = "DUP"
             formats = "GT:GQ:CN:CNQ"
-            genotype = "./.:0:%d:%g" % (ncopies, row["probes"])
+            genotype = "0/1:0:%d:%g" % (ncopies, row["probes"])
         elif ncopies < ploidy:
             svtype = "DEL"
             svlen *= -1
             formats = "GT:GQ"
-            genotype = "0/1:%d" % row["probes"]
+            # TODO XXX handle non-diploid ploidies, haploid chroms
+            if ncopies == 0:
+                # Complete deletion, 0 copies
+                gt = "1/1"
+            else:
+                # Single copy deletion
+                gt = "0/1"
+            genotype = "%s:%d" % (gt, row["probes"])
 
         # INFO
         info = ";".join(["IMPRECISE",
