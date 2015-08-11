@@ -18,7 +18,7 @@ def _get_sample(record, sample_id=None):
 
 
 def load_vcf(fname, min_depth=1, sample_id=None,
-             skip_hom=True, skip_reject=True, skip_somatic=False):
+             skip_hom=True, skip_reject=False, skip_somatic=True):
     """Parse SNV coordinates from a VCF file; group by chromosome.
 
     Returns a dict of: {chrom: position, zygosity, alt allele frequency}
