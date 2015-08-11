@@ -4,30 +4,97 @@ from __future__ import absolute_import, division, print_function
 import pandas as pd
 import vcf
 
+from . import core, gary
 from .ngfrills import echo
 
 
-def read_vcf(vcf_fname, sample_id=None, min_depth=1, skip_hom=True,
-             skip_reject=False, skip_somatic=True):
-    """Parse SNV coordinates from a VCF file into a DataFrame."""
-    with open(vcf_fname) as vcffile:
-        vcf_reader = vcf.Reader(vcffile)
-        rows = parse_records(vcf_reader, sample_id, min_depth, skip_hom,
+class VariantArray(gary.GenomicArray):
+    """An array of genomic intervals, treated as variant loci.
+
+    Required columns: chromosome, start, end, ref, alt
+    """
+    _required_columns = ("chromosome", "start", "end", "ref", "alt")
+    # Extra: zygosity, depth, alt_count, alt_freq
+
+    def __init__(self, data_table, meta_dict=None):
+        gary.GenomicArray.__init__(self, data_table, meta_dict)
+
+    # I/O
+
+    @classmethod
+    def read_vcf(cls, infile, sample_id=None, min_depth=1, skip_hom=True,
+                 skip_reject=False, skip_somatic=True):
+        """Parse SNV coordinates from a VCF file into a VariantArray."""
+        if isinstance(infile, basestring):
+            vcf_reader = vcf.Reader(filename=infile)
+        else:
+            vcf_reader = vcf.Reader(infile)
+
+        sample_id = _select_sample(vcf_reader, sample_id)
+        rows = _parse_records(vcf_reader, sample_id, min_depth, skip_hom,
                              skip_reject, skip_somatic)
-        dframe = pd.DataFrame.from_records(rows, columns=[
-            "chromosome", "start", "end",
-            "ref", "alt", "zygosity", "depth", "alt_count"])
-    dframe["alt_freq"] = dframe["alt_count"] / dframe["depth"]
-    return dframe
+        table = pd.DataFrame.from_records(rows, columns=[
+            "chromosome", "start", "end", "ref", "alt",
+            "zygosity", "depth", "alt_count"])
+        table["alt_freq"] = table["alt_count"] / table["depth"]
+        return cls(table, {"sample_id": sample_id})
+
+    # def write_vcf(self, outfile=sys.stdout):
+    #     """Write data to a file or handle in VCF format."""
+    #     # grab from export.export_vcf()
 
 
-def parse_records(vcf_reader, sample_id, min_depth, skip_hom, skip_reject,
+def _select_sample(vcf_reader, sample_id):
+    """Select a sample ID in the VCF; ensure it's valid."""
+    # ENH - take the paired normal, to select only the tumor records where the
+    # normal sample is het
+    def get_mutect_tag(metadata):
+        for tag in metadata["GATKCommandLine"]:
+            if tag["ID"] == "MuTect":
+                return sample_id
+
+    if sample_id is None:
+        # Use the VCF header to select the tumor sample
+        if "PEDIGREE" in vcf_reader.metadata:
+            for tag in vcf_reader.metadata["PEDIGREE"]:
+                if "Derived" in tag:
+                    sample_id = tag["Derived"]
+                    # normal_id = tag["Original"]
+                    echo("Selected tumor sample", sample_id,
+                         "from the VCF header PEDIGREE tag")
+                    break
+        elif "GATKCommandLine" in vcf_reader.metadata:
+            for tag in vcf_reader.metadata["GATKCommandLine"]:
+                if tag.get("ID") == "MuTect":  # any others OK?
+                    options = dict(kv.split("=", 1)
+                                   for kv in tag["CommandLineOptions"].split()
+                                   if '=' in kv)
+                    sample_id = options.get('tumor_sample_name')
+                    # normal_id = options['normal_sample_name=TR_95_N']
+                    echo("Selected tumor sample", sample_id,
+                         "from the MuTect VCF header")
+                    break
+
+    if sample_id is None:
+        sample_id = vcf_reader.samples[0]
+    choices = [s for s in vcf_reader.samples if s == sample_id]
+    assert len(choices) == 1, (
+        "Did not find single sample matching sample id %s: %s"
+        % (sample_id, vcf_reader.samples))
+    return sample_id
+
+
+def _parse_records(vcf_reader, sample_id, min_depth, skip_hom, skip_reject,
                   skip_somatic):
-    """Parse VCF records into DataFrame rows."""
-    cnt_reject = 0
+    """Parse VCF records into DataFrame rows.
+
+    Apply filters to skip records with low depth, homozygosity, the REJECT
+    flag, or the SOMATIC info field.
+    """
+    cnt_reject = 0  # For logging
     cnt_som = 0
     cnt_depth = 0
-    cnt_hom = 0  # DBG
+    cnt_hom = 0
     for record in vcf_reader:
         if skip_reject and record.FILTER and len(record.FILTER) > 0:
             cnt_reject += 1
@@ -36,34 +103,32 @@ def parse_records(vcf_reader, sample_id, min_depth, skip_hom, skip_reject,
             cnt_som += 1
             continue
 
-        # Skip unassigned contigs, alt. HLA haplotypes, etc. XXX
-        # if len(record.CHROM) > len("chr99"):
-        #     continue
-
-        # Skip homozygous variants (optionally)
-        sample = _get_sample(record, sample_id)
+        sample = record.genotype(sample_id)
 
         # Depth filter
-        depth = sample.data.DP
+        if "DP" in sample.data._fields:
+            depth = sample.data.DP
+        else:
+            # SV, probably
+            cnt_depth += 1
+            continue
         if depth < min_depth:
-            if cnt_depth == 0:
-                echo("First rejected depth:", depth)
             cnt_depth += 1
             continue
 
-        # Alt count
-        alt_count = _get_alt_count(sample)
-
-        # Het filter
+        # Skip homozygous variants (optionally)
         if sample.is_het:
             zygosity = 0.5
-        elif sample.gt_type == 0:
-            zygosity = 0.0
         else:
-            zygosity = 1.0
-        if skip_hom and zygosity != 0.5:
-            cnt_hom += 1
-            continue
+            if skip_hom:
+                cnt_hom += 1
+                continue
+            if sample.gt_type == 0:
+                zygosity = 0.0
+            else:
+                zygosity = 1.0
+
+        alt_count = _get_alt_count(sample)
 
         # Split multiallelics?
         # XXX Ensure sample genotypes are handled properly
@@ -83,22 +148,9 @@ def parse_records(vcf_reader, sample_id, min_depth, skip_hom, skip_reject,
          cnt_depth, "depth,", cnt_hom, "homozygous")
 
 
-def _get_sample(record, sample_id=None):
-    """Pick sample by sample ID or defaulting to the first sample.
-    """
-    if sample_id:
-        choices = [s for s in record.samples if s.sample == sample_id]
-        assert len(choices) == 1, \
-            "Did not find single sample matching sample id %s: %s" \
-            % (sample_id, [s.sample for s in record.samples])
-        return choices[0]
-    else:
-        return record.samples[0]
-
-
 def _get_alt_count(sample):
     """Get the alternative allele count from a sample in a VCF record."""
-    if "AD" in sample.data._fields:
+    if "AD" in sample.data._fields and sample.data.AD is not None:
         # GATK and other callers
         if isinstance(sample.data.AD, (list, tuple)):
             alt_count = float(sample.data.AD[1])
@@ -112,7 +164,7 @@ def _get_alt_count(sample):
             else:
                 alt_count = float(sample.data.AO)
         else:
-            alt_count = 0
+            alt_count = 0.0
     else:
         echo("Skipping: unsure how to get alternative allele count:",
              sample.site.CHROM, sample.site.POS, sample.site.REF, sample.data)
