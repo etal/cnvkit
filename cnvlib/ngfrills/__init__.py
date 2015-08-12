@@ -13,7 +13,6 @@ from .faidx import *
 from .regions import *
 from .samutil import *
 from .shared import *
-from .vcf import *
 
 
 # __________________________________________________________
