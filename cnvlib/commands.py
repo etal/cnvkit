@@ -914,8 +914,9 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                     (window_coords[0] * plots.MB <= chrom_snvs["start"]) &
                     (chrom_snvs["start"]  <= window_coords[1] * plots.MB)]
             snv_x = chrom_snvs["start"] * plots.MB
-            snv_y = (chrom_snvs["alt_freq"] - .5).abs() + .5
-            axis2.set_ylim(0.5, 1.0)
+            # TODO - draw trend or segment lines through median VAF
+            snv_y = chrom_snvs["alt_freq"]
+            axis2.set_ylim(0.0, 1.0)
             axis2.set_ylabel("VAF")
             axis2.scatter(snv_x, snv_y, color='#808080', alpha=0.3)
             axis2.set_xlabel("Position (Mb)")

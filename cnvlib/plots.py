@@ -175,7 +175,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
 
 def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad):
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
-    axis.set_ylim(0.5, 1.0)
+    axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
     x_starts = plot_x_dividers(axis, chrom_sizes, pad)
 
@@ -190,9 +190,10 @@ def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad):
             x_posns_chrom[chrom] = []
             y_posns_chrom[chrom] = []
             continue
-        posns = np.asarray(snvs["start"], np.float_)
+        posns = np.asfarray(snvs["start"])
         x_posns = posns + curr_offset
-        vafs = (snvs["alt_freq"] - .5).abs() + .5
+        # vafs = (snvs["alt_freq"] - .5).abs() + .5
+        vafs = np.asfarray(snvs["alt_freq"])
         x_posns_chrom[chrom] = x_posns
         y_posns_chrom[chrom] = vafs
         # Trend bars: always calculated, only shown on request
@@ -205,7 +206,11 @@ def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad):
                                v_freq))
         else:
             # Draw chromosome-wide average VAF
-            trends.append((x_posns[0], x_posns[-1], vafs.median()))
+            for mask_vaf in ((vafs > 0.5), (vafs <= 0.5)):
+                if sum(mask_vaf) > 1:
+                    these_posns = x_posns[mask_vaf]
+                    trends.append((these_posns[0], these_posns[-1],
+                                   np.median(vafs[mask_vaf])))
 
     # Test for significant shifts in VAF
     # ENH - use segments if provided
@@ -238,7 +243,7 @@ def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad):
         for x_start, x_end, y_trend in trends:
             # ENH: color by segment gain/loss
             axis.plot([x_start, x_end], [y_trend, y_trend],
-                      color='#C0C0C0', linewidth=3, zorder=-1,
+                      color='#C0C0C0', linewidth=2, zorder=-1,
                       solid_capstyle='round')
 
 
@@ -247,18 +252,20 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom):
 
     Return an iterable of: start, end, value.
     """
-    # Binary search in the chrom, I guess
     seg_starts = segments.select(chromosome=chrom)['start']
+    # Assign a segment number to each variant, basically
     indices = np.maximum(seg_starts.searchsorted(snv_posns), 1) - 1
     for i in sorted(set(indices)):
-        mask = (indices == i)
-        freqs = snv_freqs[mask]
-        posns = snv_posns[mask]
-        # yield posns, freqs
-        if sum(mask) < 2:
-            # Skip single-mutation groups
-            continue
-        yield posns[0], posns[-1], np.median(freqs)
+        mask_in_seg = (indices == i)
+        freqs = snv_freqs[mask_in_seg]
+        posns = snv_posns[mask_in_seg]
+        # Separately emit VAFs above and below .5 for plotting
+        mask_above_mid = (freqs > 0.5)
+        for mask_vaf in (mask_above_mid, ~mask_above_mid):
+            if sum(mask_vaf) > 1:
+                these_posns = posns[mask_vaf]
+                yield (these_posns[0], these_posns[-1],
+                       np.median(freqs[mask_vaf]))
 
 
 def plot_x_dividers(axis, chromosome_sizes, pad):
