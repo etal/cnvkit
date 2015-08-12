@@ -137,8 +137,8 @@ $(picard_segs:.cns=.call-clonal.cns): build/%.call-clonal.cns: build/%.cns
 
 # == Export to other formats
 
-# p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns)
-p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns) $(picard_segs:.cns=-haar.cns)
+# p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns) $(picard_segs:.cns=-haar.cns)
+p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns)
 	$(cnvkit) export seg $^ -o $@
 
 p2-all.bed: $(picard_segs:.cns=.call-clonal.cns)
