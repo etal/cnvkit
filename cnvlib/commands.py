@@ -32,6 +32,7 @@ from . import (core, ngfrills, parallel, params,
                export, importers, segmentation, call, plots)
 from .ngfrills import echo
 from .cnary import CopyNumArray as _CNA
+from .vary import VariantArray as _VA
 from ._version import __version__
 
 
@@ -818,14 +819,12 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.85)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            chrom_snvs = ngfrills.load_vcf(vcf_fname, min_variant_depth,
-                                           skip_somatic=True, skip_reject=False,
-                                           sample_id=sample_id)
+            variants = _VA.read_vcf(vcf_fname, sample_id, min_variant_depth)
             # Place chromosome labels between the CNR and LOH plots
             axis2.tick_params(labelbottom=False)
             chrom_sizes = plots.chromosome_sizes(pset_cvg)
-            plots.plot_loh(axis2, chrom_snvs, chrom_sizes, pset_seg,
-                           do_trend, PAD)
+            plots.plot_loh(axis2, variants, chrom_sizes, pset_seg, do_trend,
+                           PAD)
         else:
             _fig, axis = pyplot.subplots()
         axis.set_title(pset_cvg.sample_id)
@@ -907,18 +906,15 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.5)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            chrom_snvs = ngfrills.load_vcf(vcf_fname, min_variant_depth,
-                                           skip_somatic=True, skip_reject=False,
-                                           sample_id=sample_id)
-            # Plot LOH for only the selected region
-            # XXX make this a function in plots
-            snv_x_y = [(pos * plots.MB, abs(altfreq - .5) + 0.5)
-                       for pos, _zyg, altfreq in chrom_snvs[chrom]]
+            variants = _VA.read_vcf(vcf_fname, sample_id, min_variant_depth)
+            chrom_snvs = variants[variants["chromosome"] == chrom]
             if window_coords:
-                snv_x_y = [(x, y) for x, y in snv_x_y
-                           if (window_coords[0] * plots.MB <= x <=
-                               window_coords[1] * plots.MB)]
-            snv_x, snv_y = (zip(*snv_x_y) if snv_x_y else ([], []))
+                # Plot LOH for only the selected region
+                chrom_snvs = chrom_snvs[
+                    (window_coords[0] * plots.MB <= chrom_snvs["start"]) &
+                    (chrom_snvs["start"]  <= window_coords[1] * plots.MB)]
+            snv_x = chrom_snvs["start"] * plots.MB
+            snv_y = (chrom_snvs["alt_freq"] - .5).abs() + .5
             axis2.set_ylim(0.5, 1.0)
             axis2.set_ylabel("VAF")
             axis2.scatter(snv_x, snv_y, color='#808080', alpha=0.3)
@@ -957,8 +953,8 @@ P_scatter.add_argument('-l', '--range-list',
                 multi-page PDF.  The output filename must also be
                 specified (-o/--output).""")
 P_scatter.add_argument("-i", "--sample-id",
-        help="""Specify the name of the sample to show in plot title and use for
-                LOH analysis.""")
+        help="""Specify the name of the sample in the VCF to use for LOH
+                analysis and to show in plot title.""")
 P_scatter.add_argument('-b', '--background-marker', default=None,
         help="""Plot antitargets with this symbol, in zoomed/selected regions.
                 [Default: same as targets]""")
@@ -987,41 +983,28 @@ def _cmd_loh(args):
 
     Divergence from 0.5 indicates loss of heterozygosity in a tumor sample.
     """
-    create_loh(args.variants, args.min_depth, args.trend, args.sample_id)
+    variants = _VA.read_vcf(args.variants, args.sample_id, args.min_depth)
+    segments = _CNA.read(args.segment) if args.segment else None
+    create_loh(variants, segments, args.trend)
     if args.output:
         pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
     else:
         pyplot.show()
 
 
-def create_loh(variants, min_depth=20, do_trend=False, sample_id=None):
+def create_loh(variants, segments=None, do_trend=False):
     """Plot allelic frequencies at each variant position in a VCF file."""
-    # TODO - accept "normal" sample ID (default: look for "Normal")
-    # if so: find het vars in normal (#1), look those up in tumor (#2)
-    #   -> plot only those ones
-
-    # TODO - if given segments (args.segment),
-    #   do test for significance of shift (abs diff of alt from .5)
-    #       between segment and all other points
-    #   if significant:
-    #       colorize those points
-    #       draw a CBS-like bar at mean level in that segment
-
     _fig, axis = pyplot.subplots()
-    axis.set_title("Variant allele frequencies: %s" % variants[0])
-    chrom_snvs = ngfrills.load_vcf(variants[0], min_depth,
-                                   skip_somatic=True, skip_reject=False,
-                                   sample_id=sample_id)
-    chrom_sizes = collections.OrderedDict()
-    for chrom in sorted(chrom_snvs, key=core.sorter_chrom):
-        chrom_sizes[chrom] = max(v[0] for v in chrom_snvs[chrom])
-
+    axis.set_title("Variant allele frequencies: %s" % variants.sample_id)
+    chrom_sizes = collections.OrderedDict(
+        (chrom, subarr["end"].max())
+        for chrom, subarr in variants.by_chromosome())
     PAD = 2e7
-    plots.plot_loh(axis, chrom_snvs, chrom_sizes, None, do_trend, PAD)
+    plots.plot_loh(axis, variants, chrom_sizes, segments, do_trend, PAD)
 
 
 P_loh = AP_subparsers.add_parser('loh', help=_cmd_loh.__doc__)
-P_loh.add_argument('variants', nargs='+',
+P_loh.add_argument('variants',
         help="Sample variants in VCF format.")
 P_loh.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")

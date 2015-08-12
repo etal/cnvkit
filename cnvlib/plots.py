@@ -173,25 +173,26 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
                       color=SEG_COLOR, linewidth=4, solid_capstyle='round')
 
 
-def plot_loh(axis, chrom_snvs, chrom_sizes, segments, do_trend, pad):
+def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad):
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
     axis.set_ylim(0.5, 1.0)
     axis.set_ylabel("VAF")
     x_starts = plot_x_dividers(axis, chrom_sizes, pad)
 
     # Calculate the coordinates of plot components
+    chrom_snvs = dict(variants.by_chromosome())
     x_posns_chrom = {}
     y_posns_chrom = {}
     trends = []
     for chrom, curr_offset in iteritems(x_starts):
-        snvs = chrom_snvs[chrom]
+        snvs = chrom_snvs.get(chrom, [])
         if not len(snvs):
             x_posns_chrom[chrom] = []
             y_posns_chrom[chrom] = []
             continue
-        posns = np.array([v[0] for v in snvs], np.float_)
+        posns = np.asarray(snvs["start"], np.float_)
         x_posns = posns + curr_offset
-        vafs = np.array([abs(v[2] - .5) + 0.5 for v in snvs], np.float_)
+        vafs = (snvs["alt_freq"] - .5).abs() + .5
         x_posns_chrom[chrom] = x_posns
         y_posns_chrom[chrom] = vafs
         # Trend bars: always calculated, only shown on request
@@ -204,10 +205,11 @@ def plot_loh(axis, chrom_snvs, chrom_sizes, segments, do_trend, pad):
                                v_freq))
         else:
             # Draw chromosome-wide average VAF
-            trends.append((x_posns[0], x_posns[-1], np.median(vafs)))
+            trends.append((x_posns[0], x_posns[-1], vafs.median()))
 
     # Test for significant shifts in VAF
     # ENH - use segments if provided
+    #   if significant, colorize those points / that median line
     sig_chroms = [] # test_loh(partition_by_chrom(chrom_snvs))
 
     # Render significantly shifted heterozygous regions separately
