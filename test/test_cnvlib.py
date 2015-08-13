@@ -10,15 +10,15 @@ import numpy
 import cnvlib
 # Import all modules as a smoke test
 from cnvlib import (antitarget, commands, core, coverage, diagram, export, fix,
-                    importers, metrics, ngfrills, params, plots, cnary,
-                    reference, reports, segmentation, smoothing)
+                    importers, metrics, ngfrills, params, plots, reference,
+                    reports, segmentation, smoothing,
+                    gary, cnary, vary, rary)
 
-A_REFERENCE = 'formats/reference-tr.cnn'
 
 class GaryTests(unittest.TestCase):
 
     def setUp(self):
-        self.ex_cnr = cnvlib.read(A_REFERENCE)
+        self.ex_cnr = cnvlib.read('formats/reference-tr.cnn')
 
     def test_iter(self):
         """Test iteration."""
@@ -60,16 +60,17 @@ class GaryTests(unittest.TestCase):
 
 class CNATests(unittest.TestCase):
     """Tests for the CopyNumArray class."""
+    A_REFERENCE = 'formats/reference-tr.cnn'
 
     def setUp(self):
-        self.ex_cnr = cnvlib.read(A_REFERENCE)
+        self.ex_cnr = cnvlib.read(self.A_REFERENCE)
 
     def test_basic(self):
         """Test basic container functionality and magic methods."""
         # Length
         self.assertEqual(len(self.ex_cnr), 27526)
         # Equality
-        same = cnvlib.read(A_REFERENCE)
+        same = cnvlib.read(self.A_REFERENCE)
         self.assertEqual(self.ex_cnr, same)
         # Item access
         orig = self.ex_cnr[0]
@@ -156,6 +157,30 @@ class OtherTests(unittest.TestCase):
     # call
     # Test: convert_clonal(x, 1, 2) == convert_diploid(x)
 
+
+class RATests(unittest.TestCase):
+    """Tests for RegionArray class."""
+    A_BED = "formats/amplicon.bed"
+    A_TEXT = "formats/amplicon.text"
+    A_ILIST = "formats/nv2_baits.interval_list"
+
+    def test_read_bed(self):
+        """Read the BED format."""
+        regions = rary.RegionArray.read(self.A_BED)
+        self.assertEqual(len(regions), 1433)
+
+    def test_read_text(self):
+        """Read the text region format."""
+        regions = rary.RegionArray.read(self.A_TEXT)
+        self.assertEqual(len(regions), 1433)
+
+    def test_read_bed(self):
+        """Read the BED format."""
+        regions = rary.RegionArray.read(self.A_ILIST)
+        self.assertEqual(len(regions), 6809)
+
+
+# == helpers ==
 
 def linecount(filename):
     i = 0
