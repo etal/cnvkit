@@ -9,25 +9,11 @@ import pandas as pd
 from . import core, ngfrills
 
 
-def uniq(arr):
-    """Because I don't know how to do this with Pandas yet."""
-    # XXX see: pd.Categorical
-    # return pd.Categorical(arr, ordered=True)
-    prev = None
-    for elem in arr:
-        if elem != prev:
-            yield elem
-            prev = elem
-
-
-# NB: Start by implementing all CNVkit features here, then split later
 class GenomicArray(object):
     """An array of genomic intervals.
 
     Can represent most BED-like tabular formats with arbitrary additional
     columns: SEG, interval list, ...
-
-    Required columns: chromosome, start
     """
     _required_columns = ("chromosome", "start", "end")
 
@@ -208,7 +194,7 @@ class GenomicArray(object):
 
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
-        for chrom in uniq(self.chromosome):
+        for chrom in pd.unique(self.chromosome):
             yield chrom, self[self.chromosome == chrom]
 
     def coords(self, also=()):
@@ -371,7 +357,7 @@ class GenomicArray(object):
         )
         # OR: Replace chromosome names with integers
         # table = pd.read_table(infile, na_filter=False)
-        # chrom_names = uniq(table['chromosome'])
+        # chrom_names = pd.unique(table['chromosome'])
         # chrom_ids = np.arange(len(chrom_names))
         # chrom_id_col = np.zeros(len(table), dtype=np.int_)
         # for cn, ci in zip(chrom_names, chrom_ids):

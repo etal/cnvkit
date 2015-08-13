@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 from . import core
-from .gary import uniq
 from .cnary import CopyNumArray as CNA
 from .params import NULL_LOG2_COVERAGE
 from .ngfrills import echo
@@ -137,7 +136,7 @@ def import_seg(segfname, chrom_names, chrom_prefix, from_log10):
         dframe['mean'] *= LOG2_10
     dframe['gene'] = ["G" if mean >= 0 else "L" for mean in dframe['mean']]
 
-    for sid in uniq(dframe['sample_id']):
+    for sid in pd.unique(dframe['sample_id']):
         sample = dframe[dframe['sample_id'] == sid]
         cols = {'chromosome': sample['chromosome'],
                 'start': sample['start'],

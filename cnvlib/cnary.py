@@ -67,7 +67,7 @@ class CopyNumArray(gary.GenomicArray):
         start_idx = end_idx = None
         for chrom, subgary in self.by_chromosome():
             prev_idx = 0
-            for gene in gary.uniq(subgary.data['gene']):
+            for gene in pd.unique(subgary.data['gene']):
                 if not (gene == 'Background' or gene in ignore):
                     gene_idx = (subgary.data['gene'] == gene).nonzero()[0]
                     if not len(gene_idx):
