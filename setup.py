@@ -15,7 +15,7 @@ try:
             'numpy >= 1.6',
             'scipy >= 0.9',
             'matplotlib >= 1.1',
-            'pandas >= 0.15',
+            'pandas >= 0.16.2',
             'pysam >= 0.8',
             'pyvcf >= 0.5',
             'reportlab >= 3.0',
