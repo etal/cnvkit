@@ -35,10 +35,8 @@ def sniff_region_format(fname):
                 return 'text'
             if line.startswith('@') or re.match('\w+\t\d+\t\d+\t(\+|-|\.)\t\S+',
                                                 line):
-                echo("Detected file format: interval list")
                 return 'interval'
             if line.startswith('track') or line.count('\t') > 1:
-                echo("Detected file format: BED")
                 return 'bed'
             raise ValueError("File " + repr(fname) + " does not appear to "
                              + "be BED, interval list, or 'chr:start-end' "
@@ -58,6 +56,10 @@ def parse_regions(fname, coord_only=False, keep_strand=False):
     fmt = sniff_region_format(fname)
     if fmt is None:
         return []
+    if fmt == 'bed':
+        echo("Detected file format: BED")
+    elif fmt == 'interval':
+        echo("Detected file format: interval list")
     parser = {'text': parse_text_coords,
               'interval': parse_interval_list,
               'bed': parse_bed,

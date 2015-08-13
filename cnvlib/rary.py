@@ -1,12 +1,6 @@
 """Definitions for an array of genomic regions or features."""
 from __future__ import absolute_import, division, print_function
 
-import functools
-# import re
-# import shlex
-import sys
-
-import numpy as np
 import pandas as pd
 from Bio.File import as_handle
 
@@ -25,7 +19,7 @@ class RegionArray(gary.GenomicArray):
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
     @classmethod
-    def read(cls, fname, sample_id=None):
+    def read(cls, fname, sample_id=None, fmt=None):
         """Read regions in any of the expected file formats.
 
         Iterates over tuples of the tabular contents. Header lines are skipped.
@@ -35,13 +29,21 @@ class RegionArray(gary.GenomicArray):
         if sample_id is None:
             if isinstance(fname, basestring):
                 sample_id = core.fbase(fname)
+            elif fmt is None:
+                raise ValueError("To read regions from a stream, the file "
+                                 "format must be specified with the `fmt` "
+                                 "argument.")
             else:
-                # NB: streaming isn't actually supported yet
                 sample_id = '<unknown>'
 
-        fmt = sniff_region_format(fname)
-        if fmt is None:
-            return cls([])
+        if not fmt:
+            fmt = sniff_region_format(fname)
+            if fmt is None:
+                return cls([])
+            if fmt == 'bed':
+                echo("Detected file format: BED")
+            elif fmt == 'interval':
+                echo("Detected file format: interval list")
         parser = {'text': _parse_text_coords,
                   'interval': _parse_interval_list,
                   'bed': _parse_bed,
@@ -50,7 +52,7 @@ class RegionArray(gary.GenomicArray):
         return cls(table, {"sample_id": sample_id})
 
 
-def _parse_text_coords(fname):
+def _parse_text_coords(infile):
     """Parse text coordinates: chrom:start-end
 
     Or sometimes: chrom:start-end:name
@@ -70,13 +72,13 @@ def _parse_text_coords(fname):
         start, end = start_end.split('-')
         return chrom, int(start) - 1, int(end), name.rstrip()
 
-    with as_handle(fname, 'rU') as handle:
+    with as_handle(infile, 'rU') as handle:
         rows = [_parse_line(line) for line in handle]
     return pd.DataFrame.from_records(rows, columns=["chromosome", "start",
                                                     "end", "name"])
 
 
-def _parse_interval_list(fname):
+def _parse_interval_list(infile):
     """Parse a Picard-compatible interval list.
 
     Expected tabular columns:
@@ -84,27 +86,16 @@ def _parse_interval_list(fname):
 
     Counting is from 1.
     """
-    # ENH: just pd.read_table, skip '@'
-    @report_bad_line
-    def _parse_line(line):
-        fields = line.split('\t')
-        chrom, start, end, strand = fields[:4]
-        if len(fields) > 4:
-            name = fields[-1].rstrip()
-        else:
-            name = '-'
-        return chrom, int(start) - 1, int(end), name, strand
-
-    with as_handle(fname, 'rU') as handle:
-        rows = [_parse_line(line)
-                for line in handle
-                # Skip the SAM header
-                if not line.startswith('@')]
-    return pd.DataFrame.from_records(rows, columns=["chromosome", "start",
-                                                    "end", "name", "strand"])
+    table = pd.read_table(infile,
+                          comment='@', # Skip the SAM header
+                          names=["chromosome", "start", "end", "name",
+                                 "strand"])
+    table["name"].fillna('-', inplace=True)
+    table["start"] -= 1
+    return table
 
 
-def _parse_bed(fname):
+def _parse_bed(infile):
     """Parse a BED file.
 
     A BED file has these columns:
@@ -137,7 +128,7 @@ def _parse_bed(fname):
                 raise StopIteration
             yield line
 
-    with as_handle(fname, 'rU') as handle:
+    with as_handle(infile, 'rU') as handle:
         rows = map(_parse_line, track2track(handle))
     return pd.DataFrame.from_records(rows, columns=["chromosome", "start",
                                                     "end", "name", "strand"])

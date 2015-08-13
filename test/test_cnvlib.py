@@ -174,8 +174,8 @@ class RATests(unittest.TestCase):
         regions = rary.RegionArray.read(self.A_TEXT)
         self.assertEqual(len(regions), 1433)
 
-    def test_read_bed(self):
-        """Read the BED format."""
+    def test_read_ilist(self):
+        """Read the interval list format."""
         regions = rary.RegionArray.read(self.A_ILIST)
         self.assertEqual(len(regions), 6809)
 
