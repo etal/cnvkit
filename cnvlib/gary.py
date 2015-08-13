@@ -206,10 +206,11 @@ class GenomicArray(object):
 
         >>> probes.coords(also=["name", "strand"])
         """
-        cols = list(self._required_columns)
+        cols = list(GenomicArray._required_columns)
         if also:
             cols.extend(also)
-        return self.data.loc[:, cols]
+        coordframe = self.data.loc[:, cols]
+        return coordframe.itertuples(index=False)
 
     def labels(self):
         return self.data.apply(self.row2label, axis=1)

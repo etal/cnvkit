@@ -33,6 +33,7 @@ from . import (core, ngfrills, parallel, params,
 from .ngfrills import echo
 from .cnary import CopyNumArray as _CNA
 from .vary import VariantArray as _VA
+from .rary import RegionArray as _RA
 from ._version import __version__
 
 
@@ -778,8 +779,7 @@ def _cmd_scatter(args):
     pset_seg = _CNA.read(args.segment) if args.segment else None
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
-            for chrom, start, end in ngfrills.parse_regions(args.range_list,
-                                                            True):
+            for chrom, start, end in _RA.read(args.range_list).coords():
                 region = "{}:{}-{}".format(chrom, start, end)
                 do_scatter(pset_cvg, pset_seg, args.vcf, False, False,
                            region, args.background_marker, args.trend,

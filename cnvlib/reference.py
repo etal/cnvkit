@@ -6,17 +6,18 @@ from Bio._py3k import map, zip
 
 from . import core, fix, metrics, ngfrills, params
 from .cnary import CopyNumArray as CNA
+from .rary import RegionArray as RA
 from .ngfrills import echo
 
 
 def bed2probes(bed_fname):
     """Create neutral-coverage probes from intervals."""
-    cn_rows = [(chrom, start, end, name, 0, 0, 0, 0)
-               for chrom, start, end, name in ngfrills.parse_regions(bed_fname)]
-    return CNA.from_rows(cn_rows,
-                         ('chromosome', 'start', 'end', 'gene', 'log2', 'gc',
-                          'rmask', 'spread'),
-                         {'sample_id': core.fbase(bed_fname)})
+    regions = RA.read(bed_fname)
+    table = regions.data.loc[:, ("chromosome", "start", "end")]
+    table["gene"] = regions.data["name"]
+    table["log2"] = 0
+    table["spread"] = 0
+    return CNA(table, {"sample_id": core.fbase(bed_fname)})
 
 
 def combine_probes(filenames, fa_fname, is_male_reference):

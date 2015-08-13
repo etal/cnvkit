@@ -6,8 +6,9 @@ from itertools import groupby
 from Bio._py3k import range
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
-from . import core, ngfrills
+from . import core
 from .params import INSERT_SIZE
+from .rary import RegionArray as RA
 
 
 def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
@@ -24,10 +25,10 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
         - Divide into equal-size (region_size/avg_bin_size) portions
         - Emit the (chrom, start, end) coords of each portion
     """
-    target_chroms = group_coords(ngfrills.parse_regions(target_bed, True))
+    target_chroms = group_coords(RA.read(target_bed).coords())
     if access_bed:
         # Chromosome accessible sequence regions are given -- use them
-        access_chroms = group_coords(ngfrills.parse_regions(access_bed, True))
+        access_chroms = group_coords(RA.read(access_bed).coords())
     else:
         # Chromosome accessible sequence regions not known -- use heuristics
         # (chromosome length is endpoint of last probe; skip initial

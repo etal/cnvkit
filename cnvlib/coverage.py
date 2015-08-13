@@ -3,14 +3,14 @@ from __future__ import absolute_import, division
 import math
 import os.path
 import time
-from itertools import groupby
 
 from Bio._py3k import map, zip
 import pysam
 
 from .cnary import CopyNumArray as CNA
+from .rary import RegionArray as RA
 from .core import fbase
-from .ngfrills import echo, parse_regions
+from .ngfrills import echo
 
 from .params import NULL_LOG2_COVERAGE, READ_LEN
 
@@ -62,17 +62,11 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
 def interval_coverages_count(bed_fname, bam_fname, min_mapq):
     """Calculate log2 coverages in the BAM file at each interval."""
     bamfile = pysam.Samfile(bam_fname, 'rb')
-    # Parse the BED lines and group them by chromosome
-    # (efficient if records are already sorted by chromosome)
-    for chrom, rows_iter in groupby(parse_regions(bed_fname),
-                                    key=lambda r: r[0]):
-        # Thunk and reshape this chromosome's intervals
+    for chrom, subregions in RA.read(bed_fname).by_chromosome():
         echo("Processing chromosome", chrom, "of", os.path.basename(bam_fname))
-        _chroms, starts, ends, names = zip(*rows_iter)
-        counts_depths = [region_depth_count(bamfile, chrom, s, e, min_mapq)
-                         for s, e in zip(starts, ends)]
-        for start, end, name, (count, depth) in zip(starts, ends, names,
-                                                    counts_depths):
+        for _chrom, start, end, name, in subregions.coords(["name"]):
+            count, depth = region_depth_count(bamfile, chrom, start, end,
+                                              min_mapq)
             yield [count,
                    (chrom, start, end, name,
                     math.log(depth, 2) if depth else NULL_LOG2_COVERAGE)]
