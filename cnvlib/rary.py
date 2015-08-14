@@ -1,4 +1,4 @@
-"""Definitions for an array of genomic regions or features."""
+"""An array of genomic regions or features."""
 from __future__ import absolute_import, division, print_function
 
 import pandas as pd
@@ -10,7 +10,7 @@ from .ngfrills.regions import sniff_region_format, report_bad_line
 
 
 class RegionArray(gary.GenomicArray):
-    """An array of genomic intervals, treated as variant loci."""
+    """An array of genomic intervals."""
     _required_columns = ("chromosome", "start", "end",
                          # "name", "strand",
                         )

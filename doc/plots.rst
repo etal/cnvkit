@@ -120,6 +120,8 @@ This plot style works best with target panels of a few hundred genes at most;
 with whole-exome sequencing there are often so many genes affected by CNAs that
 the individual gene labels become difficult to read.
 
+.. image:: TR_95_T-diagram.png
+
 If only segments are provided (``-s``), gene labels are not shown.  This plot is
 then equivalent to the ``heatmap`` command, which effectively summarizes the
 segmented values from many samples.

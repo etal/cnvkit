@@ -1,4 +1,4 @@
-"""Definitions for CNVkit's core data structure, a copy number array."""
+"""CNVkit's core data structure, a copy number array."""
 from __future__ import print_function, absolute_import, division
 
 import numpy as np

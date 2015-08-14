@@ -1,4 +1,4 @@
-"""Definitions for a generic array of genomic positions."""
+"""A generic array of genomic positions."""
 from __future__ import print_function, absolute_import
 
 import sys
@@ -10,10 +10,10 @@ from . import core, ngfrills
 
 
 class GenomicArray(object):
-    """An array of genomic intervals.
+    """An array of genomic intervals. Base class for genomic data structures.
 
     Can represent most BED-like tabular formats with arbitrary additional
-    columns: SEG, interval list, ...
+    columns.
     """
     _required_columns = ("chromosome", "start", "end")
 
@@ -368,9 +368,10 @@ class GenomicArray(object):
         return cls(table, {"sample_id": sample_id})
 
     def write(self, outfile=sys.stdout):
-        """Write coverage data to a file or handle in tabular format.
+        """Write the wrapped data table to a file or handle in tabular format.
 
-        This is similar to BED or BedGraph format, but with extra columns.
+        The format is BED-like, but with a header row included and with
+        arbitrary extra columns.
 
         To combine multiple samples in one file and/or convert to another
         format, see the 'export' subcommand.
