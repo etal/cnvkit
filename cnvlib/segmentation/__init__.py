@@ -126,7 +126,7 @@ def repair_segments(segments, orig_probes):
             null_segment = (chrom, orig_start, orig_end, "_", 0.0, 0)
             extra_segments.append(null_segment)
     if extra_segments:
-        segments.add_array(segments.as_rows(extra_segments))
+        segments.concat(segments.as_rows(extra_segments))
     return segments
 
 

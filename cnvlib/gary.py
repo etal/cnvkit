@@ -265,7 +265,7 @@ class GenomicArray(object):
 
     # Modification
 
-    def add_array(self, other):
+    def concat(self, other):
         """Combine this array's data with another GenomicArray (in-place).
 
         Any optional columns must match between both arrays.
