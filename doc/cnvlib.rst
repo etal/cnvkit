@@ -9,12 +9,19 @@ Module ``cnvlib`` contents
     :undoc-members:
     :show-inheritance:
 
+The one function exposed at the top level, read, loads a file in CNVkit's native
+format and returns a CopyNumArray instance.  For your own scripting, you can
+usually accomplish what you need using the CopyNumArray and GenomicArray methods
+available on this returned object.
+
 
 Core classes
 ------------
 
-The core objects used throughout CNVkit. For your own scripting, you can usually
-accomplish what you need using CopyNumArray methods.
+The core objects used throughout CNVkit. The base class is GenomicArray. All
+of these classes wrap a `pandas <http://pandas.pydata.org/>`_ DataFrame instance
+accessible through the ``.data`` attribute which can be used for any
+manipulations that aren't already provided by methods in the wrapper class.
 
 ``gary``
 ~~~~~~~~~
