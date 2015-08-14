@@ -4,9 +4,9 @@
 
 See:
 
-- http://en.wikipedia.org/wiki/Jenks_natural_breaks_optimization
-- http://www.macwright.org/2013/02/18/literate-jenks.html
-- http://www.macwright.org/simple-statistics/docs/simple_statistics.html
+- https://en.wikipedia.org/wiki/Jenks_natural_breaks_optimization
+- https://www.macwright.org/2013/02/18/literate-jenks.html
+- https://www.macwright.org/simple-statistics/docs/simple_statistics.html
 """
 from __future__ import division, print_function
 

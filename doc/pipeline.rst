@@ -154,11 +154,11 @@ either the :ref:`batch` or :ref:`coverage` commands).
 
 
 .. note::
-    **The BAM file must be sorted.** CNVkit (and most other software) will not
-    notice out if the reads are out of order; it will just ignore the
-    out-of-order reads and the coverages will be zero after a certain point
-    early in the file (e.g. in the middle of chromosome 2). A future release
-    may try to be smarter about this.
+    **The BAM file must be sorted.** CNVkit will check that the first few reads
+    are sorted in positional order, and raise an error if they are not. However,
+    CNVkit might not notice if reads later in the file are unsorted; it will
+    just silently ignore the out-of-order reads and the coverages will be zero
+    after that point. So be safe, and sort your BAM file properly.
 
 .. note::
     **If you've prebuilt the BAM index file (.bai), make sure its timestamp is

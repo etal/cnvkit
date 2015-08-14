@@ -62,7 +62,7 @@ def rolling_median(x, width):
 def smoothed(x, width, do_fit_edges=False):
     """Smooth the values in `x` with the Kaiser windowed filter.
 
-    See: http://en.wikipedia.org/wiki/Kaiser_window
+    See: https://en.wikipedia.org/wiki/Kaiser_window
 
     Parameters:
 

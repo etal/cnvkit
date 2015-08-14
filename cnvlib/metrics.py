@@ -3,8 +3,8 @@
 For use in evaluating performance of copy number estimation.
 
 See:
-    http://en.wikipedia.org/wiki/Robust_measures_of_scale
-    http://astropy.readthedocs.org/en/latest/_modules/astropy/stats/funcs.html
+    https://en.wikipedia.org/wiki/Robust_measures_of_scale
+    https://astropy.readthedocs.org/en/latest/_modules/astropy/stats/funcs.html
 
 """
 from __future__ import division
@@ -80,8 +80,8 @@ def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-4):
     midvariance (i.e. the standard deviation) of a distribution.
 
     See:
-    http://en.wikipedia.org/wiki/Robust_measures_of_scale#The_biweight_midvariance
-    http://astropy.readthedocs.org/en/latest/_modules/astropy/stats/funcs.html
+    https://en.wikipedia.org/wiki/Robust_measures_of_scale#The_biweight_midvariance
+    https://astropy.readthedocs.org/en/latest/_modules/astropy/stats/funcs.html
     """
     a = np.asarray(a)
     if initial is None:
@@ -109,7 +109,7 @@ def median_absolute_deviation(a, scale_to_sd=True):
 
     The MAD is defined as: ``median(abs(a - median(a)))``.
 
-    See: http://en.wikipedia.org/wiki/Median_absolute_deviation
+    See: https://en.wikipedia.org/wiki/Median_absolute_deviation
     """
     a = np.asarray(a)
     a_median = np.median(a)

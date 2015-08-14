@@ -150,7 +150,7 @@ each coverage dataset)::
 In each case, given the bin-level copy ratios (.cnr) and segments (.cns) for a
 sample, the log2 ratio value of each segment is subtracted from each of the bins
 it covers, and several estimators of `spread
-<http://en.wikipedia.org/wiki/Statistical_dispersion>`_ are calculated from the
+<https://en.wikipedia.org/wiki/Statistical_dispersion>`_ are calculated from the
 residual values.
 The output text or table shows for each sample:
 
@@ -166,11 +166,11 @@ The output text or table shows for each sample:
   than the other estimates shown by the ``metrics`` command, that helpfully
   indicates the sample has some outlier bins.
 - `Median absolute deviation
-  <http://en.wikipedia.org/wiki/Median_absolute_deviation>`_ (MAD) -- very
-  `robust <http://en.wikipedia.org/wiki/Robust_measures_of_scale>`_ against
+  <https://en.wikipedia.org/wiki/Median_absolute_deviation>`_ (MAD) -- very
+  `robust <https://en.wikipedia.org/wiki/Robust_measures_of_scale>`_ against
   outliers, but less `statistically efficient
-  <http://en.wikipedia.org/wiki/Efficiency_%28statistics%29>`_.
-- `Interquartile range <http://en.wikipedia.org/wiki/Interquartile_range>`_
+  <https://en.wikipedia.org/wiki/Efficiency_%28statistics%29>`_.
+- `Interquartile range <https://en.wikipedia.org/wiki/Interquartile_range>`_
   (IQR) -- another robust measure that is easy to understand.
 - Tukey's `biweight midvariance
   <http://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/biwmidv.htm>`_

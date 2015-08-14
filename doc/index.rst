@@ -4,8 +4,8 @@ CNVkit: Genome-wide copy number from targeted DNA sequencing
 :Author: Eric Talevich
 :Contact: eric.talevich@ucsf.edu
 :License: `Apache License 2.0 <http://www.apache.org/licenses/LICENSE-2.0>`_
-:Source code: `GitHub <http://github.com/etal/cnvkit>`_
-:Packages: `PyPI <https://pypi.python.org/pypi/CNVkit>`_ | `Docker <https://registry.hub.docker.com/u/etal/cnvkit/>`_ | `Galaxy <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ | `DNAnexus <https://platform.dnanexus.com/app/cnvkit_batch>`_
+:Source code: `GitHub <https://github.com/etal/cnvkit>`_
+:Packages: `PyPI <https://pypi.python.org/pypi/CNVkit>`_ | `Docker <https://hub.docker.com/r/etal/cnvkit/>`_ | `Galaxy <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ | `DNAnexus <https://platform.dnanexus.com/app/cnvkit_batch>`_
 :Q&A: `Biostars <https://www.biostars.org/t/CNVkit/>`_ | `SeqAnswers <http://seqanswers.com/forums/showthread.php?t=47910>`_
 
 CNVkit is a Python library and command-line software toolkit to infer and
@@ -24,7 +24,7 @@ Command line usage
 ------------------
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
 
     pipeline
     plots
@@ -37,6 +37,7 @@ FAQ & How To
 ------------
 
 .. toctree::
+    :maxdepth: 3
 
     fileformats
     calling
@@ -48,9 +49,9 @@ Python API
 ----------
 
 .. toctree::
-   :maxdepth: 4
+    :maxdepth: 2
 
-   cnvlib
+    cnvlib
 
 
 Citation

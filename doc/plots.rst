@@ -13,8 +13,11 @@ those who have used array CGH.
 ::
 
     cnvkit.py scatter Sample.cnr -s Sample.cns
-    # Shell shorthane
-    cnvkit.py scatter -s Sample.cn{s,r}
+    # Shell shorthand
+    cnvkit.py scatter -s TR_95_T.cn{s,r}
+
+.. image:: TR_95_T-scatter.png
+
 
 The options ``--chromosome`` and ``--gene`` (or their single-letter equivalents)
 focus the plot on the specified region::
@@ -30,19 +33,17 @@ selected region. Note that only targeted genes can be highlighted and labeled;
 genes that are not included in the list of targets are not labeled in the .cnn
 or .cnr files and are therefore invisible to CNVkit.
 
-To create multiple region-specific plots at once, the regions of interest can be
-listed in a separate file and passed to the ``scattter`` command with the
-``-l``/``--range-list`` option. This is equivalent to creating the plots
-separately with the ``-c`` option and then combining the plots into a single
-multi-page PDF.
-
 The arguments ``-c`` and ``-g`` can be combined to e.g. highlight
 specific genes in a larger context::
 
-    # Show the whole chromosome, highlight two genes
-    cnvkit.py scatter -s Sample.cn{s,r} -c chr7 -g BRAF,MET
     # Show a chromosome arm, highlight one gene
     cnvkit.py scatter -s Sample.cn{s,r} -c chr5:100-50000000 -g TERT
+    # Show the whole chromosome, highlight two genes
+    cnvkit.py scatter -s Sample.cn{s,r} -c chr7 -g BRAF,MET
+    # Highlight two genes in a specified range
+    cnvkit.py scatter -s TR_95_T.cn{s,r} -c chr12:50000000-80000000 -g CDK4,MDM2
+
+.. image:: TR_95_T-CDK4-MDM2-scatter.png
 
 When a chromosomal region is plotted with CNVkit's "scatter" command , the size
 of the plotted datapoints is proportional to the weight of each point used in
@@ -52,6 +53,12 @@ you think there ought to be a segment, but there isn't one), then you can cast
 some doubt on the copy number call in that region. The dispersion of points
 around the segmentation line also visually indicates the level of noise or
 uncertainty.
+
+To create multiple region-specific plots at once, the regions of interest can be
+listed in a separate file and passed to the ``scattter`` command with the
+``-l``/``--range-list`` option. This is equivalent to creating the plots
+separately with the ``-c`` option and then combining the plots into a single
+multi-page PDF.
 
 Loss of heterozygosity (LOH) can be viewed alongside copy number by passing
 variants as a VCF file with the ``-v`` option. Heterozygous SNP allelic
@@ -88,6 +95,7 @@ Plot allelic frequencies at each variant position in a VCF file. Divergence from
 ::
 
     cnvkit.py loh Sample.vcf
+    cnvkit.py loh Sample.vcf -s Sample.cns
 
 
 .. _diagram:
@@ -130,17 +138,23 @@ To get an overview of the larger-scale CNVs in a cohort, use the
 
     cnvkit.py heatmap *.cns
 
+.. image:: heatmap-tr-nod.png
+
 The color range can be subtly rescaled with the ``-d`` option to de-emphasize
 low-amplitude segments, which are likely spurious CNAs::
 
     cnvkit.py heatmap *.cns -d
+
+.. image:: heatmap-tr.png
 
 A heatmap can also be drawn from bin-level log2 coverages or copy ratios (.cnn,
 .cnr), but this will be extremely slow at the genome-wide level.
 Consider doing this with a smaller number of samples and only for one chromosome
 at a time, using the ``-c`` option::
 
-    cnvkit.py heatmap *.cnr -c chr7  # Slow!
+    cnvkit.py heatmap TR_9*T.cnr -c chr12  # Slow!
+
+.. image:: heatmap-tr-chr12.png
 
 If an output file name is not specified with the ``-o`` option, an interactive
 matplotlib window will open, allowing you to select smaller regions, zoom in,

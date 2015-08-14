@@ -12,7 +12,7 @@ Install CNVkit
 
 Download the source code from GitHub:
 
-http://github.com/etal/cnvkit
+https://github.com/etal/cnvkit
 
 And read the README file.
 
