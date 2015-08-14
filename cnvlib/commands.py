@@ -847,7 +847,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             window_coords = (max(0, genes[0][0] - window_width),
                              genes[-1][1] + window_width)
 
-        # TODO - remove the show_range argument/variable
+        # TODO - consolidate show_range vs. show_chromosome
         if show_range:
             if chrom:
                 if not show_range.startswith(chrom):
@@ -1278,7 +1278,6 @@ P_metrics.set_defaults(func=_cmd_metrics)
 def _cmd_segmetrics(args):
     """Compute segment-level metrics from bin-level log2 ratios."""
     # Calculate all metrics
-    outrows = []
     cnarr = _CNA.read(args.cnarray)
     cnarr.drop_low_coverage()
     segarr = _CNA.read(args.segments)
@@ -1340,7 +1339,7 @@ def _prediction_interval(segarr, cnarr):
     for _segment, bins in cnarr.by_segment(segarr):
         k = len(bins)
         if k == 0:
-            out_cns_ci.append("NA")
+            out_cns_pi.append("NA")
             continue
         # ENH: weighted percentile
         pi = np.percentile(bins['log2'], [2.5, 97.5])
