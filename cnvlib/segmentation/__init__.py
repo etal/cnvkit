@@ -4,6 +4,7 @@ import math
 import os.path
 
 import numpy as np
+import pandas as pd
 
 from .. import core, ngfrills, params
 from ..cnary import CopyNumArray as CNA
@@ -52,7 +53,7 @@ def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
         chrom = row[1].strip('"')
         nloci = int(row[4])
         mean_cvg = float(row[5])
-        name = 'G' if mean_cvg >= 0. else 'L'
+        name = '-'
         # Save output
         out_data.append((chrom, start, end, name, mean_cvg, nloci))
 
@@ -78,7 +79,6 @@ def squash_segments(seg_pset):
     curr_end = None
     curr_val = None
     curr_cnt = 0
-
     squashed_rows = []
     for row in seg_pset:
         if row['chromosome'] == curr_chrom and row['log2'] == curr_val:
@@ -111,9 +111,11 @@ def repair_segments(segments, orig_probes):
     1. Ensure every chromosome has at least one segment.
     2. Ensure first and last segment ends match 1st/last bin ends
        (but keep log2 as-is).
+    3. Store probe-level gene names, comma-separated, as the segment name.
     """
     segments = segments.copy()
     extra_segments = []
+    # Adjust segment endpoints on each chromosome
     for chrom, subprobes in orig_probes.by_chromosome():
         chr_seg_idx = np.where(segments.chromosome == chrom)[0]
         orig_start = subprobes[0, 'start']
@@ -121,12 +123,18 @@ def repair_segments(segments, orig_probes):
         if len(chr_seg_idx):
             segments[chr_seg_idx[0], 'start'] = orig_start
             segments[chr_seg_idx[-1], 'end'] = orig_end
-            # ENH: Recalculate segment means here?
         else:
             null_segment = (chrom, orig_start, orig_end, "_", 0.0, 0)
             extra_segments.append(null_segment)
     if extra_segments:
         segments.concat(segments.as_rows(extra_segments))
+    # Adjust segment values
+    for i, (_seg, subprobes) in enumerate(orig_probes.by_segment(segments)):
+        # Segment name is the comma-separated list of bin gene names
+        subgenes = [g for g in pd.unique(subprobes['gene'])
+                    if g not in ('Background', 'CGH', '-')]
+        segments[i, 'gene'] = ",".join(subgenes) if subgenes else '-'
+        # ENH: Recalculate segment means here instead of in R
     return segments
 
 
