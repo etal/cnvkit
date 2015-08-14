@@ -45,23 +45,21 @@ def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
         seg_out = ngfrills.call_quiet('Rscript', script_fname)
 
     # Convert R dataframe contents to our standard 'basic' format
-    out_data = []
-    for row in core.parse_tsv(StringIO(seg_out)):
-        if row[0].startswith(('[', '"sample')):
-            continue
-        start, end = [int(math.ceil(float(val))) for val in row[2:4]]
-        chrom = row[1].strip('"')
-        nloci = int(row[4])
-        mean_cvg = float(row[5])
-        name = '-'
-        # Save output
-        out_data.append((chrom, start, end, name, mean_cvg, nloci))
+    table = pd.read_table(StringIO(seg_out), comment='[')
+    if len(table.columns) == 6:
+        table.columns = ["sample_id", "chromosome", "start", "end", "probes",
+                         "log2"]
+    elif len(table.columns) == 5:
+        table.columns = ["sample_id", "chromosome", "start", "end", "log2"]
+    else:
+        raise ValueError("Segmentation output is not valid SEG format:\n"
+                         + seg_out)
+    del table["sample_id"]
+    table["start"] = [int(math.ceil(float(val))) for val in table["start"]]
+    table["end"] = [int(math.ceil(float(val))) for val in table["end"]]
+    table["gene"] = '-'
+    seg_pset = CNA(table, {'sample_id': sample_id})
 
-    seg_pset = CNA.from_rows(out_data,
-                             ('chromosome', 'start', 'end', 'gene', 'log2',
-                              'probes',),
-                             {'sample_id': sample_id})
-    # seg_pset.sort()
     if method == 'flasso':
         seg_pset = squash_segments(seg_pset)
     seg_pset = repair_segments(seg_pset, probes)
