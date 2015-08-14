@@ -152,7 +152,7 @@ sample, the log2 ratio value of each segment is subtracted from each of the bins
 it covers, and several estimators of `spread
 <https://en.wikipedia.org/wiki/Statistical_dispersion>`_ are calculated from the
 residual values.
-The output text or table shows for each sample:
+The output table shows for each sample:
 
 - Total number of segments (in the .cns file) -- a large number of segments can
   indicate that the sample has either many real CNAs, or noisy coverage and

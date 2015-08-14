@@ -1254,22 +1254,9 @@ def _cmd_metrics(args):
         outrows.append([core.rbase(probes_fname), len(segments)] +
                        ["%.7f" % val for val in values])
 
-    if len(outrows) == 1:
-        # Plain-text output for one sample
-        sample_id, nseg, stdev, mad, iqr, biweight = outrows[0]
-        with ngfrills.safe_write(args.output or sys.stdout) as handle:
-            handle.write("Sample: %s\n" % sample_id)
-            handle.write("Number of called segments: %d\n" % nseg)
-            handle.write("Deviation of bin log2 ratios from segment calls:\n")
-            handle.write("  Standard deviation = %s\n" % stdev)
-            handle.write("  Median absolute deviation = %s\n" % mad)
-            handle.write("  Interquartile range = %s\n" % iqr)
-            handle.write("  Biweight midvariance = %s\n" % biweight)
-    else:
-        # Tabular output for multiple samples
-        core.write_tsv(args.output, outrows,
-                       colnames=("sample", "segments", "stdev", "mad", "iqr",
-                                 "bivar"))
+    core.write_tsv(args.output, outrows,
+                   colnames=("sample", "segments", "stdev", "mad", "iqr",
+                             "bivar"))
 
 
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
