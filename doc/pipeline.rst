@@ -190,10 +190,16 @@ content of each region.
 
     cnvkit.py reference -o Reference.cnn -f ucsc.hg19.fa *targetcoverage.cnn
 
-If normal samples are not available, it will sometimes work OK to build the
-reference from a collection of tumor samples. You can use the ``scatter`` command
-on the raw ``.cnn`` coverage files to help choose samples with relatively
-minimal CNVs for use in the reference.
+The reference can be constructed from zero, one or multiple control samples.
+
+Paired or pooled normals
+````````````````````````
+
+To analyze a cohort sequenced on a single platform, we recommend combining all
+normal samples into a pooled reference, even if matched tumor-normal pairs were
+sequenced -- our benchmarking showed that a pooled reference performed slightly
+better than constructing a separate reference for each matched tumor-normal
+pair.
 
 Notes on sample selection:
 
@@ -210,6 +216,14 @@ Notes on sample selection:
   use in building a CNVkit reference -- assuming it was sequenced on the same
   platform as the other samples you're calling.
 
+If normal samples are not available, it will sometimes work OK to build the
+reference from a collection of tumor samples. You can use the ``scatter`` command
+on the raw ``.cnn`` coverage files to help choose samples with relatively
+minimal CNVs for use in the reference.
+
+With no control samples
+```````````````````````
+
 Alternatively, you can create a "flat" reference of neutral copy number (i.e.
 log2 0.0) for each probe from the target and antitarget interval files. This
 still computes the GC content of each region if the reference genome is given.
@@ -218,16 +232,56 @@ still computes the GC content of each region if the reference genome is given.
 
     cnvkit.py reference -o FlatReference.cnn -f ucsc.hg19.fa -t Tiled.bed -a Background.bed
 
-Two possible uses for a flat reference:
+Possible uses for a flat reference include:
 
 1. Extract copy number information from one or a small number of tumor samples
    when no suitable reference or set of normal samples is available. The copy
-   number calls will not be as accurate, but large-scale CNVs may still be
-   visible.
+   number calls will not be quite as accurate, but large-scale CNVs should still
+   be visible.
 2. Create a "dummy" reference to use as input to the ``batch`` command to
    process a set of normal samples. Then, create a "real" reference from the
    resulting ``*.targetcoverage.cnn`` and ``*.antitargetcoverage.cnn`` files,
    and re-run ``batch`` on a set of tumor samples using this updated reference.
+3. Evaluate whether a given paired or pooled reference is suitable for an
+   analysis by repeating the CNVkit analysis with a flat reference and comparing
+   the CNAs found with both the original and flat reference for the same
+   samples.
+
+How it works
+````````````
+
+CNVkit uses robust methods to extract a usable signal from the reference
+samples.
+
+At each on-- and off-target genomic bin, the read depths in each of the given
+normal samples are calculated and used to estimate the expected read depth and
+the reliability of this estimate.
+Specifically, CNVkit calculates Tukey's biweight location, a weighted average of
+the normalized log2 coverages in each of the input samples, and biweight
+midvariance, the spread or statistical dispersion of read depth values using a
+similar weighting scheme.
+For background on these statistical methods see `Lax (1985)
+<http://dx.doi.org/10.1080/01621459.1985.10478177>`_ and `Randal (2008)
+<http://dx.doi.org/10.1016/j.csda.2008.04.016>`_.
+
+To adjust for the lower statistical reliability of a smaller number of samples
+for estimating parameters, a "pseudocount" equivalent to one sample of neutral
+copy number is included in the dataset when calculating these values.
+
+If a FASTA file of the reference genome is given, for each genomic bin the
+fraction of GC (proportion of "G" and "C" characters among all "A", "T", "G" and
+"C" characters in the subsequence, ignoring "N" and any other ambiguous
+characters) and repeat-masked values (proportion of lowercased non-"N"
+characters in the sequence)
+are calculated and stored in the output reference .cnn file.
+For efficiency, the samtools FASTA index file (.fai) is used to locate the
+binned sequence regions in the FASTA file.
+
+The same read-depth bias corrections used in the :ref:`fix` command are
+performed on each of the normal samples here.
+The result is a reference copy-number profile that can then be used to correct
+other individual samples.
+
 
 .. note::
     As with BAM files, CNVkit will automatically index the FASTA file if the
@@ -249,6 +303,8 @@ reference. Output a table of copy number ratios (.cnr).
 ::
 
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn Reference.cnn -o Sample.cnr
+
+.. TODO explain calculation of the "weight" column
 
 
 .. _segment:
