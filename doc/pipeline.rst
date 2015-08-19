@@ -10,7 +10,7 @@ and the usage information for each sub-command can be shown with the ``--help``
 or ``-h`` option after each sub-command name::
 
     cnvkit.py -h
-    cnvkit.py antitarget -h
+    cnvkit.py target -h
 
 A sensible output file name is normally chosen if it isn't specified, except in
 the case of the text reporting commands, which print to standard output by
@@ -25,8 +25,20 @@ batch
 
 Run the CNVkit pipeline on one or more BAM files::
 
-    cnvkit.py batch Sample.bam -t Tiled.bed -a Background.bed -r Reference.cnn
-    cnvkit.py batch *.bam --output-dir CNVs/ -t Tiled.bed -a Background.bed -r Reference.cnn
+    # From baits and tumor/normal BAMs
+    cnvkit.py batch *Tumor.bam --normal *Normal.bam \
+        --targets my_baits.bed --split --annotate refFlat.txt \
+        --fasta hg19.fasta --access data/access-5kb-mappable.hg19.bed \
+        --output-reference my_reference.cnn --output-dir results/ \
+        --diagram --scatter
+
+    # Reusing a reference for additional samples
+    cnvkit.py batch *Tumor.bam -r Reference.cnn -d results/
+
+    # Reusing targets and antitargets to build a new reference, but no analysis
+    cnvkit.py batch -n *Normal.bam --output-reference new_reference.cnn \
+        -t my_targets.bed -a my_antitargets.bed --male-reference \
+        -f hg19.fasta -g data/access-5kb-mappable.hg19.bed
 
 With the ``-p`` option, process each of the BAM files in parallel, as separate
 subprocesses. The status messages logged to the console will be somewhat
@@ -35,14 +47,28 @@ complete sooner.
 
 ::
 
-    cnvkit.py batch *.bam -d CNVs/ -t Tiled.bed -a Background.bed -r Reference.cnn -p 8
+    cnvkit.py batch *.bam -r my_reference.cnn -p 8
 
 The pipeline executed by the ``batch`` command is equivalent to::
 
-    cnvkit.py coverage Sample.bam Tiled.bed -o Sample.targetcoverage.cnn
-    cnvkit.py coverage Sample.bam Background.bed -o Sample.antitargetcoverage.cnn
-    cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn Reference_cnn -o Sample.cnr
+    cnvkit.py target baits.bed [--split --annotate --short-names] -o my_targets.bed
+    cnvkit.py antitarget my_targets.bed [--access] -o my_antitargets.bed
+
+    # For each sample...
+    cnvkit.py coverage Sample.bam my_targets.bed -o Sample.targetcoverage.cnn
+    cnvkit.py coverage Sample.bam my_antitargets.bed -o Sample.antitargetcoverage.cnn
+
+    # With all normal samples...
+    cnvkit.py reference *Normal.bam -t my_targets.bed -a my_antitargets.bed \
+        [--fasta --male-reference] -o my_reference.cnn
+
+    # For each tumor sample...
+    cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn my_reference.cnn -o Sample.cnr
     cnvkit.py segment Sample.cnr -o Sample.cns
+
+    # Optionally, with --scatter and --diagram
+    cnvkit.py scatter Sample.cnr -s Sample.cns -o Sample-scatter.pdf
+    cnvkit.py diagram Sample.cnr -s Sample.cns [--male-reference] -o Sample-diagram.pdf
 
 See the rest of the commands below to learn about each of these steps and other
 functionality in CNVkit.
@@ -57,7 +83,7 @@ Prepare a BED file of baited regions for use with CNVkit.
 
 ::
 
-    cnvkit.py target Tiled.bed --annotate refFlat.txt --split -o Targets.bed
+    cnvkit.py target my_baits.bed --annotate refFlat.txt --split -o my_targets.bed
 
 The BED file should be the baited genomic regions for your target capture kit,
 as provided by your vendor. Since these regions (usually exons) may be of
@@ -80,7 +106,7 @@ applies it as the new label for those regions. (You may find it simpler to just
 apply the refFlat annotations.)
 
 If you need higher resolution, you can select a smaller average size for your
-:ref:`target` and :ref:`antitarget` bins.
+target and :ref:`antitarget` bins.
 
 Exons in the human genome have an average size of about 200bp. The target bin
 size default of 267 is chosen so that splitting larger exons will produce bins
@@ -89,12 +115,12 @@ noisier copy number signal, this approach ensures the "noisiness" of the bins
 produced by splitting larger exons will be no worse than average.
 
 Setting the average size of target bins to 100bp, for example, will yield about
-twice as many target bins, which can result in more precise and perhaps more
-accurate segmentation. However, the number of reads counted in each bin will be
-reduced by about half, increasing the variance or "noise" in bin-level
-coverages. An excess of noisy bins can make visualization difficult, and since
-the noise may not be Gaussian, especially in the presence of many bins with zero
-reads, the CBS algorithm could produce less accurate segmentation results on
+twice as many target bins, which might result in higher-resolution segmentation.
+However, the number of reads counted in each bin will be reduced by about half,
+increasing the variance or "noise" in bin-level coverages.
+An excess of noisy bins can make visualization difficult, and since the noise
+may not be Gaussian, especially in the presence of many bins with zero reads,
+the CBS algorithm could produce less accurate segmentation results on
 low-coverage samples.
 In practice we see good results with an average of 200-300 reads per bin; we
 therefore recommend an overall on-target sequencing coverage depth of at least
@@ -113,7 +139,7 @@ off-target/"antitarget"/"background" regions.
 
 ::
 
-    cnvkit.py antitarget Tiled.bed -g data/access-5kb-mappable.hg19.bed -o Background.bed
+    cnvkit.py antitarget my_targets.bed -g data/access-5kb-mappable.hg19.bed -o my_antitargets.bed
 
 Many fully sequenced genomes, including the human genome, contain large regions
 of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
