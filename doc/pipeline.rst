@@ -217,6 +217,9 @@ content of each region.
     cnvkit.py reference -o Reference.cnn -f ucsc.hg19.fa *targetcoverage.cnn
 
 The reference can be constructed from zero, one or multiple control samples.
+A reference should be constructed specifically for each target capture panel
+(i.e. set of baits) and, ideally, match the type of sample (e.g. FFPE-extracted
+or fresh DNA) and library preparation protocol or kit used.
 
 Paired or pooled normals
 ````````````````````````
@@ -226,6 +229,11 @@ normal samples into a pooled reference, even if matched tumor-normal pairs were
 sequenced -- our benchmarking showed that a pooled reference performed slightly
 better than constructing a separate reference for each matched tumor-normal
 pair.
+Furthermore, even matched normals from a cohort sequenced together can exhibit
+distinctly different copy number biases (see `Plagnol et al. 2012
+<http://dx.doi.org/10.1093/bioinformatics/bts526>`_ and `Backenroth et al. 2014
+<http://dx.doi.org/10.1093/nar/gku345>`_); reusing a pooled reference across the
+cohort provides some consistency to help diagnose such issues.
 
 Notes on sample selection:
 
@@ -242,10 +250,10 @@ Notes on sample selection:
   use in building a CNVkit reference -- assuming it was sequenced on the same
   platform as the other samples you're calling.
 
-If normal samples are not available, it will sometimes work OK to build the
+If normal samples are not available, it will sometimes be acceptable to build the
 reference from a collection of tumor samples. You can use the ``scatter`` command
 on the raw ``.cnn`` coverage files to help choose samples with relatively
-minimal CNVs for use in the reference.
+minimal and non-recurrent CNVs for use in the reference.
 
 With no control samples
 ```````````````````````
@@ -303,8 +311,8 @@ are calculated and stored in the output reference .cnn file.
 For efficiency, the samtools FASTA index file (.fai) is used to locate the
 binned sequence regions in the FASTA file.
 
-The same read-depth bias corrections used in the :ref:`fix` command are
-performed on each of the normal samples here.
+The same read-depth :doc:`bias corrections <bias>` used in the :ref:`fix`
+command are performed on each of the normal samples here.
 The result is a reference copy-number profile that can then be used to correct
 other individual samples.
 
@@ -323,14 +331,32 @@ fix
 ---
 
 Combine the uncorrected target and antitarget coverage tables (.cnn) and
-correct for biases in regional coverage and GC content, according to the given
-reference. Output a table of copy number ratios (.cnr).
+:doc:`correct for biases <bias>` in regional coverage and GC content, according to
+the given reference. Output a table of copy number ratios (.cnr).
 
 ::
 
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn Reference.cnn -o Sample.cnr
 
-.. TODO explain calculation of the "weight" column
+How it works
+````````````
+
+The "observed" on- and off-target read depths are each median-centered and
+:doc:`bias-corrected <bias>`, as when constructing the :ref:`reference`.
+The corresponding "expected" normalized log2 read-depth values from the
+reference are then subtracted for each set of bins.
+
+A weight is assigned to each bin depending on:
+
+1. The size of the bin;
+2. The deviation of the bin's log2 value in the reference from 0;
+3. The "spread" of the bin in the reference.
+
+(The latter two only apply if at least one normal/control sample was used to
+build the reference.)
+
+Finally, the corrected on- and off-target bin-level copy ratios with associated
+weights are concatenated, sorted, and written to a .cnr file.
 
 
 .. _segment:
@@ -342,10 +368,10 @@ Infer discrete copy number segments from the given coverage table::
 
     cnvkit.py segment Sample.cnr -o Sample.cns
 
-By default this uses the circular binary segmentation algorithm (CBS), but with
-the ``-m`` option, the faster `Fused Lasso
-<http://statweb.stanford.edu/~tibs/cghFLasso.html>`_ algorithm (``flasso``) or
-even faster but less accurate `HaarSeg
+By default this uses the circular binary segmentation algorithm (CBS), which
+performed best in our benchmarking. But with the ``-m`` option, the faster
+`Fused Lasso <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_ algorithm
+(``flasso``) or even faster but less accurate `HaarSeg
 <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_
 algorithm (``haar``) can be used instead.
 

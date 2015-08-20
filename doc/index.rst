@@ -40,6 +40,7 @@ FAQ & How To
     :maxdepth: 3
 
     fileformats
+    bias
     calling
     heterogeneity
     nonhybrid

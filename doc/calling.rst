@@ -1,5 +1,5 @@
-Calling gains and losses
-========================
+Calling absolute copy number
+============================
 
 The relationship between the observed copy ratio and the true underlying copy
 number depends on tumor cell fraction (purity), genome ploidy (which may be
@@ -29,3 +29,6 @@ used to evaluate the reliability of each segment. Future releases of CNVkit
 will integrate further statistical testing to help make meaningful variant
 calls from the log2 copy ratio data.
 
+After using :ref:`call`, the adjusted .cns file can then be converted to BED or
+VCF format using the :ref:`export` command. These output styles display the
+inferred absolute integer copy number value of each segment.
