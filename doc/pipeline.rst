@@ -354,7 +354,13 @@ The "observed" on- and off-target read depths are each median-centered and
 The corresponding "expected" normalized log2 read-depth values from the
 reference are then subtracted for each set of bins.
 
-A weight is assigned to each bin depending on:
+CNVkit filters out bins failing certain predefined criteria: those where the
+reference log2 read depth is below a threshold (default -5), the spread of read
+depths among all normal samples in the reference is above a threshold (default
+1.0), or the RepeatMasker-covered proportion of the bin is above a threshold
+(default 99%).
+
+A weight is assigned to each remaining bin depending on:
 
 1. The size of the bin;
 2. The deviation of the bin's log2 value in the reference from 0;
