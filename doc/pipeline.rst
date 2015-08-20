@@ -91,19 +91,8 @@ unequal size, the ``--split`` option divides the larger regions so that the
 average bin size after dividing is close to the size specified by
 ``--average-size``.
 
-In case the vendor BED file does not label each region with a corresponding gene
-name, the ``--annotate`` option can add or replace these labels.
-Gene annotation databases, e.g. RefSeq or Ensembl, are available in "flat"
-format from UCSC (e.g. `refFlat.txt for hg19
-<http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refFlat.txt.gz>`_).
-
-In other cases the region labels are a combination of human-readable gene names
-and database accession codes, separated by commas (e.g.
-"ref|BRAF,mRNA|AB529216,ens|ENST00000496384"). The ``--short-names`` option
-splits these accessions on commas, then chooses the single accession that covers
-in the maximum number of consecutive regions that share that accession, and
-applies it as the new label for those regions. (You may find it simpler to just
-apply the refFlat annotations.)
+Bin size and resolution
+```````````````````````
 
 If you need higher resolution, you can select a smaller average size for your
 target and :ref:`antitarget` bins.
@@ -126,6 +115,23 @@ In practice we see good results with an average of 200-300 reads per bin; we
 therefore recommend an overall on-target sequencing coverage depth of at least
 200x to 300x with a read length of 100 to justify reducing the average target
 bin size to 100bp.
+
+Adding gene names
+`````````````````
+
+In case the vendor BED file does not label each region with a corresponding gene
+name, the ``--annotate`` option can add or replace these labels.
+Gene annotation databases, e.g. RefSeq or Ensembl, are available in "flat"
+format from UCSC (e.g. `refFlat.txt for hg19
+<http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refFlat.txt.gz>`_).
+
+In other cases the region labels are a combination of human-readable gene names
+and database accession codes, separated by commas (e.g.
+"ref|BRAF,mRNA|AB529216,ens|ENST00000496384"). The ``--short-names`` option
+splits these accessions on commas, then chooses the single accession that covers
+in the maximum number of consecutive regions that share that accession, and
+applies it as the new label for those regions. (You may find it simpler to just
+apply the refFlat annotations.)
 
 
 .. _antitarget:
@@ -150,6 +156,8 @@ antitarget locations by passing the locations of the accessible sequence regions
 with the ``-g`` or ``--access`` option. These regions are precomputed for the
 UCSC reference human genome hg19 (data/access-5kb-mappable.hg19.bed), and can be
 computed for other genomes with the included script ``genome2access.py``.
+Other known unmappable or poorly sequenced regions can be specified for
+exclusion with the ``-x`` option.
 
 CNVkit uses a cautious default off-target bin size that, in our experience, will
 typically include more reads than the average on-target bin.  However, we
