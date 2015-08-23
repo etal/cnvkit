@@ -115,8 +115,12 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     i.e. mean pileup depth across each region.
     """
     # Count bases in each region; exclude low-MAPQ reads
+    if min_mapq > 0:
+        bedcov_args = ['-Q', str(min_mapq)]
+    else:
+        bedcov_args = []
     try:
-        lines = pysam.bedcov(bed_fname, bam_fname, '-Q', str(min_mapq))
+        lines = pysam.bedcov(bed_fname, bam_fname, *bedcov_args)
     except pysam.SamtoolsError as exc:
         raise ValueError("Failed processing %r coverages in %r regions. PySAM error: %s"
                          % (bam_fname, bed_fname, exc))
