@@ -284,9 +284,12 @@ def HaarConv(signal, #const double * signal,
     """
     signalSize = len(signal)
     if stepHalfSize > signalSize:
-        # ENH: handle this endcase
-        raise ValueError("stepHalfSize (%s) > signalSize (%s)"
-                         % (stepHalfSize, signalSize))
+        # XXX TODO handle this endcase
+        # raise ValueError("stepHalfSize (%s) > signalSize (%s)"
+        #                  % (stepHalfSize, signalSize))
+        # echo("Error?: stepHalfSize (%s) > signalSize (%s)"
+        #      % (stepHalfSize, signalSize))
+        return np.zeros(signalSize, dtype=np.float_)
 
     result = np.zeros(signalSize, dtype=np.float_)
     if weight is not None:
@@ -379,7 +382,7 @@ def FindLocalPeaks(signal, #const double * signal,
             elif (sig_curr == sig_prev) and (sig_curr > sig_next):
                 minSuspect = None
 
-    return np.array(peakLoc)
+    return np.array(peakLoc, dtype=np.int_)
 
 
 # XXX numpy.extract should suffice
