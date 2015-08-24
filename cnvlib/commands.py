@@ -1590,7 +1590,6 @@ def _cmd_export_nb(args):
     table = export.export_nexus_basic(args.filename)
     core.write_dataframe(args.output, table)
 
-
 P_export_nb = P_export_subparsers.add_parser('nexus-basic',
         help=_cmd_export_nb.__doc__)
 P_export_nb.add_argument('filename',
