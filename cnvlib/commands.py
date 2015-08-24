@@ -1522,8 +1522,8 @@ def _cmd_export_seg(args):
 
     Compatible with IGV and GenePattern.
     """
-    outheader, outrows = export.export_seg(args.filenames)
-    core.write_tsv(args.output, outrows, colnames=outheader)
+    table = export.export_seg(args.filenames)
+    core.write_dataframe(args.output, table)
 
 P_export_seg = P_export_subparsers.add_parser('seg',
         help=_cmd_export_seg.__doc__)

@@ -115,7 +115,7 @@ def export_seg(sample_fnames):
     Segment breakpoints are not the same across samples, so samples are listed
     in serial with the sample ID as the left column.
     """
-    outrows = []
+    out_tables = []
     chrom_ids = None
     for fname in sample_fnames:
         segments = CNA.read(fname)
@@ -127,20 +127,19 @@ def export_seg(sample_fnames):
             core.assert_equal("Segment chromosome names differ",
                               previous=chrom_ids.keys(),
                               current=create_chrom_ids(segments).keys())
-
-        if 'probes' in segments:
-            outheader = ["ID", "Chromosome", "Start", "End", "NumProbes", "Mean"]
-            def row2out(row):
-                return (segments.sample_id, chrom_ids[row['chromosome']],
-                        row['start'], row['end'], row['probes'],
-                        row['log2'])
+        table = segments.data.loc[:, ["start", "end"]]
+        table["ID"] = segments.sample_id
+        table["mean"] = segments.data["log2"]
+        table["chromosome"] = [chrom_ids[chrom]
+                               for chrom in segments["chromosome"]]
+        if "probes" in segments:
+            table["num_probes"] = segments["probes"]
+            sorted_cols = ["ID", "chromosome", "start", "end", "num_probes",
+                           "mean"]
         else:
-            outheader = ["ID", "Chromosome", "Start", "End", "Mean"]
-            def row2out(row):
-                return (segments.sample_id, chrom_ids[row['chromosome']],
-                        row['start'], row['end'], row['log2'])
-        outrows.extend(row2out(row) for row in segments)
-    return outheader, outrows
+            sorted_cols = ["ID", "chromosome", "start", "end", "mean"]
+        out_tables.append(table.reindex(columns=sorted_cols))
+    return pd.concat(out_tables)
 
 
 def create_chrom_ids(segments):
