@@ -354,6 +354,7 @@ class GenomicArray(object):
                 sample_id = '<unknown>'
         # Create a multi-index of genomic coordinates (like GRanges)
         table = pd.read_table(infile, na_filter=False,
+                              dtype={'chromosome': str},
                               # index_col=['chromosome', 'start']
         )
         # OR: Replace chromosome names with integers
