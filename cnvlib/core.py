@@ -25,25 +25,29 @@ def parse_tsv(infile, keep_header=False):
             yield line.rstrip().split('\t')
 
 
-def write_tsv(outfname, table, colnames=None):
-    """Write the CGH file."""
-    if not outfname:
-        outfname = sys.stdout
-    with safe_write(outfname) as handle:
+def write_tsv(outfname, rows, colnames=None):
+    """Write rows, with optional column header, to tabular file."""
+    with safe_write(outfname or sys.stdout) as handle:
         if colnames:
             header = '\t'.join(colnames) + '\n'
             handle.write(header)
         handle.writelines('\t'.join(map(str, row)) + '\n'
-                           for row in table)
+                           for row in rows)
+
 
 def write_text(outfname, text, *more_texts):
-    if not outfname:
-        outfname = sys.stdout
-    with safe_write(outfname) as handle:
+    """Write one or more strings (blocks of text) to a file."""
+    with safe_write(outfname or sys.stdout) as handle:
         handle.write(text)
         if more_texts:
             for mtext in more_texts:
                 handle.write(mtext)
+
+
+def write_dataframe(outfname, dframe):
+    """Write a pandas.DataFrame to a tabular file."""
+    with safe_write(outfname or sys.stdout) as handle:
+        dframe.to_csv(handle, index=False, sep='\t', float_format='%.6g')
 
 
 # __________________________________________________________________________

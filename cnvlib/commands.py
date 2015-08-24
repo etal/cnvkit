@@ -1587,8 +1587,9 @@ P_export_theta.set_defaults(func=_cmd_export_theta)
 # Nexus "basic" special case: can only represent 1 sample
 def _cmd_export_nb(args):
     """Convert bin-level log2 ratios to Nexus Copy Number "basic" format."""
-    outheader, outrows = export.export_nexus_basic(args.filename)
-    core.write_tsv(args.output, outrows, colnames=outheader)
+    table = export.export_nexus_basic(args.filename)
+    core.write_dataframe(args.output, table)
+
 
 P_export_nb = P_export_subparsers.add_parser('nexus-basic',
         help=_cmd_export_nb.__doc__)
