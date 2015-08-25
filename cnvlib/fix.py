@@ -78,7 +78,7 @@ def match_ref_to_probes(ref_pset, probes):
     num_missing = pd.isnull(ref_matched.start).sum()
     if num_missing > 0:
         raise ValueError("Reference is missing %d bins found in %s"
-                         % (len(num_missing), probes.sample_id))
+                         % (num_missing, probes.sample_id))
     return ref_pset.as_dataframe(ref_matched.reset_index(drop=True))
 
 
