@@ -168,23 +168,25 @@ def export_bed(sample_fnames, args):
         - sample name or given label
         - integer copy number
     """
-    bed_rows = []
+    bed_tables = []
     for fname in sample_fnames:
         segs = CNA.read(fname)
-        rows = segments2bed(segs, args.sample_id or segs.sample_id, args.ploidy,
-                            args.male_reference, args.show_neutral)
-        bed_rows.extend(rows)
-    return None, bed_rows
+        tbl = segments2bed(segs, args.sample_id or segs.sample_id, args.ploidy,
+                           args.male_reference, args.show_neutral)
+        bed_tables.append(tbl)
+    return pd.concat(bed_tables)
 
 
 def segments2bed(segments, label, ploidy, is_reference_male, show_neutral):
-    """Convert a copy number array to a BED-like format."""
+    """Convert a copy number array to a BED-like DataFrame."""
     absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
-    for row, abs_val in zip(segments, absolutes):
-        ncopies = int(round(abs_val))
-        # Ignore regions of neutral copy number
-        if show_neutral or ncopies != ploidy:
-            yield (row["chromosome"], row["start"], row["end"], label, ncopies)
+    out = segments.data.loc[:, ["chromosome", "start", "end"]]
+    out["label"] = label
+    out["ncopies"] = np.rint(absolutes)
+    if not show_neutral:
+        # Skip regions of normal ploidy
+        out = out[out["ncopies"] != ploidy]
+    return out
 
 
 # _____________________________________________________________________________

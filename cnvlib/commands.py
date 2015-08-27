@@ -1491,8 +1491,8 @@ def _cmd_export_bed(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    outheader, outrows = export.export_bed(args.segments, args)
-    core.write_tsv(args.output, outrows, colnames=outheader)
+    table = export.export_bed(args.segments, args)
+    core.write_dataframe(args.output, table, header=False)
 
 P_export_bed = P_export_subparsers.add_parser('bed',
         help=_cmd_export_bed.__doc__)

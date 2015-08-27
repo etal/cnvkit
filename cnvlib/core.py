@@ -44,10 +44,11 @@ def write_text(outfname, text, *more_texts):
                 handle.write(mtext)
 
 
-def write_dataframe(outfname, dframe):
+def write_dataframe(outfname, dframe, header=True):
     """Write a pandas.DataFrame to a tabular file."""
     with safe_write(outfname or sys.stdout) as handle:
-        dframe.to_csv(handle, index=False, sep='\t', float_format='%.6g')
+        dframe.to_csv(handle, header=header,
+                      index=False, sep='\t', float_format='%.6g')
 
 
 # __________________________________________________________________________
