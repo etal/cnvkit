@@ -193,8 +193,8 @@ class GenomicArray(object):
 
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
-        for chrom in pd.unique(self.chromosome):
-            yield chrom, self[self.chromosome == chrom]
+        for chrom, subtable in self.data.groupby("chromosome", sort=False):
+            yield chrom, self.as_dataframe(subtable)
 
     def coords(self, also=()):
         """Iterate over plain coordinates of each bin: chromosome, start, end.
