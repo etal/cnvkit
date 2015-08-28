@@ -162,7 +162,6 @@ class GenomicArray(object):
 
     # Traversal
 
-    # XXX troubled
     # or: by_coords, by_ranges
     def by_bin(self, bins, mode='trim'):
         """Group rows by another GenomicArray; trim row start/end to bin edges.
@@ -198,11 +197,11 @@ class GenomicArray(object):
             yield chrom, self[self.chromosome == chrom]
 
     def coords(self, also=()):
-        """Get plain coordinates of each bin: chromosome, start, end.
+        """Iterate over plain coordinates of each bin: chromosome, start, end.
 
         With `also`, also include those columns.
 
-        Example:
+        Example, yielding rows in BED format:
 
         >>> probes.coords(also=["name", "strand"])
         """

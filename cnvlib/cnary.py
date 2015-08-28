@@ -170,7 +170,6 @@ class CopyNumArray(gary.GenomicArray):
 
     # Manipulation
 
-    # XXX mostly ok up to here
     def center_all(self, peak=False):
         """Recenter coverage values to the autosomes' average (in-place)."""
         # ideal: normalize to the total number of reads in this sample
