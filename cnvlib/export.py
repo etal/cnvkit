@@ -190,7 +190,104 @@ def segments2bed(segments, label, ploidy, is_reference_male, show_neutral):
 
 
 # _____________________________________________________________________________
-# theta
+# VCF
+
+VCF_HEADER = """\
+##fileformat=VCFv4.0
+##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">
+##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variation">
+##INFO=<ID=SVLEN,Number=-1,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##ALT=<ID=DEL,Description="Deletion">
+##ALT=<ID=DUP,Description="Duplication">
+##ALT=<ID=CNV,Description="Copy number variable region">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Float,Description="Genotype quality">
+##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Copy number genotype for imprecise events">
+##FORMAT=<ID=CNQ,Number=1,Type=Float,Description="Copy number genotype quality for imprecise events">
+"""
+# #CHROM  POS   ID  REF ALT   QUAL  FILTER  INFO  FORMAT  NA00001
+# 1 2827693   . CCGTGGATGCGGGGACCCGCATCCCCTCTCCCTTCACAGCTGAGTGACCCACATCCCCTCTCCCCTCGCA  C . PASS  SVTYPE=DEL;END=2827680;BKPTID=Pindel_LCS_D1099159;HOMLEN=1;HOMSEQ=C;SVLEN=-66 GT:GQ 1/1:13.9
+# 2 321682    . T <DEL>   6 PASS    IMPRECISE;SVTYPE=DEL;END=321887;SVLEN=-105;CIPOS=-56,20;CIEND=-10,62  GT:GQ 0/1:12
+# 3 12665100  . A <DUP>   14  PASS  IMPRECISE;SVTYPE=DUP;END=12686200;SVLEN=21100;CIPOS=-500,500;CIEND=-500,500   GT:GQ:CN:CNQ  ./.:0:3:16.2
+# 4 18665128  . T <DUP:TANDEM>  11  PASS  IMPRECISE;SVTYPE=DUP;END=18665204;SVLEN=76;CIPOS=-10,10;CIEND=-10,10  GT:GQ:CN:CNQ  ./.:0:5:8.3
+
+
+def export_vcf(sample_fname, ploidy, is_reference_male, sample_id=None):
+    """Convert segments to Variant Call Format.
+
+    For now, only 1 sample per VCF. (Overlapping CNVs seem tricky.)
+
+    Spec: https://samtools.github.io/hts-specs/VCFv4.2.pdf
+    """
+    segments = CNA.read(sample_fname)
+    vcf_columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER",
+                   "INFO", "FORMAT", sample_id or segments.sample_id]
+    vcf_rows = segments2vcf(segments, ploidy, is_reference_male)
+    table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
+    vcf_body = table.to_csv(sep='\t', header=True, index=False,
+                            float_format="%.3g")
+    return VCF_HEADER, vcf_body
+
+
+def segments2vcf(segments, ploidy, is_reference_male):
+    """Convert copy number segments to VCF records."""
+    table = segments.data.loc[:, ["chromosome", "end", "log2", "probes"]]
+
+    absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
+    table["ncopies"] = np.rint(absolutes)
+    idx_losses = (table["ncopies"] < ploidy)
+
+    starts = segments.start.copy()
+    starts[starts == 0] = 1
+    table["start"] = starts
+
+    svlen = segments.end - segments.start
+    svlen[idx_losses] *= -1
+    table["svlen"] = svlen
+
+    table["svtype"] = "DUP"
+    table.loc[idx_losses, "svtype"] = "DEL"
+
+    table["format"] = "GT:GQ:CN:CNQ"
+    table.loc[idx_losses, "format"] = "GT:GQ" # :CN:CNQ ?
+
+    # Reformat this data to create INFO and genotype
+    # TODO be more clever about this
+    for _idx, row in table.iterrows():
+        if row["ncopies"] == ploidy:
+            # Skip regions of neutral copy number
+            # XXX TODO handle haploid sex chromosomes
+            continue  # or "CNV" for subclonal?
+
+        if row["ncopies"] > ploidy:
+            genotype = "0/1:0:%d:%g" % (row["ncopies"], row["probes"])
+        elif row["ncopies"] < ploidy:
+            # TODO XXX handle non-diploid ploidies, haploid chroms
+            if row["ncopies"] == 0:
+                # Complete deletion, 0 copies
+                gt = "1/1"
+            else:
+                # Single copy deletion
+                gt = "0/1"
+            genotype = "%s:%d" % (gt, row["probes"])
+
+        info = ";".join(["IMPRECISE",
+                         "SVTYPE=%s" % row["svtype"],
+                         "END=%d" % row["end"],
+                         "SVLEN=%d" % row["svlen"],
+                         # CIPOS=-56,20;CIEND=-10,62
+                        ])
+
+        yield (row["chromosome"], row["start"], '.', 'N',
+               "<%s>" % row["svtype"], '.', '.',
+               info, row["format"], genotype)
+
+
+# _____________________________________________________________________________
+# THetA
 
 def export_theta(tumor, reference):
     """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
@@ -269,91 +366,6 @@ def calculate_theta_fields(seg, ref_rows, chrom_id):
             tumor_count,  # tumorCount
             ref_count     # normalCount
            )
-
-
-# _____________________________________________________________________________
-# VCF
-
-VCF_HEADER = """\
-##fileformat=VCFv4.0
-##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">
-##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">
-##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
-##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variation">
-##INFO=<ID=SVLEN,Number=-1,Type=Integer,Description="Difference in length between REF and ALT alleles">
-##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
-##ALT=<ID=DEL,Description="Deletion">
-##ALT=<ID=DUP,Description="Duplication">
-##ALT=<ID=CNV,Description="Copy number variable region">
-##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-##FORMAT=<ID=GQ,Number=1,Type=Float,Description="Genotype quality">
-##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Copy number genotype for imprecise events">
-##FORMAT=<ID=CNQ,Number=1,Type=Float,Description="Copy number genotype quality for imprecise events">
-"""
-# #CHROM  POS   ID  REF ALT   QUAL  FILTER  INFO  FORMAT  NA00001
-# 1 2827693   . CCGTGGATGCGGGGACCCGCATCCCCTCTCCCTTCACAGCTGAGTGACCCACATCCCCTCTCCCCTCGCA  C . PASS  SVTYPE=DEL;END=2827680;BKPTID=Pindel_LCS_D1099159;HOMLEN=1;HOMSEQ=C;SVLEN=-66 GT:GQ 1/1:13.9
-# 2 321682    . T <DEL>   6 PASS    IMPRECISE;SVTYPE=DEL;END=321887;SVLEN=-105;CIPOS=-56,20;CIEND=-10,62  GT:GQ 0/1:12
-# 3 12665100  . A <DUP>   14  PASS  IMPRECISE;SVTYPE=DUP;END=12686200;SVLEN=21100;CIPOS=-500,500;CIEND=-500,500   GT:GQ:CN:CNQ  ./.:0:3:16.2
-# 4 18665128  . T <DUP:TANDEM>  11  PASS  IMPRECISE;SVTYPE=DUP;END=18665204;SVLEN=76;CIPOS=-10,10;CIEND=-10,10  GT:GQ:CN:CNQ  ./.:0:5:8.3
-
-
-def export_vcf(sample_fname, ploidy, is_reference_male, sample_id=None):
-    """Convert segments to Variant Call Format.
-
-    For now, only 1 sample per VCF. (Overlapping CNVs seem tricky.)
-
-    Spec: https://samtools.github.io/hts-specs/VCFv4.2.pdf
-    """
-    segments = CNA.read(sample_fname)
-    vcf_columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER",
-                   "INFO", "FORMAT", sample_id or segments.sample_id]
-    vcf_rows = [(chrom, posn, '.', 'N', "<%s>" % alt, '.', '.', info, fmts, gtype)
-                for chrom, posn, alt, info, fmts, gtype in
-                segments2vcf(segments, ploidy, is_reference_male)]
-    table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
-    vcf_body = table.to_csv(sep='\t', header=True, index=False,
-                            float_format="%.3g")
-    return VCF_HEADER, vcf_body
-
-
-# XXX refactor with segments2bed; return a DataFrame with all info
-def segments2vcf(segments, ploidy, is_reference_male):
-    """Convert copy number segments to VCF records."""
-    absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
-    for row, abs_val in zip(segments, absolutes):
-        ncopies = int(round(abs_val))
-        if ncopies == ploidy:
-            # Skip regions of neutral copy number
-            continue  # or "CNV" for subclonal?
-
-        svlen = row["end"] - row["start"]
-        if ncopies > ploidy:
-            svtype = "DUP"
-            formats = "GT:GQ:CN:CNQ"
-            genotype = "0/1:0:%d:%g" % (ncopies, row["probes"])
-        elif ncopies < ploidy:
-            svtype = "DEL"
-            svlen *= -1
-            formats = "GT:GQ"
-            # TODO XXX handle non-diploid ploidies, haploid chroms
-            if ncopies == 0:
-                # Complete deletion, 0 copies
-                gt = "1/1"
-            else:
-                # Single copy deletion
-                gt = "0/1"
-            genotype = "%s:%d" % (gt, row["probes"])
-
-        # INFO
-        info = ";".join(["IMPRECISE",
-                         "SVTYPE=%s" % svtype,
-                         "END=%d" % row["end"],
-                         "SVLEN=%d" % svlen,
-                         # CIPOS=-56,20;CIEND=-10,62
-                        ])
-
-        yield (row["chromosome"], max(1, row["start"]), svtype, info, formats,
-                genotype)
 
 
 # _____________________________________________________________________________
