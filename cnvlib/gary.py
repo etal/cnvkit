@@ -230,7 +230,7 @@ class GenomicArray(object):
                 # Include all rows overlapping the start point
                 table = table[table.end.searchsorted(start, 'right'):]
                 # Update 5' endpoints to the boundary
-                table.start[table.start < start] = start
+                table.loc[table.start < start, "start"] = start
             else:
                 # Only rows entirely after the start point
                 table = table[table.start.searchsorted(start):]
@@ -238,7 +238,7 @@ class GenomicArray(object):
             if trim:
                 table = table[:table.start.searchsorted(end)]
                 # Update 3' endpoints to the boundary
-                table.end[table.end > end] = end
+                table.loc[table.end > end, "end"] = end
             else:
                 table = table[:table.end.searchsorted(end, 'right')]
         return self.as_dataframe(table)
