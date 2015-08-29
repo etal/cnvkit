@@ -133,6 +133,7 @@ def repair_segments(segments, orig_probes):
                     if g not in ('Background', 'CGH', '-')]
         segments[i, 'gene'] = ",".join(subgenes) if subgenes else '-'
         # ENH: Recalculate segment means here instead of in R
+    segments.sort_columns()
     return segments
 
 
