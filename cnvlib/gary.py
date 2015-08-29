@@ -225,22 +225,30 @@ class GenomicArray(object):
             table = self.data[self.data['chromosome'] == chrom]
         except KeyError:
             raise KeyError("Chromosome %s is not in this probe set" % chrom)
-        if start:
+        if start or end:
+            if start:
+                if trim:
+                    # Include all rows overlapping the start point
+                    start_idx = table.end.searchsorted(start, 'right')
+                else:
+                    # Only rows entirely after the start point
+                    start_idx = table.start.searchsorted(start)
+            else:
+                start_idx = 0
+            if end:
+                if trim:
+                    end_idx = table.start.searchsorted(end)
+                else:
+                    end_idx = table.end.searchsorted(end, 'right')
+            else:
+                end_idx = len(table)
+            table = table[start_idx:end_idx]
             if trim:
-                # Include all rows overlapping the start point
-                table = table[table.end.searchsorted(start, 'right'):].copy()
+                table = table.copy()
                 # Update 5' endpoints to the boundary
                 table.start = table.start.clip_lower(start)
-            else:
-                # Only rows entirely after the start point
-                table = table[table.start.searchsorted(start):]
-        if end:
-            if trim:
-                table = table[:table.start.searchsorted(end)].copy()
                 # Update 3' endpoints to the boundary
                 table.end = table.end.clip_upper(end)
-            else:
-                table = table[:table.end.searchsorted(end, 'right')]
         return self.as_dataframe(table)
 
     def in_ranges(self, chrom, starts=None, ends=None, trim=False):
