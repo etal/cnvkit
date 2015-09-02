@@ -4,6 +4,11 @@ Bias corrections
 The sequencing coverage depth obtained at different genomic regions is variable,
 particularly for targeted capture. Much of this variability is due to known
 biochemical effects related to library prep, target capture and sequencing.
+Normalizing the read depth in each on-- and off-target bin to the expected read
+depths derived from a reference of normal samples removes much of
+the biases attributable to GC content, target density. However, these biases
+also vary between samples, and must still be corrected even when a normal
+reference is available.
 
 To correct each of these known effects, CNVkit calculates the relationship
 between observed bin-level read depths and the values of some known biasing
