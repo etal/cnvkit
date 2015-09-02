@@ -426,7 +426,7 @@ def _cmd_coverage(args):
     pset.write(args.output)
 
 
-def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=1):
+def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0):
     """Calculate coverage in the given regions from BAM read depths."""
     if not ngfrills.ensure_bam_sorted(bam_fname):
         raise RuntimeError("BAM file %s must be sorted by coordinates"
@@ -444,7 +444,7 @@ P_coverage.add_argument('interval', help="Intervals (.bed or .list)")
 P_coverage.add_argument('-c', '--count', action='store_true',
         help="""Get read depths by counting read midpoints within each bin.
                 (An alternative algorithm).""")
-P_coverage.add_argument('-q', '--min-mapq', type=int, default=1,
+P_coverage.add_argument('-q', '--min-mapq', type=int, default=0,
         help="""Minimum mapping quality score (phred scale 0-60) to count a read
                 for coverage depth.  [Default: %(default)s]""")
 P_coverage.add_argument('-o', '--output', help="""Output file name.""")
