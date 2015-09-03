@@ -673,7 +673,7 @@ def _cmd_call(args):
 
 
 def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
-            is_sample_female=False, thresholds=(-1.1, -0.3, 0.2, 0.7)):
+            is_sample_female=False, thresholds=(-1.1, -0.25, 0.2, 0.7)):
     if method == "clonal":
         if purity and purity < 1.0:
             echo("Calling copy number with clonal purity %g, ploidy %d"
@@ -708,7 +708,7 @@ P_call.add_argument('-m', '--method',
         choices=('threshold', 'clonal'), default='threshold',
         help="""Calling method. [Default: %(default)s]""")
 P_call.add_argument('-t', '--thresholds',
-        type=csvstring, default="-1.1,-0.3,0.2,0.7",
+        type=csvstring, default="-1.1,-0.25,0.2,0.7",
         help="""Hard thresholds for calling each integer copy number, separated
                 by commas. Use the '=' sign on the command line, e.g.: -t=-1,0,1
                 [Default: %(default)s]""")

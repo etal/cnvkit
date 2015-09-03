@@ -47,11 +47,11 @@ def absolute_threshold(cnarr, ploidy, is_reference_male, thresholds):
     Allowing for random noise of +/- 0.1, the cutoffs are::
 
         DEL(0)  <  -1.1
-        LOSS(1) <  -0.3
+        LOSS(1) <  -0.25
         GAIN(3) >=  +0.2
         AMP(4)  >=  +0.7
 
-    For germline samples, better accuracy could be achieved with:
+    For germline samples, better precision could be achieved with::
 
         LOSS(1) <  -0.4
         GAIN(3) >=  +0.3
