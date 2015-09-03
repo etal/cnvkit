@@ -18,12 +18,14 @@ class GenomicArray(object):
     _required_columns = ("chromosome", "start", "end")
 
     def __init__(self, data_table, meta_dict=None):
-        if not all(c in data_table.columns for c in
-                   self._required_columns):
+        # Validation
+        if not all(c in data_table.columns for c in self._required_columns):
             raise ValueError("data table must have at least columns "
                              + repr(self._required_columns))
-        # ensure chromosomes are strings to avoid integer conversion of 1, 2...
-        data_table["chromosome"] = data_table["chromosome"].astype(str)
+        # Ensure chromosomes are strings to avoid integer conversion of 1, 2...
+        if len(data_table) and not isinstance(data_table.chromosome.iat[0],
+                                              basestring):
+            data_table["chromosome"] = data_table["chromosome"].astype("string")
         self.data = data_table
         self.meta = (dict(meta_dict)
                      if meta_dict is not None and len(meta_dict)
@@ -361,17 +363,12 @@ class GenomicArray(object):
                 sample_id = '<unknown>'
         # Create a multi-index of genomic coordinates (like GRanges)
         table = pd.read_table(infile, na_filter=False,
-                              dtype={'chromosome': str},
+                              dtype={'chromosome': 'string'},
                               # index_col=['chromosome', 'start']
         )
-        # OR: Replace chromosome names with integers
-        # table = pd.read_table(infile, na_filter=False)
-        # chrom_names = pd.unique(table['chromosome'])
-        # chrom_ids = np.arange(len(chrom_names))
-        # chrom_id_col = np.zeros(len(table), dtype=np.int_)
-        # for cn, ci in zip(chrom_names, chrom_ids):
-        #     chrom_id_col[table['chromosome'] == cn] = ci
-        # table['chromosome'] = chrom_id_col
+        table['chromosome'] = pd.Categorical(table['chromosome'],
+                                             table.chromosome.drop_duplicates(),
+                                             ordered=True)
         # table.set_index(['chromosome', 'start'], inplace=True)
         return cls(table, {"sample_id": sample_id})
 
