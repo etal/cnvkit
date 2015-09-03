@@ -107,3 +107,8 @@ interval into a consecutive series of smaller targets does not change the net
 The association between targeting density and bin read depths is then fitted and
 subtracted, as with GC and RepeatMasker.
 
+CNVkit applies the density bias correction to only the on-target bins; the
+negative "shoulder" bias is not expected to occur in off-target regions because
+those regions are not specifically captured by baits, and the positive "flank"
+bias from neighboring targets is avoided by allocating off-target bins around
+existing targets with a margin of twice the expected insert size.

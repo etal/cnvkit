@@ -186,6 +186,21 @@ Summary statistics of read counts and their binning are printed to standard
 error when CNVkit finishes calculating the coverage of each sample (through
 either the :ref:`batch` or :ref:`coverage` commands).
 
+BAM file preparation
+````````````````````
+
+For best results, use an aligner such as `BWA-MEM
+<http://bio-bwa.sourceforge.net/>`_, with the option to mark secondary mappings
+of reads, and flag PCR
+duplicates with a program such as `SAMBLASTER
+<https://github.com/GregoryFaust/samblaster>`_, `SAMBAMBA
+<http://lomereiter.github.io/sambamba/>`_, or the MarkDuplicates script in
+`Picard tools <http://picard.sourceforge.net/>`_, so that CNVkit will skip
+these reads when calculating read depth.
+
+You will probably want to index the finished BAM file using `samtools
+<http://samtools.sourceforge.net/>`_ or SAMBAMBA.  But if you haven't done this
+beforehand, CNVkit will automatically do it for you.
 
 .. note::
     **The BAM file must be sorted.** CNVkit will check that the first few reads
