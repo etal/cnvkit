@@ -50,7 +50,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
          "max=%s" % max(read_counts))
     tot_mapped_reads = bam_total_reads(bam_fname)
     if tot_mapped_reads:
-        echo("On-target percentage: %.3f (of %d mapped)"
+        echo("Percent reads in regions: %.3f (of %d mapped)"
             % (100. * tot_reads / tot_mapped_reads, tot_mapped_reads))
     else:
         echo("(Couldn't calculate total number of mapped reads)")
