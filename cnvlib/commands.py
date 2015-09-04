@@ -628,7 +628,7 @@ def _cmd_segment(args):
 
 P_segment = AP_subparsers.add_parser('segment', help=_cmd_segment.__doc__)
 P_segment.add_argument('filename',
-        help="Coverage file (.cnr), as produced by 'fix'.")
+        help="Bin-level log2 ratios (.cnr file), as produced by 'fix'.")
 P_segment.add_argument('-o', '--output',
         help="Output table file name (CNR-like table of segments, .cns).")
 P_segment.add_argument('-d', '--dataframe',
@@ -1163,7 +1163,7 @@ def _cmd_gainloss(args):
                            args.min_probes)
     echo("Found", len(gainloss), "gene-level gains and losses")
     core.write_tsv(args.output, gainloss,
-                   colnames=['Gene', 'Chrom.', 'Start', 'End', 'Coverage',
+                   colnames=['Gene', 'Chrom.', 'Start', 'End', 'Log2Ratio',
                              'Probes'])
 
 
