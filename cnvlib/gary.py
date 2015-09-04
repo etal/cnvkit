@@ -344,6 +344,7 @@ class GenomicArray(object):
         self.data = table.reset_index(drop=True)
 
     def sort_columns(self):
+        """Sort this array's columns in-place, per class definition."""
         extra_cols = []
         for col in self.data.columns:
             if col not in self._required_columns:

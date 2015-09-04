@@ -61,35 +61,32 @@ def segment_haar(cnarr):
     Output: the CBS data table
 
     """
-    # XXX in general, should segments use the actual first-probe start and
-    # last-probe end positions?
-    def midprobe(probe):
-        return 0.5 * (probe['start'] + probe['end'])
-
     # Ignore low-coverage probes
     # ENH: do in the caller (segmentation.__init__)
     cnarr = cnarr.drop_low_coverage()
-    # TODO - skip large gaps (segment parts separately)
 
-    seg_rows = []
+    chrom_tables = []
     # Segment each chromosome individually
+    # ENH - skip large gaps (segment chrom. arms separately)
     for chrom, subprobes in cnarr.by_chromosome():
-        # subtbl = subprobes[
+        # echo(chrom, ':')  # DBG
         segtable = haarSeg(subprobes['log2'])
-        # Convert the segments result table (segment start index, size, value)
-        # into CNArray-compatible rows (coverage, chromosome, start, end, gene,
-        # probes)
-        for _i, start_idx, nloci, seg_mean in segtable.itertuples():
-            start_probe = cnarr[start_idx]
-            end_probe = cnarr[start_idx + nloci]
-            gene = 'G' if seg_mean >= 0. else 'L'
-            seg_rows.append((chrom, start_probe['start'], end_probe['end'],
-                             gene, seg_mean, nloci))
-    echo("haar: Found", len(seg_rows), "segments")
-    return CNA.from_rows(seg_rows,
-                         ('chromosome', 'start', 'end', 'gene', 'log2',
-                          'probes'),
-                         {'sample_id': cnarr.sample_id})
+        chromtable = pd.DataFrame({
+            'chromosome': chrom,
+            'start': np.asarray(subprobes['start']).take(segtable['start']),
+            'end': np.asarray(subprobes['end']
+                             ).take(segtable['start']+segtable['size']-1),
+            'gene': '.',
+            'log2': segtable['log2'],
+            'probes': segtable['size'],
+        })
+        # echo(chromtable)  # DBG
+        chrom_tables.append(chromtable)
+    result = pd.concat(chrom_tables)
+    echo("haar: Found", len(result), "segments")
+    segarr = cnarr.as_dataframe(result)
+    segarr.sort_columns()
+    return segarr
 
 
 # ---- from HaarSeg R code -- the API ----
@@ -97,42 +94,32 @@ def segment_haar(cnarr):
 def haarSeg(I,
             W=None,
             rawI=None,
-            breaksFdrQ=0.005,
-            haarStartLevel=2,
-            haarEndLevel=6):
-    """Perform segmentation according to the HaarSeg algorithm.
-
-    Usage:
-
-        haarSeg(I,
-        W=vector(),
-        rawI=vector(),
-        breaksFdrQ=0.001,
-        haarStartLevel=1,
-        haarEndLevel=5)
+            breaksFdrQ=0.005,  # orig. .001
+            haarStartLevel=1,
+            haarEndLevel=5):
+    r"""Perform segmentation according to the HaarSeg algorithm.
 
     Arguments:
 
     I
-        a single array of log(R/G) measurements, sorted according to their
-        genomic location.
+        A 1D array of log-ratio values, sorted according to their genomic
+        location.
     W
-        Weight matrix, corresponding to quality of measurment.  Insert
-        \eqn{1/(\sigma^2)} as weights if your platform output \eqn{\sigma} as
-        the quality of measurment. W must have the same size as I.
+        Weight matrix, corresponding to quality of measurement, with values
+        :math:`1/(\sigma^2)`. Must have the same size as I.
     rawI
-        The mininum between the raw red and raw green measurment (before
-        applying log ratio, but after any background reduction and/or
+        The minimum between the raw test-sample and control-sample coverages
+        (before applying log ratio, but after any background reduction and/or
         normalization).
-        rawI is used for the non-stationary variance compensation.  rawI must
-        have the same size as I.
+        Used for the non-stationary variance compensation.
+        Must have the same size as I.
     breaksFdrQ
         The FDR q parameter. This value should lie between 0 and 0.5. The
         smaller this value is, the less sensitive the segmentation result will
         be.
-        For example, we will detect less breaks in the segmentation result when
-        using Q = 1e-4, compared to the amounts of breaks when using Q = 1e-3.
-        Common used values are 1e-2, 1e-3, 1e-4. Default value is 1e-3.
+        For example, we will detect fewer segmentation breaks when using Q =
+        1e-4, compared to when using Q = 1e-3.
+        Common used values are 1e-2, 1e-3, 1e-4.
     haarStartLevel
         The detail subband from which we start to detect peaks. The higher this
         value is, the less sensitive we are to short segments. The default is
@@ -166,8 +153,7 @@ def haarSeg(I,
         NSV_TH = 50
         varMask = (rawI < NSV_TH)
         pulseSize = 2
-        res = PulseConv(varMask, pulseSize)
-        diffMask = [r >= .5 for r in res]
+        diffMask = (PulseConv(varMask, pulseSize) >= .5)
         peakSigmaEst = med_abs_diff(diffI[~diffMask])
         noisySigmaEst = med_abs_diff(diffI[diffMask])
     else:
@@ -181,12 +167,10 @@ def haarSeg(I,
 
         if rawI:
             pulseSize = 2 * stepHalfSize
-            result = PulseConv(varMask, pulseSize)
-            convMask = [r >= .5 for r in result]
+            convMask = (PulseConv(varMask, pulseSize) >= .5)
             sigmaEst = (1 - convMask) * peakSigmaEst + convMask * noisySigmaEst
             convRes /= sigmaEst
             peakSigmaEst = 1.
-            # T = FDRThres(convRes[peakLoc] / sigmaEst[peakLoc], breaksFdrQ, 1)
 
         T = FDRThres(convRes[peakLoc], breaksFdrQ, peakSigmaEst)
         addonPeaks = HardThreshold(convRes, T, peakLoc)
@@ -223,7 +207,7 @@ def FDRThres(x, q, stdev):
         p = 2 * (1 - stats.norm.cdf(sortedX, stdev)) # XXX stdev
 
         # Get the largest index for which p <= m*q
-        k = which(p <= m * q)
+        k = np.nonzero(p <= m * q)[0]
         if len(k):
             T = sortedX[k[-1]]
         else:
@@ -369,7 +353,7 @@ def FindLocalPeaks(signal, #const double * signal,
             elif (sig_curr == sig_prev) and (sig_curr < sig_next):
                 maxSuspect = None
 
-        elif (sig_curr < 0):
+        elif sig_curr < 0:
             # Look for local maxima
             if (sig_curr < sig_prev) and (sig_curr < sig_next):
                 peakLoc.append(k)
@@ -385,29 +369,26 @@ def FindLocalPeaks(signal, #const double * signal,
     return np.array(peakLoc, dtype=np.int_)
 
 
-# XXX numpy.extract should suffice
 def HardThreshold(signal, #const double * signal,
                   threshold, #double threshold,
                   peakLoc, #int * peakLoc);
                  ):
     """Drop any values of peakLoc under the given threshold.
 
+    I.e. keep only the peak values where the signal amplitude is large enough.
+
     Parameters:
 
         signal: const array of floats
-        threshold: float
+        threshold: scalar float
         peakLoc: modifiable array of ints
 
     Source: HaarSeg.c
     """
-    peakLocOut = []
-    for peak_loc_elem in peakLoc:
-        if not (-threshold < signal[peak_loc_elem] < threshold):
-            # Peak is over the threshold
-            # echo("Peak", peak_loc_elem, "passes threshold:", ":",
-            #      signal[peak_loc_elem])
-            peakLocOut.append(peak_loc_elem)
-    return np.asarray(peakLocOut)
+    peakLocOut = np.extract(np.abs(signal.take(peakLoc)) >= threshold, peakLoc)
+    # echo("Peaks passing threshold:", peakLocOut,
+    #      "\nat:", signal.take(peakLocOut))
+    return peakLocOut
 
 
 def UnifyLevels(baseLevel, #const int * baseLevel,
@@ -551,20 +532,6 @@ def AdjustBreaks(signal, #const double * signal,
 
 
 # R array functions in Python
-def which(bools):
-    """Give the 'TRUE' indices of a logical object, allowing for array indices.
-
-    Example:
-
-    >>> which([True, False, True, True, False])
-    [0, 2, 3]
-    >>> which(np.arange(10) > 5)
-    array([6, 7, 8, 9])
-    """
-    return np.asarray([i for i, b in enumerate(bools) if b],
-                      dtype=np.int_)
-
-
 def match(x, table, nomatch=None):
     """Returns a vector of the positions of (first) matches of `x` in `table`.
 
