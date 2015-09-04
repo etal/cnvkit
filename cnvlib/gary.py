@@ -366,9 +366,10 @@ class GenomicArray(object):
                               dtype={'chromosome': 'string'},
                               # index_col=['chromosome', 'start']
         )
-        table['chromosome'] = pd.Categorical(table['chromosome'],
-                                             table.chromosome.drop_duplicates(),
-                                             ordered=True)
+        # XXX Pending pandas 0.17: https://github.com/pydata/pandas/issues/10505
+        # table['chromosome'] = pd.Categorical(table['chromosome'],
+        #                                      table.chromosome.drop_duplicates(),
+        #                                      ordered=True)
         # table.set_index(['chromosome', 'start'], inplace=True)
         return cls(table, {"sample_id": sample_id})
 
