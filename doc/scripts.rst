@@ -4,7 +4,9 @@ Additional scripts
 genome2access.py:
     Calculate the sequence-accessible coordinates in chromosomes from the given
     reference genome, treating long spans of 'N' characters as the inaccessible
-    regions.
+    regions and outputting the coordinates of the regions between them.
+    An "access" file for the UCSC hg19 genome is included in the CNVkit source
+    distribution under the ``data/`` directory.
 
     CNVkit will compute "antitarget" bins only within the accessible genomic
     regions specified in the "access" file produced by this script. If there are

@@ -166,6 +166,22 @@ specify a properly calculated off-target bin size for their samples in order to
 maximize copy number information.
 
 
+Off-target bin size
+```````````````````
+
+An appropriate off-target bin size can be computed as the product of the average
+target region size and the fold-enrichment of sequencing reads in targeted
+regions, such that roughly the same number of reads are mapped to on-- and
+off-target bins on average --- roughly proportional to the level of on-target
+enrichment.
+
+The preliminary coverage information can be obtained with the script
+CalculateHsMetrics in the Picard suite (http://picard.sourceforge.net/), or from
+the console output of the CNVkit :ref:`coverage` command when run on the target
+regions.
+
+
+
 .. _coverage:
 
 coverage
