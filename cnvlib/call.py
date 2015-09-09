@@ -2,8 +2,7 @@
 from __future__ import absolute_import, division, print_function
 
 import numpy as np
-
-from cnvlib import core
+import pandas as pd
 
 
 def round_log2_ratios(cnarr, absolutes, ploidy, is_reference_male,

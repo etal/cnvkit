@@ -215,75 +215,76 @@ VCF_HEADER = """\
 # 4 18665128  . T <DUP:TANDEM>  11  PASS  IMPRECISE;SVTYPE=DUP;END=18665204;SVLEN=76;CIPOS=-10,10;CIEND=-10,10  GT:GQ:CN:CNQ  ./.:0:5:8.3
 
 
-def export_vcf(sample_fname, ploidy, is_reference_male, sample_id=None):
+def export_vcf(segments, ploidy, is_reference_male, is_sample_female,
+               sample_id=None):
     """Convert segments to Variant Call Format.
 
     For now, only 1 sample per VCF. (Overlapping CNVs seem tricky.)
 
     Spec: https://samtools.github.io/hts-specs/VCFv4.2.pdf
     """
-    segments = CNA.read(sample_fname)
     vcf_columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER",
                    "INFO", "FORMAT", sample_id or segments.sample_id]
-    vcf_rows = segments2vcf(segments, ploidy, is_reference_male)
+    vcf_rows = segments2vcf(segments, ploidy, is_reference_male,
+                            is_sample_female)
     table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
     vcf_body = table.to_csv(sep='\t', header=True, index=False,
                             float_format="%.3g")
     return VCF_HEADER, vcf_body
 
 
-def segments2vcf(segments, ploidy, is_reference_male):
+def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     """Convert copy number segments to VCF records."""
-    table = segments.data.loc[:, ["chromosome", "end", "log2", "probes"]]
-
-    absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
-    table["ncopies"] = np.rint(absolutes)
-    idx_losses = (table["ncopies"] < ploidy)
+    out_dframe = segments.data.loc[:, ["chromosome", "end", "log2", "probes"]]
+    abs_dframe = call.absolute_dataframe(segments, ploidy, 1.0,
+                                         is_reference_male, is_sample_female)
+    out_dframe["ncopies"] = np.rint(abs_dframe["absolute"])
+    idx_losses = (out_dframe["ncopies"] < abs_dframe["expect"])
 
     starts = segments.start.copy()
     starts[starts == 0] = 1
-    table["start"] = starts
+    out_dframe["start"] = starts
 
     svlen = segments.end - segments.start
     svlen[idx_losses] *= -1
-    table["svlen"] = svlen
+    out_dframe["svlen"] = svlen
 
-    table["svtype"] = "DUP"
-    table.loc[idx_losses, "svtype"] = "DEL"
+    out_dframe["svtype"] = "DUP"
+    out_dframe.loc[idx_losses, "svtype"] = "DEL"
 
-    table["format"] = "GT:GQ:CN:CNQ"
-    table.loc[idx_losses, "format"] = "GT:GQ" # :CN:CNQ ?
+    out_dframe["format"] = "GT:GQ:CN:CNQ"
+    out_dframe.loc[idx_losses, "format"] = "GT:GQ" # :CN:CNQ ?
 
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
-    for _idx, row in table.iterrows():
-        if row["ncopies"] == ploidy:
+    for (_idx, out_row), (_idx, abs_row) in zip(out_dframe.iterrows(),
+                                                abs_dframe.iterrows()):
+        if out_row["ncopies"] == abs_row["expect"]:
             # Skip regions of neutral copy number
-            # XXX TODO handle haploid sex chromosomes
             continue  # or "CNV" for subclonal?
 
-        if row["ncopies"] > ploidy:
-            genotype = "0/1:0:%d:%g" % (row["ncopies"], row["probes"])
-        elif row["ncopies"] < ploidy:
+        if out_row["ncopies"] > abs_row["expect"]:
+            genotype = "0/1:0:%d:%g" % (out_row["ncopies"], out_row["probes"])
+        elif out_row["ncopies"] < abs_row["expect"]:
             # TODO XXX handle non-diploid ploidies, haploid chroms
-            if row["ncopies"] == 0:
+            if out_row["ncopies"] == 0:
                 # Complete deletion, 0 copies
                 gt = "1/1"
             else:
                 # Single copy deletion
                 gt = "0/1"
-            genotype = "%s:%d" % (gt, row["probes"])
+            genotype = "%s:%d" % (gt, out_row["probes"])
 
         info = ";".join(["IMPRECISE",
-                         "SVTYPE=%s" % row["svtype"],
-                         "END=%d" % row["end"],
-                         "SVLEN=%d" % row["svlen"],
+                         "SVTYPE=%s" % out_row["svtype"],
+                         "END=%d" % out_row["end"],
+                         "SVLEN=%d" % out_row["svlen"],
                          # CIPOS=-56,20;CIEND=-10,62
                         ])
 
-        yield (row["chromosome"], row["start"], '.', 'N',
-               "<%s>" % row["svtype"], '.', '.',
-               info, row["format"], genotype)
+        yield (out_row["chromosome"], out_row["start"], '.', 'N',
+               "<%s>" % out_row["svtype"], '.', '.',
+               info, out_row["format"], genotype)
 
 
 # _____________________________________________________________________________

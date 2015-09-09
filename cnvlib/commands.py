@@ -1541,8 +1541,22 @@ def _cmd_export_vcf(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    header, body = export.export_vcf(args.segments, args.ploidy, args.male_reference,
-                                     args.sample_id)
+    segments = _CNA.read(args.segments)
+    is_sample_female = segments.guess_xx(args.male_reference, verbose=False)
+    if args.gender:
+        is_sample_female_given = (args.gender in ["f", "female"])
+        if is_sample_female != is_sample_female_given:
+            print("Sample gender specified as", args.gender,
+                  "but chrX copy number looks like",
+                  "female" if is_sample_female else "male",
+                  file=sys.stderr)
+            is_sample_female = is_sample_female_given
+    print("Treating sample gender as",
+            "female" if is_sample_female else "male",
+            file=sys.stderr)
+
+    header, body = export.export_vcf(segments, args.ploidy, args.male_reference,
+                                     is_sample_female, args.sample_id)
     core.write_text(args.output, header, body)
 
 P_export_vcf = P_export_subparsers.add_parser('vcf',
@@ -1555,6 +1569,10 @@ P_export_vcf.add_argument("-i", "--sample-id", metavar="LABEL",
                 [Default: use the sample ID, taken from the file name]""")
 P_export_vcf.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
+P_export.add_argument("-g", "--gender",
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+        help="""Specify the sample's gender as male or female. (Otherwise
+                guessed from chrX copy number).""")
 P_export_vcf.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
