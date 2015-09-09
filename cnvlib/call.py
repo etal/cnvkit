@@ -54,6 +54,7 @@ def absolute_threshold(cnarr, ploidy, is_reference_male, thresholds):
 
         LOSS(1) <  -0.4
         GAIN(3) >=  +0.3
+
     """
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for idx, row in enumerate(cnarr):

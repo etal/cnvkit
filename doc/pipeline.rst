@@ -414,11 +414,11 @@ Infer discrete copy number segments from the given coverage table::
     cnvkit.py segment Sample.cnr -o Sample.cns
 
 By default this uses the circular binary segmentation algorithm (CBS), which
-performed best in our benchmarking. But with the ``-m`` option, the faster
-`Fused Lasso <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_ algorithm
-(``flasso``) or even faster but less accurate `HaarSeg
+performed best in our benchmarking. But with the ``-m`` option, the faster but
+less accurate `HaarSeg
 <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_
-algorithm (``haar``) can be used instead.
+(``haar``) or `Fused Lasso <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_
+(``flasso``) algorithms can be used instead.
 
 Fused Lasso additionally performs significance testing to distinguish CNAs from
 regions of neutral copy number, whereas CBS and HaarSeg by themselves only
@@ -443,10 +443,21 @@ integer values using either:
     cnvkit.py call Sample.cns -y -m threshold -t=-1.1,-0.4,0.3,0.7 -o Sample.call-threshold.cns
 
 The output is another .cns file, where the values in the log2 column are still
-log2-transformed, but represent integers in log2 scale -- e.g. a neutral
-diploid state is represented as 0.0, not the integer 2. These output files are
-still compatible with the other CNVkit commands that accept .cns files, and can
-be plotted the same way.
+log2-transformed and relative to the reference ploidy (by default: diploid
+autosomes, haploid Y or X/Y depending on reference gender).
+The segment log2 values are simply rounded to what they would be if the
+estimated copy number were an integer -- e.g. a neutral diploid state is
+represented as 0.0, and a copy number of 3 on a diploid chromosome is
+represented as 0.58.
+The output .cns file is still compatible with the other CNVkit commands that
+accept .cns files, and can be plotted the same way with the :ref:`scatter`,
+:ref:`heatmap` and :ref:`diagram` commands.
+
+To get the absolute integer copy number values in a human-readable form, use the
+command :ref:`export` ``bed``.
+
+Calling methods
+```````````````
 
 The "clonal" method considers the observed log2 ratios in the input .cns file
 as a mix of some fraction of tumor cells (specified by ``--purity``), possibly
@@ -461,5 +472,32 @@ it will be guessed from the log2 ratio of chromosome X.
 The "threshold" method simply applies fixed log2 ratio cutoff values for each
 integer copy number state. This method therefore does not require the tumor
 cell fraction or purity to be known. The default cutoffs are reasonable for a
-tumor sample with purity of at least 40% or so; for germline samples, the
+tumor sample with purity of at least 40% or so.  For germline samples, the
 ``-t`` values shown above may yield more accurate calls.
+
+The thresholds work like:
+
+=====================================   ===========
+If :math:`\log_2` value :math:`\leq`    Copy number
+-------------------------------------   -----------
+-1.1                                    0
+-0.4                                    1
+0.3                                     2
+0.7                                     3
+...                                     ...
+=====================================   ===========
+
+For homogeneous samples of known ploidy, you can calculate cutoffs from scatch
+by log-transforming the integer copy number values of interested, plus .5 (for
+rounding), divided by the ploidy. For a diploid genome::
+
+    >>> import numpy as np
+    >>> copy_nums = np.arange(5)
+    >>> print(np.log2((copy_nums+.5) / 2)
+    [-2.         -0.4150375   0.32192809  0.80735492  1.169925  ]
+
+Or, in R::
+
+    > log2( (0:4 + .5) / 2)
+    [1] -2.0000000 -0.4150375  0.3219281  0.8073549  1.1699250
+
