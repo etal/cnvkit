@@ -7,7 +7,36 @@ import-picard
 -------------
 
 Convert Picard CalculateHsMetrics per-target coverage files (.csv) to the
-CNVkit .cnn format.
+CNVkit .cnn format::
+
+    cnvkit.py import-picard *.hsmetrics.targetcoverages.csv *.hsmetrics.antitargetcoverages.csv
+    cnvkit.py import-picard picard-hsmetrics/ -d cnvkit-from-picard/
+
+You can use `Picard tools <http://broadinstitute.github.io/picard/>`_ to perform
+the bin read depth and GC calculations that CNVkit normally performs with the
+:ref:`coverage` and :ref:`reference` commands, if need be. 
+
+Procedure:
+
+1. Use the :ref:`target` and :ref:`antitarget` commands to generate the
+   "targets.bed" and "antitargets.bed" files.
+2. Convert those BED files to Picard's "interval list" format by adding the BAM
+   header to the top of the BED file and rearranging the columns -- see the
+   Picard command `BedToIntervalList
+   <http://broadinstitute.github.io/picard/command-line-overview.html#BedToIntervalList>`_.
+3. Run Picard `CalculateHsMetrics
+   <http://broadinstitute.github.io/picard/command-line-overview.html#CalculateHsMetrics>`_
+   on each of your normal/control BAM files with the "targets" and "antitargets"
+   interval lists (separately), your reference genome, and the
+   "PER_TARGET_COVERAGE" option.
+4. Use :ref:`import-picard` to convert all of the PER_TARGET_COVERAGE files to
+   CNVkit's .cnn format.
+5. Use :ref:`reference` to build a CNVkit reference from those .cnn files. It
+   will retain the GC values Picard calculated; you don't need to provide the
+   reference genome sequence again to get GC (but you if you do, it will also
+   calculate the RepeatMaster fraction values)
+6. Use :ref:`batch` with the ``-r``/``--reference`` option to process the rest
+   of your test samples.
 
 
 .. _import-seg:
