@@ -6,6 +6,8 @@ python:
 notifications:
     email: false
 
+sudo: false
+
 before_install:
     # Set up anaconda
     - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
@@ -16,7 +18,6 @@ before_install:
     # Avoid a crash with multiprocessing on Travis; not specific to Miniconda
     # - sudo rm -rf /dev/shm
     # - sudo ln -s /run/shm /dev/shm
-    # Code Coverage
 
 install:
     - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib biopython reportlab pysam
