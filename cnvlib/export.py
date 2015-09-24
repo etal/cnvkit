@@ -11,6 +11,7 @@ from Bio._py3k import map, range, zip, StringIO
 
 from . import call, core
 from .cnary import CopyNumArray as CNA
+from .vary import VariantArray as VA
 
 ProbeInfo = collections.namedtuple('ProbeInfo', 'label chrom start end gene')
 
@@ -98,7 +99,7 @@ def fmt_multi(sample_ids, rows):
 
 # Special cases
 
-def export_nexus_basic(sample_fname):
+def export_nexus_basic(sample_fname, vcf_fname=None):
     """Biodiscovery Nexus Copy Number "basic" format.
 
     Only represents one sample per file.
@@ -106,6 +107,12 @@ def export_nexus_basic(sample_fname):
     cnarr = CNA.read(sample_fname)
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'gene', 'log2']]
     out_table['probe'] = cnarr.labels()
+    if vcf_fname:
+        varr = VA.read_vcf(vcf_fname)
+        bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan)
+        # TODO catch all SNVs in a bin, not just the first
+        #   if > 1: mirror at .5, take median
+        out_table['baf'] = bafs
     return out_table
 
 

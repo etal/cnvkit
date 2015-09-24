@@ -272,6 +272,42 @@ class GenomicArray(object):
         table = pd.concat(subtables)
         return self.as_dataframe(table)
 
+    def match_to_bins(self, other, key, default=0.0):
+        """Take values of the other array at each of this array's bins.
+
+        Return an array of the `key` column values in `other` corresponding to this
+        array's bin locations, the same length as this array.
+        """
+        chrom_other = dict(other.by_chromosome())
+        all_out_vals = []
+        for chrom, these in self.by_chromosome():
+            if chrom in chrom_other:
+                those = chrom_other[chrom]
+                sites_idx = those.start.searchsorted(these.start) - 1
+                sites_idx = np.maximum(sites_idx, 0)
+                out_vals = those[key].take(sites_idx)
+                # TODO don't fill forward; leave bins after `.end` as `default`
+                # ENH
+                # TODO fill gaps (e.g. centromeres) by nearest match (neighbor)
+                # if (0 < sites_idx < len(these) - 1) and not (
+                #     (those.start < these.start < those.end) and
+                #     # SNV is between segments, e.g. in/near centromere
+                #     print("** WARNING **",
+                #         "This site {}:{}".format(chrom, these.start),
+                #         "not in other site {}:{}-{}".format(chrom,
+                #                                         those.start,
+                #                                         those.end),
+                #         "at chrom. that index", sites_idx,
+                #         "of", len(these),
+                #         file=sys.stderr)
+                #     return
+            else:
+                ngfrills.echo("Missing chromosome", chrom)
+                # Output array must still be the same length
+                out_vals = np.repeat(default, len(these))
+            all_out_vals.append(out_vals)
+        return np.concatenate(all_out_vals)
+
     # Modification
 
     def concat(self, other):

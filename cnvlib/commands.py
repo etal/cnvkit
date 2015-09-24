@@ -1605,7 +1605,7 @@ P_export_theta.set_defaults(func=_cmd_export_theta)
 # Nexus "basic" special case: can only represent 1 sample
 def _cmd_export_nb(args):
     """Convert bin-level log2 ratios to Nexus Copy Number "basic" format."""
-    table = export.export_nexus_basic(args.filename)
+    table = export.export_nexus_basic(args.filename, args.vcf)
     core.write_dataframe(args.output, table)
 
 P_export_nb = P_export_subparsers.add_parser('nexus-basic',
@@ -1613,6 +1613,9 @@ P_export_nb = P_export_subparsers.add_parser('nexus-basic',
 P_export_nb.add_argument('filename',
         help="""Log2 copy ratio data file (*.cnr), the output of the 'fix'
                 sub-command.""")
+P_export_nb.add_argument('-v', '--vcf',
+        help="""VCF of SNVs for the same sample, to calculate b-allele
+                frequencies ("baf" column in the output table).""")
 P_export_nb.add_argument('-o', '--output', help="Output file name.")
 P_export_nb.set_defaults(func=_cmd_export_nb)
 
