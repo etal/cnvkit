@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, print_function
 import pandas as pd
 import vcf
 
-from . import core, gary
+from . import gary
 from .ngfrills import echo
 
 
@@ -29,6 +29,8 @@ class VariantArray(gary.GenomicArray):
             vcf_reader = vcf.Reader(filename=infile)
         else:
             vcf_reader = vcf.Reader(infile)
+        if not vcf_reader.samples:
+            raise ValueError("No samples found in VCF file " + str(infile))
 
         sample_id = _select_sample(vcf_reader, sample_id)
         rows = _parse_records(vcf_reader, sample_id, min_depth, skip_hom,
@@ -48,10 +50,10 @@ def _select_sample(vcf_reader, sample_id):
     """Select a sample ID in the VCF; ensure it's valid."""
     # ENH - take the paired normal, to select only the tumor records where the
     # normal sample is het
-    def get_mutect_tag(metadata):
-        for tag in metadata["GATKCommandLine"]:
-            if tag["ID"] == "MuTect":
-                return sample_id
+    # def get_mutect_tag(metadata):
+    #     for tag in metadata["GATKCommandLine"]:
+    #         if tag["ID"] == "MuTect":
+    #             return sample_id
 
     if sample_id is None:
         # Use the VCF header to select the tumor sample
