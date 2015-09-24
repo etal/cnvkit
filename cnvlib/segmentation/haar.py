@@ -61,10 +61,6 @@ def segment_haar(cnarr):
     Output: the CBS data table
 
     """
-    # Ignore low-coverage probes
-    # ENH: do in the caller (segmentation.__init__)
-    cnarr = cnarr.drop_low_coverage()
-
     chrom_tables = []
     # Segment each chromosome individually
     # ENH - skip large gaps (segment chrom. arms separately)

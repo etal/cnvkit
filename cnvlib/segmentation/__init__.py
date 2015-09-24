@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division
 import math
 import os.path
+import tempfile
 
 import numpy as np
 import pandas as pd
@@ -15,15 +16,13 @@ from Bio._py3k import StringIO
 def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
                     rlibpath=None):
     """Infer copy number segments from the given coverage table."""
-    if not os.path.isfile(probes_fname):
-        raise ValueError("Not a file: %s" % probes_fname)
-
     probes = CNA.read(probes_fname)
+    filtered_probes = probes.drop_low_coverage()
     if method == 'haar':
         from . import haar
-        return haar.segment_haar(probes)
+        return haar.segment_haar(filtered_probes)
 
-    # Run R to calculate copy number segments (CBS)
+    # Run R scripts to calculate copy number segments
     if method == 'cbs':
         rscript = CBS_RSCRIPT
         threshold = threshold or 0.0001
@@ -33,19 +32,39 @@ def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
     else:
         raise ValueError("Unknown method %r" % method)
 
-    sample_id = core.fbase(probes_fname)
-    script_strings = {
-        'probes_fname': probes_fname,
-        'min_log2': params.NULL_LOG2_COVERAGE / 2,
-        'sample_id': sample_id,
-        'threshold': threshold,
-        'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
-    }
-    with ngfrills.temp_write_text(rscript % script_strings) as script_fname:
-        seg_out = ngfrills.call_quiet('Rscript', script_fname)
+    with tempfile.NamedTemporaryFile(suffix='.cnr') as tmp:
+        filtered_probes.data.to_csv(tmp, index=False, sep='\t',
+                                    float_format='%.6g')
+        tmp.flush()
+        script_strings = {
+            'probes_fname': tmp.name,
+            'sample_id': probes.sample_id,
+            'threshold': threshold,
+            'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
+        }
+        with ngfrills.temp_write_text(rscript % script_strings) as script_fname:
+            seg_out = ngfrills.call_quiet('Rscript', script_fname)
+        # ENH: run each chromosome separately
+        # ENH: run each chrom. arm separately (via knownsegs)
+    seg_pset = probes.as_dataframe(seg2cns(seg_out))
 
-    # Convert R dataframe contents to our standard 'basic' format
-    table = pd.read_table(StringIO(seg_out), comment='[')
+    if method == 'flasso':
+        seg_pset = squash_segments(seg_pset)
+
+    seg_pset = repair_segments(seg_pset, probes)
+
+    if save_dataframe:
+        return seg_pset, seg_out
+    else:
+        return seg_pset
+
+
+def seg2cns(seg_text):
+    """Convert R dataframe contents (SEG) to our native tabular format.
+
+    Return a pandas.Dataframe with CNA columns.
+    """
+    table = pd.read_table(StringIO(seg_text), comment='[')
     if len(table.columns) == 6:
         table.columns = ["sample_id", "chromosome", "start", "end", "probes",
                          "log2"]
@@ -53,21 +72,12 @@ def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
         table.columns = ["sample_id", "chromosome", "start", "end", "log2"]
     else:
         raise ValueError("Segmentation output is not valid SEG format:\n"
-                         + seg_out)
+                        + seg_text)
     del table["sample_id"]
     table["start"] = [int(math.ceil(float(val))) for val in table["start"]]
     table["end"] = [int(math.ceil(float(val))) for val in table["end"]]
     table["gene"] = '-'
-    seg_pset = CNA(table, {'sample_id': sample_id})
-
-    if method == 'flasso':
-        seg_pset = squash_segments(seg_pset)
-    seg_pset = repair_segments(seg_pset, probes)
-
-    if save_dataframe:
-        return seg_pset, seg_out
-    else:
-        return seg_pset
+    return table
 
 
 def squash_segments(seg_pset):
@@ -149,7 +159,6 @@ library('PSCBS') # Requires: R.utils, R.oo, R.methodsS3
 
 write("Loading probe coverages into a data frame", stderr())
 tbl = read.delim("%(probes_fname)s")
-tbl = tbl[tbl$log2 >= %(min_log2)d,]  # Ignore low-coverage probes
 chrom_rle = rle(as.character(tbl$chromosome))
 chrom_names = chrom_rle$value
 chrom_lengths = chrom_rle$lengths
@@ -223,7 +232,6 @@ library('cghFLasso')
 
 tbl <- read.delim("%(probes_fname)s")
 # Ignore low-coverage probes
-tbl <- tbl[tbl$log2 >= %(min_log2)d,]
 positions <- (tbl$start + tbl$end) * 0.5
 
 write("Segmenting the probe data", stderr())
