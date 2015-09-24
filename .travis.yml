@@ -17,14 +17,15 @@ before_install:
     # - sudo rm -rf /dev/shm
     # - sudo ln -s /run/shm /dev/shm
     # Code Coverage
-    - pip install codecov
+
 install:
     - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib biopython reportlab pysam
     - python setup.py install
-
+    - pip install codecov
 
 before_script: cd test/
-script: python test_cnvlib.py
+script:
+    - coverage run test_cnvlib.py
 
 after_success:
     - codecov
