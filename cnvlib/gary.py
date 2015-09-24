@@ -1,5 +1,5 @@
 """A generic array of genomic positions."""
-from __future__ import print_function, absolute_import
+from __future__ import print_function, absolute_import, division
 
 import sys
 
@@ -272,8 +272,11 @@ class GenomicArray(object):
         table = pd.concat(subtables)
         return self.as_dataframe(table)
 
-    def match_to_bins(self, other, key, default=0.0):
+    def match_to_bins(self, other, key, default=0.0, fill=False):
         """Take values of the other array at each of this array's bins.
+
+        Assign `default` to indices that fall outside the other array's bins, or
+        chromosomes that appear in `self` but not `other`.
 
         Return an array of the `key` column values in `other` corresponding to this
         array's bin locations, the same length as this array.
@@ -281,26 +284,20 @@ class GenomicArray(object):
         chrom_other = dict(other.by_chromosome())
         all_out_vals = []
         for chrom, these in self.by_chromosome():
+            midpoints = (these.start + these.end) // 2
             if chrom in chrom_other:
                 those = chrom_other[chrom]
-                sites_idx = those.start.searchsorted(these.start) - 1
-                sites_idx = np.maximum(sites_idx, 0)
-                out_vals = those[key].take(sites_idx)
-                # TODO don't fill forward; leave bins after `.end` as `default`
-                # ENH
-                # TODO fill gaps (e.g. centromeres) by nearest match (neighbor)
-                # if (0 < sites_idx < len(these) - 1) and not (
-                #     (those.start < these.start < those.end) and
-                #     # SNV is between segments, e.g. in/near centromere
-                #     print("** WARNING **",
-                #         "This site {}:{}".format(chrom, these.start),
-                #         "not in other site {}:{}-{}".format(chrom,
-                #                                         those.start,
-                #                                         those.end),
-                #         "at chrom. that index", sites_idx,
-                #         "of", len(these),
-                #         file=sys.stderr)
-                #     return
+                start_idx = np.maximum(0,
+                            those.start.searchsorted(midpoints, 'right') - 1)
+                out_vals = those[key].take(start_idx)
+
+                if fill:
+                    # TODO/ENH: fill gaps by nearest match (neighbor)
+                    pass
+                else:
+                    end_idx = np.minimum(len(those),
+                                those.end.searchsorted(midpoints))
+                    out_vals[start_idx != end_idx] = default
             else:
                 ngfrills.echo("Missing chromosome", chrom)
                 # Output array must still be the same length
