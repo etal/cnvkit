@@ -42,7 +42,6 @@ def read_fasta_index(fasta_fname):
 
     See: http://trac.seqan.de/wiki/Tutorial/IndexedFastaIO:
     """
-    # Build a dict of keys -> offsets
     index = {}
     fai_fname = ensure_fasta_index(fasta_fname)
     with open(fai_fname) as faifile:
@@ -65,13 +64,20 @@ def fasta_extract_regions(fa_fname, intervals):
         for chrom, rows in groupby(intervals, lambda cse: cse[0]):
             # Seek to chrom offset in FASTA
             try:
-                _seq_len, offset, chars_per_line, bytes_per_line = index[chrom]
+                seq_len, offset, chars_per_line, bytes_per_line = index[chrom]
             except KeyError:
                 raise ValueError("Sequence ID '" + chrom + "' is not in FASTA "
                                  + "file " + fa_fname)
+            echo("Extracting sequences from chromosome", chrom)
             eol_size = bytes_per_line - chars_per_line  # Handle \n\r, \n
             for _chrom, start, end in rows:
-                start -= 1
+                if end > seq_len:
+                    raise ValueError("Chromosome {} has length {} "
+                                     .format(chrom, seq_len) +
+                                     "which requested range {}:{}-{} "
+                                     .format(_chrom, start, end) +
+                                     "extends beyond")
+
                 # Jump to the subsequence start position
                 n_eols_to_skip, line_remainder = divmod(start, chars_per_line)
                 skip_length = start + n_eols_to_skip * eol_size
@@ -90,8 +96,9 @@ def fasta_extract_regions(fa_fname, intervals):
                 #                   read=len(subseq),
                 #                   requested=subseq_length)
                 assert len(subseq) == subseq_length, (
-                    "Read bytes=%d, chars=%d; wanted chars=%d, eols=%d"
-                    % (len(subseq_bytes), len(subseq),
+                    "%s:%d-%d read bytes=%d, chars=%d; wanted chars=%d, eols=%d"
+                    % (_chrom, start, end,
+                       len(subseq_bytes), len(subseq),
                        subseq_length, n_eols_in_subseq))
 
                 yield subseq
@@ -102,7 +109,11 @@ def _fasta_extract_regions_safe(fa_fname, intervals):
     from Bio import SeqIO
     idx = SeqIO.index(fa_fname, 'fasta')
     for chrom, rows in groupby(intervals, lambda cse: cse[0]):
+        echo("Extracting sequences from chromosome", chrom)
         seq = str(idx[chrom].seq)
         for _chrom, start, end in rows:
-            start -= 1
-            yield seq[start:end]
+            subseq = seq[start:end]
+            if len(subseq) != end - start:
+                echo("Short subsequence %s:%d-%d" % (_chrom, start, end),
+                     "read", len(subseq), ", wanted", end - start)
+            yield subseq
