@@ -5,6 +5,10 @@
 # Jython class files (present if using Jython)
 *.class
 
+# Testing & coverage shrapnel
+.coverage
+coverage.xml
+
 # Backup files from some Unix editors
 *~
 *.swp
@@ -35,6 +39,7 @@ MANIFEST
 # Stuff I don't want to see
 tags
 test/build
+test/*.pdf
 build/
 dist/
 doc/_build
