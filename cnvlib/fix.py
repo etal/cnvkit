@@ -73,6 +73,13 @@ def match_ref_to_probes(ref_pset, probes):
     """
     probes_labeled = probes.data.set_index(probes.labels())
     ref_labeled = ref_pset.data.set_index(ref_pset.labels())
+    # Safety
+    for dset, name in ((probes_labeled, "probe"),
+                       (ref_labeled, "reference")):
+        dupes = dset.index.duplicated()
+        if dupes.any():
+            raise ValueError("Duplicated genomic coordinates in " + name +
+                             " set:\n" + "\n".join(map(str, dset.index[dupes])))
     ref_matched = ref_labeled.reindex(index=probes_labeled.index)
     # Check for signs that the wrong reference was used
     num_missing = pd.isnull(ref_matched.start).sum()
