@@ -29,4 +29,5 @@ script:
     - coverage run test_cnvlib.py
 
 after_success:
+    - coverage report
     - codecov
