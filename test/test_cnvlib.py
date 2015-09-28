@@ -248,11 +248,17 @@ class CommandTests(unittest.TestCase):
         cns = segmentation.do_segmentation("formats/amplicon.cnr", False,
                                            "haar")
         self.assertTrue(len(cns) > 0)
-        # With the dataframe
+        # With the R dataframe
         cns, dframe = segmentation.do_segmentation("formats/amplicon.cnr", True,
                                                    "flasso", 0.01)
         self.assertTrue(len(cns) > 0)
         self.assertTrue(len(dframe) > 0)
+
+    def test_target(self):
+        # ENH: annotate w/ mini-refFlat
+        commands.do_targets("formats/nv2_baits.interval_list", '/dev/null')
+        commands.do_targets("formats/amplicon.bed", '/dev/null',
+                            do_short_names=True, do_split=True, avg_size=100)
 
 
 
