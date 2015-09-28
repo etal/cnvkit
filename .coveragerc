@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = cnvkit
+source = cnvlib
 
 [report]
 exclude_lines =
