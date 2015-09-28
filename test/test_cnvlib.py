@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
 """Unit tests for the CNVkit library, cnvlib."""
+from __future__ import absolute_import, division, print_function
 
 import unittest
 
-import numpy
+import numpy as np
 # from Bio._py3k import StringIO
 
 import cnvlib
@@ -31,7 +32,7 @@ class GaryTests(unittest.TestCase):
         firstrow = next(rows)
         self.assertEqual(tuple(firstrow), tuple(self.ex_cnr[0]))
         i = 0
-        for i, row in enumerate(rows):
+        for i, _row in enumerate(rows):
             pass
         self.assertEqual(i + 2, len(self.ex_cnr))
 
@@ -43,7 +44,13 @@ class GaryTests(unittest.TestCase):
         self.assertNotEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
 
     # def test_by_bin(self):
-    # def test_by_chromosome(self):
+    def test_by_chromosome(self):
+        for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
+            cnarr = cnvlib.read(fname)
+            row_count = 0
+            for _chrom, rows in cnarr.by_chromosome():
+                row_count += len(rows)
+            self.assertEqual(row_count, len(cnarr))
 
     def test_select(self):
         """Test sugary selection of a subset of the data array."""
@@ -63,12 +70,12 @@ class GaryTests(unittest.TestCase):
         self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
 
 
+
 class CNATests(unittest.TestCase):
     """Tests for the CopyNumArray class."""
-    A_REFERENCE = 'formats/reference-tr.cnn'
 
     def setUp(self):
-        self.ex_cnr = cnvlib.read(self.A_REFERENCE)
+        self.ex_cnr = cnvlib.read('formats/reference-tr.cnn')
 
     def test_empty(self):
         """Instantiate from an empty file."""
@@ -80,7 +87,7 @@ class CNATests(unittest.TestCase):
         # Length
         self.assertEqual(len(self.ex_cnr), 27526)
         # Equality
-        same = cnvlib.read(self.A_REFERENCE)
+        same = cnvlib.read('formats/reference-tr.cnn')
         self.assertEqual(self.ex_cnr, same)
         # Item access
         orig = self.ex_cnr[0]
@@ -96,14 +103,14 @@ class CNATests(unittest.TestCase):
     def test_center_all(self):
         """Test median-recentering."""
         chr1 = self.ex_cnr.in_range('chr1')
-        self.assertAlmostEqual(0, numpy.median(chr1['log2']), places=1)
+        self.assertAlmostEqual(0, np.median(chr1['log2']), places=1)
         chr1.center_all()
-        orig_chr1_cvg = numpy.median(chr1['log2'])
+        orig_chr1_cvg = np.median(chr1['log2'])
         self.assertAlmostEqual(0, orig_chr1_cvg)
         chr1plus2 = chr1.copy()
         chr1plus2['log2'] += 2.0
         chr1plus2.center_all()
-        self.assertAlmostEqual(numpy.median(chr1plus2['log2']), orig_chr1_cvg)
+        self.assertAlmostEqual(np.median(chr1plus2['log2']), orig_chr1_cvg)
 
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""
@@ -118,11 +125,9 @@ class CNATests(unittest.TestCase):
     # def test_squash_genes(self):
 
 
+
 class RATests(unittest.TestCase):
     """Tests for RegionArray class."""
-    A_BED = "formats/amplicon.bed"
-    A_TEXT = "formats/amplicon.text"
-    A_ILIST = "formats/nv2_baits.interval_list"
 
     def test_empty(self):
         """Instantiate from an empty file."""
@@ -131,17 +136,17 @@ class RATests(unittest.TestCase):
 
     def test_read_bed(self):
         """Read the BED format."""
-        regions = rary.RegionArray.read(self.A_BED)
+        regions = rary.RegionArray.read("formats/amplicon.bed")
         self.assertEqual(len(regions), 1433)
 
     def test_read_text(self):
         """Read the text region format."""
-        regions = rary.RegionArray.read(self.A_TEXT)
+        regions = rary.RegionArray.read("formats/amplicon.text")
         self.assertEqual(len(regions), 1433)
 
     def test_read_ilist(self):
         """Read the interval list format."""
-        regions = rary.RegionArray.read(self.A_ILIST)
+        regions = rary.RegionArray.read("formats/nv2_baits.interval_list")
         self.assertEqual(len(regions), 6809)
 
 
@@ -169,8 +174,48 @@ class ImporterTests(unittest.TestCase):
             self.assertEqual(seen_lines, expect_lines)
 
 
+
 class CommandTests(unittest.TestCase):
     """Tests for top-level commands."""
+
+    def test_call(self):
+        # Methods: clonal, threshold
+        tr_cns = cnvlib.read("formats/tr95t.cns")
+        tr_thresh = commands.do_call(tr_cns, "threshold",
+                            is_reference_male=True, is_sample_female=True)
+        self.assertEqual(len(tr_cns), len(tr_thresh))
+        tr_clonal = commands.do_call(tr_cns, "clonal",
+                            purity=.65,
+                            is_reference_male=True, is_sample_female=True)
+        self.assertEqual(len(tr_cns), len(tr_clonal))
+        cl_cns = cnvlib.read("formats/cl_seq.cns")
+        cl_thresh = commands.do_call(cl_cns, "threshold",
+                            thresholds=np.log2((np.arange(12) + .5) / 6.),
+                            is_reference_male=True, is_sample_female=True)
+        self.assertEqual(len(cl_cns), len(cl_thresh))
+        cl_clonal = commands.do_call(cl_cns, "clonal",
+                            ploidy=6, purity=.99,
+                            is_reference_male=True, is_sample_female=True)
+        self.assertEqual(len(cl_cns), len(cl_clonal))
+
+    def test_export(self):
+        # SEG
+        seg_rows = export.export_seg(["formats/tr95t.cns"])
+        self.assertTrue(len(seg_rows) > 0)
+        seg2_rows = export.export_seg(["formats/tr95t.cns",
+                                       "formats/cl_seq.cns"])
+        self.assertTrue(len(seg2_rows) > len(seg_rows))
+        # THetA2
+        _header, theta_rows = export.export_theta("formats/tr95t.cns",
+                                                  "formats/reference-tr.cnn")
+        self.assertTrue(len(theta_rows) > 0)
+        # VCF
+        tr_cns = cnvlib.read("formats/tr95t.cns")
+        _header, tr_vcf_body = export.export_vcf(tr_cns, 2, True, True)
+        self.assertTrue(0 < len(tr_vcf_body.splitlines()) < len(tr_cns))
+        cl_cns = cnvlib.read("formats/cl_seq.cns")
+        _header, cl_vcf_body = export.export_vcf(cl_cns, 6, True, True)
+        self.assertTrue(0 < len(cl_vcf_body.splitlines()) < len(cl_cns))
 
     def test_reference(self):
         # Empty antitargets
@@ -180,6 +225,23 @@ class CommandTests(unittest.TestCase):
         ref = commands.do_reference_flat("formats/amplicon.bed",
                                          "formats/empty")
         self.assertTrue(len(ref) > 0)
+
+    def test_segment(self):
+        # Each method
+        cns = segmentation.do_segmentation("formats/amplicon.cnr", False, "cbs")
+        self.assertTrue(len(cns) > 0)
+        cns = segmentation.do_segmentation("formats/amplicon.cnr", False,
+                                           "flasso")
+        self.assertTrue(len(cns) > 0)
+        cns = segmentation.do_segmentation("formats/amplicon.cnr", False,
+                                           "haar")
+        self.assertTrue(len(cns) > 0)
+        # With the dataframe
+        cns, dframe = segmentation.do_segmentation("formats/amplicon.cnr", True,
+                                                   "flasso", 0.01)
+        self.assertTrue(len(cns) > 0)
+        self.assertTrue(len(dframe) > 0)
+
 
 
 class OtherTests(unittest.TestCase):

@@ -56,13 +56,8 @@ $(picard_cnrs): %.cnr: %.targetcoverage.cnn %.antitargetcoverage.cnn build/refer
 $(picard_segs): %.cns: %.cnr
 	$(cnvkit) segment $< -o $@
 
-# == Alternative segmentation
-
-$(picard_segs:.cns=-flasso.cns): %-flasso.cns: %.cnr
-	$(cnvkit) segment -m flasso -t 0.01 $< -o $@
-
-$(picard_segs:.cns=-haar.cns): %-haar.cns: %.cnr
-	$(cnvkit) segment -m haar $< -o $@
+$(picard_segs:.cns=.call.cns): build/%.call.cns: build/%.cns
+	$(cnvkit) call $^ -y -m clonal --purity 0.65 -o $@
 
 
 # ------------------------------------------------------------------------------
@@ -126,24 +121,15 @@ p2-9_2-segmetrics.cns: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) segmetrics -s $^ -o $@ --stdev --mad --iqr --bivar --ci --pi
 
 
-# == Calling
-
-$(picard_segs:.cns=.call-thresh.cns): build/%.call-thresh.cns: build/%.cns
-	$(cnvkit) call $^ -y -o $@
-
-$(picard_segs:.cns=.call-clonal.cns): build/%.call-clonal.cns: build/%.cns
-	$(cnvkit) call $^ -y -m clonal --purity 0.65 -o $@
-
-
 # == Export to other formats
 
 p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns) $(picard_segs:.cns=-haar.cns)
 	$(cnvkit) export seg $^ -o $@
 
-p2-all.bed: $(picard_segs:.cns=.call-clonal.cns)
+p2-all.bed: $(picard_segs:.cns=.call.cns)
 	$(cnvkit) export bed $^ -y -o $@
 
-p2-9_2.vcf: build/p2-9_2.call-clonal.cns
+p2-9_2.vcf: build/p2-9_2.call.cns
 	$(cnvkit) export vcf $^ -y -o $@
 
 p2-9_2.theta2.input: build/p2-9_2.cns build/reference-picard.cnn
