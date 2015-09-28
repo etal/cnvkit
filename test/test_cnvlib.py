@@ -190,6 +190,13 @@ class CommandTests(unittest.TestCase):
         self.assertTrue(0 < len(list(
             commands.do_antitarget(baits_fname, access_fname, 10000, 5000))))
 
+    def test_breaks(self):
+        probes = cnvlib.read("formats/amplicon.cnr")
+        segs = segmentation.do_segmentation("formats/amplicon.cnr", False,
+                                            "haar")
+        rows = commands.do_breaks(probes, segs, 4)
+        self.assertTrue(len(rows) > 0)
+
     def test_call(self):
         # Methods: clonal, threshold
         tr_cns = cnvlib.read("formats/tr95t.cns")
@@ -228,6 +235,15 @@ class CommandTests(unittest.TestCase):
         cl_cns = cnvlib.read("formats/cl_seq.cns")
         _header, cl_vcf_body = export.export_vcf(cl_cns, 6, True, True)
         self.assertTrue(0 < len(cl_vcf_body.splitlines()) < len(cl_cns))
+
+    def test_gainloss(self):
+        probes = cnvlib.read("formats/amplicon.cnr")
+        rows = commands.do_gainloss(probes, male_reference=True)
+        self.assertTrue(len(rows) > 0)
+        segs = segmentation.do_segmentation("formats/amplicon.cnr", False,
+                                            "haar")
+        rows = commands.do_gainloss(probes, segs, True, 0.3, 4)
+        self.assertTrue(len(rows) > 0)
 
     def test_reference(self):
         # Empty antitargets
