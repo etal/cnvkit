@@ -683,8 +683,7 @@ def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
         else:
             # Simpler math if sample is pure
             echo("Calling copy number with clonal ploidy %d" % ploidy)
-            absolutes = call.absolute_pure(segments, ploidy,
-                                                is_reference_male)
+            absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
     elif method == "threshold":
         tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
         echo("Calling copy number with thresholds: " + ", ".join(tokens))
