@@ -178,6 +178,18 @@ class ImporterTests(unittest.TestCase):
 class CommandTests(unittest.TestCase):
     """Tests for top-level commands."""
 
+    def test_antitarget(self):
+        baits_fname = "formats/nv2_baits.interval_list"
+        access_fname = "../data/access-5k-mappable.hg19.bed"
+        self.assertTrue(0 < len(list(
+            commands.do_antitarget(baits_fname))))
+        self.assertTrue(0 < len(list(
+            commands.do_antitarget(baits_fname, access_fname))))
+        self.assertTrue(0 < len(list(
+            commands.do_antitarget(baits_fname, access_fname, 200000))))
+        self.assertTrue(0 < len(list(
+            commands.do_antitarget(baits_fname, access_fname, 10000, 5000))))
+
     def test_call(self):
         # Methods: clonal, threshold
         tr_cns = cnvlib.read("formats/tr95t.cns")
