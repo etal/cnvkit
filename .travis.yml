@@ -18,11 +18,12 @@ before_install:
     # Avoid a crash with multiprocessing on Travis; not specific to Miniconda
     # - sudo rm -rf /dev/shm
     # - sudo ln -s /run/shm /dev/shm
+    # For codecov.io
+    - pip install codecov
 
 install:
     - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib biopython reportlab pysam
     - python setup.py install
-    - pip install codecov
 
 before_script: cd test/
 script:
