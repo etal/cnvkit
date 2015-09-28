@@ -504,15 +504,15 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
     return ref_probes
 
 
-def do_reference_flat(target_list, antitarget_list, fa_fname=None,
+def do_reference_flat(targets, antitargets, fa_fname=None,
                       male_reference=False):
     """Compile a neutral-coverage reference from the given intervals.
 
     Combines the intervals, shifts chrX values if requested, and calculates GC
     and RepeatMasker content from the genome FASTA sequence.
     """
-    ref_probes = reference.bed2probes(target_list)
-    ref_probes.concat(reference.bed2probes(antitarget_list))
+    ref_probes = reference.bed2probes(targets)
+    ref_probes.concat(reference.bed2probes(antitargets))
     # Set sex chromosomes by "reference" gender
     ref_probes['log2'] = ref_probes.expect_flat_cvg(male_reference)
     # Calculate GC and RepeatMasker content for each probe's genomic region

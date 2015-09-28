@@ -9,6 +9,15 @@ import pandas as pd
 from . import core, ngfrills
 
 
+def _make_blank(required_cols, dtypes=(("chromosome", "string"),
+                                       ("start", "int"),
+                                       ("end", "int"))):
+    table = pd.DataFrame({key: [] for key in required_cols})
+    for col, dtype in dtypes:
+        table[col] = table[col].astype(dtype)
+    return table
+
+
 class GenomicArray(object):
     """An array of genomic intervals. Base class for genomic data structures.
 
@@ -19,13 +28,17 @@ class GenomicArray(object):
 
     def __init__(self, data_table, meta_dict=None):
         # Validation
-        if not all(c in data_table.columns for c in self._required_columns):
-            raise ValueError("data table must have at least columns "
-                             + repr(self._required_columns))
-        # Ensure chromosomes are strings to avoid integer conversion of 1, 2...
-        if len(data_table) and not isinstance(data_table.chromosome.iat[0],
-                                              basestring):
-            data_table["chromosome"] = data_table["chromosome"].astype("string")
+        if len(data_table):
+            if not all(c in data_table.columns for c in self._required_columns):
+                raise ValueError("data table must have at least columns "
+                                 + repr(self._required_columns))
+            # Ensure chromosomes are strings to avoid integer conversion of 1, 2...
+            if not isinstance(data_table.chromosome.iat[0], basestring):
+                data_table["chromosome"] = (data_table["chromosome"]
+                                            .astype("string"))
+        elif not isinstance(data_table, pd.DataFrame):
+            # Empty but conformant table
+            data_table = _make_blank(self._required_columns)
         self.data = data_table
         self.meta = (dict(meta_dict)
                      if meta_dict is not None and len(meta_dict)
@@ -396,10 +409,15 @@ class GenomicArray(object):
             else:
                 sample_id = '<unknown>'
         # Create a multi-index of genomic coordinates (like GRanges)
-        table = pd.read_table(infile, na_filter=False,
-                              dtype={'chromosome': 'string'},
-                              # index_col=['chromosome', 'start']
-        )
+        try:
+            table = pd.read_table(infile, na_filter=False,
+                                  dtype={'chromosome': 'string'},
+                                  # index_col=['chromosome', 'start']
+                                 )
+        except ValueError:
+            # File is blank/empty, most likely
+            ngfrills.echo("Blank file", infile)
+            table = _make_blank(cls._required_columns)
         # XXX Pending pandas 0.17: https://github.com/pydata/pandas/issues/10505
         # table['chromosome'] = pd.Categorical(table['chromosome'],
         #                                      table.chromosome.drop_duplicates(),

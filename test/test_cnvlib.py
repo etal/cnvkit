@@ -20,6 +20,11 @@ class GaryTests(unittest.TestCase):
     def setUp(self):
         self.ex_cnr = cnvlib.read('formats/reference-tr.cnn')
 
+    def test_empty(self):
+        """Instantiate from an empty file."""
+        garr = gary.GenomicArray.read("formats/empty")
+        self.assertEqual(len(garr), 0)
+
     def test_iter(self):
         """Test iteration."""
         rows = iter(self.ex_cnr)
@@ -65,6 +70,11 @@ class CNATests(unittest.TestCase):
     def setUp(self):
         self.ex_cnr = cnvlib.read(self.A_REFERENCE)
 
+    def test_empty(self):
+        """Instantiate from an empty file."""
+        cnarr = cnvlib.read("formats/empty")
+        self.assertEqual(len(cnarr), 0)
+
     def test_basic(self):
         """Test basic container functionality and magic methods."""
         # Length
@@ -108,6 +118,34 @@ class CNATests(unittest.TestCase):
     # def test_squash_genes(self):
 
 
+class RATests(unittest.TestCase):
+    """Tests for RegionArray class."""
+    A_BED = "formats/amplicon.bed"
+    A_TEXT = "formats/amplicon.text"
+    A_ILIST = "formats/nv2_baits.interval_list"
+
+    def test_empty(self):
+        """Instantiate from an empty file."""
+        regions = rary.RegionArray.read("formats/empty")
+        self.assertEqual(len(regions), 0)
+
+    def test_read_bed(self):
+        """Read the BED format."""
+        regions = rary.RegionArray.read(self.A_BED)
+        self.assertEqual(len(regions), 1433)
+
+    def test_read_text(self):
+        """Read the text region format."""
+        regions = rary.RegionArray.read(self.A_TEXT)
+        self.assertEqual(len(regions), 1433)
+
+    def test_read_ilist(self):
+        """Read the interval list format."""
+        regions = rary.RegionArray.read(self.A_ILIST)
+        self.assertEqual(len(regions), 6809)
+
+
+
 class ImporterTests(unittest.TestCase):
     """Tests for importers functionality."""
 
@@ -129,6 +167,19 @@ class ImporterTests(unittest.TestCase):
             for cns in importers.import_seg(fname, *args):
                 seen_lines += len(cns)
             self.assertEqual(seen_lines, expect_lines)
+
+
+class CommandTests(unittest.TestCase):
+    """Tests for top-level commands."""
+
+    def test_reference(self):
+        # Empty antitargets
+        ref = commands.do_reference(["formats/amplicon.cnr"], ["formats/empty"])
+        self.assertTrue(len(ref) > 0)
+        # Empty antitargets, flat reference
+        ref = commands.do_reference_flat("formats/amplicon.bed",
+                                         "formats/empty")
+        self.assertTrue(len(ref) > 0)
 
 
 class OtherTests(unittest.TestCase):
@@ -156,28 +207,6 @@ class OtherTests(unittest.TestCase):
 
     # call
     # Test: convert_clonal(x, 1, 2) == convert_diploid(x)
-
-
-class RATests(unittest.TestCase):
-    """Tests for RegionArray class."""
-    A_BED = "formats/amplicon.bed"
-    A_TEXT = "formats/amplicon.text"
-    A_ILIST = "formats/nv2_baits.interval_list"
-
-    def test_read_bed(self):
-        """Read the BED format."""
-        regions = rary.RegionArray.read(self.A_BED)
-        self.assertEqual(len(regions), 1433)
-
-    def test_read_text(self):
-        """Read the text region format."""
-        regions = rary.RegionArray.read(self.A_TEXT)
-        self.assertEqual(len(regions), 1433)
-
-    def test_read_ilist(self):
-        """Read the interval list format."""
-        regions = rary.RegionArray.read(self.A_ILIST)
-        self.assertEqual(len(regions), 6809)
 
 
 # == helpers ==
