@@ -255,20 +255,10 @@ class CommandTests(unittest.TestCase):
         self.assertTrue(len(ref) > 0)
 
     def test_segment(self):
-        # Each method
-        cns = segmentation.do_segmentation("formats/amplicon.cnr", False, "cbs")
-        self.assertTrue(len(cns) > 0)
-        cns = segmentation.do_segmentation("formats/amplicon.cnr", False,
-                                           "flasso")
-        self.assertTrue(len(cns) > 0)
+        # R methods are in another script
         cns = segmentation.do_segmentation("formats/amplicon.cnr", False,
                                            "haar")
         self.assertTrue(len(cns) > 0)
-        # With the R dataframe
-        cns, dframe = segmentation.do_segmentation("formats/amplicon.cnr", True,
-                                                   "flasso", 0.01)
-        self.assertTrue(len(cns) > 0)
-        self.assertTrue(len(dframe) > 0)
 
     def test_target(self):
         # ENH: annotate w/ mini-refFlat
