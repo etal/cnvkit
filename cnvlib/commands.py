@@ -679,7 +679,7 @@ def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
             echo("Calling copy number with clonal purity %g, ploidy %d"
                  % (purity, ploidy))
             absolutes = call.absolute_clonal(segments, ploidy, purity,
-                                           is_reference_male, is_sample_female)
+                                             is_reference_male, is_sample_female)
         else:
             # Simpler math if sample is pure
             echo("Calling copy number with clonal ploidy %d" % ploidy)
@@ -687,8 +687,8 @@ def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
     elif method == "threshold":
         tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
         echo("Calling copy number with thresholds: " + ", ".join(tokens))
-        absolutes = call.absolute_threshold(segments, ploidy, is_reference_male,
-                                           thresholds)
+        absolutes = call.absolute_threshold(segments, ploidy, thresholds,
+                                            is_reference_male)
     else:
         raise ValueError("Argument `method` must be one of: clonal, threshold")
     segs_adj = call.round_log2_ratios(segments, absolutes, ploidy,

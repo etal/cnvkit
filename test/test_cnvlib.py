@@ -225,32 +225,9 @@ class CommandTests(unittest.TestCase):
         for (fname, sample_is_f, ref_is_m, chr1_expect, chrx_expect, chry_expect
             ) in (
                 ("formats/f-on-f.cns", True, False, 0, 0, 0),
-                #         chr1	chrX	chrY
-                # orig	0.124	0.0291	-0.0244
-                #thresh	0	0	1**
-                # clone	0	0	0
-                # p99%	0	0	0
-
                 ("formats/f-on-m.cns", True, True, 0.585, 1, -9.97),
-                #         chr1	chrX	chrY
-                # orig	0.324	0.929	-2.02
-                #thresh	0.585	1	-9.97
-                # clone	0.585	1	-9.97
-                # p99%	0.585	1	-9.97
-
                 ("formats/m-on-f.cns", False, False, 0, -1, 0),
-                #         chr1	chrX	chrY
-                # orig	0.124	-0.929	0.124
-                #thresh	0	-1	1**
-                # clone	0	-1	0
-                # p99%	0	-1	0
-
                 ("formats/m-on-m.cns", False, True, 0, 0, 0),
-                #         chr1	chrX	chrY
-                # orig	0.0236	0.0291	0.0244
-                #thresh	0	1**	1**
-                # clone	0	0	0
-                # p99%	0	0	0
             ):
             cns = cnvlib.read(fname)
             chr1_idx = (cns.chromosome == 'chr1')
@@ -268,7 +245,7 @@ class CommandTests(unittest.TestCase):
             cns_thresh = commands.do_call(cns, "threshold",
                                  is_reference_male=ref_is_m,
                                  is_sample_female=sample_is_f)
-            # test_chrom_means(cns_thresh)  # XXX
+            test_chrom_means(cns_thresh)
             # Call clonal pure
             cns_clone = commands.do_call(cns, "clonal",
                                 is_reference_male=ref_is_m,

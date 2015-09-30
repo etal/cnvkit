@@ -28,7 +28,7 @@ def round_log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
     return newcnarr
 
 
-def absolute_threshold(cnarr, ploidy, is_reference_male, thresholds):
+def absolute_threshold(cnarr, ploidy, thresholds, is_reference_male):
     """Call integer copy number using hard thresholds for each level.
 
     Integer values are assigned for log2 ratio values less than each given
@@ -59,12 +59,14 @@ def absolute_threshold(cnarr, ploidy, is_reference_male, thresholds):
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for idx, row in enumerate(cnarr):
         cnum = 0
+        ref_copies = _reference_copies_pure(row['chromosome'], ploidy,
+                                            is_reference_male)
         for cnum, thresh in enumerate(thresholds):
             if row['log2'] <= thresh:
+                if ref_copies != ploidy:
+                    cnum = int(cnum * ref_copies / ploidy)
                 break
         else:
-            ref_copies = _reference_copies_pure(row['chromosome'], ploidy,
-                                                is_reference_male)
             cnum = int(np.ceil(_log2_ratio_to_absolute_pure(row['log2'],
                                                             ref_copies)))
         absolutes[idx] = cnum
