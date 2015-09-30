@@ -179,6 +179,7 @@ class CommandTests(unittest.TestCase):
     """Tests for top-level commands."""
 
     def test_antitarget(self):
+        """The 'antitarget' command."""
         baits_fname = "formats/nv2_baits.interval_list"
         access_fname = "../data/access-5k-mappable.hg19.bed"
         self.assertTrue(0 < len(list(
@@ -191,6 +192,7 @@ class CommandTests(unittest.TestCase):
             commands.do_antitarget(baits_fname, access_fname, 10000, 5000))))
 
     def test_breaks(self):
+        """The 'breaks' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
         segs = segmentation.do_segmentation("formats/amplicon.cnr", False,
                                             "haar")
@@ -198,6 +200,7 @@ class CommandTests(unittest.TestCase):
         self.assertTrue(len(rows) > 0)
 
     def test_call(self):
+        """The 'call' command."""
         # Methods: clonal, threshold
         tr_cns = cnvlib.read("formats/tr95t.cns")
         tr_thresh = commands.do_call(tr_cns, "threshold",
@@ -217,7 +220,68 @@ class CommandTests(unittest.TestCase):
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(cl_cns), len(cl_clonal))
 
+    def test_call_gender(self):
+        """Test each 'call' method on allosomes."""
+        for (fname, sample_is_f, ref_is_m, chr1_expect, chrx_expect, chry_expect
+            ) in (
+                ("formats/f-on-f.cns", True, False, 0, 0, 0),
+                #         chr1	chrX	chrY
+                # orig	0.124	0.0291	-0.0244
+                #thresh	0	0	1**
+                # clone	0	0	0
+                # p99%	0	0	0
+
+                ("formats/f-on-m.cns", True, True, 0.585, 1, -9.97),
+                #         chr1	chrX	chrY
+                # orig	0.324	0.929	-2.02
+                #thresh	0.585	1	-9.97
+                # clone	0.585	1	-9.97
+                # p99%	0.585	1	-9.97
+
+                ("formats/m-on-f.cns", False, False, 0, -1, 0),
+                #         chr1	chrX	chrY
+                # orig	0.124	-0.929	0.124
+                #thresh	0	-1	1**
+                # clone	0	-1	0
+                # p99%	0	-1	0
+
+                ("formats/m-on-m.cns", False, True, 0, 0, 0),
+                #         chr1	chrX	chrY
+                # orig	0.0236	0.0291	0.0244
+                #thresh	0	1**	1**
+                # clone	0	0	0
+                # p99%	0	0	0
+            ):
+            cns = cnvlib.read(fname)
+            chr1_idx = (cns.chromosome == 'chr1')
+            chrx_idx = (cns.chromosome == 'chrX')
+            chry_idx = (cns.chromosome == 'chrY')
+            def test_chrom_means(segments):
+                self.assertAlmostEqual(chr1_expect,
+                                       segments['log2'][chr1_idx].mean(), 2)
+                self.assertAlmostEqual(chrx_expect,
+                                       segments['log2'][chrx_idx].mean(), 2)
+                self.assertAlmostEqual(chry_expect,
+                                       segments['log2'][chry_idx].mean(), 2)
+
+            # Call threshold
+            cns_thresh = commands.do_call(cns, "threshold",
+                                 is_reference_male=ref_is_m,
+                                 is_sample_female=sample_is_f)
+            # test_chrom_means(cns_thresh)  # XXX
+            # Call clonal pure
+            cns_clone = commands.do_call(cns, "clonal",
+                                is_reference_male=ref_is_m,
+                                is_sample_female=sample_is_f)
+            test_chrom_means(cns_clone)
+            # Call clonal barely-mixed
+            cns_p99 = commands.do_call(cns, "clonal", purity=0.99,
+                              is_reference_male=ref_is_m,
+                              is_sample_female=sample_is_f)
+            test_chrom_means(cns_p99)
+
     def test_export(self):
+        """Run the 'export' command with each format."""
         # SEG
         seg_rows = export.export_seg(["formats/tr95t.cns"])
         self.assertTrue(len(seg_rows) > 0)
@@ -237,6 +301,7 @@ class CommandTests(unittest.TestCase):
         self.assertTrue(0 < len(cl_vcf_body.splitlines()) < len(cl_cns))
 
     def test_gainloss(self):
+        """The 'gainloss' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
         rows = commands.do_gainloss(probes, male_reference=True)
         self.assertTrue(len(rows) > 0)
@@ -245,7 +310,12 @@ class CommandTests(unittest.TestCase):
         rows = commands.do_gainloss(probes, segs, True, 0.3, 4)
         self.assertTrue(len(rows) > 0)
 
+    def test_metrics(self):
+        """The 'metrics' command."""
+        # TODO
+
     def test_reference(self):
+        """The 'reference' command."""
         # Empty antitargets
         ref = commands.do_reference(["formats/amplicon.cnr"], ["formats/empty"])
         self.assertTrue(len(ref) > 0)
@@ -255,12 +325,18 @@ class CommandTests(unittest.TestCase):
         self.assertTrue(len(ref) > 0)
 
     def test_segment(self):
+        """The 'segment' command."""
         # R methods are in another script
         cns = segmentation.do_segmentation("formats/amplicon.cnr", False,
                                            "haar")
         self.assertTrue(len(cns) > 0)
 
+    def test_segmetrics(self):
+        """The 'segmetrics' command."""
+        # TODO
+
     def test_target(self):
+        """The 'target' command."""
         # ENH: annotate w/ mini-refFlat
         commands.do_targets("formats/nv2_baits.interval_list", '/dev/null')
         commands.do_targets("formats/amplicon.bed", '/dev/null',
