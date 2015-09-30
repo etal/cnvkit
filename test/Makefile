@@ -54,7 +54,7 @@ $(picard_cnrs): %.cnr: %.targetcoverage.cnn %.antitargetcoverage.cnn build/refer
 	$(cnvkit) fix $^ -o $@
 
 $(picard_segs): %.cns: %.cnr
-	$(cnvkit) segment $< -o $@
+	$(cnvkit) segment -t .01 $< -o $@
 
 $(picard_segs:.cns=.call.cns): build/%.call.cns: build/%.cns
 	$(cnvkit) call $^ -y -m clonal --purity 0.65 -o $@
@@ -98,7 +98,7 @@ p2-5_5-cbs-diagram.pdf p2-9_2-cbs-diagram.pdf p2-20_1-cbs-diagram.pdf p2-20_2-cb
 	$(cnvkit) diagram -y --segment=$< -o $@
 
 p2-5_5-both-diagram.pdf p2-9_2-both-diagram.pdf p2-20_1-both-diagram.pdf p2-20_2-both-diagram.pdf: %-both-diagram.pdf: build/%.cns build/%.cnr
-	$(cnvkit) diagram -y --segment=$^ -t 0.5 -o $@
+	$(cnvkit) diagram -y --segment=$^ -t 0.3 -o $@
 
 # == Text reporting ==
 
@@ -123,7 +123,7 @@ p2-9_2-segmetrics.cns: build/p2-9_2.cns build/p2-9_2.cnr
 
 # == Export to other formats
 
-p2-all.seg: $(picard_segs) $(picard_segs:.cns=-flasso.cns) $(picard_segs:.cns=-haar.cns)
+p2-all.seg: $(picard_segs)
 	$(cnvkit) export seg $^ -o $@
 
 p2-all.bed: $(picard_segs:.cns=.call.cns)
