@@ -1,4 +1,4 @@
-FROM ubuntu:15.10
+FROM ubuntu:15.04
 MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev
 RUN pip install pandas pysam pyvcf
 RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('PSCBS', 'cghFLasso')"
-RUN pip install cnvkit==0.7.0
+RUN pip install cnvkit==0.7.1
 
 # ENTRYPOINT ["cnvkit.py"]
 # CMD ["--help"]
