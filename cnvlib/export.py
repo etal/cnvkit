@@ -92,14 +92,9 @@ def fmt_jtv(sample_ids, rows):
     return outheader, outrows
 
 
-# TODO
-def fmt_multi(sample_ids, rows):
-    return NotImplemented
-
-
 # Special cases
 
-def export_nexus_basic(sample_fname, vcf_fname=None):
+def export_nexus_basic(sample_fname):
     """Biodiscovery Nexus Copy Number "basic" format.
 
     Only represents one sample per file.
@@ -107,14 +102,31 @@ def export_nexus_basic(sample_fname, vcf_fname=None):
     cnarr = CNA.read(sample_fname)
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'gene', 'log2']]
     out_table['probe'] = cnarr.labels()
-    if vcf_fname:
-        varr = VA.read_vcf(vcf_fname)
-        mirrored_baf_median = lambda vals: np.median(np.abs(vals - .5) + .5)
-        bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
-                                   summary_func=mirrored_baf_median)
-        echo("Placed", sum(~np.isnan(bafs)), "variants into", len(out_table),
-             "bins")
-        out_table['baf'] = bafs
+    return out_table
+
+
+def export_nexus_ogt(sample_fname, vcf_fname):
+    """Biodiscovery Nexus Copy Number "Custom-OGT" format.
+
+    To create the b-allele frequencies column, alterate allele frequencies from
+    the VCF are aligned to the .cnr file bins.  Bins that contain no variants
+    are left blank; if a bin contains multiple variants, then the frequencies
+    are all "mirrored" to be above .5, then the median of those values is taken.
+    """
+    cnarr = CNA.read(sample_fname)
+    varr = VA.read_vcf(vcf_fname)
+    mirrored_baf_median = lambda vals: np.median(np.abs(vals - .5) + .5)
+    bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
+                                summary_func=mirrored_baf_median)
+    echo("Placed", sum(~np.isnan(bafs)), "variants into", len(cnarr), "bins")
+    out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'log2']]
+    out_table = out_table.rename(columns={
+        "chromosome": "Chromosome",
+        "start": "Position",
+        "end": "Position",
+        "log2": "Log R Ratio",
+    })
+    out_table["B-Allele Frequency"] = bafs
     return out_table
 
 
@@ -385,7 +397,7 @@ EXPORT_FORMATS = {
     # 'gct': fmt_gct,
     'jtv': fmt_jtv,
     'nexus-basic': export_nexus_basic,
-    # 'nexus-multi1': fmt_multi,
+    'nexus-ogt': export_nexus_ogt,
     'seg': export_seg,
     'theta': export_theta,
     'vcf': export_vcf,
