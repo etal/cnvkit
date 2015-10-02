@@ -1221,9 +1221,9 @@ P_gender = AP_subparsers.add_parser('gender', help=_cmd_gender.__doc__)
 P_gender.add_argument('targets', nargs='+',
         help="Copy number or copy ratio files (*.cnn, *.cnr).")
 P_gender.add_argument('-y', '--male-reference', action='store_true',
-        help="""Assume inputs are already corrected against a male
-                reference (i.e. female samples will have +1 log-coverage of
-                chrX; otherwise male samples would have -1 chrX).""")
+        help="""Assume inputs are already normalized to a male reference
+                (i.e. female samples will have +1 log-coverage of chrX;
+                otherwise male samples would have -1 chrX).""")
 P_gender.add_argument('-o', '--output',
         help="Output table file name.")
 P_gender.set_defaults(func=_cmd_gender)

@@ -43,7 +43,6 @@ class GaryTests(unittest.TestCase):
         self.ex_cnr[3, 'log2'] = -10.0
         self.assertNotEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
 
-    # def test_by_bin(self):
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
             cnarr = cnvlib.read(fname)
@@ -51,6 +50,11 @@ class GaryTests(unittest.TestCase):
             for _chrom, rows in cnarr.by_chromosome():
                 row_count += len(rows)
             self.assertEqual(row_count, len(cnarr))
+
+    # def test_by_ranges(self):
+    # def test_concat(self):
+    # def test_in_range(self):
+    # def test_in_ranges(self):
 
     def test_select(self):
         """Test sugary selection of a subset of the data array."""
@@ -98,7 +102,14 @@ class CNATests(unittest.TestCase):
         self.assertEqual(self.ex_cnr[3:6], same[3:6])
 
     # def test_by_gene(self):
-    # def test_by_segment(self):
+
+    def test_by_segment(self):
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segments = cnvlib.read("formats/amplicon.cns")
+        count_segs = 0
+        for count_segs, (_seg, _bins) in enumerate(cnarr.by_segment(segments)):
+            pass
+        self.assertEqual(len(segments), count_segs + 1)
 
     def test_center_all(self):
         """Test median-recentering."""
@@ -119,8 +130,22 @@ class CNATests(unittest.TestCase):
         self.assertTrue('gc' not in cleaned)
         self.assertTrue((cleaned['log2'] == self.ex_cnr['log2']).all())
 
-    # def test_extend(self):
-    # def test_in_range(self):
+    def test_gender(self):
+        """Guess chromosomal gender from chrX log2 ratio value."""
+        for (fname, sample_is_f, ref_is_m) in (
+                ("formats/f-on-f.cns", True, False),
+                ("formats/f-on-m.cns", True, True),
+                ("formats/m-on-f.cns", False, False),
+                ("formats/m-on-m.cns", False, True),
+                ("formats/amplicon.cnr", False, True),
+                ("formats/cl_seq.cns", True, True),
+                ("formats/tr95t.cns", True, True),
+                ("formats/reference-tr.cnn", False, False),
+            ):
+            cnarr = cnvlib.read(fname)
+            if sample_is_f != cnarr.guess_xx(ref_is_m):
+                print("Gender issue:", fname, sample_is_f, ref_is_m)
+            self.assertEqual(sample_is_f, cnarr.guess_xx(ref_is_m))
 
     # def test_squash_genes(self):
 
@@ -289,7 +314,13 @@ class CommandTests(unittest.TestCase):
 
     def test_metrics(self):
         """The 'metrics' command."""
-        # TODO
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segments = cnvlib.read("formats/amplicon.cns")
+        resids = metrics.probe_deviations_from_segments(cnarr, segments)
+        self.assertTrue(len(resids) <= len(cnarr))
+        values = metrics.ests_of_scale(resids)
+        for val in values:
+            self.assertTrue(val > 0)
 
     def test_reference(self):
         """The 'reference' command."""
@@ -304,13 +335,18 @@ class CommandTests(unittest.TestCase):
     def test_segment(self):
         """The 'segment' command."""
         # R methods are in another script
-        cns = segmentation.do_segmentation("formats/amplicon.cnr", False,
-                                           "haar")
-        self.assertTrue(len(cns) > 0)
+        segments = segmentation.do_segmentation("formats/amplicon.cnr", False,
+                                                "haar")
+        self.assertTrue(len(segments) > 0)
 
     def test_segmetrics(self):
         """The 'segmetrics' command."""
-        # TODO
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segments = cnvlib.read("formats/amplicon.cns")
+        ci = commands._confidence_interval(segments, cnarr)
+        self.assertEqual(len(ci), len(segments))
+        pi = commands._prediction_interval(segments, cnarr)
+        self.assertEqual(len(pi), len(segments))
 
     def test_target(self):
         """The 'target' command."""
