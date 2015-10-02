@@ -3,7 +3,6 @@ from __future__ import absolute_import, division, print_function
 
 import collections
 import math
-import sys
 
 import numpy as np
 import pandas as pd
@@ -12,6 +11,7 @@ from Bio._py3k import map, range, zip, StringIO
 from . import call, core
 from .cnary import CopyNumArray as CNA
 from .vary import VariantArray as VA
+from .ngfrills import echo
 
 ProbeInfo = collections.namedtuple('ProbeInfo', 'label chrom start end gene')
 
@@ -109,9 +109,11 @@ def export_nexus_basic(sample_fname, vcf_fname=None):
     out_table['probe'] = cnarr.labels()
     if vcf_fname:
         varr = VA.read_vcf(vcf_fname)
-        bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan)
-        # TODO catch all SNVs in a bin, not just the first
-        #   if > 1: mirror at .5, take median
+        mirrored_baf_median = lambda vals: np.median(np.abs(vals - .5) + .5)
+        bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
+                                   summary_func=mirrored_baf_median)
+        echo("Placed", sum(~np.isnan(bafs)), "variants into", len(out_table),
+             "bins")
         out_table['baf'] = bafs
     return out_table
 

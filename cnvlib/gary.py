@@ -177,39 +177,40 @@ class GenomicArray(object):
 
     # Traversal
 
-    # or: by_coords, by_ranges
-    def by_bin(self, bins, mode='trim'):
-        """Group rows by another GenomicArray; trim row start/end to bin edges.
-
-        Returns an iterable of (bin, GenomicArray of overlapping rows))
-
-        modes are:  exclude (drop), trim, include (keep)
-            (when coordinates are on a boundary, what happens to the overlapped
-            bins? drop, trim to size, include whole)
-
-        default = 'trim': If a probe overlaps with a bin boundary, the probe
-        start or end position is replaced with the bin boundary position. Probes
-        outside any segments are skipped. This is appropriate for most other
-        comparisons between GenomicArray objects.
-        """
-        # ENH: groupby chromosome?
-        for chrom, bin_rows in bins.by_chromosome():
-            try:
-                cn_rows = self[self.chromosome == chrom]
-            except KeyError:
-                continue
-            # Traverse rows and bins together, matching up start/end points
-            for bin_row in bin_rows:
-                # ENH: searchsorted w/ start/end arrays?
-                binned_rows = cn_rows.in_range(chrom, bin_row['start'],
-                                               bin_row['end'],
-                                               trim=(mode=='trim'))
-                yield bin_row, self.as_rows(binned_rows)
-
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
+
+    def by_ranges(self, other, mode='trim', keep_empty=True):
+        """Group rows by another GenomicArray's bin coordinate ranges.
+
+        Returns an iterable of (bin, GenomicArray of overlapping rows))
+
+        `mode` determines what to do with bins that overlap a boundary of the
+        selection.  Values are:
+
+        - ``inner``: Drop the bins on the selection boundary, don't emit them.
+        - ``outer``: Keep/emit those bins as they are.
+        - ``trim``: Emit those bins but alter their boundaries to match the
+          selection; the bin start or end position is replaced with the
+          selection boundary position. [default]
+
+        Bins in this array that fall outside the other array's bins are skipped.
+        """
+        chrom_lookup = dict(self.by_chromosome())
+        for chrom, bin_rows in other.by_chromosome():
+            if chrom in chrom_lookup:
+                cn_rows = chrom_lookup[chrom]
+                # ENH: searchsorted w/ start/end arrays?
+                for bin_row in bin_rows:
+                    yield bin_row, cn_rows.in_range(start=bin_row['start'],
+                                                    end=bin_row['end'],
+                                                    mode=mode)
+            else:
+                if keep_empty:
+                    for bin_row in bin_rows:
+                        yield bin_row, self.as_rows([])
 
     def coords(self, also=()):
         """Iterate over plain coordinates of each bin: chromosome, start, end.
@@ -229,36 +230,42 @@ class GenomicArray(object):
     def labels(self):
         return self.data.apply(self.row2label, axis=1)
 
-    # TODO replace trim=bool w/ mode=trim/drop/keep
-    def in_range(self, chrom, start=0, end=None, trim=False):
+    def in_range(self, chrom=None, start=0, end=None, mode='inner'):
         """Get the GenomicArray portion within the given genomic range.
 
-        If trim=True, include bins straddling the range boundaries, and trim
-        the bins endpoints to the boundaries.
+        `mode` works as in `by_ranges`: ``outer`` includes bins straddling the
+        range boundaries, ``trim`` additionally alters the straddling bins'
+        endpoints to match the range boundaries, and ``inner`` excludes those
+        bins.
         """
-        try:
-            table = self.data[self.data['chromosome'] == chrom]
-        except KeyError:
-            raise KeyError("Chromosome %s is not in this probe set" % chrom)
+        assert mode in ('inner', 'outer', 'trim')
+        if chrom:
+            try:
+                table = self.data[self.data['chromosome'] == chrom]
+            except KeyError:
+                raise KeyError("Chromosome %s is not in this probe set" % chrom)
+        else:
+            # Unsafe, but faster if we've already subsetted by chromosome
+            table = self.data
         if start or end:
             if start:
-                if trim:
-                    # Include all rows overlapping the start point
-                    start_idx = table.end.searchsorted(start, 'right')
-                else:
+                if mode == 'inner':
                     # Only rows entirely after the start point
                     start_idx = table.start.searchsorted(start)
+                else:
+                    # Include all rows overlapping the start point
+                    start_idx = table.end.searchsorted(start, 'right')
             else:
                 start_idx = 0
             if end:
-                if trim:
-                    end_idx = table.start.searchsorted(end)
-                else:
+                if mode == 'inner':
                     end_idx = table.end.searchsorted(end, 'right')
+                else:
+                    end_idx = table.start.searchsorted(end)
             else:
                 end_idx = len(table)
             table = table[start_idx:end_idx]
-            if trim:
+            if mode == 'trim':
                 table = table.copy()
                 # Update 5' endpoints to the boundary
                 table.start = table.start.clip_lower(start)
@@ -266,8 +273,8 @@ class GenomicArray(object):
                 table.end = table.end.clip_upper(end)
         return self.as_dataframe(table)
 
-    def in_ranges(self, chrom, starts=None, ends=None, trim=False):
-        """Get the GenomicArray portion within the given genomic range.
+    def in_ranges(self, chrom, starts=None, ends=None, mode='inner'):
+        """Get the GenomicArray portion within the given array's ranges.
         """
         assert isinstance(chrom, basestring)  # ENH: take array?
         try:
@@ -280,12 +287,13 @@ class GenomicArray(object):
         # XXX Slow path:
         if starts is None:
             starts = np.zeros(len(ends), dtype=np.int_)
-        subtables = [self.in_range(chrom, start, end, trim).data
+        subtables = [self.in_range(chrom, start, end, mode).data
                      for start, end in zip(starts, ends)]
         table = pd.concat(subtables)
         return self.as_dataframe(table)
 
-    def match_to_bins(self, other, key, default=0.0, fill=False):
+    def match_to_bins(self, other, key, default=0.0, fill=False,
+                      summary_func=np.median):
         """Take values of the other array at each of this array's bins.
 
         Assign `default` to indices that fall outside the other array's bins, or
@@ -294,29 +302,17 @@ class GenomicArray(object):
         Return an array of the `key` column values in `other` corresponding to this
         array's bin locations, the same length as this array.
         """
-        chrom_other = dict(other.by_chromosome())
-        all_out_vals = []
-        for chrom, these in self.by_chromosome():
-            midpoints = (these.start + these.end) // 2
-            if chrom in chrom_other:
-                those = chrom_other[chrom]
-                start_idx = np.maximum(0,
-                            those.start.searchsorted(midpoints, 'right') - 1)
-                out_vals = those[key].take(start_idx)
-
-                if fill:
-                    # TODO/ENH: fill gaps by nearest match (neighbor)
-                    pass
-                else:
-                    end_idx = np.minimum(len(those),
-                                those.end.searchsorted(midpoints))
-                    out_vals[start_idx != end_idx] = default
+        def rows2value(rows):
+            if len(rows) == 0:
+                return default
+            elif len(rows) == 1:
+                return rows[0, key]
             else:
-                ngfrills.echo("Missing chromosome", chrom)
-                # Output array must still be the same length
-                out_vals = np.repeat(default, len(these))
-            all_out_vals.append(out_vals)
-        return np.concatenate(all_out_vals)
+                return summary_func(rows[key])
+
+        all_out_vals = [rows2value(other_rows) for _bin, other_rows in
+                        other.by_ranges(self, mode='outer', keep_empty=True)]
+        return np.asarray(all_out_vals)
 
     # Modification
 

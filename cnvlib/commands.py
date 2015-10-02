@@ -887,7 +887,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
         if window_coords:
             # Show the selected region
             sel_probes = pset_cvg.in_range(chrom, *window_coords)
-            sel_seg = (pset_seg.in_range(chrom, *window_coords, trim=True)
+            sel_seg = (pset_seg.in_range(chrom, *window_coords, mode='trim')
                        if pset_seg else None)
         else:
             # Show the whole chromosome
