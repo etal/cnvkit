@@ -200,13 +200,13 @@ class CopyNumArray(gary.GenomicArray):
                                            params.MIN_REF_COVERAGE])
 
     def squash_genes(self, ignore=('-', 'CGH', '.'), squash_background=False,
-                     summary_stat=metrics.biweight_location):
+                     summary_func=metrics.biweight_location):
         """Combine consecutive bins with the same targeted gene name.
 
         The `ignore` parameter lists bin names that not be counted as genes to
         be output.
 
-        Parameter `summary_stat` is a function that summarizes an array of
+        Parameter `summary_func` is a function that summarizes an array of
         coverage values to produce the "squashed" gene's coverage value. By
         default this is the biweight location, but you might want median, mean,
         max, min or something else in some cases.
@@ -218,13 +218,13 @@ class CopyNumArray(gary.GenomicArray):
             chrom = core.check_unique(rows.chromosome, 'chromosome')
             start = rows.iloc[0]['start']
             end = rows.iloc[-1]['end']
-            cvg = summary_stat(rows.log2)
+            cvg = summary_func(rows.log2)
             outrow = [chrom, start, end, name, cvg]
             # Handle extra fields
             # ENH - no coverage stat; do weighted average as appropriate
             for xfield in ('gc', 'rmask', 'spread', 'weight'):
                 if xfield in self:
-                    outrow.append(summary_stat(rows[xfield]))
+                    outrow.append(summary_func(rows[xfield]))
             if 'probes' in self:
                 outrow.append(sum(rows['probes']))
             return tuple(outrow)
