@@ -2,11 +2,10 @@
 from __future__ import absolute_import, division, print_function
 
 import collections
-import math
 
 import numpy as np
 import pandas as pd
-from Bio._py3k import map, range, zip, StringIO
+from Bio._py3k import map, range, zip
 
 from . import call, core
 from .cnary import CopyNumArray as CNA
@@ -268,7 +267,7 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     # TODO be more clever about this
     for (_idx, out_row), (_idx, abs_row) in zip(out_dframe.iterrows(),
                                                 abs_dframe.iterrows()):
-        if out_row["ncopies"] == abs_row["expect"] or out_row["probes"] == "_":
+        if out_row["ncopies"] == abs_row["expect"] or not str(out_row["probes"]).isdigit():
             # Skip regions of neutral copy number
             continue  # or "CNV" for subclonal?
 
