@@ -2,11 +2,10 @@
 from __future__ import absolute_import, division, print_function
 
 import collections
-import math
 
 import numpy as np
 import pandas as pd
-from Bio._py3k import map, range, zip, StringIO
+from Bio._py3k import map, range, zip
 
 from . import call, core
 from .cnary import CopyNumArray as CNA
@@ -280,12 +279,12 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     # TODO be more clever about this
     for (_idx, out_row), (_idx, abs_row) in zip(out_dframe.iterrows(),
                                                 abs_dframe.iterrows()):
-        if out_row["ncopies"] == abs_row["expect"]:
+        if out_row["ncopies"] == abs_row["expect"] or not str(out_row["probes"]).isdigit():
             # Skip regions of neutral copy number
             continue  # or "CNV" for subclonal?
 
         if out_row["ncopies"] > abs_row["expect"]:
-            genotype = "0/1:0:%d:%g" % (out_row["ncopies"], out_row["probes"])
+            genotype = "0/1:0:%d:%g" % (out_row["ncopies"], int(out_row["probes"]))
         elif out_row["ncopies"] < abs_row["expect"]:
             # TODO XXX handle non-diploid ploidies, haploid chroms
             if out_row["ncopies"] == 0:
@@ -294,7 +293,7 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
             else:
                 # Single copy deletion
                 gt = "0/1"
-            genotype = "%s:%d" % (gt, out_row["probes"])
+            genotype = "%s:%d" % (gt, int(out_row["probes"]))
 
         info = ";".join(["IMPRECISE",
                          "SVTYPE=%s" % out_row["svtype"],
