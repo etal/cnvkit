@@ -611,18 +611,17 @@ P_fix.set_defaults(func=_cmd_fix)
 
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
+    results = segmentation.do_segmentation(args.filename, args.method,
+                                           args.threshold,
+                                           args.drop_low_coverage,
+                                           bool(args.dataframe), args.rlibpath)
     if args.dataframe:
-        segments, dframe = segmentation.do_segmentation(args.filename, True,
-                                                        args.method,
-                                                        args.threshold,
-                                                        args.rlibpath)
+        segments, dframe = results
         with open(args.dataframe, 'w') as handle:
             handle.write(dframe)
         echo("Wrote", args.dataframe)
     else:
-        segments = segmentation.do_segmentation(args.filename, False,
-                                                args.method, args.threshold,
-                                                args.rlibpath)
+        segments = results
     segments.write(args.output or segments.sample_id + '.cns')
 
 
@@ -641,6 +640,9 @@ P_segment.add_argument('-m', '--method',
 P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
                 accept breakpoints during segmentation.""")
+P_segment.add_argument("--drop-low-coverage", action='store_true',
+        help="""Drop very-low-coverage bins before segmentation to avoid
+                false-positive deletions in poor-quality tumor samples.""")
 P_segment.add_argument("--rlibpath",
         help="Path to an alternative site-library to use for R packages.")
 P_segment.set_defaults(func=_cmd_segment)

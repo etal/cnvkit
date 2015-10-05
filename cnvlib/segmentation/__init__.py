@@ -13,15 +13,19 @@ from ..cnary import CopyNumArray as CNA
 from Bio._py3k import StringIO
 
 
-def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
+def do_segmentation(probes_fname, method, threshold=None,
+                    drop_low_coverage=False, save_dataframe=False,
                     rlibpath=None):
     """Infer copy number segments from the given coverage table."""
     probes = CNA.read(probes_fname)
-    filtered_probes = probes.drop_low_coverage()
+    if drop_low_coverage:
+        filtered_probes = probes.drop_low_coverage()
+    else:
+        filtered_probes = probes
     if method == 'haar':
         from . import haar
-        segs = haar.segment_haar(filtered_probes)
-        segs['gene'] = squash_gene_names(segs, filtered_probes)
+        segs = haar.segment_haar(filtered_probes, threshold or 0.001)
+        segs['gene'] = squash_gene_names(segs, probes)
         return segs
 
     # Run R scripts to calculate copy number segments

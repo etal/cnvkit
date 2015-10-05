@@ -51,7 +51,7 @@ from scipy import stats
 from ..ngfrills import echo
 
 
-def segment_haar(cnarr):
+def segment_haar(cnarr, fdr_q):
     """Do segmentation for CNVkit.
 
     Calculate copy number segmentation by HaarSeg
@@ -65,7 +65,7 @@ def segment_haar(cnarr):
     # ENH - skip large gaps (segment chrom. arms separately)
     for chrom, subprobes in cnarr.by_chromosome():
         # echo(chrom, ':')  # DBG
-        segtable = haarSeg(subprobes['log2'])
+        segtable = haarSeg(subprobes['log2'], breaksFdrQ=fdr_q)
         chromtable = pd.DataFrame({
             'chromosome': chrom,
             'start': np.asarray(subprobes['start']).take(segtable['start']),
@@ -86,10 +86,9 @@ def segment_haar(cnarr):
 
 # ---- from HaarSeg R code -- the API ----
 
-def haarSeg(I,
+def haarSeg(I, breaksFdrQ,
             W=None,
             rawI=None,
-            breaksFdrQ=0.005,  # orig. .001
             haarStartLevel=1,
             haarEndLevel=5):
     r"""Perform segmentation according to the HaarSeg algorithm.

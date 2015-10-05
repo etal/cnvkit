@@ -219,8 +219,7 @@ class CommandTests(unittest.TestCase):
     def test_breaks(self):
         """The 'breaks' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
-        segs = segmentation.do_segmentation("formats/amplicon.cnr", False,
-                                            "haar")
+        segs = cnvlib.read("formats/amplicon.cns")
         rows = commands.do_breaks(probes, segs, 4)
         self.assertTrue(len(rows) > 0)
 
@@ -307,8 +306,7 @@ class CommandTests(unittest.TestCase):
         probes = cnvlib.read("formats/amplicon.cnr")
         rows = commands.do_gainloss(probes, male_reference=True)
         self.assertTrue(len(rows) > 0)
-        segs = segmentation.do_segmentation("formats/amplicon.cnr", False,
-                                            "haar")
+        segs = cnvlib.read("formats/amplicon.cns")
         rows = commands.do_gainloss(probes, segs, True, 0.3, 4)
         self.assertTrue(len(rows) > 0)
 
@@ -335,8 +333,11 @@ class CommandTests(unittest.TestCase):
     def test_segment(self):
         """The 'segment' command."""
         # R methods are in another script
-        segments = segmentation.do_segmentation("formats/amplicon.cnr", False,
-                                                "haar")
+        segments = segmentation.do_segmentation("formats/amplicon.cnr", "haar")
+        self.assertTrue(len(segments) > 0)
+        segments = segmentation.do_segmentation("formats/amplicon.cnr", "haar",
+                                                threshold=.001,
+                                                drop_low_coverage=True)
         self.assertTrue(len(segments) > 0)
 
     def test_segmetrics(self):
