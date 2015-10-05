@@ -22,8 +22,8 @@ class VariantArray(gary.GenomicArray):
     # I/O
 
     @classmethod
-    def read_vcf(cls, infile, sample_id=None, min_depth=1, skip_hom=True,
-                 skip_reject=False, skip_somatic=True):
+    def read_vcf(cls, infile, sample_id=None, normal_id=None, min_depth=1,
+                 skip_hom=True, skip_reject=False, skip_somatic=True):
         """Parse SNV coordinates from a VCF file into a VariantArray."""
         if isinstance(infile, basestring):
             vcf_reader = vcf.Reader(filename=infile)

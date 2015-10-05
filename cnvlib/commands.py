@@ -784,8 +784,8 @@ def _cmd_scatter(args):
                 region = "{}:{}-{}".format(chrom, start, end)
                 do_scatter(pset_cvg, pset_seg, args.vcf, False, False,
                            region, args.background_marker, args.trend,
-                           args.width, args.sample_id, args.min_variant_depth,
-                           args.y_min, args.y_max)
+                           args.width, args.sample_id, args.normal_id,
+                           args.min_variant_depth, args.y_min, args.y_max)
                 pyplot.title(region)
                 pdf_out.savefig()
                 pyplot.close()
@@ -798,8 +798,8 @@ def _cmd_scatter(args):
             show_range = None
         do_scatter(pset_cvg, pset_seg, args.vcf, args.chromosome, args.gene,
                    show_range, args.background_marker, args.trend, args.width,
-                   args.sample_id, args.min_variant_depth, args.y_min,
-                   args.y_max)
+                   args.sample_id, args.normal_id, args.min_variant_depth,
+                   args.y_min, args.y_max)
         if args.output:
             pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
             echo("Wrote", args.output)
@@ -810,7 +810,8 @@ def _cmd_scatter(args):
 def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                show_chromosome=None, show_gene=None, show_range=None,
                background_marker=None, do_trend=False, window_width=1e6,
-               sample_id=None, min_variant_depth=20, y_min=None, y_max=None):
+               sample_id=None, normal_id=None, min_variant_depth=20,
+               y_min=None, y_max=None):
     """Plot probe log2 coverages and CBS calls together."""
     if not show_gene and not show_range and not show_chromosome:
         # Plot all chromosomes, concatenated on one plot
@@ -820,7 +821,8 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.85)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            variants = _VA.read_vcf(vcf_fname, sample_id, min_variant_depth)
+            variants = _VA.read_vcf(vcf_fname, sample_id, normal_id,
+                                    min_variant_depth)
             # Place chromosome labels between the CNR and LOH plots
             axis2.tick_params(labelbottom=False)
             chrom_sizes = plots.chromosome_sizes(pset_cvg)
@@ -907,7 +909,8 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.5)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            variants = _VA.read_vcf(vcf_fname, sample_id, min_variant_depth)
+            variants = _VA.read_vcf(vcf_fname, sample_id, normal_id,
+                                    min_variant_depth)
             chrom_snvs = variants[variants["chromosome"] == chrom]
             if window_coords:
                 # Plot LOH for only the selected region
@@ -957,6 +960,8 @@ P_scatter.add_argument('-l', '--range-list',
 P_scatter.add_argument("-i", "--sample-id",
         help="""Specify the name of the sample in the VCF to use for LOH
                 analysis and to show in plot title.""")
+P_scatter.add_argument("-n", "--normal-id",
+        help="Corresponding normal sample ID in the input VCF.")
 P_scatter.add_argument('-b', '--background-marker', default=None,
         help="""Plot antitargets with this symbol, in zoomed/selected regions.
                 [Default: same as targets]""")
@@ -985,7 +990,8 @@ def _cmd_loh(args):
 
     Divergence from 0.5 indicates loss of heterozygosity in a tumor sample.
     """
-    variants = _VA.read_vcf(args.variants, args.sample_id, args.min_depth)
+    variants = _VA.read_vcf(args.variants, args.sample_id, args.normal_id,
+                            args.min_depth)
     segments = _CNA.read(args.segment) if args.segment else None
     create_loh(variants, segments, args.trend)
     if args.output:
@@ -1015,6 +1021,8 @@ P_loh.add_argument('-m', '--min-depth', type=int, default=20,
                 [Default: %(default)s]""")
 P_loh.add_argument("-i", "--sample-id",
         help="Sample name to use for LOH calculations from the input VCF.")
+P_loh.add_argument("-n", "--normal-id",
+        help="Corresponding normal sample ID in the input VCF.")
 P_loh.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_loh.add_argument('-o', '--output',
