@@ -20,7 +20,9 @@ def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
     filtered_probes = probes.drop_low_coverage()
     if method == 'haar':
         from . import haar
-        return haar.segment_haar(filtered_probes)
+        segs = haar.segment_haar(filtered_probes)
+        segs['gene'] = squash_gene_names(segs, filtered_probes)
+        return segs
 
     # Run R scripts to calculate copy number segments
     if method == 'cbs':
@@ -52,11 +54,25 @@ def do_segmentation(probes_fname, save_dataframe, method, threshold=None,
         seg_pset = squash_segments(seg_pset)
 
     seg_pset = repair_segments(seg_pset, probes)
+    seg_pset['gene'] = squash_gene_names(seg_pset, probes)
 
     if save_dataframe:
         return seg_pset, seg_out
     else:
         return seg_pset
+
+
+def squash_gene_names(segments, cnarr, ignore=('Background', 'CGH', '-')):
+    """Copy gene names from `cnarr` to the segmented `segarr`.
+
+    Segment name is the comma-separated list of bin gene names.
+    """
+    segnames = ['-'] * len(segments)
+    for i, (_seg, subprobes) in enumerate(cnarr.by_segment(segments)):
+        subgenes = [g for g in pd.unique(subprobes['gene']) if g not in ignore]
+        if subgenes:
+            segnames[i] = ",".join(subgenes)
+    return segnames
 
 
 def seg2cns(seg_text):
@@ -136,13 +152,7 @@ def repair_segments(segments, orig_probes):
             extra_segments.append(null_segment)
     if extra_segments:
         segments.concat(segments.as_rows(extra_segments))
-    # Adjust segment values
-    for i, (_seg, subprobes) in enumerate(orig_probes.by_segment(segments)):
-        # Segment name is the comma-separated list of bin gene names
-        subgenes = [g for g in pd.unique(subprobes['gene'])
-                    if g not in ('Background', 'CGH', '-')]
-        segments[i, 'gene'] = ",".join(subgenes) if subgenes else '-'
-        # ENH: Recalculate segment means here instead of in R
+    # ENH: Recalculate segment means here instead of in R
     segments.sort_columns()
     return segments
 

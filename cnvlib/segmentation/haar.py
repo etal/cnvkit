@@ -49,7 +49,6 @@ from scipy import stats
 
 # from .. import params
 from ..ngfrills import echo
-from ..cnary import CopyNumArray as CNA
 
 
 def segment_haar(cnarr):
