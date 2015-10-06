@@ -336,8 +336,7 @@ class CommandTests(unittest.TestCase):
         segments = segmentation.do_segmentation("formats/amplicon.cnr", "haar")
         self.assertTrue(len(segments) > 0)
         segments = segmentation.do_segmentation("formats/amplicon.cnr", "haar",
-                                                threshold=.001,
-                                                drop_low_coverage=True)
+                                                threshold=.001, skip_low=True)
         self.assertTrue(len(segments) > 0)
 
     def test_segmetrics(self):

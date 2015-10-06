@@ -61,9 +61,10 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-4):
     return initial + (d[mask] * w[mask]).sum() / weightsum
 
 
-def segment_mean(cnarr):
-    """Weighted average of bin log2 values, ignoring too-low-coverage bins."""
-    cnarr = cnarr.drop_low_coverage()
+def segment_mean(cnarr, skip_low=False):
+    """Weighted average of bin log2 values."""
+    if skip_low:
+        cnarr = cnarr.drop_low_coverage()
     if len(cnarr) == 0:
         return None
     if 'weight' in cnarr:

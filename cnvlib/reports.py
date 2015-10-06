@@ -65,18 +65,19 @@ def get_breakpoints(intervals, segments, min_probes):
 # _____________________________________________________________________________
 # gainloss
 
-def gainloss_by_gene(probes, threshold):
+def gainloss_by_gene(probes, threshold, skip_low):
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
     NB: Must shift sex-chromosome values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
-    for gene, chrom, start, end, coverage, nprobes in group_by_genes(probes):
+    for gene, chrom, start, end, coverage, nprobes in group_by_genes(probes,
+                                                                     skip_low):
         if abs(coverage) >= threshold:
             yield (gene, chrom, start, end, coverage, nprobes)
 
 
-def gainloss_by_segment(probes, segments, threshold):
+def gainloss_by_segment(probes, segments, threshold, skip_low):
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
     NB: Must shift sex-chromosome values beforehand with shift_xx,
@@ -85,12 +86,12 @@ def gainloss_by_segment(probes, segments, threshold):
     for segment, subprobes in probes.by_segment(segments):
         if abs(segment['log2']) >= threshold:
             for (gene, chrom, start, end, _coverage, nprobes
-                ) in group_by_genes(subprobes):
+                ) in group_by_genes(subprobes, skip_low):
                 yield (gene, chrom, start, end, segment['log2'], nprobes)
 
 
 # TODO consolidate with CNA.squash_genes
-def group_by_genes(probes):
+def group_by_genes(probes, skip_low):
     """Group probe and coverage data by gene.
 
     Return an iterable of genes, in chromosomal order, associated with their
@@ -104,7 +105,7 @@ def group_by_genes(probes):
         chrom = rows[0]['chromosome']
         start = rows[0]['start']
         end = rows[-1]['end']
-        coverage = metrics.segment_mean(rows)
-        if coverage is not None:
+        segmean = metrics.segment_mean(rows)
+        if segmean is not None:
             nprobes = len(rows)
-            yield gene, chrom, start, end, coverage, nprobes
+            yield gene, chrom, start, end, segmean, nprobes

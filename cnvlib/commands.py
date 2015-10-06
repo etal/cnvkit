@@ -1169,7 +1169,7 @@ def _cmd_gainloss(args):
     pset = _CNA.read(args.filename)
     segs = _CNA.read(args.segment) if args.segment else None
     gainloss = do_gainloss(pset, segs, args.male_reference, args.threshold,
-                           args.min_probes)
+                           args.min_probes, args.drop_low_coverage)
     echo("Found", len(gainloss), "gene-level gains and losses")
     core.write_tsv(args.output, gainloss,
                    colnames=['Gene', 'Chrom.', 'Start', 'End', 'Log2Ratio',
@@ -1177,14 +1177,15 @@ def _cmd_gainloss(args):
 
 
 def do_gainloss(probes, segments=None, male_reference=False, threshold=0.2,
-                min_probes=3):
+                min_probes=3, skip_low=False):
     """Identify targeted genes with copy number gain or loss."""
     probes = probes.shift_xx(male_reference)
     if segments:
         segments = segments.shift_xx(male_reference)
-        gainloss = reports.gainloss_by_segment(probes, segments, threshold)
+        gainloss = reports.gainloss_by_segment(probes, segments, threshold,
+                                               skip_low)
     else:
-        gainloss = reports.gainloss_by_gene(probes, threshold)
+        gainloss = reports.gainloss_by_gene(probes, threshold, skip_low)
     return [row for row in gainloss if row[5] >= min_probes]
 
 
@@ -1200,6 +1201,9 @@ P_gainloss.add_argument('-t', '--threshold', type=float, default=0.2,
 P_gainloss.add_argument('-m', '--min-probes', type=int, default=3,
         help="""Minimum number of covered probes to report a gain/loss.
                 [Default: %(default)d]""")
+P_gainloss.add_argument("--drop-low-coverage", action='store_true',
+        help="""Drop very-low-coverage bins before segmentation to avoid
+                false-positive deletions in poor-quality tumor samples.""")
 P_gainloss.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-coverage of
@@ -1288,7 +1292,8 @@ def _cmd_segmetrics(args):
     """Compute segment-level metrics from bin-level log2 ratios."""
     # Calculate all metrics
     cnarr = _CNA.read(args.cnarray)
-    cnarr.drop_low_coverage()
+    if args.drop_low_coverage:
+        cnarr = cnarr.drop_low_coverage()
     segarr = _CNA.read(args.segments)
     stats = {}
     deviations = [segbins['log2'] - segment['log2']
@@ -1361,6 +1366,9 @@ P_segmetrics.add_argument('cnarray',
         help="""Bin-level copy ratio data file (*.cnn, *.cnr).""")
 P_segmetrics.add_argument('-s', '--segments', required=True,
         help="Segmentation data file (*.cns, output of the 'segment' command).")
+P_segmetrics.add_argument("--drop-low-coverage", action='store_true',
+        help="""Drop very-low-coverage bins before segmentation to avoid
+                false-positive deletions in poor-quality tumor samples.""")
 P_segmetrics.add_argument('-o', '--output',
         help="Output table file name.")
 
