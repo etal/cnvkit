@@ -208,8 +208,8 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     cnarr.write(sample_pfx + '.cnr')
 
     echo("Segmenting", sample_pfx + '.cnr ...')
-    segments = segmentation.do_segmentation(sample_pfx + '.cnr', False, 'cbs',
-                                            None, rlibpath)
+    segments = segmentation.do_segmentation(sample_pfx + '.cnr', 'cbs',
+                                            rlibpath=rlibpath)
     segments.write(sample_pfx + '.cns')
 
     if scatter:
