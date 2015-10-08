@@ -202,7 +202,7 @@ from the segment means, similar to the existing :ref:`metrics` command, but for 
 segment individually.
 
 Results are output in the same format as the CNVkit segmentation file (.cns),
-with the stat names and calculated values printed in the "gene" column.
+with the stat names and calculated values printed in additional columns.
 
 ::
 
