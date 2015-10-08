@@ -1290,75 +1290,72 @@ P_metrics.set_defaults(func=_cmd_metrics)
 
 def _cmd_segmetrics(args):
     """Compute segment-level metrics from bin-level log2 ratios."""
+    stats = {
+        'stdev': np.std,
+        'mad':  metrics.median_absolute_deviation,
+        'iqr':  metrics.interquartile_range,
+        'bivar': metrics.biweight_midvariance,
+        'ci': _confidence_interval,
+        'pi': _prediction_interval,
+    }
+    if not any(getattr(args, name) for name in stats):
+        echo("No stats specified")
+        return
+
     # Calculate all metrics
     cnarr = _CNA.read(args.cnarray)
     if args.drop_low_coverage:
         cnarr = cnarr.drop_low_coverage()
     segarr = _CNA.read(args.segments)
-    stats = {}
     deviations = [segbins['log2'] - segment['log2']
                   for segment, segbins in  cnarr.by_segment(segarr)]
     # Measures of spread
-    for statname, option, func in (
-        ("StDev", args.stdev, np.std),
-        ("MAD", args.mad, metrics.median_absolute_deviation),
-        ("IQR", args.iqr, metrics.interquartile_range),
-        ("BiVar", args.bivar, metrics.biweight_midvariance),
-    ):
-        if option:
-            stats[statname] = np.asarray([func(d) for d in deviations],
-                                         dtype=np.float64)
+    for statname in ("StDev", "MAD", "IQR", "BiVar"):
+        option = statname.lower()
+        if getattr(args, option):
+            func = stats[option]
+            segarr[statname] = np.asfarray([func(d) for d in deviations])
+
     # Interval calculations
     if args.ci:
-        stats["CI"] = _confidence_interval(segarr, cnarr)
+        segarr["CI_lo"], segarr["CI_hi"] = _segmetric_interval(segarr, cnarr,
+                                                               stats['ci'])
     if args.pi:
-        stats["PI"] = _prediction_interval(segarr, cnarr)
-    if not stats:
-        echo("No stats specified")
-        return
+        segarr["PI_lo"], segarr["PI_hi"] = _segmetric_interval(segarr, cnarr,
+                                                               stats['pi'])
 
-    keys = sorted(stats.keys())
-    statcol = [';'.join(["%s=%s" % (key, val)
-                         for key, val in zip(keys, valrow)])
-               for valrow in zip(*[stats[k] for k in keys])]
-    segarr['gene'] = statcol
     segarr.write(args.output or segarr.sample_id + ".segmetrics.cns")
 
 
-def _confidence_interval(segarr, cnarr):
+def _segmetric_interval(segarr, cnarr, func):
+    """Compute a stat that yields intervals (low & high values)"""
+    out_vals_lo =  np.repeat(np.nan, len(segarr))
+    out_vals_hi = np.repeat(np.nan, len(segarr))
+    for i, (_segment, bins) in enumerate(cnarr.by_segment(segarr)):
+        k = len(bins)
+        if k > 0:
+            out_vals_lo[i], out_vals_hi[i] = func(bins, k)
+    return out_vals_lo, out_vals_hi
+
+
+def _confidence_interval(bins, k):
     """Confidence interval, estimated by bootstrap."""
-    out_cns_ci = []
-    for _segment, bins in cnarr.by_segment(segarr):
-        k = len(bins)
-        if k == 0:
-            out_cns_ci.append("NA")
-            continue
-        # Bootstrap for CI
-        rand_indices = np.random.random_integers(0, k - 1, (100, k))
-        bootstraps = [bins.data.take(idx) for idx in rand_indices]
-        # Recalculate segment means
-        if 'weight' in bins:
-            bootstrap_dist = [np.average(boot['log2'], weights=boot['weight'])
-                                for boot in bootstraps]
-        else:
-            bootstrap_dist = [boot['log2'].mean() for boot in bootstraps]
-        ci = np.percentile(bootstrap_dist, [2.5, 97.5])
-        out_cns_ci.append("%s,%s" % tuple(ci))
-    return out_cns_ci
+    # Bootstrap for CI
+    rand_indices = np.random.random_integers(0, k - 1, (100, k))
+    bootstraps = [bins.data.take(idx) for idx in rand_indices]
+    # Recalculate segment means
+    if 'weight' in bins:
+        bootstrap_dist = [np.average(boot['log2'], weights=boot['weight'])
+                            for boot in bootstraps]
+    else:
+        bootstrap_dist = [boot['log2'].mean() for boot in bootstraps]
+    return np.percentile(bootstrap_dist, [2.5, 97.5])
 
 
-def _prediction_interval(segarr, cnarr):
+def _prediction_interval(bins, _k):
     """Prediction interval, estimated by percentiles."""
-    out_cns_pi = []
-    for _segment, bins in cnarr.by_segment(segarr):
-        k = len(bins)
-        if k == 0:
-            out_cns_pi.append("NA")
-            continue
-        # ENH: weighted percentile
-        pi = np.percentile(bins['log2'], [2.5, 97.5])
-        out_cns_pi.append("%s,%s" % tuple(pi))
-    return out_cns_pi
+    # ENH: weighted percentile
+    return np.percentile(bins['log2'], [2.5, 97.5])
 
 
 P_segmetrics = AP_subparsers.add_parser('segmetrics', help=_cmd_segmetrics.__doc__)

@@ -342,11 +342,18 @@ class CommandTests(unittest.TestCase):
     def test_segmetrics(self):
         """The 'segmetrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
-        segments = cnvlib.read("formats/amplicon.cns")
-        ci = commands._confidence_interval(segments, cnarr)
-        self.assertEqual(len(ci), len(segments))
-        pi = commands._prediction_interval(segments, cnarr)
-        self.assertEqual(len(pi), len(segments))
+        segarr = cnvlib.read("formats/amplicon.cns")
+        for func in (commands._confidence_interval,
+                     commands._prediction_interval):
+            lo, hi = commands._segmetric_interval(segarr, cnarr, func)
+            self.assertEqual(len(lo), len(segarr))
+            self.assertEqual(len(hi), len(segarr))
+            sensible_segs_mask = (np.asarray(segarr['probes']) > 3)
+            means = segarr[sensible_segs_mask, 'log2']
+            los = lo[sensible_segs_mask]
+            his = hi[sensible_segs_mask]
+            self.assertTrue((los < means).all())
+            self.assertTrue((means < his).all())
 
     def test_target(self):
         """The 'target' command."""
