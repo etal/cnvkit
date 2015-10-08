@@ -24,7 +24,7 @@ def do_segmentation(probes_fname, method, threshold=None, skip_low=False,
     if method == 'haar':
         from . import haar
         segs = haar.segment_haar(filtered_probes, threshold or 0.001)
-        segs['gene'] = squash_gene_names(segs, probes)
+        segs['gene'], segs['weight'] = transfer_names_weights(segs, probes)
         return segs
 
     # Run R scripts to calculate copy number segments
@@ -52,12 +52,14 @@ def do_segmentation(probes_fname, method, threshold=None, skip_low=False,
         # ENH: run each chromosome separately
         # ENH: run each chrom. arm separately (via knownsegs)
     seg_pset = probes.as_dataframe(seg2cns(seg_out))
+    seg_pset.sort_columns()
 
     if method == 'flasso':
         seg_pset = squash_segments(seg_pset)
 
     seg_pset = repair_segments(seg_pset, probes)
-    seg_pset['gene'] = squash_gene_names(seg_pset, probes)
+    seg_pset['gene'], seg_pset['weight'] = transfer_names_weights(seg_pset,
+                                                                  probes)
 
     if save_dataframe:
         return seg_pset, seg_out
@@ -65,17 +67,19 @@ def do_segmentation(probes_fname, method, threshold=None, skip_low=False,
         return seg_pset
 
 
-def squash_gene_names(segments, cnarr, ignore=('Background', 'CGH', '-')):
+def transfer_names_weights(segments, cnarr, ignore=('Background', 'CGH', '-')):
     """Copy gene names from `cnarr` to the segmented `segarr`.
 
     Segment name is the comma-separated list of bin gene names.
     """
     segnames = ['-'] * len(segments)
+    segweights = np.zeros(len(segments))
     for i, (_seg, subprobes) in enumerate(cnarr.by_segment(segments)):
+        segweights[i] = subprobes['weight'].mean()
         subgenes = [g for g in pd.unique(subprobes['gene']) if g not in ignore]
         if subgenes:
             segnames[i] = ",".join(subgenes)
-    return segnames
+    return segnames, segweights
 
 
 def seg2cns(seg_text):
@@ -156,7 +160,6 @@ def repair_segments(segments, orig_probes):
     if extra_segments:
         segments.concat(segments.as_rows(extra_segments))
     # ENH: Recalculate segment means here instead of in R
-    segments.sort_columns()
     return segments
 
 
