@@ -1583,7 +1583,7 @@ P_export_vcf.add_argument("-i", "--sample-id", metavar="LABEL",
                 [Default: use the sample ID, taken from the file name]""")
 P_export_vcf.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
-P_export.add_argument("-g", "--gender",
+P_export_vcf.add_argument("-g", "--gender",
         choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
