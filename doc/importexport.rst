@@ -59,6 +59,16 @@ integer IDs. Options in ``import-seg`` can help recover the original names.
   be: "-c 23:X,24:Y,25:M".
 
 
+.. _import-theta:
+
+import-theta
+------------
+
+Convert the ".results" output of `THetA2
+<http://compbio.cs.brown.edu/projects/theta/>`_ to one or more CNVkit .cns files
+representing subclones with integer absolute copy number in each segment.
+
+
 .. _export:
 
 export
@@ -114,5 +124,39 @@ nexus-basic
 
 The format ``nexus-basic`` can be loaded directly by the commercial program
 Biodiscovery Nexus Copy Number, specifying the "basic" input format in that
-program.
+program. This allows viewing CNVkit data as if it were from array CGH.
+
+This is a tabular format very similar to .cnr files, with the columns:
+
+#. chromosome
+#. start
+#. end
+#. log2
+
+
+nexus-ogt
+`````````
+
+The format ``nexus-ogt`` can be loaded directly by the commercial program
+Biodiscovery Nexus Copy Number, specifying the "Custom-OGT" input format in that
+program. This allows viewing CNVkit data as if it were from a SNP array.
+
+This is a tabular format similar to .cnr files, but with B-allele frequencies
+(BAFs) extracted from a corresponding VCF file. The format's columns are (with
+.cnr equivalents):
+
+#. "Chromosome" (chromosome)
+#. "Position" (start)
+#. "Position" (end)
+#. "Log R Ratio" (log2)
+#. "B-Allele Frequency" (from VCF)
+
+The positions of each heterozygous variant record in the given VCF are matched
+to bins in the given .cnr file, and the variant allele frequencies are extracted
+and assigned to the matching bins.
+
+- If a bin contains no variants, the BAF field is left blank
+- If a bin contains multiple variants, the BAFs of those variants are "mirrored"
+  to be all above .5 (e.g. BAF of .3 becomes .7), then the median is taken as
+  the bin-wide BAF.
 
