@@ -1505,7 +1505,8 @@ def _cmd_export_bed(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    table = export.export_bed(args.segments, args)
+    table = export.export_bed(args.segments, args.ploidy, args.male_reference,
+                              args.sample_id, args.show_all)
     core.write_dataframe(args.output, table, header=False)
 
 P_export_bed = P_export_subparsers.add_parser('bed',
@@ -1518,9 +1519,9 @@ P_export_bed.add_argument("-i", "--sample-id", metavar="LABEL",
                 [Default: use the sample ID, taken from the file name]""")
 P_export_bed.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
-P_export_bed.add_argument("--show-neutral", action="store_true",
-        help="""Write segmented regions of neutral copy number, in addition to
-                copy number alterations. [Default: only output CNA regions]""")
+P_export_bed.add_argument("--show-all", action="store_true",
+        help="""Write all segmented regions, not just those with non-neutral
+                copy number. [Default: only output CNA regions]""")
 P_export_bed.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,

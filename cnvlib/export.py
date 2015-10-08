@@ -176,7 +176,8 @@ def create_chrom_ids(segments):
 # _____________________________________________________________________________
 # BED
 
-def export_bed(sample_fnames, args):
+def export_bed(sample_fnames, ploidy, is_reference_male,
+               sample_id=None, show_all=False):
     """Export to BED format.
 
     For each region in each sample which does not have neutral copy number
@@ -191,19 +192,19 @@ def export_bed(sample_fnames, args):
     bed_tables = []
     for fname in sample_fnames:
         segs = CNA.read(fname)
-        tbl = segments2bed(segs, args.sample_id or segs.sample_id, args.ploidy,
-                           args.male_reference, args.show_neutral)
+        tbl = segments2bed(segs, sample_id or segs.sample_id, ploidy,
+                           is_reference_male, show_all)
         bed_tables.append(tbl)
     return pd.concat(bed_tables)
 
 
-def segments2bed(segments, label, ploidy, is_reference_male, show_neutral):
+def segments2bed(segments, label, ploidy, is_reference_male, show_all):
     """Convert a copy number array to a BED-like DataFrame."""
     absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
     out = segments.data.loc[:, ["chromosome", "start", "end"]]
     out["label"] = label
     out["ncopies"] = np.rint(absolutes)
-    if not show_neutral:
+    if not show_all:
         # Skip regions of normal ploidy
         out = out[out["ncopies"] != ploidy]
     return out

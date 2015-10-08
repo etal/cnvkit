@@ -98,8 +98,9 @@ with FreeBayes's ``--cnv-map`` option::
     # Show only CNV regions
     cnvkit.py export bed *.call.cns -o all-samples.cnv-map.bed
 
-Copy-number-neutral regions are not shown in the output by default, but can be
-included with the ``--show-neutral`` option.
+By default only regions with copy number different from the given ploidy
+(default 2) are output. (Notice what this means for allosomes.)
+To output all segments, use the ``--show-neutral`` option.
 
 cdt, jtv
 ````````
