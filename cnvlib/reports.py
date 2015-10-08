@@ -65,7 +65,7 @@ def get_breakpoints(intervals, segments, min_probes):
 # _____________________________________________________________________________
 # gainloss
 
-def gainloss_by_gene(probes, threshold, skip_low):
+def gainloss_by_gene(probes, threshold, skip_low=False):
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
     NB: Must shift sex-chromosome values beforehand with shift_xx,
@@ -77,7 +77,7 @@ def gainloss_by_gene(probes, threshold, skip_low):
             yield (gene, chrom, start, end, coverage, nprobes)
 
 
-def gainloss_by_segment(probes, segments, threshold, skip_low):
+def gainloss_by_segment(probes, segments, threshold, skip_low=False):
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
     NB: Must shift sex-chromosome values beforehand with shift_xx,
