@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev
 RUN pip install pandas pysam pyvcf
 RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('PSCBS', 'cghFLasso')"
-RUN pip install cnvkit==0.7.1
+RUN pip install cnvkit==0.7.2
 
 # ENTRYPOINT ["cnvkit.py"]
 # CMD ["--help"]
