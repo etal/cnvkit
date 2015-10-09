@@ -14,14 +14,14 @@ class RTests(unittest.TestCase):
     def test_segment(self):
         # Each method
         for method in ("cbs", "flasso"):
-                cns = segmentation.do_segmentation("formats/amplicon.cnr",
-                                                   False, method)
-                self.assertTrue(len(cns) > 0)
-        # With the R dataframe
-        cns, dframe = segmentation.do_segmentation("formats/amplicon.cnr", True,
-                                                   "flasso", 0.01)
-        self.assertTrue(len(cns) > 0)
-        self.assertTrue(len(dframe) > 0)
+            cns = segmentation.do_segmentation("formats/amplicon.cnr", method)
+            self.assertTrue(len(cns) > 0)
+            # With the R dataframe
+            cns, dframe = segmentation.do_segmentation("formats/amplicon.cnr",
+                                                       "flasso", 0.01,
+                                                       save_dataframe=True)
+            self.assertTrue(len(cns) > 0)
+            self.assertTrue(len(dframe) > 0)
 
 
 
