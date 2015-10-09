@@ -9,15 +9,37 @@ All of the non-standard file formats used by CNVkit are tab-separated plain text
 and can be loaded in a spreadsheet program, R or other statistical analysis
 software for manual analysis, if desired.
 
-BED
+BED and GATK/Picard Interval List
+---------------------------------
+
+- UCSC Genome Browser's `BED definition and FAQ <http://genome.ucsc.edu/FAQ/FAQformat.html#format1>`_
+- GATK's `Interval List description
+  <https://www.broadinstitute.org/gatk/guide/article?id=1204>`_ and `FAQ
+  <https://www.broadinstitute.org/gatk/guide/article?id=1319>`_
+
+Note that BED genomic coordinates are 0-indexed, like C or Python code -- for
+example, the first nucleotide of a 1000-basepair sequence has position 0, the
+last nucleotide has position 999, and the entire region is indicated by the
+range 0-1000.
+
+Interval list coordinates are 1-indexed, like R or Matlab code. In the same
+example, the first nucleotide of a 1000-basepair sequence has position 1, the
+last nucleotide has position 1000, and the entire region is indicated by the
+range 1-1000.
+
+
+VCF
 ---
 
-See: http://genome.ucsc.edu/FAQ/FAQformat.html#format1
+See the `VCF specifications <https://github.com/samtools/hts-specs>`_.
 
-Note that BED genomic coordinates are 0-indexed, like C or Python code, but
-unlike the 1-indexed GATK/Picard interval list format. (The first nucleotide
-of a 1000-basepair sequence has position 0, the last nucleotide has position 999,
-and the entire region is indicated by the range 0-1000.)
+CNVkit currently uses VCF files in two ways:
+
+- To :ref:`export` CNVs, describing/encoding each CNV segment as a structural
+  variant (SV).
+- To plot single-nucleotide variant (SNV) allele frequencies in the
+  :ref:`scatter` and :ref:`loh` commands, or export these allele frequencies to
+  the "nexus-ogt" format.
 
 
 Target and antitarget bin-level coverages (.cnn)

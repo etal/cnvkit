@@ -89,13 +89,36 @@ region.
 loh
 ---
 
-Plot allelic frequencies at each variant position in a VCF file. Divergence from
-0.5 indicates loss of heterozygosity (LOH) in a tumor sample.
+Plot allelic frequencies at each variant position in a VCF file. Given segments,
+show the mean b-allele frequency values above and below 0.5 of SNVs falling
+within each segment. Divergence from 0.5 indicates LOH in the tumor sample.
 
 ::
 
     cnvkit.py loh Sample.vcf
-    cnvkit.py loh Sample.vcf -s Sample.cns
+    cnvkit.py loh Sample.vcf -s Sample.cns -i Sample_Tumor -n Sample_Normal
+
+Regions with LOH are reflected in heterozygous germline SNPs in the tumor sample
+with allele frequencies shifted away from the expected 0.5 value.
+Given a VCF with only the tumor sample called, it is difficult to focus on just
+the informative SNPs because it's not known which SNVs are present and
+heterozygous in normal, germline cells.
+Better results can be had by giving CNVkit more information:
+
+- Call somatic mutations using paired tumor and normal samples.
+  In the VCF, the somatic variants should be flagged in the INFO column with the
+  string "SOMATIC". (MuTect does this automatically.) Then CNVkit will skip
+  these for plotting.
+- Add a "PEDIGREE" tag to the VCF header, listing the tumor sample as "Derived"
+  and the normal as "Original". (MuTect doesn't do this, but it does add a
+  nonstandard GATK header that CNVkit can extract the same information from.)
+- In lieu of a PEDIGREE tag, tell CNVkit which sample IDs are the tumor and normal using the
+  ``-i`` and ``-n`` options, respectively.
+- If no paired normal sample is available, you can still filter for likely
+  informative SNPs by intersecting your tumor VCF with a set of known SNPs such
+  as 1000 Genomes, ESP6500, or ExAC.
+  Drop the private SNVs that don't appear in these databases to create a VCF
+  more amenable to LOH detection.
 
 
 .. _diagram:
