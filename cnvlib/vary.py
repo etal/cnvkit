@@ -137,8 +137,11 @@ def _parse_records(vcf_reader, sample_id, normal_id, min_depth,
             if n_depth is None or n_depth < min_depth:
                 cnt_depth += 1
                 continue
-            if skip_hom and n_zygosity  in (0.0, 1.0):
+            if skip_hom and n_zygosity in (0.0, 1.0):
                 cnt_hom += 1
+                continue
+            if skip_somatic and n_zygosity == 0:
+                cnt_som += 1
                 continue
         else:
             if depth is None or depth < min_depth:
@@ -178,7 +181,7 @@ def _extract_genotype(sample):
         zygosity = 0.0
     else:
         zygosity = 1.0
-    alt_count = _get_alt_count(sample)
+    alt_count = (_get_alt_count(sample) if sample.gt_type else 0.0)
     return depth, zygosity, alt_count
 
 
