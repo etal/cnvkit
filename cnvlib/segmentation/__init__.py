@@ -13,10 +13,9 @@ from ..cnary import CopyNumArray as CNA
 from Bio._py3k import StringIO
 
 
-def do_segmentation(probes_fname, method, threshold=None, skip_low=False,
+def do_segmentation(probes, method, threshold=None, skip_low=False,
                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
-    probes = CNA.read(probes_fname)
     if skip_low:
         filtered_probes = probes.drop_low_coverage()
     else:

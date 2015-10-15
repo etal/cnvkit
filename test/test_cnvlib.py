@@ -332,11 +332,12 @@ class CommandTests(unittest.TestCase):
 
     def test_segment(self):
         """The 'segment' command."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
         # R methods are in another script
-        segments = segmentation.do_segmentation("formats/amplicon.cnr", "haar")
+        segments = segmentation.do_segmentation(cnarr, "haar")
         self.assertTrue(len(segments) > 0)
-        segments = segmentation.do_segmentation("formats/amplicon.cnr", "haar",
-                                                threshold=.001, skip_low=True)
+        segments = segmentation.do_segmentation(cnarr, "haar", threshold=.001,
+                                                skip_low=True)
         self.assertTrue(len(segments) > 0)
 
     def test_segmetrics(self):

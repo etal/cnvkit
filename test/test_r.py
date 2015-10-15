@@ -5,6 +5,7 @@ from __future__ import absolute_import, division, print_function
 
 import unittest
 
+import cnvlib
 from cnvlib import segmentation
 
 
@@ -12,13 +13,13 @@ class RTests(unittest.TestCase):
     """Tests that depend on the R statistical environment."""
 
     def test_segment(self):
+        cnarr = cnvlib.read("formats/amplicon.cnr")
         # Each method
         for method in ("cbs", "flasso"):
-            cns = segmentation.do_segmentation("formats/amplicon.cnr", method)
+            cns = segmentation.do_segmentation(cnarr, method)
             self.assertTrue(len(cns) > 0)
             # With the R dataframe
-            cns, dframe = segmentation.do_segmentation("formats/amplicon.cnr",
-                                                       "flasso", 0.01,
+            cns, dframe = segmentation.do_segmentation(cnarr, "flasso", 0.01,
                                                        save_dataframe=True)
             self.assertTrue(len(cns) > 0)
             self.assertTrue(len(dframe) > 0)
