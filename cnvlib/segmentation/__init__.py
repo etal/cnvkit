@@ -74,7 +74,7 @@ def transfer_names_weights(segments, cnarr, ignore=('Background', 'CGH', '-')):
     segnames = ['-'] * len(segments)
     segweights = np.zeros(len(segments))
     for i, (_seg, subprobes) in enumerate(cnarr.by_segment(segments)):
-        segweights[i] = subprobes['weight'].mean()
+        segweights[i] = subprobes['weight'].sum()
         subgenes = [g for g in pd.unique(subprobes['gene']) if g not in ignore]
         if subgenes:
             segnames[i] = ",".join(subgenes)
