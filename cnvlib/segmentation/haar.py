@@ -65,20 +65,21 @@ def segment_haar(cnarr, fdr_q):
     # ENH - skip large gaps (segment chrom. arms separately)
     for chrom, subprobes in cnarr.by_chromosome():
         # echo(chrom, ':')  # DBG
-        segtable = haarSeg(subprobes['log2'], breaksFdrQ=fdr_q)
+        segtable = haarSeg(np.asarray(subprobes['log2']),
+                           fdr_q,
+                           W=(np.asarray(subprobes['weight'])
+                              if 'weight' in subprobes
+                              else None))
         chromtable = pd.DataFrame({
             'chromosome': chrom,
             'start': np.asarray(subprobes['start']).take(segtable['start']),
-            'end': np.asarray(subprobes['end']
-                             ).take(segtable['start']+segtable['size']-1),
-            'gene': '.',
+            'end': np.asarray(subprobes['end']).take(segtable['end']),
             'log2': segtable['log2'],
             'probes': segtable['size'],
         })
-        # echo(chromtable)  # DBG
         chrom_tables.append(chromtable)
     result = pd.concat(chrom_tables)
-    echo("haar: Found", len(result), "segments")
+    result['gene'] = '.'
     segarr = cnarr.as_dataframe(result)
     segarr.sort_columns()
     return segarr
@@ -139,7 +140,7 @@ def haarSeg(I, breaksFdrQ,
         """Median absolute deviation, with deviations given."""
         if len(diff_vals) == 0:
             return 0.
-        return np.median(np.abs(diff_vals)) / 0.6745
+        return np.median(np.abs(diff_vals)) * 1.4826
 
     diffI = HaarConv(I, None, 1)
     if rawI:
@@ -158,6 +159,7 @@ def haarSeg(I, breaksFdrQ,
         stepHalfSize = 2 ** level
         convRes = HaarConv(I, W, stepHalfSize)
         peakLoc = FindLocalPeaks(convRes)
+        # echo("Found", len(peakLoc), "peaks at level", level)  # DBG
 
         if rawI:
             pulseSize = 2 * stepHalfSize
@@ -167,49 +169,39 @@ def haarSeg(I, breaksFdrQ,
             peakSigmaEst = 1.
 
         T = FDRThres(convRes[peakLoc], breaksFdrQ, peakSigmaEst)
-        addonPeaks = HardThreshold(convRes, T, peakLoc)
+        # Keep only the peak values where the signal amplitude is large enough.
+        addonPeaks = np.extract(np.abs(convRes.take(peakLoc)) >= T, peakLoc)
         breakpoints = UnifyLevels(breakpoints, addonPeaks, 2 ** (level - 1))
 
-    # echo("Found", len(breakpoints), "breakpoints:", breakpoints)
+    # echo("Found", len(breakpoints), "breakpoints:", breakpoints)  # DBG
 
+    # Translate breakpoints to segments
     segs = SegmentByPeaks(I, breakpoints, W)
-
     segSt = np.insert(breakpoints, 0, 0)
     segEd = np.append(breakpoints, len(I))
-    segSize = segEd - segSt
-    segValues = segs[segSt]
-
-    segment_table = pd.DataFrame.from_items([('start', segSt),
-                                             ('size', segSize),
-                                             ('log2', segValues)])
-    return segment_table
+    return {'start': segSt,
+            'end': segEd - 1,
+            'size': segEd - segSt,
+            'log2': segs[segSt]}
 
 
 def FDRThres(x, q, stdev):
-    """False discovery rate (FDR) threshold.
-
-    Source: FDRThres.R
-    """
+    """False discovery rate (FDR) threshold."""
     M = len(x)
     if M < 2:
-        T = 0
+        return 0
+
+    m = np.arange(1, M+1) / M
+    x_sorted = np.sort(np.abs(x))[::-1]
+    p = 2 * (1 - stats.norm.cdf(x_sorted, stdev))  # like R "pnorm"
+    # Get the largest index for which p <= m*q
+    indices = np.nonzero(p <= m * q)[0]
+    if len(indices):
+        T = x_sorted[indices[-1]]
     else:
-        m = np.arange(1, M+1) / M
-        sortedX = sorted(map(abs, x), reverse=True)
-
-        # p = 2*(1 - pnorm(sortedX, sd = sdev));
-        p = 2 * (1 - stats.norm.cdf(sortedX, stdev)) # XXX stdev
-
-        # Get the largest index for which p <= m*q
-        k = np.nonzero(p <= m * q)[0]
-        if len(k):
-            T = sortedX[k[-1]]
-        else:
-            # echo("No passing p-values: min p=%.4g, min m=%.4g, q=%s"
-            #      % (p[0], m[0], q))
-            # T = sortedX[1] + 1e-16;  # ~= 2^-52, like MATLAB "eps"
-            T = sortedX[0] + 1e-16
-
+        # echo("No passing p-values: min p=%.4g, min m=%.4g, q=%s"
+        #      % (p[0], m[0], q))
+        T = x_sorted[0] + 1e-16  # ~= 2^-52, like MATLAB "eps"
     return T
 
 
@@ -224,14 +216,13 @@ def SegmentByPeaks(data, peaks, weights=None):
     segs = np.zeros_like(data)
     for seg_start, seg_end in zip(np.insert(peaks, 0, 0),
                                   np.append(peaks, len(data))):
-        if weights is not None:
+        if weights is not None and weights[seg_start:seg_end].sum() > 0:
             # Weighted mean of individual probe values
             val = np.average(data[seg_start:seg_end],
                              weights=weights[seg_start:seg_end])
         else:
             # Unweighted mean of individual probe values
             val = np.mean(data[seg_start:seg_end])
-        # echo("Segment value @%d-%d: %.4f" % (seg_start, seg_end, val))
         segs[seg_start:seg_end] = val
     return segs
 
@@ -244,15 +235,12 @@ def HaarConv(signal, #const double * signal,
              weight, #const double * weight,
              stepHalfSize, #int stepHalfSize,
             ):
-    """Convolve haar wavelet function with a signal, applying circular padding
-    to the signal.
-
-    Supports weights when weight pointer is not None.
+    """Convolve haar wavelet function with a signal, applying circular padding.
 
     Params:
 
         signal: const array of floats
-        weight: const array of floats
+        weight: const array of floats (optional)
         stepHalfSize: int
 
     Output:
@@ -272,18 +260,15 @@ def HaarConv(signal, #const double * signal,
     result = np.zeros(signalSize, dtype=np.float_)
     if weight is not None:
         # Init weight sums
-        highWeightSum = 0.
-        highSquareSum = 0.
-        highNonNormed = 0.
-        for k in range(stepHalfSize):
-            highWeightSum += weight[k]
-            highSquareSum += weight[k]*weight[k]
-            highNonNormed += weight[k]*signal[k]
+        highWeightSum = weight[:stepHalfSize].sum()
+        highSquareSum = np.exp2(weight[:stepHalfSize]).sum()
+        highNonNormed = (weight[:stepHalfSize] * signal[:stepHalfSize]).sum()
         # Circular padding
         lowWeightSum = highWeightSum
         lowSquareSum = highSquareSum
         lowNonNormed = -highNonNormed
 
+    # ENH: vectorize this loop (it's the performance hotspot)
     for k in range(1, signalSize):
         highEnd = k + stepHalfSize - 1
         if highEnd >= signalSize:
@@ -301,13 +286,12 @@ def HaarConv(signal, #const double * signal,
             highWeightSum += weight[highEnd] - weight[k-1]
             lowSquareSum += weight[k-1] * weight[k-1] - weight[lowEnd] * weight[lowEnd]
             highSquareSum += weight[highEnd] * weight[highEnd] - weight[k-1] * weight[k-1]
-            result[k] = math.sqrt(stepHalfSize / 2) * (
-                        lowNonNormed / lowWeightSum + highNonNormed / highWeightSum)
+            result[k] = math.sqrt(stepHalfSize / 2) * (lowNonNormed / lowWeightSum +
+                                                       highNonNormed / highWeightSum)
 
     if weight is None:
         stepNorm = math.sqrt(2. * stepHalfSize)
-        for k in range(1, signalSize):
-            result[k] /= stepNorm
+        result[1:signalSize] /= stepNorm
 
     return result
 
@@ -363,28 +347,6 @@ def FindLocalPeaks(signal, #const double * signal,
     return np.array(peakLoc, dtype=np.int_)
 
 
-def HardThreshold(signal, #const double * signal,
-                  threshold, #double threshold,
-                  peakLoc, #int * peakLoc);
-                 ):
-    """Drop any values of peakLoc under the given threshold.
-
-    I.e. keep only the peak values where the signal amplitude is large enough.
-
-    Parameters:
-
-        signal: const array of floats
-        threshold: scalar float
-        peakLoc: modifiable array of ints
-
-    Source: HaarSeg.c
-    """
-    peakLocOut = np.extract(np.abs(signal.take(peakLoc)) >= threshold, peakLoc)
-    # echo("Peaks passing threshold:", peakLocOut,
-    #      "\nat:", signal.take(peakLocOut))
-    return peakLocOut
-
-
 def UnifyLevels(baseLevel, #const int * baseLevel,
                 addonLevel, #const int * addonLevel,
                 windowSize, #int windowSize,
@@ -407,31 +369,46 @@ def UnifyLevels(baseLevel, #const int * baseLevel,
 
     Source: HaarSeg.c
     """
+    if not len(addonLevel):
+        return baseLevel
+
+    # Merge all addon items outside a window around each base item
+    # ENH: do something clever with searchsorted & masks?
     joinedLevel = []
-
-    # Going over all base
-    addon_iter = iter(addonLevel)
+    addon_idx = 0
     for base_elem in baseLevel:
-        for addon_elem in addon_iter:
-            if base_elem - windowSize <= addon_elem <= base_elem + windowSize:
-                continue
-            joinedLevel.append(addon_elem)
-            if addon_elem > base_elem + windowSize:
+        while addon_idx < len(addonLevel):
+            addon_elem = addonLevel[addon_idx]
+            if addon_elem < base_elem - windowSize:
+                # Addon is well before this base item -- use it
+                joinedLevel.append(addon_elem)
+                addon_idx += 1
+            elif base_elem - windowSize <= addon_elem <= base_elem + windowSize:
+                # Addon is too close to this base item -- skip it
+                addon_idx += 1
+            else:
+                assert base_elem + windowSize < addon_elem
+                # Addon is well beyond this base item -- keep for the next round
                 break
-
         joinedLevel.append(base_elem)
 
-    # Insert remaining indexes in addon to joined
-    joinedLevel.extend(addon_iter)
+    # Append the remaining addon items beyond the last base item's window
+    last_pos = (baseLevel[-1] + windowSize if len(baseLevel) else -1)
+    while addon_idx < len(addonLevel) and addonLevel[addon_idx] <= last_pos:
+        addon_idx += 1
+    if addon_idx < len(addonLevel):
+        joinedLevel.extend(addonLevel[addon_idx:])
+
     return np.array(sorted(joinedLevel), dtype=np.int_)
 
 
-# For the R version only, not Matlab (???)
 def PulseConv(signal, #const double * signal,
               pulseSize, #int pulseSize,
              ):
     """Convolve a pulse function with a signal, applying circular padding to the
     signal.
+
+    Used for non-stationary variance compensation.
 
     Parameters:
 
@@ -523,24 +500,6 @@ def AdjustBreaks(signal, #const double * signal,
             newPeakLoc[k] += bestOffset
 
     return newPeakLoc
-
-
-# R array functions in Python
-def match(x, table, nomatch=None):
-    """Returns a vector of the positions of (first) matches of `x` in `table`.
-
-    ## The intersection of two sets can be defined via match():
-    ## Simple version:
-    ## intersect <- function(x, y) y[match(x, y, nomatch = 0)]
-    intersect # the R function in base, slightly more careful
-
-    >>> match(range(5), range(2, 11))
-    array([None, None, 0, 1, 2], dtype=object)
-    >>> match(range(3,5), range(2, 11))
-    array([1, 2])
-    """
-    return np.asarray([(list(table).index(val) if val in table else nomatch)
-                       for val in x])
 
 
 # Testing

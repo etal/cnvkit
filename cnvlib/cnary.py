@@ -232,7 +232,7 @@ class CopyNumArray(gary.GenomicArray):
         outrows = []
         for name, subarr in self.by_gene(ignore):
             if name == 'Background' and not squash_background:
-                outrows.extend(map(tuple, subarr))
+                outrows.extend(subarr.data.itertuples(index=False))
             else:
                 outrows.append(squash_rows(name, subarr.data))
         return self.as_rows(outrows)
