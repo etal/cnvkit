@@ -194,6 +194,9 @@ def _get_alt_count(sample):
         # VarScan
         else:
             alt_count = float(sample.data.AD)
+    elif "CLCAD2" in sample.data._fields and sample.data.CLCAD2 is not None:
+        # Qiagen CLC Genomics Server -- similar to GATK's AD
+        alt_count = float(sample.data.CLCAD2[1])
     elif "AO" in sample.data._fields:
         if sample.data.AO:
             if isinstance(sample.data.AO, (list, tuple)):
