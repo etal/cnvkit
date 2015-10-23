@@ -65,22 +65,24 @@ class GenomicArray(object):
         return cls(table, meta_dict)
 
     def as_columns(self, **columns):
-        """Extract a subset of columns, reusing this instance's metadata."""
+        """Wrap the named columns in this instance's metadata."""
         return self.__class__.from_columns(columns, self.meta)
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
     def as_dataframe(self, dframe):
+        """Wrap the given pandas dataframe in this instance's metadata."""
         return self.__class__(dframe.reset_index(drop=True), self.meta.copy())
 
     # def as_index(self, index):
     #     """Subset with fancy/boolean indexing; reuse this instance's metadata."""
+    #     """Extract rows by indices, reusing this instance's metadata."""
     #     if isinstance(index, (int, slice)):
     #         return self.__class__(self.data.iloc[index], self.meta.copy())
     #     else:
     #         return self.__class__(self.data[index], self.meta.copy())
 
     def as_rows(self, rows):
-        """Extract rows by indices, reusing this instance's metadata."""
+        """Wrap the given rows in this instance's metadata."""
         return self.from_rows(rows,
                               columns=self.data.columns,
                               meta_dict=self.meta)
@@ -274,8 +276,7 @@ class GenomicArray(object):
         return self.as_dataframe(table)
 
     def in_ranges(self, chrom, starts=None, ends=None, mode='inner'):
-        """Get the GenomicArray portion within the given array's ranges.
-        """
+        """Get the GenomicArray portion within the given array's ranges."""
         assert isinstance(chrom, basestring)  # ENH: take array?
         try:
             table = self.data[self.data['chromosome'] == chrom]
