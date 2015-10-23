@@ -9,61 +9,101 @@ import pandas as pd
 
 from .. import core, ngfrills, params
 from ..cnary import CopyNumArray as CNA
+from .. import vary
+from . import haar
 
 from Bio._py3k import StringIO
 
 
-def do_segmentation(probes, method, threshold=None, skip_low=False,
-                    save_dataframe=False, rlibpath=None):
+def do_segmentation(cnarr, method, threshold=None, variants=None,
+                    skip_low=False, save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
     if skip_low:
-        filtered_probes = probes.drop_low_coverage()
+        filtered_probes = cnarr.drop_low_coverage()
     else:
-        filtered_probes = probes
-    if method == 'haar':
-        from . import haar
-        segs = haar.segment_haar(filtered_probes, threshold or 0.001)
-        segs['gene'], segs['weight'] = transfer_names_weights(segs, probes)
-        return segs
+        filtered_probes = cnarr
 
-    # Run R scripts to calculate copy number segments
-    if method == 'cbs':
-        rscript = CBS_RSCRIPT
-        threshold = threshold or 0.0001
-    elif method == 'flasso':
-        rscript = FLASSO_RSCRIPT
-        threshold = threshold or 0.005
+    if method == 'haar':
+        segarr = haar.segment_haar(filtered_probes, threshold or 0.001)
+        segarr['gene'], segarr['weight'] = transfer_names_weights(segarr, cnarr)
+
+    elif method in ('cbs', 'flasso'):
+        # Run R scripts to calculate copy number segments
+        if method == 'cbs':
+            rscript = CBS_RSCRIPT
+            threshold = threshold or 0.0001
+        elif method == 'flasso':
+            rscript = FLASSO_RSCRIPT
+            threshold = threshold or 0.005
+
+        with tempfile.NamedTemporaryFile(suffix='.cnr') as tmp:
+            filtered_probes.data.to_csv(tmp, index=False, sep='\t',
+                                        float_format='%.6g')
+            tmp.flush()
+            script_strings = {
+                'probes_fname': tmp.name,
+                'sample_id': cnarr.sample_id,
+                'threshold': threshold,
+                'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
+            }
+            with ngfrills.temp_write_text(rscript % script_strings) as script_fname:
+                seg_out = ngfrills.call_quiet('Rscript', script_fname)
+            # ENH: run each chromosome separately
+            # ENH: run each chrom. arm separately (via knownsegs)
+        segarr = cnarr.as_dataframe(seg2cns(seg_out))
+        segarr.sort_columns()
+
+        if method == 'flasso':
+            segarr = squash_segments(segarr)
+
+        segarr = repair_segments(segarr, cnarr)
+        segarr['gene'], segarr['weight'] = transfer_names_weights(segarr, cnarr)
     else:
         raise ValueError("Unknown method %r" % method)
 
-    with tempfile.NamedTemporaryFile(suffix='.cnr') as tmp:
-        filtered_probes.data.to_csv(tmp, index=False, sep='\t',
-                                    float_format='%.6g')
-        tmp.flush()
-        script_strings = {
-            'probes_fname': tmp.name,
-            'sample_id': probes.sample_id,
-            'threshold': threshold,
-            'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
-        }
-        with ngfrills.temp_write_text(rscript % script_strings) as script_fname:
-            seg_out = ngfrills.call_quiet('Rscript', script_fname)
-        # ENH: run each chromosome separately
-        # ENH: run each chrom. arm separately (via knownsegs)
-    seg_pset = probes.as_dataframe(seg2cns(seg_out))
-    seg_pset.sort_columns()
+    if variants:
+        # Re-segment the variant allele freqs within each segment
+        # (XXX WIP)
+        newsegs = []
+        for segment, subvarr in variants.by_segments(segarr):
+            subsegs = haar.haarSeg(np.asarray(subvarr.mirrored_baf()), .005)
+            if len(subsegs) == 1:
+                newsegs.append(pd.DataFrame({
+                    'chromosome': segment['chromosome'],
+                    'start': segment['start'],
+                    'end': segment['end'],
+                    'gene': segment['gene'],
+                    'log2': segment['log2'],
+                    'probes': segment['probes'],
+                    'weight': segment['weight'],
+                }))
+            elif len(subsegs) > 1:
+                # TODO - ensure breakpoint locations make sense
+                starts = np.asarray(subvarr['start']).take(subsegs['start'])
+                ends = np.asarray(subvarr['end']).take(subsegs['end'])
+                weights = segment['weight'] * subsegs['size'] / segment['size']
+                newsegs.append(pd.DataFrame({
+                    'chromosome': segment['chromosome'],
+                    'start': starts,
+                    'end': ends,
+                    'gene': segment['gene'],
+                    'log2': segment['log2'],
+                    'probes': subsegs['size'],
+                    'weight': weights,
+                }))
+            else:
+                # No segments, that's weird
+                raise ValueError("wat")
 
-    if method == 'flasso':
-        seg_pset = squash_segments(seg_pset)
-
-    seg_pset = repair_segments(seg_pset, probes)
-    seg_pset['gene'], seg_pset['weight'] = transfer_names_weights(seg_pset,
-                                                                  probes)
+        segarr = segarr.as_dataframe(pd.concat(newsegs))
+        segarr.sort_columns()
+        # TODO fix ploidy on allosomes
+        segarr.data.update(vary._allele_specific_copy_numbers(segarr, variants))
 
     if save_dataframe:
-        return seg_pset, seg_out
+        return segarr, seg_out
     else:
-        return seg_pset
+        return segarr
 
 
 def transfer_names_weights(segments, cnarr, ignore=('Background', 'CGH', '-')):

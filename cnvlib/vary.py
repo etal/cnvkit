@@ -281,6 +281,7 @@ def _allele_specific_copy_numbers(segarr, varr, ploidy=2):
                 for _seg, subvarr in varr.by_segment(segarr)]
     cn1 = 0.5 * (1 - seg_bafs) * seg_depths
     cn2 = seg_depths - cn1
-    segout = segarr.copy()
-    segout.update({"baf": seg_bafs, "CN1": cn1, "CN2": cn2})
-    return segout
+    # segout = segarr.copy()
+    # segout.update({"baf": seg_bafs, "CN1": cn1, "CN2": cn2})
+    # return segout
+    return pd.DataFrame({"baf": seg_bafs, "CN1": cn1, "CN2": cn2})

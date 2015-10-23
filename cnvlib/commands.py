@@ -612,8 +612,9 @@ def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     cnarr = _CNA.read(args.filename)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
-                                           args.drop_low_coverage,
-                                           bool(args.dataframe), args.rlibpath)
+                                           skip_low=args.drop_low_coverage,
+                                           save_dataframe=bool(args.dataframe),
+                                           rlibpath=args.rlibpath)
     if args.dataframe:
         segments, dframe = results
         with open(args.dataframe, 'w') as handle:

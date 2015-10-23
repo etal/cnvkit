@@ -16,27 +16,10 @@ The basic HaarSeg algorithm:
 
 HaarSeg segmentation is based on detecting local maxima in the wavelet domain,
 using Haar wavelet. The main algorithm parameter is breaksFdrQ, which controls
-the sensitivity of the segmentation result.  This function includes several
-optional extentions, supporting the use of weights (also known as quality of
-measurments) and raw measurments.  We recommend using both extentions where
-possible, as it greatly improves the segmentation result.  Raw red / green
-measurments are used to detect low value probes, which are more sensitive to
-noise.
-
-Examples:
-
-    real.data = c(rep.int(0,2000),rep.int(1,100),rep.int(0,2000));
-    noisy.data = real.data + rnorm(length(real.data),sd = 0.2);
-    plot(noisy.data)
-
-    # Using default parameters
-    seg.data = haarSeg(noisy.data);
-
-    # Segments result table: segment start index | segment size | segment value
-    print(seg.data$SegmentsTable)
-
-    # The complete segmented signal
-    lines(seg.data$Segmented, col="red", lwd=3)
+the sensitivity of the segmentation result. This function supports the optional
+use of weights (also known as quality of measurments) and raw measurments. We
+recommend using both extentions where possible, as it greatly improves the
+segmentation result.
 
 """
 from __future__ import absolute_import, division, print_function
@@ -74,7 +57,7 @@ def segment_haar(cnarr, fdr_q):
             'chromosome': chrom,
             'start': np.asarray(subprobes['start']).take(segtable['start']),
             'end': np.asarray(subprobes['end']).take(segtable['end']),
-            'log2': segtable['log2'],
+            'log2': segtable['mean'],
             'probes': segtable['size'],
         })
         chrom_tables.append(chromtable)
@@ -105,7 +88,8 @@ def haarSeg(I, breaksFdrQ,
     rawI
         The minimum between the raw test-sample and control-sample coverages
         (before applying log ratio, but after any background reduction and/or
-        normalization).
+        normalization). These raw red / green measurments are used to detect
+        low-value probes, which are more sensitive to noise.
         Used for the non-stationary variance compensation.
         Must have the same size as I.
     breaksFdrQ
@@ -182,7 +166,7 @@ def haarSeg(I, breaksFdrQ,
     return {'start': segSt,
             'end': segEd - 1,
             'size': segEd - segSt,
-            'log2': segs[segSt]}
+            'mean': segs[segSt]}
 
 
 def FDRThres(x, q, stdev):
@@ -261,11 +245,11 @@ def HaarConv(signal, #const double * signal,
     if weight is not None:
         # Init weight sums
         highWeightSum = weight[:stepHalfSize].sum()
-        highSquareSum = np.exp2(weight[:stepHalfSize]).sum()
+        # highSquareSum = np.exp2(weight[:stepHalfSize]).sum()
         highNonNormed = (weight[:stepHalfSize] * signal[:stepHalfSize]).sum()
         # Circular padding
         lowWeightSum = highWeightSum
-        lowSquareSum = highSquareSum
+        # lowSquareSum = highSquareSum
         lowNonNormed = -highNonNormed
 
     # ENH: vectorize this loop (it's the performance hotspot)
@@ -284,8 +268,8 @@ def HaarConv(signal, #const double * signal,
             highNonNormed += signal[highEnd] * weight[highEnd] - signal[k-1] * weight[k-1]
             lowWeightSum += weight[k-1] - weight[lowEnd]
             highWeightSum += weight[highEnd] - weight[k-1]
-            lowSquareSum += weight[k-1] * weight[k-1] - weight[lowEnd] * weight[lowEnd]
-            highSquareSum += weight[highEnd] * weight[highEnd] - weight[k-1] * weight[k-1]
+            # lowSquareSum += weight[k-1] * weight[k-1] - weight[lowEnd] * weight[lowEnd]
+            # highSquareSum += weight[highEnd] * weight[highEnd] - weight[k-1] * weight[k-1]
             result[k] = math.sqrt(stepHalfSize / 2) * (lowNonNormed / lowWeightSum +
                                                        highNonNormed / highWeightSum)
 
@@ -523,7 +507,7 @@ if __name__ == '__main__':
     noisy_data = real_data + np.random.standard_normal(len(real_data)) * .2
 
     # # Run using default parameters
-    seg_table = haarSeg(noisy_data)
+    seg_table = haarSeg(noisy_data, .005)
 
     echo(seg_table)
 
