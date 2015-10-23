@@ -173,7 +173,8 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
                       color=SEG_COLOR, linewidth=4, solid_capstyle='round')
 
 
-def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad):
+def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad,
+             do_boost=False):
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
@@ -192,8 +193,10 @@ def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad):
             continue
         posns = np.asfarray(snvs["start"])
         x_posns = posns + curr_offset
-        # vafs = (snvs["alt_freq"] - .5).abs() + .5
-        vafs = np.asfarray(snvs["alt_freq"])
+        if do_boost:
+            vafs = snvs.tumor_boost()
+        else:
+            vafs = np.asfarray(snvs["alt_freq"])
         x_posns_chrom[chrom] = x_posns
         y_posns_chrom[chrom] = vafs
         # Trend bars: always calculated, only shown on request
