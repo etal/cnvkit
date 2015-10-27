@@ -51,30 +51,10 @@ class GaryTests(unittest.TestCase):
                 row_count += len(rows)
             self.assertEqual(row_count, len(cnarr))
 
-    def test_by_ranges(self):
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
-        count_segs = 0
-        for count_segs, (seg, bins) in enumerate(cnarr.by_ranges(segarr)):
-            self.assertEqual(seg['probes'], len(bins))
-        self.assertEqual(len(segarr), count_segs + 1)
-
     # def test_concat(self):
 
-    def test_in_range(self):
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
-        for seg, bins in cnarr.by_ranges(segarr):
-            outrange = cnarr.in_range(seg['chromosome'],
-                                      seg['start'], seg['end'],
-                                      mode='outer')
-            self.assertEqual(len(bins), len(outrange))
-            trimrange = cnarr.in_range(seg['chromosome'],
-                                       seg['start'], seg['end'],
-                                       mode='trim')
-            self.assertEqual(len(bins), len(trimrange))
-
-    def test_in_ranges(self):
+    def test_ranges(self):
+        """Test range methods: by_ranges, in_range, in_ranges."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
         chrom_segarr = dict(segarr.by_chromosome())
@@ -82,21 +62,29 @@ class GaryTests(unittest.TestCase):
             count_segs = 0
             count_bins = 0
             subsegarr = chrom_segarr[chrom]
-            starts = []
-            ends = []
             for count_segs, (seg, bins) in enumerate(subarr.by_ranges(subsegarr)):
                 count_bins += len(bins)
-                starts.append(seg['start'])
-                ends.append(seg['end'])
                 self.assertEqual(seg['probes'], len(bins))
+                self.assertEqual(len(bins), len(
+                    cnarr.in_range(seg['chromosome'], seg['start'], seg['end'],
+                                mode='outer')))
+                self.assertEqual(len(bins), len(
+                    cnarr.in_range(seg['chromosome'], seg['start'], seg['end'],
+                                mode='trim')))
             self.assertEqual(len(subsegarr), count_segs + 1)
             self.assertEqual(len(subarr), count_bins)
-            self.assertEqual(len(subarr),
-                             len(subarr.in_ranges(chrom, starts, ends,
-                                                  mode="outer")))
-            self.assertEqual(len(subarr),
-                             len(subarr.in_ranges(chrom, starts, ends,
-                                                  mode="trim")))
+            self.assertEqual(len(subarr), len(
+                cnarr.in_ranges(chrom, subsegarr['start'], subsegarr['end'],
+                                mode="outer")))
+            self.assertEqual(len(subarr), len(
+                subarr.in_ranges(starts=subsegarr['start'],
+                                 ends=subsegarr['end'], mode="outer")))
+            self.assertEqual(len(subarr), len(
+                cnarr.in_ranges(chrom, subsegarr['start'], subsegarr['end'],
+                                mode="trim")))
+            self.assertEqual(len(subarr), len(
+                subarr.in_ranges(starts=subsegarr['start'],
+                                 ends=subsegarr['end'], mode="trim")))
 
     def test_select(self):
         """Test sugary selection of a subset of the data array."""

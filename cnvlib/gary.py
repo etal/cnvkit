@@ -203,12 +203,10 @@ class GenomicArray(object):
         chrom_lookup = dict(self.by_chromosome())
         for chrom, bin_rows in other.by_chromosome():
             if chrom in chrom_lookup:
-                cn_rows = chrom_lookup[chrom]
-                # ENH: searchsorted w/ start/end arrays?
-                for bin_row in bin_rows:
-                    yield bin_row, cn_rows.in_range(start=bin_row['start'],
-                                                    end=bin_row['end'],
-                                                    mode=mode)
+                subranges = chrom_lookup[chrom]._iter_ranges(
+                    starts=bin_rows['start'], ends=bin_rows['end'], mode=mode)
+                for bin_row, subrange in zip(bin_rows, subranges):
+                    yield bin_row, subrange
             else:
                 if keep_empty:
                     for bin_row in bin_rows:
@@ -240,8 +238,24 @@ class GenomicArray(object):
         endpoints to match the range boundaries, and ``inner`` excludes those
         bins.
         """
+        if isinstance(end, (int, float, np.float64)):
+            end = [int(end)]
+        results = self._iter_ranges(chrom, [start], end, mode)
+        return next(results)
+
+    def in_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
+        """Get the GenomicArray portion within the given array's ranges."""
+        subtables = [sub.data
+                     for sub in self._iter_ranges(chrom, starts, ends, mode)]
+        result = self.as_dataframe(pd.concat(subtables))
+        result.sort()
+        return result
+
+    def _iter_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
+        """Iterate through sub-ranges."""
         assert mode in ('inner', 'outer', 'trim')
         if chrom:
+            assert isinstance(chrom, basestring)  # ENH: accept array?
             try:
                 table = self.data[self.data['chromosome'] == chrom]
             except KeyError:
@@ -249,49 +263,47 @@ class GenomicArray(object):
         else:
             # Unsafe, but faster if we've already subsetted by chromosome
             table = self.data
-        if start or end:
-            if start:
-                if mode == 'inner':
-                    # Only rows entirely after the start point
-                    start_idx = table.start.searchsorted(start)
-                else:
-                    # Include all rows overlapping the start point
-                    start_idx = table.end.searchsorted(start, 'right')
-            else:
-                start_idx = 0
-            if end:
-                if mode == 'inner':
-                    end_idx = table.end.searchsorted(end, 'right')
-                else:
-                    end_idx = table.start.searchsorted(end)
-            else:
-                end_idx = len(table)
-            table = table[start_idx:end_idx]
-            if mode == 'trim':
-                table = table.copy()
-                # Update 5' endpoints to the boundary
-                table.start = table.start.clip_lower(start)
-                # Update 3' endpoints to the boundary
-                table.end = table.end.clip_upper(end)
-        return self.as_dataframe(table)
 
-    def in_ranges(self, chrom, starts=None, ends=None, mode='inner'):
-        """Get the GenomicArray portion within the given array's ranges."""
-        assert isinstance(chrom, basestring)  # ENH: take array?
-        try:
-            table = self.data[self.data['chromosome'] == chrom]
-        except KeyError:
-            raise KeyError("Chromosome %s is not in this probe set" % chrom)
+        # Edge cases
+        if not len(table):
+            yield self.as_rows([])
+            raise StopIteration
+
         if starts is None and ends is None:
-            return self.as_dataframe(table)
-        # ENH: Take a series of slices...
-        # XXX Slow path:
-        if starts is None:
-            starts = np.zeros(len(ends), dtype=np.int_)
-        subtables = [self.in_range(chrom, start, end, mode).data
-                     for start, end in zip(starts, ends)]
-        table = pd.concat(subtables)
-        return self.as_dataframe(table)
+            yield self.as_dataframe(table)
+            raise StopIteration
+
+        if starts is not None and len(starts):
+            if mode == 'inner':
+                # Only rows entirely after the start point
+                start_idxs = table.start.searchsorted(starts)
+            else:
+                # Include all rows overlapping the start point
+                start_idxs = table.end.searchsorted(starts, 'right')
+        else:
+            starts = np.zeros(len(ends) if ends is not None else 1,
+                              dtype=np.int_)
+            start_idxs = starts.copy()
+
+        if ends is not None and len(ends):
+            if mode == 'inner':
+                end_idxs = table.end.searchsorted(ends, 'right')
+            else:
+                end_idxs = table.start.searchsorted(ends)
+        else:
+            end_idxs = np.asarray([len(table)])
+            ends =  np.asarray(table.loc[len(table)-1:, 'end'])
+
+        for start_idx, start_val, end_idx, end_val in zip(start_idxs, starts,
+                                                          end_idxs, ends):
+            subtable = table[start_idx:end_idx]
+            if mode == 'trim':
+                subtable = subtable.copy()
+                # Update 5' endpoints to the boundary
+                subtable.start = subtable.start.clip_lower(start_val)
+                # Update 3' endpoints to the boundary
+                subtable.end = subtable.end.clip_upper(end_val)
+            yield self.as_dataframe(subtable)
 
     def match_to_bins(self, other, key, default=0.0, fill=False,
                       summary_func=np.median):
