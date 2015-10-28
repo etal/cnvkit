@@ -17,12 +17,12 @@ class RTests(unittest.TestCase):
         # Each method
         for method in ("cbs", "flasso"):
             cns = segmentation.do_segmentation(cnarr, method)
-            self.assertTrue(len(cns) > 0)
+            self.assertGreater(len(cns), 0)
             # With the R dataframe
             cns, dframe = segmentation.do_segmentation(cnarr, "flasso", 0.01,
                                                        save_dataframe=True)
-            self.assertTrue(len(cns) > 0)
-            self.assertTrue(len(dframe) > 0)
+            self.assertGreater(len(cns), 0)
+            self.assertGreater(len(dframe), 0)
 
 
 

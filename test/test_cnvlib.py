@@ -147,9 +147,9 @@ class CNATests(unittest.TestCase):
 
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""
-        self.assertTrue('gc' in self.ex_cnr)
+        self.assertIn('gc', self.ex_cnr)
         cleaned = self.ex_cnr.drop_extra_columns()
-        self.assertTrue('gc' not in cleaned)
+        self.assertNotIn('gc', cleaned)
         self.assertTrue((cleaned['log2'] == self.ex_cnr['log2']).all())
 
     def test_gender(self):
@@ -205,7 +205,7 @@ class ImporterTests(unittest.TestCase):
         """Test loading a Picard targetcoverage file."""
         fname = 'picard/p2-5_5.antitargetcoverage.csv'
         cna = importers.import_picard_pertargetcoverage(fname)
-        self.assertTrue(len(cna) > 1)
+        self.assertGreater(len(cna), 1)
 
     def test_import_seg(self):
         """Test loading SEG format."""
@@ -229,13 +229,12 @@ class CommandTests(unittest.TestCase):
         """The 'antitarget' command."""
         baits_fname = "formats/nv2_baits.interval_list"
         access_fname = "../data/access-5k-mappable.hg19.bed"
-        self.assertTrue(0 < len(list(
-            commands.do_antitarget(baits_fname))))
-        self.assertTrue(0 < len(list(
+        self.assertLess(0, len(list(commands.do_antitarget(baits_fname))))
+        self.assertLess(0, len(list(
             commands.do_antitarget(baits_fname, access_fname))))
-        self.assertTrue(0 < len(list(
+        self.assertLess(0, len(list(
             commands.do_antitarget(baits_fname, access_fname, 200000))))
-        self.assertTrue(0 < len(list(
+        self.assertLess(0, len(list(
             commands.do_antitarget(baits_fname, access_fname, 10000, 5000))))
 
     def test_breaks(self):
@@ -243,7 +242,7 @@ class CommandTests(unittest.TestCase):
         probes = cnvlib.read("formats/amplicon.cnr")
         segs = cnvlib.read("formats/amplicon.cns")
         rows = commands.do_breaks(probes, segs, 4)
-        self.assertTrue(len(rows) > 0)
+        self.assertGreater(len(rows), 0)
 
     def test_call(self):
         """The 'call' command."""
@@ -307,14 +306,14 @@ class CommandTests(unittest.TestCase):
         """Run the 'export' command with each format."""
         # SEG
         seg_rows = export.export_seg(["formats/tr95t.cns"])
-        self.assertTrue(len(seg_rows) > 0)
+        self.assertGreater(len(seg_rows), 0)
         seg2_rows = export.export_seg(["formats/tr95t.cns",
                                        "formats/cl_seq.cns"])
-        self.assertTrue(len(seg2_rows) > len(seg_rows))
+        self.assertGreater(len(seg2_rows), len(seg_rows))
         # THetA2
         _header, theta_rows = export.export_theta("formats/tr95t.cns",
                                                   "formats/reference-tr.cnn")
-        self.assertTrue(len(theta_rows) > 0)
+        self.assertGreater(len(theta_rows), 0)
         # VCF
         tr_cns = cnvlib.read("formats/tr95t.cns")
         _header, tr_vcf_body = export.export_vcf(tr_cns, 2, True, True)
@@ -327,40 +326,40 @@ class CommandTests(unittest.TestCase):
         """The 'gainloss' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
         rows = commands.do_gainloss(probes, male_reference=True)
-        self.assertTrue(len(rows) > 0)
+        self.assertGreater(len(rows), 0)
         segs = cnvlib.read("formats/amplicon.cns")
         rows = commands.do_gainloss(probes, segs, True, 0.3, 4)
-        self.assertTrue(len(rows) > 0)
+        self.assertGreater(len(rows), 0)
 
     def test_metrics(self):
         """The 'metrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segments = cnvlib.read("formats/amplicon.cns")
         resids = metrics.probe_deviations_from_segments(cnarr, segments)
-        self.assertTrue(len(resids) <= len(cnarr))
+        self.assertLessEqual(len(resids), len(cnarr))
         values = metrics.ests_of_scale(resids)
         for val in values:
-            self.assertTrue(val > 0)
+            self.assertGreater(val, 0)
 
     def test_reference(self):
         """The 'reference' command."""
         # Empty antitargets
         ref = commands.do_reference(["formats/amplicon.cnr"], ["formats/empty"])
-        self.assertTrue(len(ref) > 0)
+        self.assertGreater(len(ref), 0)
         # Empty antitargets, flat reference
         ref = commands.do_reference_flat("formats/amplicon.bed",
                                          "formats/empty")
-        self.assertTrue(len(ref) > 0)
+        self.assertGreater(len(ref), 0)
 
     def test_segment(self):
         """The 'segment' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
         # R methods are in another script
         segments = segmentation.do_segmentation(cnarr, "haar")
-        self.assertTrue(len(segments) > 0)
+        self.assertGreater(len(segments), 0)
         segments = segmentation.do_segmentation(cnarr, "haar", threshold=.001,
                                                 skip_low=True)
-        self.assertTrue(len(segments) > 0)
+        self.assertGreater(len(segments), 0)
 
     def test_segmetrics(self):
         """The 'segmetrics' command."""
