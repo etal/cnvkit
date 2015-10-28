@@ -1308,7 +1308,7 @@ def _cmd_segmetrics(args):
         cnarr = cnarr.drop_low_coverage()
     segarr = _CNA.read(args.segments)
     deviations = [segbins['log2'] - segment['log2']
-                  for segment, segbins in  cnarr.by_segment(segarr)]
+                  for segment, segbins in  cnarr.by_ranges(segarr)]
     # Measures of spread
     for statname in ("StDev", "MAD", "IQR", "BiVar"):
         option = statname.lower()
@@ -1331,7 +1331,7 @@ def _segmetric_interval(segarr, cnarr, func):
     """Compute a stat that yields intervals (low & high values)"""
     out_vals_lo =  np.repeat(np.nan, len(segarr))
     out_vals_hi = np.repeat(np.nan, len(segarr))
-    for i, (_segment, bins) in enumerate(cnarr.by_segment(segarr)):
+    for i, (_segment, bins) in enumerate(cnarr.by_ranges(segarr)):
         k = len(bins)
         if k > 0:
             out_vals_lo[i], out_vals_hi[i] = func(bins, k)

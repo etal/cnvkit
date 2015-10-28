@@ -335,7 +335,7 @@ def export_theta(tumor, reference):
     # Convert chromosome names to 1-based integer indices
     prev_chrom = None
     chrom_id = 0
-    for seg, ref_rows in ref_vals.by_segment(tumor_segs):
+    for seg, ref_rows in ref_vals.by_ranges(tumor_segs):
         if seg["chromosome"] != prev_chrom:
             chrom_id += 1
             prev_chrom = seg["chromosome"]

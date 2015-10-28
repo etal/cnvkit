@@ -83,7 +83,7 @@ def gainloss_by_segment(probes, segments, threshold, skip_low=False):
     NB: Must shift sex-chromosome values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
-    for segment, subprobes in probes.by_segment(segments):
+    for segment, subprobes in probes.by_ranges(segments):
         if abs(segment['log2']) >= threshold:
             for (gene, chrom, start, end, _coverage, nprobes
                 ) in group_by_genes(subprobes, skip_low):

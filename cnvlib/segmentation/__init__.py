@@ -65,7 +65,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         # Re-segment the variant allele freqs within each segment
         # (XXX WIP)
         newsegs = []
-        for segment, subvarr in variants.by_segments(segarr):
+        for segment, subvarr in variants.by_ranges(segarr):
             subsegs = haar.haarSeg(np.asarray(subvarr.mirrored_baf()), .005)
             if len(subsegs) == 1:
                 newsegs.append(pd.DataFrame({
@@ -113,7 +113,7 @@ def transfer_names_weights(segments, cnarr, ignore=('Background', 'CGH', '-')):
     """
     segnames = np.repeat('-', len(segments))
     segweights = np.zeros(len(segments))
-    for i, (_seg, subprobes) in enumerate(cnarr.by_segment(segments)):
+    for i, (_seg, subprobes) in enumerate(cnarr.by_ranges(segments)):
         segweights[i] = subprobes['weight'].sum()
         subgenes = [g for g in pd.unique(subprobes['gene']) if g not in ignore]
         if subgenes:

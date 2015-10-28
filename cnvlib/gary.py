@@ -187,7 +187,8 @@ class GenomicArray(object):
     def by_ranges(self, other, mode='trim', keep_empty=True):
         """Group rows by another GenomicArray's bin coordinate ranges.
 
-        Returns an iterable of (bin, GenomicArray of overlapping rows))
+        Returns an iterable of (bin, GenomicArray of overlapping rows)). Usually
+        used for grouping probes or SNVs by CNV segments.
 
         `mode` determines what to do with bins that overlap a boundary of the
         selection.  Values are:
@@ -204,7 +205,7 @@ class GenomicArray(object):
         for chrom, bin_rows in other.by_chromosome():
             if chrom in chrom_lookup:
                 subranges = chrom_lookup[chrom]._iter_ranges(
-                    starts=bin_rows['start'], ends=bin_rows['end'], mode=mode)
+                    None, bin_rows['start'], bin_rows['end'], mode)
                 for bin_row, subrange in zip(bin_rows, subranges):
                     yield bin_row, subrange
             else:
@@ -230,7 +231,7 @@ class GenomicArray(object):
     def labels(self):
         return self.data.apply(self.row2label, axis=1)
 
-    def in_range(self, chrom=None, start=0, end=None, mode='inner'):
+    def in_range(self, chrom=None, start=0, end=None, mode='outer'):
         """Get the GenomicArray portion within the given genomic range.
 
         `mode` works as in `by_ranges`: ``outer`` includes bins straddling the
@@ -243,7 +244,7 @@ class GenomicArray(object):
         results = self._iter_ranges(chrom, [start], end, mode)
         return next(results)
 
-    def in_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
+    def in_ranges(self, chrom=None, starts=None, ends=None, mode='outer'):
         """Get the GenomicArray portion within the given array's ranges."""
         subtables = [sub.data
                      for sub in self._iter_ranges(chrom, starts, ends, mode)]
@@ -251,7 +252,7 @@ class GenomicArray(object):
         result.sort()
         return result
 
-    def _iter_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
+    def _iter_ranges(self, chrom, starts, ends, mode):
         """Iterate through sub-ranges."""
         assert mode in ('inner', 'outer', 'trim')
         if chrom:

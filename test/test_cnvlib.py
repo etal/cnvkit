@@ -133,14 +133,6 @@ class CNATests(unittest.TestCase):
 
     # def test_by_gene(self):
 
-    def test_by_segment(self):
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segments = cnvlib.read("formats/amplicon.cns")
-        count_segs = 0
-        for count_segs, (_seg, _bins) in enumerate(cnarr.by_segment(segments)):
-            pass
-        self.assertEqual(len(segments), count_segs + 1)
-
     def test_center_all(self):
         """Test median-recentering."""
         chr1 = self.ex_cnr.in_range('chr1')

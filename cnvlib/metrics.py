@@ -19,7 +19,7 @@ def probe_deviations_from_segments(probes, segments, skip_low=True):
     if skip_low:
         probes = probes.drop_low_coverage()
     deviations = []
-    for segment, subprobes in probes.by_segment(segments):
+    for segment, subprobes in probes.by_ranges(segments):
         deviations.append(subprobes['log2'] - segment['log2'])
     return np.concatenate(deviations)
 
