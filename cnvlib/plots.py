@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division
 
 import collections
+import logging
 import math
 import sys
 
@@ -13,7 +14,6 @@ from Bio._py3k import zip
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 from . import core, smoothing
-from .ngfrills import echo
 
 SEG_COLOR = 'red'
 POINT_COLOR = '#808080'
@@ -364,16 +364,14 @@ def test_loh(bins, alpha=0.0025):
         these_shifts = np.array(partitions['thisbin'], np.float_)
         other_shifts = np.array(partitions['otherbins'], np.float_)
         if len(these_shifts) < 20:
-            echo("Too few points (%d) to test chrom %s"
-                 % (len(these_shifts), chrom))
+            logging.info("Too few points (%d) to test chrom %s",
+                         len(these_shifts), chrom)
         elif these_shifts.mean() > other_shifts.mean():
-            # DBG
-            echo("\nThese ~= %f (N=%d), Other ~= %f (N=%d)" %
-                   (these_shifts.mean(), len(these_shifts),
-                    other_shifts.mean(), len(other_shifts)))
-            # ---
+            logging.debug("\nThese ~= %f (N=%d), Other ~= %f (N=%d)",
+                          these_shifts.mean(), len(these_shifts),
+                          other_shifts.mean(), len(other_shifts))
             u, prob = stats.mannwhitneyu(these_shifts, other_shifts)
-            echo("Mann-Whitney - %s: u=%s, p=%s" % (chrom, u, prob))
+            logging.info("Mann-Whitney - %s: u=%s, p=%s", chrom, u, prob)
             if prob < alpha:
                 significant_chroms.append(chrom)
 

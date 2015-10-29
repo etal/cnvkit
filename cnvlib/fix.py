@@ -1,5 +1,7 @@
 """Supporting functions for the 'fix' command."""
 from __future__ import absolute_import, division, print_function
+
+import logging
 import bisect
 
 import numpy as np
@@ -7,7 +9,6 @@ import pandas as pd
 from Bio._py3k import zip
 
 from . import params, smoothing
-from .ngfrills import echo
 
 
 def load_adjust_coverages(pset, ref_pset,
@@ -25,7 +26,7 @@ def load_adjust_coverages(pset, ref_pset,
 
     # Drop probes that had poor coverage in the pooled reference
     ok_cvg_indices = ~mask_bad_probes(ref_matched)
-    echo("Keeping", sum(ok_cvg_indices), "of", len(ref_matched), "bins")
+    logging.info("Keeping %d of %d bins", sum(ok_cvg_indices), len(ref_matched))
     pset = pset[ok_cvg_indices]
     ref_matched = ref_matched[ok_cvg_indices]
 
@@ -33,20 +34,20 @@ def load_adjust_coverages(pset, ref_pset,
     pset.center_all()
     if fix_gc:
         if 'gc' in ref_matched:
-            echo("Correcting for GC bias...")
+            logging.info("Correcting for GC bias...")
             pset = center_by_window(pset, .1, ref_matched['gc'])
         else:
-            echo("WARNING: Skipping correction for RepeatMasker bias")
+            logging.warn("WARNING: Skipping correction for RepeatMasker bias")
     if fix_edge:
-        echo("Correcting for density bias...")
+        logging.info("Correcting for density bias...")
         pset = center_by_window(pset, .1,
                                 make_edge_sorter(pset, params.INSERT_SIZE))
     if fix_rmask:
         if 'rmask' in ref_matched:
-            echo("Correcting for RepeatMasker bias...")
+            logging.info("Correcting for RepeatMasker bias...")
             pset = center_by_window(pset, .1, ref_matched['rmask'])
         else:
-            echo("WARNING: Skipping correction for RepeatMasker bias")
+            logging.warn("WARNING: Skipping correction for RepeatMasker bias")
 
     # Normalize coverages according to the reference
     # (Subtract the reference log2 copy number to get the log2 ratio)
@@ -178,8 +179,8 @@ def make_edge_sorter(target_probes, margin):
                 gaps_right.append(0)
             else:
                 # DBG: This should probably never happen
-                echo("Oddly positioned tile (%s:%d-%d) vs. target (%d-%d)"
-                     % (chrom, tile_start, tile_end, tgt_start, tgt_end))
+                logging.info("Oddly positioned tile (%s:%d-%d) vs. target (%d-%d)",
+                             chrom, tile_start, tile_end, tgt_start, tgt_end)
                 continue
         gain = 0
         if gaps_left:
@@ -258,13 +259,13 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     weights = sizes / sizes.max()
     if (np.abs(np.mod(ref_matched['log2'], 1)) > epsilon).any():
         # NB: Not used with a flat reference
-        echo("Weighting bins by relative coverage depths in reference")
+        logging.info("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from expected coverage
         flat_cvgs = ref_matched.expect_flat_cvg()
         weights *= 2 ** -np.abs(ref_matched['log2'] - flat_cvgs)
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
-        echo("Weighting bins by coverage spread in reference")
+        logging.info("Weighting bins by coverage spread in reference")
         # Inverse of variance, 0--1
         variances = ref_matched['spread'] ** 2
         invvars = 1.0 - (variances / variances.max())

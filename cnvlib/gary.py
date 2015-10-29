@@ -1,6 +1,7 @@
 """A generic array of genomic positions."""
 from __future__ import print_function, absolute_import, division
 
+import logging
 import sys
 
 import numpy as np
@@ -426,7 +427,7 @@ class GenomicArray(object):
                                  )
         except ValueError:
             # File is blank/empty, most likely
-            ngfrills.echo("Blank file", infile)
+            logging.info("Blank file %s", infile)
             table = _make_blank(cls._required_columns)
         # XXX Pending pandas 0.17: https://github.com/pydata/pandas/issues/10505
         # table['chromosome'] = pd.Categorical(table['chromosome'],

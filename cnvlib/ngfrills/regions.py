@@ -2,12 +2,11 @@
 from __future__ import absolute_import, division, print_function
 
 import functools
+import logging
 import re
 import shlex
 
 from Bio.File import as_handle
-
-from .shared import echo
 
 
 def sniff_num_columns(bed_fname):
@@ -57,9 +56,9 @@ def parse_regions(fname, coord_only=False, keep_strand=False):
     if fmt is None:
         return []
     if fmt == 'bed':
-        echo("Detected file format: BED")
+        logging.info("Detected file format: BED")
     elif fmt == 'interval':
-        echo("Detected file format: interval list")
+        logging.info("Detected file format: interval list")
     parser = {'text': parse_text_coords,
               'interval': parse_interval_list,
               'bed': parse_bed,

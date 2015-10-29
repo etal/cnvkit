@@ -1,11 +1,12 @@
 """An array of genomic regions or features."""
 from __future__ import absolute_import, division, print_function
 
+import logging
+
 import pandas as pd
 from Bio.File import as_handle
 
 from . import core, gary
-from .ngfrills import echo
 from .ngfrills.regions import sniff_region_format, report_bad_line
 
 
@@ -41,9 +42,9 @@ class RegionArray(gary.GenomicArray):
             if fmt is None:
                 return cls([])
             if fmt == 'bed':
-                echo("Detected file format: BED")
+                logging.info("Detected file format: BED")
             elif fmt == 'interval':
-                echo("Detected file format: interval list")
+                logging.info("Detected file format: interval list")
         parser = {'text': _parse_text_coords,
                   'interval': _parse_interval_list,
                   'bed': _parse_bed,

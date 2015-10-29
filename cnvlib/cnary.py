@@ -1,11 +1,12 @@
 """CNVkit's core data structure, a copy number array."""
 from __future__ import print_function, absolute_import, division
 
+import logging
+
 import numpy as np
 import pandas as pd
 
 from . import core, gary, metrics, params
-from .ngfrills import echo
 
 
 class CopyNumArray(gary.GenomicArray):
@@ -65,13 +66,14 @@ class CopyNumArray(gary.GenomicArray):
         their name.
         """
         start_idx = end_idx = None
-        for chrom, subgary in self.by_chromosome():
+        for _chrom, subgary in self.by_chromosome():
             prev_idx = 0
             for gene in pd.unique(subgary.data['gene']):
                 if not (gene == 'Background' or gene in ignore):
                     gene_idx = (subgary.data['gene'] == gene).nonzero()[0]
                     if not len(gene_idx):
-                        echo("Specified gene name somehow missing: %s" % gene)
+                        logging.warn("Specified gene name somehow missing: %s",
+                                     gene)
                         continue
                     start_idx = gene_idx[0]
                     end_idx = gene_idx[-1] + 1
@@ -185,16 +187,17 @@ class CopyNumArray(gary.GenomicArray):
         rel_chrx_cvg = self.get_relative_chrx_cvg()
         is_xx = (rel_chrx_cvg >= cutoff)
         if verbose:
-            echo("Relative log2 coverage of X chromosome:", rel_chrx_cvg,
-                 "(assuming %s)" % ('male', 'female')[is_xx])
+            logging.info("Relative log2 coverage of X chromosome: %g "
+                         "(assuming %s)",
+                         rel_chrx_cvg, ('male', 'female')[is_xx])
         return is_xx
 
     def get_relative_chrx_cvg(self):
         """Get the relative log-coverage of chrX in a sample."""
         chromosome_x = self[self.chromosome == self._chr_x_label]
         if not len(chromosome_x):
-            echo("*WARNING* No", self._chr_x_label, "found in probes;",
-                 "check the input")
+            logging.warn("*WARNING* No %s found in probes; check the input",
+                         self._chr_x_label)
             return
         autosomes = self.autosomes()
         auto_cvgs = autosomes['log2']

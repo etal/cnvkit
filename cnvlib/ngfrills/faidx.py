@@ -1,6 +1,7 @@
 """NGS utilities: Indexed FASTA I/O."""
 from __future__ import absolute_import, division, print_function
 
+import logging
 import math
 import os
 from itertools import groupby
@@ -8,14 +9,14 @@ from itertools import groupby
 import pysam
 from Bio._py3k import map
 
-from .shared import echo, is_newer_than
+from .shared import is_newer_than
 
 
 def ensure_fasta_index(fasta_fname):
     """Ensure a FASTA file is indexed for samtools, to enable fast lookup."""
     fai_fname = fasta_fname + '.fai'
     if not is_newer_than(fai_fname, fasta_fname):
-        echo("Indexing FASTA file", fasta_fname)
+        logging.info("Indexing FASTA file %sw", fasta_fname)
         pysam.faidx(fasta_fname)
     assert os.path.isfile(fai_fname), "Failed to generate index " + fai_fname
     return fai_fname
@@ -68,7 +69,7 @@ def fasta_extract_regions(fa_fname, intervals):
             except KeyError:
                 raise ValueError("Sequence ID '" + chrom + "' is not in FASTA "
                                  + "file " + fa_fname)
-            echo("Extracting sequences from chromosome", chrom)
+            logging.info("Extracting sequences from chromosome %s", chrom)
             eol_size = bytes_per_line - chars_per_line  # Handle \n\r, \n
             for _chrom, start, end in rows:
                 if end > seq_len:
@@ -109,11 +110,11 @@ def _fasta_extract_regions_safe(fa_fname, intervals):
     from Bio import SeqIO
     idx = SeqIO.index(fa_fname, 'fasta')
     for chrom, rows in groupby(intervals, lambda cse: cse[0]):
-        echo("Extracting sequences from chromosome", chrom)
+        logging.info("Extracting sequences from chromosome %s", chrom)
         seq = str(idx[chrom].seq)
-        for _chrom, start, end in rows:
+        for chrom, start, end in rows:
             subseq = seq[start:end]
             if len(subseq) != end - start:
-                echo("Short subsequence %s:%d-%d" % (_chrom, start, end),
-                     "read", len(subseq), ", wanted", end - start)
+                logging.info("Short subsequence %s:%d-%d; read %d, wanted %d",
+                             chrom, start, end, len(subseq), end - start)
             yield subseq

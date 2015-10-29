@@ -24,6 +24,7 @@ segmentation result.
 """
 from __future__ import absolute_import, division, print_function
 
+import logging
 import math
 
 import numpy as np
@@ -31,7 +32,6 @@ import pandas as pd
 from scipy import stats
 
 # from .. import params
-from ..ngfrills import echo
 
 
 def segment_haar(cnarr, fdr_q):
@@ -47,7 +47,7 @@ def segment_haar(cnarr, fdr_q):
     # Segment each chromosome individually
     # ENH - skip large gaps (segment chrom. arms separately)
     for chrom, subprobes in cnarr.by_chromosome():
-        # echo(chrom, ':')  # DBG
+        logging.debug("%s:", chrom)
         segtable = haarSeg(np.asarray(subprobes['log2']),
                            fdr_q,
                            W=(np.asarray(subprobes['weight'])
@@ -143,7 +143,7 @@ def haarSeg(I, breaksFdrQ,
         stepHalfSize = 2 ** level
         convRes = HaarConv(I, W, stepHalfSize)
         peakLoc = FindLocalPeaks(convRes)
-        # echo("Found", len(peakLoc), "peaks at level", level)  # DBG
+        logging.debug("Found %d peaks at level %d", len(peakLoc), level)
 
         if rawI:
             pulseSize = 2 * stepHalfSize
@@ -157,7 +157,7 @@ def haarSeg(I, breaksFdrQ,
         addonPeaks = np.extract(np.abs(convRes.take(peakLoc)) >= T, peakLoc)
         breakpoints = UnifyLevels(breakpoints, addonPeaks, 2 ** (level - 1))
 
-    # echo("Found", len(breakpoints), "breakpoints:", breakpoints)  # DBG
+    logging.debug("Found %d breakpoints: %s", len(breakpoints), breakpoints)
 
     # Translate breakpoints to segments
     segs = SegmentByPeaks(I, breakpoints, W)
@@ -183,8 +183,8 @@ def FDRThres(x, q, stdev):
     if len(indices):
         T = x_sorted[indices[-1]]
     else:
-        # echo("No passing p-values: min p=%.4g, min m=%.4g, q=%s"
-        #      % (p[0], m[0], q))
+        logging.debug("No passing p-values: min p=%.4g, min m=%.4g, q=%s",
+                      p[0], m[0], q)
         T = x_sorted[0] + 1e-16  # ~= 2^-52, like MATLAB "eps"
     return T
 
@@ -237,8 +237,8 @@ def HaarConv(signal, #const double * signal,
         # XXX TODO handle this endcase
         # raise ValueError("stepHalfSize (%s) > signalSize (%s)"
         #                  % (stepHalfSize, signalSize))
-        # echo("Error?: stepHalfSize (%s) > signalSize (%s)"
-        #      % (stepHalfSize, signalSize))
+        logging.debug("Error?: stepHalfSize (%s) > signalSize (%s)",
+                      stepHalfSize, signalSize)
         return np.zeros(signalSize, dtype=np.float_)
 
     result = np.zeros(signalSize, dtype=np.float_)
@@ -509,7 +509,7 @@ if __name__ == '__main__':
     # # Run using default parameters
     seg_table = haarSeg(noisy_data, .005)
 
-    echo(seg_table)
+    logging.info("%s", seg_table)
 
     from matplotlib import pyplot
     indices = np.arange(len(noisy_data))

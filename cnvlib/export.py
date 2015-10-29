@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, print_function
 
 import collections
+import logging
 
 import numpy as np
 import pandas as pd
@@ -10,7 +11,6 @@ from Bio._py3k import map, range, zip
 from . import call, core
 from .cnary import CopyNumArray as CNA
 from .vary import VariantArray as VA
-from .ngfrills import echo
 
 ProbeInfo = collections.namedtuple('ProbeInfo', 'label chrom start end gene')
 
@@ -117,7 +117,8 @@ def export_nexus_ogt(sample_fname, vcf_fname):
     mirrored_baf_median = lambda vals: np.median(np.abs(vals - .5) + .5)
     bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
                                 summary_func=mirrored_baf_median)
-    echo("Placed", sum(~np.isnan(bafs)), "variants into", len(cnarr), "bins")
+    logging.info("Placed %d variants into %d bins",
+                 sum(~np.isnan(bafs)), len(cnarr))
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'log2']]
     out_table = out_table.rename(columns={
         "chromosome": "Chromosome",

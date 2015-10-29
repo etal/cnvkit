@@ -2,11 +2,6 @@
 from __future__ import absolute_import, division, print_function
 
 import os
-import sys
-
-
-def echo(*words):
-    print(*words, file=sys.stderr)
 
 
 def is_newer_than(target_fname, orig_fname):

@@ -1,5 +1,7 @@
 """Supporting functions for the 'antitarget' command."""
 from __future__ import absolute_import, division
+
+import logging
 import math
 import os.path
 import time
@@ -10,7 +12,6 @@ import pysam
 from .cnary import CopyNumArray as CNA
 from .rary import RegionArray as RA
 from .core import fbase
-from .ngfrills import echo
 
 from .params import NULL_LOG2_COVERAGE, READ_LEN
 
@@ -25,8 +26,8 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
             if line.strip():
                 break
         else:
-            echo("Skip processing", os.path.basename(bam_fname),
-                 "with empty regions file", bed_fname)
+            logging.info("Skip processing %s with empty regions file %s",
+                         os.path.basename(bam_fname), bed_fname)
             return CNA.from_rows([], meta_dict={'sample_id': fbase(bam_fname)})
 
     # Calculate average read depth in each bin
@@ -38,22 +39,24 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
     # Log some stats
     tot_time = time.time() - start_time
     tot_reads = sum(read_counts)
-    echo("Time: %.3f seconds (%d reads/sec, %s bins/sec)"
-         % (tot_time,
-            int(round(tot_reads / tot_time, 0)),
-            int(round(len(read_counts) / tot_time, 0))))
-    echo("Summary:",
-         "#bins=%d," % len(read_counts),
-         "#reads=%d," % tot_reads,
-         "mean=%.4f," % (tot_reads / len(read_counts)),
-         "min=%s," % min(read_counts),
-         "max=%s" % max(read_counts))
+    logging.info("Time: %.3f seconds (%d reads/sec, %s bins/sec)",
+                 tot_time,
+                 int(round(tot_reads / tot_time, 0)),
+                 int(round(len(read_counts) / tot_time, 0)))
+    logging.info("Summary: #bins=%d, #reads=%d, "
+                 "mean=%.4f, min=%s, max=%s ",
+                 len(read_counts),
+                 tot_reads,
+                 (tot_reads / len(read_counts)),
+                 min(read_counts),
+                 max(read_counts))
     tot_mapped_reads = bam_total_reads(bam_fname)
     if tot_mapped_reads:
-        echo("Percent reads in regions: %.3f (of %d mapped)"
-            % (100. * tot_reads / tot_mapped_reads, tot_mapped_reads))
+        logging.info("Percent reads in regions: %.3f (of %d mapped)",
+                     100. * tot_reads / tot_mapped_reads,
+                     tot_mapped_reads)
     else:
-        echo("(Couldn't calculate total number of mapped reads)")
+        logging.info("(Couldn't calculate total number of mapped reads)")
 
     return CNA.from_rows(list(cna_rows),
                          meta_dict={'sample_id': fbase(bam_fname)})
@@ -63,7 +66,8 @@ def interval_coverages_count(bed_fname, bam_fname, min_mapq):
     """Calculate log2 coverages in the BAM file at each interval."""
     bamfile = pysam.Samfile(bam_fname, 'rb')
     for chrom, subregions in RA.read(bed_fname).by_chromosome():
-        echo("Processing chromosome", chrom, "of", os.path.basename(bam_fname))
+        logging.info("Processing chromosome %s of %s",
+                     chrom, os.path.basename(bam_fname))
         for _chrom, start, end, name, in subregions.coords(["name"]):
             count, depth = region_depth_count(bamfile, chrom, start, end,
                                               min_mapq)
@@ -101,7 +105,7 @@ def region_depth_count(bamfile, chrom, start, end, min_mapq):
 
 def interval_coverages_pileup(bed_fname, bam_fname, min_mapq):
     """Calculate log2 coverages in the BAM file at each interval."""
-    echo("Processing reads in", os.path.basename(bam_fname))
+    logging.info("Processing reads in %s", os.path.basename(bam_fname))
     for chrom, start, end, name, count, depth in bedcov(bed_fname, bam_fname,
                                                         min_mapq):
         yield [count,

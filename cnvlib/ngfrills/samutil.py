@@ -1,12 +1,13 @@
 """BAM utilities."""
 from __future__ import absolute_import, division, print_function
 
+import logging
 import os
 from itertools import islice
 
 import pysam
 
-from .shared import echo, is_newer_than
+from .shared import is_newer_than
 
 
 def ensure_bam_index(bam_fname):
@@ -24,7 +25,7 @@ def ensure_bam_index(bam_fname):
         # MySample.bai
         bai_fname = bam_fname[:-1] + 'i'
     if not is_newer_than(bai_fname, bam_fname):
-        echo("Indexing BAM file", bam_fname)
+        logging.info("Indexing BAM file %s", bam_fname)
         pysam.index(bam_fname)
         bai_fname = bam_fname + '.bai'
     assert os.path.isfile(bai_fname), \

@@ -1,12 +1,13 @@
 """An array of genomic intervals, treated as variant loci."""
 from __future__ import absolute_import, division, print_function
 
+import logging
+
 import numpy as np
 import pandas as pd
 import vcf
 
 from . import gary
-from .ngfrills import echo
 
 
 class VariantArray(gary.GenomicArray):
@@ -98,9 +99,9 @@ def _select_sample(vcf_reader, sample_id, normal_id):
                 if "Derived" in tag:
                     sample_id = tag["Derived"]
                     normal_id = tag["Original"]
-                    echo("Selected tumor sample", sample_id,
-                         "and normal sample", normal_id,
-                         "from the VCF header PEDIGREE tag")
+                    logging.info("Selected tumor sample %s and normal sample %s"
+                                 " from the VCF header PEDIGREE tag",
+                                 sample_id, normal_id)
                     break
         elif "GATKCommandLine" in vcf_reader.metadata:
             for tag in vcf_reader.metadata["GATKCommandLine"]:
@@ -110,9 +111,9 @@ def _select_sample(vcf_reader, sample_id, normal_id):
                                    if '=' in kv)
                     sample_id = options.get('tumor_sample_name')
                     normal_id = options['normal_sample_name']
-                    echo("Selected tumor sample", sample_id,
-                         "and normal sample", normal_id,
-                         "from the MuTect VCF header")
+                    logging.info("Selected tumor sample %s and normal sample "
+                                 "%s from the MuTect VCF header",
+                                 sample_id, normal_id)
                     break
 
     if sample_id:
@@ -198,8 +199,8 @@ def _parse_records(vcf_reader, sample_id, normal_id, min_depth,
                 row += (n_zygosity, n_depth, n_alt_count)
             yield row
 
-    echo("Skipped records:", cnt_reject, "reject,",  cnt_som, "somatic,",
-         cnt_depth, "depth,", cnt_hom, "homozygous")
+    logging.info("Skipped records: %d reject, %d somatic, %d depth, "
+                 "%d homozygous", cnt_reject, cnt_som, cnt_depth, cnt_hom)
 
 
 def _extract_genotype(sample):
@@ -239,8 +240,10 @@ def _get_alt_count(sample):
         else:
             alt_count = 0.0
     else:
-        echo("Skipping: unsure how to get alternative allele count:",
-             sample.site.CHROM, sample.site.POS, sample.site.REF, sample.data)
+        logging.warn("Skipping %s:%d %s; "
+                     "unsure how to get alternative allele count: %s",
+                     sample.site.CHROM, sample.site.POS, sample.site.REF,
+                     sample.data)
         alt_count = None  # or 0 or "missing data"?
     return alt_count
 

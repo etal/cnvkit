@@ -1,5 +1,7 @@
 """Import from other formats to the CNVkit format."""
 from __future__ import absolute_import, division, print_function
+
+import logging
 import math
 import os.path
 import subprocess
@@ -10,7 +12,6 @@ import pandas as pd
 from . import core
 from .cnary import CopyNumArray as CNA
 from .params import NULL_LOG2_COVERAGE
-from .ngfrills import echo
 
 
 # __________________________________________________________________________
@@ -61,8 +62,8 @@ def import_picard_pertargetcoverage(fname):
     coverages = np.asarray(dframe['mean_coverage'])
     no_cvg_idx = (coverages == 0)
     if sum(no_cvg_idx) > TOO_MANY_NO_COVERAGE:
-        echo("*WARNING* Sample", fname, "has >", TOO_MANY_NO_COVERAGE,
-             "bins with no coverage")
+        logging.warn("*WARNING* Sample %s has >%d bins with no coverage",
+                     fname, TOO_MANY_NO_COVERAGE)
     coverages[no_cvg_idx] = 2**NULL_LOG2_COVERAGE  # Avoid math domain error
     cnarr = CNA.from_columns({"chromosome": dframe["chrom"],
                               "start": dframe["start"] - 1,
@@ -93,7 +94,7 @@ def unpipe_name(name):
         if 'CGH' in gene_names and len(gene_names) == 2:
             gene_names.remove('CGH')
         else:
-            echo("*WARNING* Ambiguous gene name:", name)
+            logging.warn("*WARNING* Ambiguous gene name: %s", name)
     return gene_names.pop()
 
 

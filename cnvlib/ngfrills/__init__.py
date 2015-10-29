@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, print_function
 
 import contextlib
+import logging
 import os
 import subprocess
 import sys
@@ -66,7 +67,7 @@ def ensure_path(fname):
             cnt += 1
             bak_fname = "%s.%d" % (fname, cnt)
         os.rename(fname, bak_fname)
-        echo("Moved existing file", fname, "->", bak_fname)
+        logging.info("Moved existing file %s -> %s", fname, bak_fname)
     return True
 
 
@@ -81,7 +82,7 @@ def safe_write(outfile, verbose=True):
         dirname = os.path.dirname(outfile)
         if dirname and not os.path.isdir(dirname):
             os.mkdir(dirname)
-            echo("Created directory", dirname)
+            logging.info("Created directory %s", dirname)
         with open(outfile, 'w') as handle:
             yield handle
     else:
@@ -97,7 +98,7 @@ def safe_write(outfile, verbose=True):
         else:
             # Probably stdout or stderr -- don't ruin the pipeline
             return
-        echo("Wrote", outfname)
+        logging.info("Wrote %s", outfname)
 
 
 @contextlib.contextmanager

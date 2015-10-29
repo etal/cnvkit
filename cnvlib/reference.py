@@ -1,13 +1,14 @@
 """Supporting functions for the 'reference' command."""
 from __future__ import absolute_import, division, print_function
 
+import logging
+
 import numpy as np
 from Bio._py3k import map, zip
 
 from . import core, fix, metrics, ngfrills, params
 from .cnary import CopyNumArray as CNA
 from .rary import RegionArray as RA
-from .ngfrills import echo
 
 
 def bed2probes(bed_fname):
@@ -34,7 +35,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
     columns = {}
 
     # Load coverage from target/antitarget files
-    echo("Loading", filenames[0])
+    logging.info("Loading %s", filenames[0])
     cnarr1 = CNA.read(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
@@ -56,7 +57,8 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         gc = cnarr1['gc']
         columns['gc'] = gc
     else:
-        echo("No FASTA reference genome provided; skipping GC, RM calculations")
+        logging.info("No FASTA reference genome provided; "
+                     "skipping GC, RM calculations")
 
     # Make the sex-chromosome coverages of male and female samples compatible
     chr_x = cnarr1._chr_x_label
@@ -99,19 +101,19 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         cnarr.center_all()
         shift_sex_chroms(cnarr)
         if 'gc' in columns:
-            echo("Correcting for GC bias...")
+            logging.info("Correcting for GC bias...")
             cnarr = fix.center_by_window(cnarr, .1, columns['gc'])
         if 'rmask' in columns:
-            echo("Correcting for RepeatMasker bias...")
+            logging.info("Correcting for RepeatMasker bias...")
             cnarr = fix.center_by_window(cnarr, .1, columns['rmask'])
-        echo("Correcting for density bias...")
+        logging.info("Correcting for density bias...")
         cnarr = fix.center_by_window(cnarr, .1, edge_sorter)
         return cnarr['log2']
 
     # Pseudocount of 1 "flat" sample
     all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
-        echo("Loading target", fname)
+        logging.info("Loading target %s", fname)
         cnarrx = CNA.read(fname)
         # Bin information should match across all files
         if not (len(cnarr1) == len(cnarrx)
@@ -124,10 +126,10 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         all_coverages.append(bias_correct_coverage(cnarrx))
     all_coverages = np.vstack(all_coverages)
 
-    echo("Calculating average bin coverages")
+    logging.info("Calculating average bin coverages")
     cvg_centers = np.apply_along_axis(metrics.biweight_location, 0,
                                       all_coverages)
-    echo("Calculating bin spreads")
+    logging.info("Calculating bin spreads")
     spreads = np.apply_along_axis(metrics.biweight_midvariance, 0,
                                   all_coverages)
     columns['spread'] = spreads
@@ -151,8 +153,8 @@ def warn_bad_probes(probes):
     fg_bad_probes = bad_probes[fg_index]
     if len(fg_bad_probes) > 0:
         bad_pct = 100 * len(fg_bad_probes) / sum(probes['gene'] != 'Background')
-        echo("*WARNING*", len(fg_bad_probes), "targets",
-             "(%.4f)" % bad_pct + '%', "failed filters:")
+        logging.info("Targets: %d (%s) bins failed filters:",
+                     len(fg_bad_probes), "%.4f" % bad_pct + '%')
         gene_cols = max(map(len, fg_bad_probes['gene']))
         labels = list(map(CNA.row2label, fg_bad_probes))
         chrom_cols = max(map(len, labels))
@@ -164,27 +166,27 @@ def warn_bad_probes(probes):
                 gene = probe['gene']
                 last_gene = gene
             if 'rmask' in probes:
-                print("  %s  %s  coverage=%.3f  spread=%.3f  rmask=%.3f"
-                      % (gene.ljust(gene_cols), label.ljust(chrom_cols),
-                         probe['log2'], probe['spread'], probe['rmask']))
+                logging.info("  %s  %s  coverage=%.3f  spread=%.3f  rmask=%.3f",
+                             gene.ljust(gene_cols), label.ljust(chrom_cols),
+                             probe['log2'], probe['spread'], probe['rmask'])
             else:
-                print("  %s  %s  coverage=%.3f  spread=%.3f"
-                      % (gene.ljust(gene_cols), label.ljust(chrom_cols),
-                         probe['log2'], probe['spread']))
+                logging.info("  %s  %s  coverage=%.3f  spread=%.3f",
+                             gene.ljust(gene_cols), label.ljust(chrom_cols),
+                             probe['log2'], probe['spread'])
 
     # Count the number of BG probes dropped, too (names are all "Background")
     bg_bad_probes = bad_probes[~fg_index]
     if len(bg_bad_probes) > 0:
         bad_pct = 100 * len(bg_bad_probes) / sum(probes['gene'] == 'Background')
-        echo("Antitargets:", len(bg_bad_probes), "(%.4f)" % bad_pct + '%',
-             "failed filters")
+        logging.info("Antitargets: %d (%s) bins failed filters",
+                     len(bg_bad_probes), "%.4f" % bad_pct + '%')
 
 
 def get_fasta_stats(probes, fa_fname):
     """Calculate GC and RepeatMasker content of each bin in the FASTA genome."""
     ngfrills.ensure_fasta_index(fa_fname)
     fa_coords = zip(probes.chromosome, probes.start, probes.end)
-    echo("Calculating GC and RepeatMasker content in", fa_fname, "...")
+    logging.info("Calculating GC and RepeatMasker content in %s ...", fa_fname)
     gc_rm_vals = [calculate_gc_lo(subseq)
                   for subseq in ngfrills.fasta_extract_regions(fa_fname,
                                                                fa_coords)]

@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function
 import argparse
 import collections
+import logging
 import math
 import os
 import sys
@@ -30,7 +31,6 @@ pyplot.ioff()
 from . import (core, ngfrills, parallel, params,
                target, antitarget, coverage, fix, metrics, reference, reports,
                export, importers, segmentation, call, plots)
-from .ngfrills import echo
 from .cnary import CopyNumArray as _CNA
 from .vary import VariantArray as _VA
 from .rary import RegionArray as _RA
@@ -96,10 +96,10 @@ def _cmd_batch(args):
         core.write_tsv(args.antitargets, antitarget_coords)
 
     if args.bam_files:
-        echo("Running", len(args.bam_files), "samples in",
-             (("%d processes" % args.processes)
-              if args.processes > 1 else "serial"))
-
+        logging.info("Running %d samples in %s",
+                     len(args.bam_files),
+                     (("%d processes" % args.processes)
+                      if args.processes > 1 else "serial"))
         pool = parallel.pick_pool(args.processes)
         for bam in args.bam_files:
             pool.apply_async(batch_run_sample,
@@ -146,15 +146,15 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
             i = 0
             for i, row in enumerate(anti_rows):
                 anti_file.write("\t".join(row) + '\n')
-            echo("Wrote", antitarget_bed,
-                    "with", i + 1, "background intervals")
+            logging.info("Wrote %s with %d background intervals",
+                         antitarget_bed, i + 1)
 
     if len(normal_bams) == 0:
-        echo("Building a flat reference...")
+        logging.info("Building a flat reference...")
         ref_arr = do_reference_flat(target_bed, antitarget_bed, fasta,
                                     male_reference)
     else:
-        echo("Building a copy number reference from normal samples...")
+        logging.info("Building a copy number reference from normal samples...")
         target_fnames = []
         antitarget_fnames = []
         # Run coverage on all normals
@@ -194,7 +194,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                      diagram=False, rlibpath=None, by_count=False):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
-    echo("Running the CNVkit pipeline on", bam_fname, "...")
+    logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
     sample_id = core.fbase(bam_fname)
     sample_pfx = os.path.join(output_dir, sample_id)
 
@@ -207,7 +207,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     cnarr = do_fix(raw_tgt, raw_anti, _CNA.read(ref_fname))
     cnarr.write(sample_pfx + '.cnr')
 
-    echo("Segmenting", sample_pfx + '.cnr ...')
+    logging.info("Segmenting %s.cnr ...", sample_pfx)
     segments = segmentation.do_segmentation(cnarr, 'cbs', rlibpath=rlibpath)
     segments.write(sample_pfx + '.cns')
 
@@ -215,14 +215,14 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
         do_scatter(cnarr, segments)
         pyplot.savefig(sample_pfx + '-scatter.pdf', format='pdf',
                        bbox_inches="tight")
-        echo("Wrote", sample_pfx + '-scatter.pdf')
+        logging.info("Wrote %s-scatter.pdf", sample_pfx)
 
     if diagram:
         from cnvlib import diagram
         outfname = sample_pfx + '-diagram.pdf'
         diagram.create_diagram(cnarr, segments, 0.5, 3, outfname,
                                male_reference)
-        echo("Wrote", outfname)
+        logging.info("Wrote %s", outfname)
 
 
 P_batch = AP_subparsers.add_parser('batch', help=_cmd_batch.__doc__)
@@ -310,13 +310,13 @@ def do_targets(bed_fname, out_fname, annotate=None, do_short_names=False,
     bed_rows = ngfrills.parse_regions(bed_fname, False,
                                       keep_strand=bool(annotate))
     if annotate:
-        ngfrills.echo("Applying annotations as target names")
+        logging.info("Applying annotations as target names")
         bed_rows = target.add_refflat_names(bed_rows, annotate)
     if do_short_names:
-        ngfrills.echo("Shortening interval labels")
+        logging.info("Shortening interval labels")
         bed_rows = target.shorten_labels(bed_rows)
     if do_split:
-        ngfrills.echo("Splitting large targets")
+        logging.info("Splitting large targets")
         bed_rows = target.split_targets(bed_rows, avg_size)
     # Output with logging
     with ngfrills.safe_write(out_fname or sys.stdout, False) as outfile:
@@ -326,7 +326,7 @@ def do_targets(bed_fname, out_fname, annotate=None, do_short_names=False,
                                                       r[1]))):
             outfile.write("\t".join(map(str, row)) + '\n')
     if out_fname:
-        ngfrills.echo("Wrote", out_fname, "with", i + 1, "target intervals")
+        logging.info("Wrote %s with %d target intervals", out_fname, i + 1)
 
 
 P_target = AP_subparsers.add_parser('target', help=_cmd_target.__doc__)
@@ -363,7 +363,8 @@ def _cmd_antitarget(args):
         i = -1
         for i, row in enumerate(out_rows):
             outfile.write("\t".join(row) + '\n')
-        echo("Wrote", args.output, "with", i + 1, "background intervals")
+        logging.info("Wrote %s with %d background intervals",
+                     args.output, i + 1)
 
 
 def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,
@@ -472,8 +473,8 @@ def _cmd_reference(args):
                 filenames.append(path)
         targets = [f for f in filenames if 'antitarget' not in f]
         antitargets = [f for f in filenames if 'antitarget' in f]
-        echo("Number of target and antitarget files: %d, %d"
-            % (len(targets), len(antitargets)))
+        logging.info("Number of target and antitarget files: %d, %d",
+                     len(targets), len(antitargets))
         ref_probes = do_reference(targets, antitargets, args.fasta,
                                   args.male_reference)
     else:
@@ -491,7 +492,8 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
                       targets=len(target_fnames),
                       antitargets=len(antitarget_fnames))
     if not fa_fname:
-        echo("No FASTA reference genome provided; skipping GC, RM calculations")
+        logging.info("No FASTA reference genome provided; "
+                     "skipping GC, RM calculations")
 
     # Calculate & save probe centers
     ref_probes = reference.combine_probes(target_fnames, fa_fname,
@@ -521,7 +523,8 @@ def do_reference_flat(targets, antitargets, fa_fname=None,
         ref_probes['rmask'] = rmask
         reference.warn_bad_probes(ref_probes)
     else:
-        echo("No FASTA reference genome provided; skipping GC, RM calculations")
+        logging.info("No FASTA reference genome provided; "
+                     "skipping GC, RM calculations")
     return ref_probes
 
 
@@ -568,10 +571,10 @@ def do_fix(target_raw, antitarget_raw, reference,
            do_gc=True, do_edge=True, do_rmask=True):
     """Combine target and antitarget coverages and correct for biases."""
     # Load, recenter and GC-correct target & antitarget probes separately
-    echo("Processing target:", target_raw.sample_id)
+    logging.info("Processing target: %s", target_raw.sample_id)
     cnarr = fix.load_adjust_coverages(target_raw, reference,
                                       do_gc, do_edge, False)
-    echo("Processing antitarget:", antitarget_raw.sample_id)
+    logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
     anti_cnarr = fix.load_adjust_coverages(antitarget_raw, reference,
                                            do_gc, False, do_rmask)
     # Merge target and antitarget & sort probes by chromosomal location
@@ -619,7 +622,7 @@ def _cmd_segment(args):
         segments, dframe = results
         with open(args.dataframe, 'w') as handle:
             handle.write(dframe)
-        echo("Wrote", args.dataframe)
+        logging.info("Wrote %s", args.dataframe)
     else:
         segments = results
     segments.write(args.output or segments.sample_id + '.cns')
@@ -678,17 +681,18 @@ def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
             is_sample_female=False, thresholds=(-1.1, -0.25, 0.2, 0.7)):
     if method == "clonal":
         if purity and purity < 1.0:
-            echo("Calling copy number with clonal purity %g, ploidy %d"
-                 % (purity, ploidy))
+            logging.info("Calling copy number with clonal purity %g, ploidy %d",
+                         purity, ploidy)
             absolutes = call.absolute_clonal(segments, ploidy, purity,
                                              is_reference_male, is_sample_female)
         else:
             # Simpler math if sample is pure
-            echo("Calling copy number with clonal ploidy %d" % ploidy)
+            logging.info("Calling copy number with clonal ploidy %d", ploidy)
             absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
     elif method == "threshold":
         tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
-        echo("Calling copy number with thresholds: " + ", ".join(tokens))
+        logging.info("Calling copy number with thresholds: %s",
+                     ", ".join(tokens))
         absolutes = call.absolute_threshold(segments, ploidy, thresholds,
                                             is_reference_male)
     else:
@@ -748,7 +752,7 @@ def _cmd_diagram(args):
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
                                       args.min_probes, args.output,
                                       args.male_reference)
-    echo("Wrote", outfname)
+    logging.info("Wrote %s", outfname)
 
 
 P_diagram = AP_subparsers.add_parser('diagram', help=_cmd_diagram.__doc__)
@@ -802,7 +806,7 @@ def _cmd_scatter(args):
                    args.y_min, args.y_max)
         if args.output:
             pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
-            echo("Wrote", args.output)
+            logging.info("Wrote %s", args.output)
         else:
             pyplot.show()
 
@@ -899,9 +903,10 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             sel_seg = (pset_seg.in_range(chrom)
                        if pset_seg else None)
 
-        echo("Showing", len(sel_probes), "probes and", len(genes),
-             "selected genes in range",
-             (chrom + ":%d-%d" % window_coords if window_coords else chrom))
+        logging.info("Showing %d probes and %d selected genes in range %s",
+                     len(sel_probes), len(genes),
+                     (chrom + ":%d-%d" % window_coords if window_coords
+                      else chrom))
 
         # Similarly for SNV allele freqs, if given
         if vcf_fname:
@@ -1037,7 +1042,7 @@ def _cmd_heatmap(args):
     create_heatmap(args.filenames, args.chromosome, args.desaturate)
     if args.output:
         pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
-        echo("Wrote", args.output)
+        logging.info("Wrote %s", args.output)
     else:
         pyplot.show()
 
@@ -1135,7 +1140,7 @@ def _cmd_breaks(args):
     pset_cvg = _CNA.read(args.filename)
     pset_seg = _CNA.read(args.segment)
     bpoints = do_breaks(pset_cvg, pset_seg, args.min_probes)
-    echo("Found", len(bpoints), "gene breakpoints")
+    logging.info("Found %d gene breakpoints", len(bpoints))
     core.write_tsv(args.output, bpoints,
                    colnames=['Gene', 'Chrom.', 'Location', 'Change',
                              'ProbesLeft', 'ProbesRight'])
@@ -1170,7 +1175,7 @@ def _cmd_gainloss(args):
     segs = _CNA.read(args.segment) if args.segment else None
     gainloss = do_gainloss(pset, segs, args.male_reference, args.threshold,
                            args.min_probes, args.drop_low_coverage)
-    echo("Found", len(gainloss), "gene-level gains and losses")
+    logging.info("Found %d gene-level gains and losses", len(gainloss))
     core.write_tsv(args.output, gainloss,
                    colnames=['Gene', 'Chrom.', 'Start', 'End', 'Log2Ratio',
                              'Probes'])
@@ -1299,7 +1304,7 @@ def _cmd_segmetrics(args):
         'pi': _prediction_interval,
     }
     if not any(getattr(args, name) for name in stats):
-        echo("No stats specified")
+        logging.info("No stats specified")
         return
 
     # Calculate all metrics
@@ -1404,7 +1409,7 @@ def _cmd_import_picard(args):
         if args.output_dir:
             if not os.path.isdir(args.output_dir):
                 os.mkdir(args.output_dir)
-                echo("Created directory", args.output_dir)
+                logging.info("Created directory %s", args.output_dir)
             outfname = os.path.join(args.output_dir, outfname)
         cnarr.write(outfname)
 

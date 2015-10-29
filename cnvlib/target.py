@@ -1,9 +1,9 @@
 """Transform bait intervals into targets more suitable for CNVkit."""
 from __future__ import division, absolute_import
+
+import logging
 import collections
 from itertools import groupby
-
-from .ngfrills import echo
 
 
 # _____________________________________________________________________________
@@ -38,10 +38,12 @@ def assign_names(region_rows, refflat_fname, default_name='-'):
             if strands_with_genes:
                 genes_in_chrom = iter(sorted(strands_with_genes))
             else:
-                echo("Chromosome", chrom, strand, "not in annotations")
+                logging.info("Chromosome %s %s not in annotations",
+                             chrom, strand)
                 continue
         else:
-            echo("Chromosome", chrom, "strand", strand, "not in annotations")
+            logging.info("Chromosome %s %s not in annotations",
+                         chrom, strand)
             continue
 
         ex_start, ex_end, ex_name = next(genes_in_chrom)
@@ -229,7 +231,7 @@ def shorten_labels(interval_rows):
         yield out_row
         longest_name_len = max(longest_name_len, len(out_row[-1]))
 
-    echo("Longest name length:", longest_name_len)
+    logging.info("Longest name length: %d", longest_name_len)
 
 
 def filter_names(names, exclude=('mRNA',)):
@@ -286,7 +288,7 @@ def split_targets(region_rows, avg_size):
         if (chrom, start, end) == (prev_chrom, prev_start, prev_end):
             # Skip duplicate regions, even if names differ
             # ENH - Update the name?
-            echo("Duplicate row", name, "%s:%d-%d" % (chrom, start, end))
+            logging.info("Duplicate row %s %s:%d-%d", name, chrom, start, end)
             continue
         if chrom == prev_chrom and start <= prev_end:
             if end > prev_end:
@@ -294,15 +296,17 @@ def split_targets(region_rows, avg_size):
                 start = prev_end
             else:
                 # Complete overlap: nothing to do on this bin
-                echo("Bin", name, ("%s:%s-%s" % (chrom, start, end)),
-                     "fully covered by previous bin",
-                     ("%s:%s-%s" % (prev_chrom, prev_start, prev_end)))
+                logging.info("Bin %s %s:%s-%s fully covered by previous bin"
+                             "%s:%s-%s",
+                             name, chrom, start, end,
+                             prev_chrom, prev_start, prev_end)
                 continue
         prev_chrom = chrom
         prev_start = start
         span = end - start
         if span >= avg_size * 1.5:
-            echo("Splitting:", name.ljust(15), str(end - start + 1).rjust(6))
+            logging.info("Splitting: %s %s",
+                         name.ljust(15), str(end - start + 1).rjust(6))
             # Divide the background region into equal-sized bins
             nbins = round(span / avg_size) or 1
             bin_size = span / nbins
