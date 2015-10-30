@@ -780,16 +780,21 @@ P_diagram.set_defaults(func=_cmd_diagram)
 
 def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
-    pset_cvg = _CNA.read(args.filename, args.sample_id)
-    pset_seg = _CNA.read(args.segment) if args.segment else None
+    cnarr = _CNA.read(args.filename, args.sample_id
+                     ) if args.filename else None
+    segarr = _CNA.read(args.segment
+                      ) if args.segment else None
+    varr = _VA.read_vcf(args.vcf, args.sample_id, args.normal_id,
+                        args.min_variant_depth
+                       ) if args.vcf else None
+
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
             for chrom, start, end in _RA.read(args.range_list).coords():
                 region = "{}:{}-{}".format(chrom, start, end)
-                do_scatter(pset_cvg, pset_seg, args.vcf, False, False,
+                do_scatter(cnarr, segarr, varr, False, False,
                            region, args.background_marker, args.trend,
-                           args.width, args.sample_id, args.normal_id,
-                           args.min_variant_depth, args.y_min, args.y_max)
+                           args.width, args.y_min, args.y_max)
                 pyplot.title(region)
                 pdf_out.savefig()
                 pyplot.close()
@@ -800,9 +805,8 @@ def _cmd_scatter(args):
             args.chromosome = None
         else:
             show_range = None
-        do_scatter(pset_cvg, pset_seg, args.vcf, args.chromosome, args.gene,
+        do_scatter(cnarr, segarr, varr, args.chromosome, args.gene,
                    show_range, args.background_marker, args.trend, args.width,
-                   args.sample_id, args.normal_id, args.min_variant_depth,
                    args.y_min, args.y_max)
         if args.output:
             pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
@@ -811,31 +815,39 @@ def _cmd_scatter(args):
             pyplot.show()
 
 
-def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
+def do_scatter(cnarr, segments=None, variants=None,
                show_chromosome=None, show_gene=None, show_range=None,
                background_marker=None, do_trend=False, window_width=1e6,
-               sample_id=None, normal_id=None, min_variant_depth=20,
-               y_min=None, y_max=None):
+               y_min=None, y_max=None, title=None):
     """Plot probe log2 coverages and CBS calls together."""
+    if title is None:
+        title = (cnarr or segments or variants).sample_id
+
     if not show_gene and not show_range and not show_chromosome:
         # Plot all chromosomes, concatenated on one plot
         PAD = 1e7
-        if vcf_fname:
+        if (cnarr or segments) and variants:
             # Lay out top 3/5 for the CN scatter, bottom 2/5 for LOH plot
             axgrid = pyplot.GridSpec(5, 1, hspace=.85)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            variants = _VA.read_vcf(vcf_fname, sample_id, normal_id,
-                                    min_variant_depth)
             # Place chromosome labels between the CNR and LOH plots
             axis2.tick_params(labelbottom=False)
-            chrom_sizes = plots.chromosome_sizes(pset_cvg)
-            plots.plot_loh(axis2, variants, chrom_sizes, pset_seg, do_trend,
+            chrom_sizes = plots.chromosome_sizes(cnarr or segments)
+            plots.plot_loh(axis2, variants, chrom_sizes, segments, do_trend,
                            PAD)
         else:
             _fig, axis = pyplot.subplots()
-        axis.set_title(pset_cvg.sample_id)
-        plots.plot_genome(axis, pset_cvg, pset_seg, PAD, do_trend, y_min, y_max)
+        if cnarr or segments:
+            axis.set_title(title)
+            plots.plot_genome(axis, cnarr, segments, PAD, do_trend, y_min, y_max)
+        else:
+            axis.set_title("Variant allele frequencies: %s" % title)
+            chrom_sizes = collections.OrderedDict(
+                (chrom, subarr["end"].max())
+                for chrom, subarr in variants.by_chromosome())
+            plots.plot_loh(axis, variants, chrom_sizes, segments, do_trend, PAD)
+
     else:
         # Plot a specified region on one chromosome
         window_coords = None
@@ -844,7 +856,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
         if show_gene:
             gene_names = show_gene.split(',')
             # Scan for probes matching the specified gene
-            gene_coords = plots.gene_coords_by_name(pset_cvg, gene_names)
+            gene_coords = plots.gene_coords_by_name(cnarr, gene_names)
             if not len(gene_coords) == 1:
                 raise ValueError("Genes %s are split across chromosomes %s"
                                  % (show_gene, gene_coords.keys()))
@@ -869,7 +881,7 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                                      " is outside specified range " +
                                      show_range)
             if not genes:
-                genes = plots.gene_coords_by_range(pset_cvg, chrom,
+                genes = plots.gene_coords_by_range(cnarr, chrom,
                                                    start, end)[chrom]
             if not genes and window_width > (end - start) / 10.0:
                 # No genes in the selected region, so highlight the region
@@ -894,14 +906,14 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
         # Prune plotted elements to the selected region
         if window_coords:
             # Show the selected region
-            sel_probes = pset_cvg.in_range(chrom, *window_coords)
-            sel_seg = (pset_seg.in_range(chrom, *window_coords, mode='trim')
-                       if pset_seg else None)
+            sel_probes = cnarr.in_range(chrom, *window_coords)
+            sel_seg = (segments.in_range(chrom, *window_coords, mode='trim')
+                       if segments else None)
         else:
             # Show the whole chromosome
-            sel_probes = pset_cvg.in_range(chrom)
-            sel_seg = (pset_seg.in_range(chrom)
-                       if pset_seg else None)
+            sel_probes = cnarr.in_range(chrom)
+            sel_seg = (segments.in_range(chrom)
+                       if segments else None)
 
         logging.info("Showing %d probes and %d selected genes in range %s",
                      len(sel_probes), len(genes),
@@ -909,21 +921,18 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
                       else chrom))
 
         # Similarly for SNV allele freqs, if given
-        if vcf_fname:
+        if (cnarr or segments) and variants:
             # Lay out top 3/5 for the CN scatter, bottom 2/5 for LOH plot
             axgrid = pyplot.GridSpec(5, 1, hspace=.5)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            variants = _VA.read_vcf(vcf_fname, sample_id, normal_id,
-                                    min_variant_depth)
             chrom_snvs = variants[variants["chromosome"] == chrom]
             if window_coords:
-                # Plot LOH for only the selected region
+                # Plot allele freqs for only the selected region
                 chrom_snvs = chrom_snvs[
                     (window_coords[0] * plots.MB <= chrom_snvs["start"]) &
                     (chrom_snvs["start"]  <= window_coords[1] * plots.MB)]
             snv_x = chrom_snvs["start"] * plots.MB
-            # TODO - draw trend or segment lines through median VAF
             snv_y = chrom_snvs["alt_freq"]
             axis2.set_ylim(0.0, 1.0)
             axis2.set_ylabel("VAF")
@@ -933,19 +942,24 @@ def do_scatter(pset_cvg, pset_seg=None, vcf_fname=None,
             axis2.get_xaxis().tick_top()
             axis2.tick_params(which='both', direction='out',
                               labelbottom=False, labeltop=False)
+        elif variants:
+            # XXX tangle: don't do the last call to plot_chromosome
+            return
+
         else:
             _fig, axis = pyplot.subplots()
             axis.set_xlabel("Position (Mb)")
 
         # Plot CNVs
-        plots.plot_chromosome(axis, sel_probes, sel_seg, chrom,
-                              pset_cvg.sample_id, genes,
+        plots.plot_chromosome(axis, sel_probes, sel_seg, chrom, genes,
                               background_marker=background_marker,
-                              do_trend=do_trend, y_min=y_min, y_max=y_max)
+                              do_trend=do_trend, y_min=y_min, y_max=y_max,
+                              title=title)
+
 
 P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
-P_scatter.add_argument('filename',
-        help="""Processed coverage sample data file (*.cnr), the output
+P_scatter.add_argument('filename', nargs="?",
+        help="""Processed bin-level copy ratios (*.cnr), the output
                 of the 'fix' sub-command.""")
 P_scatter.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")
@@ -991,7 +1005,7 @@ P_scatter.set_defaults(func=_cmd_scatter)
 # loh -------------------------------------------------------------------------
 
 def _cmd_loh(args):
-    """Plot allelic frequencies at each variant position in a VCF file.
+    """[DEPRECATED] Plot allelic frequencies at each variant position in a VCF file.
 
     Divergence from 0.5 indicates loss of heterozygosity in a tumor sample.
     """
@@ -1137,9 +1151,9 @@ P_heatmap.set_defaults(func=_cmd_heatmap)
 
 def _cmd_breaks(args):
     """List the targeted genes in which a copy number breakpoint occurs."""
-    pset_cvg = _CNA.read(args.filename)
-    pset_seg = _CNA.read(args.segment)
-    bpoints = do_breaks(pset_cvg, pset_seg, args.min_probes)
+    cnarr = _CNA.read(args.filename)
+    segarr = _CNA.read(args.segment)
+    bpoints = do_breaks(cnarr, segarr, args.min_probes)
     logging.info("Found %d gene breakpoints", len(bpoints))
     core.write_tsv(args.output, bpoints,
                    colnames=['Gene', 'Chrom.', 'Location', 'Change',

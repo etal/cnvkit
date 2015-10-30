@@ -26,19 +26,24 @@ def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
                 y_max=None):
     """Plot coverages and CBS calls for all chromosomes on one plot."""
     # Group probes by chromosome (to calculate plotting coordinates)
-    chrom_probe_centers = {chrom: 0.5 * (rows['start'] + rows['end'])
-                           for chrom, rows in probes.by_chromosome()}
+    if probes:
+        chrom_probe_centers = {chrom: 0.5 * (rows['start'] + rows['end'])
+                               for chrom, rows in probes.by_chromosome()}
+        chrom_sizes = chromosome_sizes(probes)
+    else:
+        chrom_sizes = chromosome_sizes(segments)
+
     # Same for segment calls
     chrom_seg_coords = {chrom: zip(rows['log2'], rows['start'], rows['end'])
                         for chrom, rows in segments.by_chromosome()
                        } if segments else {}
 
-    chrom_sizes = chromosome_sizes(probes)
     x_starts = plot_x_dividers(axis, chrom_sizes, pad)
     x = []
     seg_lines = []  # y-val, x-start, x-end
     for chrom, curr_offset in x_starts.items():
-        x.extend(chrom_probe_centers[chrom] + curr_offset)
+        if probes:
+            x.extend(chrom_probe_centers[chrom] + curr_offset)
         if chrom in chrom_seg_coords:
             seg_lines.extend((c[0], c[1] + curr_offset, c[2] + curr_offset)
                              for c in chrom_seg_coords[chrom])
@@ -63,14 +68,15 @@ def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
     axis.set_ylim(y_min, y_max)
 
     # Plot points
-    axis.scatter(x, probes['log2'], color=POINT_COLOR, edgecolor='none',
-                 alpha=0.2, marker='.')
-    # Add a local trend line
-    if do_trend:
-        axis.plot(x, smoothing.smooth_genome_coverages(probes,
-                                                       smoothing.smoothed,
-                                                       250),
-                  color=POINT_COLOR, linewidth=2, zorder=-1)
+    if probes:
+        axis.scatter(x, probes['log2'], color=POINT_COLOR, edgecolor='none',
+                     alpha=0.2, marker='.')
+        # Add a local trend line
+        if do_trend:
+            axis.plot(x, smoothing.smooth_genome_coverages(probes,
+                                                           smoothing.smoothed,
+                                                           250),
+                      color=POINT_COLOR, linewidth=2, zorder=-1)
     # Plot segments
     for seg_line in seg_lines:
         y1, x1, x2 = seg_line
@@ -78,9 +84,9 @@ def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
                   color=SEG_COLOR, linewidth=3, solid_capstyle='round')
 
 
-def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
+def plot_chromosome(axis, probes, segments, chromosome, genes,
                     background_marker=None, do_trend=False, y_min=None,
-                    y_max=None):
+                    y_max=None, title='CNVkit'):
     """Draw a scatter plot of probe values with CBS calls overlaid.
 
     Argument 'genes' is a list of tuples: (start, end, gene name)
@@ -104,7 +110,7 @@ def plot_chromosome(axis, probes, segments, chromosome, sample, genes,
         y_max = max(max(y) + (.25 if genes else .1), .3)
     axis.set_ylim(y_min, y_max)
     axis.set_ylabel("Copy ratio (log2)")
-    axis.set_title("%s %s" % (sample, chromosome))
+    axis.set_title("%s %s" % (title, chromosome))
     axis.tick_params(which='both', direction='out')
     axis.get_xaxis().tick_bottom()
     axis.get_yaxis().tick_left()
