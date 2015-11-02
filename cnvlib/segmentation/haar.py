@@ -43,29 +43,78 @@ def segment_haar(cnarr, fdr_q):
     Output: the CBS data table
 
     """
-    chrom_tables = []
     # Segment each chromosome individually
     # ENH - skip large gaps (segment chrom. arms separately)
-    for chrom, subprobes in cnarr.by_chromosome():
-        logging.debug("%s:", chrom)
-        segtable = haarSeg(np.asarray(subprobes['log2']),
-                           fdr_q,
-                           W=(np.asarray(subprobes['weight'])
-                              if 'weight' in subprobes
-                              else None))
-        chromtable = pd.DataFrame({
-            'chromosome': chrom,
-            'start': np.asarray(subprobes['start']).take(segtable['start']),
-            'end': np.asarray(subprobes['end']).take(segtable['end']),
-            'log2': segtable['mean'],
-            'probes': segtable['size'],
-        })
-        chrom_tables.append(chromtable)
-    result = pd.concat(chrom_tables)
-    result['gene'] = '.'
-    segarr = cnarr.as_dataframe(result)
+    chrom_tables = [one_chrom(subprobes, fdr_q, chrom)
+                    for chrom, subprobes in cnarr.by_chromosome()]
+    segarr = cnarr.as_dataframe(pd.concat(chrom_tables))
     segarr.sort_columns()
     return segarr
+
+
+def one_chrom(cnarr, fdr_q, chrom):
+    logging.debug("Segmenting %s", chrom)
+    segtable = haarSeg(np.asarray(cnarr['log2']),
+                       fdr_q,
+                       W=(np.asarray(cnarr['weight'])
+                          if 'weight' in cnarr
+                          else None))
+    table = pd.DataFrame({
+        'chromosome': chrom,
+        'start': np.asarray(cnarr['start']).take(segtable['start']),
+        'end': np.asarray(cnarr['end']).take(segtable['end']),
+        'log2': segtable['mean'],
+        'gene': '-',
+        'probes': segtable['size'],
+    })
+    return table
+
+
+def variants_in_segment(varr, segment, fdr_q):
+    if len(varr):
+        values = varr.mirrored_baf()
+        segtable = haarSeg(values,
+                           fdr_q,
+                           W=None)  # weight by sqrt(DP)?
+    else:
+        values = []
+        segtable = []
+    if segtable and len(segtable['start']) > 1:
+        logging.info("Segmented on allele freqs in %s:%d-%d",
+                     segment['chromosome'], segment['start'], segment['end'])
+        # Ensure breakpoint locations make sense
+        # - Keep original segment start, end positions
+        # - Place breakpoints midway between SNVs, I guess?
+        gap_rights = np.asarray(varr['start']).take(segtable['start'][1:])
+        gap_lefts = np.asarray(varr['end']).take(segtable['end'][:-1])
+        mid_breakpoints = [(left + right) // 2
+                           for left, right in zip(gap_lefts, gap_rights)]
+        starts = np.concatenate([[segment['start']], mid_breakpoints])
+        ends = np.concatenate([mid_breakpoints, [segment['end']]])
+        table = pd.DataFrame({
+            'chromosome': segment['chromosome'],
+            'start': starts,
+            'end': ends,
+            # 'baf': segtable['mean'],
+            'gene': '-', #segment['gene'],
+            'log2': segment['log2'],
+            'probes': segtable['size'],
+            # 'weight': segment['weight'] * segtable['size'] / segment['size'],
+        })
+    else:
+        table = pd.DataFrame({
+            'chromosome': segment['chromosome'],
+            'start': segment['start'],
+            'end': segment['end'],
+            # 'baf': np.median(values),
+            'gene': '-', #segment['gene'],
+            'log2': segment['log2'],
+            'probes': segment['probes'],
+            # 'weight': segment['weight'],
+        }, index=[0])
+
+    return table
+
 
 
 # ---- from HaarSeg R code -- the API ----

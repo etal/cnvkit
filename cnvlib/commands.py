@@ -614,7 +614,9 @@ P_fix.set_defaults(func=_cmd_fix)
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     cnarr = _CNA.read(args.filename)
+    variants = _VA.read_vcf(args.vcf) if args.vcf else None
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
+                                           variants=variants,
                                            skip_low=args.drop_low_coverage,
                                            save_dataframe=bool(args.dataframe),
                                            rlibpath=args.rlibpath)
@@ -643,6 +645,9 @@ P_segment.add_argument('-m', '--method',
 P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
                 accept breakpoints during segmentation.""")
+P_segment.add_argument('-v', '--vcf',
+        help="""VCF file name containing variants for segmentation by allele
+                frequencies.""")
 P_segment.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
@@ -1651,7 +1656,7 @@ P_export_nb.add_argument('-o', '--output', help="Output file name.")
 P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
-# Nexus "basic" special case: can only represent 1 sample
+# Nexus "Custom-OGT" special case: can only represent 1 sample
 def _cmd_export_nbo(args):
     """Convert log2 ratios and b-allele freqs to Nexus "Custom-OGT" format."""
     table = export.export_nexus_ogt(args.filename, args.vcf)
@@ -1662,7 +1667,6 @@ P_export_nbo = P_export_subparsers.add_parser('nexus-ogt',
 P_export_nbo.add_argument('filename',
         help="""Log2 copy ratio data file (*.cnr), the output of the 'fix'
                 sub-command.""")
-# P_export_nbo.add_argument('-v', '--vcf',
 P_export_nbo.add_argument('vcf',
         help="""VCF of SNVs for the same sample, to calculate b-allele
                 frequencies.""")

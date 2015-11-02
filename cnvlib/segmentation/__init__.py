@@ -57,48 +57,21 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
             segarr = squash_segments(segarr)
 
         segarr = repair_segments(segarr, cnarr)
-        segarr['gene'], segarr['weight'] = transfer_names_weights(segarr, cnarr)
+
     else:
         raise ValueError("Unknown method %r" % method)
 
     if variants:
         # Re-segment the variant allele freqs within each segment
-        # (XXX WIP)
-        newsegs = []
-        for segment, subvarr in variants.by_ranges(segarr):
-            subsegs = haar.haarSeg(np.asarray(subvarr.mirrored_baf()), .005)
-            if len(subsegs) == 1:
-                newsegs.append(pd.DataFrame({
-                    'chromosome': segment['chromosome'],
-                    'start': segment['start'],
-                    'end': segment['end'],
-                    'gene': segment['gene'],
-                    'log2': segment['log2'],
-                    'probes': segment['probes'],
-                    'weight': segment['weight'],
-                }))
-            elif len(subsegs) > 1:
-                # TODO - ensure breakpoint locations make sense
-                starts = np.asarray(subvarr['start']).take(subsegs['start'])
-                ends = np.asarray(subvarr['end']).take(subsegs['end'])
-                weights = segment['weight'] * subsegs['size'] / segment['size']
-                newsegs.append(pd.DataFrame({
-                    'chromosome': segment['chromosome'],
-                    'start': starts,
-                    'end': ends,
-                    'gene': segment['gene'],
-                    'log2': segment['log2'],
-                    'probes': subsegs['size'],
-                    'weight': weights,
-                }))
-            else:
-                # No segments, that's weird
-                raise ValueError("wat")
-
-        segarr = segarr.concat(newsegs)
+        newsegs = [haar.variants_in_segment(subvarr, segment, .005)
+                   for segment, subvarr in variants.by_ranges(segarr)]
+        segarr = segarr.as_dataframe(pd.concat(newsegs))
         segarr.sort_columns()
         # TODO fix ploidy on allosomes
-        segarr.data.update(vary._allele_specific_copy_numbers(segarr, variants))
+        allelics = vary._allele_specific_copy_numbers(segarr, variants)
+        segarr.data = pd.concat([segarr.data, allelics], axis=1, copy=False)
+
+    segarr['gene'], segarr['weight'] = transfer_names_weights(segarr, cnarr)
 
     if save_dataframe:
         return segarr, seg_out

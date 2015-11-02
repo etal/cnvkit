@@ -281,8 +281,9 @@ def _allele_specific_copy_numbers(segarr, varr, ploidy=2):
     See: PSCBS, Bentsson et al. 2011
     """
     seg_depths = ploidy * np.exp2(segarr["log2"])
-    seg_bafs = [np.median(subvarr.mirrored_baf())
-                for _seg, subvarr in varr.by_ranges(segarr)]
+    seg_bafs = np.asarray([(np.median(subvarr.mirrored_baf())
+                            if len(subvarr) else np.nan)
+                           for _seg, subvarr in varr.by_ranges(segarr)])
     cn1 = 0.5 * (1 - seg_bafs) * seg_depths
     cn2 = seg_depths - cn1
     # segout = segarr.copy()
