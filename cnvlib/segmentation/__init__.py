@@ -95,7 +95,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                 # No segments, that's weird
                 raise ValueError("wat")
 
-        segarr = segarr.as_dataframe(pd.concat(newsegs))
+        segarr = segarr.concat(newsegs)
         segarr.sort_columns()
         # TODO fix ploidy on allosomes
         segarr.data.update(vary._allele_specific_copy_numbers(segarr, variants))
@@ -197,7 +197,7 @@ def repair_segments(segments, orig_probes):
             null_segment = (chrom, orig_start, orig_end, "-", 0.0, 0)
             extra_segments.append(null_segment)
     if extra_segments:
-        segments.concat(segments.as_rows(extra_segments))
+        segments.add(segments.as_rows(extra_segments))
     # ENH: Recalculate segment means here instead of in R
     return segments
 

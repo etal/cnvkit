@@ -10,15 +10,6 @@ import pandas as pd
 from . import core, ngfrills
 
 
-def _make_blank(required_cols, dtypes=(("chromosome", "string"),
-                                       ("start", "int"),
-                                       ("end", "int"))):
-    table = pd.DataFrame({key: [] for key in required_cols})
-    for col, dtype in dtypes:
-        table[col] = table[col].astype(dtype)
-    return table
-
-
 class GenomicArray(object):
     """An array of genomic intervals. Base class for genomic data structures.
 
@@ -26,6 +17,7 @@ class GenomicArray(object):
     columns.
     """
     _required_columns = ("chromosome", "start", "end")
+    _required_dtypes = ("string", "int", "int")
 
     def __init__(self, data_table, meta_dict=None):
         # Validation
@@ -39,7 +31,7 @@ class GenomicArray(object):
                                             .astype("string"))
         elif not isinstance(data_table, pd.DataFrame):
             # Empty but conformant table
-            data_table = _make_blank(self._required_columns)
+            data_table = self._make_blank()
         self.data = data_table
         self.meta = (dict(meta_dict)
                      if meta_dict is not None and len(meta_dict)
@@ -48,6 +40,14 @@ class GenomicArray(object):
     @staticmethod
     def row2label(row):
         return "{}:{}-{}".format(row['chromosome'], row['start'], row['end'])
+
+    @classmethod
+    def _make_blank(cls):
+        """Create an empty dataframe with the columns required by this class."""
+        table = pd.DataFrame({key: [] for key in cls._required_columns})
+        for col, dtype in zip(cls._required_columns, cls._required_dtypes):
+            table[col] = table[col].astype(dtype)
+        return table
 
     @classmethod
     def from_columns(cls, columns, meta_dict=None):
@@ -247,11 +247,7 @@ class GenomicArray(object):
 
     def in_ranges(self, chrom=None, starts=None, ends=None, mode='outer'):
         """Get the GenomicArray portion within the given array's ranges."""
-        subtables = [sub.data
-                     for sub in self._iter_ranges(chrom, starts, ends, mode)]
-        result = self.as_dataframe(pd.concat(subtables))
-        result.sort()
-        return result
+        return self.concat(self._iter_ranges(chrom, starts, ends, mode))
 
     def _iter_ranges(self, chrom, starts, ends, mode):
         """Iterate through sub-ranges."""
@@ -331,7 +327,7 @@ class GenomicArray(object):
 
     # Modification
 
-    def concat(self, other):
+    def add(self, other):
         """Combine this array's data with another GenomicArray (in-place).
 
         Any optional columns must match between both arrays.
@@ -339,9 +335,19 @@ class GenomicArray(object):
         if not isinstance(other, self.__class__):
             raise ValueError("Argument (type %s) is not a %s instance"
                              % (type(other), self.__class__))
-        if len(other.data):
-            self.data = pd.concat([self.data, other.data])
+        if not len(other.data):
+            return self.copy()
+        self.data = pd.concat([self.data, other.data])
         self.sort()
+
+    def concat(self, others):
+        """Concatenate several GenomicArrays, keeping this array's metadata.
+
+        This array's data table is not implicitly included in the result.
+        """
+        result = self.as_dataframe(pd.concat([otr.data for otr in others]))
+        result.sort()
+        return result
 
     def copy(self):
         """Create an independent copy of this object."""
@@ -428,7 +434,7 @@ class GenomicArray(object):
         except ValueError:
             # File is blank/empty, most likely
             logging.info("Blank file %s", infile)
-            table = _make_blank(cls._required_columns)
+            table = cls._make_blank()
         # XXX Pending pandas 0.17: https://github.com/pydata/pandas/issues/10505
         # table['chromosome'] = pd.Categorical(table['chromosome'],
         #                                      table.chromosome.drop_duplicates(),

@@ -15,6 +15,7 @@ class RegionArray(gary.GenomicArray):
     _required_columns = ("chromosome", "start", "end",
                          # "name", "strand",
                         )
+    _required_dtypes = ("string", "int", "int")
 
     def __init__(self, data_table, meta_dict=None):
         gary.GenomicArray.__init__(self, data_table, meta_dict)

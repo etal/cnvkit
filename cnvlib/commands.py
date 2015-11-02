@@ -498,8 +498,8 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
     # Calculate & save probe centers
     ref_probes = reference.combine_probes(target_fnames, fa_fname,
                                           male_reference)
-    ref_probes.concat(reference.combine_probes(antitarget_fnames, fa_fname,
-                                               male_reference))
+    ref_probes.add(reference.combine_probes(antitarget_fnames, fa_fname,
+                                            male_reference))
     ref_probes.center_all()
     reference.warn_bad_probes(ref_probes)
     return ref_probes
@@ -513,7 +513,7 @@ def do_reference_flat(targets, antitargets, fa_fname=None,
     and RepeatMasker content from the genome FASTA sequence.
     """
     ref_probes = reference.bed2probes(targets)
-    ref_probes.concat(reference.bed2probes(antitargets))
+    ref_probes.add(reference.bed2probes(antitargets))
     # Set sex chromosomes by "reference" gender
     ref_probes['log2'] = ref_probes.expect_flat_cvg(male_reference)
     # Calculate GC and RepeatMasker content for each probe's genomic region
@@ -578,7 +578,7 @@ def do_fix(target_raw, antitarget_raw, reference,
     anti_cnarr = fix.load_adjust_coverages(antitarget_raw, reference,
                                            do_gc, False, do_rmask)
     # Merge target and antitarget & sort probes by chromosomal location
-    cnarr.concat(anti_cnarr)
+    cnarr.add(anti_cnarr)
     if len(cnarr):
         cnarr.center_all()
     # Determine weights for each bin (used in segmentation)
