@@ -24,7 +24,8 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         filtered_probes = cnarr
 
     if method == 'haar':
-        segarr = haar.segment_haar(filtered_probes, threshold or 0.001)
+        threshold = threshold or 0.001
+        segarr = haar.segment_haar(filtered_probes, threshold)
         segarr['gene'], segarr['weight'] = transfer_names_weights(segarr, cnarr)
 
     elif method in ('cbs', 'flasso'):
@@ -63,7 +64,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
 
     if variants:
         # Re-segment the variant allele freqs within each segment
-        newsegs = [haar.variants_in_segment(subvarr, segment, .005)
+        newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
                    for segment, subvarr in variants.by_ranges(segarr)]
         segarr = segarr.as_dataframe(pd.concat(newsegs))
         segarr.sort_columns()
