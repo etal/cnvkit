@@ -11,6 +11,9 @@ match the reference if those BED files are missing or you're not sure which ones
 are correct.
 """
 
+import logging
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 import cnvlib
 from cnvlib import ngfrills, reference
 
@@ -21,7 +24,7 @@ def write_bed(rows, fname):
         i = 0
         for i, row in enumerate(rows):
             outfile.write("\t".join(map(str, row)) + '\n')
-        ngfrills.echo("Wrote", fname, "with", i + 1, "bins")
+        logging.info("Wrote %s with %d bins", fname, i + 1)
 
 
 def main(args):
