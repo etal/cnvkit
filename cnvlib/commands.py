@@ -29,8 +29,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 from . import (core, ngfrills, parallel, params,
-               target, antitarget, coverage, fix, metrics, reference, reports,
-               export, importers, segmentation, call, plots)
+               access, antitarget, call, coverage, export, fix, importers,
+               metrics, plots, reference, reports, segmentation, target)
 from .cnary import CopyNumArray as _CNA
 from .vary import VariantArray as _VA
 from .rary import RegionArray as _RA
@@ -348,6 +348,44 @@ P_target.add_argument('-a', '--avg-size', type=int, default=200 / .75,
                 [Default: %(default)s]""")
 P_target.add_argument('-o', '--output', help="""Output file name.""")
 P_target.set_defaults(func=_cmd_target)
+
+
+# access ----------------------------------------------------------------------
+
+def _cmd_access(args):
+    """List the locations of accessible sequence regions in a FASTA file."""
+    # Closes over args.output
+    def write_row(chrom, run_start, run_end):
+        args.output.write("%s\t%s\t%s\n" % (chrom, run_start, run_end))
+        args.output.flush()
+
+    for row in do_access(args.fa_fname, args.exclude, args.min_gap_size):
+        write_row(*row)
+
+
+def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
+    """List the locations of accessible sequence regions in a FASTA file."""
+    access_regions = access.get_regions(fa_fname)
+    for ex_fname in exclude_fnames:
+        access_regions = access.exclude_regions(ex_fname, access_regions)
+    for row in access.join_regions(access_regions, min_gap_size):
+        yield row
+
+
+P_access = AP_subparsers.add_parser('access', help=_cmd_access.__doc__)
+P_access.add_argument("fa_fname",
+                help="Genome FASTA file name")
+P_access.add_argument("-s", "--min-gap-size", type=int, default=5000,
+                help="""Minimum gap size between accessible sequence
+                regions.  Regions separated by less than this distance will
+                be joined together. [Default: %(default)s]""")
+P_access.add_argument("-x", "--exclude", action="append", default=[],
+                help="""Additional regions to exclude, in BED format. Can be
+                used multiple times.""")
+P_access.add_argument("-o", "--output",
+                type=argparse.FileType('w'), default=sys.stdout,
+                help="Output file name")
+P_access.set_defaults(func=_cmd_access)
 
 
 # antitarget ------------------------------------------------------------------
