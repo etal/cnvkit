@@ -10,9 +10,9 @@ import numpy as np
 
 import cnvlib
 # Import all modules as a smoke test
-from cnvlib import (antitarget, commands, core, coverage, diagram, export, fix,
-                    importers, metrics, ngfrills, params, plots, reference,
-                    reports, segmentation, smoothing,
+from cnvlib import (access, antitarget, commands, core, coverage, diagram,
+                    export, fix, importers, metrics, ngfrills, params, plots,
+                    reference, reports, segmentation, smoothing,
                     gary, cnary, vary, rary)
 
 
