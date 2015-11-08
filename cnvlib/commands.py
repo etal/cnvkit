@@ -268,7 +268,7 @@ P_batch_newref.add_argument('--target-avg-size', type=int,
 # For antitargets:
 P_batch_newref.add_argument('-g', '--access',
         help="""Regions of accessible sequence on chromosomes (.bed), as
-                output by genome2access.py.""")
+                output by the 'access' command.""")
 P_batch_newref.add_argument('--antitarget-avg-size', type=int,
         help="Average size of antitarget bins (results are approximate).")
 P_batch_newref.add_argument('--antitarget-min-size', type=int,

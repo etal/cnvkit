@@ -134,6 +134,51 @@ applies it as the new label for those regions. (You may find it simpler to just
 apply the refFlat annotations.)
 
 
+.. _access:
+
+access
+------
+
+Calculate the sequence-accessible coordinates in chromosomes from the given
+reference genome, output as a BED file.
+
+::
+
+    cnvkit.py access hg19.fa -x excludes.bed -o access-hg19.bed
+
+Many fully sequenced genomes, including the human genome, contain large regions
+of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
+telomeres, and highly repetitive regions.) In the FASTA reference genome
+sequence these regions are filled in with large stretches of "N" characters.
+These regions cannot be mapped by resequencing, so we will want to avoid them when
+calculating the :ref:`antitarget` bin locations (for example).
+
+The ``access`` command computes the locations of the accessible sequence regions
+for a given reference genome based on these masked-out sequences, treating long
+spans of 'N' characters as the inaccessible regions and outputting the
+coordinates of the regions between them.
+
+Other known unmappable or poorly sequenced regions can be specified for
+exclusion with the ``-x`` option.
+This option can be used more than once to exclude several BED files listing
+different sets of regions.
+For example, "excludable" regions of poor mappability have been precalculated by
+others and are available from the `UCSC FTP Server
+<ftp://hgdownload.soe.ucsc.edu/goldenPath/>`_ (see `here for hg19
+<ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/>`_).
+
+If there are many small excluded/inaccessible regions in the genome, then small,
+less-reliable antitarget bins would be squeezed into the remaining accessible
+regions.  The ``-s`` option tells the script to ignore short regions that would
+otherwise be excluded as inaccessible, allowing larger antitarget bins to
+overlap them.
+
+An "access" file precomputed for the UCSC reference human genome build hg19,
+with some know low-mappability regions excluded, is included in the CNVkit
+source distribution under the ``data/`` directory
+(``data/access-5kb-mappable.hg19.bed``).
+
+
 .. _antitarget:
 
 antitarget
@@ -147,17 +192,11 @@ off-target/"antitarget"/"background" regions.
 
     cnvkit.py antitarget my_targets.bed -g data/access-5kb-mappable.hg19.bed -o my_antitargets.bed
 
-Many fully sequenced genomes, including the human genome, contain large regions
-of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
-telomeres, and highly repetitive regions.) In the FASTA genome sequence these
-regions are filled in with large stretches of "N" characters. These regions
-cannot be mapped by resequencing, so we can avoid them when calculating the
-antitarget locations by passing the locations of the accessible sequence regions
-with the ``-g`` or ``--access`` option. These regions are precomputed for the
-UCSC reference human genome hg19 (data/access-5kb-mappable.hg19.bed), and can be
-computed for other genomes with the included script ``genome2access.py``.
-Other known unmappable or poorly sequenced regions can be specified for
-exclusion with the ``-x`` option.
+Certain genomic regions cannot be mapped by resequencing (see :ref:`access`); we
+can avoid them when calculating the antitarget locations by passing the
+locations of the accessible sequence regions with the ``-g`` or ``--access``
+option. CNVkit will then compute "antitarget" bins only within the accessible
+genomic regions specified in the "access" file.
 
 CNVkit uses a cautious default off-target bin size that, in our experience, will
 typically include more reads than the average on-target bin.  However, we

@@ -40,10 +40,10 @@ If your reference genome is the UCSC human genome hg19, a BED file of the
 sequencing-accessible regions is included in the CNVkit distribution as
 ``data/access-5kb-mappable.hg19.bed``.
 If you're not using hg19, consider building the "access" file yourself from your
-reference genome sequence (say, ``mm10.fasta``) using the bundled script
-``genome2access.py``::
+reference genome sequence (say, ``mm10.fasta``) using the :ref:`access`
+command::
 
-    genome2access.py mm10.fasta -s 10000 -o access-10kb.mm10.bed
+    cnvkit.py access mm10.fasta -s 10000 -o access-10kb.mm10.bed
 
 We'll use this file in the next step to ensure off-target bins ("antitargets")
 are allocated only in chromosomal regions that can be mapped.
