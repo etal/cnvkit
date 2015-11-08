@@ -93,48 +93,74 @@ class VariantArray(gary.GenomicArray):
 
 def _select_sample(vcf_reader, sample_id, normal_id):
     """Select a sample ID in the VCF; ensure it's valid."""
-    if sample_id is None and normal_id is None:
+    peds = list(_parse_pedigrees(vcf_reader))
+    if sample_id is None and normal_id is None and peds:
         # Use the VCF header to select the tumor sample
-        if "PEDIGREE" in vcf_reader.metadata:
-            for tag in vcf_reader.metadata["PEDIGREE"]:
-                if "Derived" in tag:
-                    sample_id = tag["Derived"]
-                    normal_id = tag["Original"]
-                    logging.info("Selected tumor sample %s and normal sample %s"
-                                 " from the VCF header PEDIGREE tag",
-                                 sample_id, normal_id)
-                    break
-        elif "GATKCommandLine" in vcf_reader.metadata:
-            for tag in vcf_reader.metadata["GATKCommandLine"]:
-                if tag.get("ID") == "MuTect":  # any others OK?
-                    options = dict(kv.split("=", 1)
-                                   for kv in tag["CommandLineOptions"].split()
-                                   if '=' in kv)
-                    sample_id = options.get('tumor_sample_name')
-                    normal_id = options['normal_sample_name']
-                    logging.info("Selected tumor sample %s and normal sample "
-                                 "%s from the MuTect VCF header",
-                                 sample_id, normal_id)
-                    break
-
-    if sample_id:
+        # Take the first entry, if any
+        sample_id, normal_id = peds[0]
+    elif sample_id and normal_id:
+        # Take the given IDs at face value, just verify below
         pass
+    elif sample_id:
+        if peds:
+            for sid, nid in peds:
+                if sid == sample_id:
+                    normal_id = nid
+                    break
         # if normal_id is None and len(vcf_reader.samples == 2):
         #     normal_id = next(s for s in vcf_reader.samples if s != sample_id)
     elif normal_id:
-        try:
-            sample_id = next(s for s in vcf_reader.samples if s != normal_id)
-        except StopIteration:
-            raise ValueError("No other sample in VCF besides the specified " +
-                             "normal " + normal_id + "; did you mean to use" +
-                             "this as the sample_id instead?")
+        if peds:
+            for sid, nid in peds:
+                if nid == normal_id:
+                    sample_id = sid
+                    break
+        else:
+            try:
+                sample_id = next(s for s in vcf_reader.samples if s != normal_id)
+            except StopIteration:
+                raise ValueError(
+                    "No other sample in VCF besides the specified normal " +
+                    normal_id + "; did you mean to use this as the sample_id "
+                    "instead?")
     else:
         sample_id = vcf_reader.samples[0]
 
     _confirm_unique(sample_id, vcf_reader.samples)
     if normal_id:
         _confirm_unique(normal_id, vcf_reader.samples)
+    logging.info("Selected tumor sample " + sample_id +
+                 (" and normal sample %s" % normal_id if normal_id else ''))
     return sample_id, normal_id
+
+
+def _parse_pedigrees(vcf_reader):
+    """Extract tumor/normal pair sample IDs from the VCF header.
+
+    Return an iterable of (tumor sample ID, normal sample ID).
+    """
+    if "PEDIGREE" in vcf_reader.metadata:
+        for tag in vcf_reader.metadata["PEDIGREE"]:
+            if "Derived" in tag:
+                sample_id = tag["Derived"]
+                normal_id = tag["Original"]
+                logging.debug("Found tumor sample %s and normal sample %s "
+                              "in the VCF header PEDIGREE tag",
+                              sample_id, normal_id)
+                yield sample_id, normal_id
+
+    elif "GATKCommandLine" in vcf_reader.metadata:
+        for tag in vcf_reader.metadata["GATKCommandLine"]:
+            if tag.get("ID") == "MuTect":  # any others OK?
+                options = dict(kv.split("=", 1)
+                                for kv in tag["CommandLineOptions"].split()
+                                if '=' in kv)
+                sample_id = options.get('tumor_sample_name')
+                normal_id = options['normal_sample_name']
+                logging.debug("Found tumor sample %s and normal sample "
+                              "%s in the MuTect VCF header",
+                              sample_id, normal_id)
+                yield sample_id, normal_id
 
 
 def _confirm_unique(sample_id, samples):
