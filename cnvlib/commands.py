@@ -139,15 +139,13 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
             anti_kwargs['avg_bin_size'] = antitarget_avg_size
         if antitarget_min_size:
             anti_kwargs['min_bin_size'] = antitarget_min_size
-        anti_rows = do_antitarget(target_bed, **anti_kwargs)
+        anti_rarr = do_antitarget(target_bed, **anti_kwargs)
         # Devise a temporary antitarget filename
         antitarget_bed = tgt_name_base + '.antitarget' + tgt_name_ext
         with ngfrills.safe_write(antitarget_bed, False) as anti_file:
-            i = 0
-            for i, row in enumerate(anti_rows):
-                anti_file.write("\t".join(row) + '\n')
-            logging.info("Wrote %s with %d background intervals",
-                         antitarget_bed, i + 1)
+            anti_rarr.write(anti_file, ngfrills.sniff_region_format(target_bed))
+        logging.info("Wrote %s with %d background intervals",
+                     antitarget_bed, len(anti_rarr))
 
     if len(normal_bams) == 0:
         logging.info("Building a flat reference...")
@@ -392,17 +390,17 @@ P_access.set_defaults(func=_cmd_access)
 
 def _cmd_antitarget(args):
     """Derive a background/antitarget BED file from a target BED file."""
-    out_rows = do_antitarget(args.interval, args.access,
+    out_rarr = do_antitarget(args.interval, args.access,
                              args.avg_size, args.min_size)
+
     if not args.output:
         base, ext = args.interval.rsplit('.', 1)
         args.output = base + '.antitarget.' + ext
     with ngfrills.safe_write(args.output, False) as outfile:
-        i = -1
-        for i, row in enumerate(out_rows):
-            outfile.write("\t".join(row) + '\n')
-        logging.info("Wrote %s with %d background intervals",
-                     args.output, i + 1)
+        # Match the output format to the input (BED/interval list)
+        out_rarr.write(outfile, ngfrills.sniff_region_format(args.interval))
+    logging.info("Wrote %s with %d background intervals",
+                 args.output, len(out_rarr))
 
 
 def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,
@@ -410,24 +408,8 @@ def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,
     """Derive a background/antitarget BED file from a target BED file."""
     if not min_bin_size:
         min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_REF_COVERAGE))
-    background_regions = antitarget.get_background(target_bed, access_bed,
-                                                   avg_bin_size, min_bin_size)
-
-    # Sniff the number of columns in the BED/interval file
-    # Output will try to match this format
-    ncols = ngfrills.sniff_num_columns(target_bed)
-    if ncols == 3:
-        # Just the coordinates
-        suffix = []
-    elif ncols == 5:
-        # Standard interval: coordinates, strand, name
-        suffix = ['+', 'Background']
-    else:
-        # Full or extended BED, or whatever
-        suffix = ['Background']
-
-    for row in background_regions:
-        yield list(map(str, row)) + suffix
+    return antitarget.get_background(target_bed, access_bed, avg_bin_size,
+                                     min_bin_size)
 
 
 P_anti = AP_subparsers.add_parser('antitarget', help=_cmd_antitarget.__doc__)
