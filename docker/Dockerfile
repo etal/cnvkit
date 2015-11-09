@@ -1,8 +1,7 @@
-FROM ubuntu:15.04
+FROM ubuntu:15.10
 MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
 
 ENV DEBIAN_FRONTEND noninteractive
-# RUN echo "deb http://archive.ubuntu.com/ubuntu utopic main universe" > /etc/apt/sources.list
 RUN apt-get update && apt-get install -y \
     cython \
     libfreetype6-dev \
@@ -18,8 +17,8 @@ RUN apt-get update && apt-get install -y \
     zlib1g-dev
 RUN pip install pandas pysam pyvcf
 RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('PSCBS', 'cghFLasso')"
-RUN pip install cnvkit==0.7.2
+RUN pip install cnvkit==0.7.3
 
-# ENTRYPOINT ["cnvkit.py"]
-# CMD ["--help"]
-CMD ["bash"]
+ENTRYPOINT ["cnvkit.py"]
+CMD ["--help"]
+# CMD ["bash"]
