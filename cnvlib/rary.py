@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, print_function
 
 import logging
+import sys
 
 import pandas as pd
 from Bio.File import as_handle
@@ -52,6 +53,23 @@ class RegionArray(gary.GenomicArray):
                  }[fmt]
         table = parser(fname)
         return cls(table, {"sample_id": sample_id})
+
+    def write(self, outfile=sys.stdout, fmt="bed"):
+        assert fmt in ("text", "interval", "bed")
+        if fmt == "text":
+            cp = self.copy()
+            cp['start'] += 1
+            table = cp.labels()
+        else:
+            table = self.data
+            if fmt == "interval":
+                table["start"] += 1
+                if "name" not in table:
+                    table["name"] = '-'
+                if "strand" not in table:
+                    table["strand"] = "+"
+        table.to_csv(outfile, sep='\t', header=False, index=False)
+
 
 
 def _parse_text_coords(infile):
