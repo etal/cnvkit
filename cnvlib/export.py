@@ -178,36 +178,49 @@ def create_chrom_ids(segments):
 # BED
 
 def export_bed(sample_fnames, ploidy, is_reference_male,
-               sample_id=None, show_all=False):
+               sample_id=None, show="ploidy"):
     """Export to BED format.
 
-    For each region in each sample which does not have neutral copy number
-    (equal to 2 or the value set by --ploidy), the columns are:
+    For each region in each sample (possibly filtered according to `show`),
+    the columns are:
 
         - reference sequence name
         - start (0-indexed)
         - end
         - sample name or given label
         - integer copy number
+
+    By default (show="ploidy"), skip regions where copy number is the default
+    ploidy, i.e. equal to 2 or the value set by --ploidy.
+    If show="variant", skip regions where copy number is neutral, i.e. equal to
+    the reference ploidy on autosomes, or half that on sex chromosomes.
     """
     bed_tables = []
     for fname in sample_fnames:
         segs = CNA.read(fname)
         tbl = segments2bed(segs, sample_id or segs.sample_id, ploidy,
-                           is_reference_male, show_all)
+                           is_reference_male, show)
         bed_tables.append(tbl)
     return pd.concat(bed_tables)
 
 
-def segments2bed(segments, label, ploidy, is_reference_male, show_all):
+def segments2bed(segments, label, ploidy, is_reference_male, show):
     """Convert a copy number array to a BED-like DataFrame."""
     absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
     out = segments.data.loc[:, ["chromosome", "start", "end"]]
     out["label"] = label
     out["ncopies"] = np.rint(absolutes)
-    if not show_all:
-        # Skip regions of normal ploidy
+    if show == "ploidy":
+        # Skip regions of default ploidy
         out = out[out["ncopies"] != ploidy]
+    elif show == "variants":
+        # Skip regions of non-neutral copy number
+        # XXX: female samples w/ male reference will show chrX as variant
+        haploid_mask = (segments["chromsome"] == segments._chr_y_label)
+        if is_reference_male:
+            haploid_mask |= (segments["chromsome"] == segments._chr_x_label)
+        out = out[(~haploid_mask & (out["ncopies"] != ploidy)) |
+                  (haploid_mask & (out["ncopies"] != ploidy//2))]
     return out
 
 

@@ -127,7 +127,7 @@ p2-all.seg: $(picard_segs)
 	$(cnvkit) export seg $^ -o $@
 
 p2-all.bed: $(picard_segs:.cns=.call.cns)
-	$(cnvkit) export bed $^ -y -o $@
+	$(cnvkit) export bed $^ -y --show variant -o $@
 
 p2-9_2.vcf: build/p2-9_2.call.cns
 	$(cnvkit) export vcf $^ -y -o $@
