@@ -7,8 +7,7 @@ import sys
 import pandas as pd
 from Bio.File import as_handle
 
-from . import core, gary
-from .ngfrills.regions import sniff_region_format, report_bad_line
+from . import core, gary, ngfrills
 
 
 class RegionArray(gary.GenomicArray):
@@ -40,7 +39,7 @@ class RegionArray(gary.GenomicArray):
                 sample_id = '<unknown>'
 
         if not fmt:
-            fmt = sniff_region_format(fname)
+            fmt = ngfrills.sniff_region_format(fname)
             if fmt is None:
                 return cls([])
             if fmt == 'bed':
@@ -54,7 +53,7 @@ class RegionArray(gary.GenomicArray):
         table = parser(fname)
         return cls(table, {"sample_id": sample_id})
 
-    def write(self, outfile=sys.stdout, fmt="bed"):
+    def write(self, outfile=sys.stdout, fmt="bed", verbose=True):
         assert fmt in ("text", "interval", "bed")
         if fmt == "text":
             cp = self.copy()
@@ -68,7 +67,19 @@ class RegionArray(gary.GenomicArray):
                     table["name"] = '-'
                 if "strand" not in table:
                     table["strand"] = "+"
-        table.to_csv(outfile, sep='\t', header=False, index=False)
+        with ngfrills.safe_write(outfile, False) as outfile:
+            table.to_csv(outfile, sep='\t', header=False, index=False)
+        if verbose:
+            # Log the output path, if possible
+            if isinstance(outfile, basestring):
+                outfname = outfile
+            elif hasattr(outfile, 'name') and outfile not in (sys.stdout,
+                                                              sys.stderr):
+                outfname = outfile.name
+            else:
+                # Probably stdout or stderr used in a pipeline -- don't pollute
+                return
+            logging.info("Wrote %s with %d regions", outfname, len(table))
 
 
 
@@ -79,7 +90,7 @@ def _parse_text_coords(infile):
 
     Text coordinates are assumed to be counting from 1.
     """
-    @report_bad_line
+    @ngfrills.report_bad_line
     def _parse_line(line):
         fields = line.split(':')
         if len(fields) == 3:
@@ -127,7 +138,7 @@ def _parse_bed(infile):
     after encountering a track line other than the first one in the file.
     """
     # ENH: just pd.read_table, skip 'track'
-    @report_bad_line
+    @ngfrills.report_bad_line
     def _parse_line(line):
         fields = line.split('\t', 6)
         chrom, start, end = fields[:3]
