@@ -74,12 +74,12 @@ def smoothed(x, width, do_fit_edges=False):
     """
     x, wing = check_inputs(x, width)
     # Pad the edges with mirror-image copies of the array
-    signal = np.concatenate((x[wing-1::-1], x, x[:-wing:-1]))
+    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
     # Apply signal smoothing
-    window = np.kaiser(2* wing + 1, 14)
+    window = np.kaiser(2 * wing + 1, 14)
     y = np.convolve(window / window.sum(), signal, mode='same')
     # Chop off the ends of the result so it has the original size
-    y = y[wing:1-wing]
+    y = y[wing:-wing]
     if do_fit_edges:
         fit_edges(x, y, wing)  # In-place
     return y
