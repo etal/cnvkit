@@ -315,7 +315,6 @@ def do_targets(bed_fname, annotate=None, do_short_names=False, do_split=False,
         logging.info("Splitting large targets")
         bed_rows = target.split_targets(bed_rows, avg_size)
     bed_rarr = _RA.from_rows(bed_rows,
-                             # XXX how many cols?
                              ['chromosome', 'start', 'end', 'name'])
     bed_rarr.sort()
     return bed_rarr
