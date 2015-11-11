@@ -54,7 +54,7 @@ class RegionArray(gary.GenomicArray):
         return cls(table, {"sample_id": sample_id})
 
     def write(self, outfile=sys.stdout, fmt="bed", verbose=True):
-        assert fmt in ("text", "interval", "bed")
+        assert fmt in ("text", "interval") or fmt.startswith("bed")
         if fmt == "text":
             cp = self.copy()
             cp['start'] += 1
@@ -67,6 +67,16 @@ class RegionArray(gary.GenomicArray):
                     table["name"] = '-'
                 if "strand" not in table:
                     table["strand"] = "+"
+                table = table.loc[:, ["chromosome", "start", "end", "strand",
+                                      "name"]]
+            elif fmt == "bed4":
+                if "name" not in table:
+                    table["name"] = '-'
+                table = table.loc[:, ["chromosome", "start", "end", "name"]]
+            elif fmt == "bed3":
+                table = table.loc[:, ["chromosome", "start", "end"]]
+            # Default: bed-like, keep all trailing columns
+
         with ngfrills.safe_write(outfile, False) as outfile:
             table.to_csv(outfile, sep='\t', header=False, index=False)
         if verbose:

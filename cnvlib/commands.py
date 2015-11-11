@@ -122,13 +122,12 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
 
     if annotate or short_names or split:
         # Pre-process baits/targets
-        new_target_fname = tgt_name_base + '.target' + tgt_name_ext
+        new_target_fname = tgt_name_base + '.target.bed'
         tgt_rarr = do_targets(target_bed, annotate, short_names, split,
                               **({'avg_size': target_avg_size}
                                  if split and target_avg_size
                                  else {}))
-        tgt_rarr.write(new_target_fname,
-                       ngfrills.sniff_region_format(target_bed))
+        tgt_rarr.write(new_target_fname, "bed4")
         target_bed = new_target_fname
 
     if not antitarget_bed:
@@ -142,8 +141,8 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
             anti_kwargs['min_bin_size'] = antitarget_min_size
         anti_rarr = do_antitarget(target_bed, **anti_kwargs)
         # Devise a temporary antitarget filename
-        antitarget_bed = tgt_name_base + '.antitarget' + tgt_name_ext
-        anti_rarr.write(antitarget_bed, ngfrills.sniff_region_format(target_bed))
+        antitarget_bed = tgt_name_base + '.antitarget.bed'
+        anti_rarr.write(antitarget_bed, "bed4")
 
     if len(normal_bams) == 0:
         logging.info("Building a flat reference...")
@@ -298,7 +297,7 @@ def _cmd_target(args):
     """Transform bait intervals into targets more suitable for CNVkit."""
     rarr = do_targets(args.interval, args.annotate, args.short_names,
                       args.split, args.avg_size)
-    rarr.write(args.output, ngfrills.sniff_region_format(args.interval))
+    rarr.write(args.output, "bed4")
 
 
 def do_targets(bed_fname, annotate=None, do_short_names=False, do_split=False,
@@ -391,8 +390,7 @@ def _cmd_antitarget(args):
     if not args.output:
         base, ext = args.interval.rsplit('.', 1)
         args.output = base + '.antitarget.' + ext
-    # Match the output format to the input (BED/interval list)
-    out_rarr.write(args.output, ngfrills.sniff_region_format(args.interval))
+    out_rarr.write(args.output, "bed4")
 
 
 def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,

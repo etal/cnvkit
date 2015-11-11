@@ -380,9 +380,11 @@ class CommandTests(unittest.TestCase):
     def test_target(self):
         """The 'target' command."""
         # ENH: annotate w/ mini-refFlat
-        commands.do_targets("formats/nv2_baits.interval_list", '/dev/null')
-        commands.do_targets("formats/amplicon.bed", '/dev/null',
-                            do_short_names=True, do_split=True, avg_size=100)
+        r = commands.do_targets("formats/nv2_baits.interval_list")
+        self.assertGreater(len(r), 0)
+        r = commands.do_targets("formats/amplicon.bed", do_short_names=True,
+                                do_split=True, avg_size=100)
+        self.assertGreater(len(r), 0)
 
 
 
