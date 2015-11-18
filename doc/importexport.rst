@@ -14,7 +14,7 @@ CNVkit .cnn format::
 
 You can use `Picard tools <http://broadinstitute.github.io/picard/>`_ to perform
 the bin read depth and GC calculations that CNVkit normally performs with the
-:ref:`coverage` and :ref:`reference` commands, if need be. 
+:ref:`coverage` and :ref:`reference` commands, if need be.
 
 Procedure:
 
@@ -74,33 +74,53 @@ representing subclones with integer absolute copy number in each segment.
 export
 ------
 
-Convert copy number ratio tables (.cnr files) to another format.
+Convert copy number ratio tables (.cnr files) or segments (.cns) to
+another format.
 
 bed
 ```
 
-The segmented output from multiple samples (``*.cns``) can be exported to BED
-format to support a variety of other uses, such as viewing in a genome browser.
-The log2 ratio value of each segment is converted and rounded to an integer
-value, as required by the BED format. To get accurate copy number values, see
-the :ref:`call` command.
+Segments can be exported to BED format to support a variety of other uses, such
+as viewing in a genome browser.  The log2 ratio value of each segment is
+converted and rounded to an integer value, as required by the BED format. To get
+accurate copy number values, see the :ref:`call` command.
 
 ::
 
     # Estimate integer copy number of each segment
     cnvkit.py call Sample.cns -y -o Sample.call.cns
     # Show estimated integer copy number of all regions
-    cnvkit.py export bed Sample.call.cns --show-neutral -y -o Sample.bed
+    cnvkit.py export bed Sample.call.cns --show all -y -o Sample.bed
 
 The same format can also specify CNV regions to the FreeBayes variant caller
 with FreeBayes's ``--cnv-map`` option::
 
     # Show only CNV regions
-    cnvkit.py export bed *.call.cns -o all-samples.cnv-map.bed
+    cnvkit.py export bed Sample.call.cns -o all-samples.cnv-map.bed
 
 By default only regions with copy number different from the given ploidy
 (default 2) are output. (Notice what this means for allosomes.)
-To output all segments, use the ``--show-neutral`` option.
+To output all segments, use the ``--show all`` option.
+
+vcf
+```
+
+Convert segments, ideally already adjusted by the :ref:`call` command, to
+a :ref:`vcfformat` file. Copy ratios are converted to absolute integers, as with
+BED export, and VCF records are created for the segments where the copy number
+is different from the expected ploidy (e.g. 2 on autosomes, 1 on haploid sex
+chromosomes, depending on sample gender).
+
+Gender can be specified with the ``-g``/``--gender`` option, or will be guessed
+automatically. If a male reference is used, use ``-y``/``--male-reference`` to
+say so. Note that these are different: If a female sample is run with a male
+reference, segments on chromosome X with log2-ratio +1 will be skipped, because
+that's the expected copy number, while an X-chromosome segment with log2-ratio 0
+will be printed as a hemizygous loss.
+
+::
+
+    cnvkit.py export vcf Sample.cns -y -g female -i "SampleID" -o Sample.cnv.vcf
 
 cdt, jtv
 ````````

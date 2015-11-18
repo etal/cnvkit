@@ -9,6 +9,8 @@ All of the non-standard file formats used by CNVkit are tab-separated plain text
 and can be loaded in a spreadsheet program, R or other statistical analysis
 software for manual analysis, if desired.
 
+.. _bedformat:
+
 BED and GATK/Picard Interval List
 ---------------------------------
 
@@ -27,6 +29,8 @@ example, the first nucleotide of a 1000-basepair sequence has position 1, the
 last nucleotide has position 1000, and the entire region is indicated by the
 range 1-1000.
 
+
+.. _vcfformat:
 
 VCF
 ---
