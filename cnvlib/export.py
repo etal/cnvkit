@@ -181,9 +181,9 @@ def create_chrom_ids(segments):
 # _____________________________________________________________________________
 # BED
 
-def export_bed(sample_fnames, ploidy, is_reference_male,
-               sample_id=None, show="ploidy"):
-    """Export to BED format.
+def export_bed(segments, ploidy, is_reference_male, is_sample_female,
+               label, show):
+    """Convert a copy number array to a BED-like DataFrame.
 
     For each region in each sample (possibly filtered according to `show`),
     the columns are:
@@ -199,17 +199,6 @@ def export_bed(sample_fnames, ploidy, is_reference_male,
     If show="variant", skip regions where copy number is neutral, i.e. equal to
     the reference ploidy on autosomes, or half that on sex chromosomes.
     """
-    bed_tables = []
-    for fname in sample_fnames:
-        segs = CNA.read(fname)
-        tbl = segments2bed(segs, sample_id or segs.sample_id, ploidy,
-                           is_reference_male, show)
-        bed_tables.append(tbl)
-    return pd.concat(bed_tables)
-
-
-def segments2bed(segments, label, ploidy, is_reference_male, show):
-    """Convert a copy number array to a BED-like DataFrame."""
     absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
     out = segments.data.loc[:, ["chromosome", "start", "end"]]
     out["label"] = label
@@ -217,14 +206,12 @@ def segments2bed(segments, label, ploidy, is_reference_male, show):
     if show == "ploidy":
         # Skip regions of default ploidy
         out = out[out["ncopies"] != ploidy]
-    elif show == "variants":
+    elif show == "variant":
         # Skip regions of non-neutral copy number
-        # XXX: female samples w/ male reference will show chrX as variant
-        haploid_mask = (segments["chromsome"] == segments._chr_y_label)
-        if is_reference_male:
-            haploid_mask |= (segments["chromsome"] == segments._chr_x_label)
-        out = out[(~haploid_mask & (out["ncopies"] != ploidy)) |
-                  (haploid_mask & (out["ncopies"] != ploidy//2))]
+        abs_dframe = call.absolute_dataframe(segments, ploidy, 1.0,
+                                             is_reference_male,
+                                             is_sample_female)
+        out = out[out["ncopies"] != abs_dframe["expect"]]
     return out
 
 
@@ -298,7 +285,9 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     # TODO be more clever about this
     for (_idx, out_row), (_idx, abs_row) in zip(out_dframe.iterrows(),
                                                 abs_dframe.iterrows()):
-        if out_row["ncopies"] == abs_row["expect"] or not str(out_row["probes"]).isdigit():
+        if (out_row["ncopies"] == abs_row["expect"] or
+            # Survive files from buggy v0.7.1 (#53)
+            not str(out_row["probes"]).isdigit()):
             # Skip regions of neutral copy number
             continue  # or "CNV" for subclonal?
 

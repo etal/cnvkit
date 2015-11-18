@@ -314,13 +314,23 @@ class CommandTests(unittest.TestCase):
         _header, theta_rows = export.export_theta("formats/tr95t.cns",
                                                   "formats/reference-tr.cnn")
         self.assertGreater(len(theta_rows), 0)
-        # VCF
-        tr_cns = cnvlib.read("formats/tr95t.cns")
-        _header, tr_vcf_body = export.export_vcf(tr_cns, 2, True, True)
-        self.assertTrue(0 < len(tr_vcf_body.splitlines()) < len(tr_cns))
-        cl_cns = cnvlib.read("formats/cl_seq.cns")
-        _header, cl_vcf_body = export.export_vcf(cl_cns, 6, True, True)
-        self.assertTrue(0 < len(cl_vcf_body.splitlines()) < len(cl_cns))
+        for fname, ploidy, is_f in [("tr95t.cns", 2, True),
+                                    ("cl_seq.cns", 6, True),
+                                    ("amplicon.cns", 2, False)]:
+            cns = cnvlib.read("formats/" + fname)
+            # BED
+            self.assertLess(len(export.export_bed(cns, ploidy, True, is_f,
+                                                  cns.sample_id, "ploidy")),
+                            len(cns))
+            self.assertLess(len(export.export_bed(cns, ploidy, True, is_f,
+                                                  cns.sample_id, "variant")),
+                            len(cns))
+            self.assertEqual(len(export.export_bed(cns, ploidy, True, is_f,
+                                                   cns.sample_id, "all")),
+                             len(cns))
+            # VCF
+            _vheader, vcf_body = export.export_vcf(cns, ploidy, True, is_f)
+            self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
 
     def test_gainloss(self):
         """The 'gainloss' command."""

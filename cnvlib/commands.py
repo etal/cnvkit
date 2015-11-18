@@ -11,6 +11,7 @@ import os
 import sys
 
 import numpy as np
+import pandas as pd
 
 from Bio._py3k import map, range, zip
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
@@ -673,19 +674,8 @@ def _cmd_call(args):
         raise RuntimeError("Purity must be between 0 and 1.")
 
     segments = _CNA.read(args.segment)
-    is_sample_female = segments.guess_xx(args.male_reference, verbose=False)
-    if args.gender:
-        is_sample_female_given = (args.gender in ["f", "female"])
-        if is_sample_female != is_sample_female_given:
-            print("Sample gender specified as", args.gender,
-                  "but chrX copy number looks like",
-                  "female" if is_sample_female else "male",
-                  file=sys.stderr)
-            is_sample_female = is_sample_female_given
-    print("Treating sample gender as",
-            "female" if is_sample_female else "male",
-            file=sys.stderr)
-
+    is_sample_female = verify_gender_arg(segments, args.gender,
+                                         args.male_reference)
     segs_adj = do_call(segments, args.method, args.ploidy, args.purity,
                        args.male_reference, is_sample_female, args.thresholds)
     segs_adj.write(args.output or segs_adj.sample_id + '.call.cns')
@@ -718,6 +708,21 @@ def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
 
 def csvstring(text):
     return tuple(map(float, text.split(",")))
+
+
+def verify_gender_arg(cnarr, gender_arg, is_male_reference):
+    is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
+    if gender_arg:
+        is_sample_female_given = (gender_arg in ["f", "female"])
+        if is_sample_female != is_sample_female_given:
+            logging.info("Sample gender specified as %s "
+                         "but chrX copy number looks like %s",
+                         gender_arg,
+                         "female" if is_sample_female else "male")
+            is_sample_female = is_sample_female_given
+    logging.info("Treating sample gender as %s",
+                 "female" if is_sample_female else "male")
+    return is_sample_female
 
 
 P_call = AP_subparsers.add_parser('call', help=_cmd_call.__doc__)
@@ -1540,9 +1545,21 @@ def _cmd_export_bed(args):
     """
     if args.show_all and args.show == "ploidy":
         # Until this option is removed, let it override the default
+        logging.warn("Option '--show-all' is deprecated; "
+                     "use '--show all' instead.")
         args.show = "all"
-    table = export.export_bed(args.segments, args.ploidy, args.male_reference,
-                              args.sample_id, args.show)
+    bed_tables = []
+    for segfname in args.segments:
+        segments = _CNA.read(segfname)
+        # ENH: args.gender as a comma-separated list of genders
+        is_sample_female = verify_gender_arg(segments, args.gender,
+                                             args.male_reference)
+        tbl = export.export_bed(segments, args.ploidy,
+                                args.male_reference, is_sample_female,
+                                args.sample_id or segments.sample_id,
+                                args.show)
+        bed_tables.append(tbl)
+    table = pd.concat(bed_tables)
     core.write_dataframe(args.output, table, header=False)
 
 P_export_bed = P_export_subparsers.add_parser('bed',
@@ -1555,6 +1572,10 @@ P_export_bed.add_argument("-i", "--sample-id", metavar="LABEL",
                 [Default: use the sample ID, taken from the file name]""")
 P_export_bed.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
+P_export_bed.add_argument("-g", "--gender",
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+        help="""Specify the sample's gender as male or female. (Otherwise
+                guessed from chrX copy number).""")
 P_export_bed.add_argument("--show",
         choices=('ploidy', 'variant', 'all'), default="ploidy",
         help="""Which segmented regions to show:
@@ -1600,19 +1621,9 @@ def _cmd_export_vcf(args):
     already been adjusted to integer absolute values using the 'call' command.
     """
     segments = _CNA.read(args.segments)
-    is_sample_female = segments.guess_xx(args.male_reference, verbose=False)
-    if args.gender:
-        is_sample_female_given = (args.gender in ["f", "female"])
-        if is_sample_female != is_sample_female_given:
-            print("Sample gender specified as", args.gender,
-                  "but chrX copy number looks like",
-                  "female" if is_sample_female else "male",
-                  file=sys.stderr)
-            is_sample_female = is_sample_female_given
-    print("Treating sample gender as",
-            "female" if is_sample_female else "male",
-            file=sys.stderr)
-
+    is_sample_female = verify_gender_arg(segments,
+                                         args.gender,
+                                         args.male_reference)
     header, body = export.export_vcf(segments, args.ploidy, args.male_reference,
                                      is_sample_female, args.sample_id)
     core.write_text(args.output, header, body)
