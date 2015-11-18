@@ -1693,22 +1693,19 @@ P_export_nbo.add_argument('-o', '--output', help="Output file name.")
 P_export_nbo.set_defaults(func=_cmd_export_nbo)
 
 
-
-
 # All else: export any number of .cnr or .cns files
 
 for fmt_key, fmt_descr in (
     ('cdt', "Convert log2 ratios to CDT format. Compatible with Java TreeView."),
     ('jtv', "Convert log2 ratios to Java TreeView's native format."),
     # Not implemented yet:
-    # 'multi' (Nexus Copy Number "multi1")
     # 'gct' (GenePattern).
 ):
     def _cmd_export_simple(args):
         sample_ids = list(map(core.fbase, args.filenames))
-        rows = export.merge_samples(args.filenames)
+        table = export.merge_samples(args.filenames)
         formatter = export.EXPORT_FORMATS[fmt_key]
-        outheader, outrows = formatter(sample_ids, rows)
+        outheader, outrows = formatter(sample_ids, table)
         core.write_tsv(args.output, outrows, colnames=outheader)
 
     P_export_simple = P_export_subparsers.add_parser(fmt_key, help=fmt_descr)

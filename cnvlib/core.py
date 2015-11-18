@@ -4,26 +4,10 @@ import sys
 import os.path
 from itertools import takewhile
 
-from Bio.File import as_handle
-
 from .ngfrills import safe_write
 
 # __________________________________________________________________________
 # I/O helpers
-
-def parse_tsv(infile, keep_header=False):
-    """Parse a tabular data table into an iterable of lists.
-
-    Rows are split on tabs.  Header row is optionally included in the output.
-    """
-    with as_handle(infile) as handle:
-        lines = iter(handle)
-        header = next(lines)
-        if keep_header:
-            yield header.rstrip().split('\t')
-        for line in lines:
-            yield line.rstrip().split('\t')
-
 
 def write_tsv(outfname, rows, colnames=None):
     """Write rows, with optional column header, to tabular file."""

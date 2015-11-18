@@ -12,7 +12,6 @@ from . import call, core
 from .cnary import CopyNumArray as CNA
 from .vary import VariantArray as VA
 
-ProbeInfo = collections.namedtuple('ProbeInfo', 'label chrom start end gene')
 
 def merge_samples(filenames):
     """Merge probe values from multiple samples into a 2D table (of sorts).
@@ -22,72 +21,71 @@ def merge_samples(filenames):
     Output:
         list-of-tuples: (probe, log2 coverages...)
     """
-    handles = []
-    datastreams = []  # e.g. [list-of-pairs, list-of-pairs, ...]
-    for fname in filenames:
-        handle = open(fname)
-        handles.append(handle)
-        data = core.parse_tsv(handle)
-        datastreams.append(data)
-    # Emit the individual rows merged across samples, one per probe
-    for rows in zip(*datastreams):
-        yield merge_rows(rows)
-    # Clean up
-    for handle in handles:
-        handle.close()
+    def label_with_gene(cnarr):
+        row2label = lambda row: "{}:{}-{}:{}".format(
+            row['chromosome'], row['start'], row['end'], row['gene'])
+        return cnarr.data.apply(row2label, axis=1)
 
-
-def merge_rows(rows):
-    """Combine equivalent rows of coverage data across multiple samples.
-
-    Check that probe info matches across all samples, then merge the log2
-    coverage values.
-
-    Input: a list of individual rows corresponding to the same probes from
-    different coverage files.
-    Output: a list starting with the single common Probe object, followed by the
-    log2 coverage values from each sample, in order.
-    """
-    probe_infos, coverages = zip(*map(row_to_probe_coverage, rows))
-    probe_info = core.check_unique(probe_infos, "probe Name")
-    combined_row = [probe_info] + list(coverages)
-    return combined_row
-
-
-def row_to_probe_coverage(row):
-    """Repack a parsed row into a ProbeInfo instance and coverage value."""
-    chrom, start, end, gene, coverage = row[:5]
-    label = "%s:%s-%s:%s" % (chrom, start, end, gene)
-    probe_info = ProbeInfo(label, chrom, int(start), int(end), gene)
-    return probe_info, float(coverage)
+    if not filenames:
+        return []
+    first_cnarr = CNA.read(filenames[0])
+    out_table = first_cnarr.data.loc[:, ["chromosome", "start", "end", "gene"]]
+    out_table["label"] = label_with_gene(first_cnarr)
+    out_table[first_cnarr.sample_id] = first_cnarr["log2"]
+    for fname in filenames[1:]:
+        cnarr = CNA.read(fname)
+        # Verify labels match
+        labels = label_with_gene(cnarr)
+        if not (labels == out_table["label"]).all():
+            raise ValueError("Mismatched row coordinates in %s" % fname)
+        # Copy the next column by sample ID
+        if cnarr.sample_id in out_table.columns:
+            raise ValueError("Duplicate sample ID: %s" % cnarr.sample_id)
+        out_table[cnarr.sample_id] = cnarr["log2"]
+        del cnarr
+    return out_table
 
 
 # Supported formats:
 
-def fmt_cdt(sample_ids, rows):
+def fmt_cdt(sample_ids, table):
     """Format as CDT."""
     outheader = ['GID', 'CLID', 'NAME', 'GWEIGHT'] + sample_ids
     header2 = ['AID', '', '', '']
     header2.extend(['ARRY' + str(i).zfill(3) + 'X'
                     for i in range(len(sample_ids))])
     outrows = [header2]
-    for i, row in enumerate(rows):
-        probe, values = row[0], row[1:]
-        outrow = ['GENE%dX' % i, 'IMAGE:%d' % i, probe.label, 1] # or probe.gene?
-        outrow.extend(values)
-        outrows.append(outrow)
+    outtable = pd.concat([
+        pd.DataFrame({
+            "GID": table.index.apply(lambda x: "GENE%dX" % x),
+            "CLID": table.index.apply(lambda x: "IMAGE:%d" % x),
+            "NAME": table["label"],
+            "GWEIGHT": 1,
+        }),
+        table.drop(["chromosome", "start", "end", "gene", "label"],
+                   axis=1)],
+        axis=1)
+    outrows.extend(outtable.itertuples(index=False))
     return outheader, outrows
 
 
 # TODO
-def fmt_gct(sample_ids, rows):
+def fmt_gct(sample_ids, table):
     return NotImplemented
 
 
-def fmt_jtv(sample_ids, rows):
+def fmt_jtv(sample_ids, table):
     """Format for Java TreeView."""
     outheader = ["CloneID", "Name"] + sample_ids
-    outrows = [["IMAGE:", row[0].label] + row[1:] for row in rows]
+    outtable = pd.concat([
+        pd.DataFrame({
+            "CloneID": "IMAGE:",
+            "Name": table["label"],
+        }),
+        table.drop(["chromosome", "start", "end", "gene", "label"],
+                   axis=1)],
+        axis=1)
+    outrows = outtable.itertuples(index=False)
     return outheader, outrows
 
 
