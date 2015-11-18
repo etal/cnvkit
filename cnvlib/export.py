@@ -112,11 +112,17 @@ def export_nexus_ogt(sample_fname, vcf_fname):
     are left blank; if a bin contains multiple variants, then the frequencies
     are all "mirrored" to be above .5, then the median of those values is taken.
     """
+    def mirrored_baf_median(vals):
+        shift = np.median(np.abs(vals - .5))
+        if np.median(vals) > .5:
+            return .5 + shift
+        else:
+            return .5 - shift
+
     cnarr = CNA.read(sample_fname)
     varr = VA.read_vcf(vcf_fname)
-    mirrored_baf_median = lambda vals: np.median(np.abs(vals - .5) + .5)
     bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
-                                summary_func=mirrored_baf_median)
+                               summary_func=mirrored_baf_median)
     logging.info("Placed %d variants into %d bins",
                  sum(~np.isnan(bafs)), len(cnarr))
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'log2']]
