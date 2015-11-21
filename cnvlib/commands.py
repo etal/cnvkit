@@ -946,7 +946,7 @@ def do_scatter(cnarr, segments=None, variants=None,
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
             # Plot allele freqs for only the selected region
             sel_snvs = variants.in_range(chrom, *window_coords)
-            plots.snv_on_chromosome(axis2, sel_snvs, segments, genes,
+            plots.snv_on_chromosome(axis2, sel_snvs, sel_seg, genes,
                                     do_trend, # do_boost,
                                    )
         elif variants:
@@ -954,7 +954,7 @@ def do_scatter(cnarr, segments=None, variants=None,
             # nb: don't do the last call to cnv_on_chromosome
             _fig, axis = pyplot.subplots()
             sel_snvs = variants.in_range(chrom, *window_coords)
-            plots.snv_on_chromosome(axis, sel_snvs, segments, genes,
+            plots.snv_on_chromosome(axis, sel_snvs, sel_seg, genes,
                                     do_trend, # do_boost,
                                    )
             return
