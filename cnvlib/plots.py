@@ -17,13 +17,161 @@ from . import core, smoothing
 
 SEG_COLOR = 'red'
 POINT_COLOR = '#808080'
+
+# === Chromosome-level scatter plots ===
+
 HIGHLIGHT_COLOR = 'gold'
+MB = 1e-6  # To rescale from bases to megabases
 
-MB = 1e-6
+def setup_chromosome(axis, probes=None, segments=None, variants=None,
+                     y_min=None, y_max=None, y_label=None):
+    """Configure axes for plotting a single chromosome's data.
+
+    `probes`, `segments`, and `variants` should already be subsetted to the
+    region that will be plotted.
+    """
+    min_x = np.inf
+    max_x = 0
+    for arr in (probes, segments, variants):
+        if arr:
+            max_x = max(max_x, arr[len(arr) - 1, "end"])
+            min_x = min(min_x, arr[0, "start"])
+    if not max_x > min_x:
+        raise ValueError("No usable data points to plot out of"
+                         "%d probes, %d segments, %d variants"
+                         % (len(probes) if probes else 0,
+                            len(segments) if segments else 0,
+                            len(variants) if variants else 0))
+    axis.set_xlim(min_x * MB, max_x * MB)
+    if y_min and y_max:
+        axis.set_ylim(y_min, y_max)
+        if y_min < 0 < y_max:
+            axis.axhline(color='k')
+    if y_label:
+        axis.set_ylabel(y_label)
+    axis.tick_params(which='both', direction='out')
+    axis.get_xaxis().tick_bottom()
+    axis.get_yaxis().tick_left()
 
 
-def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
-                y_max=None):
+def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
+                      do_trend=False, y_min=None, y_max=None):
+    """Draw a scatter plot of probe values with CBS calls overlaid.
+
+    Argument 'genes' is a list of tuples: (start, end, gene name)
+    """
+    # Get scatter plot coordinates
+    x = 0.5 * (probes['start'] + probes['end']) * MB # bin midpoints
+    y = probes['log2']
+    if 'weight' in probes:
+        w = 46 * probes['weight'] ** 2 + 2
+    else:
+        w = np.repeat(30, len(x))
+    is_bg = (probes['gene'] == 'Background')
+
+    # Configure axes
+    # TODO - use segment y-values if probes not given
+    if not y_min:
+        y_min = max(-5.0, min(y.min() - .1, -.3)) if len(y) else -1.1
+    if not y_max:
+        y_max = max(.3, y.max() + (.25 if genes else .1)) if len(y) else 1.1
+    setup_chromosome(axis, probes, segments, None, y_min, y_max,
+                     "Copy ratio (log2)")
+    if genes:
+        # Rotate text in proportion to gene density
+        ngenes = len(genes)
+        text_size = ('small' if ngenes <= 6 else 'x-small')
+        if ngenes <= 3:
+            text_rot = 'horizontal'
+        elif ngenes <= 6:
+            text_rot = 30
+        elif ngenes <= 10:
+            text_rot = 45
+        elif ngenes <= 20:
+            text_rot = 60
+        else:
+            text_rot = 'vertical'
+        for gene in genes:
+            gene_start, gene_end, gene_name = gene
+            # Highlight and label gene region
+            # (rescale positions from bases to megabases)
+            axis.axvspan(gene_start * MB, gene_end * MB,
+                         alpha=0.5, color=HIGHLIGHT_COLOR, zorder=-1)
+            axis.text(0.5 * (gene_start + gene_end) * MB,
+                      min(2.4, y.max() + .1) if len(y) else .1,
+                      gene_name,
+                      horizontalalignment='center',
+                      rotation=text_rot,
+                      size=text_size)
+                      # size='small')
+
+    if background_marker in (None, 'o'):
+        # Plot targets and antitargets with the same marker
+        axis.scatter(x, y, w, color=POINT_COLOR, alpha=0.4, marker='o')
+    else:
+        # Use the given marker to plot antitargets separately
+        x_fg = []
+        y_fg = []
+        w_fg = []
+        x_bg = []
+        y_bg = []
+        # w_bg = []
+        for x_pt, y_pt, w_pt, is_bg_pt in zip(x, y, w, is_bg):
+            if is_bg_pt:
+                x_bg.append(x_pt)
+                y_bg.append(y_pt)
+                # w_bg.append(w_pt)
+            else:
+                x_fg.append(x_pt)
+                y_fg.append(y_pt)
+                w_fg.append(w_pt)
+        axis.scatter(x_fg, y_fg, w_fg, color=POINT_COLOR, alpha=0.4, marker='o')
+        axis.scatter(x_bg, y_bg, color=POINT_COLOR, alpha=0.5,
+                     marker=background_marker)
+
+    # Add a local trend line
+    if do_trend:
+        axis.plot(x, smoothing.smoothed(y, 100),
+                    color=POINT_COLOR, linewidth=2, zorder=-1)
+
+    # Get coordinates for CBS lines & draw them
+    if segments:
+        for row in segments:
+            axis.plot((row['start'] * MB, row['end'] * MB),
+                      (row['log2'], row['log2']),
+                      color=SEG_COLOR, linewidth=4, solid_capstyle='round')
+
+
+def snv_on_chromosome(axis, variants, segments, genes,
+                      do_trend, do_boost=False):
+    # TODO only set x-limits if not already done for probes/segments
+    # setup_chromosome(axis, None, segments, variants,
+    #                  0.0, 1.0, "VAF")
+    axis.set_ylim(0.0, 1.0)
+    axis.set_ylabel("VAF")
+    axis.set_xlabel("Position (Mb)")
+    axis.get_yaxis().tick_left()
+    axis.get_xaxis().tick_top()
+    axis.tick_params(which='both', direction='out',
+                     labelbottom=False, labeltop=False)
+
+    x_mb = variants["start"] * MB
+    y = variants["alt_freq"]
+    axis.scatter(x_mb, y, color='#808080', alpha=0.3)
+    # TODO - show segments
+    # TODO - highlight genes/selection
+    # TODO - use do_boost
+
+
+# === Genome-level scatter plots ===
+
+def setup_genome(axis, probes, segments, variants, y_min=None, y_max=None):
+    """Configure axes for plotting a whole genomes's data."""
+    pass
+
+
+def cnv_on_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
+                  y_max=None):
     """Plot coverages and CBS calls for all chromosomes on one plot."""
     # Group probes by chromosome (to calculate plotting coordinates)
     if probes:
@@ -84,103 +232,8 @@ def plot_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
                   color=SEG_COLOR, linewidth=3, solid_capstyle='round')
 
 
-def plot_chromosome(axis, probes, segments, chromosome, genes,
-                    background_marker=None, do_trend=False, y_min=None,
-                    y_max=None, title='CNVkit'):
-    """Draw a scatter plot of probe values with CBS calls overlaid.
-
-    Argument 'genes' is a list of tuples: (start, end, gene name)
-    """
-    # Get scatter plot coordinates
-    sel_probes = probes[probes['chromosome'] == chromosome]
-    x = [probe_center(row) * MB for row in sel_probes]
-    y = sel_probes['log2']
-    if 'weight' in sel_probes:
-        w = 46 * sel_probes['weight'] ** 2 + 2
-    else:
-        w = np.repeat(30, len(x))
-    is_bg = (sel_probes['gene'] == 'Background')
-
-    # Configure axes
-    axis.axhline(color='k')
-    axis.set_xlim(max(0, min(x)), max(x))
-    if not y_min:
-        y_min = limit(min(y) - .1, -5.0, -.3)
-    if not y_max:
-        y_max = max(max(y) + (.25 if genes else .1), .3)
-    axis.set_ylim(y_min, y_max)
-    axis.set_ylabel("Copy ratio (log2)")
-    axis.set_title("%s %s" % (title, chromosome))
-    axis.tick_params(which='both', direction='out')
-    axis.get_xaxis().tick_bottom()
-    axis.get_yaxis().tick_left()
-    if genes:
-        # Rotate text in proportion to gene density
-        ngenes = len(genes)
-        text_size = ('small' if ngenes <= 6 else 'x-small')
-        if ngenes <= 3:
-            text_rot = 'horizontal'
-        elif ngenes <= 6:
-            text_rot = 30
-        elif ngenes <= 10:
-            text_rot = 45
-        elif ngenes <= 20:
-            text_rot = 60
-        else:
-            text_rot = 'vertical'
-        for gene in genes:
-            gene_start, gene_end, gene_name = gene
-            # Rescale positions from bases to megabases
-            gene_start *= MB
-            gene_end *= MB
-            # Highlight and label gene region
-            axis.axvspan(gene_start, gene_end, alpha=0.5, color=HIGHLIGHT_COLOR,
-                         zorder=-1)
-            axis.text(0.5 * (gene_start + gene_end), min(max(y) + .1, 2.4),
-                      gene_name, horizontalalignment='center',
-                      rotation=text_rot,
-                      size=text_size)
-                      # size='small')
-
-    if background_marker in (None, 'o'):
-        # Plot targets and antitargets with the same marker
-        axis.scatter(x, y, w, color=POINT_COLOR, alpha=0.4, marker='o')
-    else:
-        # Use the given marker to plot antitargets separately
-        x_fg = []
-        y_fg = []
-        w_fg = []
-        x_bg = []
-        y_bg = []
-        # w_bg = []
-        for x_pt, y_pt, w_pt, is_bg_pt in zip(x, y, w, is_bg):
-            if is_bg_pt:
-                x_bg.append(x_pt)
-                y_bg.append(y_pt)
-                # w_bg.append(w_pt)
-            else:
-                x_fg.append(x_pt)
-                y_fg.append(y_pt)
-                w_fg.append(w_pt)
-        axis.scatter(x_fg, y_fg, w_fg, color=POINT_COLOR, alpha=0.4, marker='o')
-        axis.scatter(x_bg, y_bg, color=POINT_COLOR, alpha=0.5,
-                     marker=background_marker)
-
-    # Add a local trend line
-    if do_trend:
-        axis.plot(x, smoothing.smoothed(y, 100),
-                    color=POINT_COLOR, linewidth=2, zorder=-1)
-
-    # Get coordinates for CBS lines & draw them
-    if segments:
-        for row in segments[segments['chromosome'] == chromosome]:
-            axis.plot((row['start'] * MB, row['end'] * MB),
-                      (row['log2'], row['log2']),
-                      color=SEG_COLOR, linewidth=4, solid_capstyle='round')
-
-
-def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad,
-             do_boost=False):
+def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, pad,
+                  do_boost=False):
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
@@ -256,6 +309,7 @@ def plot_loh(axis, variants, chrom_sizes, segments, do_trend, pad,
                       solid_capstyle='round')
 
 
+
 def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom):
     """Group SNP allele frequencies by segment.
 
@@ -323,18 +377,6 @@ def chromosome_sizes(probes, to_mb=False):
         if to_mb:
             chrom_sizes[chrom] *= MB
     return chrom_sizes
-
-
-
-def limit(x, lower, upper):
-    """Limit x to between lower and upper bounds."""
-    assert lower < upper
-    return max(lower, min(x, upper))
-
-
-def probe_center(row):
-    """Return the midpoint of the probe location."""
-    return 0.5 * (row['start'] + row['end'])
 
 
 def partition_by_chrom(chrom_snvs):
@@ -408,6 +450,8 @@ def cvg2rgb(cvg, desaturate):
 
 
 # XXX should this be a CopyNumArray method?
+# or: use by_genes internally
+# or: have by_genes use this internally
 def gene_coords_by_name(probes, names):
     """Find the chromosomal position of each named gene in probes.
 
@@ -461,19 +505,4 @@ def gene_coords_by_range(probes, chrom, start, end,
     # Reorganize the data structure
     return {chrom: [(start, end, name)
                     for name, (start, end) in genes.items()]}
-
-
-# XXX not really specific to plots...
-def parse_range(text):
-    """Parse a chromosomal range specification.
-
-    Range spec string should look like: 'chr1:1234-5678'
-    """
-    try:
-        chrom, rest = text.split(':')
-        start, end = map(int, rest.split('-'))
-        return chrom, start, end
-    except Exception:
-        raise ValueError("Invalid range spec: " + text
-                         + " (should be like: chr1:2333000-2444000)")
 

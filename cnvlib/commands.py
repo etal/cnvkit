@@ -811,21 +811,15 @@ def _cmd_scatter(args):
         with PdfPages(args.output) as pdf_out:
             for chrom, start, end in _RA.read(args.range_list).coords():
                 region = "{}:{}-{}".format(chrom, start, end)
-                do_scatter(cnarr, segarr, varr, False, False,
-                           region, args.background_marker, args.trend,
+                do_scatter(cnarr, segarr, varr, region, False,
+                           args.background_marker, args.trend,
                            args.width, args.y_min, args.y_max)
                 pyplot.title(region)
                 pdf_out.savefig()
                 pyplot.close()
     else:
-        if args.chromosome and (':' in args.chromosome or
-                                '-' in args.chromosome):
-            show_range = args.chromosome
-            args.chromosome = None
-        else:
-            show_range = None
         do_scatter(cnarr, segarr, varr, args.chromosome, args.gene,
-                   show_range, args.background_marker, args.trend, args.width,
+                   args.background_marker, args.trend, args.width,
                    args.y_min, args.y_max)
         if args.output:
             pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
@@ -835,14 +829,18 @@ def _cmd_scatter(args):
 
 
 def do_scatter(cnarr, segments=None, variants=None,
-               show_chromosome=None, show_gene=None, show_range=None,
+               show_range=None, show_gene=None,
                background_marker=None, do_trend=False, window_width=1e6,
                y_min=None, y_max=None, title=None):
-    """Plot probe log2 coverages and CBS calls together."""
+    """Plot probe log2 coverages and CBS calls together.
+
+    show_gene: name of gene to highligh
+    show_range: chromosome name or coordinate string like "chr1:20-30"
+    """
     if title is None:
         title = (cnarr or segments or variants).sample_id
 
-    if not show_gene and not show_range and not show_chromosome:
+    if not show_gene and not show_range:
         # Plot all chromosomes, concatenated on one plot
         PAD = 1e7
         if (cnarr or segments) and variants:
@@ -853,23 +851,31 @@ def do_scatter(cnarr, segments=None, variants=None,
             # Place chromosome labels between the CNR and LOH plots
             axis2.tick_params(labelbottom=False)
             chrom_sizes = plots.chromosome_sizes(cnarr or segments)
-            plots.plot_loh(axis2, variants, chrom_sizes, segments, do_trend,
-                           PAD)
+            plots.snv_on_genome(axis2, variants, chrom_sizes, segments,
+                                do_trend, PAD)
         else:
             _fig, axis = pyplot.subplots()
         if cnarr or segments:
             axis.set_title(title)
-            plots.plot_genome(axis, cnarr, segments, PAD, do_trend, y_min, y_max)
+            plots.cnv_on_genome(axis, cnarr, segments, PAD, do_trend, y_min, y_max)
         else:
             axis.set_title("Variant allele frequencies: %s" % title)
             chrom_sizes = collections.OrderedDict(
                 (chrom, subarr["end"].max())
                 for chrom, subarr in variants.by_chromosome())
-            plots.plot_loh(axis, variants, chrom_sizes, segments, do_trend, PAD)
+            plots.snv_on_genome(axis, variants, chrom_sizes, segments, do_trend,
+                                PAD)
 
     else:
+        # TODO - consolidate show_range vs. show_chromosome
+        # ENH: also accept tuple (chrom, start, end) instead of string
+        if show_range and (':' in show_range or '-' in show_range):
+            show_chromosome = None
+        else:
+            show_chromosome, show_range = show_range, None
+
         # Plot a specified region on one chromosome
-        window_coords = None
+        window_coords = ()
         chrom = None
         genes = []
         if show_gene:
@@ -885,21 +891,20 @@ def do_scatter(cnarr, segments=None, variants=None,
             window_coords = (max(0, genes[0][0] - window_width),
                              genes[-1][1] + window_width)
 
-        # TODO - consolidate show_range vs. show_chromosome
         if show_range:
             if chrom:
                 if not show_range.startswith(chrom):
                     raise ValueError("Selected genes are on chromosome " +
                                      chrom + " but specified range is " +
                                      show_range)
-            chrom, start, end = plots.parse_range(show_range)
+            chrom, start, end = parse_range_text(show_range)
             if window_coords:
                 if start > window_coords[0] or end < window_coords[1]:
                     raise ValueError("Selected gene range " + chrom +
                                      (":%d-%d" % window_coords) +
                                      " is outside specified range " +
                                      show_range)
-            if not genes:
+            if cnarr and not genes:
                 genes = plots.gene_coords_by_range(cnarr, chrom,
                                                    start, end)[chrom]
             if not genes and window_width > (end - start) / 10.0:
@@ -923,16 +928,10 @@ def do_scatter(cnarr, segments=None, variants=None,
                 window_coords = None
 
         # Prune plotted elements to the selected region
-        if window_coords:
-            # Show the selected region
-            sel_probes = cnarr.in_range(chrom, *window_coords)
-            sel_seg = (segments.in_range(chrom, *window_coords, mode='trim')
-                       if segments else None)
-        else:
-            # Show the whole chromosome
-            sel_probes = cnarr.in_range(chrom)
-            sel_seg = (segments.in_range(chrom)
-                       if segments else None)
+        sel_probes = (cnarr.in_range(chrom, *window_coords)
+                        if cnarr else _CNA([]))
+        sel_seg = (segments.in_range(chrom, *window_coords, mode='trim')
+                    if segments else _CNA([]))
 
         logging.info("Showing %d probes and %d selected genes in range %s",
                      len(sel_probes), len(genes),
@@ -945,24 +944,19 @@ def do_scatter(cnarr, segments=None, variants=None,
             axgrid = pyplot.GridSpec(5, 1, hspace=.5)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            chrom_snvs = variants[variants["chromosome"] == chrom]
-            if window_coords:
-                # Plot allele freqs for only the selected region
-                chrom_snvs = chrom_snvs[
-                    (window_coords[0] * plots.MB <= chrom_snvs["start"]) &
-                    (chrom_snvs["start"]  <= window_coords[1] * plots.MB)]
-            snv_x = chrom_snvs["start"] * plots.MB
-            snv_y = chrom_snvs["alt_freq"]
-            axis2.set_ylim(0.0, 1.0)
-            axis2.set_ylabel("VAF")
-            axis2.scatter(snv_x, snv_y, color='#808080', alpha=0.3)
-            axis2.set_xlabel("Position (Mb)")
-            axis2.get_yaxis().tick_left()
-            axis2.get_xaxis().tick_top()
-            axis2.tick_params(which='both', direction='out',
-                              labelbottom=False, labeltop=False)
+            # Plot allele freqs for only the selected region
+            sel_snvs = variants.in_range(chrom, *window_coords)
+            plots.snv_on_chromosome(axis2, sel_snvs, segments, genes,
+                                    do_trend, # do_boost,
+                                   )
         elif variants:
-            # XXX tangle: don't do the last call to plot_chromosome
+            # XXX tangle
+            # nb: don't do the last call to cnv_on_chromosome
+            _fig, axis = pyplot.subplots()
+            sel_snvs = variants.in_range(chrom, *window_coords)
+            plots.snv_on_chromosome(axis, sel_snvs, segments, genes,
+                                    do_trend, # do_boost,
+                                   )
             return
 
         else:
@@ -970,10 +964,25 @@ def do_scatter(cnarr, segments=None, variants=None,
             axis.set_xlabel("Position (Mb)")
 
         # Plot CNVs
-        plots.plot_chromosome(axis, sel_probes, sel_seg, chrom, genes,
-                              background_marker=background_marker,
-                              do_trend=do_trend, y_min=y_min, y_max=y_max,
-                              title=title)
+        axis.set_title("%s %s" % (title, chrom))
+        plots.cnv_on_chromosome(axis, sel_probes, sel_seg, genes,
+                                background_marker=background_marker,
+                                do_trend=do_trend, y_min=y_min, y_max=y_max)
+
+
+
+def parse_range_text(text):
+    """Parse a chromosomal range specification.
+
+    Range spec string should look like: 'chr1:1234-5678'
+    """
+    try:
+        chrom, rest = text.split(':')
+        start, end = map(int, rest.split('-'))
+        return chrom, start, end
+    except Exception:
+        raise ValueError("Invalid range spec: " + text
+                         + " (should be like: chr1:2333000-2444000)")
 
 
 P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
@@ -1031,22 +1040,17 @@ def _cmd_loh(args):
     variants = _VA.read_vcf(args.variants, args.sample_id, args.normal_id,
                             args.min_depth)
     segments = _CNA.read(args.segment) if args.segment else None
-    create_loh(variants, segments, args.trend)
-    if args.output:
-        pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
-    else:
-        pyplot.show()
-
-
-def create_loh(variants, segments=None, do_trend=False):
-    """Plot allelic frequencies at each variant position in a VCF file."""
     _fig, axis = pyplot.subplots()
     axis.set_title("Variant allele frequencies: %s" % variants.sample_id)
     chrom_sizes = collections.OrderedDict(
         (chrom, subarr["end"].max())
         for chrom, subarr in variants.by_chromosome())
     PAD = 2e7
-    plots.plot_loh(axis, variants, chrom_sizes, segments, do_trend, PAD)
+    plots.snv_on_genome(axis, variants, chrom_sizes, segments, args.trend, PAD)
+    if args.output:
+        pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
+    else:
+        pyplot.show()
 
 
 P_loh = AP_subparsers.add_parser('loh', help=_cmd_loh.__doc__)

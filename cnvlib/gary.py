@@ -232,7 +232,7 @@ class GenomicArray(object):
     def labels(self):
         return self.data.apply(self.row2label, axis=1)
 
-    def in_range(self, chrom=None, start=0, end=None, mode='outer'):
+    def in_range(self, chrom=None, start=None, end=None, mode='outer'):
         """Get the GenomicArray portion within the given genomic range.
 
         `mode` works as in `by_ranges`: ``outer`` includes bins straddling the
@@ -240,9 +240,11 @@ class GenomicArray(object):
         endpoints to match the range boundaries, and ``inner`` excludes those
         bins.
         """
+        if isinstance(start, (int, float, np.float64)):
+            start = [int(start)]
         if isinstance(end, (int, float, np.float64)):
             end = [int(end)]
-        results = self._iter_ranges(chrom, [start], end, mode)
+        results = self._iter_ranges(chrom, start, end, mode)
         return next(results)
 
     def in_ranges(self, chrom=None, starts=None, ends=None, mode='outer'):
