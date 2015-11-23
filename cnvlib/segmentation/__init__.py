@@ -85,7 +85,7 @@ def transfer_names_weights(segments, cnarr, ignore=('Background', 'CGH', '-')):
 
     Segment name is the comma-separated list of bin gene names.
     """
-    segnames = np.repeat('-', len(segments))
+    segnames = ['-'] * len(segments)
     segweights = np.zeros(len(segments))
     for i, (_seg, subprobes) in enumerate(cnarr.by_ranges(segments)):
         segweights[i] = subprobes['weight'].sum()
