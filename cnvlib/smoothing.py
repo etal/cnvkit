@@ -6,6 +6,7 @@ from collections import deque
 import math
 
 import numpy as np
+import pandas as pd
 
 from . import core, metrics
 
@@ -31,9 +32,11 @@ def check_inputs(x, width):
 
 
 def rolling_median(x, width):
-    """Rolling median.
+    """Rolling median with mirrored edges.
 
     Contributed by Peter Otten to comp.lang.python.
+    This is (somehow) faster than pandas' Cythonized skip-list implementation
+    for arrays smaller than ~100,000 elements.
 
     Source:
     https://bitbucket.org/janto/snippets/src/tip/running_median.py
@@ -57,6 +60,15 @@ def rolling_median(x, width):
         insort(sortwin, item)
         result[i] = sortwin[wing]
     return result
+
+
+def rolling_quantile(x, width, quant):
+    """Rolling quantile (0--1) with mirrored edges."""
+    x, wing = check_inputs(x, width)
+    # Pad the edges of the original array with mirror copies
+    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
+    rolled = pd.rolling_median(signal, 2 * wing + 1, quant, center=True)
+    return rolled[wing:-wing]
 
 
 def smoothed(x, width, do_fit_edges=False):
