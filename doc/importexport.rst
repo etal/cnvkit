@@ -181,3 +181,12 @@ and assigned to the matching bins.
   to be all above .5 (e.g. BAF of .3 becomes .7), then the median is taken as
   the bin-wide BAF.
 
+
+.. _version:
+
+version
+-------
+
+Print CNVkit's version as a string on standard output::
+
+    cnvkit.py version
