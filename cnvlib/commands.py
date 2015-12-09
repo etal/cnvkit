@@ -867,16 +867,13 @@ def do_scatter(cnarr, segments=None, variants=None,
                                 PAD)
 
     else:
-        # TODO - consolidate show_range vs. show_chromosome
-        # ENH: also accept tuple (chrom, start, end) instead of string
-        if show_range and (':' in show_range or '-' in show_range):
-            show_chromosome = None
-        else:
-            show_chromosome, show_range = show_range, None
-
         # Plot a specified region on one chromosome
+        #  -r \ -g  | None  | Some
+        # None      | genome| genes w/ auto window
+        # chr       | chr   | genes w/ no window *
+        # chr:s-e   | window| genes w/ given window
+        chrom, start, end = unpack_range(show_range)
         window_coords = ()
-        chrom = None
         genes = []
         if show_gene:
             gene_names = show_gene.split(',')
@@ -885,20 +882,23 @@ def do_scatter(cnarr, segments=None, variants=None,
             if not len(gene_coords) == 1:
                 raise ValueError("Genes %s are split across chromosomes %s"
                                  % (show_gene, gene_coords.keys()))
-            chrom, genes = gene_coords.popitem()
-            genes.sort()
+            g_chrom, genes = gene_coords.popitem()
+            if chrom:
+                # Confirm that the selected chromosomes match
+                core.assert_equal("Chromosome also selected by region (-r)"
+                                  "does not match",
+                                  **{"chromosome": chrom,
+                                     "gene(s)": g_chrom})
+            else:
+                chrom = g_chrom
             # Set the display window to the selected genes +/- a margin
+            genes.sort()
             window_coords = (max(0, genes[0][0] - window_width),
                              genes[-1][1] + window_width)
 
-        if show_range:
-            if chrom:
-                if not show_range.startswith(chrom):
-                    raise ValueError("Selected genes are on chromosome " +
-                                     chrom + " but specified range is " +
-                                     show_range)
-            chrom, start, end = parse_range_text(show_range)
+        if start:
             if window_coords:
+                # Genes were specified, & window was set around them
                 if start > window_coords[0] or end < window_coords[1]:
                     raise ValueError("Selected gene range " + chrom +
                                      (":%d-%d" % window_coords) +
@@ -912,26 +912,16 @@ def do_scatter(cnarr, segments=None, variants=None,
                 # itself (unless the selection is ~entire displayed window)
                 genes = [(start, end, "Selection")]
             window_coords = (max(0, start - window_width), end + window_width)
-
-        if show_chromosome:
-            if chrom:
-                # Confirm that the selected chromosomes match
-                core.assert_equal("Chromosome also selected by region or gene "
-                                  "does not match",
-                                  **{"chromosome": show_chromosome,
-                                     "region or gene": chrom})
-            else:
-                chrom = show_chromosome
-            if window_coords and not (show_gene and show_range):
-                # Reset window to show the whole chromosome
-                # (unless range and gene were both specified)
-                window_coords = None
+        elif show_range and window_coords:
+            # Specified range is only chrom, no start-end
+            # Reset window around selected genes to show the whole chromosome
+            window_coords = ()
 
         # Prune plotted elements to the selected region
         sel_probes = (cnarr.in_range(chrom, *window_coords)
-                        if cnarr else _CNA([]))
+                      if cnarr else _CNA([]))
         sel_seg = (segments.in_range(chrom, *window_coords, mode='trim')
-                    if segments else _CNA([]))
+                   if segments else _CNA([]))
 
         logging.info("Showing %d probes and %d selected genes in range %s",
                      len(sel_probes), len(genes),
@@ -969,6 +959,25 @@ def do_scatter(cnarr, segments=None, variants=None,
                                 background_marker=background_marker,
                                 do_trend=do_trend, y_min=y_min, y_max=y_max)
 
+
+def unpack_range(a_range):
+    """Extract chromosome, start, end from a string or tuple.
+
+    Examples:
+
+        "chr1" -> ("chr1", None, None)
+        "chr1:100-123" -> ("chr1", 100, 123)
+        ("chr1", 100, 123) -> ("chr1", 100, 123)
+    """
+    if not a_range:
+        return None, None, None
+    if isinstance(a_range, basestring):
+        if ':' in a_range or '-' in a_range:
+            return parse_range_text(a_range)
+        return a_range, None, None
+    if isinstance(a_range, (list, tuple)) and len(a_range) == 3:
+        return tuple(a_range)
+    raise ValueError("Not a range: %r" % a_range)
 
 
 def parse_range_text(text):
