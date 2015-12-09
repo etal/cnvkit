@@ -1094,7 +1094,7 @@ def _cmd_heatmap(args):
         pyplot.show()
 
 
-def do_heatmap(cnarrs, show_chromosome=None, do_desaturate=False):
+def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     """Plot copy number for multiple samples as a heatmap."""
     # ENH - see the zip magic in _cmd_format
     # Also, for more efficient plotting:
@@ -1109,12 +1109,24 @@ def do_heatmap(cnarrs, show_chromosome=None, do_desaturate=False):
     axis.set_ylabel("Samples")
     axis.set_axis_bgcolor('#DDDDDD')
 
+    r_chrom, r_start, r_end = unpack_range(show_range)
+    if r_start:
+        logging.info("Showing log2 ratios in range %s:%d-%d",
+                     r_chrom, r_start, r_end)
+    else:
+        logging.info("Showing log2 ratios on chromosome %s", r_chrom)
+
     # Group each file's probes/segments by chromosome
     sample_data = [collections.defaultdict(list) for _c in cnarrs]
-    for i, pset in enumerate(cnarrs):
-        for chrom, subpset in pset.by_chromosome():
-            sample_data[i][chrom] = list(zip(subpset['start'], subpset['end'],
-                                             subpset['log2']))
+    for i, cnarr in enumerate(cnarrs):
+        if r_chrom:
+            subcna = cnarr.in_range(r_chrom, r_start, r_end)
+            sample_data[i][r_chrom] = list(zip(subcna['start'], subcna['end'],
+                                               subcna['log2']))
+        else:
+            for chrom, subcna in cnarr.by_chromosome():
+                sample_data[i][chrom] = list(zip(subcna['start'], subcna['end'],
+                                                 subcna['log2']))
 
     # Calculate the size (max endpoint value) of each chromosome
     chrom_sizes = {}
@@ -1133,19 +1145,20 @@ def do_heatmap(cnarrs, show_chromosome=None, do_desaturate=False):
         rgbcolor = plots.cvg2rgb(cvg, do_desaturate)
         axis.fill(x_coords, y_coords, color=rgbcolor)
 
-    if show_chromosome:
+    if show_range:
         # Lay out only the selected chromosome
-        chrom_offsets = {show_chromosome: 0.0}
+        # chrom_offsets = {r_chrom: 0.0}
         # Set x-axis the chromosomal positions (in Mb), title as the chromosome
-        axis.set_xlim(0, chrom_sizes[show_chromosome] * plots.MB)
-        axis.set_title(show_chromosome)
+        axis.set_xlim((r_start or 0) * plots.MB,
+                      (r_end or chrom_sizes[r_chrom]) * plots.MB)
+        axis.set_title(show_range)
         axis.set_xlabel("Position (Mb)")
         axis.tick_params(which='both', direction='out')
         axis.get_xaxis().tick_bottom()
         axis.get_yaxis().tick_left()
         # Plot the individual probe/segment coverages
         for i, row in enumerate(sample_data):
-            for start, end, cvg in row[show_chromosome]:
+            for start, end, cvg in row[r_chrom]:
                 plot_rect(i, start * plots.MB, end * plots.MB, cvg)
 
     else:
