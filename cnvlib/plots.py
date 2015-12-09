@@ -156,11 +156,13 @@ def snv_on_chromosome(axis, variants, segments, genes,
                      labelbottom=False, labeltop=False)
 
     x_mb = variants["start"] * MB
-    y = variants["alt_freq"]
+    if do_boost:
+        y = variants.tumor_boost()
+    else:
+        y = variants["alt_freq"]
     axis.scatter(x_mb, y, color='#808080', alpha=0.3)
     # TODO - show segments
     # TODO - highlight genes/selection
-    # TODO - use do_boost
 
 
 # === Genome-level scatter plots ===
