@@ -1076,7 +1076,8 @@ P_loh.set_defaults(func=_cmd_loh)
 
 def _cmd_heatmap(args):
     """Plot copy number for multiple samples as a heatmap."""
-    create_heatmap(args.filenames, args.chromosome, args.desaturate)
+    cnarrs = list(map(_CNA.read, args.filenames))
+    do_heatmap(cnarrs, args.chromosome, args.desaturate)
     if args.output:
         pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
         logging.info("Wrote %s", args.output)
@@ -1084,7 +1085,7 @@ def _cmd_heatmap(args):
         pyplot.show()
 
 
-def create_heatmap(filenames, show_chromosome=None, do_desaturate=False):
+def do_heatmap(cnarrs, show_chromosome=None, do_desaturate=False):
     """Plot copy number for multiple samples as a heatmap."""
     # ENH - see the zip magic in _cmd_format
     # Also, for more efficient plotting:
@@ -1093,16 +1094,15 @@ def create_heatmap(filenames, show_chromosome=None, do_desaturate=False):
     _fig, axis = pyplot.subplots()
 
     # List sample names on the y-axis
-    axis.set_yticks([i + 0.5 for i in range(len(filenames))])
-    axis.set_yticklabels(list(map(core.fbase, filenames)))
+    axis.set_yticks([i + 0.5 for i in range(len(cnarrs))])
+    axis.set_yticklabels([c.sample_id for c in cnarrs])
     axis.invert_yaxis()
     axis.set_ylabel("Samples")
     axis.set_axis_bgcolor('#DDDDDD')
 
     # Group each file's probes/segments by chromosome
-    sample_data = [collections.defaultdict(list) for _f in filenames]
-    for i, fname in enumerate(filenames):
-        pset = _CNA.read(fname)
+    sample_data = [collections.defaultdict(list) for _c in cnarrs]
+    for i, pset in enumerate(cnarrs):
         for chrom, subpset in pset.by_chromosome():
             sample_data[i][chrom] = list(zip(subpset['start'], subpset['end'],
                                              subpset['log2']))
