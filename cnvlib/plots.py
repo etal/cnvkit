@@ -144,7 +144,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
 
 def snv_on_chromosome(axis, variants, segments, genes,
                       do_trend, do_boost=False):
-    # TODO only set x-limits if not already done for probes/segments
+    # XXX only set x-limits if not already done for probes/segments
     # setup_chromosome(axis, None, segments, variants,
     #                  0.0, 1.0, "VAF")
     axis.set_ylim(0.0, 1.0)
@@ -159,11 +159,19 @@ def snv_on_chromosome(axis, variants, segments, genes,
     if do_boost:
         y = variants.tumor_boost()
     else:
-        y = variants["alt_freq"]
+        y = np.asfarray(variants["alt_freq"])
     axis.scatter(x_mb, y, color='#808080', alpha=0.3)
-    # TODO - show segments
     # TODO - highlight genes/selection
-
+    if segments:
+        # Draw average VAF within each segment
+        posns = np.asfarray(variants["start"]) # * MB
+        y = np.asfarray(y)
+        for v_start, v_end, v_freq in group_snvs_by_segments(posns, y,
+                                                             segments):
+            # ENH: color by segment gain/loss
+            axis.plot([v_start * MB, v_end * MB], [v_freq, v_freq],
+                      color='#C0C0C0', linewidth=2, #zorder=1,
+                      solid_capstyle='round')
 
 # === Genome-level scatter plots ===
 
@@ -312,12 +320,15 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, pad,
 
 
 
-def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom):
+# XXX use by_ranges
+def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom=None):
     """Group SNP allele frequencies by segment.
 
     Return an iterable of: start, end, value.
     """
-    seg_starts = segments.select(chromosome=chrom)['start']
+    if chrom:
+        segments = segments.select(chromosome=chrom)
+    seg_starts = segments['start']
     # Assign a segment number to each variant, basically
     indices = np.maximum(seg_starts.searchsorted(snv_posns), 1) - 1
     for i in sorted(set(indices)):
