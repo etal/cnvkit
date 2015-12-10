@@ -12,18 +12,6 @@ from __future__ import division
 import numpy as np
 
 
-def probe_deviations_from_segments(probes, segments, skip_low=True):
-    """Difference in CN estimate of each probe from its segment."""
-    probes.sort()
-    segments.sort()
-    if skip_low:
-        probes = probes.drop_low_coverage()
-    deviations = []
-    for segment, subprobes in probes.by_ranges(segments):
-        deviations.append(subprobes['log2'] - segment['log2'])
-    return np.concatenate(deviations)
-
-
 def ests_of_scale(deviations):
     """Estimators of scale: standard deviation, MAD, biweight midvariance.
 

@@ -235,3 +235,14 @@ class CopyNumArray(gary.GenomicArray):
         cvg[idx] = -1.0
         return cvg
 
+    # Reporting
+
+    def residuals(self, segments):
+        """Difference in log2 value of each bin from its segment mean."""
+        # NB: for skip_low=True, call self.drop_low_coverage() beforehand
+        # ENH: As an alternative to segments, take regions; calculate
+        # region medians, subtract those. Then, can take chromosome (arm)
+        # residuals w/o segments.
+        resids = [subcna['log2'] - seg['log2']
+                      for seg, subcna in self.by_ranges(segments)]
+        return np.concatenate(resids)

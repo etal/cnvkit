@@ -1292,8 +1292,8 @@ def _cmd_metrics(args):
     for probes_fname, segs_fname in zip(args.cnarrays, args.segments):
         cnarr = _CNA.read(probes_fname)
         segments = _CNA.read(segs_fname)
-        values = metrics.ests_of_scale(
-            metrics.probe_deviations_from_segments(cnarr, segments))
+        values = metrics.ests_of_scale(cnarr.drop_low_coverage()
+                                       .residuals(segments))
         outrows.append([core.rbase(probes_fname), len(segments)] +
                        ["%.7f" % val for val in values])
 
