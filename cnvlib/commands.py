@@ -872,7 +872,7 @@ def do_scatter(cnarr, segments=None, variants=None,
         # None      | genome| genes w/ auto window
         # chr       | chr   | genes w/ no window *
         # chr:s-e   | window| genes w/ given window
-        chrom, start, end = unpack_range(show_range)
+        chrom, start, end = plots.unpack_range(show_range)
         window_coords = ()
         genes = []
         if show_gene:
@@ -958,40 +958,6 @@ def do_scatter(cnarr, segments=None, variants=None,
         plots.cnv_on_chromosome(axis, sel_probes, sel_seg, genes,
                                 background_marker=background_marker,
                                 do_trend=do_trend, y_min=y_min, y_max=y_max)
-
-
-def unpack_range(a_range):
-    """Extract chromosome, start, end from a string or tuple.
-
-    Examples:
-
-        "chr1" -> ("chr1", None, None)
-        "chr1:100-123" -> ("chr1", 100, 123)
-        ("chr1", 100, 123) -> ("chr1", 100, 123)
-    """
-    if not a_range:
-        return None, None, None
-    if isinstance(a_range, basestring):
-        if ':' in a_range or '-' in a_range:
-            return parse_range_text(a_range)
-        return a_range, None, None
-    if isinstance(a_range, (list, tuple)) and len(a_range) == 3:
-        return tuple(a_range)
-    raise ValueError("Not a range: %r" % a_range)
-
-
-def parse_range_text(text):
-    """Parse a chromosomal range specification.
-
-    Range spec string should look like: 'chr1:1234-5678'
-    """
-    try:
-        chrom, rest = text.split(':')
-        start, end = map(int, rest.split('-'))
-        return chrom, start, end
-    except Exception:
-        raise ValueError("Invalid range spec: " + text
-                         + " (should be like: chr1:2333000-2444000)")
 
 
 P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
@@ -1109,7 +1075,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     axis.set_ylabel("Samples")
     axis.set_axis_bgcolor('#DDDDDD')
 
-    r_chrom, r_start, r_end = unpack_range(show_range)
+    r_chrom, r_start, r_end = plots.unpack_range(show_range)
     if r_start:
         logging.info("Showing log2 ratios in range %s:%d-%d",
                      r_chrom, r_start, r_end)

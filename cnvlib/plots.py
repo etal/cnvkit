@@ -333,7 +333,7 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom):
                        np.median(freqs[mask_vaf]))
 
 
-def plot_x_dividers(axis, chromosome_sizes, pad):
+def plot_x_dividers(axis, chrom_sizes, pad):
     """Plot vertical dividers and x-axis labels given the chromosome sizes.
 
     Returns a table of the x-position offsets of each chromosome.
@@ -343,13 +343,13 @@ def plot_x_dividers(axis, chromosome_sizes, pad):
     region, under a tick.
     Sets the x-axis limits to the covered range.
     """
-    assert isinstance(chromosome_sizes, collections.OrderedDict)
+    assert isinstance(chrom_sizes, collections.OrderedDict)
 
     x_dividers = []
     x_centers = []
     x_starts = collections.OrderedDict()
     curr_offset = pad
-    for label, size in chromosome_sizes.items():
+    for label, size in chrom_sizes.items():
         x_starts[label] = curr_offset
         x_centers.append(curr_offset + 0.5 * size)
         x_dividers.append(curr_offset + size + pad)
@@ -360,7 +360,7 @@ def plot_x_dividers(axis, chromosome_sizes, pad):
         axis.axvline(x=xposn, color='k')
     # Use chromosome names as x-axis labels (instead of base positions)
     axis.set_xticks(x_centers)
-    axis.set_xticklabels(chromosome_sizes.keys(), rotation=60)
+    axis.set_xticklabels(chrom_sizes.keys(), rotation=60)
     axis.tick_params(labelsize='small')
     axis.tick_params(axis='x', length=0)
     axis.get_yaxis().tick_left()
@@ -508,3 +508,36 @@ def gene_coords_by_range(probes, chrom, start, end,
     return {chrom: [(start, end, name)
                     for name, (start, end) in genes.items()]}
 
+
+def unpack_range(a_range):
+    """Extract chromosome, start, end from a string or tuple.
+
+    Examples:
+
+        "chr1" -> ("chr1", None, None)
+        "chr1:100-123" -> ("chr1", 100, 123)
+        ("chr1", 100, 123) -> ("chr1", 100, 123)
+    """
+    if not a_range:
+        return None, None, None
+    if isinstance(a_range, basestring):
+        if ':' in a_range or '-' in a_range:
+            return parse_range_text(a_range)
+        return a_range, None, None
+    if isinstance(a_range, (list, tuple)) and len(a_range) == 3:
+        return tuple(a_range)
+    raise ValueError("Not a range: %r" % a_range)
+
+
+def parse_range_text(text):
+    """Parse a chromosomal range specification.
+
+    Range spec string should look like: 'chr1:1234-5678'
+    """
+    try:
+        chrom, rest = text.split(':')
+        start, end = map(int, rest.split('-'))
+        return chrom, start, end
+    except Exception:
+        raise ValueError("Invalid range spec: " + text
+                         + " (should be like: chr1:2333000-2444000)")
