@@ -335,24 +335,24 @@ def export_theta(tumor, reference):
     where chromosome IDs ("chrm") are integers 1 through 24.
     """
     tumor_segs = CNA.read(tumor)
-    ref_vals = CNA.read(reference)
+    ref_cnarr = CNA.read(reference)
 
     outheader = ["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]
     outrows = []
     # Convert chromosome names to 1-based integer indices
     prev_chrom = None
     chrom_id = 0
-    for seg, ref_rows in ref_vals.by_ranges(tumor_segs):
+    for seg, subcnarr in ref_cnarr.by_ranges(tumor_segs):
         if seg["chromosome"] != prev_chrom:
             chrom_id += 1
             prev_chrom = seg["chromosome"]
-        fields = calculate_theta_fields(seg, ref_rows, chrom_id)
+        fields = calculate_theta_fields(seg, subcnarr, chrom_id)
         outrows.append(fields)
 
     return outheader, outrows
 
 
-def calculate_theta_fields(seg, ref_rows, chrom_id):
+def calculate_theta_fields(seg, cnarr, chrom_id):
     """Convert a segment's info to a row of THetA input.
 
     For the normal/reference bin count, take the mean of the bin values within
@@ -384,7 +384,7 @@ def calculate_theta_fields(seg, ref_rows, chrom_id):
         return int(round(read_count))
 
     tumor_count = logratio2count(seg["log2"])
-    ref_count = logratio2count(ref_rows["log2"].mean())
+    ref_count = logratio2count(cnarr["log2"].mean())
     # e.g. "start_1_93709:end_1_19208166"
     row_id = ("start_%d_%d:end_%d_%d"
               % (chrom_id, seg["start"], chrom_id, seg["end"]))
