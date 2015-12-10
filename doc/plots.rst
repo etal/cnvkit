@@ -175,9 +175,10 @@ low-amplitude segments, which are likely spurious CNAs::
 A heatmap can also be drawn from bin-level log2 coverages or copy ratios (.cnn,
 .cnr), but this will be extremely slow at the genome-wide level.
 Consider doing this with a smaller number of samples and only for one chromosome
-at a time, using the ``-c`` option::
+or chromosomal region at a time, using the ``-c`` option::
 
     cnvkit.py heatmap TR_9*T.cnr -c chr12  # Slow!
+    cnvkit.py heatmap TR_9*T.cnr -c chr7:125000000-145000000
 
 .. image:: heatmap-tr-chr12.png
 
