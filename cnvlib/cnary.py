@@ -244,5 +244,29 @@ class CopyNumArray(gary.GenomicArray):
         # region medians, subtract those. Then, can take chromosome (arm)
         # residuals w/o segments.
         resids = [subcna['log2'] - seg['log2']
-                      for seg, subcna in self.by_ranges(segments)]
+                  for seg, subcna in self.by_ranges(segments)]
         return np.concatenate(resids)
+
+    def guess_average_depth(self, segments=None):
+        """Estimate the effective average read depth from variance.
+
+        Assume read depths are Poisson distributed, converting log2 values to
+        absolute counts. Then the mean depth equals the variance , and the average
+        read depth is the estimated mean divided by the estimated variance.
+        Use robust estimators (Tukey's biweight location and midvariance) to
+        compensate for outliers and overdispersion.
+
+        See: http://www.evanmiller.org/how-to-read-an-unlabeled-sales-chart.html
+        """
+        # ENH: Drop allosomes?
+        if segments:
+            y_log2 = self.residuals(segments)
+        else:
+            # ENH: difference from a trend line?
+            y_log2 = self['log2']
+        y = np.exp2(y_log2)
+        # ENH: use weight argument to these stats
+        loc = metrics.biweight_location(y)
+        spread = metrics.biweight_midvariance(y, loc)
+        scale = loc / spread**2
+        return scale
