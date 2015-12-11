@@ -444,7 +444,7 @@ class GenomicArray(object):
         # table.set_index(['chromosome', 'start'], inplace=True)
         return cls(table, {"sample_id": sample_id})
 
-    def write(self, outfile=sys.stdout):
+    def write(self, outfile=None):
         """Write the wrapped data table to a file or handle in tabular format.
 
         The format is BED-like, but with a header row included and with
@@ -453,6 +453,6 @@ class GenomicArray(object):
         To combine multiple samples in one file and/or convert to another
         format, see the 'export' subcommand.
         """
-        with ngfrills.safe_write(outfile) as handle:
+        with ngfrills.safe_write(outfile or sys.stdout) as handle:
             self.data.to_csv(handle, index=False, sep='\t', float_format='%.6g')
 

@@ -666,6 +666,56 @@ P_segment.add_argument("--rlibpath",
 P_segment.set_defaults(func=_cmd_segment)
 
 
+# rescale ---------------------------------------------------------------------
+
+def _cmd_rescale(args):
+    """Rescale segment copy ratio values given known purity and ploidy."""
+    if args.purity and not 0.0 < args.purity <= 1.0:
+        raise RuntimeError("Purity must be between 0 and 1.")
+
+    cnarr = _CNA.read(args.filename)
+    is_sample_female = verify_gender_arg(cnarr, args.gender,
+                                         args.male_reference)
+    outarr = do_rescale(cnarr, args.ploidy, args.purity, args.male_reference,
+                        is_sample_female)
+    outarr.write(args.output)
+
+
+def do_rescale(cnarr, ploidy=2, purity=None, is_reference_male=False,
+               is_sample_female=False):
+    absolutes = call.absolute_clonal(cnarr, ploidy, purity,
+                                     is_reference_male, is_sample_female)
+    # Convert back to log2 ratios; avoid a logarithm domain error
+    outarr = cnarr.copy()
+    outarr['log2'] = np.log2(np.maximum(absolutes / ploidy, 1e-3))
+    # Adjust sex chromosomes to be relative to the reference
+    if is_reference_male:
+        outarr[outarr.chromosome == outarr._chr_x_label, 'log2'] += 1.0
+    outarr[outarr.chromosome == outarr._chr_y_label, 'log2'] += 1.0
+    return outarr
+
+
+P_rescale = AP_subparsers.add_parser('rescale', help=_cmd_rescale.__doc__)
+P_rescale.add_argument('filename',
+        help="Copy ratios (.cnr or .cns).")
+P_rescale.add_argument("--ploidy", type=int, default=2,
+        help="Ploidy of the sample cells. [Default: %(default)d]")
+P_rescale.add_argument("--purity", type=float,
+        help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
+P_rescale.add_argument("-g", "--gender",
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+        help="""Specify the sample's gender as male or female. (Otherwise
+                guessed from chrX copy number).""")
+P_rescale.add_argument('-y', '--male-reference', action='store_true',
+        help="""Was a male reference used?  If so, expect half ploidy on
+                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
+                if a male reference was used, the "neutral" copy number (ploidy)
+                of chrX is 1; chrY is haploid for either gender reference.""")
+P_rescale.add_argument('-o', '--output',
+        help="Output table file name (CNR-like table of segments, .cns).")
+P_rescale.set_defaults(func=_cmd_rescale)
+
+
 # call ------------------------------------------------------------------------
 
 def _cmd_call(args):
@@ -1079,7 +1129,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     if r_start:
         logging.info("Showing log2 ratios in range %s:%d-%d",
                      r_chrom, r_start, r_end)
-    else:
+    elif r_chrom:
         logging.info("Showing log2 ratios on chromosome %s", r_chrom)
 
     # Group each file's probes/segments by chromosome
