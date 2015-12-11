@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from Bio._py3k import map, range, zip
 
-from . import call, core
+from . import call, core, params
 from .cnary import CopyNumArray as CNA
 from .vary import VariantArray as VA
 
@@ -337,6 +337,30 @@ def export_theta(tumor, reference):
     tumor_segs = CNA.read(tumor)
     ref_cnarr = CNA.read(reference)
 
+    # Capture parameters in a closure: avg_depth, avg_bin_width
+    # (These two scaling factors don't meaningfully affect THetA's calculation
+    # unless they're too small)
+    avg_depth = 500
+    # Similar number of reads in on-, off-target bins; treat them equally
+    avg_bin_width = 200
+    def log2ratio_to_count(log2_ratio, nbins):
+        """Calculate a segment's read count from log2-ratio.
+
+        Math:
+            nbases = read_length * read_count
+        and
+            nbases = bin_width * read_depth
+        where
+            read_depth = read_depth_ratio * avg_depth
+
+        So:
+            read_length * read_count = bin_width * read_depth
+            read_count = bin_width * read_depth / read_length
+        """
+        read_depth = (2 ** log2_ratio) * avg_depth
+        read_count = nbins * avg_bin_width * read_depth / params.READ_LEN
+        return int(round(read_count))
+
     outheader = ["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]
     outrows = []
     # Convert chromosome names to 1-based integer indices
@@ -346,45 +370,21 @@ def export_theta(tumor, reference):
         if seg["chromosome"] != prev_chrom:
             chrom_id += 1
             prev_chrom = seg["chromosome"]
-        fields = calculate_theta_fields(seg, subcnarr, chrom_id)
+        fields = format_theta_row(seg, subcnarr, chrom_id, log2ratio_to_count)
         outrows.append(fields)
 
     return outheader, outrows
 
 
-def calculate_theta_fields(seg, cnarr, chrom_id):
+def format_theta_row(seg, cnarr, chrom_id, log2_to_count):
     """Convert a segment's info to a row of THetA input.
 
     For the normal/reference bin count, take the mean of the bin values within
     each segment so that segments match between tumor and normal.
     """
-    # These two scaling factors don't meaningfully affect THetA's calculation
-    # unless they're too small
-    expect_depth = 100  # Average exome-wide depth of coverage
-    read_length = 100
-    # Similar number of reads in on-, off-target bins; treat them equally
-    segment_size = 1000 * seg["probes"]
-
-    def logratio2count(log2_ratio):
-        """Calculate a segment's read count from log2-ratio.
-
-        Math:
-            nbases = read_length * read_count
-        and
-            nbases = segment_size * read_depth
-        where
-            read_depth = read_depth_ratio * expect_depth
-
-        So:
-            read_length * read_count = segment_size * read_depth
-            read_count = segment_size * read_depth / read_length
-        """
-        read_depth = (2 ** log2_ratio) * expect_depth
-        read_count = segment_size * read_depth / read_length
-        return int(round(read_count))
-
-    tumor_count = logratio2count(seg["log2"])
-    ref_count = logratio2count(cnarr["log2"].mean())
+    nbins = seg["probes"] if "probes" in seg else len(cnarr)
+    tumor_count = log2_to_count(seg["log2"], nbins)
+    ref_count = log2_to_count(cnarr["log2"].mean(), nbins)
     # e.g. "start_1_93709:end_1_19208166"
     row_id = ("start_%d_%d:end_%d_%d"
               % (chrom_id, seg["start"], chrom_id, seg["end"]))
