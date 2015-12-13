@@ -375,8 +375,10 @@ class CommandTests(unittest.TestCase):
         """The 'segmetrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
-        for func in (commands._confidence_interval,
-                     commands._prediction_interval):
+        for func in (
+            lambda x: metrics.confidence_interval_bootstrap(x, 0.05, 100),
+            lambda x: metrics.prediction_interval(x, 0.05),
+        ):
             lo, hi = commands._segmetric_interval(segarr, cnarr, func)
             self.assertEqual(len(lo), len(segarr))
             self.assertEqual(len(hi), len(segarr))

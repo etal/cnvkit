@@ -155,3 +155,30 @@ def q_n(a):
 
     return quartile / scale
 
+
+# Intervals
+
+def confidence_interval_bootstrap(bins, alpha, bootstraps=100):
+    """Confidence interval for segment mean log2 value, estimated by bootstrap."""
+    # Bootstrap for CI
+    k = len(bins)
+    rand_indices = np.random.random_integers(0, k - 1, (bootstraps, k))
+    bootstraps = [bins.data.take(idx) for idx in rand_indices]
+    # Recalculate segment means
+    if 'weight' in bins:
+        bootstrap_dist = [np.average(boot['log2'], weights=boot['weight'])
+                            for boot in bootstraps]
+    else:
+        bootstrap_dist = [boot['log2'].mean() for boot in bootstraps]
+    pct_lo = 100 * alpha / 2
+    pct_hi = 100 * (1 - alpha / 2)
+    return np.percentile(bootstrap_dist, [pct_lo, pct_hi])
+
+
+def prediction_interval(bins, alpha):
+    """Prediction interval, estimated by percentiles."""
+    pct_lo = 100 * alpha / 2
+    pct_hi = 100 * (1 - alpha / 2)
+    # ENH: weighted percentile
+    return np.percentile(bins['log2'], [pct_lo, pct_hi])
+

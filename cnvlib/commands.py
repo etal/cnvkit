@@ -1370,13 +1370,17 @@ P_metrics.set_defaults(func=_cmd_metrics)
 
 def _cmd_segmetrics(args):
     """Compute segment-level metrics from bin-level log2 ratios."""
+    if not 0.0 < args.alpha <= 1.0:
+        raise RuntimeError("alpha must be between 0 and 1.")
+
     stats = {
         'stdev': np.std,
         'mad':  metrics.median_absolute_deviation,
         'iqr':  metrics.interquartile_range,
         'bivar': metrics.biweight_midvariance,
-        'ci': _confidence_interval,
-        'pi': _prediction_interval,
+        'ci': lambda x: metrics.confidence_interval_bootstrap(x, args.alpha,
+                                                              args.bootstrap),
+        'pi': lambda x: metrics.prediction_interval(x, args.alpha),
     }
     if not any(getattr(args, name) for name in stats):
         logging.info("No stats specified")
@@ -1412,30 +1416,9 @@ def _segmetric_interval(segarr, cnarr, func):
     out_vals_lo =  np.repeat(np.nan, len(segarr))
     out_vals_hi = np.repeat(np.nan, len(segarr))
     for i, (_segment, bins) in enumerate(cnarr.by_ranges(segarr)):
-        k = len(bins)
-        if k > 0:
-            out_vals_lo[i], out_vals_hi[i] = func(bins, k)
+        if len(bins):
+            out_vals_lo[i], out_vals_hi[i] = func(bins)
     return out_vals_lo, out_vals_hi
-
-
-def _confidence_interval(bins, k):
-    """Confidence interval, estimated by bootstrap."""
-    # Bootstrap for CI
-    rand_indices = np.random.random_integers(0, k - 1, (100, k))
-    bootstraps = [bins.data.take(idx) for idx in rand_indices]
-    # Recalculate segment means
-    if 'weight' in bins:
-        bootstrap_dist = [np.average(boot['log2'], weights=boot['weight'])
-                            for boot in bootstraps]
-    else:
-        bootstrap_dist = [boot['log2'].mean() for boot in bootstraps]
-    return np.percentile(bootstrap_dist, [2.5, 97.5])
-
-
-def _prediction_interval(bins, _k):
-    """Prediction interval, estimated by percentiles."""
-    # ENH: weighted percentile
-    return np.percentile(bins['log2'], [2.5, 97.5])
 
 
 P_segmetrics = AP_subparsers.add_parser('segmetrics', help=_cmd_segmetrics.__doc__)
@@ -1463,7 +1446,12 @@ P_segmetrics_stats.add_argument('--ci', action='store_true',
         help="Confidence interval (by bootstrap).")
 P_segmetrics_stats.add_argument('--pi', action='store_true',
         help="Prediction interval.")
-
+P_segmetrics_stats.add_argument('-a', '--alpha', type=float, default=.05,
+        help="""Level to estimate confidence and prediction intervals;
+                use with --ci and --pi. [Default: %(default)s]""")
+P_segmetrics_stats.add_argument('-b', '--bootstrap', type=int, default=100,
+        help="""Number of bootstrap iterations to estimate confidence interval;
+                use with --ci. [Default: %(default)d]""")
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
 
 
