@@ -345,7 +345,7 @@ class CommandTests(unittest.TestCase):
         """The 'metrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segments = cnvlib.read("formats/amplicon.cns")
-        resids = metrics.probe_deviations_from_segments(cnarr, segments)
+        resids = cnarr.residuals(segments)
         self.assertLessEqual(len(resids), len(cnarr))
         values = metrics.ests_of_scale(resids)
         for val in values:
