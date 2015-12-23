@@ -676,8 +676,12 @@ def _cmd_rescale(args):
     cnarr = _CNA.read(args.filename)
     is_sample_female = verify_gender_arg(cnarr, args.gender,
                                          args.male_reference)
-    outarr = do_rescale(cnarr, args.ploidy, args.purity, args.male_reference,
-                        is_sample_female)
+    if args.purity and args.purity < 1.0:
+        outarr = do_rescale(cnarr, args.ploidy, args.purity,
+                            args.male_reference, is_sample_female)
+    # TODO - center -- before or after?
+    if args.center:
+
     outarr.write(args.output)
 
 
@@ -698,6 +702,10 @@ def do_rescale(cnarr, ploidy=2, purity=None, is_reference_male=False,
 P_rescale = AP_subparsers.add_parser('rescale', help=_cmd_rescale.__doc__)
 P_rescale.add_argument('filename',
         help="Copy ratios (.cnr or .cns).")
+P_rescale.add_argument("--center", type=int, default=2,
+        choices=('mean', 'median', 'mode', 'biweight'),
+        help="""Re-center the log2 ratio values using this estimate of the
+                center or average value.""")
 P_rescale.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_rescale.add_argument("--purity", type=float,

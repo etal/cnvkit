@@ -92,22 +92,25 @@ class CopyNumArray(gary.GenomicArray):
 
     # Manipulation
 
-    def center_all(self, peak=False):
+    def center_all(self, estimator=None):
         """Recenter coverage values to the autosomes' average (in-place)."""
-        # ideal: normalize to the total number of reads in this sample
-        mid = self.autosomes()['log2'].median()
-        # mask_cvg = (mask_autosome &
-        #             (self.data['log2'] >= mid - 1.1) &
-        #             (self.data['log2'] <= mid + 1.1))
-        # if peak and sum(mask_cvg) > 210:
-        #     # Estimate the location of peak density
-        #     # hack: from a smoothed histogram -- enh: kernel density estimate
-        #     x = self[mask_cvg, 'log2']
-        #     w = self[mask_cvg, 'weight'] if 'weight' in self else None
-        #     resn = int(round(np.sqrt(len(x))))
-        #     x_vals, x_edges = np.histogram(x, bins=8*resn, weights=w)
-        #     xs = smoothing.smoothed(x_vals, resn)
-        #     mid = x_edges[np.argmax(xs)]
+        est_funcs = {
+            "mean": np.mean,
+            "median": np.median,
+            # "mode": ...,
+            "biweight": metrics.biweight_location,
+        }
+        if isinstance(estimator, basestring):
+            if estimator in est_funcs:
+                estimator = est_funcs[estimator]
+            else:
+                raise ValueError("Estimator must be a function or one of: %s"
+                                 % ", ".join(map(repr, est_funcs)))
+
+        if estimator:
+            mid = self.autosomes()['log2'].median()
+        else:
+            mid = estimator(self.autosomes()['log2'])
         self.data['log2'] -= mid
 
     def drop_low_coverage(self):

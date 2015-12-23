@@ -60,6 +60,21 @@ def segment_mean(cnarr, skip_low=False):
     return cnarr['log2'].mean()
 
 
+def peak_loc(cnarr):
+    # mask_cvg = (mask_autosome &
+    #             (cnarr.data['log2'] >= mid - 1.1) &
+    #             (cnarr.data['log2'] <= mid + 1.1))
+    # if peak and sum(mask_cvg) > 210:
+        # x = cnarr[mask_cvg, 'log2']
+        # w = cnarr[mask_cvg, 'weight'] if 'weight' in self else None
+        # Estimate the location of peak density
+        # hack: from a smoothed histogram -- enh: kernel density estimate
+    resn = int(round(np.sqrt(len(x))))
+    x_vals, x_edges = np.histogram(x, bins=8*resn, weights=w)
+    xs = smoothing.smoothed(x_vals, resn)
+    mid = x_edges[np.argmax(xs)]
+
+
 # Estimators of scale
 
 def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-4):
