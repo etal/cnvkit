@@ -679,9 +679,8 @@ def _cmd_rescale(args):
     if args.purity and args.purity < 1.0:
         outarr = do_rescale(cnarr, args.ploidy, args.purity,
                             args.male_reference, is_sample_female)
-    # TODO - center -- before or after?
     if args.center:
-
+        outarr.center_all(args.center)
     outarr.write(args.output)
 
 
@@ -702,7 +701,7 @@ def do_rescale(cnarr, ploidy=2, purity=None, is_reference_male=False,
 P_rescale = AP_subparsers.add_parser('rescale', help=_cmd_rescale.__doc__)
 P_rescale.add_argument('filename',
         help="Copy ratios (.cnr or .cns).")
-P_rescale.add_argument("--center", type=int, default=2,
+P_rescale.add_argument("--center",
         choices=('mean', 'median', 'mode', 'biweight'),
         help="""Re-center the log2 ratio values using this estimate of the
                 center or average value.""")

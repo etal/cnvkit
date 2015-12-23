@@ -96,7 +96,7 @@ class CopyNumArray(gary.GenomicArray):
         """Recenter coverage values to the autosomes' average (in-place)."""
         est_funcs = {
             "mean": np.mean,
-            "median": np.median,
+            "median": None, #np.median,
             # "mode": ...,
             "biweight": metrics.biweight_location,
         }
@@ -108,9 +108,9 @@ class CopyNumArray(gary.GenomicArray):
                                  % ", ".join(map(repr, est_funcs)))
 
         if estimator:
-            mid = self.autosomes()['log2'].median()
-        else:
             mid = estimator(self.autosomes()['log2'])
+        else:
+            mid = self.autosomes()['log2'].median()
         self.data['log2'] -= mid
 
     def drop_low_coverage(self):
