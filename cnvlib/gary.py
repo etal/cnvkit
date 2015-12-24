@@ -225,7 +225,10 @@ class GenomicArray(object):
         """
         cols = list(GenomicArray._required_columns)
         if also:
-            cols.extend(also)
+            if isinstance(also, basestring):
+                cols.append(also)
+            else:
+                cols.extend(also)
         coordframe = self.data.loc[:, cols]
         return coordframe.itertuples(index=False)
 
