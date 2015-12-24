@@ -68,27 +68,38 @@ to other formats using the :ref:`export` command.
 Adjusting copy ratios and segments for normal cell contamination
 ----------------------------------------------------------------
 
-CNVkit's :ref:`call` command converts the segmented log2 ratio estimates  to
-absolute integer copy numbers.
+CNVkit's :ref:`rescale` command uses an estimate of tumor fraction (from
+any source) to directly rescale segment log2 ratio values to the value that
+would be seen a completely pure, uncontaminated sample. Example with tumor
+purity of 60% and a male reference::
 
-The ``clonal`` method in this command uses an estimate of tumor fraction (from
-any source) to directly rescale segment log2 ratio values and round them to the
-nearest integer copy number. Example with tumor purity of 60% and a male
-reference::
+    cnvkit.py rescale Sample.cns --purity 0.6 -y -o Sample.rescale.cns
 
-    cnvkit.py call -m clonal Sample.cns --purity 0.6 -y -o Sample.call-clonal.cns
+CNVkit's :ref:`call` command then converts the segmented log2 ratio estimates to
+absolute integer copy numbers. Note that the rescaling step is optional; either
+way, hard thresholds can be used::
 
-Alternatively, if the tumor cell fraction is not known, hard thresholds can be
-used instead:
+    # With CNVkit's default cutoffs
+    cnvkit.py call -m threshold Sample.cns -y -o Sample.call.cns
+    # Or, using a custom set of cutoffs
+    cnvkit.py call -t=-1.1,-0.4,0.3,0.7 Sample.cns -y -o Sample.call.cns
 
-    cnvkit.py call -m threshold Sample.cns -y -o Sample.call-threshold.cns
+Alternatively, if the tumor cell fraction is known confidently, then use the
+``clonal`` method to simply round the log2 ratios to the nearest integer copy
+number::
 
+    cnvkit.py call -m clonal Sample.cns -y --purity 0.65 -o Sample.call.cns
+    # Or, if already rescaled
+    cnvkit.py call -m clonal Sample.rescale.cns -y -o Sample.call.cns
 
-Export integer copy numbers as BED
-----------------------------------
+Export integer copy numbers as BED or VCF
+-----------------------------------------
 
 The :ref:`export` ``bed`` command emits integer copy number calls in standard
 BED format::
 
-    cnvkit.py export bed Sample.cns -y -o Sample.bed
+    cnvkit.py export bed Sample.call.cns -y -o Sample.bed
+    cnvkit.py export vcf Sample.call.cns -y -o Sample.vcf
 
+The rounding of the .cns file's log2 ratios to integer copy numbers here is the
+same as in the :ref:`call` command with the ``clonal`` method.

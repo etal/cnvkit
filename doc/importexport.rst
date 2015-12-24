@@ -83,7 +83,7 @@ bed
 Segments can be exported to BED format to support a variety of other uses, such
 as viewing in a genome browser.  The log2 ratio value of each segment is
 converted and rounded to an integer value, as required by the BED format. To get
-accurate copy number values, see the :ref:`call` command.
+accurate copy number values, see the commands :ref:`rescale` and :ref:`call`.
 
 ::
 
@@ -105,11 +105,11 @@ To output all segments, use the ``--show all`` option.
 vcf
 ```
 
-Convert segments, ideally already adjusted by the :ref:`call` command, to
-a :ref:`vcfformat` file. Copy ratios are converted to absolute integers, as with
-BED export, and VCF records are created for the segments where the copy number
-is different from the expected ploidy (e.g. 2 on autosomes, 1 on haploid sex
-chromosomes, depending on sample gender).
+Convert segments, ideally already adjusted by the :ref:`rescale` and/or
+:ref:`call` commands, to a :ref:`vcfformat` file. Copy ratios are converted to
+absolute integers, as with BED export, and VCF records are created for the
+segments where the copy number is different from the expected ploidy (e.g. 2 on
+autosomes, 1 on haploid sex chromosomes, depending on sample gender).
 
 Gender can be specified with the ``-g``/``--gender`` option, or will be guessed
 automatically. If a male reference is used, use ``-y``/``--male-reference`` to

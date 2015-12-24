@@ -467,6 +467,39 @@ Fused Lasso additionally performs significance testing to distinguish CNAs from
 regions of neutral copy number, whereas CBS and HaarSeg by themselves only
 identify the supported segmentation breakpoints.
 
+.. _rescale:
+
+rescale
+-------
+
+If there is a known level of normal-cell DNA contamination in the analyzed tumor
+sample (see the page on :doc:`tumor heterogeneity <heterogeneity>`), you can
+opt to rescale the log2 copy ratio estimates in your .cnr or .cns file to remove
+the impact of this contamination, so the resulting log2 ratio values in the file
+match what would be observed in a completely pure tumor sample.
+
+The calculation of new log2 values for the sex chromosomes depends on the
+chromosomal gender of the sample and whether a male reference was used, while
+for autosomes the specified ploidy (default 2, diploid) is used. For example,
+with tumor purity of 60% and a male reference, letting CNVkit guess the sample's
+chromosomal gender::
+
+    cnvkit.py rescale Sample.cns --purity 0.6 -y -o Sample.rescaled.cns
+
+This can be done before or after segmentation, using a .cnr or .cns file; the
+resulting .cns file should be essentially the same.
+
+The ``rescale`` command can also optionally re-center the log2 values, though
+this will typically not be needed since the .cnr files are automatically
+median-centered by the :ref:`fix` command when normalizing to a reference and
+correcting biases. However, if the analyzed genome is highly aneuploid and
+contains widespread copy number losses, median centering may place
+copy-number-neutral regions slightly off-center from the expected log2 value of
+0.0, in which case alternative centering approaches can be specified with the
+``--center`` option::
+
+    cnvkit.py rescale Sample.cns --center mode
+
 
 .. _call:
 
@@ -477,13 +510,14 @@ Given segmented log2 ratio estimates (.cns), round the copy ratio estimates to
 integer values using either:
 
 - A list of threshold log2 values for each copy number state, or
-- Some algebra, given known tumor cell fraction and normal ploidy.
+- :ref:`Rescaling <rescale>` for a given known tumor cell fraction and normal
+  ploidy, then simple rounding to the nearest integer copy number.
 
 ::
 
     cnvkit.py call Sample.cns -o Sample.call.cns
-    cnvkit.py call Sample.cns -y -m clonal --purity 0.65 -o Sample.call-clonal.cns
-    cnvkit.py call Sample.cns -y -m threshold -t=-1.1,-0.4,0.3,0.7 -o Sample.call-threshold.cns
+    cnvkit.py call Sample.cns -y -m threshold -t=-1.1,-0.4,0.3,0.7 -o Sample.call.cns
+    cnvkit.py call Sample.cns -y -m clonal --purity 0.65 -o Sample.call.cns
 
 The output is another .cns file, where the values in the log2 column are still
 log2-transformed and relative to the reference ploidy (by default: diploid
@@ -502,15 +536,16 @@ command :ref:`export` ``bed``.
 Calling methods
 ```````````````
 
-The "clonal" method considers the observed log2 ratios in the input .cns file
-as a mix of some fraction of tumor cells (specified by ``--purity``), possibly
-with altered copy number, and a remainder of normal cells with neutral copy
-number (specified by ``--ploidy`` for autosomes). This equation is rearranged
-to find the absolute copy number of the tumor cells alone, rounded to the
-nearest integer. The expected and observed ploidy of the sex chromosomes (X and
-Y) is different, so it's important to specify ``-y``/``--male-reference`` if a
-male reference was used; the sample gender can be specified if known, otherwise
-it will be guessed from the log2 ratio of chromosome X.
+The "clonal" method uses the same calculation as the :ref:`rescale` command. It
+considers the observed log2 ratios in the input .cns file as a mix of some
+fraction of tumor cells (specified by ``--purity``), possibly with altered copy
+number, and a remainder of normal cells with neutral copy number (specified by
+``--ploidy`` for autosomes). This equation is rearranged to find the absolute
+copy number of the tumor cells alone, rounded to the nearest integer. The
+expected and observed ploidy of the sex chromosomes (X and Y) is different, so
+it's important to specify ``-y``/``--male-reference`` if a male reference was
+used; the sample gender can be specified if known, otherwise it will be guessed
+from the average log2 ratio of chromosome X.
 
 The "threshold" method simply applies fixed log2 ratio cutoff values for each
 integer copy number state. This method therefore does not require the tumor
@@ -531,7 +566,7 @@ If :math:`\log_2` value :math:`\leq`    Copy number
 =====================================   ===========
 
 For homogeneous samples of known ploidy, you can calculate cutoffs from scatch
-by log-transforming the integer copy number values of interested, plus .5 (for
+by log-transforming the integer copy number values of interest, plus .5 (for
 rounding), divided by the ploidy. For a diploid genome::
 
     >>> import numpy as np
