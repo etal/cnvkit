@@ -180,6 +180,17 @@ class GenomicArray(object):
 
     # Traversal
 
+    def autosomes(self, also=()):
+        """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
+        is_auto = self.chromosome.str.match(r"(chr)?\d+",
+                                            as_indexer=True, na=False)
+        if also:
+            if isinstance(also, basestring):
+                also = [also]
+            for a_chrom in also:
+                is_auto |= (self.chromosome == a_chrom)
+        return self[is_auto]
+
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
         for chrom, subtable in self.data.groupby("chromosome", sort=False):

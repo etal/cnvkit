@@ -43,6 +43,20 @@ class GaryTests(unittest.TestCase):
         self.ex_cnr[3, 'log2'] = -10.0
         self.assertNotEqual(tuple(self.ex_cnr[3]), tuple(dupe[3]))
 
+    def test_autosomes(self):
+        """Test selection of autosomes."""
+        len_all = len(self.ex_cnr)
+        len_x = (self.ex_cnr.chromosome == 'chrX').sum()
+        len_y = (self.ex_cnr.chromosome == 'chrY').sum()
+        auto = self.ex_cnr.autosomes()
+        self.assertEqual(len(auto), len_all - len_x - len_y)
+        autox = self.ex_cnr.autosomes(also='chrX')
+        self.assertEqual(len(autox), len_all - len_y)
+        autoy = self.ex_cnr.autosomes(also=['chrY'])
+        self.assertEqual(len(autoy), len_all - len_x)
+        autoxy = self.ex_cnr.autosomes(also=['chrX', 'chrY'])
+        self.assertEqual(len(autoxy), len_all)
+
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
             cnarr = cnvlib.read(fname)

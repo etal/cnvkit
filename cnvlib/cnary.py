@@ -50,10 +50,6 @@ class CopyNumArray(gary.GenomicArray):
 
     # Traversal
 
-    def autosomes(self):
-        return self[(self.chromosome != self._chr_x_label) &
-                    (self.chromosome != self._chr_y_label)]
-
     # XXX hair: some genes overlap; some bins cover multiple genes
     #   -> option: whether to split gene names on commas
     def by_gene(self, ignore=('-', 'CGH', '.')):
