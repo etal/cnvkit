@@ -3,6 +3,7 @@ from __future__ import print_function, absolute_import, division
 
 import logging
 import sys
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -182,8 +183,11 @@ class GenomicArray(object):
 
     def autosomes(self, also=()):
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
-        is_auto = self.chromosome.str.match(r"(chr)?\d+",
-                                            as_indexer=True, na=False)
+        with warnings.catch_warnings():
+            # NB: We're not using the deprecated part of this pandas method
+            warnings.simplefilter("ignore", UserWarning)
+            is_auto = self.chromosome.str.match(r"(chr)?\d+",
+                                                as_indexer=True, na=False)
         if also:
             if isinstance(also, basestring):
                 also = [also]
