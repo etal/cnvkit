@@ -624,7 +624,8 @@ P_fix.set_defaults(func=_cmd_fix)
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     cnarr = _CNA.read(args.filename)
-    variants = _VA.read_vcf(args.vcf) if args.vcf else None
+    variants = (_VA.read_vcf(args.vcf, skip_hom=True, skip_somatic=True)
+                if args.vcf else None)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
                                            variants=variants,
                                            skip_low=args.drop_low_coverage,
@@ -861,7 +862,7 @@ def _cmd_scatter(args):
     segarr = _CNA.read(args.segment
                       ) if args.segment else None
     varr = _VA.read_vcf(args.vcf, args.sample_id, args.normal_id,
-                        args.min_variant_depth
+                        args.min_variant_depth, skip_hom=True, skip_somatic=True
                        ) if args.vcf else None
 
     if args.range_list:
@@ -1070,7 +1071,7 @@ def _cmd_loh(args):
     Divergence from 0.5 indicates loss of heterozygosity in a tumor sample.
     """
     variants = _VA.read_vcf(args.variants, args.sample_id, args.normal_id,
-                            args.min_depth)
+                            args.min_depth, skip_hom=True, skip_somatic=True)
     segments = _CNA.read(args.segment) if args.segment else None
     _fig, axis = pyplot.subplots()
     axis.set_title("Variant allele frequencies: %s" % variants.sample_id)

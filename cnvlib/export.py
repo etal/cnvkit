@@ -118,7 +118,7 @@ def export_nexus_ogt(sample_fname, vcf_fname):
             return .5 - shift
 
     cnarr = CNA.read(sample_fname)
-    varr = VA.read_vcf(vcf_fname)
+    varr = VA.read_vcf(vcf_fname, skip_hom=True, skip_somatic=True)
     bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
                                summary_func=mirrored_baf_median)
     logging.info("Placed %d variants into %d bins",

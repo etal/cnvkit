@@ -17,7 +17,7 @@ class VariantArray(gary.GenomicArray):
     """
     _required_columns = ("chromosome", "start", "end", "ref", "alt")
     _required_dtypes = ("string", "int", "int", "string", "string")
-    # Extra: zygosity, depth, alt_count, alt_freq
+    # Extra: somatic, zygosity, depth, alt_count, alt_freq
 
     def __init__(self, data_table, meta_dict=None):
         gary.GenomicArray.__init__(self, data_table, meta_dict)
@@ -57,32 +57,70 @@ class VariantArray(gary.GenomicArray):
     # I/O
 
     @classmethod
-    def read_vcf(cls, infile, sample_id=None, normal_id=None, min_depth=1,
-                 skip_hom=True, skip_reject=False, skip_somatic=True):
+    def read_vcf(cls, infile, sample_id=None, normal_id=None, min_depth=None,
+                 skip_hom=False, skip_reject=False, skip_somatic=False):
         """Parse SNV coordinates from a VCF file into a VariantArray."""
         if isinstance(infile, basestring):
             vcf_reader = vcf.Reader(filename=infile)
         else:
             vcf_reader = vcf.Reader(infile)
         if not vcf_reader.samples:
-            raise ValueError("No samples found in VCF file " + str(infile))
+            logging.warn("VCF file %s has no samples; parsing minimal info",
+                         infile)
+            return cls._read_vcf_nosample(infile, sample_id, skip_reject)
 
+        columns = [
+            "chromosome", "start", "end", "ref", "alt",
+            "somatic", "zygosity", "depth", "alt_count"]
         sample_id, normal_id = _select_sample(vcf_reader, sample_id, normal_id)
         if normal_id:
-            columns = [
-                "chromosome", "start", "end", "ref", "alt",
-                "zygosity", "depth", "alt_count",
-                "n_zygosity", "n_depth", "n_alt_count"]
-        else:
-            columns = [
-                "chromosome", "start", "end", "ref", "alt",
-                "zygosity", "depth", "alt_count"]
-        rows = _parse_records(vcf_reader, sample_id, normal_id, min_depth,
-                              skip_hom, skip_reject, skip_somatic)
+            columns.extend(["n_zygosity", "n_depth", "n_alt_count"])
+        rows = _parse_records(vcf_reader, sample_id, normal_id, skip_reject)
         table = pd.DataFrame.from_records(rows, columns=columns)
         table["alt_freq"] = table["alt_count"] / table["depth"]
         if normal_id:
             table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
+        # Filter out records as requested
+        if min_depth:
+            dkey = "n_depth" if "n_depth" in table else "depth"
+            idx_depth = table[dkey] >= min_depth
+            cnt_depth = (~idx_depth).sum()
+            table = table[idx_depth]
+        if skip_hom:
+            zkey = "n_zygosity" if "n_zygosity" in table else "zygosity"
+            idx_hom = (table[zkey] != 0.0) & (table[zkey] != 1.0)
+            cnt_hom = (~idx_hom).sum()
+            table = table[idx_hom]
+        if skip_somatic:
+            idx_som = table["somatic"]
+            cnt_som = (~idx_som).sum()
+            table = table[idx_som]
+        logging.info("Skipped records: %d somatic, %d depth, %d homozygous",
+                     cnt_som, cnt_depth, cnt_hom)
+
+        return cls(table, {"sample_id": sample_id})
+
+    @classmethod
+    def _read_vcf_nosample(cls, vcf_file, sample_id=None, skip_reject=False):
+        table = pd.read_table(vcf_file,
+                              comment="#",
+                              header=None,
+                              na_filter=False,
+                              names=["chromosome", "start", "_ID", "ref", "alt",
+                                     "_QUAL", "filter", "info"],
+                              usecols=cls._required_columns,
+                              # usecols=["chromosome", "start", "ref", "alt",
+                              #          # "filter", "info",
+                              #         ],
+                              # ENH: converters=func -> to parse each col
+                              dtype=dict(zip(cls._required_columns,
+                                             cls._required_dtypes)),
+                             )
+        # ENH: do things with filter, info
+        # if skip_reject and record.FILTER and len(record.FILTER) > 0:
+        table['end'] = table['start']  # TODO: _get_end
+        table['start'] -= 1
+        table = table.loc[:, cls._required_columns]
         return cls(table, {"sample_id": sample_id})
 
 
@@ -171,46 +209,28 @@ def _confirm_unique(sample_id, samples):
             % (sample_id, samples))
 
 
-def _parse_records(vcf_reader, sample_id, normal_id, min_depth,
-                   skip_hom, skip_reject, skip_somatic):
+def _parse_records(vcf_reader, sample_id, normal_id, skip_reject):
     """Parse VCF records into DataFrame rows.
 
     Apply filters to skip records with low depth, homozygosity, the REJECT
     flag, or the SOMATIC info field.
     """
     cnt_reject = 0  # For logging
-    cnt_som = 0
-    cnt_depth = 0
-    cnt_hom = 0
     for record in vcf_reader:
+        is_som = False
         if skip_reject and record.FILTER and len(record.FILTER) > 0:
             cnt_reject += 1
             continue
-        if skip_somatic and record.INFO.get("SOMATIC"):
-            cnt_som += 1
-            continue
+        if record.INFO.get("SOMATIC"):
+            is_som = True
 
         sample = record.genotype(sample_id)
         depth, zygosity, alt_count = _extract_genotype(sample)
         if normal_id:
             normal = record.genotype(normal_id)
             n_depth, n_zygosity, n_alt_count = _extract_genotype(normal)
-            if n_depth is None or n_depth < min_depth:
-                cnt_depth += 1
-                continue
-            if skip_hom and n_zygosity in (0.0, 1.0):
-                cnt_hom += 1
-                continue
-            if skip_somatic and n_zygosity == 0:
-                cnt_som += 1
-                continue
-        else:
-            if depth is None or depth < min_depth:
-                cnt_depth += 1
-                continue
-            if skip_hom and zygosity  in (0.0, 1.0):
-                cnt_hom += 1
-                continue
+            if n_zygosity == 0:
+                is_som = True
 
         # Split multiallelics?
         # XXX Ensure sample genotypes are handled properly
@@ -218,16 +238,17 @@ def _parse_records(vcf_reader, sample_id, normal_id, min_depth,
             posn = record.POS - 1
             end = _get_end(posn, alt, record.INFO)
             row = (record.CHROM, posn, end, record.REF, str(alt),
-                zygosity,
-                depth,
-                alt_count,
-                )
+                   is_som,
+                   zygosity,
+                   depth,
+                   alt_count,
+                  )
             if normal_id:
                 row += (n_zygosity, n_depth, n_alt_count)
             yield row
 
-    logging.info("Skipped records: %d reject, %d somatic, %d depth, "
-                 "%d homozygous", cnt_reject, cnt_som, cnt_depth, cnt_hom)
+    if cnt_reject:
+        logging.info('Filtered out %d records', cnt_reject)
 
 
 def _extract_genotype(sample):
