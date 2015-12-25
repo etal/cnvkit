@@ -131,7 +131,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
 
     # Add a local trend line
     if do_trend:
-        axis.plot(x, smoothing.smoothed(y, 100),
+        axis.plot(x, smoothing.smoothed(y, 50),
                     color=POINT_COLOR, linewidth=2, zorder=-1)
 
     # Get coordinates for CBS lines & draw them
@@ -231,15 +231,27 @@ def cnv_on_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
                      alpha=0.2, marker='.')
         # Add a local trend line
         if do_trend:
-            axis.plot(x, smoothing.smooth_genome_coverages(probes,
-                                                           smoothing.smoothed,
-                                                           250),
+            axis.plot(x, _smooth_genome_log2(probes, smoothing.smoothed, 150),
                       color=POINT_COLOR, linewidth=2, zorder=-1)
     # Plot segments
     for seg_line in seg_lines:
         y1, x1, x2 = seg_line
         axis.plot((x1, x2), (y1, y1),
                   color=SEG_COLOR, linewidth=3, solid_capstyle='round')
+
+
+def _smooth_genome_log2(cnarr, smooth_func, width):
+    """Fit a trendline through bin log2 ratios, handling chromosome boundaries.
+
+    Returns an array of smoothed log2 values, calculated with `smooth_func`
+    and `width`, equal in length to `cnarr`.
+    """
+    # ENH: also split by centromeres (long internal gaps -- see PSCBS)
+    # ENH: use pandas groupby
+    out = {chrom: smooth_func(subcna['log2'], width)
+           for chrom, subcna in cnarr.by_chromosome()}
+    return np.concatenate(
+        [out[chrom] for chrom in sorted(out, key=core.sorter_chrom)])
 
 
 def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, pad,

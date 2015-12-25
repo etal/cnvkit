@@ -133,19 +133,6 @@ def _fit_edge(x, y, window_start, window_stop, interp_start, interp_stop,
     y[interp_start:interp_stop] = values
 
 
-def smooth_genome_coverages(probes, smooth_func, width):
-    """Fit a trendline through probe coverages, handling chromosome boundaries.
-
-    Returns an array of smoothed coverage values, calculated with `smooth_func`
-    and `width`, equal in length to `probes`.
-    """
-    # ENH: also split by centromeres (long internal gaps -- see PSCBS)
-    out = {chrom: smooth_func(subprobes['log2'], width)
-           for chrom, subprobes in probes.by_chromosome()}
-    return np.concatenate(
-        [out[chrom] for chrom in sorted(out, key=core.sorter_chrom)])
-
-
 # Outlier detection
 
 def outlier_iqr(a, c=1.5):
