@@ -67,7 +67,16 @@ def rolling_quantile(x, width, quant):
     x, wing = check_inputs(x, width)
     # Pad the edges of the original array with mirror copies
     signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
-    rolled = pd.rolling_median(signal, 2 * wing + 1, quant, center=True)
+    rolled = pd.rolling_quantile(signal, 2 * wing + 1, quant, center=True)
+    return rolled[wing:-wing]
+
+
+def rolling_std(x, width):
+    """Rolling quantile (0--1) with mirrored edges."""
+    x, wing = check_inputs(x, width)
+    # Pad the edges of the original array with mirror copies
+    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
+    rolled = pd.rolling_std(signal, 2 * wing + 1, center=True)
     return rolled[wing:-wing]
 
 
@@ -175,5 +184,17 @@ def outlier_mad_median(a):
 
     a = np.asarray(a)
     dists = np.abs(a - np.median(a))
-    mad = metrics.median_absolute_deviation(a, scale_to_sd=False)
+    mad = metrics.median_absolute_deviation(a)
     return (dists / mad) > K
+
+
+def rolling_outlier_std(x, width, stdevs):
+    """Return a boolean mask of outliers by stdev within a rolling window.
+
+    Outliers are the array elements outside `stdevs` standard deviations from
+    the smoothed trend line, as calculated from the trend line residuals.
+    """
+    dists = x - smoothed(x, width)
+    x_std = rolling_std(dists, width)
+    outliers = (dists.abs() > x_std * stdevs)
+    return outliers

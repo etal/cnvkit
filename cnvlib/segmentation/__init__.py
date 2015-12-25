@@ -1,5 +1,6 @@
 """Segmentation of copy number values."""
 from __future__ import absolute_import, division
+import logging
 import math
 import os.path
 import tempfile
@@ -7,25 +8,28 @@ import tempfile
 import numpy as np
 import pandas as pd
 
-from .. import core, ngfrills, params
+from .. import core, ngfrills, params, smoothing, vary
 from ..cnary import CopyNumArray as CNA
-from .. import vary
 from . import haar
 
 from Bio._py3k import StringIO
 
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
-                    skip_low=False, save_dataframe=False, rlibpath=None):
+                    skip_low=False, skip_stdev=None,
+                    save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
+    filtered_cn = cnarr
     if skip_low:
-        filtered_probes = cnarr.drop_low_coverage()
-    else:
-        filtered_probes = cnarr
+        before = len(filtered_cn)
+        filtered_cn = filtered_cn.drop_low_coverage()
+        logging.info("Dropped %d low-coverage bins", before - len(filtered_cn))
+    if skip_stdev:
+        filtered_cn = drop_outliers_stdev(filtered_cn, 30, skip_stdev)
 
     if method == 'haar':
         threshold = threshold or 0.001
-        segarr = haar.segment_haar(filtered_probes, threshold)
+        segarr = haar.segment_haar(filtered_cn, threshold)
         segarr['gene'], segarr['weight'] = transfer_names_weights(segarr, cnarr)
 
     elif method in ('cbs', 'flasso'):
@@ -38,7 +42,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
             threshold = threshold or 0.005
 
         with tempfile.NamedTemporaryFile(suffix='.cnr') as tmp:
-            filtered_probes.data.to_csv(tmp, index=False, sep='\t',
+            filtered_cn.data.to_csv(tmp, index=False, sep='\t',
                                         float_format='%.6g')
             tmp.flush()
             script_strings = {
@@ -78,6 +82,22 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         return segarr, seg_out
     else:
         return segarr
+
+
+def drop_outliers_stdev(cnarr, width, n_stdevs):
+    """Drop outlier bins with log2 ratios too far from the trend line."""
+    outlier_mask = np.concatenate([
+        smoothing.rolling_outlier_std(subarr['log2'], width, n_stdevs)
+        for _chrom, subarr in cnarr.by_chromosome()])
+    n_outliers = outlier_mask.sum()
+    if n_outliers:
+        logging.info("Dropped %d outlier bins:\n%s%s",
+                     n_outliers,
+                     cnarr[outlier_mask].data.head(20),
+                     "\n..." if n_outliers > 20 else "")
+    else:
+        logging.info("No outlier bins")
+    return cnarr[~outlier_mask]
 
 
 def transfer_names_weights(segments, cnarr, ignore=('Background', 'CGH', '-')):
