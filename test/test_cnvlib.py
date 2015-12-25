@@ -148,16 +148,23 @@ class CNATests(unittest.TestCase):
     # def test_by_gene(self):
 
     def test_center_all(self):
-        """Test median-recentering."""
+        """Test recentering."""
+        # Median-centering an already median-centered array -> no change
         chr1 = self.ex_cnr.in_range('chr1')
         self.assertAlmostEqual(0, np.median(chr1['log2']), places=1)
         chr1.center_all()
         orig_chr1_cvg = np.median(chr1['log2'])
         self.assertAlmostEqual(0, orig_chr1_cvg)
+        # Median-centering resets a shift away from the median
         chr1plus2 = chr1.copy()
         chr1plus2['log2'] += 2.0
         chr1plus2.center_all()
         self.assertAlmostEqual(np.median(chr1plus2['log2']), orig_chr1_cvg)
+        # Other methods for centering are similar for a CN-neutral chromosome
+        for method in ("mean", "mode", "biweight"):
+            cp = chr1.copy()
+            cp.center_all(method)
+            self.assertLess(abs(cp['log2'].median() - orig_chr1_cvg), 0.1)
 
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""

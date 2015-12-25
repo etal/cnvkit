@@ -10,6 +10,7 @@ See:
 from __future__ import division
 
 import numpy as np
+from scipy import stats
 
 
 def ests_of_scale(deviations):
@@ -49,6 +50,21 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-4):
     return initial + (d[mask] * w[mask]).sum() / weightsum
 
 
+def modal_location(arr):
+    """Return the modal value of an array's values.
+
+    The "mode" is the location of peak density among the values, estimated using
+    a Gaussian kernel density estimator.
+
+    `arr` is a 1-D array of floating-point values, e.g. bin log2 ratio values.
+    """
+    sarr = np.sort(arr)
+    kde = stats.gaussian_kde(sarr)
+    y = kde.evaluate(sarr)
+    peak = sarr[y.argmax()]
+    return peak
+
+
 def segment_mean(cnarr, skip_low=False):
     """Weighted average of bin log2 values."""
     if skip_low:
@@ -58,21 +74,6 @@ def segment_mean(cnarr, skip_low=False):
     if 'weight' in cnarr:
         return np.average(cnarr['log2'], weights=cnarr['weight'])
     return cnarr['log2'].mean()
-
-
-def peak_loc(cnarr):
-    # mask_cvg = (mask_autosome &
-    #             (cnarr.data['log2'] >= mid - 1.1) &
-    #             (cnarr.data['log2'] <= mid + 1.1))
-    # if peak and sum(mask_cvg) > 210:
-        # x = cnarr[mask_cvg, 'log2']
-        # w = cnarr[mask_cvg, 'weight'] if 'weight' in self else None
-        # Estimate the location of peak density
-        # hack: from a smoothed histogram -- enh: kernel density estimate
-    resn = int(round(np.sqrt(len(x))))
-    x_vals, x_edges = np.histogram(x, bins=8*resn, weights=w)
-    xs = smoothing.smoothed(x_vals, resn)
-    mid = x_edges[np.argmax(xs)]
 
 
 # Estimators of scale
