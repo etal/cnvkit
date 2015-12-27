@@ -11,21 +11,22 @@ sudo: false
 addons:
   apt:
     packages:
+    - libblas-dev
+    - libfreetype6-dev
+    - liblapack-dev
     - python-dev
+    - python-matplotlib
     - python-numpy
     - python-scipy
     - python-tk
-    - python-matplotlib
-    - libfreetype6
 
 before_install:
-    - export PATH=/home/travis/miniconda/bin:$PATH
-
-install:
     - pip install biopython pandas pysam pyvcf reportlab
-    - python setup.py install
     # For codecov.io
     - pip install codecov
+
+install:
+    - python setup.py install
 
 before_script: cd test/
 script:
