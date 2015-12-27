@@ -6,8 +6,12 @@ python:
 notifications:
     email: false
 
+# Use the Docker container-based infrastructure
+# https://docs.travis-ci.com/user/workers/container-based-infrastructure/#Routing-your-build-to-container-based-infrastructure
 sudo: false
 
+# Install these Debian packages without sudo
+# https://docs.travis-ci.com/user/migrating-from-legacy/#Adding-APT-Packages
 addons:
   apt:
     packages:
@@ -21,16 +25,21 @@ addons:
     - python-scipy
     - python-tk
 
-before_install:
-    - pip install biopython pandas pysam pyvcf reportlab
+# Cache the compiled pip package dependencies
+# https://docs.travis-ci.com/user/caching/#pip-cache
+cache: pip
+
+# Use the default install step for Python:
+#   pip install -r requirements.txt
+# https://docs.travis-ci.com/user/languages/python/#Dependency-Management
+
+before_script:
+    - cd test/
     # For codecov.io
     - pip install codecov
 
-install:
-    - python setup.py install
-
-before_script: cd test/
 script:
+    # - python setup.py install
     - coverage run test_cnvlib.py
 
 after_success:
