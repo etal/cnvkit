@@ -29,7 +29,7 @@ addons:
 # https://docs.travis-ci.com/user/caching/#pip-cache
 cache: pip
 
-# Use the default install step for Python:
+# Use the default install step for Python (which installs deps & CNVkit itself):
 #   pip install -r requirements.txt
 # https://docs.travis-ci.com/user/languages/python/#Dependency-Management
 
@@ -39,7 +39,6 @@ before_script:
     - pip install codecov
 
 script:
-    # - python setup.py install
     - coverage run test_cnvlib.py
 
 after_success:
