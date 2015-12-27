@@ -11,6 +11,7 @@ sudo: false
 addons:
   apt:
     packages:
+    - gfortran
     - libblas-dev
     - libfreetype6-dev
     - liblapack-dev
