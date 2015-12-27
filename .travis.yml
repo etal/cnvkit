@@ -14,16 +14,13 @@ before_install:
     - chmod +x miniconda.sh
     - ./miniconda.sh -b
     - export PATH=/home/travis/miniconda/bin:$PATH
-    - conda update --yes conda
-    # Avoid a crash with multiprocessing on Travis; not specific to Miniconda
-    # - sudo rm -rf /dev/shm
-    # - sudo ln -s /run/shm /dev/shm
-    # For codecov.io
-    - pip install codecov
 
 install:
-    - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib biopython reportlab pysam
+    - conda update --yes conda
+    - conda install --yes python=$TRAVIS_PYTHON_VERSION atlas numpy scipy matplotlib biopython reportlab pysam pyvcf pandas
     - python setup.py install
+    # For codecov.io
+    - pip install codecov
 
 before_script: cd test/
 script:
