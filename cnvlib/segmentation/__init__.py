@@ -120,7 +120,10 @@ def seg2cns(seg_text):
 
     Return a pandas.Dataframe with CNA columns.
     """
-    table = pd.read_table(StringIO(seg_text), comment='[')
+    try:
+        table = pd.read_table(StringIO(seg_text), comment='[')
+    except pd.parser.CParserError:
+        raise ValueError("Unexpected dataframe contents:\n%s" % (seg_text))
     if len(table.columns) == 6:
         table.columns = ["sample_id", "chromosome", "start", "end", "probes",
                          "log2"]
