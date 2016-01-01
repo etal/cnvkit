@@ -72,7 +72,7 @@ This approach is preferred on Mac OS X, and is a solid choice on Linux, too.
 
 To download and install CNVkit and its Python dependencies::
 
-    conda install -c bioconda cnvkit
+    conda install -c bioconda -c r cnvkit
 
 
 From a Python package repository
@@ -175,4 +175,3 @@ directory, too. To run the test suite::
 
 To run the pipeline on additional, larger example file sets, see the separate
 repository `cnvkit-examples <https://github.com/etal/cnvkit-examples>`_.
-
