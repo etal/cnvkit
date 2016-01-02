@@ -1625,7 +1625,7 @@ P_export_bed.add_argument("--show",
                 'all' = all segment regions;
                 'variant' = CNA regions with non-neutral copy number;
                 'ploidy' = CNA regions with non-default ploidy.
-                [Default: %(default)d]""")
+                [Default: %(default)s]""")
 P_export_bed.add_argument("--show-all", action="store_true",
         help="""Write all segmented regions.
                 [DEPRECATED; use "--show all" instead]""")
