@@ -89,7 +89,7 @@ The BED file should be the baited genomic regions for your target capture kit,
 as provided by your vendor. Since these regions (usually exons) may be of
 unequal size, the ``--split`` option divides the larger regions so that the
 average bin size after dividing is close to the size specified by
-``--average-size``.
+``--average-size``.  If any of these three (``--split``, ``--annotate``, or ``--short-names``) flags are used, a new target BED file will be created; otherwise, the provided target BED file will be used as-is.
 
 Bin size and resolution
 ```````````````````````
