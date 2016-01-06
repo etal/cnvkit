@@ -43,31 +43,18 @@ def rolling_median(x, width):
     https://groups.google.com/d/msg/comp.lang.python/0OARyHF0wtA/SEs-glW4t6gJ
     """
     x, wing = check_inputs(x, width)
-    # Pre-allocate the result array
-    result = np.empty_like(x)
-    # Keep a copy of the rolling window in original order; initially fill with
-    # a mirrored copy of the first 'wing' points
-    window = deque(np.concatenate((x[wing::-1], x[:wing])))
-    # Also keep a sorted copy of the rolling window values
-    sortwin = sorted(window)
-    # Pad the right edge of the original array with a mirror copy
-    signal = np.concatenate((x[wing:], x[:-wing-1:-1]))
-    # Calculate the rolling median at each subsequent point
-    for i, item in enumerate(signal):
-        old = window.popleft()
-        window.append(item)
-        del sortwin[bisect_left(sortwin, old)]
-        insort(sortwin, item)
-        result[i] = sortwin[wing]
-    return result
+    # Pad the edges of the original array with mirror copies
+    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
+    rolled = pd.rolling_median(signal, 2 * wing + 1, center=True)
+    return rolled[wing:-wing]
 
 
-def rolling_quantile(x, width, quant):
+def rolling_quantile(x, width, quantile):
     """Rolling quantile (0--1) with mirrored edges."""
     x, wing = check_inputs(x, width)
     # Pad the edges of the original array with mirror copies
     signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
-    rolled = pd.rolling_quantile(signal, 2 * wing + 1, quant, center=True)
+    rolled = pd.rolling_quantile(signal, 2 * wing + 1, quantile, center=True)
     return rolled[wing:-wing]
 
 
@@ -144,7 +131,7 @@ def _fit_edge(x, y, window_start, window_stop, interp_start, interp_stop,
 
 # Outlier detection
 
-def outlier_iqr(a, c=1.5):
+def outlier_iqr(a, c=3.0):
     """Detect outliers as a multiple of the IQR from the median.
 
     By convention, "outliers" are points more than 1.5 * IQR from the median,
@@ -188,6 +175,40 @@ def outlier_mad_median(a):
     return (dists / mad) > K
 
 
+def rolling_outlier_iqr(x, width, c=3.0):
+    """Detect outliers as a multiple of the IQR from the median.
+
+    By convention, "outliers" are points more than 1.5 * IQR from the median (~2
+    SD if values are normally distributed), and "extremes" or extreme outliers
+    are those more than 3.0 * IQR (~4 SD).
+    """
+    dists = x - smoothed(x, width)
+    q_hi = rolling_quantile(dists, width, .75)
+    q_lo = rolling_quantile(dists, width, .25)
+    iqr = q_hi - q_lo
+    outliers = (np.abs(dists) > iqr * c)
+    return outliers
+
+
+def rolling_outlier_quantile(x, width, q, m):
+    """Return a boolean mask of outliers by multiples of a quantile in a window.
+
+    Outliers are the array elements outside `m` times the `q`'th
+    quantile of deviations from the smoothed trend line, as calculated from
+    the trend line residuals. (For example, take the magnitude of the 95th
+    quantile times 5, and mark any elements greater than that value as
+    outliers.)
+
+    This is the smoothing method used in BIC-seq (doi:10.1073/pnas.1110574108)
+    with the parameters width=200, q=.95, m=5 for WGS.
+    """
+    # Assume the outlier-free distribution is symmetric
+    dists = np.abs(x - smoothed(x, width))
+    quants = rolling_quantile(dists, width, q)
+    outliers = (dists > quants * m)
+    return outliers
+
+
 def rolling_outlier_std(x, width, stdevs):
     """Return a boolean mask of outliers by stdev within a rolling window.
 
@@ -196,5 +217,5 @@ def rolling_outlier_std(x, width, stdevs):
     """
     dists = x - smoothed(x, width)
     x_std = rolling_std(dists, width)
-    outliers = (dists.abs() > x_std * stdevs)
+    outliers = (np.abs(dists) > x_std * stdevs)
     return outliers
