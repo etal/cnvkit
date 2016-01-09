@@ -180,6 +180,8 @@ class CopyNumArray(gary.GenomicArray):
         # ENH - better coverage approach: take Z-scores or rank of +1,0 or 0,-1
         # based on the available probes, then choose which is more probable
         rel_chrx_cvg = self.get_relative_chrx_cvg()
+        if rel_chrx_cvg is None:
+            return
         is_xx = (rel_chrx_cvg >= cutoff)
         if verbose:
             logging.info("Relative log2 coverage of X chromosome: %g "
