@@ -422,7 +422,7 @@ class GenomicArray(object):
         """Sort this array's bins in-place, with smart chromosome ordering."""
         table = self.data.copy()
         table['SORT_KEY'] = self.chromosome.apply(core.sorter_chrom)
-        table.sort_index(by=['SORT_KEY', 'start'], inplace=True)
+        table.sort_values(by=['SORT_KEY', 'start'], inplace=True)
         del table['SORT_KEY']
         self.data = table.reset_index(drop=True)
 
