@@ -629,7 +629,7 @@ def _cmd_segment(args):
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
                                            variants=variants,
                                            skip_low=args.drop_low_coverage,
-                                           skip_stdev=args.drop_stdev,
+                                           skip_outliers=args.drop_outliers,
                                            save_dataframe=bool(args.dataframe),
                                            rlibpath=args.rlibpath)
     if args.dataframe:
@@ -663,10 +663,12 @@ P_segment.add_argument('-v', '--vcf',
 P_segment.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
-P_segment.add_argument("--drop-stdev", type=float,
-        help="""Drop outlier bins more than this many standard deviations away
-                from the average within a rolling window. No filtering if 0.
-                [Default: off; a reasonable value is 5]""")
+P_segment.add_argument("--drop-outliers",
+        type=float, default=5, metavar="FACTOR",
+        help="""Drop outlier bins more than this many multiples of the 90th
+                quantile away from the average within a rolling window.
+                Set to 0 for no outlier filtering.
+                [Default: %(default)g]""")
 P_segment.add_argument("--rlibpath",
         help="Path to an alternative site-library to use for R packages.")
 P_segment.set_defaults(func=_cmd_segment)

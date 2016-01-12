@@ -182,6 +182,8 @@ def rolling_outlier_iqr(x, width, c=3.0):
     SD if values are normally distributed), and "extremes" or extreme outliers
     are those more than 3.0 * IQR (~4 SD).
     """
+    if len(x) <= width:
+        return np.zeros(len(x), dtype=np.bool_)
     dists = x - smoothed(x, width)
     q_hi = rolling_quantile(dists, width, .75)
     q_lo = rolling_quantile(dists, width, .25)
@@ -202,7 +204,8 @@ def rolling_outlier_quantile(x, width, q, m):
     This is the smoothing method used in BIC-seq (doi:10.1073/pnas.1110574108)
     with the parameters width=200, q=.95, m=5 for WGS.
     """
-    # Assume the outlier-free distribution is symmetric
+    if len(x) <= width:
+        return np.zeros(len(x), dtype=np.bool_)
     dists = np.abs(x - smoothed(x, width))
     quants = rolling_quantile(dists, width, q)
     outliers = (dists > quants * m)
@@ -215,6 +218,8 @@ def rolling_outlier_std(x, width, stdevs):
     Outliers are the array elements outside `stdevs` standard deviations from
     the smoothed trend line, as calculated from the trend line residuals.
     """
+    if len(x) <= width:
+        return np.zeros(len(x), dtype=np.bool_)
     dists = x - smoothed(x, width)
     x_std = rolling_std(dists, width)
     outliers = (np.abs(dists) > x_std * stdevs)
