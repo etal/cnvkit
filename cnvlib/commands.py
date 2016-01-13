@@ -1406,8 +1406,8 @@ def _cmd_segmetrics(args):
     if args.drop_low_coverage:
         cnarr = cnarr.drop_low_coverage()
     segarr = _CNA.read(args.segments)
-    deviations = [segbins['log2'] - segment['log2']
-                  for segment, segbins in  cnarr.by_ranges(segarr)]
+    deviations = [segbins.log2 - segment.log2
+                  for segment, segbins in cnarr.by_ranges(segarr)]
     # Measures of spread
     for statname in ("StDev", "MAD", "IQR", "BiVar"):
         option = statname.lower()

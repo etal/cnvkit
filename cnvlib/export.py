@@ -23,7 +23,7 @@ def merge_samples(filenames):
     """
     def label_with_gene(cnarr):
         row2label = lambda row: "{}:{}-{}:{}".format(
-            row['chromosome'], row['start'], row['end'], row['gene'])
+            row.chromosome, row.start, row.end, row.gene)
         return cnarr.data.apply(row2label, axis=1)
 
     if not filenames:
@@ -283,36 +283,36 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
 
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
-    for (_idx, out_row), (_idx, abs_row) in zip(out_dframe.iterrows(),
-                                                abs_dframe.iterrows()):
-        if (out_row["ncopies"] == abs_row["expect"] or
+    for out_row, abs_row in zip(out_dframe.itertuples(index=False),
+                                abs_dframe.itertuples(index=False)):
+        if (out_row.ncopies == abs_row.expect or
             # Survive files from buggy v0.7.1 (#53)
-            not str(out_row["probes"]).isdigit()):
+            not str(out_row.probes).isdigit()):
             # Skip regions of neutral copy number
             continue  # or "CNV" for subclonal?
 
-        if out_row["ncopies"] > abs_row["expect"]:
-            genotype = "0/1:0:%d:%g" % (out_row["ncopies"], int(out_row["probes"]))
-        elif out_row["ncopies"] < abs_row["expect"]:
+        if out_row.ncopies > abs_row.expect:
+            genotype = "0/1:0:%d:%d" % (out_row.ncopies, out_row.probes)
+        elif out_row.ncopies < abs_row.expect:
             # TODO XXX handle non-diploid ploidies, haploid chroms
-            if out_row["ncopies"] == 0:
+            if out_row.ncopies == 0:
                 # Complete deletion, 0 copies
                 gt = "1/1"
             else:
                 # Single copy deletion
                 gt = "0/1"
-            genotype = "%s:%d" % (gt, int(out_row["probes"]))
+            genotype = "%s:%d" % (gt, out_row.probes)
 
         info = ";".join(["IMPRECISE",
-                         "SVTYPE=%s" % out_row["svtype"],
-                         "END=%d" % out_row["end"],
-                         "SVLEN=%d" % out_row["svlen"],
+                         "SVTYPE=%s" % out_row.svtype,
+                         "END=%d" % out_row.end,
+                         "SVLEN=%d" % out_row.svlen,
                          # CIPOS=-56,20;CIEND=-10,62
                         ])
 
-        yield (out_row["chromosome"], out_row["start"], '.', 'N',
-               "<%s>" % out_row["svtype"], '.', '.',
-               info, out_row["format"], genotype)
+        yield (out_row.chromosome, out_row.start, '.', 'N',
+               "<%s>" % out_row.svtype, '.', '.',
+               info, out_row.format, genotype)
 
 
 # _____________________________________________________________________________
@@ -367,9 +367,9 @@ def export_theta(tumor, reference):
     prev_chrom = None
     chrom_id = 0
     for seg, subcnarr in ref_cnarr.by_ranges(tumor_segs):
-        if seg["chromosome"] != prev_chrom:
+        if seg.chromosome != prev_chrom:
             chrom_id += 1
-            prev_chrom = seg["chromosome"]
+            prev_chrom = seg.chromosome
         fields = format_theta_row(seg, subcnarr, chrom_id, log2ratio_to_count)
         outrows.append(fields)
 
@@ -382,16 +382,16 @@ def format_theta_row(seg, cnarr, chrom_id, log2_to_count):
     For the normal/reference bin count, take the mean of the bin values within
     each segment so that segments match between tumor and normal.
     """
-    nbins = seg["probes"] if "probes" in seg else len(cnarr)
-    tumor_count = log2_to_count(seg["log2"], nbins)
-    ref_count = log2_to_count(cnarr["log2"].mean(), nbins)
+    nbins = seg.probes if "probes" in seg else len(cnarr)
+    tumor_count = log2_to_count(seg.log2, nbins)
+    ref_count = log2_to_count(cnarr.log2.mean(), nbins)
     # e.g. "start_1_93709:end_1_19208166"
     row_id = ("start_%d_%d:end_%d_%d"
-              % (chrom_id, seg["start"], chrom_id, seg["end"]))
+              % (chrom_id, seg.start, chrom_id, seg.end))
     return (row_id,       # ID
             chrom_id,     # chrm
-            seg["start"], # start
-            seg["end"],   # end
+            seg.start,    # start
+            seg.end,      # end
             tumor_count,  # tumorCount
             ref_count     # normalCount
            )

@@ -59,15 +59,15 @@ def absolute_threshold(cnarr, ploidy, thresholds, is_reference_male):
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for idx, row in enumerate(cnarr):
         cnum = 0
-        ref_copies = _reference_copies_pure(row['chromosome'], ploidy,
+        ref_copies = _reference_copies_pure(row.chromosome, ploidy,
                                             is_reference_male)
         for cnum, thresh in enumerate(thresholds):
-            if row['log2'] <= thresh:
+            if row.log2 <= thresh:
                 if ref_copies != ploidy:
                     cnum = int(cnum * ref_copies / ploidy)
                 break
         else:
-            cnum = int(np.ceil(_log2_ratio_to_absolute_pure(row['log2'],
+            cnum = int(np.ceil(_log2_ratio_to_absolute_pure(row.log2,
                                                             ref_copies)))
         absolutes[idx] = cnum
     return absolutes
@@ -78,9 +78,9 @@ def absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for i, row in enumerate(cnarr):
         ref_copies, expect_copies = _reference_expect_copies(
-            row['chromosome'], ploidy, is_sample_female, is_reference_male)
+            row.chromosome, ploidy, is_sample_female, is_reference_male)
         absolutes[i] = _log2_ratio_to_absolute(
-            row['log2'], ref_copies, expect_copies, purity)
+            row.log2, ref_copies, expect_copies, purity)
     return absolutes
 
 
@@ -88,9 +88,9 @@ def absolute_pure(cnarr, ploidy, is_reference_male):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for i, row in enumerate(cnarr):
-        ref_copies = _reference_copies_pure(row['chromosome'], ploidy,
+        ref_copies = _reference_copies_pure(row.chromosome, ploidy,
                                             is_reference_male)
-        absolutes[i] = _log2_ratio_to_absolute_pure(row['log2'], ref_copies)
+        absolutes[i] = _log2_ratio_to_absolute_pure(row.log2, ref_copies)
     return absolutes
 
 
@@ -100,11 +100,11 @@ def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_femal
     reference_copies = expect_copies = np.zeros(len(cnarr), dtype=np.int_)
     for i, row in enumerate(cnarr):
         ref_copies, exp_copies = _reference_expect_copies(
-            row['chromosome'], ploidy, is_sample_female, is_reference_male)
+            row.chromosome, ploidy, is_sample_female, is_reference_male)
         reference_copies[i] = ref_copies
         expect_copies[i] = exp_copies
         absolutes[i] = _log2_ratio_to_absolute(
-            row['log2'], ref_copies, exp_copies, purity)
+            row.log2, ref_copies, exp_copies, purity)
     return pd.DataFrame({'absolute': absolutes,
                          'reference': reference_copies,
                          'expect': expect_copies})

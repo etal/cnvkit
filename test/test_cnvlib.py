@@ -78,13 +78,13 @@ class GaryTests(unittest.TestCase):
             subsegarr = chrom_segarr[chrom]
             for count_segs, (seg, bins) in enumerate(subarr.by_ranges(subsegarr)):
                 count_bins += len(bins)
-                self.assertEqual(seg['probes'], len(bins))
+                self.assertEqual(seg.probes, len(bins))
                 self.assertEqual(len(bins), len(
-                    cnarr.in_range(seg['chromosome'], seg['start'], seg['end'],
-                                mode='outer')))
+                    cnarr.in_range(seg.chromosome, seg.start, seg.end,
+                                   mode='outer')))
                 self.assertEqual(len(bins), len(
-                    cnarr.in_range(seg['chromosome'], seg['start'], seg['end'],
-                                mode='trim')))
+                    cnarr.in_range(seg.chromosome, seg.start, seg.end,
+                                   mode='trim')))
             self.assertEqual(len(subsegarr), count_segs + 1)
             self.assertEqual(len(subarr), count_bins)
             self.assertEqual(len(subarr), len(

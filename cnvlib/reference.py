@@ -160,19 +160,19 @@ def warn_bad_probes(probes):
         chrom_cols = max(map(len, labels))
         last_gene = None
         for label, probe in zip(labels, fg_bad_probes):
-            if probe['gene'] == last_gene:
+            if probe.gene == last_gene:
                 gene = '  "'
             else:
-                gene = probe['gene']
+                gene = probe.gene
                 last_gene = gene
             if 'rmask' in probes:
                 logging.info("  %s  %s  coverage=%.3f  spread=%.3f  rmask=%.3f",
                              gene.ljust(gene_cols), label.ljust(chrom_cols),
-                             probe['log2'], probe['spread'], probe['rmask'])
+                             probe.log2, probe.spread, probe.rmask)
             else:
                 logging.info("  %s  %s  coverage=%.3f  spread=%.3f",
                              gene.ljust(gene_cols), label.ljust(chrom_cols),
-                             probe['log2'], probe['spread'])
+                             probe.log2, probe.spread)
 
     # Count the number of BG probes dropped, too (names are all "Background")
     bg_bad_probes = bad_probes[~fg_index]

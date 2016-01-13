@@ -26,6 +26,14 @@ class CopyNumArray(gary.GenomicArray):
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
     @property
+    def log2(self):
+        return self.data["log2"]
+
+    @log2.setter
+    def log2(self, value):
+        self.data["log2"] = value
+
+    @property
     def _chr_x_label(self):
         if 'chr_x' in self.meta:
             return self.meta['chr_x']
@@ -239,7 +247,7 @@ class CopyNumArray(gary.GenomicArray):
         # ENH: As an alternative to segments, take regions; calculate
         # region medians, subtract those. Then, can take chromosome (arm)
         # residuals w/o segments.
-        resids = [subcna['log2'] - seg['log2']
+        resids = [subcna.log2 - seg.log2
                   for seg, subcna in self.by_ranges(segments)]
         return np.concatenate(resids)
 

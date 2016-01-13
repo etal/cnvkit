@@ -137,8 +137,8 @@ def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
     # Get coordinates for CBS lines & draw them
     if segments:
         for row in segments:
-            axis.plot((row['start'] * MB, row['end'] * MB),
-                      (row['log2'], row['log2']),
+            axis.plot((row.start * MB, row.end * MB),
+                      (row.log2, row.log2),
                       color=SEG_COLOR, linewidth=4, solid_capstyle='round')
 
 
@@ -340,7 +340,7 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom=None):
     """
     if chrom:
         segments = segments.select(chromosome=chrom)
-    seg_starts = segments['start']
+    seg_starts = segments.start
     # Assign a segment number to each variant, basically
     indices = np.maximum(seg_starts.searchsorted(snv_posns), 1) - 1
     for i in sorted(set(indices)):
@@ -521,13 +521,13 @@ def gene_coords_by_range(probes, chrom, start, end,
     # Tabulate the genes in the selected region
     genes = collections.OrderedDict()
     for row in probes.in_range(chrom, start, end):
-        name = str(row['gene'])
+        name = str(row.gene)
         if name in ignore:
             continue
         if name in genes:
-            genes[name][1] = row['end']
+            genes[name][1] = row.end
         else:
-            genes[name] = [row['start'], row['end']]
+            genes[name] = [row.start, row.end]
     # Reorganize the data structure
     return {chrom: [(start, end, name)
                     for name, (start, end) in genes.items()]}

@@ -81,7 +81,7 @@ def variants_in_segment(varr, segment, fdr_q):
         segtable = []
     if segtable and len(segtable['start']) > 1:
         logging.info("Segmented on allele freqs in %s:%d-%d",
-                     segment['chromosome'], segment['start'], segment['end'])
+                     segment.chromosome, segment.start, segment.end)
         # Ensure breakpoint locations make sense
         # - Keep original segment start, end positions
         # - Place breakpoints midway between SNVs, I guess?
@@ -89,28 +89,28 @@ def variants_in_segment(varr, segment, fdr_q):
         gap_lefts = np.asarray(varr['end']).take(segtable['end'][:-1])
         mid_breakpoints = [(left + right) // 2
                            for left, right in zip(gap_lefts, gap_rights)]
-        starts = np.concatenate([[segment['start']], mid_breakpoints])
-        ends = np.concatenate([mid_breakpoints, [segment['end']]])
+        starts = np.concatenate([[segment.start], mid_breakpoints])
+        ends = np.concatenate([mid_breakpoints, [segment.end]])
         table = pd.DataFrame({
-            'chromosome': segment['chromosome'],
+            'chromosome': segment.chromosome,
             'start': starts,
             'end': ends,
             # 'baf': segtable['mean'],
-            'gene': '-', #segment['gene'],
-            'log2': segment['log2'],
+            'gene': '-', #segment.gene,
+            'log2': segment.log2,
             'probes': segtable['size'],
-            # 'weight': segment['weight'] * segtable['size'] / segment['size'],
+            # 'weight': segment.weight * segtable['size'] / segment.size,
         })
     else:
         table = pd.DataFrame({
-            'chromosome': segment['chromosome'],
-            'start': segment['start'],
-            'end': segment['end'],
+            'chromosome': segment.chromosome,
+            'start': segment.start,
+            'end': segment.end,
             # 'baf': np.median(values),
-            'gene': '-', #segment['gene'],
-            'log2': segment['log2'],
-            'probes': segment['probes'],
-            # 'weight': segment['weight'],
+            'gene': '-', #segment.gene,
+            'log2': segment.log2,
+            'probes': segment.probes,
+            # 'weight': segment.weight,
         }, index=[0])
 
     return table

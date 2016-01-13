@@ -40,7 +40,7 @@ class GenomicArray(object):
 
     @staticmethod
     def row2label(row):
-        return "{}:{}-{}".format(row['chromosome'], row['start'], row['end'])
+        return "{}:{}-{}".format(row.chromosome, row.start, row.end)
 
     @classmethod
     def _make_blank(cls):
@@ -159,7 +159,7 @@ class GenomicArray(object):
         return NotImplemented
 
     def __iter__(self):
-        return (row for i, row in self.data.iterrows())
+        return self.data.itertuples(index=False)
 
     __next__ = next
 
