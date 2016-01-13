@@ -95,7 +95,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
             cnarr[(cnarr.chromosome == chr_x) | (cnarr.chromosome == chr_y),
                   'log2'] += 1.0
 
-    edge_sorter = fix.make_edge_sorter(cnarr1, params.INSERT_SIZE)
+    edge_bias = fix.get_edge_bias(cnarr1, params.INSERT_SIZE)
     def bias_correct_coverage(cnarr):
         """Perform bias corrections on the sample."""
         cnarr.center_all()
@@ -107,7 +107,7 @@ def combine_probes(filenames, fa_fname, is_male_reference):
             logging.info("Correcting for RepeatMasker bias...")
             cnarr = fix.center_by_window(cnarr, .1, columns['rmask'])
         logging.info("Correcting for density bias...")
-        cnarr = fix.center_by_window(cnarr, .1, edge_sorter)
+        cnarr = fix.center_by_window(cnarr, .1, edge_bias)
         return cnarr['log2']
 
     # Pseudocount of 1 "flat" sample
