@@ -7,7 +7,7 @@ import collections
 import math
 import sys
 
-from . import metrics
+from . import metrics, params
 
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
@@ -15,17 +15,17 @@ iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 # _____________________________________________________________________________
 # breaks
 
-def get_gene_intervals(all_probes, skip=('Background', 'CGH', '-', '.')):
+def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
     """Tally genomic locations of each targeted gene.
 
     Return a dict of chromosomes to a list of tuples: (gene name, start, end).
     """
+    ignore += ("Background",)
     # Tally the start & end points for each targeted gene; group by chromosome
     gene_probes = collections.defaultdict(lambda: collections.defaultdict(list))
     for row in all_probes:
         gname = str(row['gene'])
-        # Skip probes labeled 'Background' (antitargets) or 'CGH' (intergenic)
-        if gname not in skip:
+        if gname not in ignore:
             gene_probes[row['chromosome']][gname].append(row)
     # Condense into a single interval for each gene
     intervals = collections.defaultdict(list)

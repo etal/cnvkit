@@ -52,7 +52,7 @@ class CopyNumArray(gary.GenomicArray):
 
     # XXX hair: some genes overlap; some bins cover multiple genes
     #   -> option: whether to split gene names on commas
-    def by_gene(self, ignore=('-', 'CGH', '.')):
+    def by_gene(self, ignore=params.IGNORE_GENE_NAMES):
         """Iterate over probes grouped by gene name.
 
         Emits pairs of (gene name, CNA of rows with same name)
@@ -115,8 +115,8 @@ class CopyNumArray(gary.GenomicArray):
                                            params.NULL_LOG2_COVERAGE -
                                            params.MIN_REF_COVERAGE])
 
-    def squash_genes(self, ignore=('-', 'CGH', '.'), squash_background=False,
-                     summary_func=metrics.biweight_location):
+    def squash_genes(self, summary_func=metrics.biweight_location,
+                     squash_background=False, ignore=params.IGNORE_GENE_NAMES):
         """Combine consecutive bins with the same targeted gene name.
 
         The `ignore` parameter lists bin names that not be counted as genes to

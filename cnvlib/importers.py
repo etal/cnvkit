@@ -9,9 +9,8 @@ import subprocess
 import numpy as np
 import pandas as pd
 
-from . import core
+from . import core, params
 from .cnary import CopyNumArray as CNA
-from .params import NULL_LOG2_COVERAGE
 
 
 # __________________________________________________________________________
@@ -64,7 +63,8 @@ def import_picard_pertargetcoverage(fname):
     if sum(no_cvg_idx) > TOO_MANY_NO_COVERAGE:
         logging.warn("*WARNING* Sample %s has >%d bins with no coverage",
                      fname, TOO_MANY_NO_COVERAGE)
-    coverages[no_cvg_idx] = 2**NULL_LOG2_COVERAGE  # Avoid math domain error
+    # Avoid math domain error
+    coverages[no_cvg_idx] = 2**params.NULL_LOG2_COVERAGE
     cnarr = CNA.from_columns({"chromosome": dframe["chrom"],
                               "start": dframe["start"] - 1,
                               "end": dframe["end"],
@@ -85,17 +85,22 @@ def unpipe_name(name):
     Picard CalculateHsMetrics combines the labels of overlapping intervals
     by joining all labels with '|', e.g. 'BRAF|BRAF' -- no two distinct
     targeted genes actually overlap, though, so these dupes are redundant.
-
-    Also, in our convention, 'CGH' probes are selected intergenic regions, not
-    meaningful gene names, so 'CGH|FOO' resolves as 'FOO'.
+    Meaningless target names are dropped, e.g. 'CGH|FOO|-' resolves as 'FOO'.
+    In case of ambiguity, the longest name is taken, e.g. "TERT|TERT Promoter"
+    resolves as "TERT Promoter".
     """
     gene_names = set(name.split('|'))
-    if len(gene_names) > 1:
-        if 'CGH' in gene_names and len(gene_names) == 2:
-            gene_names.remove('CGH')
-        else:
-            logging.warn("*WARNING* Ambiguous gene name: %s", name)
-    return gene_names.pop()
+    if len(gene_names) == 1:
+        return name
+    else:
+        cleaned_names = gene_names.difference(params.IGNORE_GENE_NAMES)
+        if cleaned_names:
+            gene_names = cleaned_names
+        new_name = sorted(gene_names, key=len, reverse=True)[0]
+        if len(gene_names) > 1:
+            logging.warn("*WARNING* Ambiguous gene name %r; using %r",
+                         name, new_name)
+        return new_name
 
 
 # __________________________________________________________________________

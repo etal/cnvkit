@@ -108,11 +108,12 @@ def drop_outliers(cnarr, width, factor):
     return cnarr[~outlier_mask]
 
 
-def transfer_names_weights(segments, cnarr, ignore=('Background', 'CGH', '-')):
+def transfer_names_weights(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     """Copy gene names from `cnarr` to the segmented `segarr`.
 
     Segment name is the comma-separated list of bin gene names.
     """
+    ignore += ("Background",)
     segnames = ['-'] * len(segments)
     segweights = np.zeros(len(segments))
     for i, (_seg, subprobes) in enumerate(cnarr.by_ranges(segments)):

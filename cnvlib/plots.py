@@ -13,7 +13,7 @@ import numpy as np
 from Bio._py3k import zip
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
-from . import core, smoothing
+from . import core, params, smoothing
 
 SEG_COLOR = 'red'
 POINT_COLOR = '#808080'
@@ -512,16 +512,17 @@ def gene_coords_by_name(probes, names):
 
 
 def gene_coords_by_range(probes, chrom, start, end,
-                         skip=('Background', 'CGH', '-', '.')):
+                         ignore=params.IGNORE_GENE_NAMES):
     """Find the chromosomal position of all genes in a range.
 
     Returns a dict: {chromosome: [(start, end, gene), ...]}
     """
+    ignore += ('Background',)
     # Tabulate the genes in the selected region
     genes = collections.OrderedDict()
     for row in probes.in_range(chrom, start, end):
         name = str(row['gene'])
-        if name in skip:
+        if name in ignore:
             continue
         if name in genes:
             genes[name][1] = row['end']
