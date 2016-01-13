@@ -16,7 +16,7 @@ from Bio._py3k import StringIO
 
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
-                    skip_low=False, skip_stdev=None,
+                    skip_low=False, skip_outliers=None,
                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
     filtered_cn = cnarr
@@ -24,8 +24,8 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         before = len(filtered_cn)
         filtered_cn = filtered_cn.drop_low_coverage()
         logging.info("Dropped %d low-coverage bins", before - len(filtered_cn))
-    if skip_stdev:
-        filtered_cn = drop_outliers_stdev(filtered_cn, 30, skip_stdev)
+    if skip_outliers:
+        filtered_cn = drop_outliers(filtered_cn, 50, skip_outliers)
 
     if method == 'haar':
         threshold = threshold or 0.001
@@ -84,10 +84,18 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         return segarr
 
 
-def drop_outliers_stdev(cnarr, width, n_stdevs):
-    """Drop outlier bins with log2 ratios too far from the trend line."""
+def drop_outliers(cnarr, width, factor):
+    """Drop outlier bins with log2 ratios too far from the trend line.
+
+    Outliers are the log2 values `factor` times the 90th quantile of absolute
+    deviations from the rolling average, within a window of given `width`. The
+    90th quantile is about 1.2 standard deviations if the log2 values are
+    Gaussian, so this is similar to calling outliers `factor`*1.2 standard
+    deviations from the rolling mean. For a window size of 50, the breakdown
+    point is 5 outliers within a window, which is plenty robust for our needs.
+    """
     outlier_mask = np.concatenate([
-        smoothing.rolling_outlier_std(subarr['log2'], width, n_stdevs)
+        smoothing.rolling_outlier_quantile(subarr['log2'], width, .90, factor)
         for _chrom, subarr in cnarr.by_chromosome()])
     n_outliers = outlier_mask.sum()
     if n_outliers:

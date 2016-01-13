@@ -40,8 +40,8 @@ def load_adjust_coverages(pset, ref_pset,
             logging.warn("WARNING: Skipping correction for RepeatMasker bias")
     if fix_edge:
         logging.info("Correcting for density bias...")
-        pset = center_by_window(pset, .1,
-                                make_edge_sorter(pset, params.INSERT_SIZE))
+        edge_bias = get_edge_bias(pset, params.INSERT_SIZE)
+        pset = center_by_window(pset, .1, edge_bias)
     if fix_rmask:
         if 'rmask' in ref_matched:
             logging.info("Correcting for RepeatMasker bias...")
@@ -102,13 +102,9 @@ def center_by_window(cnarr, fraction, sort_key):
     df = cnarr.data.reset_index(drop=True)
     shuffle_order = np.random.permutation(df.index)
     df = df.reindex(shuffle_order)
-    if isinstance(sort_key, (np.ndarray, pd.Series)):
-        # Apply the same shuffling to the key array as to the target probe set
-        sort_key = sort_key[shuffle_order]
-    elif callable(sort_key):
-        sort_key = df.apply(sort_key, axis=1) # ???
-    else:
-        raise ValueError("What is this?: %r" % sort_key)
+    # Apply the same shuffling to the key array as to the target probe set
+    assert isinstance(sort_key, (np.ndarray, pd.Series))
+    sort_key = sort_key[shuffle_order]
     # Sort the data according to the specified parameter
     order = np.argsort(sort_key, kind='mergesort')
     df = df.iloc[order]
@@ -120,85 +116,86 @@ def center_by_window(cnarr, fraction, sort_key):
     return fixarr
 
 
-def make_edge_sorter(target_probes, margin):
-    """Create a sort-key function for tiling edge effects."""
-    # Index the target interval positions
-    chrom_tile_starts = {}
-    chrom_tile_ends = {}
-    for chrom, rows in target_probes.by_chromosome():
-        chrom_tile_starts[chrom] = rows['start']
-        chrom_tile_ends[chrom] = rows['end']
+def get_edge_bias(cnarr, margin):
+    """Quantify the "edge effect" of the target tile and its neighbors.
 
-    def get_edge(chrom, tgt_start, tgt_end, insert_size):
-        """Quantify the "edge effect" of the target tile and its neighbors.
+    The result is proportional to the change in the target's coverage due to
+    these edge effects, i.e. the expected loss of coverage near the target
+    edges and, if there are close neighboring tiles, gain of coverage due
+    to "spill over" reads from the neighbor tiles.
 
-        The result is proportional to the change in the target's coverage due to
-        these edge effects, i.e. the expected loss of coverage near the target
-        edges and, if there are close neighboring tiles, gain of coverage due
-        to "spill over" reads from the neighbor tiles.
+    (This is not the actual change in coverage. This is just a tribute.)
+    """
+    output_by_chrom = []
+    for chrom, subarr in cnarr.by_chromosome():
+        # tile_starts = subarr['start']
+        # tile_ends = subarr['end']
+        table = subarr.data
+        table["margin_start"] = table.start - margin
+        table["margin_end"] = table.end + margin
+        table["target_size"] = table.end - table.start
 
-        (This is not the actual change in coverage. This is just a tribute.)
-        """
-        margin_start = tgt_start - insert_size
-        margin_end = tgt_end + insert_size
-        tile_starts = chrom_tile_starts[chrom]
-        tile_ends = chrom_tile_ends[chrom]
-        target_size = (tgt_end - tgt_start)
+        # Calculate coverage loss at (both edges of) each tile
+        losses = table.target_size.apply(edge_loss, args=(margin,))
 
-        # Calculate coverage loss at (both) tile edges
-        loss = edge_loss(target_size, insert_size)
+        # Find the leftmost tile in each tile's margin
+        table['left_idx'] = np.maximum(0,
+                    np.searchsorted(table.end, table.margin_start) - 1)
+
+        def row_gains(row):
+            """Calculate the edge effects on this bin.
+
+            Find tiled intervals within a margin (+/- bp) of the given probe
+            (including the probe itself, so the edge is never zero). Return the
+            proportion of the windowed range that is covered by tiled regions.
+            """
+            gaps_left = []
+            gaps_right = []
+            for neighbor_idx in xrange(row.left_idx, len(table)):
+                # tile_start, tile_end = table.iloc[neighbor_idx, ["start", "end"]]
+                tile_start = table.iat[neighbor_idx, 1]
+                tile_end = table.iat[neighbor_idx, 2]
+                # tile_start = neighbor.start
+                # tile_end = neighbor.end
+                if tile_end <= row.margin_start:
+                    # No overlap on the 5' end -- keep moving forward
+                    continue
+                if tile_start >= row.margin_end:
+                    # No overlap on the 3' end -- we're done
+                    break
+                if tile_start == row.start and tile_end == row.end:
+                    # The target itself
+                    continue
+                # Tile is within margins
+                if row.margin_start <= tile_end <= row.start:
+                    # Left neighbor
+                    gaps_left.append(row.start - tile_end)
+                elif row.end <= tile_start <= row.margin_end:
+                    # Right neighbor
+                    gaps_right.append(tile_start - row.end)
+                elif tile_start < row.start and tile_end >= row.start:
+                    # Overlap on left side -- treat as adjacent
+                    gaps_left.append(0)
+                elif tile_start <= row.end and tile_end > row.end:
+                    # Overlap on right side -- treat as adjacent
+                    gaps_right.append(0)
+                else:
+                    # DBG: This should probably never happen
+                    logging.info("Oddly positioned tile (%s:%d-%d) vs. target (%d-%d)",
+                                chrom, tile_start, tile_end, row.start, row.end)
+                    continue
+            gain = 0.0
+            if gaps_left:
+                gain += edge_gain(row.target_size, margin, min(gaps_left))
+            if gaps_right:
+                gain += edge_gain(row.target_size, margin, min(gaps_right))
+            return gain
 
         # For each neighbor tile, calculate coverage gain to the target
-        gaps_left = []
-        gaps_right = []
-        # Find the leftmost tile in the margin
-        left_idx = max(0, bisect.bisect_left(tile_ends, margin_start) - 1)
-        for (tile_start, tile_end) in zip(tile_starts[left_idx:],
-                                          tile_ends[left_idx:]):
-            if tile_end <= margin_start:
-                # No overlap on the 5' end -- keep moving forward
-                continue
-            if tile_start >= margin_end:
-                # No overlap on the 3' end -- we're done
-                break
-            if tile_start == tgt_start and tile_end == tgt_end:
-                # The target itself
-                continue
-            # Tile is within margins
-            if margin_start <= tile_end <= tgt_start:
-                # Left neighbor
-                gaps_left.append(tgt_start - tile_end)
-            elif tgt_end <= tile_start <= margin_end:
-                # Right neighbor
-                gaps_right.append(tile_start - tgt_end)
-            elif tile_start < tgt_start and tile_end >= tgt_start:
-                # Overlap on left side -- treat as adjacent
-                gaps_left.append(0)
-            elif tile_start <= tgt_end and tile_end > tgt_end:
-                # Overlap on right side -- treat as adjacent
-                gaps_right.append(0)
-            else:
-                # DBG: This should probably never happen
-                logging.info("Oddly positioned tile (%s:%d-%d) vs. target (%d-%d)",
-                             chrom, tile_start, tile_end, tgt_start, tgt_end)
-                continue
-        gain = 0
-        if gaps_left:
-            gain += edge_gain(target_size, insert_size, min(gaps_left))
-        if gaps_right:
-            gain += edge_gain(target_size, insert_size, min(gaps_right))
-        return gain - loss
-
-    def sorter_edge(row):
-        """Calculate the edge effects on this bin.
-
-        Find tiled intervals within a margin (+/- bp) of the given probe
-        (including the probe itself, so the edge is never zero). Return the
-        proportion of the windowed range that is covered by tiled regions.
-        """
-        return get_edge(row['chromosome'], row['start'], row['end'], margin)
-
-    return sorter_edge
+        gainz = table.apply(row_gains, axis=1, reduce=True)
+        out_row = gainz - losses
+        output_by_chrom.append(out_row)
+    return np.concatenate(output_by_chrom)
 
 
 def edge_loss(target_size, insert_size):
