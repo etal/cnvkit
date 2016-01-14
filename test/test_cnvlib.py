@@ -428,21 +428,21 @@ class OtherTests(unittest.TestCase):
         """Test the 'edge' bias correction calculations."""
         # With no gap, gain and loss should balance out
         # 1. Wide target, no secondary corrections triggered
-        target_size = 600
         insert_size = 250
-        loss = fix.edge_loss(target_size, insert_size)
-        gain = fix.edge_gain(target_size, insert_size, 0)  # Adjacent
+        gap_size = np.zeros(1)  # Adjacent
+        target_size = np.asarray([600])
+        loss = fix.edge_losses(target_size, insert_size)
+        gain = fix.edge_gains(target_size, gap_size, insert_size)
         gain *= 2  # Same on the other side
         self.assertAlmostEqual(loss, gain)
-        # TODO - what tests make sense here?
         # 2. Trigger 'loss' correction (target_size < 2 * insert_size)
-        # target_size = 600
-        # self.assertAlmostEqual(fix.edge_loss(target_size, insert_size),
-        #                        2 * fix.edge_gain(target_size, insert_size, 0))
+        target_size = np.asarray([450])
+        self.assertAlmostEqual(fix.edge_losses(target_size, insert_size),
+                        2 * fix.edge_gains(target_size, gap_size, insert_size))
         # 3. Trigger 'gain' correction (target_size + gap_size < insert_size)
-        # target_size = 300
-        # self.assertAlmostEqual(fix.edge_loss(target_size, insert_size),
-        #                        2 * fix.edge_gain(target_size, insert_size, 0))
+        target_size = np.asarray([300])
+        self.assertAlmostEqual(fix.edge_losses(target_size, insert_size),
+                        2 * fix.edge_gains(target_size, gap_size, insert_size))
 
     # call
     # Test: convert_clonal(x, 1, 2) == convert_diploid(x)

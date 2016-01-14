@@ -135,7 +135,7 @@ def get_edge_bias(cnarr, margin):
         table["target_size"] = table.end - table.start
 
         # Calculate coverage loss at (both edges of) each tile
-        losses = table.target_size.apply(edge_loss, args=(margin,))
+        losses = edge_losses(table.target_size, margin)
 
         # Find the neighboring tiles within each tile's margins,
         # but not the target itself
@@ -148,30 +148,31 @@ def get_edge_bias(cnarr, margin):
         # Find tiled intervals within a margin (+/- bp) of the given probe
         # (excluding the probe itself), then calculate the relative coverage
         # "gain" due to the neighbors, if any.
-        def l_row_gains(row):
-            gaps_left = row.start - table.end[row.l_start_idx:row.l_end_idx]
-            return edge_gain(row.target_size, margin, gaps_left.min())
+        def l_row_gaps(row):
+            neighbor_ends = np.asarray(table.end[row.l_start_idx:row.l_end_idx])
+            return (row.start - neighbor_ends).min()
 
-        def r_row_gains(row):
-            gaps_right = table.start[row.r_start_idx:row.r_end_idx] - row.end
-            return edge_gain(row.target_size, margin, gaps_right.min())
+        def r_row_gaps(row):
+            neighbor_starts = np.asarray(table.start[row.r_start_idx:row.r_end_idx])
+            return (neighbor_starts - row.end).min()
 
         gains = np.zeros(len(table))
         l_rows = table[table.l_start_idx < table.l_end_idx]
-        gains[l_rows.index.values] = l_rows.apply(l_row_gains,
-                                                  axis=1, reduce=True)
-
+        l_gaps = l_rows.apply(l_row_gaps, axis=1, reduce=True)
+        gains[l_rows.index.values] = edge_gains(l_rows.target_size, l_gaps,
+                                                   margin)
         r_rows = table[table.r_start_idx < table.r_end_idx]
-        gains[r_rows.index.values] += r_rows.apply(r_row_gains,
-                                                   axis=1, reduce=True)
+        r_gaps = r_rows.apply(r_row_gaps, axis=1, reduce=True)
+        gains[r_rows.index.values] += edge_gains(r_rows.target_size, r_gaps,
+                                                    margin)
 
         out_row = gains - losses
         output_by_chrom.append(out_row)
     return np.concatenate(output_by_chrom)
 
 
-def edge_loss(target_size, insert_size):
-    """Calculate coverage loss at the edges of a baited region.
+def edge_losses(target_sizes, insert_size):
+    """Calculate coverage losses at the edges of baited regions.
 
     Letting i = insert size and t = target size, the proportional loss of
     coverage near the two edges of the baited region (combined) is::
@@ -184,16 +185,17 @@ def edge_loss(target_size, insert_size):
 
     on each side, or (i-t)^2 / 2it total.
     """
-    loss = insert_size / (2 * target_size)
-    if target_size < insert_size:
-        # Drop the shoulder part that would extend past the bait
-        loss -= ((insert_size - target_size)**2
-                 / (2 * insert_size * target_size))
-    return loss
+    losses = insert_size / (2 * target_sizes)
+    # Drop the shoulder part that would extend past the bait
+    small_mask = (target_sizes < insert_size)
+    t_small = target_sizes[small_mask]
+    losses[small_mask] -= ((insert_size - t_small)**2
+                           / (2 * insert_size * t_small))
+    return losses
 
 
-def edge_gain(target_size, insert_size, gap_size):
-    """Calculate coverage gain from a neighboring bait's flanking reads.
+def edge_gains(target_sizes, gap_sizes, insert_size):
+    """Calculate coverage gain from neighboring baits' flanking reads.
 
     Letting i = insert size, t = target size, g = gap to neighboring bait,
     the gain of coverage due to a nearby bait, if g < i, is::
@@ -206,15 +208,19 @@ def edge_gain(target_size, insert_size, gap_size):
 
     If a neighbor overlaps the target, treat it as adjacent (gap size 0).
     """
-    assert gap_size <= insert_size, (gap_size, insert_size)
-    gap_size = max(0, gap_size)
-    gain = ((insert_size - gap_size)**2
-            / (4 * insert_size * target_size))
-    if target_size + gap_size < insert_size:
-        # Drop the flank part that extends past this baited region
-        gain -= ((insert_size - target_size - gap_size)**2
-                 / (4 * insert_size * target_size))
-    return gain
+    if not (gap_sizes <= insert_size).all():
+        raise ValueError("Gaps greater than insert size:\n" +
+                         gap_sizes[gap_sizes > insert_size].head())
+    gap_sizes = np.maximum(0, gap_sizes)
+    gains = ((insert_size - gap_sizes)**2
+             / (4 * insert_size * target_sizes))
+    # Drop the flank part that extends past this baited region
+    past_other_side_mask = (target_sizes + gap_sizes < insert_size)
+    g_past = gap_sizes[past_other_side_mask]
+    t_past = target_sizes[past_other_side_mask]
+    gains[past_other_side_mask] -= ((insert_size - t_past - g_past)**2
+                                    / (4 * insert_size * t_past))
+    return gains
 
 
 def apply_weights(cnarr, ref_matched, epsilon=1e-4):
