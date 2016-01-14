@@ -5,7 +5,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-from Bio._py3k import zip
 
 from . import params, smoothing
 
@@ -71,8 +70,8 @@ def mask_bad_probes(probes):
 def match_ref_to_probes(ref_pset, probes):
     """Filter the reference probes to match the target or antitarget probe set.
     """
-    probes_labeled = probes.data.set_index(probes.labels())
-    ref_labeled = ref_pset.data.set_index(ref_pset.labels())
+    probes_labeled = probes.data.set_index(pd.Index(probes.coords()))
+    ref_labeled = ref_pset.data.set_index(pd.Index(ref_pset.coords()))
     # Safety
     for dset, name in ((probes_labeled, "probe"),
                        (ref_labeled, "reference")):
