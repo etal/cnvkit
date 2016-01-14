@@ -2,7 +2,6 @@
 from __future__ import absolute_import, division, print_function
 
 import logging
-import bisect
 
 import numpy as np
 import pandas as pd
@@ -127,7 +126,7 @@ def get_edge_bias(cnarr, margin):
     (This is not the actual change in coverage. This is just a tribute.)
     """
     output_by_chrom = []
-    for chrom, subarr in cnarr.by_chromosome():
+    for _chrom, subarr in cnarr.by_chromosome():
         # tile_starts = subarr['start']
         # tile_ends = subarr['end']
         table = subarr.data
@@ -138,62 +137,35 @@ def get_edge_bias(cnarr, margin):
         # Calculate coverage loss at (both edges of) each tile
         losses = table.target_size.apply(edge_loss, args=(margin,))
 
-        # Find the leftmost tile in each tile's margin
-        table['left_idx'] = np.maximum(0,
-                    np.searchsorted(table.end, table.margin_start) - 1)
+        # Find the neighboring tiles within each tile's margins,
+        # but not the target itself
+        table["l_start_idx"] = table.end.searchsorted(table.margin_start)
+        table["l_end_idx"] = table.start.searchsorted(table.start)
+        table["r_start_idx"] = table.end.searchsorted(table.end, "right")
+        table["r_end_idx"] = table.start.searchsorted(table.margin_end, "right")
 
-        def row_gains(row):
-            """Calculate the edge effects on this bin.
+        # For each target, calculate coverage gain from neighboring targets
+        # Find tiled intervals within a margin (+/- bp) of the given probe
+        # (excluding the probe itself), then calculate the relative coverage
+        # "gain" due to the neighbors, if any.
+        def l_row_gains(row):
+            gaps_left = row.start - table.end[row.l_start_idx:row.l_end_idx]
+            return edge_gain(row.target_size, margin, gaps_left.min())
 
-            Find tiled intervals within a margin (+/- bp) of the given probe
-            (including the probe itself, so the edge is never zero). Return the
-            proportion of the windowed range that is covered by tiled regions.
-            """
-            gaps_left = []
-            gaps_right = []
-            for neighbor_idx in xrange(row.left_idx, len(table)):
-                # tile_start, tile_end = table.iloc[neighbor_idx, ["start", "end"]]
-                tile_start = table.iat[neighbor_idx, 1]
-                tile_end = table.iat[neighbor_idx, 2]
-                # tile_start = neighbor.start
-                # tile_end = neighbor.end
-                if tile_end <= row.margin_start:
-                    # No overlap on the 5' end -- keep moving forward
-                    continue
-                if tile_start >= row.margin_end:
-                    # No overlap on the 3' end -- we're done
-                    break
-                if tile_start == row.start and tile_end == row.end:
-                    # The target itself
-                    continue
-                # Tile is within margins
-                if row.margin_start <= tile_end <= row.start:
-                    # Left neighbor
-                    gaps_left.append(row.start - tile_end)
-                elif row.end <= tile_start <= row.margin_end:
-                    # Right neighbor
-                    gaps_right.append(tile_start - row.end)
-                elif tile_start < row.start and tile_end >= row.start:
-                    # Overlap on left side -- treat as adjacent
-                    gaps_left.append(0)
-                elif tile_start <= row.end and tile_end > row.end:
-                    # Overlap on right side -- treat as adjacent
-                    gaps_right.append(0)
-                else:
-                    # DBG: This should probably never happen
-                    logging.info("Oddly positioned tile (%s:%d-%d) vs. target (%d-%d)",
-                                chrom, tile_start, tile_end, row.start, row.end)
-                    continue
-            gain = 0.0
-            if gaps_left:
-                gain += edge_gain(row.target_size, margin, min(gaps_left))
-            if gaps_right:
-                gain += edge_gain(row.target_size, margin, min(gaps_right))
-            return gain
+        def r_row_gains(row):
+            gaps_right = table.start[row.r_start_idx:row.r_end_idx] - row.end
+            return edge_gain(row.target_size, margin, gaps_right.min())
 
-        # For each neighbor tile, calculate coverage gain to the target
-        gainz = table.apply(row_gains, axis=1, reduce=True)
-        out_row = gainz - losses
+        gains = np.zeros(len(table))
+        l_rows = table[table.l_start_idx < table.l_end_idx]
+        gains[l_rows.index.values] = l_rows.apply(l_row_gains,
+                                                  axis=1, reduce=True)
+
+        r_rows = table[table.r_start_idx < table.r_end_idx]
+        gains[r_rows.index.values] += r_rows.apply(r_row_gains,
+                                                   axis=1, reduce=True)
+
+        out_row = gains - losses
         output_by_chrom.append(out_row)
     return np.concatenate(output_by_chrom)
 
@@ -231,8 +203,11 @@ def edge_gain(target_size, insert_size, gap_size):
     If the neighbor flank extends beyond the target (t+g < i), reduce by::
 
         (i-t-g)^2 / 4it
+
+    If a neighbor overlaps the target, treat it as adjacent (gap size 0).
     """
-    assert gap_size <= insert_size
+    assert gap_size <= insert_size, (gap_size, insert_size)
+    gap_size = max(0, gap_size)
     gain = ((insert_size - gap_size)**2
             / (4 * insert_size * target_size))
     if target_size + gap_size < insert_size:
