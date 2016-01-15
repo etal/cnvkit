@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from . import core, gary, metrics, params
+from . import core, gary, metrics, params, smoothing
 
 
 class CopyNumArray(gary.GenomicArray):
@@ -241,17 +241,27 @@ class CopyNumArray(gary.GenomicArray):
 
     # Reporting
 
-    def residuals(self, segments):
-        """Difference in log2 value of each bin from its segment mean."""
-        # NB: for skip_low=True, call self.drop_low_coverage() beforehand
-        # ENH: As an alternative to segments, take regions; calculate
-        # region medians, subtract those. Then, can take chromosome (arm)
-        # residuals w/o segments.
-        resids = [subcna.log2 - seg.log2
-                  for seg, subcna in self.by_ranges(segments)]
+    def residuals(self, segments=None):
+        """Difference in log2 value of each bin from its segment mean.
+
+        If segments are just regions (e.g. RegionArray) with no log2 values
+        precalculated, subtract the median of this array's log2 values within
+        each region. If no segments are given, subtract each chromosome's
+        median.
+
+        """
+        if not segments:
+            resids = [subcna.log2 - subcna.log2.median()
+                      for _chrom, subcna in self.by_chromosome()]
+        elif "log2" in segments:
+            resids = [subcna.log2 - seg.log2
+                      for seg, subcna in self.by_ranges(segments)]
+        else:
+            resids = [subcna.log2 - subcna.log2.median()
+                      for _seg, subcna in self.by_ranges(segments)]
         return np.concatenate(resids)
 
-    def guess_average_depth(self, segments=None):
+    def guess_average_depth(self, segments=None, window=100):
         """Estimate the effective average read depth from variance.
 
         Assume read depths are Poisson distributed, converting log2 values to
@@ -260,14 +270,24 @@ class CopyNumArray(gary.GenomicArray):
         Use robust estimators (Tukey's biweight location and midvariance) to
         compensate for outliers and overdispersion.
 
+        With `segments`, take the residuals of this array's log2 values from
+        those of the segments to remove the confounding effect of real CNVs.
+
+        If `window` is an integer, calculate and subtract a smoothed trendline
+        to remove the effect of CNVs without segmentation (skipped if `segments`
+        are given).
+
         See: http://www.evanmiller.org/how-to-read-an-unlabeled-sales-chart.html
         """
-        # ENH: Drop allosomes?
-        if segments:
-            y_log2 = self.residuals(segments)
-        else:
-            # ENH: difference from a trend line?
-            y_log2 = self['log2']
+        # Try to drop allosomes
+        cnarr = self.autosomes()
+        if not len(cnarr):
+            cnarr = self
+        # Remove variations due to real/likely CNVs
+        y_log2 = cnarr.residuals(segments)
+        if window:
+            y_log2 -= smoothing.smoothed(y_log2, window)
+        # Guess Poisson parameter from absolute-scale values
         y = np.exp2(y_log2)
         # ENH: use weight argument to these stats
         loc = metrics.biweight_location(y)

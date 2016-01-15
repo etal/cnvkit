@@ -190,6 +190,16 @@ class CNATests(unittest.TestCase):
                 print("Gender issue:", fname, sample_is_f, ref_is_m)
             self.assertEqual(sample_is_f, cnarr.guess_xx(ref_is_m))
 
+    def test_residuals(self):
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segments = cnvlib.read("formats/amplicon.cns")
+        regions = rary.RegionArray(segments.data).drop_extra_columns()
+        for arg in (None, segments, regions):
+            resid = cnarr.residuals(arg)
+            self.assertAlmostEqual(0, resid.mean(), delta=.3)
+            self.assertAlmostEqual(1, np.percentile(resid, 80), delta=.2)
+            self.assertAlmostEqual(2, resid.std(), delta=.5)
+
     # def test_squash_genes(self):
 
 
