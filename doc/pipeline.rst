@@ -89,7 +89,9 @@ The BED file should be the baited genomic regions for your target capture kit,
 as provided by your vendor. Since these regions (usually exons) may be of
 unequal size, the ``--split`` option divides the larger regions so that the
 average bin size after dividing is close to the size specified by
-``--average-size``.  If any of these three (``--split``, ``--annotate``, or ``--short-names``) flags are used, a new target BED file will be created; otherwise, the provided target BED file will be used as-is.
+``--average-size``.  If any of these three (``--split``, ``--annotate``, or
+``--short-names``) flags are used, a new target BED file will be created;
+otherwise, the provided target BED file will be used as-is.
 
 Bin size and resolution
 ```````````````````````
@@ -192,11 +194,11 @@ off-target/"antitarget"/"background" regions.
 
     cnvkit.py antitarget my_targets.bed -g data/access-5kb-mappable.hg19.bed -o my_antitargets.bed
 
-Certain genomic regions cannot be mapped by resequencing (see :ref:`access`); we
-can avoid them when calculating the antitarget locations by passing the
-locations of the accessible sequence regions with the ``-g`` or ``--access``
-option. CNVkit will then compute "antitarget" bins only within the accessible
-genomic regions specified in the "access" file.
+Certain genomic regions cannot be mapped by short-read resequencing (see
+:ref:`access`); we can avoid them when calculating the antitarget locations by
+passing the locations of the accessible sequence regions with the ``-g`` or
+``--access`` option. CNVkit will then compute "antitarget" bins only within the
+accessible genomic regions specified in the "access" file.
 
 CNVkit uses a cautious default off-target bin size that, in our experience, will
 typically include more reads than the average on-target bin.  However, we
