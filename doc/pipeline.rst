@@ -493,10 +493,10 @@ The ``rescale`` command can also optionally re-center the log2 values, though
 this will typically not be needed since the .cnr files are automatically
 median-centered by the :ref:`fix` command when normalizing to a reference and
 correcting biases. However, if the analyzed genome is highly aneuploid and
-contains widespread copy number losses, median centering may place
-copy-number-neutral regions slightly off-center from the expected log2 value of
-0.0, in which case alternative centering approaches can be specified with the
-``--center`` option::
+contains widespread copy number losses or gains unequally, median centering may
+place copy-number-neutral regions slightly off-center from the expected log2
+value of 0.0. To address such cases, alternative centering approaches can be
+specified with the ``--center`` option::
 
     cnvkit.py rescale Sample.cns --center mode
 

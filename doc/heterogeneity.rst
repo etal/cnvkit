@@ -9,20 +9,58 @@ values to absolute integer copy numbers.
 CNVkit provides several points of integration with existing tools and methods
 for dealing with tumor heterogeneity and normal-cell contamination.
 
+Estimating tumor purity and normal contamination
+------------------------------------------------
 
-Inferring tumor purity and subclonal population fractions
----------------------------------------------------------
+A rough estimate of tumor purity can usually be obtained using one or more of
+these approaches:
 
-The third-party program `THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_
-can be used to estimate tumor cell content and infer integer copy number of
-tumor subclones in a sample.  CNVkit provides wrappers for exporting segments to
-THetA2's input format and importing THetA2's result file as CNVkit's segmented
-.cns files.
+1. A pathologist can visually estimate the purity of an sample taken from a
+   solid tumor by examination under a microscope, counting stromal and
+   neoplastic cells.
+2. If the tumor is belived to be driven by a somatic point mutation, e.g. BRAF
+   V600E in melanoma, then that mutation is assumed to be fully clonal and its
+   allele frequency indicates the tumor purity. This can be complicated by copy
+   number alterations at the same site and whether the point mutation is
+   homozygous or heterozygous, but the frequencies of other somatic mutations in
+   the same sample may resolve this satisfactorily.
+3. Larger-scale, hemizygous losses that cover germline heterozygous SNPs shift
+   the allele frequencies of the same SNPs as they are present in the tumor
+   sample. In a 50% pure tumor sample, for example, these SNP b-allele
+   frequencies would shift from 50% to 67% or 33%, assuming a diploid sample
+   (i.e. 1 of 2 copies from the normal sample and 0 or 1 of 1 copy from the
+   tumor, depending on whether the variant allele was lost or retained). The
+   general calculation is a bit more complicated than in #1 or #2, and can be
+   done similarly for copy number gains and homozygous deletions.
+4. The log2 ratio values of CNAs in a tumor sample correspond to integer copy
+   numbers in tumor cells, and in aggregate these log2 values will cluster
+   around values that indicate subclone populations, each with a given ploidy
+   and clonality. For example, a single-copy loss in a 50% pure tumor sample
+   will have 3/4 the coverage of a neutral site (2/2 normal copies, 1/2 tumor
+   copies), for a log2 value of log2(.75) = -0.415. This calculation can also be
+   generalized to other copy number states.
 
-.. We are also working on similar wrappers for related programs including PyLOH.
+Software implementations of the latter three approaches can be used directly on
+DNA sequencing data.
+
+
+Inferring tumor purity and subclonal population fractions from sequencing
+-------------------------------------------------------------------------
+
+While inferring the tumor population structure is currently out of the scope of
+CNVkit, this work can be done using other third-party programs such as
+`THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_,
+`PyClone <http://compbio.bccrc.ca/software/pyclone/>`_, or
+`BubbleTree <https://www.bioconductor.org/packages/release/bioc/html/BubbleTree.html>`_.
+Each of these programs can be used to estimate tumor cell content and infer
+integer copy number of tumor subclones in a sample.
+
 
 Using CNVkit with THetA2
 ````````````````````````
+
+CNVkit provides wrappers for exporting segments to THetA2's input format and
+importing THetA2's result file as CNVkit's segmented .cns files.
 
 THetA2's input file is a BED-like file, typically with the extension ``.input``,
 listing the read counts  within each copy-number segment in a pair of tumor and
