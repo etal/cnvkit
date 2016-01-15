@@ -126,47 +126,23 @@ def get_edge_bias(cnarr, margin):
     """
     output_by_chrom = []
     for _chrom, subarr in cnarr.by_chromosome():
-        # tile_starts = subarr['start']
-        # tile_ends = subarr['end']
-        table = subarr.data
-        table["margin_start"] = table.start - margin
-        table["margin_end"] = table.end + margin
-        table["target_size"] = table.end - table.start
-
+        tile_starts = np.asarray(subarr['start'])
+        tile_ends = np.asarray(subarr['end'])
+        tgt_sizes = tile_ends - tile_starts
         # Calculate coverage loss at (both edges of) each tile
-        losses = edge_losses(table.target_size, margin)
-
-        # Find the neighboring tiles within each tile's margins,
-        # but not the target itself
-        table["l_start_idx"] = table.end.searchsorted(table.margin_start)
-        table["l_end_idx"] = table.start.searchsorted(table.start)
-        table["r_start_idx"] = table.end.searchsorted(table.end, "right")
-        table["r_end_idx"] = table.start.searchsorted(table.margin_end, "right")
-
-        # For each target, calculate coverage gain from neighboring targets
+        losses = edge_losses(tgt_sizes, margin)
         # Find tiled intervals within a margin (+/- bp) of the given probe
         # (excluding the probe itself), then calculate the relative coverage
-        # "gain" due to the neighbors, if any.
-        def l_row_gaps(row):
-            neighbor_ends = np.asarray(table.end[row.l_start_idx:row.l_end_idx])
-            return (row.start - neighbor_ends).min()
-
-        def r_row_gaps(row):
-            neighbor_starts = np.asarray(table.start[row.r_start_idx:row.r_end_idx])
-            return (neighbor_starts - row.end).min()
-
-        gains = np.zeros(len(table))
-        l_rows = table[table.l_start_idx < table.l_end_idx]
-        l_gaps = l_rows.apply(l_row_gaps, axis=1, reduce=True)
-        gains[l_rows.index.values] = edge_gains(l_rows.target_size, l_gaps,
-                                                   margin)
-        r_rows = table[table.r_start_idx < table.r_end_idx]
-        r_gaps = r_rows.apply(r_row_gaps, axis=1, reduce=True)
-        gains[r_rows.index.values] += edge_gains(r_rows.target_size, r_gaps,
-                                                    margin)
-
-        out_row = gains - losses
-        output_by_chrom.append(out_row)
+        # "gain" due to the neighbors, if any
+        gap_sizes = np.asarray(tile_starts[1:]) - np.asarray(tile_ends[:-1])
+        ok_gaps_mask = (gap_sizes < margin)
+        ok_gaps = gap_sizes[ok_gaps_mask]
+        left_gains = edge_gains(tgt_sizes[1:][ok_gaps_mask], ok_gaps, margin)
+        right_gains = edge_gains(tgt_sizes[:-1][ok_gaps_mask], ok_gaps, margin)
+        gains = np.zeros(len(subarr))
+        gains[np.concatenate([[False], ok_gaps_mask])] += left_gains
+        gains[np.concatenate([ok_gaps_mask, [False]])] += right_gains
+        output_by_chrom.append(gains - losses)
     return np.concatenate(output_by_chrom)
 
 
