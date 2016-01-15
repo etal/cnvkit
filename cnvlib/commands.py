@@ -393,7 +393,7 @@ def _cmd_antitarget(args):
     out_rarr.write(args.output, "bed4")
 
 
-def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,
+def do_antitarget(target_bed, access_bed=None, avg_bin_size=100000,
                   min_bin_size=None):
     """Derive a background/antitarget BED file from a target BED file."""
     if not min_bin_size:
@@ -408,7 +408,7 @@ P_anti.add_argument('interval',
 P_anti.add_argument('-g', '--access',
         help="""Regions of accessible sequence on chromosomes (.bed), as
                 output by genome2access.py.""")
-P_anti.add_argument('-a', '--avg-size', type=int, default=150000,
+P_anti.add_argument('-a', '--avg-size', type=int, default=100000,
         help="""Average size of antitarget bins (results are approximate).
                 [Default: %(default)s]""")
 P_anti.add_argument('-m', '--min-size', type=int,
