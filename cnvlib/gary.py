@@ -200,7 +200,7 @@ class GenomicArray(object):
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
 
-    def by_ranges(self, other, mode='trim', keep_empty=True):
+    def by_ranges(self, other, mode='inner', keep_empty=True):
         """Group rows by another GenomicArray's bin coordinate ranges.
 
         Returns an iterable of (bin, GenomicArray of overlapping rows)). Usually
@@ -250,7 +250,7 @@ class GenomicArray(object):
     def labels(self):
         return self.data.apply(self.row2label, axis=1)
 
-    def in_range(self, chrom=None, start=None, end=None, mode='outer'):
+    def in_range(self, chrom=None, start=None, end=None, mode='inner'):
         """Get the GenomicArray portion within the given genomic range.
 
         `mode` works as in `by_ranges`: ``outer`` includes bins straddling the
@@ -265,7 +265,7 @@ class GenomicArray(object):
         results = self._iter_ranges(chrom, start, end, mode)
         return next(results)
 
-    def in_ranges(self, chrom=None, starts=None, ends=None, mode='outer'):
+    def in_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
         """Get the GenomicArray portion within the given array's ranges."""
         return self.concat(self._iter_ranges(chrom, starts, ends, mode))
 
