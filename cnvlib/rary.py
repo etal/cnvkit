@@ -129,8 +129,8 @@ def _parse_interval_list(infile):
     """
     table = pd.read_table(infile,
                           comment='@', # Skip the SAM header
-                          names=["chromosome", "start", "end", "name",
-                                 "strand"])
+                          names=["chromosome", "start", "end", "strand", "name",
+                                ])
     table["name"].fillna('-', inplace=True)
     table["start"] -= 1
     return table
