@@ -186,7 +186,7 @@ class GenomicArray(object):
         with warnings.catch_warnings():
             # NB: We're not using the deprecated part of this pandas method
             warnings.simplefilter("ignore", UserWarning)
-            is_auto = self.chromosome.str.match(r"(chr)?\d+",
+            is_auto = self.chromosome.str.match(r"(chr)?\d+$",
                                                 as_indexer=True, na=False)
         if also:
             if isinstance(also, basestring):
