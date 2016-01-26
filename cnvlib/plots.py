@@ -7,16 +7,14 @@ import math
 import sys
 
 import numpy as np
-# from matplotlib import pyplot
-# pyplot.ioff()
 
 from Bio._py3k import zip
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 from . import core, params, smoothing
 
-SEG_COLOR = 'red'
-POINT_COLOR = '#808080'
+SEG_COLOR = "darkorange"
+POINT_COLOR = '#606060'
 
 # === Chromosome-level scatter plots ===
 
@@ -160,7 +158,7 @@ def snv_on_chromosome(axis, variants, segments, genes,
         y = variants.tumor_boost()
     else:
         y = np.asfarray(variants["alt_freq"])
-    axis.scatter(x_mb, y, color='#808080', alpha=0.3)
+    axis.scatter(x_mb, y, color=POINT_COLOR, alpha=0.3)
     # TODO - highlight genes/selection
     if segments:
         # Draw average VAF within each segment
