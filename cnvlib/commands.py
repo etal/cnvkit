@@ -676,7 +676,7 @@ P_segment.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
 P_segment.add_argument("--drop-outliers",
-        type=float, default=5, metavar="FACTOR",
+        type=float, default=10, metavar="FACTOR",
         help="""Drop outlier bins more than this many multiples of the 90th
                 quantile away from the average within a rolling window.
                 Set to 0 for no outlier filtering.

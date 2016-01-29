@@ -16,7 +16,7 @@ from Bio._py3k import StringIO
 
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
-                    skip_low=False, skip_outliers=None,
+                    skip_low=False, skip_outliers=10,
                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
     filtered_cn = cnarr
