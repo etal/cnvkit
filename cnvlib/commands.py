@@ -99,8 +99,8 @@ def _cmd_batch(args):
     if args.bam_files:
         logging.info("Running %d samples in %s",
                      len(args.bam_files),
-                     (("%d processes" % args.processes)
-                      if args.processes > 1 else "serial"))
+                     ("serial" if args.processes == 1
+                      else ("%d processes" % args.processes)))
         pool = parallel.pick_pool(args.processes)
         for bam in args.bam_files:
             pool.apply_async(batch_run_sample,
