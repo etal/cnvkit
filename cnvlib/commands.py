@@ -412,7 +412,8 @@ P_anti.add_argument('-a', '--avg-size', type=int, default=100000,
         help="""Average size of antitarget bins (results are approximate).
                 [Default: %(default)s]""")
 P_anti.add_argument('-m', '--min-size', type=int,
-        help="Minimum size of antitarget bins (smaller regions are dropped).")
+        help="""Minimum size of antitarget bins (smaller regions are dropped).
+                [Default: 1/16 avg size, calculated]""")
 P_anti.add_argument('-o', '--output', help="""Output file name.""")
 P_anti.set_defaults(func=_cmd_antitarget)
 
