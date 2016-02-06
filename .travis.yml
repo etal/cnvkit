@@ -6,9 +6,8 @@ python:
 notifications:
     email: false
 
-# Use the Docker container-based infrastructure
-# https://docs.travis-ci.com/user/workers/container-based-infrastructure/#Routing-your-build-to-container-based-infrastructure
-sudo: false
+sudo: required
+dist: trusty
 
 # Install these Debian packages without sudo
 # https://docs.travis-ci.com/user/migrating-from-legacy/#Adding-APT-Packages
@@ -20,10 +19,14 @@ addons:
     - libfreetype6-dev
     - liblapack-dev
     - python-dev
+    - python-biopython
+    - python-dateutil
     - python-matplotlib
     - python-numpy
+    - python-reportlab
     - python-scipy
     - python-tk
+    - python-tz
 
 # Cache the compiled pip package dependencies
 # https://docs.travis-ci.com/user/caching/#pip-cache

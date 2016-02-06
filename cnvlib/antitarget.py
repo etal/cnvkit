@@ -28,6 +28,13 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
     if access_bed:
         # Chromosome accessible sequence regions are given -- use them
         access_chroms = dict(RA.read(access_bed).by_chromosome())
+        # But filter out untargeted chroms/contigs with long names
+        max_tgt_chr_name_len = max(map(len, target_chroms))
+        for untgt_chr in set(access_chroms) - set(target_chroms):
+            if len(untgt_chr) > max_tgt_chr_name_len:
+                print >>sys.stderr, "Dropping chrom", untgt_chr
+                del access_chroms[untgt_chr]
+
     else:
         # Chromosome accessible sequence regions not known -- use heuristics
         # (chromosome length is endpoint of last probe; skip initial
