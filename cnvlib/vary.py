@@ -81,6 +81,7 @@ class VariantArray(gary.GenomicArray):
         if normal_id:
             table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
         # Filter out records as requested
+        cnt_depth = cnt_hom = cnt_som = 0
         if min_depth:
             dkey = "n_depth" if "n_depth" in table else "depth"
             idx_depth = table[dkey] >= min_depth
