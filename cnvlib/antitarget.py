@@ -1,11 +1,11 @@
 """Supporting functions for the 'antitarget' command."""
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
+import re
 import sys
 
 from Bio._py3k import range
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
-from . import core
 from .params import INSERT_SIZE
 from .rary import RegionArray as RA
 
@@ -28,13 +28,13 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
     if access_bed:
         # Chromosome accessible sequence regions are given -- use them
         access_chroms = dict(RA.read(access_bed).by_chromosome())
-        # But filter out untargeted chroms/contigs with long names
-        max_tgt_chr_name_len = max(map(len, target_chroms))
+        # But filter out untargeted allosomes/contigs
+        is_autosome = re.compile(r"(chr)?\d+$")
         for untgt_chr in set(access_chroms) - set(target_chroms):
-            if len(untgt_chr) > max_tgt_chr_name_len:
-                print >>sys.stderr, "Dropping chrom", untgt_chr
+            if not is_autosome.match(untgt_chr):
+                print("Skipping untargeted chromosome", untgt_chr,
+                      file=sys.stderr)
                 del access_chroms[untgt_chr]
-
     else:
         # Chromosome accessible sequence regions not known -- use heuristics
         # (chromosome length is endpoint of last probe; skip initial
