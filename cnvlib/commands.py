@@ -1176,8 +1176,11 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     chrom_sizes = {}
     for row in sample_data:
         for chrom, data in iteritems(row):
-            max_posn = max(coord[1] for coord in data)
-            chrom_sizes[chrom] = max(max_posn, chrom_sizes.get(chrom, 0))
+            if data:
+                max_posn = max(coord[1] for coord in data)
+                chrom_sizes[chrom] = max(max_posn, chrom_sizes.get(chrom, 0))
+            else:
+                chrom_sizes[chrom] = chrom_sizes.get(chrom, 0)
     chrom_sizes = collections.OrderedDict(sorted(iteritems(chrom_sizes),
                                                  key=core.sorter_chrom_at(0)))
 
