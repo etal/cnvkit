@@ -1147,6 +1147,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     # List sample names on the y-axis
     axis.set_yticks([i + 0.5 for i in range(len(cnarrs))])
     axis.set_yticklabels([c.sample_id for c in cnarrs])
+    axis.set_ylim(0, len(cnarrs))
     axis.invert_yaxis()
     axis.set_ylabel("Samples")
     axis.set_axis_bgcolor('#DDDDDD')
