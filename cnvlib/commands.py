@@ -1583,8 +1583,8 @@ def _cmd_import_theta(args):
         for seg, ncop in zip(tumor_segs.copy(), copies):
             if ncop is None:
                 continue
-            seg["log2"] = math.log((ncop or 0.5) / args.ploidy, 2)
-            new_segs.append(seg)
+            new_segs.append(seg._replace(
+                log2=math.log((ncop or 0.5) / args.ploidy, 2)))
         new_cns = tumor_segs.as_rows(new_segs)
         new_cns.write(os.path.join(args.output_dir,
                                    "%s-%d.cns" % (tumor_segs.sample_id, i + 1)))
@@ -1595,7 +1595,7 @@ P_import_theta = AP_subparsers.add_parser('import-theta',
 P_import_theta.add_argument("tumor_cns")
 P_import_theta.add_argument("theta_results")
 P_import_theta.add_argument("--ploidy", type=int, default=2,
-        help="Ploidy of the sample cells. [Default: %(default)d]")
+        help="Ploidy of normal cells. [Default: %(default)d]")
 P_import_theta.add_argument('-d', '--output-dir', default='.',
         help="Output directory name.")
 P_import_theta.set_defaults(func=_cmd_import_theta)
