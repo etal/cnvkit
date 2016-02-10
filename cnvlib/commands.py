@@ -1575,19 +1575,24 @@ def _cmd_import_theta(args):
     integer copy number calls.
     """
     tumor_segs = _CNA.read(args.tumor_cns)
-    theta = importers.parse_theta_results(args.theta_results)
-    for i, copies in enumerate(theta['C']):
+    for i, new_cns in enumerate(do_import_theta(tumor_segs, args.theta_results,
+                                                args.ploidy)):
+        new_cns.write(os.path.join(args.output_dir,
+                                   "%s-%d.cns" % (tumor_segs.sample_id, i + 1)))
+
+
+def do_import_theta(segarr, theta_results_fname, ploidy=2):
+    theta = importers.parse_theta_results(theta_results_fname)
+    for copies in theta['C']:
         # Replace segment values with these integers
         # Drop any segments where the C value is None
         new_segs = []
-        for seg, ncop in zip(tumor_segs.copy(), copies):
+        for seg, ncop in zip(segarr.copy(), copies):
             if ncop is None:
                 continue
             new_segs.append(seg._replace(
-                log2=math.log((ncop or 0.5) / args.ploidy, 2)))
-        new_cns = tumor_segs.as_rows(new_segs)
-        new_cns.write(os.path.join(args.output_dir,
-                                   "%s-%d.cns" % (tumor_segs.sample_id, i + 1)))
+                log2=math.log((ncop or 0.5) / ploidy, 2)))
+        yield segarr.as_rows(new_segs)
 
 
 P_import_theta = AP_subparsers.add_parser('import-theta',

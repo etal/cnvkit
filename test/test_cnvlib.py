@@ -363,6 +363,13 @@ class CommandTests(unittest.TestCase):
             _vheader, vcf_body = export.export_vcf(cns, ploidy, True, is_f)
             self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
 
+    def test_import_theta(self):
+        """The 'import-theta' command."""
+        cns = cnvlib.read("formats/nv3.cns")
+        theta_fname = "formats/nv3.n2.results"
+        for new_cns in commands.do_import_theta(cns, theta_fname):
+            self.assertTrue(0 < len(new_cns) <= len(cns))
+
     def test_gainloss(self):
         """The 'gainloss' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
