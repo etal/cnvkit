@@ -527,8 +527,8 @@ def gene_coords_by_range(probes, chrom, start, end,
         else:
             genes[name] = [row.start, row.end]
     # Reorganize the data structure
-    return {chrom: [(start, end, name)
-                    for name, (start, end) in genes.items()]}
+    return {chrom: [(gstart, gend, name)
+                    for name, (gstart, gend) in genes.items()]}
 
 
 def unpack_range(a_range):
@@ -554,11 +554,14 @@ def unpack_range(a_range):
 def parse_range_text(text):
     """Parse a chromosomal range specification.
 
-    Range spec string should look like: 'chr1:1234-5678'
+    Range spec string should look like ``chr1:1234-5678`` or ``chr1:1234-`` or
+    ``chr1:-5678``, where missing start becomes 0 and missing end becomes None.
     """
     try:
         chrom, rest = text.split(':')
-        start, end = map(int, rest.split('-'))
+        start, end = rest.split('-')
+        start = int(start) if start else 0
+        end = int(end) if end else None
         return chrom, start, end
     except Exception:
         raise ValueError("Invalid range spec: " + text

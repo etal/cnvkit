@@ -974,7 +974,11 @@ def do_scatter(cnarr, segments=None, variants=None,
             window_coords = (max(0, genes[0][0] - window_width),
                              genes[-1][1] + window_width)
 
-        if start:
+        if start is not None or end is not None:
+            # Default selection endpoint to the maximum chromosome position
+            if not end:
+                end = (cnarr or segments or variants
+                      ).select(chromosome=chrom).end.iat[-1]
             if window_coords:
                 # Genes were specified, & window was set around them
                 if start > window_coords[0] or end < window_coords[1]:
@@ -982,14 +986,16 @@ def do_scatter(cnarr, segments=None, variants=None,
                                      (":%d-%d" % window_coords) +
                                      " is outside specified range " +
                                      show_range)
+            window_coords = (max(0, start - window_width), end + window_width)
             if cnarr and not genes:
                 genes = plots.gene_coords_by_range(cnarr, chrom,
                                                    start, end)[chrom]
             if not genes and window_width > (end - start) / 10.0:
                 # No genes in the selected region, so highlight the region
                 # itself (unless the selection is ~entire displayed window)
+                logging.info("No genes found in selection; will show the "
+                             "selected range itself instead")
                 genes = [(start, end, "Selection")]
-            window_coords = (max(0, start - window_width), end + window_width)
         elif show_range and window_coords:
             # Specified range is only chrom, no start-end
             # Reset window around selected genes to show the whole chromosome
@@ -1153,50 +1159,43 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     axis.set_axis_bgcolor('#DDDDDD')
 
     r_chrom, r_start, r_end = plots.unpack_range(show_range)
-    if r_start:
-        logging.info("Showing log2 ratios in range %s:%d-%d",
-                     r_chrom, r_start, r_end)
+    if r_start is not None or r_end is not None:
+        logging.info("Showing log2 ratios in range %s:%d-%s",
+                     r_chrom, r_start, r_end or '*')
     elif r_chrom:
         logging.info("Showing log2 ratios on chromosome %s", r_chrom)
 
     # Closes over do_desaturate
-    def cna2df(cnarr):
+    def cna2df(cna):
         """Extract a dataframe of plotting points from a CopyNumArray."""
-        points = cnarr.data.loc[:, ["start", "end"]]
-        points["color"] = cnarr.log2.apply(plots.cvg2rgb,
-                                           args=(do_desaturate,))
+        points = cna.data.loc[:, ["start", "end"]]
+        points["color"] = cna.log2.apply(plots.cvg2rgb, args=(do_desaturate,))
         return points
 
     # Group each file's probes/segments by chromosome
     sample_data = [collections.defaultdict(list) for _c in cnarrs]
+    # Calculate the size (max endpoint value) of each chromosome
+    chrom_sizes = collections.OrderedDict()
     for i, cnarr in enumerate(cnarrs):
         if r_chrom:
-            subcna = cnarr.in_range(r_chrom, r_start, r_end)
+            subcna = cnarr.in_range(r_chrom, r_start, r_end, mode="trim")
             sample_data[i][r_chrom] = cna2df(subcna)
+            chrom_sizes[r_chrom] = max(subcna.end.iat[-1] if subcna else 0,
+                                       chrom_sizes.get(r_chrom, 0))
         else:
             for chrom, subcna in cnarr.by_chromosome():
                 sample_data[i][chrom] = cna2df(subcna)
-
-    # Calculate the size (max endpoint value) of each chromosome
-    chrom_sizes = {}
-    for row in sample_data:
-        for chrom, data in iteritems(row):
-            if len(data):
-                max_posn = data.end.max() # max(coord[1] for coord in data)
-                chrom_sizes[chrom] = max(max_posn, chrom_sizes.get(chrom, 0))
-            else:
-                chrom_sizes[chrom] = chrom_sizes.get(chrom, 0)
-    chrom_sizes = collections.OrderedDict(sorted(iteritems(chrom_sizes),
-                                                 key=core.sorter_chrom_at(0)))
+                chrom_sizes[chrom] = max(subcna.end.iat[-1] if subcna else 0,
+                                         chrom_sizes.get(r_chrom, 0))
 
     # Closes over axis
-    def plot_row(i, row):
+    def plot_sample_chrom(i, sample):
         """Draw the given coordinates and colors as a horizontal series."""
         xranges = [(start, end - start)
-                   for start, end in zip(row.start, row.end)]
+                   for start, end in zip(sample.start, sample.end)]
         bars = BrokenBarHCollection(xranges, (i, i+1),
                                     edgecolors="none",
-                                    facecolors=row["color"])
+                                    facecolors=sample["color"])
         axis.add_collection(bars)
 
     if show_range:
@@ -1210,23 +1209,23 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
         axis.get_xaxis().tick_bottom()
         axis.get_yaxis().tick_left()
         # Plot the individual probe/segment coverages
-        for i, row in enumerate(sample_data):
-            crow = row[r_chrom]
+        for i, sample in enumerate(sample_data):
+            crow = sample[r_chrom]
             crow["start"] *= plots.MB
             crow["end"] *= plots.MB
-            plot_row(i, crow)
+            plot_sample_chrom(i, crow)
 
     else:
         # Lay out chromosome dividers and x-axis labels
         # (Just enough padding to avoid overlap with the divider line)
         chrom_offsets = plots.plot_x_dividers(axis, chrom_sizes, 1)
         # Plot the individual probe/segment coverages
-        for i, row in enumerate(sample_data):
+        for i, sample in enumerate(sample_data):
             for chrom, curr_offset in iteritems(chrom_offsets):
-                crow = row[chrom]
+                crow = sample[chrom]
                 crow["start"] += curr_offset
                 crow["end"] += curr_offset
-                plot_row(i, crow)
+                plot_sample_chrom(i, crow)
 
     return axis
 

@@ -309,8 +309,8 @@ class GenomicArray(object):
             else:
                 end_idxs = table.start.searchsorted(ends)
         else:
-            end_idxs = np.asarray([len(table)])
-            ends =  np.asarray(table.loc[len(table)-1:, 'end'])
+            end_idxs = np.repeat(len(table), len(starts))
+            ends = [None] * len(starts)
 
         for start_idx, start_val, end_idx, end_val in zip(start_idxs, starts,
                                                           end_idxs, ends):
@@ -318,9 +318,11 @@ class GenomicArray(object):
             if mode == 'trim':
                 subtable = subtable.copy()
                 # Update 5' endpoints to the boundary
-                subtable.start = subtable.start.clip_lower(start_val)
+                if start_val:
+                    subtable.start = subtable.start.clip_lower(start_val)
                 # Update 3' endpoints to the boundary
-                subtable.end = subtable.end.clip_upper(end_val)
+                if end_val:
+                    subtable.end = subtable.end.clip_upper(end_val)
             yield self.as_dataframe(subtable)
 
     def match_to_bins(self, other, key, default=0.0, fill=False,
