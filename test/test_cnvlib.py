@@ -363,12 +363,22 @@ class CommandTests(unittest.TestCase):
             _vheader, vcf_body = export.export_vcf(cns, ploidy, True, is_f)
             self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
 
-    def test_import_theta(self):
-        """The 'import-theta' command."""
-        cns = cnvlib.read("formats/nv3.cns")
-        theta_fname = "formats/nv3.n2.results"
-        for new_cns in commands.do_import_theta(cns, theta_fname):
-            self.assertTrue(0 < len(new_cns) <= len(cns))
+    def test_fix(self):
+        """The 'fix' command."""
+        # Extract fake target/antitarget bins from a combined file
+        ref = cnvlib.read('formats/reference-tr.cnn')
+        is_bg = (ref["gene"] == "Background")
+        tgt_bins = ref[~is_bg]
+        tgt_bins.log2 += np.random.randn(len(tgt_bins)) / 5
+        anti_bins = ref[is_bg]
+        anti_bins.log2 += np.random.randn(len(anti_bins)) / 5
+        blank_bins = cnary.CopyNumArray([])
+        # Typical usage (hybrid capture)
+        cnr = commands.do_fix(tgt_bins, anti_bins, ref)
+        self.assertTrue(0 < len(cnr) <= len(ref))
+        # Blank antitargets (WGS or amplicon)
+        cnr = commands.do_fix(tgt_bins, blank_bins, ref[~is_bg])
+        self.assertTrue(0 < len(cnr) <= len(tgt_bins))
 
     def test_gainloss(self):
         """The 'gainloss' command."""
@@ -378,6 +388,13 @@ class CommandTests(unittest.TestCase):
         segs = cnvlib.read("formats/amplicon.cns")
         rows = commands.do_gainloss(probes, segs, True, 0.3, 4)
         self.assertGreater(len(rows), 0)
+
+    def test_import_theta(self):
+        """The 'import-theta' command."""
+        cns = cnvlib.read("formats/nv3.cns")
+        theta_fname = "formats/nv3.n2.results"
+        for new_cns in commands.do_import_theta(cns, theta_fname):
+            self.assertTrue(0 < len(new_cns) <= len(cns))
 
     def test_metrics(self):
         """The 'metrics' command."""
