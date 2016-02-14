@@ -62,8 +62,6 @@ def mask_bad_probes(probes):
     """
     mask = ((probes['log2'] < params.MIN_REF_COVERAGE) |
             (probes['spread'] > params.MAX_REF_SPREAD))
-    if 'rmask' in probes:
-        mask |= (probes['rmask'] > params.MAX_REPEAT_FRACTION)
     return mask
 
 

@@ -2,7 +2,6 @@
 # Filters used in constructing the reference
 MIN_REF_COVERAGE = -5.0
 MAX_REF_SPREAD = 1.0
-MAX_REPEAT_FRACTION = .99
 NULL_LOG2_COVERAGE = -20
 
 # Sequencing read length (or average, if it varies)
