@@ -89,13 +89,13 @@ def drop_outliers(cnarr, width, factor):
 
     Outliers are the log2 values `factor` times the 90th quantile of absolute
     deviations from the rolling average, within a window of given `width`. The
-    90th quantile is about 1.2 standard deviations if the log2 values are
-    Gaussian, so this is similar to calling outliers `factor`*1.2 standard
+    90th quantile is about 1.97 standard deviations if the log2 values are
+    Gaussian, so this is similar to calling outliers `factor`*1.97 standard
     deviations from the rolling mean. For a window size of 50, the breakdown
-    point is 5 outliers within a window, which is plenty robust for our needs.
+    point is 2.5 outliers within a window, which is plenty robust for our needs.
     """
     outlier_mask = np.concatenate([
-        smoothing.rolling_outlier_quantile(subarr['log2'], width, .90, factor)
+        smoothing.rolling_outlier_quantile(subarr['log2'], width, .95, factor)
         for _chrom, subarr in cnarr.by_chromosome()])
     n_outliers = outlier_mask.sum()
     if n_outliers:
