@@ -266,7 +266,11 @@ class GenomicArray(object):
         return next(results)
 
     def in_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
-        """Get the GenomicArray portion within the given array's ranges."""
+        """Get the GenomicArray portion within the specified ranges.
+
+        Same as `in_ranges` but the `starts` and `ends` are arrays of equal
+        length, and the output concatenates all the selected bins.
+        """
         return self.concat(self._iter_ranges(chrom, starts, ends, mode))
 
     def _iter_ranges(self, chrom, starts, ends, mode):
