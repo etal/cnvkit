@@ -230,7 +230,8 @@ coverage
 
 Calculate coverage in the given regions from BAM read depths.
 
-With the -p option, calculates mean read depth from a pileup; otherwise, counts
+By default, coverage is calculated via mean read depth from a pileup.
+Alternatively, using the `--count` option counts
 the number of read start positions in the interval and normalizes to the
 interval size.
 
@@ -580,4 +581,3 @@ Or, in R::
 
     > log2( (0:4 + .5) / 2)
     [1] -2.0000000 -0.4150375  0.3219281  0.8073549  1.1699250
-
