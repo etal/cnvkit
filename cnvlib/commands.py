@@ -1398,7 +1398,7 @@ def _cmd_metrics(args):
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
 P_metrics.add_argument('cnarrays', nargs='+',
         help="""One or more bin-level coverage data files (*.cnn, *.cnr).""")
-P_metrics.add_argument('-s', '--segments', nargs='+',
+P_metrics.add_argument('-s', '--segments', nargs='+', required=True,
         help="""One or more segmentation data files (*.cns, output of the
                 'segment' command).  If more than one file is given, the number
                 must match the coverage data files, in which case the input
