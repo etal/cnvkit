@@ -212,9 +212,9 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     if (np.abs(np.mod(ref_matched['log2'], 1)) > epsilon).any():
         # NB: Not used with a flat reference
         logging.info("Weighting bins by relative coverage depths in reference")
-        # Penalize bins that deviate from expected coverage
+        # Penalize bins that deviate from neutral coverage
         flat_cvgs = ref_matched.expect_flat_cvg()
-        weights *= 2 ** -np.abs(ref_matched['log2'] - flat_cvgs)
+        weights *= np.exp2(-np.abs(ref_matched['log2'] - flat_cvgs))
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
         logging.info("Weighting bins by coverage spread in reference")
