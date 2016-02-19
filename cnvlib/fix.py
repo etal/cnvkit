@@ -61,6 +61,7 @@ def mask_bad_probes(probes):
     Returns a bool array where True indicates probes that failed the checks.
     """
     mask = ((probes['log2'] < params.MIN_REF_COVERAGE) |
+            (probes['log2'] > -params.MIN_REF_COVERAGE) |
             (probes['spread'] > params.MAX_REF_SPREAD))
     return mask
 
