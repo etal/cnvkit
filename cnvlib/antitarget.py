@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, print_function
 import re
 import sys
+import logging
 
 from Bio._py3k import range
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
@@ -29,12 +30,20 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
         # Chromosome accessible sequence regions are given -- use them
         access_chroms = dict(RA.read(access_bed).by_chromosome())
         # But filter out untargeted allosomes/contigs
+        untgt_chroms = set(access_chroms) - set(target_chroms)
         is_autosome = re.compile(r"(chr)?\d+$")
-        for untgt_chr in set(access_chroms) - set(target_chroms):
-            if not is_autosome.match(untgt_chr):
-                print("Skipping untargeted chromosome", untgt_chr,
-                      file=sys.stderr)
-                del access_chroms[untgt_chr]
+        if any(is_autosome.match(c) for c in target_chroms):
+            # Autosomes have numeric names -- keep them
+            chroms_to_skip = [c for c in untgt_chroms
+                              if not is_autosome.match(c)]
+        else:
+            # Alternative contigs have long names -- skip them
+            max_tgt_chr_name_len = max(map(len, target_chroms))
+            chroms_to_skip = [c for c in untgt_chroms
+                              if len(c) > max_tgt_chr_name_len]
+        for untgt_chr in chroms_to_skip:
+            logging.info("Skipping untargeted chromosome %s", untgt_chr)
+            del access_chroms[untgt_chr]
     else:
         # Chromosome accessible sequence regions not known -- use heuristics
         # (chromosome length is endpoint of last probe; skip initial
