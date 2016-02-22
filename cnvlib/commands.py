@@ -78,6 +78,15 @@ def _cmd_batch(args):
                  "given to build a new reference if -r/--reference is not used."
                  "\n(See: cnvkit.py batch -h)")
 
+    # Ensure sample IDs are unique to avoid overwriting outputs
+    seen_sids = {}
+    for fname in (args.bam_files or []) + (args.normal or []):
+        sid = core.fbase(fname)
+        if sid in seen_sids:
+            sys.exit("Duplicate sample ID %r (from %s and %s)"
+                     % (sid, fname, seen_sids[sid]))
+        seen_sids[sid] = fname
+
     if not args.reference:
         # Build a copy number reference; update (anti)targets upon request
         args.reference, args.targets, args.antitargets = batch_make_reference(
