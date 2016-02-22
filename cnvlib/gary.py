@@ -188,6 +188,9 @@ class GenomicArray(object):
             warnings.simplefilter("ignore", UserWarning)
             is_auto = self.chromosome.str.match(r"(chr)?\d+$",
                                                 as_indexer=True, na=False)
+        if not is_auto.any():
+            # The autosomes, if any, are not named with plain integers
+            return self
         if also:
             if isinstance(also, basestring):
                 also = [also]
