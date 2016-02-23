@@ -601,14 +601,14 @@ def do_fix(target_raw, antitarget_raw, reference,
         # Down-weight the more variable probe set (targets or antitargets)
         tgt_iqr = metrics.interquartile_range(cnarr.residuals())
         anti_iqr = metrics.interquartile_range(anti_cnarr.residuals())
-        iqr_ratio = tgt_iqr / anti_iqr
+        iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
         if iqr_ratio > 1:
             logging.info("Targets are %.2f x more variable than antitargets",
-                        iqr_ratio)
+                         iqr_ratio)
             cnarr["weight"] /= iqr_ratio
         else:
-            logging.info("Antitargets are %.2f x more variable than antitargets",
-                        1. / iqr_ratio)
+            logging.info("Antitargets are %.2f x more variable than targets",
+                         1. / iqr_ratio)
             anti_cnarr["weight"] *= iqr_ratio
         # Combine target and antitarget bins
         cnarr.add(anti_cnarr)
