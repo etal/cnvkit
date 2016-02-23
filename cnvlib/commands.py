@@ -520,7 +520,7 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
                                           male_reference)
     ref_probes.add(reference.combine_probes(antitarget_fnames, fa_fname,
                                             male_reference))
-    ref_probes.center_all()
+    ref_probes.center_all(skip_low=False)
     reference.warn_bad_probes(ref_probes)
     return ref_probes
 
@@ -599,8 +599,8 @@ def do_fix(target_raw, antitarget_raw, reference,
                                            do_gc, False, do_rmask)
     if len(anti_cnarr):
         # Down-weight the more variable probe set (targets or antitargets)
-        tgt_iqr = metrics.interquartile_range(cnarr.residuals())
-        anti_iqr = metrics.interquartile_range(anti_cnarr.residuals())
+        tgt_iqr = metrics.interquartile_range(cnarr.drop_low_coverage().residuals())
+        anti_iqr = metrics.interquartile_range(anti_cnarr.drop_low_coverage().residuals())
         iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
         if iqr_ratio > 1:
             logging.info("Targets are %.2f x more variable than antitargets",
@@ -736,6 +736,9 @@ P_rescale.add_argument("--center",
         choices=('mean', 'median', 'mode', 'biweight'),
         help="""Re-center the log2 ratio values using this estimate of the
                 center or average value.""")
+# P_rescale.add_argument("--keep-low-coverage", action='store_true',
+#         help="""Drop very-low-coverage bins before segmentation to avoid
+#                 false-positive deletions in poor-quality tumor samples.""")
 P_rescale.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_rescale.add_argument("--purity", type=float,

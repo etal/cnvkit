@@ -96,7 +96,7 @@ class CopyNumArray(gary.GenomicArray):
 
     # Manipulation
 
-    def center_all(self, estimator=np.median):
+    def center_all(self, estimator=np.median, skip_low=True):
         """Recenter coverage values to the autosomes' average (in-place)."""
         est_funcs = {
             "mean": np.mean,
@@ -110,7 +110,8 @@ class CopyNumArray(gary.GenomicArray):
             else:
                 raise ValueError("Estimator must be a function or one of: %s"
                                  % ", ".join(map(repr, est_funcs)))
-        self.data['log2'] -= estimator(self.autosomes()['log2'])
+        table = (self.drop_low_coverage() if skip_low else self).autosomes()
+        self.data['log2'] -= estimator(table['log2'])
 
     def drop_low_coverage(self):
         """Drop bins with extremely low log2 coverage values.
