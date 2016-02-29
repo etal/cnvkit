@@ -831,6 +831,9 @@ P_call.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_call.add_argument("--purity", type=float,
         help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
+P_call.add_argument('-v', '--vcf',
+        help="""VCF file name containing variants for assigning allele
+                frequencies and copy number.""")
 P_call.add_argument("-g", "--gender",
         choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
