@@ -27,15 +27,15 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
     """
     target_chroms = dict(RA.read(target_bed).by_chromosome())
     if access_bed:
-        # Chromosome accessible sequence regions are given -- use them
+        # Chromosomes' accessible sequence regions are given -- use them
         access_chroms = dict(RA.read(access_bed).by_chromosome())
-        # But filter out untargeted allosomes/contigs
+        # But filter out untargeted alternative contigs and mitochondria
         untgt_chroms = set(access_chroms) - set(target_chroms)
-        is_autosome = re.compile(r"(chr)?\d+$")
-        if any(is_autosome.match(c) for c in target_chroms):
-            # Autosomes have numeric names -- keep them
+        # Autosomes typically have numeric names, allosomes are X and Y
+        is_canonical = re.compile(r"(chr)?(\d+|[XYxy])$")
+        if any(is_canonical.match(c) for c in target_chroms):
             chroms_to_skip = [c for c in untgt_chroms
-                              if not is_autosome.match(c)]
+                              if not is_canonical.match(c)]
         else:
             # Alternative contigs have long names -- skip them
             max_tgt_chr_name_len = max(map(len, target_chroms))
