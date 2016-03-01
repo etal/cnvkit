@@ -792,8 +792,8 @@ def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
                                             is_reference_male)
     else:
         raise ValueError("Argument `method` must be one of: clonal, threshold")
-    segs_adj = call.round_log2_ratios(segments, absolutes, ploidy,
-                                      is_reference_male)
+    segs_adj = segments.copy()
+    segs_adj["cn"] = np.asarray(np.rint(absolutes), dtype=np.int_)
     return segs_adj
 
 
