@@ -199,19 +199,18 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female,
     If show="variant", skip regions where copy number is neutral, i.e. equal to
     the reference ploidy on autosomes, or half that on sex chromosomes.
     """
-    absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
     out = segments.data.loc[:, ["chromosome", "start", "end"]]
     out["label"] = label
-    out["ncopies"] = np.rint(absolutes)
+    out["ncopies"] = (segments["cn"] if "cn" in segments
+                      else np.rint(call.absolute_pure(segments, ploidy,
+                                                      is_reference_male)))
     if show == "ploidy":
         # Skip regions of default ploidy
         out = out[out["ncopies"] != ploidy]
     elif show == "variant":
         # Skip regions of non-neutral copy number
-        abs_dframe = call.absolute_dataframe(segments, ploidy, 1.0,
-                                             is_reference_male,
-                                             is_sample_female)
-        out = out[out["ncopies"] != abs_dframe["expect"]]
+        exp_copies = call.absolute_expect(segments, ploidy, is_sample_female)
+        out = out[out["ncopies"] != exp_copies]
     return out
 
 
@@ -262,10 +261,17 @@ def export_vcf(segments, ploidy, is_reference_male, is_sample_female,
 def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     """Convert copy number segments to VCF records."""
     out_dframe = segments.data.loc[:, ["chromosome", "end", "log2", "probes"]]
-    abs_dframe = call.absolute_dataframe(segments, ploidy, 1.0,
-                                         is_reference_male, is_sample_female)
-    out_dframe["ncopies"] = np.rint(abs_dframe["absolute"])
-    idx_losses = (out_dframe["ncopies"] < abs_dframe["expect"])
+    if "cn" in segments:
+        out_dframe["ncopies"] = segments["cn"]
+        abs_expect = call.absolute_expect(segments, ploidy, is_sample_female)
+
+    else:
+        abs_dframe = call.absolute_dataframe(segments, ploidy, 1.0,
+                                             is_reference_male,
+                                             is_sample_female)
+        out_dframe["ncopies"] = np.rint(abs_dframe["absolute"])
+        abs_expect = abs_dframe["expect"]
+    idx_losses = (out_dframe["ncopies"] < abs_expect)
 
     starts = segments.start.copy()
     starts[starts == 0] = 1
@@ -283,17 +289,16 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
 
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
-    for out_row, abs_row in zip(out_dframe.itertuples(index=False),
-                                abs_dframe.itertuples(index=False)):
-        if (out_row.ncopies == abs_row.expect or
+    for out_row, abs_exp in zip(out_dframe.itertuples(index=False), abs_expect):
+        if (out_row.ncopies == abs_exp or
             # Survive files from buggy v0.7.1 (#53)
             not str(out_row.probes).isdigit()):
             # Skip regions of neutral copy number
             continue  # or "CNV" for subclonal?
 
-        if out_row.ncopies > abs_row.expect:
+        if out_row.ncopies > abs_exp:
             genotype = "0/1:0:%d:%d" % (out_row.ncopies, out_row.probes)
-        elif out_row.ncopies < abs_row.expect:
+        elif out_row.ncopies < abs_exp:
             # TODO XXX handle non-diploid ploidies, haploid chroms
             if out_row.ncopies == 0:
                 # Complete deletion, 0 copies

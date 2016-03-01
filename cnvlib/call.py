@@ -107,6 +107,37 @@ def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_femal
                          'expect': expect_copies})
 
 
+def absolute_expect(cnarr, ploidy, is_sample_female):
+    """Absolute integer number of expected copies in each bin.
+
+    I.e. the given ploidy for autosomes, and XY or XX sex chromosome counts
+    according to the sample's specified gender.
+    """
+    exp_copies = np.repeat(ploidy, len(cnarr))
+    is_y = np.asarray(cnarr.chromosome == cnarr._chr_y_label)
+    if is_sample_female:
+        exp_copies[is_y] = 0
+    else:
+        is_x = np.asarray(cnarr.chromosome == cnarr._chr_x_label)
+        exp_copies[is_x | is_y] = ploidy // 2
+    return exp_copies
+
+
+def absolute_reference(cnarr, ploidy, is_reference_male):
+    """Absolute integer number of reference copies in each bin.
+
+    I.e. the given ploidy for autosomes, 1 or 2 X according to the reference
+    gender, and always 1 copy of Y.
+    """
+    ref_copies = np.repeat(ploidy, len(cnarr))
+    is_x = np.asarray(cnarr.chromosome == cnarr._chr_x_label)
+    is_y = np.asarray(cnarr.chromosome == cnarr._chr_y_label)
+    if is_reference_male:
+        ref_copies[is_x] = ploidy // 2
+    ref_copies[is_y] = ploidy // 2
+    return ref_copies
+
+
 def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male):
     """Determine the number copies of a chromosome expected and in reference.
 
