@@ -298,24 +298,30 @@ class CommandTests(unittest.TestCase):
 
     def test_call_gender(self):
         """Test each 'call' method on allosomes."""
-        for (fname, sample_is_f, ref_is_m, chr1_expect, chrx_expect, chry_expect
+        for (fname, sample_is_f, ref_is_m,
+             chr1_expect, chrx_expect, chry_expect,
+             chr1_cn, chrx_cn, chry_cn,
             ) in (
-                ("formats/f-on-f.cns", True, False, 0, 0, 0),
-                ("formats/f-on-m.cns", True, True, 0.585, 1, -9.97),
-                ("formats/m-on-f.cns", False, False, 0, -1, 0),
-                ("formats/m-on-m.cns", False, True, 0, 0, 0),
+                ("formats/f-on-f.cns", True, False, 0, 0, None, 2, 2, None),
+                ("formats/f-on-m.cns", True, True, 0.585, 1, None, 3, 2, None),
+                ("formats/m-on-f.cns", False, False, 0, -1, 0, 2, 1, 1),
+                ("formats/m-on-m.cns", False, True, 0, 0, 0, 2, 1, 1),
             ):
             cns = cnvlib.read(fname)
             chr1_idx = (cns.chromosome == 'chr1')
             chrx_idx = (cns.chromosome == 'chrX')
             chry_idx = (cns.chromosome == 'chrY')
             def test_chrom_means(segments):
+                self.assertEqual(chr1_cn, segments['cn'][chr1_idx].mean())
                 self.assertAlmostEqual(chr1_expect,
-                                       segments['log2'][chr1_idx].mean(), 2)
+                                       segments['log2'][chr1_idx].mean(), 0)
+                self.assertEqual(chrx_cn, segments['cn'][chrx_idx].mean())
                 self.assertAlmostEqual(chrx_expect,
-                                       segments['log2'][chrx_idx].mean(), 2)
-                self.assertAlmostEqual(chry_expect,
-                                       segments['log2'][chry_idx].mean(), 2)
+                                       segments['log2'][chrx_idx].mean(), 0)
+                if not sample_is_f:
+                    self.assertEqual(chry_cn, segments['cn'][chry_idx].mean())
+                    self.assertAlmostEqual(chry_expect,
+                                           segments['log2'][chry_idx].mean(), 0)
 
             # Call threshold
             cns_thresh = commands.do_call(cns, "threshold",

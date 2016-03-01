@@ -772,29 +772,32 @@ def _cmd_call(args):
     segs_adj.write(args.output or segs_adj.sample_id + '.call.cns')
 
 
-def do_call(segments, method, ploidy=2, purity=None, is_reference_male=False,
+def do_call(cnarr, method, ploidy=2, purity=None, is_reference_male=False,
             is_sample_female=False, thresholds=(-1.1, -0.25, 0.2, 0.7)):
+    outarr = cnarr.copy()
     if method == "clonal":
         if purity and purity < 1.0:
             logging.info("Calling copy number with clonal purity %g, ploidy %d",
                          purity, ploidy)
-            absolutes = call.absolute_clonal(segments, ploidy, purity,
+            absolutes = call.absolute_clonal(cnarr, ploidy, purity,
                                              is_reference_male, is_sample_female)
+            # Recalculate sample log2 ratios after rescaling for purity
+            outarr["log2"] = call.log2_ratios(cnarr, absolutes, ploidy,
+                                              is_reference_male)
         else:
             # Simpler math if sample is pure
             logging.info("Calling copy number with clonal ploidy %d", ploidy)
-            absolutes = call.absolute_pure(segments, ploidy, is_reference_male)
+            absolutes = call.absolute_pure(cnarr, ploidy, is_reference_male)
     elif method == "threshold":
         tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
         logging.info("Calling copy number with thresholds: %s",
                      ", ".join(tokens))
-        absolutes = call.absolute_threshold(segments, ploidy, thresholds,
+        absolutes = call.absolute_threshold(cnarr, ploidy, thresholds,
                                             is_reference_male)
     else:
         raise ValueError("Argument `method` must be one of: clonal, threshold")
-    segs_adj = segments.copy()
-    segs_adj["cn"] = np.asarray(np.rint(absolutes), dtype=np.int_)
-    return segs_adj
+    outarr["cn"] = np.asarray(np.rint(absolutes), dtype=np.int_)
+    return outarr
 
 
 def csvstring(text):

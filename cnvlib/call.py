@@ -5,27 +5,24 @@ import numpy as np
 import pandas as pd
 
 
-def round_log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
-                      min_abs_val=1e-3):
-    """Convert absolute integer copy numbers to log2 ratios.
+def log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
+                min_abs_val=1e-3, round_to_int=False):
+    """Convert absolute copy numbers to log2 ratios.
+
+    Optionally round copy numbers to integers.
 
     Account for reference gender & ploidy of sex chromosomes.
     """
-    newcnarr = cnarr.copy()
-    chr_x = cnarr._chr_x_label
-    chr_y = cnarr._chr_y_label
-
     # Round absolute copy numbers to integer values
-    absolutes = np.round(absolutes)
+    if round_to_int:
+        absolutes = np.rint(absolutes)
     # Avoid a logarithm domain error
-    absolutes = np.maximum(absolutes, min_abs_val)
-    newcnarr['log2'] = np.log2(absolutes / float(ploidy))
-
+    ratios = np.log2(np.maximum(absolutes / ploidy, min_abs_val))
     # Adjust sex chromosomes to be relative to the reference
     if is_reference_male:
-        newcnarr[newcnarr.chromosome == chr_x, 'log2'] += 1.0
-    newcnarr[newcnarr.chromosome == chr_y, 'log2'] += 1.0
-    return newcnarr
+        ratios[np.asarray(cnarr.chromosome == cnarr._chr_x_label)] += 1.0
+    ratios[np.asarray(cnarr.chromosome == cnarr._chr_y_label)] += 1.0
+    return ratios
 
 
 def absolute_threshold(cnarr, ploidy, thresholds, is_reference_male):
