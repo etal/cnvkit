@@ -705,13 +705,13 @@ def _cmd_rescale(args):
         raise RuntimeError("Purity must be between 0 and 1.")
 
     cnarr = _CNA.read(args.filename)
+    if args.center:
+        cnarr.center_all(args.center)
     if args.purity and args.purity < 1.0:
         is_sample_female = verify_gender_arg(cnarr, args.gender,
                                              args.male_reference)
         cnarr = do_rescale(cnarr, args.ploidy, args.purity,
                            args.male_reference, is_sample_female)
-    if args.center:
-        cnarr.center_all(args.center)
     cnarr.write(args.output)
 
 
