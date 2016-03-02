@@ -89,13 +89,13 @@ class VariantArray(gary.GenomicArray):
             table = table[idx_depth]
         if skip_hom:
             zkey = "n_zygosity" if "n_zygosity" in table else "zygosity"
-            idx_hom = (table[zkey] != 0.0) & (table[zkey] != 1.0)
-            cnt_hom = (~idx_hom).sum()
-            table = table[idx_hom]
+            idx_het = (table[zkey] != 0.0) & (table[zkey] != 1.0)
+            cnt_hom = (~idx_het).sum()
+            table = table[idx_het]
         if skip_somatic:
             idx_som = table["somatic"]
-            cnt_som = (~idx_som).sum()
-            table = table[idx_som]
+            cnt_som = idx_som.sum()
+            table = table[~idx_som]
         logging.info("Skipped records: %d somatic, %d depth, %d homozygous",
                      cnt_som, cnt_depth, cnt_hom)
 
