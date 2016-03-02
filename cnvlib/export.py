@@ -110,13 +110,6 @@ def export_nexus_ogt(sample_fname, vcf_fname):
     are left blank; if a bin contains multiple variants, then the frequencies
     are all "mirrored" to be above .5, then the median of those values is taken.
     """
-    def mirrored_baf_median(vals):
-        shift = np.median(np.abs(vals - .5))
-        if np.median(vals) > .5:
-            return .5 + shift
-        else:
-            return .5 - shift
-
     cnarr = CNA.read(sample_fname)
     varr = VA.read_vcf(vcf_fname, skip_hom=True, skip_somatic=True)
     bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
@@ -132,6 +125,14 @@ def export_nexus_ogt(sample_fname, vcf_fname):
     })
     out_table["B-Allele Frequency"] = bafs
     return out_table
+
+
+def mirrored_baf_median(vals):
+    shift = np.median(np.abs(vals - .5))
+    if np.median(vals) > .5:
+        return .5 + shift
+    else:
+        return .5 - shift
 
 
 def export_seg(sample_fnames):

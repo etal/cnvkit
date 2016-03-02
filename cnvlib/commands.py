@@ -765,16 +765,24 @@ def _cmd_call(args):
         raise RuntimeError("Purity must be between 0 and 1.")
 
     segments = _CNA.read(args.segment)
+    vcf = (_VA.read_vcf(args.vcf, skip_hom=True, skip_somatic=True)
+           if args.vcf else None)
     is_sample_female = verify_gender_arg(segments, args.gender,
                                          args.male_reference)
-    segs_adj = do_call(segments, args.method, args.ploidy, args.purity,
+    segs_adj = do_call(segments, vcf, args.method, args.ploidy, args.purity,
                        args.male_reference, is_sample_female, args.thresholds)
     segs_adj.write(args.output or segs_adj.sample_id + '.call.cns')
 
 
-def do_call(cnarr, method, ploidy=2, purity=None, is_reference_male=False,
-            is_sample_female=False, thresholds=(-1.1, -0.25, 0.2, 0.7)):
+def do_call(cnarr, variants, method, ploidy=2, purity=None,
+            is_reference_male=False, is_sample_female=False,
+            thresholds=(-1.1, -0.25, 0.2, 0.7)):
     outarr = cnarr.copy()
+    if variants:
+        # baf_median = lambda x: np.median(np.abs(x - .5)) + .5
+        baf_median = export.mirrored_baf_median
+        outarr["baf"] = cnarr.match_to_bins(variants, 'alt_freq', np.nan,
+                                            summary_func=baf_median)
     if method == "clonal":
         if purity and purity < 1.0:
             logging.info("Calling copy number with clonal purity %g, ploidy %d",
@@ -784,6 +792,9 @@ def do_call(cnarr, method, ploidy=2, purity=None, is_reference_male=False,
             # Recalculate sample log2 ratios after rescaling for purity
             outarr["log2"] = call.log2_ratios(cnarr, absolutes, ploidy,
                                               is_reference_male)
+            if variants:
+                # Rescale b-allele frequencies for purity
+                outarr["baf"] = rescale_baf(purity, outarr["baf"])
         else:
             # Simpler math if sample is pure
             logging.info("Calling copy number with clonal ploidy %d", ploidy)
@@ -797,7 +808,29 @@ def do_call(cnarr, method, ploidy=2, purity=None, is_reference_male=False,
     else:
         raise ValueError("Argument `method` must be one of: clonal, threshold")
     outarr["cn"] = np.asarray(np.rint(absolutes), dtype=np.int_)
+    if "baf" in outarr:
+        # Major and minor allelic copy numbers
+        outarr["cn1"] = np.asarray(np.rint(absolutes * outarr["baf"]),
+                                   dtype=np.int_).clip(0, outarr["cn"])
+        outarr["cn2"] = outarr["cn"] - outarr["cn1"]
+        is_null = outarr["baf"].isnull()
+        outarr[is_null, "cn1"] = np.nan
+        outarr[is_null, "cn2"] = np.nan
     return outarr
+
+
+def rescale_baf(purity, observed_baf, normal_baf=0.5):
+    """Adjust B-allele frequencies for sample purity.
+
+    Math:
+        t_baf*purity + n_baf*(1-purity) = obs_baf
+        obs_baf - n_baf * (1-purity) = t_baf * purity
+        t_baf = (obs_baf - n_baf * (1-purity))/purity
+    """
+    # ENH: use normal_baf array if available
+    tumor_baf = (observed_baf - normal_baf * (1-purity)) / purity
+    # ENH: warn if tumor_baf < 0 -- purity estimate may be too low
+    return tumor_baf
 
 
 def csvstring(text):

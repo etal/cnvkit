@@ -279,19 +279,19 @@ class CommandTests(unittest.TestCase):
         """The 'call' command."""
         # Methods: clonal, threshold
         tr_cns = cnvlib.read("formats/tr95t.cns")
-        tr_thresh = commands.do_call(tr_cns, "threshold",
+        tr_thresh = commands.do_call(tr_cns, None, "threshold",
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(tr_cns), len(tr_thresh))
-        tr_clonal = commands.do_call(tr_cns, "clonal",
+        tr_clonal = commands.do_call(tr_cns, None, "clonal",
                             purity=.65,
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(tr_cns), len(tr_clonal))
         cl_cns = cnvlib.read("formats/cl_seq.cns")
-        cl_thresh = commands.do_call(cl_cns, "threshold",
+        cl_thresh = commands.do_call(cl_cns, None, "threshold",
                             thresholds=np.log2((np.arange(12) + .5) / 6.),
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(cl_cns), len(cl_thresh))
-        cl_clonal = commands.do_call(cl_cns, "clonal",
+        cl_clonal = commands.do_call(cl_cns, None, "clonal",
                             ploidy=6, purity=.99,
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(cl_cns), len(cl_clonal))
@@ -324,17 +324,17 @@ class CommandTests(unittest.TestCase):
                                            segments['log2'][chry_idx].mean(), 0)
 
             # Call threshold
-            cns_thresh = commands.do_call(cns, "threshold",
+            cns_thresh = commands.do_call(cns, None, "threshold",
                                  is_reference_male=ref_is_m,
                                  is_sample_female=sample_is_f)
             test_chrom_means(cns_thresh)
             # Call clonal pure
-            cns_clone = commands.do_call(cns, "clonal",
+            cns_clone = commands.do_call(cns, None, "clonal",
                                 is_reference_male=ref_is_m,
                                 is_sample_female=sample_is_f)
             test_chrom_means(cns_clone)
             # Call clonal barely-mixed
-            cns_p99 = commands.do_call(cns, "clonal", purity=0.99,
+            cns_p99 = commands.do_call(cns, None, "clonal", purity=0.99,
                               is_reference_male=ref_is_m,
                               is_sample_female=sample_is_f)
             test_chrom_means(cns_p99)
