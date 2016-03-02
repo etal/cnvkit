@@ -21,7 +21,8 @@ def bed2probes(bed_fname):
     return CNA(table, {"sample_id": core.fbase(bed_fname)})
 
 
-def combine_probes(filenames, fa_fname, is_male_reference):
+def combine_probes(filenames, fa_fname, is_male_reference,
+                   fix_gc, fix_edge, fix_rmask):
     """Calculate the median coverage of each bin across multiple samples.
 
     Input:
@@ -48,17 +49,16 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         return CNA.from_rows([], col_names, {'sample_id': "reference"})
 
     # Calculate GC and RepeatMasker content for each probe's genomic region
-    if fa_fname:
+    if fa_fname and (fix_rmask or fix_gc):
         gc, rmask = get_fasta_stats(cnarr1, fa_fname)
-        columns['gc'] = gc
-        columns['rmask'] = rmask
-    elif 'gc' in cnarr1:
+        if fix_gc:
+            columns['gc'] = gc
+        if fix_rmask:
+            columns['rmask'] = rmask
+    elif 'gc' in cnarr1 and fix_gc:
         # Reuse .cnn GC values if they're already stored (via import-picard)
         gc = cnarr1['gc']
         columns['gc'] = gc
-    else:
-        logging.info("No FASTA reference genome provided; "
-                     "skipping GC, RM calculations")
 
     # Make the sex-chromosome coverages of male and female samples compatible
     chr_x = cnarr1._chr_x_label
@@ -100,14 +100,15 @@ def combine_probes(filenames, fa_fname, is_male_reference):
         """Perform bias corrections on the sample."""
         cnarr.center_all()
         shift_sex_chroms(cnarr)
-        if 'gc' in columns:
+        if 'gc' in columns and fix_gc:
             logging.info("Correcting for GC bias...")
             cnarr = fix.center_by_window(cnarr, .1, columns['gc'])
-        if 'rmask' in columns:
+        if 'rmask' in columns and fix_rmask:
             logging.info("Correcting for RepeatMasker bias...")
             cnarr = fix.center_by_window(cnarr, .1, columns['rmask'])
-        logging.info("Correcting for density bias...")
-        cnarr = fix.center_by_window(cnarr, .1, edge_bias)
+        if fix_edge:
+            logging.info("Correcting for density bias...")
+            cnarr = fix.center_by_window(cnarr, .1, edge_bias)
         return cnarr['log2']
 
     # Pseudocount of 1 "flat" sample

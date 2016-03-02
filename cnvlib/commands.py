@@ -496,7 +496,8 @@ def _cmd_reference(args):
         logging.info("Number of target and antitarget files: %d, %d",
                      len(targets), len(antitargets))
         ref_probes = do_reference(targets, antitargets, args.fasta,
-                                  args.male_reference)
+                                  args.male_reference,
+                                  args.do_gc, args.do_edge, args.do_rmask)
     else:
         raise ValueError(usage_err_msg)
 
@@ -506,7 +507,7 @@ def _cmd_reference(args):
 
 
 def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
-                 male_reference=False):
+                 male_reference=False, do_gc=True, do_edge=True, do_rmask=True):
     """Compile a coverage reference from the given files (normal samples)."""
     core.assert_equal("Unequal number of target and antitarget files given",
                       targets=len(target_fnames),
@@ -517,9 +518,11 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
 
     # Calculate & save probe centers
     ref_probes = reference.combine_probes(target_fnames, fa_fname,
-                                          male_reference)
+                                          male_reference,
+                                          do_gc, do_edge, False)
     ref_probes.add(reference.combine_probes(antitarget_fnames, fa_fname,
-                                            male_reference))
+                                            male_reference,
+                                            do_gc, False, do_rmask))
     ref_probes.center_all(skip_low=False)
     reference.warn_bad_probes(ref_probes)
     return ref_probes
@@ -563,6 +566,12 @@ P_reference.add_argument('-y', '--male-reference', action='store_true',
                 log-coverage by -1, so the reference chrX average is -1.
                 Otherwise, shift male samples' chrX by +1, so the reference chrX
                 average is 0.""")
+P_reference.add_argument('--no-gc', dest='do_gc', action='store_false',
+        help="Skip GC correction.")
+P_reference.add_argument('--no-edge', dest='do_edge', action='store_false',
+        help="Skip edge-effect correction.")
+P_reference.add_argument('--no-rmask', dest='do_rmask', action='store_false',
+        help="Skip RepeatMasker correction.")
 P_reference.add_argument('-o', '--output', help="Output file name.")
 P_reference.set_defaults(func=_cmd_reference)
 

@@ -35,7 +35,7 @@ def load_adjust_coverages(pset, ref_pset,
             logging.info("Correcting for GC bias...")
             pset = center_by_window(pset, .1, ref_matched['gc'])
         else:
-            logging.warn("WARNING: Skipping correction for RepeatMasker bias")
+            logging.warn("WARNING: Skipping correction for GC bias")
     if fix_edge:
         logging.info("Correcting for density bias...")
         edge_bias = get_edge_bias(pset, params.INSERT_SIZE)
