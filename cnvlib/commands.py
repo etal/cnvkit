@@ -709,7 +709,10 @@ P_segment.set_defaults(func=_cmd_segment)
 # rescale ---------------------------------------------------------------------
 
 def _cmd_rescale(args):
-    """Rescale segment copy ratio values given known purity and ploidy."""
+    """[DEPRECATED] Rescale segment copy ratios given known purity and ploidy.
+
+    Instead, use the command "call -m none".
+    """
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
@@ -742,9 +745,6 @@ P_rescale.add_argument("--center",
         choices=('mean', 'median', 'mode', 'biweight'),
         help="""Re-center the log2 ratio values using this estimate of the
                 center or average value.""")
-# P_rescale.add_argument("--keep-low-coverage", action='store_true',
-#         help="""Drop very-low-coverage bins before segmentation to avoid
-#                 false-positive deletions in poor-quality tumor samples.""")
 P_rescale.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_rescale.add_argument("--purity", type=float,
@@ -770,14 +770,19 @@ def _cmd_call(args):
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
-    segments = _CNA.read(args.segment)
+    cnarr = _CNA.read(args.filename)
+    if args.center:
+        cnarr.center_all(args.center)
+    is_sample_female = (verify_gender_arg(cnarr, args.gender,
+                                          args.male_reference)
+                        if args.purity and args.purity < 1.0
+                        else None)
     vcf = (_VA.read_vcf(args.vcf, skip_hom=True, skip_somatic=True)
-           if args.vcf else None)
-    is_sample_female = verify_gender_arg(segments, args.gender,
-                                         args.male_reference)
-    segs_adj = do_call(segments, vcf, args.method, args.ploidy, args.purity,
-                       args.male_reference, is_sample_female, args.thresholds)
-    segs_adj.write(args.output or segs_adj.sample_id + '.call.cns')
+           if args.vcf
+           else None)
+    cnarr = do_call(cnarr, vcf, args.method, args.ploidy, args.purity,
+                    args.male_reference, is_sample_female, args.thresholds)
+    cnarr.write(args.output or cnarr.sample_id + '.call.cns')
 
 
 def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
@@ -822,7 +827,7 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
         if "baf" in outarr:
             # Major and minor allelic copy numbers
             outarr["cn1"] = np.asarray(np.rint(absolutes * outarr["baf"]),
-                                    dtype=np.int_).clip(0, outarr["cn"])
+                                       dtype=np.int_).clip(0, outarr["cn"])
             outarr["cn2"] = outarr["cn"] - outarr["cn1"]
             is_null = outarr["baf"].isnull()
             outarr[is_null, "cn1"] = np.nan
@@ -864,8 +869,12 @@ def verify_gender_arg(cnarr, gender_arg, is_male_reference):
 
 
 P_call = AP_subparsers.add_parser('call', help=_cmd_call.__doc__)
-P_call.add_argument('segment',
-        help="Segmentation calls (.cns), the output of the 'segment' command.")
+P_call.add_argument('filename',
+        help="Copy ratios (.cnr or .cns).")
+P_call.add_argument("--center",
+        choices=('mean', 'median', 'mode', 'biweight'),
+        help="""Re-center the log2 ratio values using this estimate of the
+                center or average value.""")
 P_call.add_argument('-m', '--method',
         choices=('threshold', 'clonal', 'none'), default='threshold',
         help="""Calling method. [Default: %(default)s]""")
@@ -1158,6 +1167,8 @@ def _cmd_loh(args):
     """[DEPRECATED] Plot allelic frequencies at each variant position in a VCF file.
 
     Divergence from 0.5 indicates loss of heterozygosity in a tumor sample.
+
+    Instead, use the command "scatter -v".
     """
     variants = _VA.read_vcf(args.variants, args.sample_id, args.normal_id,
                             args.min_depth, skip_hom=True, skip_somatic=True)
