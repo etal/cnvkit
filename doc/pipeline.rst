@@ -291,7 +291,7 @@ reference
 
 Compile a copy-number reference from the given files or directory (containing
 normal samples). If given a reference genome (-f option), also calculate the GC
-content of each region.
+content and repeat-masked proportion of each region.
 
 ::
 
@@ -368,32 +368,39 @@ How it works
 CNVkit uses robust methods to extract a usable signal from the reference
 samples.
 
-At each on-- and off-target genomic bin, the read depths in each of the given
-normal samples are calculated and used to estimate the expected read depth and
-the reliability of this estimate.
-Specifically, CNVkit calculates Tukey's biweight location, a weighted average of
-the normalized log2 coverages in each of the input samples, and biweight
-midvariance, the spread or statistical dispersion of read depth values using a
-similar weighting scheme.
-For background on these statistical methods see `Lax (1985)
-<http://dx.doi.org/10.1080/01621459.1985.10478177>`_ and `Randal (2008)
-<http://dx.doi.org/10.1016/j.csda.2008.04.016>`_.
+Each input sample is first median-centered, then read-depth :doc:`bias
+corrections <bias>` (the same used in the :ref:`fix` command) are performed on
+each of the normal samples separately.
 
+The samples' median-centered, bias-corrected log2 read depth values are then combined
+to take the weighted average (Tukey's biweight location) and spread (Tukey's
+biweight midvariance) of the values at each on-- and off-target genomic bin
+among all samples.
+(For background on these statistical methods see `Lax (1985)
+<http://dx.doi.org/10.1080/01621459.1985.10478177>`_ and `Randal (2008)
+<http://dx.doi.org/10.1016/j.csda.2008.04.016>`_.)
 To adjust for the lower statistical reliability of a smaller number of samples
 for estimating parameters, a "pseudocount" equivalent to one sample of neutral
 copy number is included in the dataset when calculating these values.
+
+These values are saved in the output "reference.cnn" file as the "log2" and
+"spread" columns, indicating the expected read depth and the reliability of this
+estimate.
 
 If a FASTA file of the reference genome is given, for each genomic bin the
 fraction of GC (proportion of "G" and "C" characters among all "A", "T", "G" and
 "C" characters in the subsequence, ignoring "N" and any other ambiguous
 characters) and repeat-masked values (proportion of lowercased non-"N"
 characters in the sequence)
-are calculated and stored in the output reference .cnn file.
+are calculated and stored in the output "reference.cnn" file as columns "gc" and
+"rmask".
 For efficiency, the samtools FASTA index file (.fai) is used to locate the
 binned sequence regions in the FASTA file.
+If the GC or RepeatMasker bias corrections are skipped using the ``--no-gc`` or
+``--no-rmask`` options, then those columns are omitted from the output file; if
+both are skipped, then the genome FASTA file (if provided) is not examined at
+all.
 
-The same read-depth :doc:`bias corrections <bias>` used in the :ref:`fix`
-command are performed on each of the normal samples here.
 The result is a reference copy-number profile that can then be used to correct
 other individual samples.
 
@@ -427,11 +434,18 @@ The "observed" on- and off-target read depths are each median-centered and
 The corresponding "expected" normalized log2 read-depth values from the
 reference are then subtracted for each set of bins.
 
+Bias corrections use the GC and RepeatMasker information from the "gc" and
+"rmask" columns of the reference .cnn file; if those are missing (i.e. the
+reference was built without those corrections), ``fix`` will skip them too (with
+a warning). If you constructed the reference but then called `fix` with a
+different set of bias correction flags, the biases could be over- or
+under-corrected in the test sample -- so use the options ``--no-gc``,
+``--no-rmask`` and ``--no-edge`` consistently or not at all.
+
 CNVkit filters out bins failing certain predefined criteria: those where the
-reference log2 read depth is below a threshold (default -5), the spread of read
+reference log2 read depth is below a threshold (default -5), or the spread of read
 depths among all normal samples in the reference is above a threshold (default
-1.0), or the RepeatMasker-covered proportion of the bin is above a threshold
-(default 99%).
+1.0).
 
 A weight is assigned to each remaining bin depending on:
 
@@ -509,12 +523,14 @@ specified with the ``--center`` option::
 call
 ----
 
-Given segmented log2 ratio estimates (.cns), round the copy ratio estimates to
-integer values using either:
+Given segmented log2 ratio estimates (.cns), derive each segment's absolute
+integer copy number using either:
 
-- A list of threshold log2 values for each copy number state, or
+- A list of threshold log2 values for each copy number state (``-m threshold``),
+  or
 - :ref:`Rescaling <rescale>` for a given known tumor cell fraction and normal
-  ploidy, then simple rounding to the nearest integer copy number.
+  ploidy, then simple rounding to the nearest integer copy number
+  (``-m clonal``).
 
 ::
 
@@ -522,19 +538,13 @@ integer values using either:
     cnvkit.py call Sample.cns -y -m threshold -t=-1.1,-0.4,0.3,0.7 -o Sample.call.cns
     cnvkit.py call Sample.cns -y -m clonal --purity 0.65 -o Sample.call.cns
 
-The output is another .cns file, where the values in the log2 column are still
-log2-transformed and relative to the reference ploidy (by default: diploid
-autosomes, haploid Y or X/Y depending on reference gender).
-The segment log2 values are simply rounded to what they would be if the
-estimated copy number were an integer -- e.g. a neutral diploid state is
-represented as 0.0, and a copy number of 3 on a diploid chromosome is
-represented as 0.58.
-The output .cns file is still compatible with the other CNVkit commands that
-accept .cns files, and can be plotted the same way with the :ref:`scatter`,
-:ref:`heatmap` and :ref:`diagram` commands.
+The output is another .cns file, with an additional "cn" column listing each
+segment's absolute integer copy number. This .cns file is still compatible with
+the other CNVkit commands that accept .cns files, and can be plotted the same
+way with the :ref:`scatter`, :ref:`heatmap` and :ref:`diagram` commands.
 
-To get the absolute integer copy number values in a human-readable form, use the
-command :ref:`export` ``bed``.
+To get these copy number values in another format, e.g. BED or VCF, see the
+:ref:`export` command.
 
 Calling methods
 ```````````````
@@ -552,9 +562,18 @@ from the average log2 ratio of chromosome X.
 
 The "threshold" method simply applies fixed log2 ratio cutoff values for each
 integer copy number state. This method therefore does not require the tumor
-cell fraction or purity to be known. The default cutoffs are reasonable for a
-tumor sample with purity of at least 40% or so.  For germline samples, the
-``-t`` values shown above may yield more accurate calls.
+cell fraction or purity to be specified.
+In the output, the values in the log2 column are still log2-transformed and
+relative to the reference ploidy (by default: diploid autosomes, haploid Y or
+X/Y depending on reference gender).
+The segment log2 values are simply rounded to what they would be if the
+estimated copy number were an integer -- e.g. a neutral diploid state is
+represented as 0.0, and a copy number of 3 on a diploid chromosome is
+represented as 0.58.
+
+The default threshold values are reasonable for a tumor sample with purity of
+at least 40% or so.  For germline samples, the ``-t`` values shown above may
+yield more accurate calls.
 
 The thresholds work like:
 
@@ -581,3 +600,23 @@ Or, in R::
 
     > log2( (0:4 + .5) / 2)
     [1] -2.0000000 -0.4150375  0.3219281  0.8073549  1.1699250
+
+Allele frequencies and counts
+`````````````````````````````
+
+When a VCF file containing SNV calls for the same tumor sample (and optionally a
+matched normal) is given using the ``-v``/``--vcf`` option, the b-allele
+frequencies (BAFs) of the heterozygous, non-somatic SNVs falling within each
+segment are mirrored, averaged, and listed in the output .cns file as an
+additional "baf" column. The BAFs are also rescaled if ``--purity`` is
+specified.
+
+Then, for each segment with a BAF value (i.e. where SNVs were available),
+allele-specific integer copy number values are inferred from the total copy
+number and BAF, and output in columns "cn1" and "cn2". This calculation uses the
+same method as `PSCBS
+<http://bioinformatics.oxfordjournals.org/content/27/15/2038.short>`_:
+total copy number is multiplied by the BAF, and rounded to the nearest integer.
+
+Allelic imbalance, including copy-number-neutral loss of heterozygosity (LOH),
+is then apparent when a segment's "cn1" and "cn2" fields have different values.
