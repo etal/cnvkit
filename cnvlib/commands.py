@@ -730,11 +730,8 @@ def do_rescale(cnarr, ploidy=2, purity=None, is_reference_male=False,
                                      is_reference_male, is_sample_female)
     # Convert back to log2 ratios; avoid a logarithm domain error
     outarr = cnarr.copy()
-    outarr['log2'] = np.log2(np.maximum(absolutes / ploidy, 1e-3))
-    # Adjust sex chromosomes to be relative to the reference
-    if is_reference_male:
-        outarr[outarr.chromosome == outarr._chr_x_label, 'log2'] += 1.0
-    outarr[outarr.chromosome == outarr._chr_y_label, 'log2'] += 1.0
+    outarr['log2'] = call.log2_ratios(cnarr, absolutes, ploidy,
+                                      is_reference_male)
     return outarr
 
 
@@ -783,48 +780,53 @@ def _cmd_call(args):
     segs_adj.write(args.output or segs_adj.sample_id + '.call.cns')
 
 
-def do_call(cnarr, variants, method, ploidy=2, purity=None,
+def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
             is_reference_male=False, is_sample_female=False,
             thresholds=(-1.1, -0.25, 0.2, 0.7)):
+    if method not in ("threshold", "clonal", "none"):
+        raise ValueError("Argument `method` must be one of: clonal, threshold")
+
     outarr = cnarr.copy()
     if variants:
         # baf_median = lambda x: np.median(np.abs(x - .5)) + .5
         baf_median = export.mirrored_baf_median
-        outarr["baf"] = cnarr.match_to_bins(variants, 'alt_freq', np.nan,
+        outarr["baf"] = outarr.match_to_bins(variants, 'alt_freq', np.nan,
                                             summary_func=baf_median)
-    if method == "clonal":
-        if purity and purity < 1.0:
-            logging.info("Calling copy number with clonal purity %g, ploidy %d",
-                         purity, ploidy)
-            absolutes = call.absolute_clonal(cnarr, ploidy, purity,
-                                             is_reference_male, is_sample_female)
-            # Recalculate sample log2 ratios after rescaling for purity
-            outarr["log2"] = call.log2_ratios(cnarr, absolutes, ploidy,
-                                              is_reference_male)
-            if variants:
-                # Rescale b-allele frequencies for purity
-                outarr["baf"] = rescale_baf(purity, outarr["baf"])
-        else:
-            # Simpler math if sample is pure
-            logging.info("Calling copy number with clonal ploidy %d", ploidy)
-            absolutes = call.absolute_pure(cnarr, ploidy, is_reference_male)
-    elif method == "threshold":
+
+    if purity and purity < 1.0:
+        logging.info("Rescaling sample with purity %g, ploidy %d",
+                     purity, ploidy)
+        absolutes = call.absolute_clonal(outarr, ploidy, purity,
+                                         is_reference_male, is_sample_female)
+        # Recalculate sample log2 ratios after rescaling for purity
+        outarr["log2"] = call.log2_ratios(outarr, absolutes, ploidy,
+                                          is_reference_male)
+        if variants:
+            # Rescale b-allele frequencies for purity
+            outarr["baf"] = rescale_baf(purity, outarr["baf"])
+    elif method == "clonal":
+        # Estimate absolute copy numbers from the original log2 values
+        logging.info("Calling copy number with clonal ploidy %d", ploidy)
+        absolutes = call.absolute_pure(outarr, ploidy, is_reference_male)
+
+    if method == "threshold":
+        # Apply cutoffs to either original or rescaled log2 values
         tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
         logging.info("Calling copy number with thresholds: %s",
                      ", ".join(tokens))
-        absolutes = call.absolute_threshold(cnarr, ploidy, thresholds,
+        absolutes = call.absolute_threshold(outarr, ploidy, thresholds,
                                             is_reference_male)
-    else:
-        raise ValueError("Argument `method` must be one of: clonal, threshold")
-    outarr["cn"] = np.asarray(np.rint(absolutes), dtype=np.int_)
-    if "baf" in outarr:
-        # Major and minor allelic copy numbers
-        outarr["cn1"] = np.asarray(np.rint(absolutes * outarr["baf"]),
-                                   dtype=np.int_).clip(0, outarr["cn"])
-        outarr["cn2"] = outarr["cn"] - outarr["cn1"]
-        is_null = outarr["baf"].isnull()
-        outarr[is_null, "cn1"] = np.nan
-        outarr[is_null, "cn2"] = np.nan
+
+    if method != "none":
+        outarr["cn"] = np.asarray(np.rint(absolutes), dtype=np.int_)
+        if "baf" in outarr:
+            # Major and minor allelic copy numbers
+            outarr["cn1"] = np.asarray(np.rint(absolutes * outarr["baf"]),
+                                    dtype=np.int_).clip(0, outarr["cn"])
+            outarr["cn2"] = outarr["cn"] - outarr["cn1"]
+            is_null = outarr["baf"].isnull()
+            outarr[is_null, "cn1"] = np.nan
+            outarr[is_null, "cn2"] = np.nan
     return outarr
 
 
@@ -865,7 +867,7 @@ P_call = AP_subparsers.add_parser('call', help=_cmd_call.__doc__)
 P_call.add_argument('segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")
 P_call.add_argument('-m', '--method',
-        choices=('threshold', 'clonal'), default='threshold',
+        choices=('threshold', 'clonal', 'none'), default='threshold',
         help="""Calling method. [Default: %(default)s]""")
 P_call.add_argument('-t', '--thresholds',
         type=csvstring, default="-1.1,-0.25,0.2,0.7",

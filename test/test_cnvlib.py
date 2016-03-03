@@ -277,7 +277,7 @@ class CommandTests(unittest.TestCase):
 
     def test_call(self):
         """The 'call' command."""
-        # Methods: clonal, threshold
+        # Methods: clonal, threshold, none
         tr_cns = cnvlib.read("formats/tr95t.cns")
         tr_thresh = commands.do_call(tr_cns, None, "threshold",
                             is_reference_male=True, is_sample_female=True)
@@ -295,6 +295,10 @@ class CommandTests(unittest.TestCase):
                             ploidy=6, purity=.99,
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(cl_cns), len(cl_clonal))
+        cl_none = commands.do_call(cl_cns, None, "none",
+                            ploidy=6, purity=.99,
+                            is_reference_male=True, is_sample_female=True)
+        self.assertEqual(len(cl_cns), len(cl_none))
 
     def test_call_gender(self):
         """Test each 'call' method on allosomes."""
