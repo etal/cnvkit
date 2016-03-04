@@ -489,6 +489,8 @@ identify the supported segmentation breakpoints.
 rescale
 -------
 
+(Deprecated in favor of ``call -m none``, see below.)
+
 If there is a known level of normal-cell DNA contamination in the analyzed tumor
 sample (see the page on :doc:`tumor heterogeneity <heterogeneity>`), you can
 opt to rescale the log2 copy ratio estimates in your .cnr or .cns file to remove
@@ -542,40 +544,62 @@ The output is another .cns file, with an additional "cn" column listing each
 segment's absolute integer copy number. This .cns file is still compatible with
 the other CNVkit commands that accept .cns files, and can be plotted the same
 way with the :ref:`scatter`, :ref:`heatmap` and :ref:`diagram` commands.
-
 To get these copy number values in another format, e.g. BED or VCF, see the
 :ref:`export` command.
+
+Alternatively, the ``-m none`` option performs rescaling, re-centering, and
+extracting b-allele frequencies from a VCF, but does not add a 
+
+Transformations
+```````````````
+
+With the ``--purity`` option, log2 ratios are rescaled using the same
+calculation as the :ref:`rescale` command. The observed log2 ratios in the input
+.cns file are treated as a mix of some fraction of tumor cells (specified by
+``--purity``), possibly with altered copy number, and a remainder of normal
+cells with neutral copy number (specified by ``--ploidy`` for autosomes; by
+default, diploid autosomes, haploid Y or X/Y depending on reference gender).
+This equation is rearranged to find the absolute copy number of the tumor cells
+alone, rounded to the nearest integer. The expected and observed ploidy of the
+sex chromosomes (X and Y) is different, so it's important to specify
+``-y``/``--male-reference`` if a male reference was used; the sample gender can
+be specified if known, otherwise it will be guessed from the average log2 ratio
+of chromosome X.
+
+When a VCF file containing SNV calls for the same tumor sample (and optionally a
+matched normal) is given using the ``-v``/``--vcf`` option, the b-allele
+frequencies (BAFs) of the heterozygous, non-somatic SNVs falling within each
+segment are mirrored, averaged, and listed in the output .cns file as an
+additional "baf" column (using the same logic as ``export nexus-ogt``).
+If ``--purity`` was specified, then the BAF values are also rescaled.
+
 
 Calling methods
 ```````````````
 
-The "clonal" method uses the same calculation as the :ref:`rescale` command. It
-considers the observed log2 ratios in the input .cns file as a mix of some
-fraction of tumor cells (specified by ``--purity``), possibly with altered copy
-number, and a remainder of normal cells with neutral copy number (specified by
-``--ploidy`` for autosomes). This equation is rearranged to find the absolute
-copy number of the tumor cells alone, rounded to the nearest integer. The
-expected and observed ploidy of the sex chromosomes (X and Y) is different, so
-it's important to specify ``-y``/``--male-reference`` if a male reference was
-used; the sample gender can be specified if known, otherwise it will be guessed
-from the average log2 ratio of chromosome X.
+After the above adjustments, the "threshold" and "clonal" methods calculate the
+absolute integer copy number of each segment.
 
-The "threshold" method simply applies fixed log2 ratio cutoff values for each
-integer copy number state. This method therefore does not require the tumor
-cell fraction or purity to be specified.
-In the output, the values in the log2 column are still log2-transformed and
-relative to the reference ploidy (by default: diploid autosomes, haploid Y or
-X/Y depending on reference gender).
-The segment log2 values are simply rounded to what they would be if the
-estimated copy number were an integer -- e.g. a neutral diploid state is
-represented as 0.0, and a copy number of 3 on a diploid chromosome is
-represented as 0.58.
+The "clonal" method converts the log2 values to absolute scale using the given
+``--ploidy``, then simply rounds the absolute copy number values to the nearest
+integer. This method is reasonable for germline samples, highly pure tumor
+samples (e.g. cell lines), or when the tumor fraction is accurately known and
+specified with ``--purity``.
+
+The "threshold" method applies fixed log2 ratio cutoff values for each
+integer copy number state. This approach can be an alternative to specifying
+and adjusting for the tumor cell fraction or purity directly. However, if
+``--purity`` is specified, then the log2 values will still be rescaled before
+applying the copy number thresholds.
 
 The default threshold values are reasonable for a tumor sample with purity of
 at least 40% or so.  For germline samples, the ``-t`` values shown above may
 yield more accurate calls.
 
-The thresholds work like:
+The thresholds map to integer copy numbers in order, starting from zero:
+log2 ratios up to the first threshold value are assigned a copy number 0, log2
+ratios between the first and second threshold values get copy number 1, and so
+on.
 
 =====================================   ===========
 If :math:`\log_2` value :math:`\leq`    Copy number
@@ -604,17 +628,10 @@ Or, in R::
 Allele frequencies and counts
 `````````````````````````````
 
-When a VCF file containing SNV calls for the same tumor sample (and optionally a
-matched normal) is given using the ``-v``/``--vcf`` option, the b-allele
-frequencies (BAFs) of the heterozygous, non-somatic SNVs falling within each
-segment are mirrored, averaged, and listed in the output .cns file as an
-additional "baf" column. The BAFs are also rescaled if ``--purity`` is
-specified.
-
-Then, for each segment with a BAF value (i.e. where SNVs were available),
-allele-specific integer copy number values are inferred from the total copy
-number and BAF, and output in columns "cn1" and "cn2". This calculation uses the
-same method as `PSCBS
+If a VCF file is given using the ``-v``/``--vcf`` option, then for each segment
+with a BAF value (i.e. where SNVs were available), allele-specific integer copy
+number values are inferred from the total copy number and BAF, and output in
+columns "cn1" and "cn2". This calculation uses the same method as `PSCBS
 <http://bioinformatics.oxfordjournals.org/content/27/15/2038.short>`_:
 total copy number is multiplied by the BAF, and rounded to the nearest integer.
 
