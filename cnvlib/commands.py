@@ -856,7 +856,7 @@ def csvstring(text):
 def verify_gender_arg(cnarr, gender_arg, is_male_reference):
     is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
     if gender_arg:
-        is_sample_female_given = (gender_arg in ["f", "female"])
+        is_sample_female_given = (gender_arg.lower() not in ["m", "male"])
         if is_sample_female != is_sample_female_given:
             logging.info("Sample gender specified as %s "
                          "but chrX copy number looks like %s",
