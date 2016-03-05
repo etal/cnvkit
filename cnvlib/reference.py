@@ -16,8 +16,8 @@ def bed2probes(bed_fname):
     regions = RA.read(bed_fname)
     table = regions.data.loc[:, ("chromosome", "start", "end")]
     table["gene"] = (regions.data["name"] if "name" in regions.data else '-')
-    table["log2"] = 0
-    table["spread"] = 0
+    table["log2"] = 0.0
+    table["spread"] = 0.0
     return CNA(table, {"sample_id": core.fbase(bed_fname)})
 
 
@@ -61,8 +61,8 @@ def combine_probes(filenames, fa_fname, is_male_reference,
         columns['gc'] = gc
 
     # Make the sex-chromosome coverages of male and female samples compatible
-    chr_x = cnarr1._chr_x_label
-    chr_y = cnarr1._chr_y_label
+    is_chr_x = (cnarr1.chromosome == cnarr1._chr_x_label)
+    is_chr_y = (cnarr1.chromosome == cnarr1._chr_y_label)
     flat_coverage = cnarr1.expect_flat_cvg(is_male_reference)
     def shift_sex_chroms(cnarr):
         """Shift sample X and Y chromosomes to match the reference gender.
@@ -84,16 +84,15 @@ def combine_probes(filenames, fa_fname, is_male_reference,
             xy sample, xy ref: 0    (from -1)   +1
 
         """
-        is_xx = cnarr.guess_xx()
+        is_sample_female = cnarr.guess_xx()
         cnarr['log2'] += flat_coverage
-        if is_xx:
+        if is_sample_female:
             # chrX already OK
             # No chrY; it's all noise, so just match the male
-            cnarr[cnarr.chromosome == chr_y, 'log2'] = -1.0
+            cnarr[is_chr_y, 'log2'] = -1.0
         else:
             # 1/2 #copies of each sex chromosome
-            cnarr[(cnarr.chromosome == chr_x) | (cnarr.chromosome == chr_y),
-                  'log2'] += 1.0
+            cnarr[is_chr_x | is_chr_y, 'log2'] += 1.0
 
     edge_bias = fix.get_edge_bias(cnarr1, params.INSERT_SIZE)
     def bias_correct_coverage(cnarr):
