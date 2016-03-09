@@ -524,6 +524,7 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
                                             male_reference, False,
                                             do_gc, False, do_rmask))
     ref_probes.center_all(skip_low=True)
+    ref_probes.sort_columns()
     reference.warn_bad_probes(ref_probes)
     return ref_probes
 
@@ -548,6 +549,7 @@ def do_reference_flat(targets, antitargets, fa_fname=None,
     else:
         logging.info("No FASTA reference genome provided; "
                      "skipping GC, RM calculations")
+    ref_probes.sort_columns()
     return ref_probes
 
 
