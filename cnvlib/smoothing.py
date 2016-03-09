@@ -1,14 +1,12 @@
 """Signal smoothing functions."""
 from __future__ import absolute_import, division
 
-from bisect import insort, bisect_left
-from collections import deque
 import math
 
 import numpy as np
 import pandas as pd
 
-from . import core, metrics
+from . import metrics
 
 
 def check_inputs(x, width):
@@ -32,16 +30,7 @@ def check_inputs(x, width):
 
 
 def rolling_median(x, width):
-    """Rolling median with mirrored edges.
-
-    Contributed by Peter Otten to comp.lang.python.
-    This is (somehow) faster than pandas' Cythonized skip-list implementation
-    for arrays smaller than ~100,000 elements.
-
-    Source:
-    https://bitbucket.org/janto/snippets/src/tip/running_median.py
-    https://groups.google.com/d/msg/comp.lang.python/0OARyHF0wtA/SEs-glW4t6gJ
-    """
+    """Rolling median with mirrored edges."""
     x, wing = check_inputs(x, width)
     # Pad the edges of the original array with mirror copies
     signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
