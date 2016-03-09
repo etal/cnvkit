@@ -21,7 +21,7 @@ def bed2probes(bed_fname):
     return CNA(table, {"sample_id": core.fbase(bed_fname)})
 
 
-def combine_probes(filenames, fa_fname, is_male_reference,
+def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
                    fix_gc, fix_edge, fix_rmask):
     """Calculate the median coverage of each bin across multiple samples.
 
@@ -97,17 +97,23 @@ def combine_probes(filenames, fa_fname, is_male_reference,
     edge_bias = fix.get_edge_bias(cnarr1, params.INSERT_SIZE)
     def bias_correct_coverage(cnarr):
         """Perform bias corrections on the sample."""
-        cnarr.center_all()
+        cnarr.center_all(skip_low=skip_low)
         shift_sex_chroms(cnarr)
-        if 'gc' in columns and fix_gc:
-            logging.info("Correcting for GC bias...")
-            cnarr = fix.center_by_window(cnarr, .1, columns['gc'])
-        if 'rmask' in columns and fix_rmask:
-            logging.info("Correcting for RepeatMasker bias...")
-            cnarr = fix.center_by_window(cnarr, .1, columns['rmask'])
-        if fix_edge:
-            logging.info("Correcting for density bias...")
-            cnarr = fix.center_by_window(cnarr, .1, edge_bias)
+        # Skip bias corrections if most bins have no coverage (e.g. user error)
+        if (cnarr['log2'] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+           ).sum() <= len(cnarr) // 2:
+            logging.warn("WARNING: most bins have no or very low coverage; "
+                         "check that the right BED file was used")
+        else:
+            if 'gc' in columns and fix_gc:
+                logging.info("Correcting for GC bias...")
+                cnarr = fix.center_by_window(cnarr, .1, columns['gc'])
+            if 'rmask' in columns and fix_rmask:
+                logging.info("Correcting for RepeatMasker bias...")
+                cnarr = fix.center_by_window(cnarr, .1, columns['rmask'])
+            if fix_edge:
+                logging.info("Correcting for density bias...")
+                cnarr = fix.center_by_window(cnarr, .1, edge_bias)
         return cnarr['log2']
 
     # Pseudocount of 1 "flat" sample

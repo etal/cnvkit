@@ -9,7 +9,7 @@ import pandas as pd
 from . import params, smoothing
 
 
-def load_adjust_coverages(pset, ref_pset,
+def load_adjust_coverages(pset, ref_pset, skip_low,
                           fix_gc, fix_edge, fix_rmask):
     """Load and filter probe coverages; correct using reference and GC."""
     if 'gc' in pset:
@@ -29,29 +29,34 @@ def load_adjust_coverages(pset, ref_pset,
     ref_matched = ref_matched[ok_cvg_indices]
 
     # Apply corrections for known systematic biases in coverage
-    pset.center_all()
-    if fix_gc:
-        if 'gc' in ref_matched:
-            logging.info("Correcting for GC bias...")
-            pset = center_by_window(pset, .1, ref_matched['gc'])
-        else:
-            logging.warn("WARNING: Skipping correction for GC bias")
-    if fix_edge:
-        logging.info("Correcting for density bias...")
-        edge_bias = get_edge_bias(pset, params.INSERT_SIZE)
-        pset = center_by_window(pset, .1, edge_bias)
-    if fix_rmask:
-        if 'rmask' in ref_matched:
-            logging.info("Correcting for RepeatMasker bias...")
-            pset = center_by_window(pset, .1, ref_matched['rmask'])
-        else:
-            logging.warn("WARNING: Skipping correction for RepeatMasker bias")
+    pset.center_all(skip_low=skip_low)
+    # Skip bias corrections if most bins have no coverage (e.g. user error)
+    if (pset['log2'] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+        ).sum() <= len(pset) // 2:
+            logging.warn("WARNING: most bins have no or very low coverage; "
+                         "check that the right BED file was used")
+    else:
+        if fix_gc:
+            if 'gc' in ref_matched:
+                logging.info("Correcting for GC bias...")
+                pset = center_by_window(pset, .1, ref_matched['gc'])
+            else:
+                logging.warn("WARNING: Skipping correction for GC bias")
+        if fix_edge:
+            logging.info("Correcting for density bias...")
+            edge_bias = get_edge_bias(pset, params.INSERT_SIZE)
+            pset = center_by_window(pset, .1, edge_bias)
+        if fix_rmask:
+            if 'rmask' in ref_matched:
+                logging.info("Correcting for RepeatMasker bias...")
+                pset = center_by_window(pset, .1, ref_matched['rmask'])
+            else:
+                logging.warn("WARNING: Skipping correction for RepeatMasker bias")
 
     # Normalize coverages according to the reference
     # (Subtract the reference log2 copy number to get the log2 ratio)
     pset.data['log2'] -= ref_matched['log2']
-
-    pset.center_all()
+    pset.center_all(skip_low=skip_low)
     return apply_weights(pset, ref_matched)
 
 

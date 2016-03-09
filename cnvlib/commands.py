@@ -518,12 +518,12 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
 
     # Calculate & save probe centers
     ref_probes = reference.combine_probes(target_fnames, fa_fname,
-                                          male_reference,
+                                          male_reference, True,
                                           do_gc, do_edge, False)
     ref_probes.add(reference.combine_probes(antitarget_fnames, fa_fname,
-                                            male_reference,
+                                            male_reference, False,
                                             do_gc, False, do_rmask))
-    ref_probes.center_all(skip_low=False)
+    ref_probes.center_all(skip_low=True)
     reference.warn_bad_probes(ref_probes)
     return ref_probes
 
@@ -601,10 +601,10 @@ def do_fix(target_raw, antitarget_raw, reference,
     """Combine target and antitarget coverages and correct for biases."""
     # Load, recenter and GC-correct target & antitarget probes separately
     logging.info("Processing target: %s", target_raw.sample_id)
-    cnarr = fix.load_adjust_coverages(target_raw, reference,
+    cnarr = fix.load_adjust_coverages(target_raw, reference, True,
                                       do_gc, do_edge, False)
     logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
-    anti_cnarr = fix.load_adjust_coverages(antitarget_raw, reference,
+    anti_cnarr = fix.load_adjust_coverages(antitarget_raw, reference, False,
                                            do_gc, False, do_rmask)
     if len(anti_cnarr):
         # Down-weight the more variable probe set (targets or antitargets)
@@ -621,9 +621,7 @@ def do_fix(target_raw, antitarget_raw, reference,
             anti_cnarr["weight"] *= iqr_ratio
         # Combine target and antitarget bins
         cnarr.add(anti_cnarr)
-    if len(cnarr):
-        cnarr.center_all()
-    # Determine weights for each bin (used in segmentation)
+    cnarr.center_all(skip_low=True)
     return cnarr
 
 
