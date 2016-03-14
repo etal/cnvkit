@@ -16,7 +16,7 @@ try:
             'scipy >= 0.9',
             'matplotlib >= 1.1',
             'pandas >= 0.17.1',
-            'pysam >= 0.8',
+            'pysam>=0.8,<0.9',
             'pyvcf >= 0.5',
             'reportlab >= 3.0',
             'biopython >= 1.62',
