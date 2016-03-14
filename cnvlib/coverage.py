@@ -132,6 +132,8 @@ def bedcov(bed_fname, bam_fname, min_mapq):
         raise ValueError("BED file %r sequence IDs don't match any in BAM file %r"
                          % (bed_fname, bam_fname))
     # Return an iterable...
+    if isinstance(lines, basestring):
+        lines = lines.splitlines()
     for line in lines:
         fields = line.split('\t')
         if len(fields) == 5:
@@ -159,6 +161,8 @@ def bam_total_reads(bam_fname):
     Uses the BAM index to do this quickly.
     """
     lines = pysam.idxstats(bam_fname)
+    if isinstance(lines, basestring):
+        lines = lines.splitlines()
     tot_mapped_reads = 0
     for line in lines:
         _seqname, _seqlen, nmapped, _nunmapped = line.split()
