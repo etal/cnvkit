@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division
 
 import math
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -34,7 +35,10 @@ def rolling_median(x, width):
     x, wing = check_inputs(x, width)
     # Pad the edges of the original array with mirror copies
     signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
-    rolled = pd.rolling_median(signal, 2 * wing + 1, center=True)
+    with warnings.catch_warnings():
+        # NB: in pandas 0.18+ this function is deprecated
+        warnings.simplefilter("ignore", FutureWarning)
+        rolled = pd.rolling_median(signal, 2 * wing + 1, center=True)
     return rolled[wing:-wing]
 
 
@@ -43,7 +47,11 @@ def rolling_quantile(x, width, quantile):
     x, wing = check_inputs(x, width)
     # Pad the edges of the original array with mirror copies
     signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
-    rolled = pd.rolling_quantile(signal, 2 * wing + 1, quantile, center=True)
+    with warnings.catch_warnings():
+        # NB: in pandas 0.18+ this function is deprecated
+        warnings.simplefilter("ignore", FutureWarning)
+        rolled = pd.rolling_quantile(signal, 2 * wing + 1, quantile,
+                                     center=True)
     return rolled[wing:-wing]
 
 
@@ -52,7 +60,10 @@ def rolling_std(x, width):
     x, wing = check_inputs(x, width)
     # Pad the edges of the original array with mirror copies
     signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
-    rolled = pd.rolling_std(signal, 2 * wing + 1, center=True)
+    with warnings.catch_warnings():
+        # NB: in pandas 0.18+ this function is deprecated
+        warnings.simplefilter("ignore", FutureWarning)
+        rolled = pd.rolling_std(signal, 2 * wing + 1, center=True)
     return rolled[wing:-wing]
 
 
