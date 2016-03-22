@@ -31,6 +31,11 @@ clean:
 	# Picard
 	rm -rf build/p*targetcoverage.cnn $(picard_targets) p*-scatter.pdf p*-diagram.pdf
 
+.PHONY: test
+test:
+	python test_cnvlib.py
+	python test_r.py
+
 
 # ------------------------------------------------------------------------------
 # Standard workflow
