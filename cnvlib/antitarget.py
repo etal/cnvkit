@@ -29,6 +29,13 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
     if access_bed:
         # Chromosomes' accessible sequence regions are given -- use them
         access_chroms = dict(RA.read(access_bed).by_chromosome())
+        if access_chroms and set(access_chroms).isdisjoint(target_chroms):
+            raise ValueError("Chromosome names in the accessible regions file "
+                             "%s %r do not match those in targets %s %r"
+                             % (access_bed,
+                                tuple(sorted(access_chroms.keys())[:3]),
+                                target_bed,
+                                tuple(sorted(target_chroms.keys())[:3])))
         # But filter out untargeted alternative contigs and mitochondria
         untgt_chroms = set(access_chroms) - set(target_chroms)
         # Autosomes typically have numeric names, allosomes are X and Y
