@@ -539,6 +539,7 @@ integer copy number using either:
     cnvkit.py call Sample.cns -o Sample.call.cns
     cnvkit.py call Sample.cns -y -m threshold -t=-1.1,-0.4,0.3,0.7 -o Sample.call.cns
     cnvkit.py call Sample.cns -y -m clonal --purity 0.65 -o Sample.call.cns
+    cnvkit.py call Sample.cns -y -v Sample.vcf -m clonal --purity 0.7 -o Sample.call.cns
 
 The output is another .cns file, with an additional "cn" column listing each
 segment's absolute integer copy number. This .cns file is still compatible with
@@ -547,8 +548,20 @@ way with the :ref:`scatter`, :ref:`heatmap` and :ref:`diagram` commands.
 To get these copy number values in another format, e.g. BED or VCF, see the
 :ref:`export` command.
 
+With a VCF file of SNVs (``-v``/``--vcf``), the b-allele frequencies of SNPs in
+the tumor sample are extracted and averaged for each segment::
+
+    cnvkit.py call Sample.cns -y -v Sample.vcf -o Sample.call.cns
+
+The segment b-allele frequencies are also used to calculate major and minor
+allele-specific integer copy numbers (see below).
+
 Alternatively, the ``-m none`` option performs rescaling, re-centering, and
-extracting b-allele frequencies from a VCF, but does not add a 
+extracting b-allele frequencies from a VCF (if requested), but does not add a
+"cn" column or allele copy numbers::
+
+    cnvkit.py call Sample.cns -v Sample.vcf --purity 0.8 -m none -o Sample.call.cns
+
 
 Transformations
 ```````````````
@@ -592,9 +605,20 @@ and adjusting for the tumor cell fraction or purity directly. However, if
 ``--purity`` is specified, then the log2 values will still be rescaled before
 applying the copy number thresholds.
 
-The default threshold values are reasonable for a tumor sample with purity of
-at least 40% or so.  For germline samples, the ``-t`` values shown above may
-yield more accurate calls.
+The default threshold values are reasonably "safe" for a tumor sample with
+purity of at least 30%.
+The inner cutoffs of +0.2 and -0.25 are sensitive enough to detect a single-copy
+gain or loss in a diploid tumor with purity (or subclone cellularity) as low as
+30%.
+But the outer cutoffs of -1.1 and +0.7 assume 100% purity, so a more extreme
+copy number, i.e. homozygous deletion (0 copies) or multi-copy amplification (4+
+copies), is only assigned to a CNV if there is strong evidence for it.
+For germline samples, the ``-t`` values shown below (or ``-m clonal``) may yield
+more precise calls.
+
+.. i.e. tumor samples of high enough quality to pass other QC measures typically
+   used in clinical labs (e.g. tumor cellularity estimated >50% by a pathologist).
+.. A log2 threshold of +/- 0.2 is commonly used for array CGH data in similar contexts.
 
 The thresholds map to integer copy numbers in order, starting from zero:
 log2 ratios up to the first threshold value are assigned a copy number 0, log2
@@ -602,7 +626,7 @@ ratios between the first and second threshold values get copy number 1, and so
 on.
 
 =====================================   ===========
-If :math:`\log_2` value :math:`\leq`    Copy number
+If log2 value is up to                  Copy number
 -------------------------------------   -----------
 -1.1                                    0
 -0.4                                    1
@@ -624,6 +648,13 @@ Or, in R::
 
     > log2( (0:4 + .5) / 2)
     [1] -2.0000000 -0.4150375  0.3219281  0.8073549  1.1699250
+
+For arbitrary purity and ploidy::
+
+    > purity = 0.6
+    > ploidy = 4
+    > log2( (1 - purity) + purity * (0:6 + .5) / ploidy )
+    [1] -1.0740006 -0.6780719 -0.3677318 -0.1124747  0.1043367  0.2927817  0.4594316
 
 Allele frequencies and counts
 `````````````````````````````
