@@ -20,6 +20,7 @@ try:
             'pyvcf >= 0.5',
             'reportlab >= 3.0',
             'biopython >= 1.62',
+            'pyfaidx >= 0.4.7'
         ])
 except ImportError:
     from distutils.core import setup
