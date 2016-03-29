@@ -1,6 +1,7 @@
 """Export CNVkit objects and files to other formats."""
 from __future__ import absolute_import, division, print_function
 
+import math
 import collections
 import logging
 
@@ -227,6 +228,9 @@ VCF_HEADER = """\
 ##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variation">
 ##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Difference in length between REF and ALT alleles">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=FOLD_CHANGE,Number=1,Type=Float,Description="Fold change">
+##INFO=<ID=FOLD_CHANGE_LOG,Number=1,Type=Float,Description="Log fold change">
+##INFO=<ID=PROBES,Number=1,Type=Integer,Description="Number of probes in CNV">
 ##ALT=<ID=DEL,Description="Deletion">
 ##ALT=<ID=DUP,Description="Duplication">
 ##ALT=<ID=CNV,Description="Copy number variable region">
@@ -314,6 +318,9 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
                          "SVTYPE=%s" % out_row.svtype,
                          "END=%d" % out_row.end,
                          "SVLEN=%d" % out_row.svlen,
+                         "FOLD_CHANGE=%f" % math.pow(2.0, out_row.log2),
+                         "FOLD_CHANGE_LOG=%f" % out_row.log2,
+                         "PROBES=%d" % out_row.probes
                          # CIPOS=-56,20;CIEND=-10,62
                         ])
 
