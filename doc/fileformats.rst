@@ -101,14 +101,21 @@ columns present in .cnn files, the .cnr file has the columns:
 * Log2 ratio (``log2``)
 * Proportional weight to be used for segmentation (``weight``)
 
-The weight value is the inverse of the variance (i.e. square of ``spread`` in
-the reference) of normalized log2 coverage values seen among all normal samples
-at that bin. This value is used to weight the bin log2 ratio values during
-segmentation.
+The weight value is derived from several sources:
 
+- The size of the bin relative to the average bin size (for targets or
+  antitargets, separately)
+- For a paired or pooled reference, the deviation of the reference log2 value
+  from neutral coverage (i.e. distance from 0.0)
+- For a pooled reference, the inverse of the variance (i.e. square of ``spread``
+  in the reference) of normalized log2 coverage values seen among all normal
+  samples at that bin.
+
+This calculated value is used to weight the bin log2 ratio values during
+segmentation.
 Also, when a genomic region is plotted with CNVkit's "scatter" command, the size
-of the plotted datapoints is proportional to the weight of each point used in
-segmentation -- a relatively small point indicates a less reliable bin.
+of the plotted datapoints is proportional to each bin's weight -- a relatively
+small point indicates a less reliable bin.
 
 
 Segmented log2 ratios (.cns)
@@ -118,7 +125,6 @@ In addition to the ``chromosome``, ``start``, ``end``, ``gene`` and ``log2``
 columns present in .cnr files, the .cns file format has the additional column
 ``probes``, indicating the number of bins covered by the segment.
 
-The ``gene`` column does not contain actual gene names. Rather, the sign of the
-segment's copy ratio value is indicated by 'G' if greater than zero or 'L' if
-less than zero.
+The ``gene`` column concatenates the gene names of all the bins that the segment
+covers. The ``weight`` column sums the bin-level weights.
 

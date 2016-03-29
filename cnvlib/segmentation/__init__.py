@@ -153,31 +153,34 @@ def squash_segments(seg_pset):
     curr_chrom = None
     curr_start = None
     curr_end = None
+    curr_genes = []
     curr_val = None
     curr_cnt = 0
     squashed_rows = []
     chromosome, start, end, gene, log2, probes = 0, 1, 2, 3, 4, 5
     for row in seg_pset:
-        if row[chromosome] == curr_chrom and row[log2] == curr_val:
+        if row.chromosome == curr_chrom and row.log2 == curr_val:
             # Continue the current segment
-            curr_end = row[end]
+            curr_end = row.end
+            curr_genes.append(row.gene)
             curr_cnt += 1
         else:
             # Segment break
             # Finish the current segment
             if curr_cnt:
                 squashed_rows.append((curr_chrom, curr_start, curr_end,
-                                      ('G' if curr_val >= 0. else 'L'),
+                                      ",".join(pd.unique(curr_genes)),
                                       curr_val, curr_cnt))
             # Start a new segment
-            curr_chrom = row[chromosome]
-            curr_start = row[start]
-            curr_end = row[end]
-            curr_val = row[log2]
+            curr_chrom = row.chromosome
+            curr_start = row.start
+            curr_end = row.end
+            curr_genes = []
+            curr_val = row.log2
             curr_cnt = 1
     # Remainder
     squashed_rows.append((curr_chrom, curr_start, curr_end,
-                          ('G' if curr_val >= 0. else 'L'),
+                          ",".join(pd.unique(curr_genes)),
                           curr_val, curr_cnt))
     return seg_pset.as_rows(squashed_rows)
 
