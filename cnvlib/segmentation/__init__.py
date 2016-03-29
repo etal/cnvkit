@@ -157,7 +157,6 @@ def squash_segments(seg_pset):
     curr_val = None
     curr_cnt = 0
     squashed_rows = []
-    chromosome, start, end, gene, log2, probes = 0, 1, 2, 3, 4, 5
     for row in seg_pset:
         if row.chromosome == curr_chrom and row.log2 == curr_val:
             # Continue the current segment
