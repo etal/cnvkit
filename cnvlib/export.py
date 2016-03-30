@@ -111,7 +111,8 @@ def export_nexus_ogt(sample_fname, vcf_fname):
     are all "mirrored" to be above .5, then the median of those values is taken.
     """
     cnarr = CNA.read(sample_fname)
-    varr = VA.read_vcf(vcf_fname, skip_hom=True, skip_somatic=True)
+    varr = VA.read_vcf(vcf_fname, sample_id=cnarr.sample_id,
+                       skip_hom=True, skip_somatic=True)
     bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
                                summary_func=mirrored_baf_median)
     logging.info("Placed %d variants into %d bins",

@@ -168,8 +168,8 @@ def _select_sample(vcf_reader, sample_id, normal_id):
     _confirm_unique(sample_id, vcf_reader.samples)
     if normal_id:
         _confirm_unique(normal_id, vcf_reader.samples)
-    logging.info("Selected tumor sample " + sample_id +
-                 (" and normal sample %s" % normal_id if normal_id else ''))
+    logging.info("Selected test sample " + sample_id +
+                 (" and control sample %s" % normal_id if normal_id else ''))
     return sample_id, normal_id
 
 
