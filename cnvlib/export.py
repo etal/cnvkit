@@ -102,7 +102,7 @@ def export_nexus_basic(sample_fname):
     return out_table
 
 
-def export_nexus_ogt(sample_fname, vcf_fname):
+def export_nexus_ogt(sample_fname, vcf_fname, sample_id):
     """Biodiscovery Nexus Copy Number "Custom-OGT" format.
 
     To create the b-allele frequencies column, alterate allele frequencies from
@@ -111,7 +111,7 @@ def export_nexus_ogt(sample_fname, vcf_fname):
     are all "mirrored" to be above .5, then the median of those values is taken.
     """
     cnarr = CNA.read(sample_fname)
-    varr = VA.read_vcf(vcf_fname, sample_id=cnarr.sample_id,
+    varr = VA.read_vcf(vcf_fname, sample_id=sample_id or cnarr.sample_id,
                        skip_hom=True, skip_somatic=True)
     bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
                                summary_func=mirrored_baf_median)

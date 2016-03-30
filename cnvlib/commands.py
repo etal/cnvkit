@@ -1840,7 +1840,7 @@ P_export_nb.set_defaults(func=_cmd_export_nb)
 # Nexus "Custom-OGT" special case: can only represent 1 sample
 def _cmd_export_nbo(args):
     """Convert log2 ratios and b-allele freqs to Nexus "Custom-OGT" format."""
-    table = export.export_nexus_ogt(args.filename, args.vcf)
+    table = export.export_nexus_ogt(args.filename, args.vcf, args.sample_id)
     core.write_dataframe(args.output, table)
 
 P_export_nbo = P_export_subparsers.add_parser('nexus-ogt',
@@ -1851,6 +1851,9 @@ P_export_nbo.add_argument('filename',
 P_export_nbo.add_argument('vcf',
         help="""VCF of SNVs for the same sample, to calculate b-allele
                 frequencies.""")
+P_export_nbo.add_argument("-i", "--sample-id",
+        help="""Specify the name of the sample in the VCF to use to extract
+                b-allele frequencies.""")
 P_export_nbo.add_argument('-o', '--output', help="Output file name.")
 P_export_nbo.set_defaults(func=_cmd_export_nbo)
 
