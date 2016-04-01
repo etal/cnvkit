@@ -994,11 +994,11 @@ def do_scatter(cnarr, segments=None, variants=None,
         # Plot all chromosomes, concatenated on one plot
         PAD = 1e7
         if (cnarr or segments) and variants:
-            # Lay out top 3/5 for the CN scatter, bottom 2/5 for LOH plot
+            # Lay out top 3/5 for the CN scatter, bottom 2/5 for SNP plot
             axgrid = pyplot.GridSpec(5, 1, hspace=.85)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            # Place chromosome labels between the CNR and LOH plots
+            # Place chromosome labels between the CNR and SNP plots
             axis2.tick_params(labelbottom=False)
             chrom_sizes = plots.chromosome_sizes(cnarr or segments)
             plots.snv_on_genome(axis2, variants, chrom_sizes, segments,
@@ -1086,7 +1086,7 @@ def do_scatter(cnarr, segments=None, variants=None,
 
         # Similarly for SNV allele freqs, if given
         if (cnarr or segments) and variants:
-            # Lay out top 3/5 for the CN scatter, bottom 2/5 for LOH plot
+            # Lay out top 3/5 for the CN scatter, bottom 2/5 for SNP plot
             axgrid = pyplot.GridSpec(5, 1, hspace=.5)
             axis = pyplot.subplot(axgrid[:3])
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
@@ -1136,8 +1136,8 @@ P_scatter.add_argument('-l', '--range-list',
                 multi-page PDF.  The output filename must also be
                 specified (-o/--output).""")
 P_scatter.add_argument("-i", "--sample-id",
-        help="""Specify the name of the sample in the VCF to use for LOH
-                analysis and to show in plot title.""")
+        help="""Specify the name of the sample in the VCF to use for b-allele
+                frequency extraction and to show in plot title.""")
 P_scatter.add_argument("-n", "--normal-id",
         help="Corresponding normal sample ID in the input VCF.")
 P_scatter.add_argument('-b', '--background-marker', default=None,
@@ -1146,10 +1146,11 @@ P_scatter.add_argument('-b', '--background-marker', default=None,
 P_scatter.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_scatter.add_argument('-v', '--vcf',
-        help="""VCF file name containing variants to plot for LOH.""")
+        help="""VCF file name containing variants to plot for SNV allele
+                frequencies.""")
 P_scatter.add_argument('-m', '--min-variant-depth', type=int, default=20,
-        help="""Minimum read depth for a variant to be displayed in the LOH
-                plot. [Default: %(default)s]""")
+        help="""Minimum read depth for a SNV to be displayed in the b-allele
+                frequency plot. [Default: %(default)s]""")
 P_scatter.add_argument('-w', '--width', type=float, default=1e6,
         help="""Width of margin to show around the selected gene or region
                 on the chromosome (use with --gene or --region).
