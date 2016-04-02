@@ -953,6 +953,8 @@ def _cmd_scatter(args):
                      ) if args.filename else None
     segarr = _CNA.read(args.segment
                       ) if args.segment else None
+    if not args.sample_id and (cnarr or segarr):
+        args.sample_id = (cnarr or segarr).sample_id
     varr = _VA.read_vcf(args.vcf, args.sample_id, args.normal_id,
                         args.min_variant_depth, skip_hom=True, skip_somatic=True
                        ) if args.vcf else None
