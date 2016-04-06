@@ -190,7 +190,6 @@ def warn_bad_probes(probes):
 
 def get_fasta_stats(probes, fa_fname):
     """Calculate GC and RepeatMasker content of each bin in the FASTA genome."""
-    ngfrills.ensure_fasta_index(fa_fname)
     fa_coords = zip(probes.chromosome, probes.start, probes.end)
     logging.info("Calculating GC and RepeatMasker content in %s ...", fa_fname)
     gc_rm_vals = [calculate_gc_lo(subseq)
