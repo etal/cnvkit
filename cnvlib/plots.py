@@ -32,10 +32,14 @@ def setup_chromosome(axis, probes=None, segments=None, variants=None,
     max_x = 0
     for arr in (probes, segments, variants):
         if arr:
-            max_x = max(max_x, arr[len(arr) - 1, "end"])
-            min_x = min(min_x, arr[0, "start"])
+            max_x = max(max_x, arr.end.iat[-1])
+            min_x = min(min_x, arr.start.iat[0])
     if not max_x > min_x:
-        raise ValueError("No usable data points to plot out of"
+        if any((probes, segments, variants)):
+            logging.warn("*WARNING* selection start %s > end %s (%s); did you "
+                         "correctly sort the input file by genomic location?",
+                         min_x, max_x, max_x - min_x)
+        raise ValueError("No usable data points to plot out of "
                          "%d probes, %d segments, %d variants"
                          % (len(probes) if probes else 0,
                             len(segments) if segments else 0,
