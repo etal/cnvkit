@@ -15,7 +15,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
-from . import plots, reports
+from . import params, plots, reports
 
 # Silence Biopython's whinging
 from Bio import BiopythonWarning
@@ -45,13 +45,20 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, male_referenc
     # Label genes where copy ratio value exceeds threshold
     cnarr = cnarr.shift_xx(male_reference)
     if cnarr_is_seg:
-        gainloss = []
+        sel = cnarr.data[(cnarr.data.log2.abs() >= threshold) &
+                          ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
+        gainloss = [(s.gene, s.chromosome, s.start, s.end, s.log2, s.probes)
+                    for s in sel.itertuples(index=False)]
     elif segarr:
         segarr = segarr.shift_xx(male_reference)
         gainloss = reports.gainloss_by_segment(cnarr, segarr, threshold)
     else:
         gainloss = reports.gainloss_by_gene(cnarr, threshold)
     gene_labels = [gl_row[0] for gl_row in gainloss if gl_row[5] >= min_probes]
+    # NB: If multiple segments cover the same gene (gene contains breakpoints),
+    # all those segments are marked as "hits".  We'll uniquify them.
+    # TODO - use different logic to only label the gene's signficant segment(s)
+    seen_genes = set()
 
     # Consolidate genes & coverage values as chromosome features
     features = collections.defaultdict(list)
@@ -61,7 +68,14 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, male_referenc
         cnarr = cnarr.squash_genes()
     for row in cnarr:
         if row.start - 1 >= 0 and row.end <= chrom_sizes[row.chromosome]:  # Sanity check
-            feat_name = row.gene if row.gene in gene_labels else None
+            if row.gene in gene_labels and row.gene not in seen_genes:
+                seen_genes.add(row.gene)
+                feat_name = row.gene
+                if "," in feat_name:
+                    # TODO - line-wrap multi-gene labels (reportlab won't do \n)
+                    feat_name = feat_name.replace(",", ", ")
+            else:
+                feat_name = None
             features[row.chromosome].append(
                 (row.start - 1, row.end, strand, feat_name,
                  colors.Color(*plots.cvg2rgb(row.log2, not cnarr_is_seg))))
