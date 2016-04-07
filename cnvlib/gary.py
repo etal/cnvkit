@@ -216,7 +216,7 @@ class GenomicArray(object):
         - ``outer``: Keep/emit those bins as they are.
         - ``trim``: Emit those bins but alter their boundaries to match the
           selection; the bin start or end position is replaced with the
-          selection boundary position. [default]
+          selection boundary position.
 
         Bins in this array that fall outside the other array's bins are skipped.
         """
