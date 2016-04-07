@@ -301,7 +301,7 @@ def _get_end(posn, alt, info):
     """Get record end position."""
     if "END" in info:
         # Structural variant
-        return posn + info['END']
+        return info['END']
     return posn + len(alt)
 
 
