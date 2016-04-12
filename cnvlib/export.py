@@ -338,7 +338,7 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
 # _____________________________________________________________________________
 # THetA
 
-def export_theta(tumor, reference):
+def export_theta(tumor_segs, normal_cn, variants):
     """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
 
     Follows the THetA segmentation import script but avoid repeating the
@@ -354,9 +354,6 @@ def export_theta(tumor, reference):
 
     where chromosome IDs ("chrm") are integers 1 through 24.
     """
-    tumor_segs = CNA.read(tumor)
-    ref_cnarr = CNA.read(reference)
-
     # Capture parameters in a closure: avg_depth, avg_bin_width
     # (These two scaling factors don't meaningfully affect THetA's calculation
     # unless they're too small)
@@ -386,7 +383,7 @@ def export_theta(tumor, reference):
     # Convert chromosome names to 1-based integer indices
     prev_chrom = None
     chrom_id = 0
-    for seg, subcnarr in ref_cnarr.by_ranges(tumor_segs):
+    for seg, subcnarr in normal_cn.by_ranges(tumor_segs):
         if seg.chromosome != prev_chrom:
             chrom_id += 1
             prev_chrom = seg.chromosome
