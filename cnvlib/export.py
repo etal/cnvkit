@@ -1,9 +1,9 @@
 """Export CNVkit objects and files to other formats."""
 from __future__ import absolute_import, division, print_function
 
-import math
 import collections
 import logging
+import time
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,7 @@ from Bio._py3k import map, range, zip
 from . import call, core, params
 from .cnary import CopyNumArray as CNA
 from .vary import VariantArray as VA
+from ._version import __version__
 
 
 def merge_samples(filenames):
@@ -228,6 +229,8 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female,
 
 VCF_HEADER = """\
 ##fileformat=VCFv4.0
+##fileDate={date}
+##source=CNVkit v{version}
 ##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">
 ##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS for imprecise variants">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
@@ -244,7 +247,7 @@ VCF_HEADER = """\
 ##FORMAT=<ID=GQ,Number=1,Type=Float,Description="Genotype quality">
 ##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Copy number genotype for imprecise events">
 ##FORMAT=<ID=CNQ,Number=1,Type=Float,Description="Copy number genotype quality for imprecise events">
-"""
+""".format(date=time.strftime("%Y%m%d"), version=__version__)
 # #CHROM  POS   ID  REF ALT   QUAL  FILTER  INFO  FORMAT  NA00001
 # 1 2827693   . CCGTGGATGCGGGGACCCGCATCCCCTCTCCCTTCACAGCTGAGTGACCCACATCCCCTCTCCCCTCGCA  C . PASS  SVTYPE=DEL;END=2827680;BKPTID=Pindel_LCS_D1099159;HOMLEN=1;HOMSEQ=C;SVLEN=-66 GT:GQ 1/1:13.9
 # 2 321682    . T <DEL>   6 PASS    IMPRECISE;SVTYPE=DEL;END=321887;SVLEN=-105;CIPOS=-56,20;CIEND=-10,62  GT:GQ 0/1:12
@@ -324,7 +327,7 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
                          "SVTYPE=%s" % out_row.svtype,
                          "END=%d" % out_row.end,
                          "SVLEN=%d" % out_row.svlen,
-                         "FOLD_CHANGE=%f" % math.pow(2.0, out_row.log2),
+                         "FOLD_CHANGE=%f" % 2.0 ** out_row.log2,
                          "FOLD_CHANGE_LOG=%f" % out_row.log2,
                          "PROBES=%d" % out_row.probes
                          # CIPOS=-56,20;CIEND=-10,62
