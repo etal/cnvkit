@@ -1808,19 +1808,53 @@ P_export_vcf.set_defaults(func=_cmd_export_vcf)
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn
 def _cmd_export_theta(args):
     """Convert segments to THetA2 input file format (*.input)."""
-    outheader, outrows = export.export_theta(args.tumor_segment,
-                                             args.normal_reference)
-    # if not args.output:
-    #     args.output = tumor_segs.sample_id + ".input"
+    tumor_cn = _CNA.read(args.tumor_segment)
+    # Handle deprecated positional reference
+    if args.normal_reference:
+        logging.warn("Second positional argument normal_reference is "
+                     "deprecated; use --reference instead.")
+        if not args.reference:
+            args.reference = args.normal_reference
+    normal_cn = (_CNA.read(args.reference) if args.reference else None)
+    outheader, outrows = export.export_theta(tumor_cn, normal_cn)
+    if not args.output:
+        args.output = tumor_cn.sample_id + ".interval_count"
     core.write_tsv(args.output, outrows, colnames=outheader)
+    if args.vcf:
+        variants = _VA.read_vcf(args.vcf,
+                                sample_id=args.sample_id or tumor_cn.sample_id,
+                                normal_id=args.normal_id, min_depth=args.min_depth,
+                                skip_somatic=True, skip_hom=False)
+        tumor_snps, normal_snps = export.export_theta_snps(variants)
+        for title, table in [("tumor", tumor_snps), ("normal", normal_snps)]:
+            out_fname = "{}.{}.snp_formatted.txt".format(tumor_cn.sample_id, title)
+            table.to_csv(out_fname, sep='\t', index=False,
+                         header=("#Chrm", "Pos", "Ref_Allele", "Mut_Allele"))
+            print("Wrote", out_fname)
 
 P_export_theta = P_export_subparsers.add_parser('theta',
         help=_cmd_export_theta.__doc__)
 P_export_theta.add_argument('tumor_segment',
         help="""Tumor-sample segmentation file from CNVkit (.cns).""")
-P_export_theta.add_argument('normal_reference',
+P_export_theta.add_argument("normal_reference", nargs='?',
         help="""Reference copy number profile (.cnn), or normal-sample bin-level
-                log2 copy ratios (.cnr).""")
+                log2 copy ratios (.cnr). [DEPRECATED]""")
+P_export_theta.add_argument("-r", "--reference",
+        help="""Reference copy number profile (.cnn), or normal-sample bin-level
+                log2 copy ratios (.cnr). Use if the tumor_segment input file
+                does not contain a "weight" column.""")
+P_export_theta.add_argument("-v", "--vcf",
+        help="""VCF file containing SNVs observed in both the tumor and normal
+                samples. Tumor sample ID should match the `tumor_segment`
+                filename or be specified with -i/--sample-id.""")
+P_export_theta.add_argument("-i", "--sample-id",
+        help="""Specify the name of the tumor sample in the VCF (given with
+                -v/--vcf). [Default: taken the tumor_segment file name]""")
+P_export_theta.add_argument("-n", "--normal-id",
+        help="Corresponding normal sample ID in the input VCF.")
+P_export_theta.add_argument('-m', '--min-depth', type=int, default=20,
+        help="""Minimum read depth for a SNP in the VCF to be counted.
+                [Default: %(default)s]""")
 P_export_theta.add_argument('-o', '--output', help="Output file name.")
 P_export_theta.set_defaults(func=_cmd_export_theta)
 

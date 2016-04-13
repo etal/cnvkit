@@ -338,7 +338,7 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
 # _____________________________________________________________________________
 # THetA
 
-def export_theta(tumor, reference):
+def export_theta(tumor_segs, normal_cn):
     """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
 
     Follows the THetA segmentation import script but avoid repeating the
@@ -354,8 +354,14 @@ def export_theta(tumor, reference):
 
     where chromosome IDs ("chrm") are integers 1 through 24.
     """
-    tumor_segs = CNA.read(tumor)
-    ref_cnarr = CNA.read(reference)
+    # Drop any chromosomes that are not integer or XY
+    # THetA hard-codes X & Y, so we can, too
+    xy_names = (["chrX", "chrY"]
+                if tumor_segs.chromosome.iat[0].startswith('chr')
+                else ["X", "Y"])
+    tumor_segs = tumor_segs.autosomes(also=xy_names)
+    if normal_cn:
+        normal_cn = normal_cn.autosomes(also=xy_names)
 
     # Capture parameters in a closure: avg_depth, avg_bin_width
     # (These two scaling factors don't meaningfully affect THetA's calculation
@@ -386,12 +392,16 @@ def export_theta(tumor, reference):
     # Convert chromosome names to 1-based integer indices
     prev_chrom = None
     chrom_id = 0
-    for seg, subcnarr in ref_cnarr.by_ranges(tumor_segs):
-        if seg.chromosome != prev_chrom:
-            chrom_id += 1
-            prev_chrom = seg.chromosome
-        fields = format_theta_row(seg, subcnarr, chrom_id, log2ratio_to_count)
-        outrows.append(fields)
+    if normal_cn:
+        for seg, subcnarr in normal_cn.by_ranges(tumor_segs):
+            if seg.chromosome != prev_chrom:
+                chrom_id += 1
+                prev_chrom = seg.chromosome
+            fields = format_theta_row(seg, subcnarr, chrom_id, log2ratio_to_count)
+            outrows.append(fields)
+    else:
+        # TODO - use segment weights
+        raise NotImplementedError("reference is still needed")
 
     return outheader, outrows
 
@@ -415,6 +425,29 @@ def format_theta_row(seg, cnarr, chrom_id, log2_to_count):
             tumor_count,  # tumorCount
             ref_count     # normalCount
            )
+
+
+def export_theta_snps(varr):
+    """Generate THetA's SNP per-allele read count "formatted.txt" files."""
+    # Drop any chromosomes that are not integer or XY
+    varr = varr.autosomes(also=(["chrX", "chrY"]
+                       if varr.chromosome.iat[0].startswith("chr")
+                       else ["X", "Y"]))
+    # Skip indels
+    varr = varr[(varr["ref"].str.len() == 1) & (varr["alt"].str.len() == 1)]
+    # Drop rows with any NaN
+    varr.data.dropna(subset=["depth", "n_depth", "alt_count", "n_alt_count"],
+                     inplace=True)
+    # Avoid weird situation I've seen on alt contigs
+    varr = varr[varr["depth"] >= varr["alt_count"]]
+    # Reformat for THetA2
+    for depth_key, alt_key in (("depth", "alt_count"),
+                               ("n_depth", "n_alt_count")):
+        # Extract the SNP allele counts that THetA2 uses
+        table = varr.data.loc[:, ("chromosome", "start", depth_key, alt_key)]
+        table["ref_depth"] = (table[depth_key] - table[alt_key]).astype("int")
+        table[alt_key] = table[alt_key].astype("int")
+        yield table.loc[:, ("chromosome", "start", "ref_depth", alt_key)]
 
 
 # _____________________________________________________________________________
