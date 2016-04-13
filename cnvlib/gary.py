@@ -454,20 +454,23 @@ class GenomicArray(object):
                 sample_id = core.fbase(infile)
             else:
                 sample_id = '<unknown>'
-        # Create a multi-index of genomic coordinates (like GRanges)
         try:
-            table = pd.read_table(infile, na_filter=False,
-                                  dtype={'chromosome': 'string'},
-                                  # index_col=['chromosome', 'start']
-                                 )
+            table = pd.read_table(infile,
+                                  dtype={'chromosome': 'string'})
+            t2 = table.dropna()
+            if len(t2) < len(table):
+                logging.warn("Dropped %d rows with missing data",
+                             len(table) - len(t2))
+                table = t2
         except ValueError:
             # File is blank/empty, most likely
-            logging.info("Blank file %s", infile)
+            logging.warn("Blank file?: %s", infile)
             table = cls._make_blank()
         # XXX Pending pandas 0.17: https://github.com/pydata/pandas/issues/10505
         # table['chromosome'] = pd.Categorical(table['chromosome'],
         #                                      table.chromosome.drop_duplicates(),
         #                                      ordered=True)
+        # Create a multi-index of genomic coordinates (like GRanges)
         # table.set_index(['chromosome', 'start'], inplace=True)
         return cls(table, {"sample_id": sample_id})
 
