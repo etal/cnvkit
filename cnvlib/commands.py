@@ -1816,10 +1816,11 @@ def _cmd_export_theta(args):
         if not args.reference:
             args.reference = args.normal_reference
     normal_cn = (_CNA.read(args.reference) if args.reference else None)
-    outheader, outrows = export.export_theta(tumor_cn, normal_cn)
+    table = export.export_theta(tumor_cn, normal_cn)
     if not args.output:
         args.output = tumor_cn.sample_id + ".interval_count"
-    core.write_tsv(args.output, outrows, colnames=outheader)
+    table.to_csv(args.output, sep='\t', index=False)
+    logging.info("Wrote %s", args.output)
     if args.vcf:
         variants = _VA.read_vcf(args.vcf,
                                 sample_id=args.sample_id or tumor_cn.sample_id,
@@ -1828,9 +1829,8 @@ def _cmd_export_theta(args):
         tumor_snps, normal_snps = export.export_theta_snps(variants)
         for title, table in [("tumor", tumor_snps), ("normal", normal_snps)]:
             out_fname = "{}.{}.snp_formatted.txt".format(tumor_cn.sample_id, title)
-            table.to_csv(out_fname, sep='\t', index=False,
-                         header=("#Chrm", "Pos", "Ref_Allele", "Mut_Allele"))
-            print("Wrote", out_fname)
+            table.to_csv(out_fname, sep='\t', index=False)
+            logging.info("Wrote %s", out_fname)
 
 P_export_theta = P_export_subparsers.add_parser('theta',
         help=_cmd_export_theta.__doc__)

@@ -366,68 +366,98 @@ def export_theta(tumor_segs, normal_cn):
     if normal_cn:
         normal_cn = normal_cn.autosomes(also=xy_names)
 
-    # Capture parameters in a closure: avg_depth, avg_bin_width
-    # (These two scaling factors don't meaningfully affect THetA's calculation
-    # unless they're too small)
-    avg_depth = 500
-    # Similar number of reads in on-, off-target bins; treat them equally
-    avg_bin_width = 200
-    def log2ratio_to_count(log2_ratio, nbins):
-        """Calculate a segment's read count from log2-ratio.
+    table = tumor_segs.data.loc[:, ["start", "end"]]
 
-        Math:
-            nbases = read_length * read_count
-        and
-            nbases = bin_width * read_depth
-        where
-            read_depth = read_depth_ratio * avg_depth
-
-        So:
-            read_length * read_count = bin_width * read_depth
-            read_count = bin_width * read_depth / read_length
-        """
-        read_depth = (2 ** log2_ratio) * avg_depth
-        read_count = nbins * avg_bin_width * read_depth / params.READ_LEN
-        return int(round(read_count))
-
-    outheader = ["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]
-    outrows = []
     # Convert chromosome names to 1-based integer indices
-    prev_chrom = None
-    chrom_id = 0
-    if normal_cn:
-        for seg, subcnarr in normal_cn.by_ranges(tumor_segs):
-            if seg.chromosome != prev_chrom:
-                chrom_id += 1
-                prev_chrom = seg.chromosome
-            fields = format_theta_row(seg, subcnarr, chrom_id, log2ratio_to_count)
-            outrows.append(fields)
-    else:
-        # TODO - use segment weights
-        raise NotImplementedError("reference is still needed")
+    chr2idx = {c: i+1
+            for i, c in enumerate(tumor_segs.chromosome.drop_duplicates())}
+    table["chrm"] = tumor_segs.chromosome.replace(chr2idx)
+    # Unique string identifier for each row, e.g. "start_1_93709:end_1_19208166"
+    table["#ID"] = ["start_%d_%d:end_%d_%d"
+                    % (row.chrm, row.start, row.chrm, row.end)
+                    for row in table.itertuples(index=False)]
 
-    return outheader, outrows
+    # Calculate/estimate per-segment read counts in tumor and normal samples
+    ref_means, nbins = ref_means_nbins(tumor_segs, normal_cn)
+    table["tumorCount"] = theta_read_counts(tumor_segs.log2, nbins)
+    table["normalCount"] = theta_read_counts(ref_means, nbins)
+    return table[["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]]
 
 
-def format_theta_row(seg, cnarr, chrom_id, log2_to_count):
-    """Convert a segment's info to a row of THetA input.
+def ref_means_nbins(tumor_segs, normal_cn):
+    """Extract segments' reference mean log2 values and probe counts.
 
-    For the normal/reference bin count, take the mean of the bin values within
-    each segment so that segments match between tumor and normal.
+    Code paths::
+
+        wt_mdn  wt_old  probes  norm -> norm, nbins
+        +       *       *       -       0,  wt_mdn
+        -       +       +       -       0,  wt_old * probes
+        -       +       -       -       0,  wt_old * size?
+        -       -       +       -       0,  probes
+        -       -       -       -       0,  size?
+
+        +       -       +       +       norm, probes
+        +       -       -       +       norm, bin counts
+        -       +       +       +       norm, probes
+        -       +       -       +       norm, bin counts
+        -       -       +       +       norm, probes
+        -       -       -       +       norm, bin counts
     """
-    nbins = seg.probes if "probes" in seg else len(cnarr)
-    tumor_count = log2_to_count(seg.log2, nbins)
-    ref_count = log2_to_count(cnarr.log2.mean(), nbins)
-    # e.g. "start_1_93709:end_1_19208166"
-    row_id = ("start_%d_%d:end_%d_%d"
-              % (chrom_id, seg.start, chrom_id, seg.end))
-    return (row_id,       # ID
-            chrom_id,     # chrm
-            seg.start,    # start
-            seg.end,      # end
-            tumor_count,  # tumorCount
-            ref_count     # normalCount
-           )
+    if normal_cn:
+        subarrs = [subarr for _seg, subarr in normal_cn.by_ranges(tumor_segs)]
+        # For the normal/reference bin count, take the mean of the bin values
+        # within each segment so that segments match between tumor and normal.
+        # ENH: weighted mean, like gainloss
+        ref_means = np.asarray([s.log2.mean() for s in subarrs])
+        if "probes" in tumor_segs:
+            nbins = tumor_segs["probes"]
+        else:
+            nbins = np.asarray([len(s) for s in subarrs])
+    else:
+        # Assume neutral reference log2 across all segments
+        # (weights already account for reference log2)
+        ref_means = np.zeros(len(tumor_segs))
+        if "weight" in tumor_segs and (tumor_segs["weight"] > 1.0).any():
+            # Segment weights are already multiplied by probe counts
+            nbins = tumor_segs["weight"]
+            # Rescale to average 1.0 (we'll do the same below, too)
+            nbins /= nbins.max() / nbins.mean()
+        else:
+            if "probes" in tumor_segs:
+                nbins = tumor_segs["probes"]
+            else:
+                logging.warn("No probe counts in tumor segments file and no "
+                             "normal reference given; guessing normal "
+                             "read-counts-per-segment from segment sizes")
+                sizes = tumor_segs.end - tumor_segs.start
+                nbins = sizes / sizes.mean()
+            if "weight" in tumor_segs:
+                # Already checked -- these are old-style weights that were not
+                # multiplied by `probes` originally
+                nbins *= tumor_segs["weight"] / tumor_segs["weight"].mean()
+    return ref_means, nbins
+
+
+def theta_read_counts(log2_ratio, nbins,
+                      # These two scaling factors don't meaningfully affect
+                      # THetA's calculation unless they're too small
+                      avg_depth=500, avg_bin_width=200):
+    """Calculate segments' read counts from log2-ratios.
+
+    Math:
+        nbases = read_length * read_count
+    and
+        nbases = bin_width * read_depth
+    where
+        read_depth = read_depth_ratio * avg_depth
+
+    So:
+        read_length * read_count = bin_width * read_depth
+        read_count = bin_width * read_depth / read_length
+    """
+    read_depth = (2 ** log2_ratio) * avg_depth
+    read_count = nbins * avg_bin_width * read_depth / params.READ_LEN
+    return read_count.round().astype('int')
 
 
 def export_theta_snps(varr):
@@ -450,7 +480,9 @@ def export_theta_snps(varr):
         table = varr.data.loc[:, ("chromosome", "start", depth_key, alt_key)]
         table["ref_depth"] = (table[depth_key] - table[alt_key]).astype("int")
         table[alt_key] = table[alt_key].astype("int")
-        yield table.loc[:, ("chromosome", "start", "ref_depth", alt_key)]
+        table = table.loc[:, ("chromosome", "start", "ref_depth", alt_key)]
+        table.columns = ["#Chrm", "Pos", "Ref_Allele", "Mut_Allele"]
+        yield table
 
 
 # _____________________________________________________________________________
