@@ -352,9 +352,13 @@ class CommandTests(unittest.TestCase):
                                        "formats/cl_seq.cns"])
         self.assertGreater(len(seg2_rows), len(seg_rows))
         # THetA2
-        _header, theta_rows = export.export_theta("formats/tr95t.cns",
-                                                  "formats/reference-tr.cnn")
+        cnr = cnvlib.read("formats/tr95t.cns")
+        theta_rows = export.export_theta(cnr, None)
         self.assertGreater(len(theta_rows), 0)
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        theta_rows = export.export_theta(cnr, ref)
+        self.assertGreater(len(theta_rows), 0)
+        # Formats that calculate absolute copy number
         for fname, ploidy, is_f in [("tr95t.cns", 2, True),
                                     ("cl_seq.cns", 6, True),
                                     ("amplicon.cns", 2, False)]:
