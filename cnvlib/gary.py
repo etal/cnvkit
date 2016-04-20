@@ -457,16 +457,18 @@ class GenomicArray(object):
         try:
             table = pd.read_table(infile,
                                   dtype={'chromosome': 'string'})
-            t2 = table.dropna()
-            if len(t2) < len(table):
-                logging.warn("Dropped %d rows with missing data",
-                             len(table) - len(t2))
-                table = t2
+            if "log2" in table.columns:
+                # Every bin needs a log2 value; the others can be NaN
+                t2 = table.dropna(subset=["log2"])
+                if len(t2) < len(table):
+                    logging.warn("Dropped %d rows with missing log2 values",
+                                len(table) - len(t2))
+                    table = t2
         except ValueError:
             # File is blank/empty, most likely
             logging.warn("Blank file?: %s", infile)
             table = cls._make_blank()
-        # XXX Pending pandas 0.17: https://github.com/pydata/pandas/issues/10505
+        # ENH
         # table['chromosome'] = pd.Categorical(table['chromosome'],
         #                                      table.chromosome.drop_duplicates(),
         #                                      ordered=True)
