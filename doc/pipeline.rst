@@ -293,10 +293,6 @@ Compile a copy-number reference from the given files or directory (containing
 normal samples). If given a reference genome (-f option), also calculate the GC
 content and repeat-masked proportion of each region.
 
-::
-
-    cnvkit.py reference -o Reference.cnn -f ucsc.hg19.fa *targetcoverage.cnn
-
 The reference can be constructed from zero, one or multiple control samples.
 A reference should be constructed specifically for each target capture panel
 (i.e. set of baits) and, ideally, match the type of sample (e.g. FFPE-extracted
@@ -304,6 +300,11 @@ or fresh DNA) and library preparation protocol or kit used.
 
 Paired or pooled normals
 ````````````````````````
+
+Provide the ``*.targetcoverage.cnn`` and ``*.antitargetcoverage.cnn`` files
+created by the :ref:`coverage` command::
+
+    cnvkit.py reference *coverage.cnn -f ucsc.hg19.fa -o Reference.cnn
 
 To analyze a cohort sequenced on a single platform, we recommend combining all
 normal samples into a pooled reference, even if matched tumor-normal pairs were
