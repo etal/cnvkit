@@ -61,34 +61,32 @@ Using CNVkit with THetA2
 
 CNVkit provides wrappers for exporting segments to THetA2's input format and
 importing THetA2's result file as CNVkit's segmented .cns files.
+See the commands :ref:`export_theta` and :ref:`import-theta` for usage
+instructions.
 
-THetA2's input file is a BED-like file, typically with the extension ``.input``,
-listing the read counts  within each copy-number segment in a pair of tumor and
-normal samples.
-CNVkit can generate this file given the CNVkit-inferred tumor segmentation
-(.cns) and normal copy log2-ratios (.cnr) or copy number reference file (.cnn).
-This bypasses the initial step of THetA2, CreateExomeInput, which counts the
-reads in each sample's BAM file.
+After running the CNVkit :doc:`pipeline` on a sample, and calling SNVs jointly
+on the tumor and normal samples, generate the THetA2 input files from the .cns
+and .vcf files::
 
-After running the CNVkit :doc:`pipeline` on a sample, create the THetA2 input file::
+    cnvkit.py export theta Sample_T.cns reference.cnn -v Sample_Paired.vcf
 
-    # From a paired normal sample
-    cnvkit.py export theta Sample_Tumor.cns Sample_Normal.cnr -o Sample.theta2.input
-    # From an existing CNVkit reference
-    cnvkit.py export theta Sample_Tumor.cns reference.cnn -o Sample.theta2.input
+This produces three output files: ``Sample_T.interval_count``,
+``Sample_T.tumor.snp_formatted.txt``, and
+``Sample_T.normal.snp_formatted.txt``.
 
 Then, run THetA2 (assuming the program was unpacked at ``/path/to/theta2/``)::
 
-    # Generates Sample.theta2.BEST.results:
-    /path/to/theta2/bin/RunTHetA Sample.theta2.input
-    # Parameters for low-quality samples:
-    /path/to/theta2/python/RunTHetA.py Sample.theta2.input -n 2 -k 4 -m .90 --FORCE --NUM_PROCESSES `nproc`
+    # Generates Sample_T.BEST.results:
+    /path/to/theta2/bin/RunTHetA Sample_T.interval_count \
+        --TUMOR_SNP Sample_T.tumor.snp_formatted.txt \
+        --NORMAL_SNP Sample_T.normal.snp_formatted.txt \
+        --BAF --NUM_PROCESSES `nproc` --FORCE
 
 Finally, import THetA2's results back into CNVkit's .cns format, matching the
 original segmentation (.cns) to the THetA2-inferred absolute copy number
 values.::
 
-    cnvkit.py import-theta Sample_Tumor.cns Sample.theta2.BEST.results
+    cnvkit.py import-theta Sample_T.cns Sample_T.BEST.results
 
 THetA2 adjusts the segment log2 values to the inferred cellularity of each
 detected subclone; this can result in one or two .cns files representing
@@ -122,9 +120,9 @@ way, hard thresholds can be used::
     # Or, using a custom set of cutoffs
     cnvkit.py call -t=-1.1,-0.4,0.3,0.7 Sample.cns -y -o Sample.call.cns
 
-Alternatively, if the tumor cell fraction is known confidently, then use the
-``clonal`` method to simply round the log2 ratios to the nearest integer copy
-number::
+Alternatively, if the tumor cell fraction is known confidently, then these can
+be done in one step with ``call``, using the ``clonal`` method to simply round
+the log2 ratios to the nearest integer copy number::
 
     cnvkit.py call -m clonal Sample.cns -y --purity 0.65 -o Sample.call.cns
     # Or, if already rescaled
@@ -133,8 +131,8 @@ number::
 Export integer copy numbers as BED or VCF
 -----------------------------------------
 
-The :ref:`export` ``bed`` command emits integer copy number calls in standard
-BED format::
+The :ref:`export` ``bed`` and ``vcf`` commands emit integer copy number calls in
+the standard BED or VCF formats::
 
     cnvkit.py export bed Sample.call.cns -y -o Sample.bed
     cnvkit.py export vcf Sample.call.cns -y -o Sample.vcf

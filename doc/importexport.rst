@@ -1,6 +1,20 @@
 Compatibility and other I/O
 ===========================
 
+
+.. _version:
+
+version
+-------
+
+Print CNVkit's version as a string on standard output::
+
+    cnvkit.py version
+
+If you submit a bug report or feature request for CNVkit, please include the
+CNVkit version in your message so we can help you more efficiently.
+
+
 .. _import-picard:
 
 import-picard
@@ -68,6 +82,12 @@ Convert the ".results" output of `THetA2
 <http://compbio.cs.brown.edu/projects/theta/>`_ to one or more CNVkit .cns files
 representing subclones with integer absolute copy number in each segment.
 
+::
+
+    cnvkit.py import-theta Sample.cns Sample.BEST.results
+
+See the page on tumor :ref:`heterogeneity` for more guidance on performing this
+analysis.
 
 .. _export:
 
@@ -182,11 +202,55 @@ and assigned to the matching bins.
   the bin-wide BAF.
 
 
-.. _version:
+.. _export_theta:
 
-version
--------
+theta
+`````
 
-Print CNVkit's version as a string on standard output::
+`THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_ is a program for
+estimating normal-cell contamination and tumor subclone population fractions
+based on a tumor sample's copy number profile and, optionally, SNP allele
+frequencies. (See the page on tumor :ref:`heterogeneity` for more guidance.)
 
-    cnvkit.py version
+THetA2's input file is a BED-like file, typically with the extension
+``.interval_count``, listing the read counts  within each copy-number segment in
+a pair of tumor and normal samples.
+CNVkit can generate this file given the CNVkit-inferred tumor segmentation
+(.cns), bypassing the initial step of THetA2, CreateExomeInput, which counts the
+reads in each sample's BAM file.
+
+The normal-sample read counts in this file are used for weighting each segment
+in THetA2's calculations. We recommend providing these to ``export theta`` via
+the CNVkit pooled or paired reference file (.cnn) you created for your panel::
+
+    # From an existing CNVkit reference
+    cnvkit.py export theta Sample_Tumor.cns reference.cnn -o Sample.theta2.interval_count
+
+The THetA2 normal read counts can also be derived from the normal sample's bin
+log2 ratios, if for some reason this is all you have::
+
+    # From a paired normal sample
+    cnvkit.py export theta Sample_Tumor.cns Sample_Normal.cnr -o Sample.theta2.interval_count
+
+If neither file is given, the THetA2 normal read counts will be calculated from
+the segment weight values in the given .cns file, or the number of probes if the
+"weight" column is missing, or as a last resort, the segment sizes if the
+"probes" column is also missing::
+
+    # From segment weights and/or probe counts
+    cnvkit.py export theta Sample_Tumor.cns -o Sample.theta2.interval_count
+
+
+THetA2 also can take the tumor and normal samples' SNP allele frequencies as
+input to improve its estimates. THetA2 uses another custom format for these
+values, and provides another script for creating these files from VCF that we'd
+again prefer to bypass. CNVkit's ``export theta`` command produces these two
+additional files when given a VCF file of paired tumor-normal SNV calls with the
+``-v``/``--vcf`` option::
+
+    cnvkit.py export theta Sample_Tumor.cns reference.cnn -v Sample_Paired.vcf
+
+This produces three output files; ``-o`` will be used for the read count file,
+while the SNV allele count files will be named according to the .cns file, e.g.
+``Sample_Tumor.tumor.snp_formatted.txt`` and
+``Sample_Tumor.normal.snp_formatted.txt``.
