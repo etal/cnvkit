@@ -406,7 +406,7 @@ class CommandTests(unittest.TestCase):
     def test_import_theta(self):
         """The 'import-theta' command."""
         cns = cnvlib.read("formats/nv3.cns")
-        theta_fname = "formats/nv3.n2.results"
+        theta_fname = "formats/nv3.n3.results"
         for new_cns in commands.do_import_theta(cns, theta_fname):
             self.assertTrue(0 < len(new_cns) <= len(cns))
 

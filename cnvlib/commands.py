@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function
 import argparse
 import collections
 import logging
-import math
 import os
 import sys
 
@@ -1660,15 +1659,16 @@ def _cmd_import_theta(args):
 def do_import_theta(segarr, theta_results_fname, ploidy=2):
     theta = importers.parse_theta_results(theta_results_fname)
     for copies in theta['C']:
-        # Replace segment values with these integers
         # Drop any segments where the C value is None
-        new_segs = []
-        for seg, ncop in zip(segarr.copy(), copies):
-            if ncop is None:
-                continue
-            new_segs.append(seg._replace(
-                log2=math.log((ncop or 0.5) / ploidy, 2)))
-        yield segarr.as_rows(new_segs)
+        mask_drop = np.array([c is None for c in copies], dtype='bool')
+        segarr = segarr[~mask_drop].copy()
+        ok_copies = np.array([c for c in copies if c is not None], dtype='int')
+        # Replace remaining segment values with these integers
+        segarr["cn"] = ok_copies.copy()
+        ok_copies[ok_copies == 0] = 0.5
+        segarr["log2"] = np.log2(ok_copies / ploidy)
+        segarr.sort_columns()
+        yield segarr
 
 
 P_import_theta = AP_subparsers.add_parser('import-theta',
