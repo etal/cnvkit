@@ -58,13 +58,13 @@ Python API
 Citation
 ========
 
-We are in the process of publishing a manuscript describing CNVkit.
-If you use this software in a publication, for now, please cite our preprint
-manuscript by DOI, like so:
+We have published a manuscript describing CNVkit.
+If you use this software in a publication, please cite our paper like so:
 
     Talevich, E., Shain, A.H., Botton, T., & Bastian, B.C. (2014).
-    CNVkit: Copy number detection and visualization for targeted sequencing using off-target reads.
-    *bioRxiv* doi: http://dx.doi.org/10.1101/010876
+    `CNVkit: Genome-wide copy number detection and visualization from targeted sequencing.
+    <http://dx.doi.org/10.1371/journal.pcbi.1004873>`_
+    *PLOS Computational Biology* 12(4): e1004873
 
 A poster presentation can be viewed at `F1000 Research
 <http://f1000research.com/posters/1096236>`_.
@@ -81,7 +81,7 @@ We'd like to highlight:
 * McCreery, M.Q. *et al.* (2015).
   `Evolution of metastasis revealed by mutational landscapes of chemically
   induced skin cancers. <http://dx.doi.org/10.1038/nm.3979>`_
-  *Nature Medicine*
+  *Nature Medicine* 21, 1514–1520
 * Shain, A.H. *et al.* (2015).
   `Exome sequencing of desmoplastic melanoma identifies recurrent NFKBIE
   promoter mutations and diverse activating mutations in the MAPK pathway.

@@ -1,18 +1,19 @@
 To cite CNVkit in publications, please use:
 
   Talevich, E., Shain, A. H., Botton, T., & Bastian, B. C. (2014).
-  CNVkit: Copy number detection and visualization for targeted sequencing using
-  off-target reads. bioRxiv doi: http://dx.doi.org/10.1101/010876
+  CNVkit: Genome-wide copy number detection and visualization from
+  targeted sequencing. PLOS Computational Biology 12(4): e1004873.
+  doi: 10.1371/journal.pcbi.1004873
 
 A BibTeX entry for LaTeX users is:
 
 @article{,
-  title = {{CNVkit: Copy number detection and visualization for targeted sequencing using off-target reads}},
+  title = {{CNVkit: Genome-wide copy number detection and visualization from targeted sequencing}},
   author = {Talevich, Eric and Shain, A. Hunter and Botton, Thomas and Bastian, Boris C.},
-  journal = {bioRxiv},
-  month = oct,
-  year = {2014}
-  doi = {10.1101/010876},
-  url = {http://dx.doi.org/10.1101/010876},
+  journal = {PLOS Computational Biology},
+  month = apr,
+  year = {2016}
+  doi = {10.1371/journal.pcbi.1004873},
+  url = {http://dx.doi.org/10.1371/journal.pcbi.1004873},
 }
 
