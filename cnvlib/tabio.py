@@ -27,6 +27,21 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     Int'l       interval    Gary
     ======      ========    ====
 
+    :Parameters:
+        infile : handle or string
+            Filename or opened file-like object to read.
+        fmt : string
+            File format.
+        into : class
+            GenomicArray class or subclass to instantiate, overriding the
+            default for the target file format.
+        sample_id : string
+            Sample identifier.
+        meta : dict
+            Metadata, as arbitrary key-value pairs.
+        **kwargs :
+            Additional fields to add to metadata.
+
     """
     if meta is None:
         meta = {}
@@ -80,20 +95,14 @@ def read_sniff(infile):
 
 def read_tab(infile):
     """Read tab-separated data with column names in the first row."""
-    try:
-        dframe = pd.read_table(infile, #na_filter=False,
-                            dtype={'chromosome': 'string'})
-        if "log2" in dframe.columns:
-            # Every bin needs a log2 value; the others can be NaN
-            t2 = dframe.dropna(subset=["log2"])
-            if len(t2) < len(dframe):
-                logging.warn("Dropped %d rows with missing log2 values",
-                            len(dframe) - len(t2))
-                dframe = t2
-    except ValueError:
-        # File is blank/empty, most likely
-        logging.warn("Blank file?: %s", infile)
-        dframe = []
+    dframe = pd.read_table(infile, dtype={'chromosome': 'string'})
+    if "log2" in dframe.columns:
+        # Every bin needs a log2 value; the others can be NaN
+        d2 = dframe.dropna(subset=["log2"])
+        if len(d2) < len(dframe):
+            logging.warn("Dropped %d rows with missing log2 values",
+                        len(dframe) - len(d2))
+            dframe = d2
     return dframe
 
 
@@ -275,7 +284,7 @@ def write_text(dframe):
     return dframe.apply(GA.row2label, axis=1)
 
 
-def write_vcf(infile):
+def write_vcf(dframe):
     """Variant Call Format (VCF) for SV loci."""
     return NotImplemented
 
