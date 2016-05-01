@@ -5,17 +5,15 @@ from __future__ import print_function, absolute_import, division
 import logging
 import sys
 
-# import numpy as np
 import pandas as pd
 from Bio.File import as_handle
 
 from cnvlib import core, ngfrills
 from cnvlib.gary import GenomicArray as GA
-from cnvlib.rary import RegionArray as RA
 from cnvlib.vary import VariantArray as VA
 
 
-def read(infile, fmt="tab", into=GA, sample_id=None, meta=None, **kwargs):
+def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     """Read tabular data from a file or stream into a genome object.
 
     Supported formats:
@@ -42,10 +40,12 @@ def read(infile, fmt="tab", into=GA, sample_id=None, meta=None, **kwargs):
     if fmt not in READERS:
         raise ValueError("Unknown format: %s" % fmt)
     try:
-        dframe = READERS[fmt](infile)
+        reader, suggest_into = READERS[fmt]
+        dframe = reader(infile)
     except ValueError:
         # File is blank/empty, most likely
         logging.info("Blank file?: %s", infile)
+        suggest_into = GA
         dframe = []
     # TODO/ENH CategoricalIndex ---
     # if dframe:
@@ -54,7 +54,7 @@ def read(infile, fmt="tab", into=GA, sample_id=None, meta=None, **kwargs):
     #                                      ordered=True)
     # Create a multi-index of genomic coordinates (like GRanges)
     # dframe.set_index(['chromosome', 'start'], inplace=True)
-    return into(dframe, meta)
+    return (into or suggest_into)(dframe, meta)
 
 
 def read_sniff(infile):
@@ -199,16 +199,17 @@ def read_vcf(infile):
 
 
 READERS = {
-    "tab": read_tab,  # GA
-    "bed": read_bed,  # GA
-    "bed3": read_bed3,  # GA
-    "bed4": read_bed4,  # GA
-    "bed6": read_bed6,  # GA
-    "interval": read_interval,  # GA
-    # "interval_list": read_interval,
-    "text": read_text,  # GA
-    # "text_coords": read_text,
-    "vcf": read_vcf,  # VA
+    "tab": (read_tab, GA),
+    "bed": (read_bed, GA),
+    "bed3": (read_bed3, GA),
+    "bed4": (read_bed4, GA),
+    "bed6": (read_bed6, GA),
+    "interval": (read_interval, GA),
+    # "interval_list": (read_interval, GA),
+    "sniff": (read_sniff, GA),
+    "text": (read_text, GA),
+    # "text_coords": (read_text, GA),
+    "vcf": (read_vcf, VA),
 }
 
 
