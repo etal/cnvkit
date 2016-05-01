@@ -85,7 +85,7 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
                     bin_start = bin_end
                 out_rows.append((chrom, bin_start, end))
     out_arr = RA.from_rows(out_rows)
-    out_arr["name"] = "Background"
+    out_arr["gene"] = "Background"
     return out_arr
 
 

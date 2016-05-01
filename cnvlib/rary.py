@@ -16,7 +16,7 @@ from . import core, gary, ngfrills
 class RegionArray(gary.GenomicArray):
     """An array of genomic intervals."""
     _required_columns = ("chromosome", "start", "end",
-                         # "name", "strand",
+                         # "gene", "strand",
                         )
     _required_dtypes = (str, int, int)
 
@@ -66,16 +66,16 @@ class RegionArray(gary.GenomicArray):
             table = self.data
             if fmt == "interval":
                 table["start"] += 1
-                if "name" not in table:
-                    table["name"] = '-'
+                if "gene" not in table:
+                    table["gene"] = '-'
                 if "strand" not in table:
                     table["strand"] = "+"
                 table = table.loc[:, ["chromosome", "start", "end", "strand",
-                                      "name"]]
+                                      "gene"]]
             elif fmt == "bed4":
-                if "name" not in table:
-                    table["name"] = '-'
-                table = table.loc[:, ["chromosome", "start", "end", "name"]]
+                if "gene" not in table:
+                    table["gene"] = '-'
+                table = table.loc[:, ["chromosome", "start", "end", "gene"]]
             elif fmt == "bed3":
                 table = table.loc[:, ["chromosome", "start", "end"]]
             # Default: bed-like, keep all trailing columns
@@ -99,7 +99,7 @@ class RegionArray(gary.GenomicArray):
 def _parse_text_coords(infile):
     """Parse text coordinates: chrom:start-end
 
-    Or sometimes: chrom:start-end:name
+    Or sometimes: chrom:start-end:gene
 
     Text coordinates are assumed to be counting from 1.
     """
@@ -107,34 +107,34 @@ def _parse_text_coords(infile):
     def _parse_line(line):
         fields = line.split(':')
         if len(fields) == 3:
-            chrom, start_end, name = fields
+            chrom, start_end, gene = fields
         elif len(fields) == 2:
             chrom, start_end = fields
-            name = '-'
+            gene = '-'
         else:
             raise ValueError("Bad line: %r" % line)
         start, end = start_end.split('-')
-        return chrom, int(start) - 1, int(end), name.rstrip()
+        return chrom, int(start) - 1, int(end), gene.rstrip()
 
     with as_handle(infile, 'rU') as handle:
         rows = [_parse_line(line) for line in handle]
     return pd.DataFrame.from_records(rows, columns=["chromosome", "start",
-                                                    "end", "name"])
+                                                    "end", "gene"])
 
 
 def _parse_interval_list(infile):
     """Parse a Picard-compatible interval list.
 
     Expected tabular columns:
-        chromosome, start position, end position, strand, region name
+        chromosome, start position, end position, strand, gene
 
     Counting is from 1.
     """
     table = pd.read_table(infile,
                           comment='@', # Skip the SAM header
-                          names=["chromosome", "start", "end", "strand", "name",
+                          names=["chromosome", "start", "end", "strand", "gene",
                                 ])
-    table["name"].fillna('-', inplace=True)
+    table["gene"].fillna('-', inplace=True)
     table["start"] -= 1
     return table
 
@@ -143,7 +143,7 @@ def _parse_bed(infile):
     """Parse a BED file.
 
     A BED file has these columns:
-        chromosome, start position, end position, [name, strand, other stuff...]
+        chromosome, start position, end position, [gene, strand, other stuff...]
 
     Counting is from 0.
 
@@ -155,11 +155,11 @@ def _parse_bed(infile):
     def _parse_line(line):
         fields = line.split('\t', 6)
         chrom, start, end = fields[:3]
-        name = (fields[3].rstrip()
+        gene = (fields[3].rstrip()
                 if len(fields) >= 4 else '-')
         strand = (fields[5].rstrip()
                 if len(fields) >= 6 else '.')
-        return chrom, int(start), int(end), name, strand
+        return chrom, int(start), int(end), gene, strand
 
     def track2track(handle):
         firstline = next(handle)
@@ -175,5 +175,5 @@ def _parse_bed(infile):
     with as_handle(infile, 'rU') as handle:
         rows = list(map(_parse_line, track2track(handle)))
     return pd.DataFrame.from_records(rows, columns=["chromosome", "start",
-                                                    "end", "name", "strand"])
+                                                    "end", "gene", "strand"])
 

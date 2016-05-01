@@ -17,7 +17,7 @@ def bed2probes(bed_fname):
     """Create neutral-coverage probes from intervals."""
     regions = RA.read(bed_fname)
     table = regions.data.loc[:, ("chromosome", "start", "end")]
-    table["gene"] = (regions.data["name"] if "name" in regions.data else '-')
+    table["gene"] = (regions.data["gene"] if "gene" in regions.data else '-')
     table["log2"] = 0.0
     table["spread"] = 0.0
     return CNA(table, {"sample_id": core.fbase(bed_fname)})

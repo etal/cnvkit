@@ -247,7 +247,7 @@ class GenomicArray(object):
 
         Example, yielding rows in BED format:
 
-        >>> probes.coords(also=["name", "strand"])
+        >>> probes.coords(also=["gene", "strand"])
         """
         cols = list(GenomicArray._required_columns)
         if also:
