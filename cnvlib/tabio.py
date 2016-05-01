@@ -8,9 +8,9 @@ import sys
 import pandas as pd
 from Bio.File import as_handle
 
-from cnvlib import core, ngfrills
-from cnvlib.gary import GenomicArray as GA
-from cnvlib.vary import VariantArray as VA
+from . import core, ngfrills
+from .gary import GenomicArray as GA
+from .vary import VariantArray as VA
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
