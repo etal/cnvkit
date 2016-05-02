@@ -41,6 +41,7 @@ setup_args.update(
         'cnvlib',
         'cnvlib.ngfrills',
         'cnvlib.segmentation',
+        'cnvlib.tabio',
     ],
     scripts=[join(DIR, 'cnvkit.py')] + glob(join(DIR, 'scripts/*.py')),
     classifiers=[
