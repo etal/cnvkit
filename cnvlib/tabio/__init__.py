@@ -12,7 +12,7 @@ from .. import core, ngfrills
 from ..gary import GenomicArray as GA
 from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
-from . import bedio, picard, vcfio
+from . import bedio, picard, textcoord, vcfio
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
@@ -110,41 +110,15 @@ def read_tab(infile):
     return dframe
 
 
-def read_text(infile):
-    """Text coordinate format: "chr:start-end", one per line.
-
-    Or sometimes: "chrom:start-end gene" or "chrom:start-end REF>ALT"
-
-    Coordinate indexing is assumed to be from 1.
-    """
-    @ngfrills.report_bad_line
-    def _parse_line(line):
-        fields = line.split(':')
-        if len(fields) == 3:
-            chrom, start_end, gene = fields
-        elif len(fields) == 2:
-            chrom, start_end = fields
-            gene = '-'
-        else:
-            raise ValueError("Bad line: %r" % line)
-        start, end = start_end.split('-')
-        return chrom, int(start) - 1, int(end), gene.rstrip()
-
-    with as_handle(infile, 'rU') as handle:
-        rows = [_parse_line(line) for line in handle]
-    return pd.DataFrame.from_records(rows, columns=["chromosome", "start",
-                                                    "end", "gene"])
-
-
 READERS = {
+    "auto": (read_auto, GA),
     "tab": (read_tab, GA),
     "bed": (bedio.read_bed, GA),
     "bed3": (bedio.read_bed3, GA),
     "bed4": (bedio.read_bed4, GA),
     "bed6": (bedio.read_bed6, GA),
     "interval": (picard.read_interval, GA),
-    "auto": (read_auto, GA),
-    "text": (read_text, GA),
+    "text": (textcoord.read_text, GA),
     "vcf": (vcfio.read_vcf, VA),
 }
 
@@ -175,17 +149,10 @@ def write_tab(dframe):
     return dframe
 
 
-def write_text(dframe):
-    dframe = dframe.copy()
-    dframe['start'] += 1
-    return dframe.apply(GA.row2label, axis=1)
-
-
 WRITERS = {
     "tab": write_tab,
     "bed": bedio.write_bed,
     "interval": picard.write_interval,
-    "text": write_text,
+    "text": textcoord.write_text,
     "vcf": vcfio.write_vcf,
 }
-
