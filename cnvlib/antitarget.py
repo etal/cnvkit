@@ -12,7 +12,6 @@ iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 from . import tabio
 from .params import INSERT_SIZE
-# from .rary import RegionArray as RA
 from .gary import GenomicArray as GA
 
 
@@ -30,10 +29,10 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
         - Divide into equal-size (region_size/avg_bin_size) portions
         - Emit the (chrom, start, end) coords of each portion
     """
-    target_chroms = dict(tabio.read(target_bed, "sniff").by_chromosome())
+    target_chroms = dict(tabio.read_auto(target_bed).by_chromosome())
     if access_bed:
         # Chromosomes' accessible sequence regions are given -- use them
-        access_chroms = dict(tabio.read(access_bed, "sniff").by_chromosome())
+        access_chroms = dict(tabio.read_auto(access_bed).by_chromosome())
         if access_chroms and set(access_chroms).isdisjoint(target_chroms):
             raise ValueError("Chromosome names in the accessible regions file "
                              "%s %r do not match those in targets %s %r"

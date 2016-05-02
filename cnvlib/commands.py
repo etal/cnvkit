@@ -34,7 +34,6 @@ from . import (core, ngfrills, parallel, params,
                tabio)
 from .cnary import CopyNumArray as _CNA
 from .vary import VariantArray as _VA
-from .rary import RegionArray as _RA
 from .gary import GenomicArray as _GA
 from ._version import __version__
 
@@ -968,8 +967,7 @@ def _cmd_scatter(args):
 
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
-            for chrom, start, end in tabio.read(args.range_list, "sniff"
-                                               ).coords():
+            for chrom, start, end in tabio.read_auto(args.range_list).coords():
                 region = "{}:{}-{}".format(chrom, start, end)
                 do_scatter(cnarr, segarr, varr, region, False,
                            args.background_marker, args.trend,

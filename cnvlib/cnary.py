@@ -247,7 +247,7 @@ class CopyNumArray(gary.GenomicArray):
     def residuals(self, segments=None):
         """Difference in log2 value of each bin from its segment mean.
 
-        If segments are just regions (e.g. RegionArray) with no log2 values
+        If segments are just regions (e.g. GenomicArray) with no log2 values
         precalculated, subtract the median of this array's log2 values within
         each region. If no segments are given, subtract each chromosome's
         median.

@@ -13,8 +13,8 @@ import time
 from Bio._py3k import map, zip
 import pysam
 
+from . import tabio
 from .cnary import CopyNumArray as CNA
-from .rary import RegionArray as RA
 from .core import fbase
 
 from .params import NULL_LOG2_COVERAGE, READ_LEN
@@ -69,7 +69,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
 def interval_coverages_count(bed_fname, bam_fname, min_mapq):
     """Calculate log2 coverages in the BAM file at each interval."""
     bamfile = pysam.Samfile(bam_fname, 'rb')
-    for chrom, subregions in RA.read(bed_fname).by_chromosome():
+    for chrom, subregions in tabio.read_auto(bed_fname).by_chromosome():
         logging.info("Processing chromosome %s of %s",
                      chrom, os.path.basename(bam_fname))
         for _chrom, start, end, gene, in subregions.coords(["gene"]):

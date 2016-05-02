@@ -1,6 +1,6 @@
 """I/O for tabular formats of genomic data.
 """
-from __future__ import print_function, absolute_import, division
+from __future__ import absolute_import, division, print_function
 
 import logging
 import sys
@@ -10,6 +10,7 @@ from Bio.File import as_handle
 
 from .. import core, ngfrills
 from ..gary import GenomicArray as GA
+from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
 from . import bedio, picard, vcfio
 
@@ -73,7 +74,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     return (into or suggest_into)(dframe, meta)
 
 
-def read_sniff(infile):
+def read_auto(infile):
     """Auto-detect file format, and return an appropriate parser function."""
     if not isinstance(infile, basestring) and not hasattr(infile, "seek"):
         raise ValueError("Can only auto-detect format from filename or "
@@ -138,7 +139,7 @@ READERS = {
     "bed4": (bedio.read_bed4, GA),
     "bed6": (bedio.read_bed6, GA),
     "interval": (picard.read_interval, GA),
-    "sniff": (read_sniff, GA),
+    "auto": (read_auto, GA),
     "text": (read_text, GA),
     "vcf": (vcfio.read_vcf, VA),
 }

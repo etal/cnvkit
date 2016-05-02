@@ -14,7 +14,7 @@ from .cnary import CopyNumArray as CNA
 
 def bed2probes(bed_fname):
     """Create neutral-coverage probes from intervals."""
-    regions = tabio.read(bed_fname, "sniff")
+    regions = tabio.read_auto(bed_fname)
     table = regions.data.loc[:, ("chromosome", "start", "end")]
     table["gene"] = (regions.data["gene"] if "gene" in regions.data else '-')
     table["log2"] = 0.0
