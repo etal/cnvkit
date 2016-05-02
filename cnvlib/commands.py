@@ -30,10 +30,12 @@ pyplot.ioff()
 
 from . import (core, ngfrills, parallel, params,
                access, antitarget, call, coverage, export, fix, importers,
-               metrics, plots, reference, reports, segmentation, target)
+               metrics, plots, reference, reports, segmentation, target,
+               tabio)
 from .cnary import CopyNumArray as _CNA
 from .vary import VariantArray as _VA
 from .rary import RegionArray as _RA
+from .gary import GenomicArray as _GA
 from ._version import __version__
 
 
@@ -96,7 +98,7 @@ def _cmd_batch(args):
             args.processes, args.count_reads)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
-        ref_arr = _CNA.read(args.reference)
+        ref_arr = tabio.read(args.reference, into=_CNA)
         target_coords, antitarget_coords = reference.reference2regions(ref_arr)
         ref_pfx = os.path.join(args.output_dir, core.fbase(args.reference))
         args.targets = ref_pfx + '.target-tmp.bed'
@@ -132,11 +134,11 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
     if annotate or short_names or split:
         # Pre-process baits/targets
         new_target_fname = tgt_name_base + '.target.bed'
-        tgt_rarr = do_targets(target_bed, annotate, short_names, split,
+        tgt_arr = do_targets(target_bed, annotate, short_names, split,
                               **({'avg_size': target_avg_size}
                                  if split and target_avg_size
                                  else {}))
-        tgt_rarr.write(new_target_fname, "bed4")
+        tabio.write(tgt_arr, new_target_fname, "bed4")
         target_bed = new_target_fname
 
     if not antitarget_bed:
@@ -148,10 +150,10 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
             anti_kwargs['avg_bin_size'] = antitarget_avg_size
         if antitarget_min_size:
             anti_kwargs['min_bin_size'] = antitarget_min_size
-        anti_rarr = do_antitarget(target_bed, **anti_kwargs)
+        anti_arr = do_antitarget(target_bed, **anti_kwargs)
         # Devise a temporary antitarget filename
         antitarget_bed = tgt_name_base + '.antitarget.bed'
-        anti_rarr.write(antitarget_bed, "bed4")
+        tabio.write(anti_arr, antitarget_bed, "bed4")
 
     if len(normal_bams) == 0:
         logging.info("Building a flat reference...")
@@ -182,7 +184,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
     if not output_reference:
         output_reference = os.path.join(output_dir, "reference.cnn")
     ngfrills.ensure_path(output_reference)
-    ref_arr.write(output_reference)
+    tabio.write(ref_arr, output_reference)
 
     return output_reference, target_bed, antitarget_bed
 
@@ -190,7 +192,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
 def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count):
     """Run coverage on one sample, write to file."""
     cnarr = do_coverage(bed_fname, bam_fname, by_count)
-    cnarr.write(out_fname)
+    tabio.write(cnarr, out_fname)
 
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
@@ -203,17 +205,17 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     sample_pfx = os.path.join(output_dir, sample_id)
 
     raw_tgt = do_coverage(target_bed, bam_fname, by_count)
-    raw_tgt.write(sample_pfx + '.targetcoverage.cnn')
+    tabio.write(raw_tgt, sample_pfx + '.targetcoverage.cnn')
 
     raw_anti = do_coverage(antitarget_bed, bam_fname, by_count)
-    raw_anti.write(sample_pfx + '.antitargetcoverage.cnn')
+    tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
-    cnarr = do_fix(raw_tgt, raw_anti, _CNA.read(ref_fname))
-    cnarr.write(sample_pfx + '.cnr')
+    cnarr = do_fix(raw_tgt, raw_anti, tabio.read(ref_fname, into=_CNA))
+    tabio.write(cnarr, sample_pfx + '.cnr')
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
     segments = segmentation.do_segmentation(cnarr, 'cbs', rlibpath=rlibpath)
-    segments.write(sample_pfx + '.cns')
+    tabio.write(segments, sample_pfx + '.cns')
 
     if scatter:
         do_scatter(cnarr, segments)
@@ -306,7 +308,7 @@ def _cmd_target(args):
     """Transform bait intervals into targets more suitable for CNVkit."""
     rarr = do_targets(args.interval, args.annotate, args.short_names,
                       args.split, args.avg_size)
-    rarr.write(args.output, "bed4")
+    tabio.write(rarr, args.output, "bed4")
 
 
 def do_targets(bed_fname, annotate=None, do_short_names=False, do_split=False,
@@ -323,10 +325,10 @@ def do_targets(bed_fname, annotate=None, do_short_names=False, do_split=False,
     if do_split:
         logging.info("Splitting large targets")
         bed_rows = target.split_targets(bed_rows, avg_size)
-    bed_rarr = _RA.from_rows(bed_rows,
+    bed_arr = _GA.from_rows(bed_rows,
                              ['chromosome', 'start', 'end', 'gene'])
-    bed_rarr.sort()
-    return bed_rarr
+    bed_arr.sort()
+    return bed_arr
 
 
 P_target = AP_subparsers.add_parser('target', help=_cmd_target.__doc__)
@@ -392,13 +394,12 @@ P_access.set_defaults(func=_cmd_access)
 
 def _cmd_antitarget(args):
     """Derive a background/antitarget BED file from a target BED file."""
-    out_rarr = do_antitarget(args.interval, args.access,
-                             args.avg_size, args.min_size)
-
+    out_arr = do_antitarget(args.interval, args.access,
+                            args.avg_size, args.min_size)
     if not args.output:
         base, ext = args.interval.rsplit('.', 1)
         args.output = base + '.antitarget.' + ext
-    out_rarr.write(args.output, "bed4")
+    tabio.write(out_arr, args.output, "bed4")
 
 
 def do_antitarget(target_bed, access_bed=None, avg_bin_size=100000,
@@ -442,7 +443,7 @@ def _cmd_coverage(args):
         if os.path.exists(args.output):
             args.output = '%s.%s.cnn' % (bambase, bedbase)
     ngfrills.ensure_path(args.output)
-    pset.write(args.output)
+    tabio.write(pset, args.output)
 
 
 def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0):
@@ -502,7 +503,7 @@ def _cmd_reference(args):
 
     ref_fname = args.output or "cnv_reference.cnn"
     ngfrills.ensure_path(ref_fname)
-    ref_probes.write(ref_fname)
+    tabio.write(ref_probes, ref_fname)
 
 
 def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
@@ -586,15 +587,16 @@ def _cmd_fix(args):
     biases and re-center.
     """
     # Verify that target and antitarget are from the same sample
-    tgt_raw = _CNA.read(args.target)
-    anti_raw = _CNA.read(args.antitarget)
+    tgt_raw = tabio.read(args.target, into=_CNA)
+    anti_raw = tabio.read(args.antitarget, into=_CNA)
     if tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
-    target_table = do_fix(tgt_raw, anti_raw, _CNA.read(args.reference),
+    target_table = do_fix(tgt_raw, anti_raw,
+                          tabio.read(args.reference, into=_CNA),
                           args.do_gc, args.do_edge, args.do_rmask)
-    target_table.write(args.output or tgt_raw.sample_id + '.cnr')
+    tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
 
 
 def do_fix(target_raw, antitarget_raw, reference,
@@ -654,7 +656,7 @@ P_fix.set_defaults(func=_cmd_fix)
 
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
-    cnarr = _CNA.read(args.filename)
+    cnarr = tabio.read(args.filename, into=_CNA)
     variants = (_VA.read_vcf(args.vcf, skip_hom=True, skip_somatic=True)
                 if args.vcf else None)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
@@ -670,7 +672,7 @@ def _cmd_segment(args):
         logging.info("Wrote %s", args.dataframe)
     else:
         segments = results
-    segments.write(args.output or segments.sample_id + '.cns')
+    tabio.write(segments, args.output or segments.sample_id + '.cns')
 
 
 P_segment = AP_subparsers.add_parser('segment', help=_cmd_segment.__doc__)
@@ -715,7 +717,7 @@ def _cmd_rescale(args):
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
-    cnarr = _CNA.read(args.filename)
+    cnarr = tabio.read(args.filename, into=_CNA)
     if args.center:
         cnarr.center_all(args.center)
     if args.purity and args.purity < 1.0:
@@ -723,7 +725,7 @@ def _cmd_rescale(args):
                                              args.male_reference)
         cnarr = do_rescale(cnarr, args.ploidy, args.purity,
                            args.male_reference, is_sample_female)
-    cnarr.write(args.output)
+    tabio.write(cnarr, args.output)
 
 
 def do_rescale(cnarr, ploidy=2, purity=None, is_reference_male=False,
@@ -769,7 +771,7 @@ def _cmd_call(args):
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
-    cnarr = _CNA.read(args.filename)
+    cnarr = tabio.read(args.filename, into=_CNA)
     if args.center:
         cnarr.center_all(args.center)
     is_sample_female = (verify_gender_arg(cnarr, args.gender,
@@ -781,7 +783,7 @@ def _cmd_call(args):
            else None)
     cnarr = do_call(cnarr, vcf, args.method, args.ploidy, args.purity,
                     args.male_reference, is_sample_female, args.thresholds)
-    cnarr.write(args.output or cnarr.sample_id + '.call.cns')
+    tabio.write(cnarr, args.output or cnarr.sample_id + '.call.cns')
 
 
 def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
@@ -915,8 +917,8 @@ def _cmd_diagram(args):
     each chromosome (segments on the left side, probes on the right side).
     """
     from cnvlib import diagram
-    cnarr = _CNA.read(args.filename) if args.filename else None
-    segarr = _CNA.read(args.segment) if args.segment else None
+    cnarr = tabio.read(args.filename, into=_CNA) if args.filename else None
+    segarr = tabio.read(args.segment, into=_CNA) if args.segment else None
     is_sample_female = verify_gender_arg(cnarr or segarr, args.gender,
                                          args.male_reference)
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
@@ -954,9 +956,9 @@ P_diagram.set_defaults(func=_cmd_diagram)
 
 def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
-    cnarr = _CNA.read(args.filename, args.sample_id
+    cnarr = tabio.read(args.filename, into=_CNA, sample_id=args.sample_id
                      ) if args.filename else None
-    segarr = _CNA.read(args.segment
+    segarr = tabio.read(args.segment, into=_CNA
                       ) if args.segment else None
     if not args.sample_id and (cnarr or segarr):
         args.sample_id = (cnarr or segarr).sample_id
@@ -966,7 +968,8 @@ def _cmd_scatter(args):
 
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
-            for chrom, start, end in _RA.read(args.range_list).coords():
+            for chrom, start, end in tabio.read(args.range_list, "sniff"
+                                               ).coords():
                 region = "{}:{}-{}".format(chrom, start, end)
                 do_scatter(cnarr, segarr, varr, region, False,
                            args.background_marker, args.trend,
@@ -1180,7 +1183,7 @@ def _cmd_loh(args):
     """
     variants = _VA.read_vcf(args.variants, args.sample_id, args.normal_id,
                             args.min_depth, skip_hom=True, skip_somatic=True)
-    segments = _CNA.read(args.segment) if args.segment else None
+    segments = tabio.read(args.segment, into=_CNA) if args.segment else None
     _fig, axis = pyplot.subplots()
     axis.set_title("Variant allele frequencies: %s" % variants.sample_id)
     chrom_sizes = collections.OrderedDict(
@@ -1217,7 +1220,7 @@ P_loh.set_defaults(func=_cmd_loh)
 
 def _cmd_heatmap(args):
     """Plot copy number for multiple samples as a heatmap."""
-    cnarrs = list(map(_CNA.read, args.filenames))
+    cnarrs = [tabio.read(f, into=_CNA) for f in args.filenames]
     do_heatmap(cnarrs, args.chromosome, args.desaturate)
     if args.output:
         pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
@@ -1336,8 +1339,8 @@ P_heatmap.set_defaults(func=_cmd_heatmap)
 
 def _cmd_breaks(args):
     """List the targeted genes in which a copy number breakpoint occurs."""
-    cnarr = _CNA.read(args.filename)
-    segarr = _CNA.read(args.segment)
+    cnarr = tabio.read(args.filename, into=_CNA)
+    segarr = tabio.read(args.segment, into=_CNA)
     bpoints = do_breaks(cnarr, segarr, args.min_probes)
     logging.info("Found %d gene breakpoints", len(bpoints))
     core.write_tsv(args.output, bpoints,
@@ -1370,8 +1373,8 @@ P_breaks.set_defaults(func=_cmd_breaks)
 
 def _cmd_gainloss(args):
     """Identify targeted genes with copy number gain or loss."""
-    cnarr = _CNA.read(args.filename)
-    segarr = _CNA.read(args.segment) if args.segment else None
+    cnarr = tabio.read(args.filename, into=_CNA)
+    segarr = tabio.read(args.segment, into=_CNA) if args.segment else None
     is_sample_female = verify_gender_arg(cnarr, args.gender,
                                          args.male_reference)
     gainloss = do_gainloss(cnarr, segarr, args.threshold,
@@ -1439,7 +1442,7 @@ def _cmd_gender(args):
     """Guess samples' gender from the relative coverage of chromosome X."""
     outrows = []
     for fname in args.targets:
-        rel_chrx_cvg = _CNA.read(fname).get_relative_chrx_cvg()
+        rel_chrx_cvg = tabio.read(fname, into=_CNA).get_relative_chrx_cvg()
         if args.male_reference:
             is_xx = (rel_chrx_cvg >= 0.5)
         else:
@@ -1480,8 +1483,8 @@ def _cmd_metrics(args):
     # Calculate all metrics
     outrows = []
     for probes_fname, segs_fname in zip(args.cnarrays, args.segments):
-        cnarr = _CNA.read(probes_fname)
-        segments = _CNA.read(segs_fname)
+        cnarr = tabio.read(probes_fname, into=_CNA)
+        segments = tabio.read(segs_fname, into=_CNA)
         values = metrics.ests_of_scale(cnarr.drop_low_coverage()
                                        .residuals(segments))
         outrows.append([core.rbase(probes_fname), len(segments)] +
@@ -1527,10 +1530,10 @@ def _cmd_segmetrics(args):
         return
 
     # Calculate all metrics
-    cnarr = _CNA.read(args.cnarray)
+    cnarr = tabio.read(args.cnarray, into=_CNA)
     if args.drop_low_coverage:
         cnarr = cnarr.drop_low_coverage()
-    segarr = _CNA.read(args.segments)
+    segarr = tabio.read(args.segments, into=_CNA)
     deviations = [segbins.log2 - segment.log2
                   for segment, segbins in cnarr.by_ranges(segarr)]
     # Measures of spread
@@ -1548,7 +1551,7 @@ def _cmd_segmetrics(args):
         segarr["PI_lo"], segarr["PI_hi"] = _segmetric_interval(segarr, cnarr,
                                                                stats['pi'])
 
-    segarr.write(args.output or segarr.sample_id + ".segmetrics.cns")
+    tabio.write(segarr, args.output or segarr.sample_id + ".segmetrics.cns")
 
 
 def _segmetric_interval(segarr, cnarr, func):
@@ -1614,7 +1617,7 @@ def _cmd_import_picard(args):
                 os.mkdir(args.output_dir)
                 logging.info("Created directory %s", args.output_dir)
             outfname = os.path.join(args.output_dir, outfname)
-        cnarr.write(outfname)
+        tabio.write(cnarr, outfname)
 
 
 P_import_picard = AP_subparsers.add_parser('import-picard',
@@ -1642,7 +1645,8 @@ def _cmd_import_seg(args):
 
     for segset in importers.import_seg(args.segfile, chrom_names, args.prefix,
                                        args.from_log10):
-        segset.write(os.path.join(args.output_dir, segset.sample_id + '.cns'))
+        tabio.write(segset, os.path.join(args.output_dir,
+                                         segset.sample_id + '.cns'))
 
 
 P_import_seg = AP_subparsers.add_parser('import-seg',
@@ -1671,11 +1675,12 @@ def _cmd_import_theta(args):
     Equivalently, use the THetA results file to convert CNVkit .cns segments to
     integer copy number calls.
     """
-    tumor_segs = _CNA.read(args.tumor_cns)
+    tumor_segs = tabio.read(args.tumor_cns, into=_CNA)
     for i, new_cns in enumerate(do_import_theta(tumor_segs, args.theta_results,
                                                 args.ploidy)):
-        new_cns.write(os.path.join(args.output_dir,
-                                   "%s-%d.cns" % (tumor_segs.sample_id, i + 1)))
+        tabio.write(new_cns, os.path.join(args.output_dir,
+                                          "%s-%d.cns" % (tumor_segs.sample_id,
+                                                         i + 1)))
 
 
 def do_import_theta(segarr, theta_results_fname, ploidy=2):
@@ -1726,7 +1731,7 @@ def _cmd_export_bed(args):
         args.show = "all"
     bed_tables = []
     for segfname in args.segments:
-        segments = _CNA.read(segfname)
+        segments = tabio.read(segfname, into=_CNA)
         # ENH: args.gender as a comma-separated list of genders
         is_sample_female = verify_gender_arg(segments, args.gender,
                                              args.male_reference)
@@ -1796,7 +1801,7 @@ def _cmd_export_vcf(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    segments = _CNA.read(args.segments)
+    segments = tabio.read(args.segments, into=_CNA)
     is_sample_female = verify_gender_arg(segments,
                                          args.gender,
                                          args.male_reference)
@@ -1830,14 +1835,15 @@ P_export_vcf.set_defaults(func=_cmd_export_vcf)
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn
 def _cmd_export_theta(args):
     """Convert segments to THetA2 input file format (*.input)."""
-    tumor_cn = _CNA.read(args.tumor_segment)
+    tumor_cn = tabio.read(args.tumor_segment, into=_CNA)
     # Handle deprecated positional reference
     if args.normal_reference:
         logging.warn("Second positional argument normal_reference is "
                      "deprecated; use --reference instead.")
         if not args.reference:
             args.reference = args.normal_reference
-    normal_cn = (_CNA.read(args.reference) if args.reference else None)
+    normal_cn = (tabio.read(args.reference, into=_CNA)
+                 if args.reference else None)
     table = export.export_theta(tumor_cn, normal_cn)
     if not args.output:
         args.output = tumor_cn.sample_id + ".interval_count"

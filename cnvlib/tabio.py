@@ -13,6 +13,7 @@ from .gary import GenomicArray as GA
 from .vary import VariantArray as VA
 
 
+# TODO - picard_hs_pertarget (Picard CalculateHsMetrics per_target_coverages)
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     """Read tabular data from a file or stream into a genome object.
 
@@ -80,17 +81,15 @@ def read_sniff(infile):
                          % infile)
 
     fmt = ngfrills.sniff_region_format(infile)
+    if hasattr(infile, "seek"):
+        infile.seek(0)
     if fmt is None:
-        return None #cls([])
+        return []
     if fmt == 'bed':
         logging.info("Detected file format: BED")
     elif fmt == 'interval':
         logging.info("Detected file format: interval list")
-    parser = {'text': read_text,
-              'interval': read_interval,
-              'bed': read_bed,
-             }[fmt]
-    return parser
+    return READERS[fmt][0](infile)
 
 
 def read_tab(infile):

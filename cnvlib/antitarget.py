@@ -10,8 +10,10 @@ import logging
 from Bio._py3k import range
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
+from . import tabio
 from .params import INSERT_SIZE
-from .rary import RegionArray as RA
+# from .rary import RegionArray as RA
+from .gary import GenomicArray as GA
 
 
 def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
@@ -28,10 +30,10 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
         - Divide into equal-size (region_size/avg_bin_size) portions
         - Emit the (chrom, start, end) coords of each portion
     """
-    target_chroms = dict(RA.read(target_bed).by_chromosome())
+    target_chroms = dict(tabio.read(target_bed, "sniff").by_chromosome())
     if access_bed:
         # Chromosomes' accessible sequence regions are given -- use them
-        access_chroms = dict(RA.read(access_bed).by_chromosome())
+        access_chroms = dict(tabio.read(access_bed, "sniff").by_chromosome())
         if access_chroms and set(access_chroms).isdisjoint(target_chroms):
             raise ValueError("Chromosome names in the accessible regions file "
                              "%s %r do not match those in targets %s %r"
@@ -63,7 +65,7 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
 
     backgrounds = find_background_regions(access_chroms, target_chroms,
                                           2 * INSERT_SIZE)
-    bg_arr = RA.from_rows(backgrounds)
+    bg_arr = GA.from_rows(backgrounds)
     bg_arr.sort()
 
     # Emit regions as antitarget bins according to avg_bin_size and min_bin_size
@@ -84,7 +86,7 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
                     out_rows.append((chrom, bin_start, bin_end))
                     bin_start = bin_end
                 out_rows.append((chrom, bin_start, end))
-    out_arr = RA.from_rows(out_rows)
+    out_arr = GA.from_rows(out_rows)
     out_arr["gene"] = "Background"
     return out_arr
 
@@ -93,7 +95,7 @@ def guess_chromosome_regions(target_chroms, telomere_size):
     """Determine (minimum) chromosome lengths from target coordinates."""
     endpoints = [target_region[len(target_region) - 1, 'end']
                  for _chrom, target_region in target_chroms.items()]
-    whole_chroms = RA.from_columns({"chromosome": list(target_chroms.keys()),
+    whole_chroms = GA.from_columns({"chromosome": list(target_chroms.keys()),
                                     "start": telomere_size,
                                     "end": endpoints})
     return dict(whole_chroms.by_chromosome())

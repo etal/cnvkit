@@ -8,14 +8,13 @@ import logging
 import numpy as np
 from Bio._py3k import map, zip
 
-from . import core, fix, metrics, ngfrills, params
+from . import core, fix, metrics, ngfrills, params, tabio
 from .cnary import CopyNumArray as CNA
-from .rary import RegionArray as RA
 
 
 def bed2probes(bed_fname):
     """Create neutral-coverage probes from intervals."""
-    regions = RA.read(bed_fname)
+    regions = tabio.read(bed_fname, "sniff")
     table = regions.data.loc[:, ("chromosome", "start", "end")]
     table["gene"] = (regions.data["gene"] if "gene" in regions.data else '-')
     table["log2"] = 0.0
@@ -39,7 +38,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
 
     # Load coverage from target/antitarget files
     logging.info("Loading %s", filenames[0])
-    cnarr1 = CNA.read(filenames[0])
+    cnarr1 = tabio.read(filenames[0], into=CNA)
     if not len(cnarr1):
         # Just create an empty array with the right columns
         col_names = ['chromosome', 'start', 'end', 'gene', 'log2']
@@ -122,7 +121,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
     all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         logging.info("Loading target %s", fname)
-        cnarrx = CNA.read(fname)
+        cnarrx = tabio.read(fname, into=CNA)
         # Bin information should match across all files
         if not (len(cnarr1) == len(cnarrx)
                 and (cnarr1.chromosome == cnarrx.chromosome).all()
