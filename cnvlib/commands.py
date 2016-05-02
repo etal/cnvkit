@@ -97,7 +97,7 @@ def _cmd_batch(args):
             args.processes, args.count_reads)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
-        ref_arr = tabio.read(args.reference, into=_CNA)
+        ref_arr = tabio.read_cna(args.reference)
         target_coords, antitarget_coords = reference.reference2regions(ref_arr)
         ref_pfx = os.path.join(args.output_dir, core.fbase(args.reference))
         args.targets = ref_pfx + '.target-tmp.bed'
@@ -209,7 +209,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     raw_anti = do_coverage(antitarget_bed, bam_fname, by_count)
     tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
-    cnarr = do_fix(raw_tgt, raw_anti, tabio.read(ref_fname, into=_CNA))
+    cnarr = do_fix(raw_tgt, raw_anti, tabio.read_cna(ref_fname))
     tabio.write(cnarr, sample_pfx + '.cnr')
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
@@ -586,14 +586,14 @@ def _cmd_fix(args):
     biases and re-center.
     """
     # Verify that target and antitarget are from the same sample
-    tgt_raw = tabio.read(args.target, into=_CNA)
-    anti_raw = tabio.read(args.antitarget, into=_CNA)
+    tgt_raw = tabio.read_cna(args.target)
+    anti_raw = tabio.read_cna(args.antitarget)
     if tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
     target_table = do_fix(tgt_raw, anti_raw,
-                          tabio.read(args.reference, into=_CNA),
+                          tabio.read_cna(args.reference),
                           args.do_gc, args.do_edge, args.do_rmask)
     tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
 
@@ -655,7 +655,7 @@ P_fix.set_defaults(func=_cmd_fix)
 
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
-    cnarr = tabio.read(args.filename, into=_CNA)
+    cnarr = tabio.read_cna(args.filename)
     variants = (_VA.read_vcf(args.vcf, skip_hom=True, skip_somatic=True)
                 if args.vcf else None)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
@@ -716,7 +716,7 @@ def _cmd_rescale(args):
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
-    cnarr = tabio.read(args.filename, into=_CNA)
+    cnarr = tabio.read_cna(args.filename)
     if args.center:
         cnarr.center_all(args.center)
     if args.purity and args.purity < 1.0:
@@ -770,7 +770,7 @@ def _cmd_call(args):
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
-    cnarr = tabio.read(args.filename, into=_CNA)
+    cnarr = tabio.read_cna(args.filename)
     if args.center:
         cnarr.center_all(args.center)
     is_sample_female = (verify_gender_arg(cnarr, args.gender,
@@ -916,8 +916,8 @@ def _cmd_diagram(args):
     each chromosome (segments on the left side, probes on the right side).
     """
     from cnvlib import diagram
-    cnarr = tabio.read(args.filename, into=_CNA) if args.filename else None
-    segarr = tabio.read(args.segment, into=_CNA) if args.segment else None
+    cnarr = tabio.read_cna(args.filename) if args.filename else None
+    segarr = tabio.read_cna(args.segment) if args.segment else None
     is_sample_female = verify_gender_arg(cnarr or segarr, args.gender,
                                          args.male_reference)
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
@@ -955,10 +955,9 @@ P_diagram.set_defaults(func=_cmd_diagram)
 
 def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
-    cnarr = tabio.read(args.filename, into=_CNA, sample_id=args.sample_id
-                     ) if args.filename else None
-    segarr = tabio.read(args.segment, into=_CNA
-                      ) if args.segment else None
+    cnarr = tabio.read_cna(args.filename, sample_id=args.sample_id
+                          ) if args.filename else None
+    segarr = tabio.read_cna(args.segment) if args.segment else None
     if not args.sample_id and (cnarr or segarr):
         args.sample_id = (cnarr or segarr).sample_id
     varr = _VA.read_vcf(args.vcf, args.sample_id, args.normal_id,
@@ -1181,7 +1180,7 @@ def _cmd_loh(args):
     """
     variants = _VA.read_vcf(args.variants, args.sample_id, args.normal_id,
                             args.min_depth, skip_hom=True, skip_somatic=True)
-    segments = tabio.read(args.segment, into=_CNA) if args.segment else None
+    segments = tabio.read_cna(args.segment) if args.segment else None
     _fig, axis = pyplot.subplots()
     axis.set_title("Variant allele frequencies: %s" % variants.sample_id)
     chrom_sizes = collections.OrderedDict(
@@ -1218,7 +1217,7 @@ P_loh.set_defaults(func=_cmd_loh)
 
 def _cmd_heatmap(args):
     """Plot copy number for multiple samples as a heatmap."""
-    cnarrs = [tabio.read(f, into=_CNA) for f in args.filenames]
+    cnarrs = [tabio.read_cna(f) for f in args.filenames]
     do_heatmap(cnarrs, args.chromosome, args.desaturate)
     if args.output:
         pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
@@ -1337,8 +1336,8 @@ P_heatmap.set_defaults(func=_cmd_heatmap)
 
 def _cmd_breaks(args):
     """List the targeted genes in which a copy number breakpoint occurs."""
-    cnarr = tabio.read(args.filename, into=_CNA)
-    segarr = tabio.read(args.segment, into=_CNA)
+    cnarr = tabio.read_cna(args.filename)
+    segarr = tabio.read_cna(args.segment)
     bpoints = do_breaks(cnarr, segarr, args.min_probes)
     logging.info("Found %d gene breakpoints", len(bpoints))
     core.write_tsv(args.output, bpoints,
@@ -1371,8 +1370,8 @@ P_breaks.set_defaults(func=_cmd_breaks)
 
 def _cmd_gainloss(args):
     """Identify targeted genes with copy number gain or loss."""
-    cnarr = tabio.read(args.filename, into=_CNA)
-    segarr = tabio.read(args.segment, into=_CNA) if args.segment else None
+    cnarr = tabio.read_cna(args.filename)
+    segarr = tabio.read_cna(args.segment) if args.segment else None
     is_sample_female = verify_gender_arg(cnarr, args.gender,
                                          args.male_reference)
     gainloss = do_gainloss(cnarr, segarr, args.threshold,
@@ -1440,7 +1439,7 @@ def _cmd_gender(args):
     """Guess samples' gender from the relative coverage of chromosome X."""
     outrows = []
     for fname in args.targets:
-        rel_chrx_cvg = tabio.read(fname, into=_CNA).get_relative_chrx_cvg()
+        rel_chrx_cvg = tabio.read_cna(fname).get_relative_chrx_cvg()
         if args.male_reference:
             is_xx = (rel_chrx_cvg >= 0.5)
         else:
@@ -1481,8 +1480,8 @@ def _cmd_metrics(args):
     # Calculate all metrics
     outrows = []
     for probes_fname, segs_fname in zip(args.cnarrays, args.segments):
-        cnarr = tabio.read(probes_fname, into=_CNA)
-        segments = tabio.read(segs_fname, into=_CNA)
+        cnarr = tabio.read_cna(probes_fname)
+        segments = tabio.read_cna(segs_fname)
         values = metrics.ests_of_scale(cnarr.drop_low_coverage()
                                        .residuals(segments))
         outrows.append([core.rbase(probes_fname), len(segments)] +
@@ -1528,10 +1527,10 @@ def _cmd_segmetrics(args):
         return
 
     # Calculate all metrics
-    cnarr = tabio.read(args.cnarray, into=_CNA)
+    cnarr = tabio.read_cna(args.cnarray)
     if args.drop_low_coverage:
         cnarr = cnarr.drop_low_coverage()
-    segarr = tabio.read(args.segments, into=_CNA)
+    segarr = tabio.read_cna(args.segments)
     deviations = [segbins.log2 - segment.log2
                   for segment, segbins in cnarr.by_ranges(segarr)]
     # Measures of spread
@@ -1673,7 +1672,7 @@ def _cmd_import_theta(args):
     Equivalently, use the THetA results file to convert CNVkit .cns segments to
     integer copy number calls.
     """
-    tumor_segs = tabio.read(args.tumor_cns, into=_CNA)
+    tumor_segs = tabio.read_cna(args.tumor_cns)
     for i, new_cns in enumerate(do_import_theta(tumor_segs, args.theta_results,
                                                 args.ploidy)):
         tabio.write(new_cns, os.path.join(args.output_dir,
@@ -1729,7 +1728,7 @@ def _cmd_export_bed(args):
         args.show = "all"
     bed_tables = []
     for segfname in args.segments:
-        segments = tabio.read(segfname, into=_CNA)
+        segments = tabio.read_cna(segfname)
         # ENH: args.gender as a comma-separated list of genders
         is_sample_female = verify_gender_arg(segments, args.gender,
                                              args.male_reference)
@@ -1799,7 +1798,7 @@ def _cmd_export_vcf(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    segments = tabio.read(args.segments, into=_CNA)
+    segments = tabio.read_cna(args.segments)
     is_sample_female = verify_gender_arg(segments,
                                          args.gender,
                                          args.male_reference)
@@ -1833,14 +1832,14 @@ P_export_vcf.set_defaults(func=_cmd_export_vcf)
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn
 def _cmd_export_theta(args):
     """Convert segments to THetA2 input file format (*.input)."""
-    tumor_cn = tabio.read(args.tumor_segment, into=_CNA)
+    tumor_cn = tabio.read_cna(args.tumor_segment)
     # Handle deprecated positional reference
     if args.normal_reference:
         logging.warn("Second positional argument normal_reference is "
                      "deprecated; use --reference instead.")
         if not args.reference:
             args.reference = args.normal_reference
-    normal_cn = (tabio.read(args.reference, into=_CNA)
+    normal_cn = (tabio.read_cna(args.reference)
                  if args.reference else None)
     table = export.export_theta(tumor_cn, normal_cn)
     if not args.output:

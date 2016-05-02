@@ -13,7 +13,6 @@ import pandas as pd
 from Bio._py3k import map, range, zip
 
 from . import call, core, params, tabio
-from .cnary import CopyNumArray as CNA
 from .vary import VariantArray as VA
 from ._version import __version__
 
@@ -33,12 +32,12 @@ def merge_samples(filenames):
 
     if not filenames:
         return []
-    first_cnarr = tabio.read(filenames[0], into=CNA)
+    first_cnarr = tabio.read_cna(filenames[0])
     out_table = first_cnarr.data.loc[:, ["chromosome", "start", "end", "gene"]]
     out_table["label"] = label_with_gene(first_cnarr)
     out_table[first_cnarr.sample_id] = first_cnarr["log2"]
     for fname in filenames[1:]:
-        cnarr = tabio.read(fname, into=CNA)
+        cnarr = tabio.read_cna(fname)
         # Verify labels match
         labels = label_with_gene(cnarr)
         if not (labels == out_table["label"]).all():
@@ -101,7 +100,7 @@ def export_nexus_basic(sample_fname):
 
     Only represents one sample per file.
     """
-    cnarr = tabio.read(sample_fname, into=CNA)
+    cnarr = tabio.read_cna(sample_fname)
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'gene', 'log2']]
     out_table['probe'] = cnarr.labels()
     return out_table
@@ -116,7 +115,7 @@ def export_nexus_ogt(sample_fname, vcf_fname, sample_id,
     are left blank; if a bin contains multiple variants, then the frequencies
     are all "mirrored" to be above .5, then the median of those values is taken.
     """
-    cnarr = tabio.read(sample_fname, into=CNA)
+    cnarr = tabio.read_cna(sample_fname)
     if min_weight and "weight" in cnarr:
         mask_low_weight = (cnarr["weight"] < min_weight)
         logging.info("Dropping %d bins with weight below %f",
@@ -156,7 +155,7 @@ def export_seg(sample_fnames):
     out_tables = []
     chrom_ids = None
     for fname in sample_fnames:
-        segments = tabio.read(fname, into=CNA)
+        segments = tabio.read_cna(fname)
         if chrom_ids is None:
             # Create & store
             chrom_ids = create_chrom_ids(segments)

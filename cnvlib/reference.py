@@ -38,7 +38,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
 
     # Load coverage from target/antitarget files
     logging.info("Loading %s", filenames[0])
-    cnarr1 = tabio.read(filenames[0], into=CNA)
+    cnarr1 = tabio.read_cna(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
         col_names = ['chromosome', 'start', 'end', 'gene', 'log2']
@@ -121,7 +121,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
     all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         logging.info("Loading target %s", fname)
-        cnarrx = tabio.read(fname, into=CNA)
+        cnarrx = tabio.read_cna(fname)
         # Bin information should match across all files
         if not (len(cnarr1) == len(cnarrx)
                 and (cnarr1.chromosome == cnarrx.chromosome).all()

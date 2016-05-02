@@ -93,6 +93,10 @@ def read_auto(infile):
     return read(infile, fmt)
 
 
+def read_cna(infile, sample_id=None, meta=None, **kwargs):
+    return read(infile, into=CNA, sample_id=sample_id, meta=meta, **kwargs)
+
+
 def read_tab(infile):
     """Read tab-separated data with column names in the first row."""
     dframe = pd.read_table(infile, dtype={'chromosome': 'string'})
