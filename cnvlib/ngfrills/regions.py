@@ -1,5 +1,6 @@
 """NGS utilities: BED/Interval I/O, genomic regions and ranges."""
 from __future__ import absolute_import, division, print_function
+from builtins import next
 
 import functools
 import logging

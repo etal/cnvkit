@@ -9,6 +9,7 @@ See:
 - https://www.macwright.org/simple-statistics/docs/simple_statistics.html
 """
 from __future__ import division, print_function
+from builtins import range
 
 import numpy as np
 
@@ -62,7 +63,7 @@ def jenks_matrices(data, n_classes):
     # 0 i i i
     # 0 i i i
 
-    for l in xrange(2, n_rows):
+    for l in range(2, n_rows):
         # Estimate variance for each potential classing of the data, for
         # each potential number of classes.
         # ENH: lift these out of the loop & apply more array magic
@@ -74,13 +75,13 @@ def jenks_matrices(data, n_classes):
         # Record the last variance in column 1
         variance_combinations[l][1] = variances[l-1]
 
-        for m in xrange(1, l):
+        for m in range(1, l):
             # For each column from index 1 to just before the diagonal
             # Or, for each element up to the current l marker again
             lower_class_limit = l - m + 1  # >=2, <=l
             iv = lower_class_limit - 1  # >=1, <l
             variance = variances[m-1]
-            for j in xrange(2, n_cols):
+            for j in range(2, n_cols):
                 # If adding this element to an existing class will increase
                 # its variance beyond the limit, break the class at this
                 # point, setting the `lower_class_limit` at this point.
@@ -107,7 +108,7 @@ def jenks_breaks(data, lower_class_limits, n_classes):
     breakpoints[n_classes] = data[-1]  # Upper bound
     # Use the lower_class_limits matrix as indices into itself, iteratively
     lower_limit_idx = len(data)
-    for j in xrange(n_classes, 0, -1):
+    for j in range(n_classes, 0, -1):
         lower_limit_idx = lower_class_limits[lower_limit_idx, j] - 1
         breakpoints[j - 1] = data[lower_limit_idx]
     return breakpoints

@@ -3,6 +3,7 @@
 Namely: breaks, gainloss.
 """
 from __future__ import absolute_import, division
+from builtins import str
 import collections
 import math
 import sys

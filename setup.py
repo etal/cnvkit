@@ -20,7 +20,8 @@ try:
             'pyvcf >= 0.5',
             'reportlab >= 3.0',
             'biopython >= 1.62',
-            'pyfaidx >= 0.4.7'
+            'pyfaidx >= 0.4.7',
+            'future >= 0.15.2'
         ])
 except ImportError:
     from distutils.core import setup
@@ -53,6 +54,8 @@ setup_args.update(
         "Operating System :: POSIX :: Linux",
         "Operating System :: Unix",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
         "Topic :: Scientific/Engineering",

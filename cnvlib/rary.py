@@ -1,5 +1,8 @@
 """An array of genomic regions or features."""
 from __future__ import absolute_import, division, print_function
+from builtins import next
+from builtins import map
+from past.builtins import basestring
 
 import logging
 import sys
@@ -15,7 +18,7 @@ class RegionArray(gary.GenomicArray):
     _required_columns = ("chromosome", "start", "end",
                          # "name", "strand",
                         )
-    _required_dtypes = ("string", "int", "int")
+    _required_dtypes = (str, int, int)
 
     def __init__(self, data_table, meta_dict=None):
         gary.GenomicArray.__init__(self, data_table, meta_dict)
@@ -170,7 +173,7 @@ def _parse_bed(infile):
             yield line
 
     with as_handle(infile, 'rU') as handle:
-        rows = map(_parse_line, track2track(handle))
+        rows = list(map(_parse_line, track2track(handle)))
     return pd.DataFrame.from_records(rows, columns=["chromosome", "start",
                                                     "end", "name", "strand"])
 
