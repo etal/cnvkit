@@ -8,22 +8,22 @@ import unittest
 import numpy as np
 # from Bio._py3k import StringIO
 
-import cnvlib
 # Import all modules as a smoke test
+import cnvlib
 from cnvlib import (access, antitarget, commands, core, coverage, diagram,
                     export, fix, importers, metrics, ngfrills, params, plots,
-                    reference, reports, segmentation, smoothing,
+                    reference, reports, segmentation, smoothing, tabio,
                     gary, cnary, vary, rary)
 
 
 class GaryTests(unittest.TestCase):
 
     def setUp(self):
-        self.ex_cnr = cnvlib.read('formats/reference-tr.cnn')
+        self.ex_cnr = tabio.read_cna('formats/reference-tr.cnn')
 
     def test_empty(self):
         """Instantiate from an empty file."""
-        garr = gary.GenomicArray.read("formats/empty")
+        garr = tabio.read("formats/empty")
         self.assertEqual(len(garr), 0)
 
     def test_iter(self):
@@ -59,7 +59,7 @@ class GaryTests(unittest.TestCase):
 
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
-            cnarr = cnvlib.read(fname)
+            cnarr = tabio.read_cna(fname)
             row_count = 0
             for _chrom, rows in cnarr.by_chromosome():
                 row_count += len(rows)
@@ -69,8 +69,8 @@ class GaryTests(unittest.TestCase):
 
     def test_ranges(self):
         """Test range methods: by_ranges, in_range, in_ranges."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
+        cnarr = tabio.read_cna("formats/amplicon.cnr")
+        segarr = tabio.read_cna("formats/amplicon.cns")
         chrom_segarr = dict(segarr.by_chromosome())
         for chrom, subarr in cnarr.by_chromosome():
             count_segs = 0
@@ -123,11 +123,11 @@ class CNATests(unittest.TestCase):
     """Tests for the CopyNumArray class."""
 
     def setUp(self):
-        self.ex_cnr = cnvlib.read('formats/reference-tr.cnn')
+        self.ex_cnr = tabio.read_cna('formats/reference-tr.cnn')
 
     def test_empty(self):
         """Instantiate from an empty file."""
-        cnarr = cnvlib.read("formats/empty")
+        cnarr = tabio.read_cna("formats/empty")
         self.assertEqual(len(cnarr), 0)
 
     def test_basic(self):
@@ -135,7 +135,7 @@ class CNATests(unittest.TestCase):
         # Length
         self.assertEqual(len(self.ex_cnr), 27526)
         # Equality
-        same = cnvlib.read('formats/reference-tr.cnn')
+        same = tabio.read_cna('formats/reference-tr.cnn')
         self.assertEqual(self.ex_cnr, same)
         # Item access
         orig = self.ex_cnr[0]
@@ -185,15 +185,15 @@ class CNATests(unittest.TestCase):
                 ("formats/tr95t.cns", True, True),
                 ("formats/reference-tr.cnn", False, False),
             ):
-            cnarr = cnvlib.read(fname)
+            cnarr = tabio.read_cna(fname)
             if sample_is_f != cnarr.guess_xx(ref_is_m):
                 print("Gender issue:", fname, sample_is_f, ref_is_m)
             self.assertEqual(sample_is_f, cnarr.guess_xx(ref_is_m))
 
     def test_residuals(self):
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segments = cnvlib.read("formats/amplicon.cns")
-        regions = rary.RegionArray(segments.data).drop_extra_columns()
+        cnarr = tabio.read_cna("formats/amplicon.cnr")
+        segments = tabio.read_cna("formats/amplicon.cns")
+        regions = gary.GenomicArray(segments.data).drop_extra_columns()
         for arg in (None, segments, regions):
             resid = cnarr.residuals(arg)
             self.assertAlmostEqual(0, resid.mean(), delta=.3)
@@ -204,27 +204,28 @@ class CNATests(unittest.TestCase):
 
 
 
-class RATests(unittest.TestCase):
-    """Tests for RegionArray class."""
+class IOTests(unittest.TestCase):
+    """Tests for I/O modules."""
 
     def test_empty(self):
         """Instantiate from an empty file."""
-        regions = rary.RegionArray.read("formats/empty")
-        self.assertEqual(len(regions), 0)
+        for fmt in ("auto", "tab", "bed", "interval", "text"):
+            regions = tabio.read("formats/empty", fmt=fmt)
+            self.assertEqual(len(regions), 0)
 
     def test_read_bed(self):
         """Read the BED format."""
-        regions = rary.RegionArray.read("formats/amplicon.bed")
+        regions = tabio.read("formats/amplicon.bed", "bed")
         self.assertEqual(len(regions), 1433)
 
     def test_read_text(self):
         """Read the text region format."""
-        regions = rary.RegionArray.read("formats/amplicon.text")
+        regions = tabio.read("formats/amplicon.text", "text")
         self.assertEqual(len(regions), 1433)
 
     def test_read_ilist(self):
         """Read the interval list format."""
-        regions = rary.RegionArray.read("formats/nv2_baits.interval_list")
+        regions = tabio.read("formats/nv2_baits.interval_list", "interval")
         self.assertEqual(len(regions), 6809)
 
 
@@ -270,15 +271,15 @@ class CommandTests(unittest.TestCase):
 
     def test_breaks(self):
         """The 'breaks' command."""
-        probes = cnvlib.read("formats/amplicon.cnr")
-        segs = cnvlib.read("formats/amplicon.cns")
+        probes = tabio.read_cna("formats/amplicon.cnr")
+        segs = tabio.read_cna("formats/amplicon.cns")
         rows = commands.do_breaks(probes, segs, 4)
         self.assertGreater(len(rows), 0)
 
     def test_call(self):
         """The 'call' command."""
         # Methods: clonal, threshold, none
-        tr_cns = cnvlib.read("formats/tr95t.cns")
+        tr_cns = tabio.read_cna("formats/tr95t.cns")
         tr_thresh = commands.do_call(tr_cns, None, "threshold",
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(tr_cns), len(tr_thresh))
@@ -286,7 +287,7 @@ class CommandTests(unittest.TestCase):
                             purity=.65,
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(tr_cns), len(tr_clonal))
-        cl_cns = cnvlib.read("formats/cl_seq.cns")
+        cl_cns = tabio.read_cna("formats/cl_seq.cns")
         cl_thresh = commands.do_call(cl_cns, None, "threshold",
                             thresholds=np.log2((np.arange(12) + .5) / 6.),
                             is_reference_male=True, is_sample_female=True)
@@ -311,7 +312,7 @@ class CommandTests(unittest.TestCase):
                 ("formats/m-on-f.cns", False, False, 0, -1, 0, 2, 1, 1),
                 ("formats/m-on-m.cns", False, True, 0, 0, 0, 2, 1, 1),
             ):
-            cns = cnvlib.read(fname)
+            cns = tabio.read_cna(fname)
             chr1_idx = (cns.chromosome == 'chr1')
             chrx_idx = (cns.chromosome == 'chrX')
             chry_idx = (cns.chromosome == 'chrY')
@@ -352,17 +353,17 @@ class CommandTests(unittest.TestCase):
                                        "formats/cl_seq.cns"])
         self.assertGreater(len(seg2_rows), len(seg_rows))
         # THetA2
-        cnr = cnvlib.read("formats/tr95t.cns")
+        cnr = tabio.read_cna("formats/tr95t.cns")
         theta_rows = export.export_theta(cnr, None)
         self.assertGreater(len(theta_rows), 0)
-        ref = cnvlib.read("formats/reference-tr.cnn")
+        ref = tabio.read_cna("formats/reference-tr.cnn")
         theta_rows = export.export_theta(cnr, ref)
         self.assertGreater(len(theta_rows), 0)
         # Formats that calculate absolute copy number
         for fname, ploidy, is_f in [("tr95t.cns", 2, True),
                                     ("cl_seq.cns", 6, True),
                                     ("amplicon.cns", 2, False)]:
-            cns = cnvlib.read("formats/" + fname)
+            cns = tabio.read_cna("formats/" + fname)
             # BED
             self.assertLess(len(export.export_bed(cns, ploidy, True, is_f,
                                                   cns.sample_id, "ploidy")),
@@ -380,7 +381,7 @@ class CommandTests(unittest.TestCase):
     def test_fix(self):
         """The 'fix' command."""
         # Extract fake target/antitarget bins from a combined file
-        ref = cnvlib.read('formats/reference-tr.cnn')
+        ref = tabio.read_cna('formats/reference-tr.cnn')
         is_bg = (ref["gene"] == "Background")
         tgt_bins = ref[~is_bg]
         tgt_bins.log2 += np.random.randn(len(tgt_bins)) / 5
@@ -396,24 +397,24 @@ class CommandTests(unittest.TestCase):
 
     def test_gainloss(self):
         """The 'gainloss' command."""
-        probes = cnvlib.read("formats/amplicon.cnr")
+        probes = tabio.read_cna("formats/amplicon.cnr")
         rows = commands.do_gainloss(probes, male_reference=True)
         self.assertGreater(len(rows), 0)
-        segs = cnvlib.read("formats/amplicon.cns")
+        segs = tabio.read_cna("formats/amplicon.cns")
         rows = commands.do_gainloss(probes, segs, 0.3, 4, male_reference=True)
         self.assertGreater(len(rows), 0)
 
     def test_import_theta(self):
         """The 'import-theta' command."""
-        cns = cnvlib.read("formats/nv3.cns")
+        cns = tabio.read_cna("formats/nv3.cns")
         theta_fname = "formats/nv3.n3.results"
         for new_cns in commands.do_import_theta(cns, theta_fname):
             self.assertTrue(0 < len(new_cns) <= len(cns))
 
     def test_metrics(self):
         """The 'metrics' command."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segments = cnvlib.read("formats/amplicon.cns")
+        cnarr = tabio.read_cna("formats/amplicon.cnr")
+        segments = tabio.read_cna("formats/amplicon.cns")
         resids = cnarr.residuals(segments)
         self.assertLessEqual(len(resids), len(cnarr))
         values = metrics.ests_of_scale(resids)
@@ -432,7 +433,7 @@ class CommandTests(unittest.TestCase):
 
     def test_segment(self):
         """The 'segment' command."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
+        cnarr = tabio.read_cna("formats/amplicon.cnr")
         # R methods are in another script
         segments = segmentation.do_segmentation(cnarr, "haar")
         self.assertGreater(len(segments), 0)
@@ -442,8 +443,8 @@ class CommandTests(unittest.TestCase):
 
     def test_segmetrics(self):
         """The 'segmetrics' command."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
+        cnarr = tabio.read_cna("formats/amplicon.cnr")
+        segarr = tabio.read_cna("formats/amplicon.cns")
         for func in (
             lambda x: metrics.confidence_interval_bootstrap(x, 0.05, 100),
             lambda x: metrics.prediction_interval(x, 0.05),

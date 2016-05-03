@@ -453,52 +453,6 @@ class GenomicArray(object):
         assert len(sorted_colnames) == len(self.data.columns)
         self.data = self.data.reindex(columns=sorted_colnames)
 
-    # I/O
-
-    @classmethod
-    def read(cls, infile, sample_id=None):
-        if sample_id is None:
-            if isinstance(infile, basestring):
-                sample_id = core.fbase(infile)
-            else:
-                sample_id = '<unknown>'
-        try:
-            table = pd.read_table(infile,
-                                  dtype={'chromosome': 'str'})
-            # Handle some optional columns
-            if "log2" in table.columns:
-                # Every bin needs a log2 value; the others can be NaN
-                t2 = table.dropna(subset=["log2"])
-                if len(t2) < len(table):
-                    logging.warn("Dropped %d rows with missing log2 values",
-                                len(table) - len(t2))
-                    table = t2
-            if "gene" in table.columns:
-                table.gene = table.gene.fillna('')
-        except ValueError:
-            # File is blank/empty, most likely
-            logging.warn("Blank file?: %s", infile)
-            table = cls._make_blank()
-        # ENH
-        # table['chromosome'] = pd.Categorical(table['chromosome'],
-        #                                      table.chromosome.drop_duplicates(),
-        #                                      ordered=True)
-        # Create a multi-index of genomic coordinates (like GRanges)
-        # table.set_index(['chromosome', 'start'], inplace=True)
-        return cls(table, {"sample_id": sample_id})
-
-    def write(self, outfile=None):
-        """Write the wrapped data table to a file or handle in tabular format.
-
-        The format is BED-like, but with a header row included and with
-        arbitrary extra columns.
-
-        To combine multiple samples in one file and/or convert to another
-        format, see the 'export' subcommand.
-        """
-        with ngfrills.safe_write(outfile or sys.stdout) as handle:
-            self.data.to_csv(handle, index=False, sep='\t', float_format='%.6g')
-
     def _get_gene_map(self):
         """
         Returns a (ordered) dictionary of unique gene names and the data indices

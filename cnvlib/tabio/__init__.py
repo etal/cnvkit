@@ -1,4 +1,4 @@
-"""I/O for tabular formats of genomic data.
+"""I/O for tabular formats of genomic data (regions or features).
 """
 from __future__ import absolute_import, division, print_function
 
@@ -94,12 +94,17 @@ def read_auto(infile):
 
 
 def read_cna(infile, sample_id=None, meta=None, **kwargs):
+    """Read a tabular file to create a CopyNumArray object."""
     return read(infile, into=CNA, sample_id=sample_id, meta=meta, **kwargs)
 
 
 def read_tab(infile):
-    """Read tab-separated data with column names in the first row."""
-    dframe = pd.read_table(infile, dtype={'chromosome': 'string'})
+    """Read tab-separated data with column names in the first row.
+
+    The format is BED-like, but with a header row included and with
+    arbitrary extra columns.
+    """
+    dframe = pd.read_table(infile, dtype={'chromosome': 'str'})
     if "log2" in dframe.columns:
         # Every bin needs a log2 value; the others can be NaN
         d2 = dframe.dropna(subset=["log2"])
