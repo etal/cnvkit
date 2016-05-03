@@ -1,5 +1,6 @@
 """NGS utilities: Indexed FASTA I/O."""
 from __future__ import absolute_import, division, print_function
+from builtins import str
 
 import logging
 from itertools import groupby

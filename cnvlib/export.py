@@ -1,5 +1,8 @@
 """Export CNVkit objects and files to other formats."""
 from __future__ import absolute_import, division, print_function
+from builtins import zip
+from builtins import str
+from builtins import range
 
 import collections
 import logging
@@ -160,8 +163,8 @@ def export_seg(sample_fnames):
         else:
             # Verify
             core.assert_equal("Segment chromosome names differ",
-                              previous=chrom_ids.keys(),
-                              current=create_chrom_ids(segments).keys())
+                              previous=list(chrom_ids.keys()),
+                              current=list(create_chrom_ids(segments).keys()))
         table = segments.data.loc[:, ["start", "end"]]
         table["ID"] = segments.sample_id
         table["mean"] = segments.data["log2"]

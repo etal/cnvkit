@@ -1,5 +1,8 @@
 """Transform bait intervals into targets more suitable for CNVkit."""
 from __future__ import division, absolute_import
+from builtins import zip
+from builtins import str
+from builtins import next
 
 import logging
 import collections
@@ -85,7 +88,7 @@ def read_refflat_genes(fname):
             genedict[name].append((chrom, strand, start, end))
 
     chromdict = collections.defaultdict(list)
-    for name, locs in genedict.iteritems():
+    for name, locs in genedict.items():
         locs = list(set(locs))
         if len(locs) == 1:
             chrom, strand, start, end = locs[0]
@@ -128,8 +131,8 @@ def parse_refflat_line(line):
     start, end = fields[4:6]
     # start, end = fields[6:8]
     exon_count, exon_starts, exon_ends = fields[8:11]
-    exons = zip(exon_starts.rstrip(',').split(','),
-                exon_ends.rstrip(',').split(','))
+    exons = list(zip(exon_starts.rstrip(',').split(','),
+                exon_ends.rstrip(',').split(',')))
     assert len(exons) == int(exon_count), (
         "Exon count mismatch at %s: file says %s, but counted %d intervals"
         % (name, exon_count, len(exons)))

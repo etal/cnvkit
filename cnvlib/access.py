@@ -6,6 +6,8 @@ Inaccessible regions, e.g. telomeres and centromeres, are masked out with N in
 the reference genome sequence; this script scans those to identify the
 coordinates of the accessible regions (those between the long spans of N's).
 """
+from builtins import next
+from builtins import zip
 
 import itertools
 import logging

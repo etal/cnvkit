@@ -1,5 +1,7 @@
 """Supporting functions for the 'reference' command."""
 from __future__ import absolute_import, division, print_function
+from builtins import zip
+from builtins import map
 
 import logging
 
@@ -161,9 +163,9 @@ def warn_bad_probes(probes):
         bad_pct = 100 * len(fg_bad_probes) / sum(probes['gene'] != 'Background')
         logging.info("Targets: %d (%s) bins failed filters:",
                      len(fg_bad_probes), "%.4f" % bad_pct + '%')
-        gene_cols = max(map(len, fg_bad_probes['gene']))
+        gene_cols = max(list(map(len, fg_bad_probes['gene'])))
         labels = list(map(CNA.row2label, fg_bad_probes))
-        chrom_cols = max(map(len, labels))
+        chrom_cols = max(list(map(len, labels)))
         last_gene = None
         for label, probe in zip(labels, fg_bad_probes):
             if probe.gene == last_gene:
@@ -190,12 +192,12 @@ def warn_bad_probes(probes):
 
 def get_fasta_stats(probes, fa_fname):
     """Calculate GC and RepeatMasker content of each bin in the FASTA genome."""
-    fa_coords = zip(probes.chromosome, probes.start, probes.end)
+    fa_coords = list(zip(probes.chromosome, probes.start, probes.end))
     logging.info("Calculating GC and RepeatMasker content in %s ...", fa_fname)
     gc_rm_vals = [calculate_gc_lo(subseq)
                   for subseq in ngfrills.fasta_extract_regions(fa_fname,
                                                                fa_coords)]
-    gc_vals, rm_vals = zip(*gc_rm_vals)
+    gc_vals, rm_vals = list(zip(*gc_rm_vals))
     return np.asfarray(gc_vals), np.asfarray(rm_vals)
 
 
@@ -219,17 +221,17 @@ def reference2regions(reference, coord_only=False):
     Like loading two BED files with ngfrills.parse_regions.
     """
     cna2rows = (_cna2coords if coord_only else _cna2regions)
-    return map(cna2rows, _ref_split_targets(reference))
+    return list(map(cna2rows, _ref_split_targets(reference)))
 
 
 def _cna2coords(cnarr):
     """Extract the coordinate columns from a CopyNumberArray"""
-    return zip(cnarr['chromosome'], cnarr['start'], cnarr['end'])
+    return list(zip(cnarr['chromosome'], cnarr['start'], cnarr['end']))
 
 
 def _cna2regions(cnarr):
     """Extract the region columns (including genes) from a CopyNumberArray"""
-    return zip(cnarr['chromosome'], cnarr['start'], cnarr['end'], cnarr['gene'])
+    return list(zip(cnarr['chromosome'], cnarr['start'], cnarr['end'], cnarr['gene']))
 
 
 def _ref_split_targets(ref_arr):
