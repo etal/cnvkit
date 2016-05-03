@@ -1,5 +1,6 @@
 """CNV utilities."""
 from __future__ import absolute_import, division, print_function
+from builtins import map
 import sys
 import os.path
 from itertools import takewhile
@@ -89,7 +90,7 @@ def assert_equal(msg, **values):
     ok = True
     key1, val1 = values.popitem()
     msg += ": %s = %r" % (key1, val1)
-    for okey, oval in values.iteritems():
+    for okey, oval in values.items():
         msg += ", %s = %r" % (okey, oval)
         if oval != val1:
             ok = False

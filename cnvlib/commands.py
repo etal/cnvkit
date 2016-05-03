@@ -3,6 +3,9 @@
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
 from __future__ import absolute_import, division, print_function
+from builtins import map
+from builtins import zip
+from builtins import range
 import argparse
 import collections
 import logging
@@ -1032,7 +1035,7 @@ def do_scatter(cnarr, segments=None, variants=None,
             gene_coords = plots.gene_coords_by_name(cnarr, gene_names)
             if not len(gene_coords) == 1:
                 raise ValueError("Genes %s are split across chromosomes %s"
-                                 % (show_gene, gene_coords.keys()))
+                                 % (show_gene, list(gene_coords.keys())))
             g_chrom, genes = gene_coords.popitem()
             if chrom:
                 # Confirm that the selected chromosomes match

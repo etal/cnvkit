@@ -1,5 +1,10 @@
 """An array of genomic intervals, treated as variant loci."""
 from __future__ import absolute_import, division, print_function
+from builtins import next
+from builtins import str
+from builtins import map
+from builtins import zip
+from past.builtins import basestring
 
 import logging
 
@@ -114,8 +119,8 @@ class VariantArray(gary.GenomicArray):
                               #          # "filter", "info",
                               #         ],
                               # ENH: converters=func -> to parse each col
-                              dtype=dict(zip(cls._required_columns,
-                                             cls._required_dtypes)),
+                              dtype=dict(list(zip(cls._required_columns,
+                                             cls._required_dtypes))),
                              )
         # ENH: do things with filter, info
         # if skip_reject and record.FILTER and len(record.FILTER) > 0:

@@ -23,6 +23,8 @@ segmentation result.
 
 """
 from __future__ import absolute_import, division, print_function
+from builtins import zip
+from builtins import range
 
 import logging
 import math

@@ -1,5 +1,8 @@
 """Plotting utilities."""
 from __future__ import absolute_import, division
+from builtins import str
+from builtins import zip
+from past.builtins import basestring
 
 import collections
 import logging
@@ -194,14 +197,14 @@ def cnv_on_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
         chrom_sizes = chromosome_sizes(segments)
 
     # Same for segment calls
-    chrom_seg_coords = {chrom: zip(rows['log2'], rows['start'], rows['end'])
+    chrom_seg_coords = {chrom: list(zip(rows['log2'], rows['start'], rows['end']))
                         for chrom, rows in segments.by_chromosome()
                        } if segments else {}
 
     x_starts = plot_x_dividers(axis, chrom_sizes, pad)
     x = []
     seg_lines = []  # y-val, x-start, x-end
-    for chrom, curr_offset in x_starts.items():
+    for chrom, curr_offset in list(x_starts.items()):
         if probes:
             x.extend(chrom_probe_centers[chrom] + curr_offset)
         if chrom in chrom_seg_coords:
@@ -374,7 +377,7 @@ def plot_x_dividers(axis, chrom_sizes, pad):
     x_centers = []
     x_starts = collections.OrderedDict()
     curr_offset = pad
-    for label, size in chrom_sizes.items():
+    for label, size in list(chrom_sizes.items()):
         x_starts[label] = curr_offset
         x_centers.append(curr_offset + 0.5 * size)
         x_dividers.append(curr_offset + size + pad)
@@ -385,7 +388,7 @@ def plot_x_dividers(axis, chrom_sizes, pad):
         axis.axvline(x=xposn, color='k')
     # Use chromosome names as x-axis labels (instead of base positions)
     axis.set_xticks(x_centers)
-    axis.set_xticklabels(chrom_sizes.keys(), rotation=60)
+    axis.set_xticklabels(list(chrom_sizes.keys()), rotation=60)
     axis.tick_params(labelsize='small')
     axis.tick_params(axis='x', length=0)
     axis.get_yaxis().tick_left()
@@ -507,9 +510,9 @@ def gene_coords_by_name(probes, names):
         all_coords[chrom][start, end].update(orig_names)
     # Consolidate each region's gene names into a string
     uniq_coords = {}
-    for chrom, hits in all_coords.iteritems():
+    for chrom, hits in all_coords.items():
         uniq_coords[chrom] = [(start, end, ",".join(sorted(orig_names)))
-                             for (start, end), orig_names in hits.iteritems()]
+                             for (start, end), orig_names in hits.items()]
     return uniq_coords
 
 
@@ -532,7 +535,7 @@ def gene_coords_by_range(probes, chrom, start, end,
             genes[name] = [row.start, row.end]
     # Reorganize the data structure
     return {chrom: [(gstart, gend, name)
-                    for name, (gstart, gend) in genes.items()]}
+                    for name, (gstart, gend) in list(genes.items())]}
 
 
 def unpack_range(a_range):

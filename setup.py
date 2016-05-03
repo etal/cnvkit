@@ -53,6 +53,8 @@ setup_args.update(
         "Operating System :: POSIX :: Linux",
         "Operating System :: Unix",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 2.7",
         "Topic :: Scientific/Engineering",

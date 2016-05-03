@@ -1,5 +1,7 @@
 """CNVkit's core data structure, a copy number array."""
 from __future__ import print_function, absolute_import, division
+from builtins import map
+from past.builtins import basestring
 
 import logging
 

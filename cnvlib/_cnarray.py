@@ -1,5 +1,11 @@
 """Definitions for the core data structure, a copy number array."""
 from __future__ import print_function
+from builtins import str
+from builtins import zip
+from builtins import map
+from builtins import next
+from past.builtins import basestring
+from builtins import object
 
 import sys
 
@@ -457,7 +463,7 @@ class CopyNumArray(object):
             assert callable(selector)
             condition = numpy.apply_along_axis(selector, 0, outrows)
             outrows = numpy.extract(condition, outrows)
-        for key, val in kwargs.items():
+        for key, val in list(kwargs.items()):
             assert key in self
             outrows = outrows[outrows[key] == val]
         return self.to_rows(outrows)
@@ -534,7 +540,7 @@ class CopyNumArray(object):
         outrows = []
         for name, subarr in self.by_gene(ignore):
             if name == 'Background' and not squash_background:
-                outrows.extend(map(tuple, subarr))
+                outrows.extend(list(map(tuple, subarr)))
             else:
                 outrows.append(squash_rows(name, subarr))
         return self.to_rows(outrows)
