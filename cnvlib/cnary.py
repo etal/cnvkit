@@ -19,7 +19,7 @@ class CopyNumArray(gary.GenomicArray):
     Optional columns: gc, rmask, spread, weight, probes
     """
     _required_columns = ("chromosome", "start", "end", "gene", "log2")
-    _required_dtypes = ("string", "int", "int", "string", "float")
+    _required_dtypes = (str, int, int, str, float)
     # ENH: make gene optional
     # Extra columns, in order:
     # "gc", "rmask", "spread", "weight", "probes"

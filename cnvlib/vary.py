@@ -21,7 +21,7 @@ class VariantArray(gary.GenomicArray):
     Required columns: chromosome, start, end, ref, alt
     """
     _required_columns = ("chromosome", "start", "end", "ref", "alt")
-    _required_dtypes = ("string", "int", "int", "string", "string")
+    _required_dtypes = (str, int, int, str, str)
     # Extra: somatic, zygosity, depth, alt_count, alt_freq
 
     def __init__(self, data_table, meta_dict=None):

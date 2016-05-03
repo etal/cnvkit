@@ -22,7 +22,7 @@ class GenomicArray(object):
     columns.
     """
     _required_columns = ("chromosome", "start", "end")
-    _required_dtypes = ("str", "int", "int")
+    _required_dtypes = (str, int, int)
 
     def __init__(self, data_table, meta_dict=None):
         # Validation
@@ -265,9 +265,9 @@ class GenomicArray(object):
         endpoints to match the range boundaries, and ``inner`` excludes those
         bins.
         """
-        if isinstance(start, (int, float, np.float64)):
+        if isinstance(start, (int, np.int64, float, np.float64)):
             start = [int(start)]
-        if isinstance(end, (int, float, np.float64)):
+        if isinstance(end, (int, np.int64, float, np.float64)):
             end = [int(end)]
         results = self._iter_ranges(chrom, start, end, mode)
         return next(results)
