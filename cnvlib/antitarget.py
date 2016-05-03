@@ -1,5 +1,8 @@
 """Supporting functions for the 'antitarget' command."""
 from __future__ import absolute_import, division, print_function
+from builtins import map
+from builtins import next
+from builtins import range
 import re
 import sys
 import logging
@@ -45,7 +48,7 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
                               if not is_canonical.match(c)]
         else:
             # Alternative contigs have long names -- skip them
-            max_tgt_chr_name_len = max(map(len, target_chroms))
+            max_tgt_chr_name_len = max(list(map(len, target_chroms)))
             chroms_to_skip = [c for c in untgt_chroms
                               if len(c) > max_tgt_chr_name_len]
         for untgt_chr in chroms_to_skip:
@@ -89,8 +92,8 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
 def guess_chromosome_regions(target_chroms, telomere_size):
     """Determine (minimum) chromosome lengths from target coordinates."""
     endpoints = [target_region[len(target_region) - 1, 'end']
-                 for _chrom, target_region in target_chroms.iteritems()]
-    whole_chroms = RA.from_columns({"chromosome": target_chroms.keys(),
+                 for _chrom, target_region in target_chroms.items()]
+    whole_chroms = RA.from_columns({"chromosome": list(target_chroms.keys()),
                                     "start": telomere_size,
                                     "end": endpoints})
     return dict(whole_chroms.by_chromosome())
@@ -98,7 +101,7 @@ def guess_chromosome_regions(target_chroms, telomere_size):
 
 def find_background_regions(access_chroms, target_chroms, pad_size):
     """Take coordinates of accessible regions and targets; emit antitargets."""
-    for chrom, access_arr in access_chroms.iteritems():
+    for chrom, access_arr in access_chroms.items():
         if chrom in target_chroms:
             target_regions = target_chroms[chrom].coords()
 

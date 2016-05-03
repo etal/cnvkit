@@ -1,5 +1,10 @@
 """An array of genomic intervals, treated as variant loci."""
 from __future__ import absolute_import, division, print_function
+from builtins import next
+from builtins import str
+from builtins import map
+from builtins import zip
+from past.builtins import basestring
 
 import logging
 
@@ -16,7 +21,7 @@ class VariantArray(gary.GenomicArray):
     Required columns: chromosome, start, end, ref, alt
     """
     _required_columns = ("chromosome", "start", "end", "ref", "alt")
-    _required_dtypes = ("string", "int", "int", "string", "string")
+    _required_dtypes = (str, int, int, str, str)
     # Extra: somatic, zygosity, depth, alt_count, alt_freq
 
     def __init__(self, data_table, meta_dict=None):
@@ -58,7 +63,7 @@ class VariantArray(gary.GenomicArray):
 
     @classmethod
     def read_vcf(cls, infile, sample_id=None, normal_id=None, min_depth=None,
-                 skip_hom=False, skip_reject=False, skip_somatic=False):
+                 skip_hom=False, skip_reject=False, skip_somatic=False, ignore_gt_field=False):
         """Parse SNV coordinates from a VCF file into a VariantArray."""
         if isinstance(infile, basestring):
             vcf_reader = vcf.Reader(filename=infile)
@@ -75,11 +80,15 @@ class VariantArray(gary.GenomicArray):
         sample_id, normal_id = _select_sample(vcf_reader, sample_id, normal_id)
         if normal_id:
             columns.extend(["n_zygosity", "n_depth", "n_alt_count"])
-        rows = _parse_records(vcf_reader, sample_id, normal_id, skip_reject)
+        rows = _parse_records(vcf_reader, sample_id, normal_id, skip_reject, ignore_gt_field)
         table = pd.DataFrame.from_records(rows, columns=columns)
         table["alt_freq"] = table["alt_count"] / table["depth"]
+        if ignore_gt_field:
+                table["zygosity"] = (2 * table["alt_freq"]).round() / 2
         if normal_id:
             table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
+            if ignore_gt_field:
+                table["n_zygosity"] = (2 * table["n_alt_freq"]).round() / 2
         # Filter out records as requested
         cnt_depth = cnt_hom = cnt_som = 0
         if min_depth:
@@ -114,8 +123,8 @@ class VariantArray(gary.GenomicArray):
                               #          # "filter", "info",
                               #         ],
                               # ENH: converters=func -> to parse each col
-                              dtype=dict(zip(cls._required_columns,
-                                             cls._required_dtypes)),
+                              dtype=dict(list(zip(cls._required_columns,
+                                             cls._required_dtypes))),
                              )
         # ENH: do things with filter, info
         # if skip_reject and record.FILTER and len(record.FILTER) > 0:
@@ -210,7 +219,7 @@ def _confirm_unique(sample_id, samples):
             % (sample_id, samples))
 
 
-def _parse_records(vcf_reader, sample_id, normal_id, skip_reject):
+def _parse_records(vcf_reader, sample_id, normal_id, skip_reject, ignore_gt):
     """Parse VCF records into DataFrame rows.
 
     Apply filters to skip records with low depth, homozygosity, the REJECT
@@ -226,10 +235,10 @@ def _parse_records(vcf_reader, sample_id, normal_id, skip_reject):
             is_som = True
 
         sample = record.genotype(sample_id)
-        depth, zygosity, alt_count = _extract_genotype(sample)
+        depth, zygosity, alt_count = _extract_genotype(sample, ignore_gt)
         if normal_id:
             normal = record.genotype(normal_id)
-            n_depth, n_zygosity, n_alt_count = _extract_genotype(normal)
+            n_depth, n_zygosity, n_alt_count = _extract_genotype(normal, ignore_gt)
             if n_zygosity == 0:
                 is_som = True
 
@@ -252,7 +261,7 @@ def _parse_records(vcf_reader, sample_id, normal_id, skip_reject):
         logging.info('Filtered out %d records', cnt_reject)
 
 
-def _extract_genotype(sample):
+def _extract_genotype(sample, ignore_gt):
     if "DP" in sample.data._fields:
         depth = sample.data.DP
     else:
@@ -260,11 +269,11 @@ def _extract_genotype(sample):
         depth = alt_count = None
     if sample.is_het:
         zygosity = 0.5
-    elif sample.gt_type == 0:
+    elif not ignore_gt and sample.gt_type == 0:
         zygosity = 0.0
     else:
         zygosity = 1.0
-    alt_count = (_get_alt_count(sample) if sample.gt_type else 0.0)
+    alt_count = _get_alt_count(sample) if ignore_gt or sample.gt_type else 0.0
     return depth, zygosity, alt_count
 
 

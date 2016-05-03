@@ -107,7 +107,7 @@ def build_chrom_diagram(features, chr_sizes, sample_id):
     chr_diagram.page_size = PAGE_SIZE
     chr_diagram.title_size = 18
 
-    for chrom, length in chr_sizes.items():
+    for chrom, length in list(chr_sizes.items()):
         chrom_features = features.get(chrom)
         if not chrom_features:
             continue

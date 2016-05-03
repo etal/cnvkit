@@ -1,5 +1,9 @@
 """Supporting functions for the 'antitarget' command."""
 from __future__ import absolute_import, division
+from builtins import zip
+from builtins import str
+from builtins import map
+from past.builtins import basestring
 
 import logging
 import math
@@ -34,7 +38,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
     ic_func = (interval_coverages_count if by_count
                else interval_coverages_pileup)
     results = ic_func(bed_fname, bam_fname, min_mapq)
-    read_counts, cna_rows = zip(*list(results))
+    read_counts, cna_rows = list(zip(*list(results)))
 
     # Log some stats
     tot_time = time.time() - start_time
@@ -143,7 +147,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
             name = "-"
         else:
             raise RuntimeError("Bad line from bedcov:\n" + line)
-        start, end, basecount = map(int, (start_s, end_s, basecount_s.strip()))
+        start, end, basecount = list(map(int, (start_s, end_s, basecount_s.strip())))
         span = end - start
         if span > 0:
             # Algebra from above
