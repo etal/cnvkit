@@ -83,8 +83,12 @@ class VariantArray(gary.GenomicArray):
         rows = _parse_records(vcf_reader, sample_id, normal_id, skip_reject, ignore_gt_field)
         table = pd.DataFrame.from_records(rows, columns=columns)
         table["alt_freq"] = table["alt_count"] / table["depth"]
+        if ignore_gt_field:
+                table["zygosity"] = (2 * table["alt_freq"]).round() / 2
         if normal_id:
             table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
+            if ignore_gt_field:
+                table["n_zygosity"] = (2 * table["n_alt_freq"]).round() / 2
         # Filter out records as requested
         cnt_depth = cnt_hom = cnt_som = 0
         if min_depth:
