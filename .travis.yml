@@ -38,6 +38,7 @@ addons:
     - python3-scipy
     - python3-tk
     - python3-tz
+    - cython3
 
 # Cache the compiled pip package dependencies
 # https://docs.travis-ci.com/user/caching/#pip-cache
