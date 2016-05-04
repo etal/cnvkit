@@ -1,5 +1,7 @@
 """CNVkit's core data structure, a copy number array."""
 from __future__ import print_function, absolute_import, division
+from builtins import map
+from past.builtins import basestring
 
 import logging
 
@@ -17,7 +19,7 @@ class CopyNumArray(gary.GenomicArray):
     Optional columns: gc, rmask, spread, weight, probes
     """
     _required_columns = ("chromosome", "start", "end", "gene", "log2")
-    _required_dtypes = ("string", "int", "int", "string", "float")
+    _required_dtypes = (str, int, int, str, float)
     # ENH: make gene optional
     # Extra columns, in order:
     # "gc", "rmask", "spread", "weight", "probes"

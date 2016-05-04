@@ -1,5 +1,8 @@
 """Import from other formats to the CNVkit format."""
 from __future__ import absolute_import, division, print_function
+from builtins import next
+from builtins import map
+from builtins import zip
 
 import logging
 import math
@@ -176,7 +179,7 @@ def parse_theta_results(fname):
         # mu
         mu = body[1].split(',')
         mu_normal = float(mu[0])
-        mu_tumors = map(float, mu[1:])
+        mu_tumors = list(map(float, mu[1:]))
 
         # C
         copies = body[2].split(':')
