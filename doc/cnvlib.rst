@@ -40,14 +40,6 @@ manipulations that aren't already provided by methods in the wrapper class.
     :undoc-members:
     :show-inheritance:
 
-``rary``
-~~~~~~~~~
-
-.. automodule:: cnvlib.rary
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 ``vary``
 ~~~~~~~~~
 

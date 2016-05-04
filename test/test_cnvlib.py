@@ -13,7 +13,7 @@ import cnvlib
 from cnvlib import (access, antitarget, commands, core, coverage, diagram,
                     export, fix, importers, metrics, ngfrills, params, plots,
                     reference, reports, segmentation, smoothing, tabio,
-                    gary, cnary, vary, rary)
+                    gary, cnary, vary)
 
 
 class GaryTests(unittest.TestCase):
