@@ -293,10 +293,14 @@ Compile a copy-number reference from the given files or directory (containing
 normal samples). If given a reference genome (-f option), also calculate the GC
 content and repeat-masked proportion of each region.
 
-The reference can be constructed from zero, one or multiple control samples.
-A reference should be constructed specifically for each target capture panel
-(i.e. set of baits) and, ideally, match the type of sample (e.g. FFPE-extracted
-or fresh DNA) and library preparation protocol or kit used.
+The reference can be constructed from zero, one or multiple control samples (see
+below).
+
+A reference should be constructed specifically for each target capture panel,
+using a BED file listing the genomic coordinates of the baited regions.
+Ideally, the control or "normal" samples used to build the reference should
+match the type of sample (e.g. FFPE-extracted or fresh DNA) and library
+preparation protocol or kit used for the test (e.g. tumor) samples.
 
 Paired or pooled normals
 ````````````````````````
