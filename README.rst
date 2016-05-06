@@ -111,13 +111,14 @@ these Python packages via ``pip`` or ``conda``:
 - `NumPy <http://www.numpy.org/>`_
 - `SciPy <http://www.scipy.org/>`_
 - `Pandas <http://pandas.pydata.org/>`_
+- `pyfaidx <https://github.com/mdshw5/pyfaidx>`_
 - `pysam <https://github.com/pysam-developers/pysam>`_
 - `PyVCF <https://github.com/jamescasbon/PyVCF>`_
 
 On Ubuntu or Debian Linux::
 
-    sudo apt-get install python-numpy python-scipy python-matplotlib python-reportlab python-pip
-    sudo pip install pandas biopython pysam pyvcf --upgrade
+    sudo apt-get install python-numpy python-scipy python-matplotlib python-reportlab python-pandas
+    sudo pip install biopython pyfaidx pysam pyvcf --upgrade
 
 
 On Mac OS X you may instead find it much easier to first install the Python
@@ -125,14 +126,14 @@ package manager `Miniconda`_, or the full `Anaconda`_ distribution, which
 includes most of the dependencies. Then install the rest of CNVkit's
 dependencies::
 
-    conda install numpy scipy pandas matplotlib reportlab biopython pysam pyvcf
+    conda install numpy scipy pandas matplotlib reportlab biopython pyfaidx pysam pyvcf
 
 Otherwise, we recommend using `Homebrew <http://brew.sh/>`_ to install an
 up-to-date Python (e.g. ``brew install python``) and as many of the Python
 packages as possible (primarily NumPy, SciPy and matplotlib). Then, proceed with
 pip::
 
-    sudo pip install numpy scipy pandas matplotlib reportlab biopython pysam pyvcf
+    sudo pip install numpy scipy pandas matplotlib reportlab biopython pyfaidx pysam pyvcf
 
 
 R dependencies
