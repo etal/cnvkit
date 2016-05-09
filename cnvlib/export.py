@@ -472,8 +472,9 @@ def export_theta_snps(varr):
     # Skip indels
     varr = varr[(varr["ref"].str.len() == 1) & (varr["alt"].str.len() == 1)]
     # Drop rows with any NaN
-    varr.data.dropna(subset=["depth", "n_depth", "alt_count", "n_alt_count"],
-                     inplace=True)
+    varr.data.dropna(subset=["depth", "alt_count"], inplace=True)
+    if "n_depth" in varr and "n_alt_count" in varr:
+        varr.data.dropna(subset=["n_depth", "alt_count"], inplace=True)
     # Avoid weird situation I've seen on alt contigs
     varr = varr[varr["depth"] >= varr["alt_count"]]
     # Reformat for THetA2
