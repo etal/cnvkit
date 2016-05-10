@@ -131,18 +131,27 @@ def seg2cns(seg_text):
 
     Return a pandas.Dataframe with CNA columns.
     """
+    text_stream = StringIO(seg_text)
+    n_tabs = None
+    for line in text_stream:
+        if line.startswith(('[', "WARNING")):
+            continue
+        n_tabs = line.count('\t')
+        if n_tabs == 5:
+            col_names = ["sample_id", "chromosome", "start", "end", "probes",
+                         "log2"]
+        elif n_tabs == 4:
+            col_names = ["sample_id", "chromosome", "start", "end", "log2"]
+        else:
+            raise ValueError("Data columns are not valid SEG format:\n" + line)
+        break
+    else:
+        raise ValueError("SEG file contains no data")
+
     try:
-        table = pd.read_table(StringIO(seg_text), comment='[')
+        table = pd.read_table(text_stream, names=col_names)
     except pd.parser.CParserError:
         raise ValueError("Unexpected dataframe contents:\n%s" % (seg_text))
-    if len(table.columns) == 6:
-        table.columns = ["sample_id", "chromosome", "start", "end", "probes",
-                         "log2"]
-    elif len(table.columns) == 5:
-        table.columns = ["sample_id", "chromosome", "start", "end", "log2"]
-    else:
-        raise ValueError("Segmentation output is not valid SEG format:\n"
-                        + seg_text)
     del table["sample_id"]
     table["start"] = [int(math.ceil(float(val))) for val in table["start"]]
     table["end"] = [int(math.ceil(float(val))) for val in table["end"]]
