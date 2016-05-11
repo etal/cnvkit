@@ -149,7 +149,7 @@ def seg2cns(seg_text):
         raise ValueError("SEG file contains no data")
 
     try:
-        table = pd.read_table(text_stream, names=col_names)
+        table = pd.read_table(text_stream, names=col_names, header=None)
     except pd.parser.CParserError:
         raise ValueError("Unexpected dataframe contents:\n%s" % (seg_text))
     del table["sample_id"]
