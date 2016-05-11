@@ -400,7 +400,7 @@ class CommandTests(unittest.TestCase):
         rows = commands.do_gainloss(probes, male_reference=True)
         self.assertGreater(len(rows), 0)
         segs = cnvlib.read("formats/amplicon.cns")
-        rows = commands.do_gainloss(probes, segs, True, 0.3, 4)
+        rows = commands.do_gainloss(probes, segs, 0.3, 4, male_reference=True)
         self.assertGreater(len(rows), 0)
 
     def test_import_theta(self):

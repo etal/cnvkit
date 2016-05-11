@@ -167,10 +167,11 @@ class CopyNumArray(gary.GenomicArray):
 
     # Chromosomal gender
 
-    def shift_xx(self, male_reference=False):
+    def shift_xx(self, male_reference=False, is_xx=None):
         """Adjust chrX coverages (divide in half) for apparent female samples."""
         outprobes = self.copy()
-        is_xx = self.guess_xx(male_reference=male_reference)
+        if is_xx is None:
+            is_xx = self.guess_xx(male_reference=male_reference)
         if is_xx and male_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
             outprobes[outprobes.chromosome == self._chr_x_label, 'log2'] -= 1.0

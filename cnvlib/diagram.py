@@ -26,7 +26,8 @@ CHROM_FATNESS = 0.3
 PAGE_SIZE = (11.0*inch, 8.5*inch)
 
 
-def create_diagram(cnarr, segarr, threshold, min_probes, outfname, male_reference):
+def create_diagram(cnarr, segarr, threshold, min_probes, outfname,
+                   is_reference_male, is_sample_female):
     """Create the diagram."""
     if cnarr and segarr:
         do_both = True  # Draw segments on left, probes on right.
@@ -43,14 +44,16 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, male_referenc
         do_both = False
 
     # Label genes where copy ratio value exceeds threshold
-    cnarr = cnarr.shift_xx(male_reference)
+    if is_sample_female is None:
+        is_sample_female = cnarr.guess_xx(male_reference=is_reference_male)
+    cnarr = cnarr.shift_xx(is_reference_male, is_sample_female)
     if cnarr_is_seg:
         sel = cnarr.data[(cnarr.data.log2.abs() >= threshold) &
                           ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
         gainloss = [(s.gene, s.chromosome, s.start, s.end, s.log2, s.probes)
                     for s in sel.itertuples(index=False)]
     elif segarr:
-        segarr = segarr.shift_xx(male_reference)
+        segarr = segarr.shift_xx(is_reference_male, is_sample_female)
         gainloss = reports.gainloss_by_segment(cnarr, segarr, threshold)
     else:
         gainloss = reports.gainloss_by_gene(cnarr, threshold)

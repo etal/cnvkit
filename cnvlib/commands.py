@@ -228,7 +228,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
         from cnvlib import diagram
         outfname = sample_pfx + '-diagram.pdf'
         diagram.create_diagram(cnarr, segments, 0.5, 3, outfname,
-                               male_reference)
+                               male_reference, None)
         logging.info("Wrote %s", outfname)
 
 
@@ -920,9 +920,11 @@ def _cmd_diagram(args):
     from cnvlib import diagram
     cnarr = _CNA.read(args.filename) if args.filename else None
     segarr = _CNA.read(args.segment) if args.segment else None
+    is_sample_female = verify_gender_arg(cnarr or segarr, args.gender,
+                                         args.male_reference)
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
                                       args.min_probes, args.output,
-                                      args.male_reference)
+                                      args.male_reference, is_sample_female)
     logging.info("Wrote %s", outfname)
 
 
@@ -942,6 +944,10 @@ P_diagram.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-CNR of
                 chrX; otherwise male samples would have -1 chrX).""")
+P_diagram.add_argument("-g", "--gender",
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+        help="""Specify the sample's gender as male or female. (Otherwise
+                guessed from chrX copy number).""")
 P_diagram.add_argument('-o', '--output',
         help="Output PDF file name.")
 P_diagram.set_defaults(func=_cmd_diagram)
@@ -1367,26 +1373,31 @@ P_breaks.set_defaults(func=_cmd_breaks)
 
 def _cmd_gainloss(args):
     """Identify targeted genes with copy number gain or loss."""
-    pset = _CNA.read(args.filename)
-    segs = _CNA.read(args.segment) if args.segment else None
-    gainloss = do_gainloss(pset, segs, args.male_reference, args.threshold,
-                           args.min_probes, args.drop_low_coverage)
+    cnarr = _CNA.read(args.filename)
+    segarr = _CNA.read(args.segment) if args.segment else None
+    is_sample_female = verify_gender_arg(cnarr, args.gender,
+                                         args.male_reference)
+    gainloss = do_gainloss(cnarr, segarr, args.threshold,
+                           args.min_probes, args.drop_low_coverage,
+                           args.male_reference, is_sample_female)
     logging.info("Found %d gene-level gains and losses", len(gainloss))
     core.write_tsv(args.output, gainloss,
                    colnames=['Gene', 'Chrom.', 'Start', 'End', 'Log2Ratio',
                              'Probes'])
 
 
-def do_gainloss(probes, segments=None, male_reference=False, threshold=0.2,
-                min_probes=3, skip_low=False):
+def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
+                skip_low=False, male_reference=False, is_sample_female=None):
     """Identify targeted genes with copy number gain or loss."""
-    probes = probes.shift_xx(male_reference)
+    if is_sample_female is None:
+        is_sample_female = cnarr.guess_xx(male_reference=male_reference)
+    cnarr = cnarr.shift_xx(male_reference, is_sample_female)
     if segments:
-        segments = segments.shift_xx(male_reference)
-        gainloss = reports.gainloss_by_segment(probes, segments, threshold,
+        segments = segments.shift_xx(male_reference, is_sample_female)
+        gainloss = reports.gainloss_by_segment(cnarr, segments, threshold,
                                                skip_low)
     else:
-        gainloss = reports.gainloss_by_gene(probes, threshold, skip_low)
+        gainloss = reports.gainloss_by_gene(cnarr, threshold, skip_low)
     return [row for row in gainloss if row[5] >= min_probes]
 
 
@@ -1409,6 +1420,10 @@ P_gainloss.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-coverage of
                 chrX; otherwise male samples would have -1 chrX).""")
+P_gainloss.add_argument("-g", "--gender",
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+        help="""Specify the sample's gender as male or female. (Otherwise
+                guessed from chrX copy number).""")
 P_gainloss.add_argument('-o', '--output',
         help="Output table file name.")
 P_gainloss.set_defaults(func=_cmd_gainloss)
