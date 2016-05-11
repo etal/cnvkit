@@ -461,6 +461,7 @@ class GenomicArray(object):
         try:
             table = pd.read_table(infile,
                                   dtype={'chromosome': 'str'})
+            # Handle some optional columns
             if "log2" in table.columns:
                 # Every bin needs a log2 value; the others can be NaN
                 t2 = table.dropna(subset=["log2"])
@@ -468,6 +469,8 @@ class GenomicArray(object):
                     logging.warn("Dropped %d rows with missing log2 values",
                                 len(table) - len(t2))
                     table = t2
+            if "gene" in table.columns:
+                table.gene = table.gene.fillna('')
         except ValueError:
             # File is blank/empty, most likely
             logging.warn("Blank file?: %s", infile)
