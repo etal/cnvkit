@@ -2,8 +2,6 @@
 language: python
 python:
     - "2.7"
-    - "3.4"
-    - "3.5"
 
 notifications:
     email: false
@@ -29,17 +27,6 @@ addons:
     - python-scipy
     - python-tk
     - python-tz
-    - python3-dev
-    - python3-biopython
-    - python3-dateutil
-    - python3-matplotlib
-    - python3-numpy
-    - python3-reportlab
-    - python3-scipy
-    - python3-tk
-    - python3-tz
-    - cython
-    - cython3
 
 # Cache the compiled pip package dependencies
 # https://docs.travis-ci.com/user/caching/#pip-cache
