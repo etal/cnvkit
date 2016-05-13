@@ -93,7 +93,7 @@ We'd like to highlight:
   *New England Journal of Medicine*, 373(20), 1926-1936
 
 Specific support for CNVkit is included in `bcbio-nextgen
-<https://bcbio-nextgen.readthedocs.org/>`_, `THetA2
+<https://bcbio-nextgen.readthedocs.io`_, `THetA2
 <http://compbio.cs.brown.edu/projects/theta/>`_, and `MetaSV
 <http://bioinform.github.io/metasv/>`_;
 CNVkit can also :ref:`export` files to several standard formats that can be used

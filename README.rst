@@ -5,7 +5,7 @@ CNVkit
 A command-line toolkit and Python library for detecting copy number variants
 and alterations genome-wide from targeted DNA sequencing.
 
-Read the full documentation at: http://cnvkit.readthedocs.org
+Read the full documentation at: http://cnvkit.readthedocs.io
 
 .. image:: https://travis-ci.org/etal/cnvkit.svg?branch=master
     :target: https://travis-ci.org/etal/cnvkit

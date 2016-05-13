@@ -182,7 +182,7 @@ segments are spurious. One possible heuristic for judging the overall noisiness
 of each sample in a table is to multiply the number of segments by the biweight
 midvariance -- the value will tend to be higher for unreliable samples.
 Check questionable samples for poor coverage (using e.g. `bedtools
-<http://bedtools.readthedocs.org/>`_, `chanjo <http://www.chanjo.co/>`_,
+<http://bedtools.readthedocs.io`_, `chanjo <http://www.chanjo.co/>`_,
 `IGV <http://www.broadinstitute.org/igv/>`_ or `Picard CalculateHsMetrics
 <http://broadinstitute.github.io/picard/command-line-overview.html#CalculateHsMetrics>`_).
 
