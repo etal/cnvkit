@@ -3,9 +3,6 @@
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
 from __future__ import absolute_import, division, print_function
-from builtins import map
-from builtins import zip
-from builtins import range
 import argparse
 import collections
 import logging
@@ -1381,9 +1378,7 @@ def _cmd_gainloss(args):
                            args.min_probes, args.drop_low_coverage,
                            args.male_reference, is_sample_female)
     logging.info("Found %d gene-level gains and losses", len(gainloss))
-    core.write_tsv(args.output, gainloss,
-                   colnames=['Gene', 'Chrom.', 'Start', 'End', 'Log2Ratio',
-                             'Probes'])
+    core.write_dataframe(args.output, gainloss)
 
 
 def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
@@ -1393,12 +1388,16 @@ def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
         is_sample_female = cnarr.guess_xx(male_reference=male_reference)
     cnarr = cnarr.shift_xx(male_reference, is_sample_female)
     if segments:
+        logging.info("Creating gainloss report from segmented data")
         segments = segments.shift_xx(male_reference, is_sample_female)
-        gainloss = reports.gainloss_by_segment(cnarr, segments, threshold,
-                                               skip_low)
+        gainloss = pd.DataFrame(reports.gainloss_by_segment(cnarr, segments, threshold,
+                                               skip_low))
+        gainloss = gainloss.reindex(columns= ["gene"] + [x for x in gainloss.columns if x != "gene"])
     else:
-        gainloss = reports.gainloss_by_gene(cnarr, threshold, skip_low)
-    return [row for row in gainloss if row[5] >= min_probes]
+        logging.info("Creating gainloss report from log2 ratios")
+        columns = ["gene"] + [x for x in cnarr._required_columns if x != "gene"] + ["probes"]
+        gainloss = pd.DataFrame(reports.gainloss_by_gene(cnarr, threshold, skip_low), columns=columns)
+    return gainloss.query("probes >= {}".format(min_probes))
 
 
 P_gainloss = AP_subparsers.add_parser('gainloss', help=_cmd_gainloss.__doc__)

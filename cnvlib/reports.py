@@ -86,9 +86,9 @@ def gainloss_by_segment(probes, segments, threshold, skip_low=False):
     """
     for segment, subprobes in probes.by_ranges(segments):
         if abs(segment.log2) >= threshold:
-            for (gene, chrom, start, end, _coverage, nprobes
-                ) in group_by_genes(subprobes, skip_low):
-                yield (gene, chrom, start, end, segment.log2, nprobes)
+            for (gene, chrom, start, end, _coverage, nprobes) in \
+                    group_by_genes(subprobes, skip_low):
+                yield segment._replace(gene=gene, start=start, end=end)
 
 
 # TODO consolidate with CNA.squash_genes

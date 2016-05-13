@@ -6,7 +6,6 @@ from past.builtins import basestring
 import logging
 
 import numpy as np
-import pandas as pd
 
 from . import core, gary, metrics, params, smoothing
 
@@ -75,9 +74,8 @@ class CopyNumArray(gary.GenomicArray):
         start_idx = end_idx = None
         for _chrom, subgary in self.by_chromosome():
             prev_idx = 0
-            for gene in pd.unique(subgary.data['gene']):
+            for gene, gene_idx in subgary._get_gene_map().items():
                 if not (gene == 'Background' or gene in ignore):
-                    gene_idx = (subgary.data['gene'] == gene).nonzero()[0]
                     if not len(gene_idx):
                         logging.warn("Specified gene name somehow missing: %s",
                                      gene)

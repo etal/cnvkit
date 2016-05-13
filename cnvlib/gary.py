@@ -2,6 +2,7 @@
 from __future__ import print_function, absolute_import, division
 from builtins import next
 from builtins import zip
+from collections import OrderedDict
 from past.builtins import basestring
 from builtins import object
 
@@ -204,6 +205,11 @@ class GenomicArray(object):
 
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
+
+        # necessary because of pandas bug which says:
+        #   ValueError: items in new_categories are not the same as in old categories
+        self.data.chromosome = self.data.chromosome.astype(str)
+
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
 
@@ -495,3 +501,22 @@ class GenomicArray(object):
         with ngfrills.safe_write(outfile or sys.stdout) as handle:
             self.data.to_csv(handle, index=False, sep='\t', float_format='%.6g')
 
+    def _get_gene_map(self):
+        """
+        Returns a (ordered) dictionary of unique gene names and the data indices of their segments
+        in the order of occurrence (genomic order)
+        :return: OrderedDict
+        """
+
+        if 'gene' not in self.data:
+            return OrderedDict()
+
+        genes = OrderedDict()
+        for ix, row in self.data.iterrows():
+            if pd.isnull(row.gene):
+                continue
+            for gene in row.gene.split(','):
+                if gene not in genes:
+                    genes[gene] = []
+                genes[gene].append(ix)
+        return genes
