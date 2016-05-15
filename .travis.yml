@@ -8,7 +8,7 @@ install:
 before_script:
     - conda create -q -y --name testenv python=$CONDA_PY
     - source activate testenv
-    - conda install -c bioconda cnvkit -y -q  # Just installing this for the dependencies, will remove immediately
+    - conda install -c bioconda -c R cnvkit -y -q  # Just installing this for the dependencies, will remove immediately
     - conda remove cnvkit -y -q
     - python setup.py install  # Install the actual version
     - cd test/
