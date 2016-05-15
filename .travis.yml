@@ -1,42 +1,16 @@
-# Configuration file to run tests on Travis-CI via GitHub notifications
-language: python
-python:
-    - "2.7"
+language: c
+sudo: false
 
-notifications:
-    email: false
-
-sudo: required
-dist: trusty
-
-# Install these Debian packages without sudo
-# https://docs.travis-ci.com/user/migrating-from-legacy/#Adding-APT-Packages
-addons:
-  apt:
-    packages:
-    - gfortran
-    - libblas-dev
-    - libfreetype6-dev
-    - liblapack-dev
-    - python-dev
-    - python-biopython
-    - python-dateutil
-    - python-matplotlib
-    - python-numpy
-    - python-reportlab
-    - python-scipy
-    - python-tk
-    - python-tz
-
-# Cache the compiled pip package dependencies
-# https://docs.travis-ci.com/user/caching/#pip-cache
-cache: pip
-
-# Use the default install step for Python (which installs deps & CNVkit itself):
-#   pip install -r requirements.txt
-# https://docs.travis-ci.com/user/languages/python/#Dependency-Management
+install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install md5sha1sum; fi
+  - source devtools/travis-ci/install_miniconda.sh
 
 before_script:
+    - conda create -q -y --name testenv python=$CONDA_PY
+    - source activate testenv
+    - conda install -c bioconda cnvkit -y -q  # Just installing this for the dependencies, will remove immediately
+    - conda remove cnvkit -y -q
+    - python setup.py install  # Install the actual version
     - cd test/
     # For codecov.io
     - pip install codecov
@@ -47,3 +21,13 @@ script:
 after_success:
     - coverage report
     - codecov
+
+os:
+  - osx
+  - linux
+
+env:
+  - CONDA_PY=2.7 PYSAM=0.8.5
+  - CONDA_PY=2.7 PYSAM=0.9.0
+  - CONDA_PY=3.5 PYSAM=0.8.5
+  - CONDA_PY=3.5 PYSAM=0.9.0
