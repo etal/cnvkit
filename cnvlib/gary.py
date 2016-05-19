@@ -1,14 +1,14 @@
 """A generic array of genomic positions."""
 from __future__ import print_function, absolute_import, division
 from builtins import next
-from builtins import zip
-from collections import OrderedDict
-from past.builtins import basestring
 from builtins import object
+from builtins import zip
+from past.builtins import basestring
 
 import logging
 import sys
 import warnings
+from collections import OrderedDict
 
 import numpy as np
 import pandas as pd
@@ -205,11 +205,9 @@ class GenomicArray(object):
 
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
-
-        # necessary because of pandas bug which says:
-        #   ValueError: items in new_categories are not the same as in old categories
+        # Workaround for pandas 0.18.0 bug:
+        # https://github.com/pydata/pandas/issues/13179
         self.data.chromosome = self.data.chromosome.astype(str)
-
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
 
@@ -503,8 +501,8 @@ class GenomicArray(object):
 
     def _get_gene_map(self):
         """
-        Returns a (ordered) dictionary of unique gene names and the data indices of their segments
-        in the order of occurrence (genomic order)
+        Returns a (ordered) dictionary of unique gene names and the data indices
+        of their segments in the order of occurrence (genomic order)
         :return: OrderedDict
         """
 

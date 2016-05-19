@@ -1388,16 +1388,17 @@ def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
         is_sample_female = cnarr.guess_xx(male_reference=male_reference)
     cnarr = cnarr.shift_xx(male_reference, is_sample_female)
     if segments:
-        logging.info("Creating gainloss report from segmented data")
         segments = segments.shift_xx(male_reference, is_sample_female)
-        gainloss = pd.DataFrame(reports.gainloss_by_segment(cnarr, segments, threshold,
-                                               skip_low))
-        gainloss = gainloss.reindex(columns= ["gene"] + [x for x in gainloss.columns if x != "gene"])
+        gainloss = reports.gainloss_by_segment(cnarr, segments, threshold,
+                                               skip_low)
     else:
-        logging.info("Creating gainloss report from log2 ratios")
-        columns = ["gene"] + [x for x in cnarr._required_columns if x != "gene"] + ["probes"]
-        gainloss = pd.DataFrame(reports.gainloss_by_gene(cnarr, threshold, skip_low), columns=columns)
-    return gainloss.query("probes >= {}".format(min_probes))
+        gainloss = reports.gainloss_by_gene(cnarr, threshold, skip_low)
+    columns = ["gene", "chromosome", "start", "end", "log2", "probes"]
+    # ENH: keep "baf", "weight" columns if present
+    gainloss = pd.DataFrame.from_records(gainloss, columns=columns)
+    if min_probes:
+        gainloss = gainloss[gainloss.probes >= min_probes]
+    return gainloss
 
 
 P_gainloss = AP_subparsers.add_parser('gainloss', help=_cmd_gainloss.__doc__)
