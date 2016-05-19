@@ -1387,16 +1387,20 @@ def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
     if is_sample_female is None:
         is_sample_female = cnarr.guess_xx(male_reference=male_reference)
     cnarr = cnarr.shift_xx(male_reference, is_sample_female)
+    if "probes" not in cnarr:
+        cnarr["probes"] = 1
+        cnarr.sort_columns()
     if segments:
         segments = segments.shift_xx(male_reference, is_sample_female)
         gainloss = reports.gainloss_by_segment(cnarr, segments, threshold,
                                                skip_low)
     else:
         gainloss = reports.gainloss_by_gene(cnarr, threshold, skip_low)
-    columns = ["gene", "chromosome", "start", "end", "log2", "probes"]
-    # ENH: keep "baf", "weight" columns if present
-    gainloss = pd.DataFrame.from_records(gainloss, columns=columns)
-    if min_probes:
+    gainloss = list(gainloss)
+    columns = (gainloss[0].index if len(gainloss) else cnarr._required_columns)
+    columns = ["gene"] + [col for col in columns if col != "gene"]
+    gainloss = pd.DataFrame.from_records(gainloss).reindex(columns=columns)
+    if min_probes and len(gainloss):
         gainloss = gainloss[gainloss.probes >= min_probes]
     return gainloss
 

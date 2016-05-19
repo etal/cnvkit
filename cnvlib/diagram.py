@@ -50,14 +50,13 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname,
     if cnarr_is_seg:
         sel = cnarr.data[(cnarr.data.log2.abs() >= threshold) &
                           ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
-        gainloss = [(s.gene, s.chromosome, s.start, s.end, s.log2, s.probes)
-                    for s in sel.itertuples(index=False)]
+        gainloss = sel.itertuples(index=False)
     elif segarr:
         segarr = segarr.shift_xx(is_reference_male, is_sample_female)
         gainloss = reports.gainloss_by_segment(cnarr, segarr, threshold)
     else:
         gainloss = reports.gainloss_by_gene(cnarr, threshold)
-    gene_labels = [gl_row[0] for gl_row in gainloss if gl_row[5] >= min_probes]
+    gene_labels = [gl_row.gene for gl_row in gainloss if gl_row.probes >= min_probes]
     # NB: If multiple segments cover the same gene (gene contains breakpoints),
     # all those segments are marked as "hits".  We'll uniquify them.
     # TODO - use different logic to only label the gene's signficant segment(s)

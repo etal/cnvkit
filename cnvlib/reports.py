@@ -8,6 +8,8 @@ import collections
 import math
 import sys
 
+import numpy as np
+
 from . import metrics, params
 
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
@@ -66,33 +68,38 @@ def get_breakpoints(intervals, segments, min_probes):
 # _____________________________________________________________________________
 # gainloss
 
-def gainloss_by_gene(probes, threshold, skip_low=False):
+def gainloss_by_gene(cnarr, threshold, skip_low=False):
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
     NB: Must shift sex-chromosome values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
-    for gene, chrom, start, end, coverage, nprobes in group_by_genes(probes,
-                                                                     skip_low):
-        if abs(coverage) >= threshold:
-            yield (gene, chrom, start, end, coverage, nprobes)
+    for row in group_by_genes(cnarr, skip_low):
+        if abs(row.log2) >= threshold:
+            yield row
 
 
-def gainloss_by_segment(probes, segments, threshold, skip_low=False):
+def gainloss_by_segment(cnarr, segments, threshold, skip_low=False):
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
     NB: Must shift sex-chromosome values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
-    for segment, subprobes in probes.by_ranges(segments):
+    extra_cols = [col for col in segments.data.columns
+                  if col not in cnarr.data.columns]
+    for colname in extra_cols:
+        cnarr[colname] = np.nan
+    for segment, subprobes in cnarr.by_ranges(segments):
         if abs(segment.log2) >= threshold:
-            for (gene, chrom, start, end, _coverage, nprobes
-                ) in group_by_genes(subprobes, skip_low):
-                yield (gene, chrom, start, end, segment.log2, nprobes)
+            for row in group_by_genes(subprobes, skip_low):
+                row["log2"] = segment.log2
+                for colname in extra_cols:
+                    row[colname] = getattr(segment, colname)
+                yield row
 
 
 # TODO consolidate with CNA.squash_genes
-def group_by_genes(probes, skip_low):
+def group_by_genes(cnarr, skip_low):
     """Group probe and coverage data by gene.
 
     Return an iterable of genes, in chromosomal order, associated with their
@@ -100,13 +107,16 @@ def group_by_genes(probes, skip_low):
 
         [(gene, chrom, start, end, [coverages]), ...]
     """
-    for gene, rows in probes.by_gene():
-        if gene == 'Background':
+    for gene, rows in cnarr.by_gene():
+        if not rows or gene == "Background":
             continue
-        chrom = rows[0, 'chromosome']
-        start = rows[0, 'start']
-        end = rows[len(rows)-1, 'end']
-        segmean = metrics.segment_mean(rows)
-        if segmean is not None:
-            nprobes = len(rows)
-            yield gene, chrom, start, end, segmean, nprobes
+        segmean = metrics.segment_mean(rows, skip_low)
+        if segmean is None:
+            continue
+        outrow = rows[0].copy()
+        outrow["end"] = rows.end.iat[-1]
+        outrow["log2"] = segmean
+        outrow["probes"] = len(rows)
+        if "weight" in rows:
+            outrow["weight"] = rows["weight"].sum()
+        yield outrow
