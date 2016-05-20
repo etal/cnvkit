@@ -178,7 +178,7 @@ def confidence_interval_bootstrap(bins, alpha, bootstraps=100):
     """Confidence interval for segment mean log2 value, estimated by bootstrap."""
     # Bootstrap for CI
     k = len(bins)
-    rand_indices = np.random.random_integers(0, k - 1, (bootstraps, k))
+    rand_indices = np.random.randint(0, k, (bootstraps, k))
     bootstraps = [bins.data.take(idx) for idx in rand_indices]
     # Recalculate segment means
     if 'weight' in bins:
