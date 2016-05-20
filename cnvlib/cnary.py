@@ -38,8 +38,7 @@ class CopyNumArray(gary.GenomicArray):
     def _chr_x_label(self):
         if 'chr_x' in self.meta:
             return self.meta['chr_x']
-        chr_x = ('chrX' if self[0, 'chromosome'].startswith('chr')
-                 else 'X')
+        chr_x = ('chrX' if self.chromosome.iat[0].startswith('chr') else 'X')
         self.meta['chr_x'] = chr_x
         return chr_x
 
@@ -142,8 +141,8 @@ class CopyNumArray(gary.GenomicArray):
             if len(rows) == 1:
                 return tuple(rows.iloc[0])
             chrom = core.check_unique(rows.chromosome, 'chromosome')
-            start = rows.iloc[0]['start']
-            end = rows.iloc[-1]['end']
+            start = rows.start.iat[0]
+            end = rows.end.iat[-1]
             cvg = summary_func(rows.log2)
             outrow = [chrom, start, end, name, cvg]
             # Handle extra fields
