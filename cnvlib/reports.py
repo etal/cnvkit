@@ -115,6 +115,7 @@ def group_by_genes(cnarr, skip_low):
             continue
         outrow = rows[0].copy()
         outrow["end"] = rows.end.iat[-1]
+        outrow["gene"] = gene
         outrow["log2"] = segmean
         outrow["probes"] = len(rows)
         if "weight" in rows:

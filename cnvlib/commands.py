@@ -1387,9 +1387,6 @@ def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
     if is_sample_female is None:
         is_sample_female = cnarr.guess_xx(male_reference=male_reference)
     cnarr = cnarr.shift_xx(male_reference, is_sample_female)
-    if "probes" not in cnarr:
-        cnarr["probes"] = 1
-        cnarr.sort_columns()
     if segments:
         segments = segments.shift_xx(male_reference, is_sample_female)
         gainloss = reports.gainloss_by_segment(cnarr, segments, threshold,
