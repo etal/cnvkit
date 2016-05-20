@@ -1604,7 +1604,7 @@ def _cmd_import_picard(args):
     CalculateHsMetrics script in Picard tools.
     """
     for fname in importers.find_picard_files(args.targets):
-        cnarr = importers.import_picard_pertargetcoverage(fname)
+        cnarr = tabio.read(fname, "picardhs")
         outfname = os.path.basename(fname)[:-4] + '.cnn'
         if args.output_dir:
             if not os.path.isdir(args.output_dir):

@@ -218,26 +218,25 @@ class IOTests(unittest.TestCase):
         regions = tabio.read("formats/amplicon.bed", "bed")
         self.assertEqual(len(regions), 1433)
 
-    def test_read_text(self):
-        """Read the text region format."""
-        regions = tabio.read("formats/amplicon.text", "text")
-        self.assertEqual(len(regions), 1433)
-
     def test_read_ilist(self):
         """Read the interval list format."""
         regions = tabio.read("formats/nv2_baits.interval_list", "interval")
         self.assertEqual(len(regions), 6809)
 
+    def test_read_picardhs(self):
+        """Read Picard CalculateHsMetrics PER_TARGET_COVERAGE format."""
+        cna = tabio.read("picard/p2-5_5.antitargetcoverage.csv", "picardhs")
+        self.assertEqual(len(cna), 12563)
+
+    def test_read_text(self):
+        """Read the text region format."""
+        regions = tabio.read("formats/amplicon.text", "text")
+        self.assertEqual(len(regions), 1433)
+
 
 
 class ImporterTests(unittest.TestCase):
     """Tests for importers functionality."""
-
-    def test_import_picard(self):
-        """Test loading a Picard targetcoverage file."""
-        fname = 'picard/p2-5_5.antitargetcoverage.csv'
-        cna = importers.import_picard_pertargetcoverage(fname)
-        self.assertGreater(len(cna), 1)
 
     def test_import_seg(self):
         """Test loading SEG format."""

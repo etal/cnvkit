@@ -117,6 +117,7 @@ def read_tab(infile):
 
 
 READERS = {
+    # Format name, formatter, default target class
     "auto": (read_auto, GA),
     "tab": (read_tab, GA),
     "bed": (bedio.read_bed, GA),
@@ -124,6 +125,7 @@ READERS = {
     "bed4": (bedio.read_bed4, GA),
     "bed6": (bedio.read_bed6, GA),
     "interval": (picard.read_interval, GA),
+    "picardhs": (picard.read_picard_hs, CNA),
     "text": (textcoord.read_text, GA),
     "vcf": (vcfio.read_vcf, VA),
 }
@@ -133,9 +135,10 @@ READERS = {
 
 def write(garr, outfile=None, fmt="tab", verbose=True):
     """Write a genome object to a file or stream."""
-    dframe = WRITERS[fmt](garr.data)
+    formatter, show_header = WRITERS[fmt]
+    dframe = formatter(garr.data)
     with ngfrills.safe_write(outfile or sys.stdout) as handle:
-        dframe.to_csv(handle, header=(fmt == "tab"), index=False, sep='\t',
+        dframe.to_csv(handle, header=show_header, index=False, sep='\t',
                       float_format='%.6g')
     if verbose:
         # Log the output path, if possible
@@ -156,9 +159,11 @@ def write_tab(dframe):
 
 
 WRITERS = {
-    "tab": write_tab,
-    "bed": bedio.write_bed,
-    "interval": picard.write_interval,
-    "text": textcoord.write_text,
-    "vcf": vcfio.write_vcf,
+    # Format name, formatter, show header
+    "tab": (write_tab, True),
+    "bed": (bedio.write_bed, False),
+    "interval": (picard.write_interval, False),
+    "picardhs": (picard.write_picard_hs, True),
+    "text": (textcoord.write_text, False),
+    "vcf": (vcfio.write_vcf, True),
 }

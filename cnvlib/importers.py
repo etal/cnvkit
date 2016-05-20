@@ -4,22 +4,17 @@ from builtins import next
 from builtins import map
 from builtins import zip
 
-import logging
 import math
 import os.path
 import subprocess
 
-import numpy as np
 import pandas as pd
 
-from . import core, params
 from .cnary import CopyNumArray as CNA
 
 
 # __________________________________________________________________________
 # import-picard
-
-TOO_MANY_NO_COVERAGE = 100
 
 def find_picard_files(file_and_dir_names):
     """Search the given paths for 'targetcoverage' CSV files.
@@ -47,64 +42,6 @@ def find_picard_files(file_and_dir_names):
                              % tgt)
     filenames.sort()
     return filenames
-
-
-def import_picard_pertargetcoverage(fname):
-    """Parse a Picard CalculateHsMetrics PER_TARGET_COVERAGE file.
-
-    Return a CopyNumArray.
-
-    Input column names:
-        chrom (str),
-        start, end, length (int),
-        name (str),
-        %gc, mean_coverage, normalized_coverage (float)
-    """
-    dframe = pd.read_table(fname, na_filter=False)
-    coverages = np.asarray(dframe['mean_coverage'])
-    no_cvg_idx = (coverages == 0)
-    if sum(no_cvg_idx) > TOO_MANY_NO_COVERAGE:
-        logging.warn("*WARNING* Sample %s has >%d bins with no coverage",
-                     fname, TOO_MANY_NO_COVERAGE)
-    # Avoid math domain error
-    coverages[no_cvg_idx] = 2**params.NULL_LOG2_COVERAGE
-    cnarr = CNA.from_columns({"chromosome": dframe["chrom"],
-                              "start": dframe["start"] - 1,
-                              "end": dframe["end"],
-                              "gene": dframe["name"].apply(unpipe_name),
-                              "gc": dframe["%gc"],
-                              "log2": np.log2(coverages)},
-                             {"sample_id": core.fbase(fname)})
-    cnarr.sort()
-    return cnarr
-
-
-def unpipe_name(name):
-    """Fix the duplicated gene names Picard spits out.
-
-    Return a string containing the single gene name, sans duplications and pipe
-    characters.
-
-    Picard CalculateHsMetrics combines the labels of overlapping intervals
-    by joining all labels with '|', e.g. 'BRAF|BRAF' -- no two distinct
-    targeted genes actually overlap, though, so these dupes are redundant.
-    Meaningless target names are dropped, e.g. 'CGH|FOO|-' resolves as 'FOO'.
-    In case of ambiguity, the longest name is taken, e.g. "TERT|TERT Promoter"
-    resolves as "TERT Promoter".
-    """
-    if '|' not in name:
-        return name
-    gene_names = set(name.split('|'))
-    if len(gene_names) == 1:
-        return gene_names.pop()
-    cleaned_names = gene_names.difference(params.IGNORE_GENE_NAMES)
-    if cleaned_names:
-        gene_names = cleaned_names
-    new_name = sorted(gene_names, key=len, reverse=True)[0]
-    if len(gene_names) > 1:
-        logging.warn("*WARNING* Ambiguous gene name %r; using %r",
-                     name, new_name)
-    return new_name
 
 
 # __________________________________________________________________________
