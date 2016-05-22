@@ -5,6 +5,7 @@ from past.builtins import basestring
 
 import logging
 import sys
+import types
 
 import pandas as pd
 from Bio.File import as_handle
@@ -13,22 +14,17 @@ from .. import core, ngfrills
 from ..gary import GenomicArray as GA
 from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
-from . import bedio, picard, textcoord, vcfio
+from . import bedio, picard, seg, tab, textcoord, vcfio
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     """Read tabular data from a file or stream into a genome object.
 
-    Supported formats:
+    Supported formats: see READERS
 
-    ======      ========    ====
-    Format      Code        Into
-    ------      --------    ----
-    TSV         tab         Gary
-    VCF         vcf         Vary
-    BED         bed
-    Int'l       interval    Gary
-    ======      ========    ====
+    If a format supports multiple samples, return the sample specified by
+    `sample_id`, or if unspecified, return the first sample and warn if there
+    were other samples present in the file.
 
     :Parameters:
         infile : handle or string
@@ -43,36 +39,40 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         meta : dict
             Metadata, as arbitrary key-value pairs.
         **kwargs :
-            Additional fields to add to metadata.
+            Additional keyword arguments to the format-specific reader function.
 
     """
-    if meta is None:
-        meta = {}
-    meta.update(kwargs)
-    if sample_id is None and "sample_id" not in meta:
-        if isinstance(infile, basestring):
-            sample_id = core.fbase(infile)
-        else:
-            sample_id = '<unknown>'
-        meta["sample_id"] = sample_id
     if fmt not in READERS:
         raise ValueError("Unknown format: %s" % fmt)
+
+    if meta is None:
+        meta = {}
+    if "sample_id" not in meta:
+        if sample_id:
+            meta["sample_id"] = sample_id
+        elif isinstance(infile, basestring):
+            meta["sample_id"] = core.fbase(infile)
+        else:
+            meta["sample_id"] = "<unknown>"
+    if fmt in ("seg", "vcf") and sample_id is not None:
+        # Multi-sample formats: choose one sample
+        kwargs["sample_id"] = sample_id
     try:
         reader, suggest_into = READERS[fmt]
-        dframe = reader(infile)
+        dframe = reader(infile, **kwargs)
     except ValueError:
         # File is blank/empty, most likely
         logging.info("Blank file?: %s", infile)
         suggest_into = GA
         dframe = []
-    # TODO/ENH CategoricalIndex ---
+    return (into or suggest_into)(dframe, meta)
+    # ENH CategoricalIndex ---
     # if dframe:
     # dframe['chromosome'] = pd.Categorical(dframe['chromosome'],
     #                                      dframe.chromosome.drop_duplicates(),
     #                                      ordered=True)
     # Create a multi-index of genomic coordinates (like GRanges)
     # dframe.set_index(['chromosome', 'start'], inplace=True)
-    return (into or suggest_into)(dframe, meta)
 
 
 def read_auto(infile):
@@ -94,38 +94,22 @@ def read_auto(infile):
     return read(infile, fmt)
 
 
-def read_cna(infile, sample_id=None, meta=None, **kwargs):
+def read_cna(infile, sample_id=None, meta=None):
     """Read a tabular file to create a CopyNumArray object."""
-    return read(infile, into=CNA, sample_id=sample_id, meta=meta, **kwargs)
-
-
-def read_tab(infile):
-    """Read tab-separated data with column names in the first row.
-
-    The format is BED-like, but with a header row included and with
-    arbitrary extra columns.
-    """
-    dframe = pd.read_table(infile, dtype={'chromosome': 'str'})
-    if "log2" in dframe.columns:
-        # Every bin needs a log2 value; the others can be NaN
-        d2 = dframe.dropna(subset=["log2"])
-        if len(d2) < len(dframe):
-            logging.warn("Dropped %d rows with missing log2 values",
-                        len(dframe) - len(d2))
-            dframe = d2
-    return dframe
+    return read(infile, into=CNA, sample_id=sample_id, meta=meta)
 
 
 READERS = {
     # Format name, formatter, default target class
     "auto": (read_auto, GA),
-    "tab": (read_tab, GA),
     "bed": (bedio.read_bed, GA),
     "bed3": (bedio.read_bed3, GA),
     "bed4": (bedio.read_bed4, GA),
     "bed6": (bedio.read_bed6, GA),
     "interval": (picard.read_interval, GA),
     "picardhs": (picard.read_picard_hs, CNA),
+    "seg": (seg.read_seg, CNA),
+    "tab": (tab.read_tab, GA),
     "text": (textcoord.read_text, GA),
     "vcf": (vcfio.read_vcf, VA),
 }
@@ -133,11 +117,13 @@ READERS = {
 
 # _____________________________________________________________________
 
-def write(garr, outfile=None, fmt="tab", verbose=True):
+def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
     """Write a genome object to a file or stream."""
     formatter, show_header = WRITERS[fmt]
-    dframe = formatter(garr.data)
-    with ngfrills.safe_write(outfile or sys.stdout) as handle:
+    if fmt in ("seg", "vcf"):
+        kwargs["sample_id"] = garr.sample_id
+    dframe = formatter(garr.data, **kwargs)
+    with ngfrills.safe_write(outfile or sys.stdout, verbose=False) as handle:
         dframe.to_csv(handle, header=show_header, index=False, sep='\t',
                       float_format='%.6g')
     if verbose:
@@ -153,17 +139,13 @@ def write(garr, outfile=None, fmt="tab", verbose=True):
         logging.info("Wrote %s with %d regions", outfname, len(dframe))
 
 
-def write_tab(dframe):
-    """Write tab-separated data with column names in the first row."""
-    return dframe
-
-
 WRITERS = {
     # Format name, formatter, show header
-    "tab": (write_tab, True),
     "bed": (bedio.write_bed, False),
     "interval": (picard.write_interval, False),
     "picardhs": (picard.write_picard_hs, True),
+    "seg": (seg.write_seg, True),
+    "tab": (tab.write_tab, True),
     "text": (textcoord.write_text, False),
     "vcf": (vcfio.write_vcf, True),
 }

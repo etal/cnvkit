@@ -1637,10 +1637,10 @@ def _cmd_import_seg(args):
     else:
         chrom_names = args.chromosomes
 
-    for segset in importers.import_seg(args.segfile, chrom_names, args.prefix,
-                                       args.from_log10):
-        tabio.write(segset, os.path.join(args.output_dir,
-                                         segset.sample_id + '.cns'))
+    for sid, segtable in tabio.seg.parse_seg(args.segfile, chrom_names, args.prefix,
+                                             args.from_log10):
+        segarr = _CNA(segtable, {"sample_id": sid})
+        tabio.write(segarr, os.path.join(args.output_dir, sid + '.cns'))
 
 
 P_import_seg = AP_subparsers.add_parser('import-seg',

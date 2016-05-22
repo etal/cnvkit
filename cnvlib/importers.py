@@ -1,16 +1,9 @@
 """Import from other formats to the CNVkit format."""
 from __future__ import absolute_import, division, print_function
-from builtins import next
-from builtins import map
-from builtins import zip
+from builtins import map, next, zip
 
-import math
 import os.path
 import subprocess
-
-import pandas as pd
-
-from .cnary import CopyNumArray as CNA
 
 
 # __________________________________________________________________________
@@ -42,59 +35,6 @@ def find_picard_files(file_and_dir_names):
                              % tgt)
     filenames.sort()
     return filenames
-
-
-# __________________________________________________________________________
-# import-seg
-
-LOG2_10 = math.log(10, 2)   # To convert log10 values to log2
-
-def import_seg(segfname, chrom_names, chrom_prefix, from_log10):
-    """Parse a SEG file as an iterable of CopyNumArray instances.
-
-    `chrom_names`:
-        Map (string) chromosome IDs to names. (Applied before chrom_prefix.)
-        e.g. {'23': 'X', '24': 'Y', '25': 'M'}
-
-    `chrom_prefix`: prepend this string to chromosome names
-        (usually 'chr' or None)
-
-    `from_log10`: Convert values from log10 to log2.
-    """
-    dframe = pd.read_table(segfname, na_filter=False)
-    if len(dframe.columns) == 6:
-        dframe.columns = ['sample_id', 'chromosome', 'start', 'end', 'nprobes',
-                          'mean']
-    elif len(dframe.columns) == 5:
-        dframe.columns = ['sample_id', 'chromosome', 'start', 'end', 'mean']
-    else:
-        raise ValueError("SEG format expects 5 or 6 columns; found {}: {}"
-                         .format(len(dframe.columns), ' '.join(dframe.columns)))
-
-    # Calculate values for output columns
-    dframe['chromosome'] = dframe['chromosome'].apply(str)
-    if chrom_names:
-        dframe['chromosome'] = dframe['chromosome'].apply(lambda c:
-                                                          chrom_names.get(c, c))
-    if chrom_prefix:
-        dframe['chromosome'] = dframe['chromosome'].apply(lambda c:
-                                                          chrom_prefix + c)
-    if from_log10:
-        dframe['mean'] *= LOG2_10
-    dframe['gene'] = ["G" if mean >= 0 else "L" for mean in dframe['mean']]
-
-    for sid in pd.unique(dframe['sample_id']):
-        sample = dframe[dframe['sample_id'] == sid]
-        cols = {'chromosome': sample['chromosome'],
-                'start': sample['start'],
-                'end': sample['end'],
-                'gene': sample['gene'],
-                'log2': sample['mean']}
-        if 'nprobes' in dframe:
-            cols['probes'] = sample['nprobes']
-        cns = CNA.from_columns(cols, {'sample_id': sid})
-        cns.sort()
-        yield cns
 
 
 # __________________________________________________________________________

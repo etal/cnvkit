@@ -133,7 +133,8 @@ class CNATests(unittest.TestCase):
     def test_basic(self):
         """Test basic container functionality and magic methods."""
         # Length
-        self.assertEqual(len(self.ex_cnr), 27526)
+        self.assertEqual(len(self.ex_cnr),
+                         linecount('formats/reference-tr.cnn') - 1)
         # Equality
         same = tabio.read_cna('formats/reference-tr.cnn')
         self.assertEqual(self.ex_cnr, same)
@@ -215,41 +216,47 @@ class IOTests(unittest.TestCase):
 
     def test_read_bed(self):
         """Read the BED format."""
-        regions = tabio.read("formats/amplicon.bed", "bed")
-        self.assertEqual(len(regions), 1433)
+        fname = "formats/amplicon.bed"
+        regions = tabio.read(fname, "bed")
+        self.assertEqual(len(regions), linecount(fname))
+        self.assertEqual(regions.sample_id, "amplicon")
 
     def test_read_ilist(self):
         """Read the interval list format."""
         regions = tabio.read("formats/nv2_baits.interval_list", "interval")
         self.assertEqual(len(regions), 6809)
+        self.assertEqual(regions.sample_id, "nv2_baits")
 
     def test_read_picardhs(self):
         """Read Picard CalculateHsMetrics PER_TARGET_COVERAGE format."""
-        cna = tabio.read("picard/p2-5_5.antitargetcoverage.csv", "picardhs")
-        self.assertEqual(len(cna), 12563)
+        fname = "picard/p2-5_5.antitargetcoverage.csv"
+        cna = tabio.read(fname, "picardhs")
+        self.assertEqual(len(cna), linecount(fname) - 1)
+        self.assertEqual(cna.sample_id, "p2-5_5")
+
+    def test_read_seg(self):
+        """Read the SEG format."""
+        for fname, header_len, args in (
+            # Convert integer chrom. IDs to hg19 names
+            ('formats/cw-tr-log2.seg', 1,
+             ({'23': 'X', '24': 'Y', '25': 'M'}, "chr", False)),
+            # Convert segmented array CGH data in log10 scale to log2
+            ('formats/acgh-log10.seg', 1, (None, None, True)),
+            # From PSCBS/DNAcopy, with a stray warning message from R
+            ('formats/warning.seg', 2, (None, None, False)),
+        ):
+            expect_lines = linecount(fname) - header_len
+            seen_lines = 0
+            for _sample_id, dframe in tabio.seg.parse_seg(fname, *args):
+                seen_lines += len(dframe)
+            self.assertEqual(seen_lines, expect_lines)
 
     def test_read_text(self):
         """Read the text region format."""
-        regions = tabio.read("formats/amplicon.text", "text")
-        self.assertEqual(len(regions), 1433)
-
-
-
-class ImporterTests(unittest.TestCase):
-    """Tests for importers functionality."""
-
-    def test_import_seg(self):
-        """Test loading SEG format."""
-        for fname, args in (
-            # cnvkit.py import-seg cw-tr-log2.seg -p chr -c human -d tmp
-            ('formats/cw-tr-log2.seg', ({'23': 'X', '24': 'Y', '25': 'M'}, "chr", False)),
-            # cnvkit.py import-seg --from-log10 acgh-log10.seg -d tmp/
-            ('formats/acgh-log10.seg', (None, None, True))):
-            expect_lines = linecount(fname) - 1
-            seen_lines = 0
-            for cns in importers.import_seg(fname, *args):
-                seen_lines += len(cns)
-            self.assertEqual(seen_lines, expect_lines)
+        fname = "formats/amplicon.text"
+        regions = tabio.read(fname, "text")
+        self.assertEqual(len(regions), linecount(fname))
+        self.assertEqual(regions.sample_id, "amplicon")
 
 
 
@@ -499,7 +506,7 @@ class OtherTests(unittest.TestCase):
 # == helpers ==
 
 def linecount(filename):
-    i = 0
+    i = -1
     with open(filename) as handle:
         for i, _line in enumerate(handle):
             pass

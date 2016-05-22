@@ -8,7 +8,7 @@ import tempfile
 import numpy as np
 import pandas as pd
 
-from .. import core, ngfrills, params, smoothing, vary
+from .. import core, ngfrills, params, smoothing, tabio, vary
 from ..cnary import CopyNumArray as CNA
 from . import cbs, flasso, haar
 
@@ -55,12 +55,11 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                 seg_out = ngfrills.call_quiet('Rscript', script_fname)
             # ENH: run each chromosome separately
             # ENH: run each chrom. arm separately (via knownsegs)
-        segarr = cnarr.as_dataframe(seg2cns(seg_out))
+        # Convert R dataframe contents (SEG) to a proper CopyNumArray
+        segarr = tabio.read(StringIO(seg_out), "seg", sample_id=0)
         segarr.sort_columns()
-
         if method == 'flasso':
             segarr = squash_segments(segarr)
-
         segarr = repair_segments(segarr, cnarr)
 
     else:
@@ -124,39 +123,6 @@ def transfer_names_weights(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
         if subgenes:
             segnames[i] = ",".join(subgenes)
     return segnames, segweights
-
-
-def seg2cns(seg_text):
-    """Convert R dataframe contents (SEG) to our native tabular format.
-
-    Return a pandas.Dataframe with CNA columns.
-    """
-    text_stream = StringIO(seg_text)
-    n_tabs = None
-    for line in text_stream:
-        if line.startswith(('[', "WARNING")):
-            continue
-        n_tabs = line.count('\t')
-        if n_tabs == 5:
-            col_names = ["sample_id", "chromosome", "start", "end", "probes",
-                         "log2"]
-        elif n_tabs == 4:
-            col_names = ["sample_id", "chromosome", "start", "end", "log2"]
-        else:
-            raise ValueError("Data columns are not valid SEG format:\n" + line)
-        break
-    else:
-        raise ValueError("SEG file contains no data")
-
-    try:
-        table = pd.read_table(text_stream, names=col_names, header=None)
-    except pd.parser.CParserError:
-        raise ValueError("Unexpected dataframe contents:\n%s" % (seg_text))
-    del table["sample_id"]
-    table["start"] = [int(math.ceil(float(val))) for val in table["start"]]
-    table["end"] = [int(math.ceil(float(val))) for val in table["end"]]
-    table["gene"] = '-'
-    return table
 
 
 def squash_segments(seg_pset):
