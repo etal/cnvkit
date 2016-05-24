@@ -2,15 +2,48 @@ from __future__ import absolute_import, division, print_function
 from past.builtins import basestring
 
 import logging
+from itertools import chain
 
 import pandas as pd
 import vcf
 
-_required_columns = ("chromosome", "start", "end", "ref", "alt")
-_required_dtypes = ("string", "int", "int", "string", "string")
+from ..vary import VariantArray as VA
 
-# TODO - pass sample_id, required_columns/dtypes to here & back to caller
-def read_vcf(infile, sample_id=None, normal_id=None, min_depth=None,
+
+def read_vcf(infile, sample_id=None, normal_id=None,
+             min_depth=None, skip_hom=False, skip_reject=False,
+             skip_somatic=False):
+    """Read one tumor-normal pair or unmatched sample from a VCF file.
+
+    By default, return the first tumor-normal pair or unmatched sample in the
+    file.  If `sample_id` is a string identifier, return the (paired or single)
+    sample  matching that ID.  If `sample_id` is a positive integer, return the
+    sample or pair at that index position, counting from 0.
+    """
+    results = parse_vcf(infile, sample_id, normal_id, min_depth,
+                        skip_hom, skip_reject, skip_somatic)
+    sid, nid, dframe = next(results)
+    try:
+        next(results)
+    except StopIteration:
+        pass
+    else:
+        if nid:
+            logging.warn("WARNING: VCF file contains multiple tumor-normal "
+                         "pairs; returning the first pair '%s' / '%s'",
+                         sid, nid)
+        else:
+            logging.warn("WARNING: VCF file contains multiple samples; "
+                         "returning the first sample '%s'", sid)
+
+    if dframe is None or len(dframe) == 0:
+        raise ValueError("No sample(s) %s found in VCF file" % sample_id or '')
+    logging.info("Selected test sample " + str(sid) +
+                 (" and control sample %s" % (nid if nid else '')))
+    return dframe
+
+
+def parse_vcf(infile, sample_id=None, normal_id=None, min_depth=None,
              skip_hom=False, skip_reject=False, skip_somatic=False):
     """Variant Call Format (VCF) for SNV loci."""
     if isinstance(infile, basestring):
@@ -20,106 +53,105 @@ def read_vcf(infile, sample_id=None, normal_id=None, min_depth=None,
     if not vcf_reader.samples:
         logging.warn("VCF file %s has no samples; parsing minimal info",
                         infile)
-        return _read_vcf_nosample(infile, sample_id, skip_reject)
+        yield sample_id, normal_id, _read_vcf_nosample(infile, skip_reject)
+        raise StopIteration
 
     columns = [
         "chromosome", "start", "end", "ref", "alt",
         "somatic", "zygosity", "depth", "alt_count"]
-    sample_id, normal_id = _select_sample(vcf_reader, sample_id, normal_id)
-    if normal_id:
-        columns.extend(["n_zygosity", "n_depth", "n_alt_count"])
-    rows = _parse_records(vcf_reader, sample_id, normal_id, skip_reject)
-    table = pd.DataFrame.from_records(rows, columns=columns)
-    table["alt_freq"] = table["alt_count"] / table["depth"]
-    if normal_id:
-        table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
-    # Filter out records as requested
-    cnt_depth = cnt_hom = cnt_som = 0
-    if min_depth:
-        dkey = "n_depth" if "n_depth" in table else "depth"
-        idx_depth = table[dkey] >= min_depth
-        cnt_depth = (~idx_depth).sum()
-        table = table[idx_depth]
-    if skip_hom:
-        zkey = "n_zygosity" if "n_zygosity" in table else "zygosity"
-        idx_het = (table[zkey] != 0.0) & (table[zkey] != 1.0)
-        cnt_hom = (~idx_het).sum()
-        table = table[idx_het]
-    if skip_somatic:
-        idx_som = table["somatic"]
-        cnt_som = idx_som.sum()
-        table = table[~idx_som]
-    logging.info("Skipped records: %d somatic, %d depth, %d homozygous",
-                    cnt_som, cnt_depth, cnt_hom)
+    columns_tn = columns + ["n_zygosity", "n_depth", "n_alt_count"]
+    records = list(vcf_reader)
+    for sid, nid in _iter_samples(vcf_reader, sample_id, normal_id):
+        rows = _parse_records(records, sid, nid, skip_reject)
+        table = pd.DataFrame.from_records(rows, columns=(columns_tn if nid
+                                                         else columns))
+        table["alt_freq"] = table["alt_count"] / table["depth"]
+        if nid:
+            table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
+        # Filter out records as requested
+        cnt_depth = cnt_hom = cnt_som = 0
+        if min_depth:
+            dkey = "n_depth" if "n_depth" in table else "depth"
+            idx_depth = table[dkey] >= min_depth
+            cnt_depth = (~idx_depth).sum()
+            table = table[idx_depth]
+        if skip_hom:
+            # XXX drop this option
+            zkey = "n_zygosity" if "n_zygosity" in table else "zygosity"
+            idx_het = (table[zkey] != 0.0) & (table[zkey] != 1.0)
+            cnt_hom = (~idx_het).sum()
+            table = table[idx_het]
+        if skip_somatic:
+            idx_som = table["somatic"]
+            cnt_som = idx_som.sum()
+            table = table[~idx_som]
+        logging.info("Skipped records: %d somatic, %d depth, %d homozygous",
+                        cnt_som, cnt_depth, cnt_hom)
+        yield sid, nid, table
 
-    return table #, sample_id
-    # return cls(table, {"sample_id": sample_id})
 
-def _read_vcf_nosample(vcf_file, sample_id=None, skip_reject=False):
+def _read_vcf_nosample(vcf_file, skip_reject=False):
+    columns = VA._required_columns
+    dtypes = VA._required_dtypes
     table = pd.read_table(vcf_file,
-                            comment="#",
-                            header=None,
-                            na_filter=False,
-                            names=["chromosome", "start", "_ID", "ref", "alt",
-                                    "_QUAL", "filter", "info"],
-                            usecols=_required_columns,
-                            # # usecols=["chromosome", "start", "ref", "alt",
-                            # #          # "filter", "info",
-                            # #         ],
-                            # # ENH: converters=func -> to parse each col
-                            dtype=dict(zip(_required_columns,
-                                           _required_dtypes)),
-                            )
+                          comment="#",
+                          header=None,
+                          na_filter=False,
+                          names=["chromosome", "start", "_ID", "ref", "alt",
+                                 "_QUAL", "filter", "info"],
+                          usecols=columns,
+                          # # usecols=["chromosome", "start", "ref", "alt",
+                          # #          # "filter", "info",
+                          # #         ],
+                          # # ENH: converters=func -> to parse each col
+                          dtype=dict(zip(columns, dtypes)),
+                         )
     # ENH: do things with filter, info
     # if skip_reject and record.FILTER and len(record.FILTER) > 0:
-    table['end'] = table['start']  # TODO: _get_end
+    table['end'] = table['start'] + table["alt"].str.len()  # ENH: INFO["END"]
     table['start'] -= 1
-    table = table.loc[:, _required_columns]
-    # return cls(table, {"sample_id": sample_id})
+    return table.loc[:, columns]
 
 
+def _iter_samples(vcf_reader, sample_id, normal_id):
+    """Emit the sample IDs of all samples or tumor-normal pairs in the VCF.
 
-def _select_sample(vcf_reader, sample_id, normal_id):
-    """Select a sample ID in the VCF; ensure it's valid."""
+    Determine tumor-normal pairs from the PEDIGREE tag(s). If no PEDIGREE tag is
+    present, use the specified sample_id and normal_id as the pair, or if
+    unspecified, emit all samples as unpaired tumors.
+    """
+    if isinstance(sample_id, int):
+        sample_id = vcf_reader.samples[sample_id]
+    if isinstance(normal_id, int):
+        normal_id = vcf_reader.samples[normal_id]
+    for sid in (sample_id, normal_id):
+        if sid and sid not in vcf_reader.samples:
+            raise ValueError("Specified sample %s not in VCF file"
+                             % sid)
+    pairs = None
     peds = list(_parse_pedigrees(vcf_reader))
-    if sample_id is None and normal_id is None and peds:
-        # Use the VCF header to select the tumor sample
-        # Take the first entry, if any
-        sample_id, normal_id = peds[0]
-    elif sample_id and normal_id:
-        # Take the given IDs at face value, just verify below
-        pass
-    elif sample_id:
-        if peds:
-            for sid, nid in peds:
-                if sid == sample_id:
-                    normal_id = nid
-                    break
-        # if normal_id is None and len(vcf_reader.samples == 2):
-        #     normal_id = next(s for s in vcf_reader.samples if s != sample_id)
+    if peds:
+        # Trust the PEDIGREE tag
+        pairs = peds
     elif normal_id:
-        if peds:
-            for sid, nid in peds:
-                if nid == normal_id:
-                    sample_id = sid
-                    break
-        else:
-            try:
-                sample_id = next(s for s in vcf_reader.samples if s != normal_id)
-            except StopIteration:
-                raise ValueError(
-                    "No other sample in VCF besides the specified normal " +
-                    normal_id + "; did you mean to use this as the sample_id "
-                    "instead?")
+        # All/any other samples are tumors paired with this normal
+        try:
+            other_ids = [s for s in vcf_reader.samples if s != normal_id]
+        except StopIteration:
+            raise ValueError(
+                "No other sample in VCF besides the specified normal " +
+                normal_id + "; did you mean to use this as the sample_id "
+                "instead?")
+        pairs = [(oid, normal_id) for oid in other_ids]
     else:
-        sample_id = vcf_reader.samples[0]
-
-    _confirm_unique(sample_id, vcf_reader.samples)
-    if normal_id:
-        _confirm_unique(normal_id, vcf_reader.samples)
-    logging.info("Selected test sample " + sample_id +
-                 (" and control sample %s" % normal_id if normal_id else ''))
-    return sample_id, normal_id
+        # All samples are unpaired tumors
+        pairs = [(sid, None) for sid in vcf_reader.samples]
+    if sample_id:
+        # Keep only the specified tumor/test sample
+        pairs = [(s, n) for s, n in pairs if s == sample_id]
+    for sid in set(chain(*pairs)):
+        _confirm_unique(sid, vcf_reader.samples)
+    return pairs
 
 
 def _parse_pedigrees(vcf_reader):
@@ -159,14 +191,14 @@ def _confirm_unique(sample_id, samples):
             % (sample_id, samples))
 
 
-def _parse_records(vcf_reader, sample_id, normal_id, skip_reject):
+def _parse_records(records, sample_id, normal_id, skip_reject):
     """Parse VCF records into DataFrame rows.
 
     Apply filters to skip records with low depth, homozygosity, the REJECT
     flag, or the SOMATIC info field.
     """
     cnt_reject = 0  # For logging
-    for record in vcf_reader:
+    for record in records:
         is_som = False
         if skip_reject and record.FILTER and len(record.FILTER) > 0:
             cnt_reject += 1
@@ -213,7 +245,8 @@ def _extract_genotype(sample):
         zygosity = 0.0
     else:
         zygosity = 1.0
-    alt_count = (_get_alt_count(sample) if sample.gt_type else 0.0)
+    # alt_count = _get_alt_count(sample)
+    alt_count = _get_alt_count(sample) if sample.gt_type else 0.0
     return depth, zygosity, alt_count
 
 
@@ -238,11 +271,11 @@ def _get_alt_count(sample):
         else:
             alt_count = 0.0
     else:
-        logging.warn("Skipping %s:%d %s; "
+        logging.debug("Skipping %s:%d %s; "
                      "unsure how to get alternative allele count: %s",
                      sample.site.CHROM, sample.site.POS, sample.site.REF,
                      sample.data)
-        alt_count = None  # or 0 or "missing data"?
+        alt_count = None  # or 0.0 or np.nan?
     return alt_count
 
 
