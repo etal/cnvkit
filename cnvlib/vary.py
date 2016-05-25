@@ -27,7 +27,7 @@ class VariantArray(gary.GenomicArray):
     def __init__(self, data_table, meta_dict=None):
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
-    def mirrored_baf(self, above_half=True, tumor_boost=True):
+    def mirrored_baf(self, above_half=True, tumor_boost=False):
         """Mirrored B-allele frequencies (BAFs).
 
         Flip BAFs to be all above 0.5 (if `above_half`) or below 0.5, for
