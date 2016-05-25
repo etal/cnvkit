@@ -115,7 +115,8 @@ def _cmd_batch(args):
             pool.apply_async(batch_run_sample,
                              (bam, args.targets, args.antitargets, args.reference,
                               args.output_dir, args.male_reference, args.scatter,
-                              args.diagram, args.rlibpath, args.count_reads))
+                              args.diagram, args.rlibpath, args.count_reads,
+                              args.drop_low_coverage))
         pool.close()
         pool.join()
 
@@ -196,7 +197,8 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count):
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                      output_dir, male_reference=False, scatter=False,
-                     diagram=False, rlibpath=None, by_count=False):
+                     diagram=False, rlibpath=None, by_count=False,
+                     skip_low=False):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
@@ -213,7 +215,8 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     tabio.write(cnarr, sample_pfx + '.cnr')
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
-    segments = segmentation.do_segmentation(cnarr, 'cbs', rlibpath=rlibpath)
+    segments = segmentation.do_segmentation(cnarr, 'cbs', rlibpath=rlibpath,
+                                            skip_low=skip_low)
     tabio.write(segments, sample_pfx + '.cns')
 
     if scatter:
@@ -239,6 +242,9 @@ P_batch.add_argument('-y', '--male-reference', action='store_true',
 P_batch.add_argument('-c', '--count-reads', action='store_true',
         help="""Get read depths by counting read midpoints within each bin.
                 (An alternative algorithm).""")
+P_batch.add_argument("--drop-low-coverage", action='store_true',
+        help="""Drop very-low-coverage bins before segmentation to avoid
+                false-positive deletions in poor-quality tumor samples.""")
 P_batch.add_argument('-p', '--processes', type=int, default=1,
         help="""Number of subprocesses used to running each of the BAM files in
                 parallel. Give 0 or a negative value to use the maximum number
@@ -296,7 +302,7 @@ P_batch_report.add_argument('-d', '--output-dir', default='.',
 P_batch_report.add_argument('--scatter', action='store_true',
         help="Create a whole-genome copy ratio profile as a PDF scatter plot.")
 P_batch_report.add_argument('--diagram', action='store_true',
-        help="Create a diagram of copy ratios on chromosomes as a PDF.")
+        help="Create an ideogram of copy ratios on chromosomes as a PDF.")
 
 P_batch.set_defaults(func=_cmd_batch)
 
@@ -1479,12 +1485,13 @@ def _cmd_metrics(args):
 
     # Calculate all metrics
     outrows = []
-    for probes_fname, segs_fname in zip(args.cnarrays, args.segments):
-        cnarr = tabio.read_cna(probes_fname)
-        segments = tabio.read_cna(segs_fname)
-        values = metrics.ests_of_scale(cnarr.drop_low_coverage()
-                                       .residuals(segments))
-        outrows.append([core.rbase(probes_fname), len(segments)] +
+    for cna_fname, seg_fname in zip(args.cnarrays, args.segments):
+        cnarr = tabio.read_cna(cna_fname)
+        if args.drop_low_coverage:
+            cnarr = cnarr.drop_low_coverage()
+        segments = tabio.read_cna(seg_fname)
+        values = metrics.ests_of_scale(cnarr.residuals(segments))
+        outrows.append([core.rbase(cna_fname), len(segments)] +
                        ["%.7f" % val for val in values])
 
     core.write_tsv(args.output, outrows,
@@ -1501,6 +1508,10 @@ P_metrics.add_argument('-s', '--segments', nargs='+', required=True,
                 must match the coverage data files, in which case the input
                 files will be paired together in the given order. Otherwise, the
                 same segments will be used for all coverage files.""")
+P_metrics.add_argument("--drop-low-coverage", action='store_true',
+        help="""Drop very-low-coverage bins before calculations to reduce
+                negative "fat tail" of bin log2 values in poor-quality
+                tumor samples.""")
 P_metrics.add_argument('-o', '--output',
         help="Output table file name.")
 P_metrics.set_defaults(func=_cmd_metrics)
