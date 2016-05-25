@@ -564,22 +564,29 @@ P_reference.add_argument('references', nargs='*',
                 directory that contains them.""")
 P_reference.add_argument('-f', '--fasta',
         help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
-P_reference.add_argument('-t', '--targets',
-        help="Target intervals (.bed or .list)")
-P_reference.add_argument('-a', '--antitargets',
-        help="Antitarget intervals (.bed or .list)")
+P_reference.add_argument('-o', '--output', help="Output file name.")
 P_reference.add_argument('-y', '--male-reference', action='store_true',
         help="""Create a male reference: shift female samples' chrX
                 log-coverage by -1, so the reference chrX average is -1.
                 Otherwise, shift male samples' chrX by +1, so the reference chrX
                 average is 0.""")
-P_reference.add_argument('--no-gc', dest='do_gc', action='store_false',
+
+P_reference_flat = P_reference.add_argument_group(
+    "To construct a generic, \"flat\" copy number reference with neutral "
+    "expected coverage")
+P_reference_flat.add_argument('-t', '--targets',
+        help="Target intervals (.bed or .list)")
+P_reference_flat.add_argument('-a', '--antitargets',
+        help="Antitarget intervals (.bed or .list)")
+
+P_reference_bias = P_reference.add_argument_group(
+    "To disable specific automatic bias corrections")
+P_reference_bias.add_argument('--no-gc', dest='do_gc', action='store_false',
         help="Skip GC correction.")
-P_reference.add_argument('--no-edge', dest='do_edge', action='store_false',
+P_reference_bias.add_argument('--no-edge', dest='do_edge', action='store_false',
         help="Skip edge-effect correction.")
-P_reference.add_argument('--no-rmask', dest='do_rmask', action='store_false',
+P_reference_bias.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
-P_reference.add_argument('-o', '--output', help="Output file name.")
 P_reference.set_defaults(func=_cmd_reference)
 
 
