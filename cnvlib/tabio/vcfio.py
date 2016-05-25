@@ -5,6 +5,7 @@ import logging
 from itertools import chain
 
 import pandas as pd
+import numpy as np
 import vcf
 
 from ..vary import VariantArray as VA
@@ -68,6 +69,7 @@ def parse_vcf(infile, sample_id=None, normal_id=None, min_depth=None,
         table["alt_freq"] = table["alt_count"] / table["depth"]
         if nid:
             table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
+        table = table.fillna({col: 0.0 for col in table.columns[6:]})
         # Filter out records as requested
         cnt_depth = cnt_hom = cnt_som = 0
         if min_depth:
@@ -237,16 +239,15 @@ def _extract_genotype(sample):
     if "DP" in sample.data._fields:
         depth = sample.data.DP
     else:
-        # SV, probably
-        depth = alt_count = None
+        # SV or not called, probably
+        depth = alt_count = np.nan #0.0
     if sample.is_het:
         zygosity = 0.5
     elif sample.gt_type == 0:
         zygosity = 0.0
     else:
         zygosity = 1.0
-    # alt_count = _get_alt_count(sample)
-    alt_count = _get_alt_count(sample) if sample.gt_type else 0.0
+    alt_count = _get_alt_count(sample)
     return depth, zygosity, alt_count
 
 
@@ -275,7 +276,7 @@ def _get_alt_count(sample):
                      "unsure how to get alternative allele count: %s",
                      sample.site.CHROM, sample.site.POS, sample.site.REF,
                      sample.data)
-        alt_count = None  # or 0.0 or np.nan?
+        alt_count = np.nan
     return alt_count
 
 
