@@ -328,10 +328,10 @@
      fit-margin-left="3"
      fit-margin-right="3"
      fit-margin-bottom="3"
-     inkscape:window-width="1855"
+     inkscape:window-width="1920"
      inkscape:window-height="1056"
-     inkscape:window-x="65"
-     inkscape:window-y="24"
+     inkscape:window-x="1920"
+     inkscape:window-y="37"
      inkscape:window-maximized="1"
      showguides="true"
      inkscape:guide-bbox="true">
@@ -372,7 +372,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -1055,7 +1055,8 @@
              height="93.220268"
              width="266.10168"
              id="rect19342" /></flowRegion><flowPara
-           id="flowPara19344">Circular binary segmentation</flowPara></flowRoot>      <text
+           id="flowPara19344">Find CNV</flowPara><flowPara
+           id="flowPara3204"> breakpoints</flowPara></flowRoot>      <text
          sodipodi:linespacing="125%"
          id="text85158"
          y="262.52502"
@@ -1116,7 +1117,7 @@
              height="83.066666"
              width="212.11784"
              id="rect85239" /></flowRegion><flowPara
-           id="flowPara85247">scatter, diagram, heatmap, loh</flowPara></flowRoot>    </g>
+           id="flowPara85247">scatter, diagram, heatmap</flowPara></flowRoot>    </g>
     <g
        id="g86823"
        transform="translate(-157.38334,27.079956)">
@@ -1174,7 +1175,7 @@
              width="248.9796"
              id="rect85267" /></flowRegion><flowPara
            style="font-size:20px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;text-anchor:middle;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-           id="flowPara85269">CDT, SEG, JTV</flowPara></flowRoot>    </g>
+           id="flowPara85269">BED, SEG, VCF</flowPara></flowRoot>    </g>
     <g
        id="g85404"
        transform="translate(14.429685,73.856892)">

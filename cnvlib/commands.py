@@ -719,63 +719,6 @@ P_segment.add_argument("--rlibpath",
 P_segment.set_defaults(func=_cmd_segment)
 
 
-# rescale ---------------------------------------------------------------------
-
-def _cmd_rescale(args):
-    """[DEPRECATED] Rescale segment copy ratios given known purity and ploidy.
-
-    Instead, use the command "call -m none".
-    """
-    if args.purity and not 0.0 < args.purity <= 1.0:
-        raise RuntimeError("Purity must be between 0 and 1.")
-
-    cnarr = tabio.read_cna(args.filename)
-    if args.center:
-        cnarr.center_all(args.center)
-    if args.purity and args.purity < 1.0:
-        is_sample_female = verify_gender_arg(cnarr, args.gender,
-                                             args.male_reference)
-        cnarr = do_rescale(cnarr, args.ploidy, args.purity,
-                           args.male_reference, is_sample_female)
-    tabio.write(cnarr, args.output)
-
-
-def do_rescale(cnarr, ploidy=2, purity=None, is_reference_male=False,
-               is_sample_female=False):
-    absolutes = call.absolute_clonal(cnarr, ploidy, purity,
-                                     is_reference_male, is_sample_female)
-    # Convert back to log2 ratios; avoid a logarithm domain error
-    outarr = cnarr.copy()
-    outarr['log2'] = call.log2_ratios(cnarr, absolutes, ploidy,
-                                      is_reference_male)
-    return outarr
-
-
-P_rescale = AP_subparsers.add_parser('rescale', help=_cmd_rescale.__doc__)
-P_rescale.add_argument('filename',
-        help="Copy ratios (.cnr or .cns).")
-P_rescale.add_argument("--center",
-        choices=('mean', 'median', 'mode', 'biweight'),
-        help="""Re-center the log2 ratio values using this estimate of the
-                center or average value.""")
-P_rescale.add_argument("--ploidy", type=int, default=2,
-        help="Ploidy of the sample cells. [Default: %(default)d]")
-P_rescale.add_argument("--purity", type=float,
-        help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
-P_rescale.add_argument("-g", "--gender",
-        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
-        help="""Specify the sample's gender as male or female. (Otherwise
-                guessed from chrX copy number).""")
-P_rescale.add_argument('-y', '--male-reference', action='store_true',
-        help="""Was a male reference used?  If so, expect half ploidy on
-                chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
-                if a male reference was used, the "neutral" copy number (ploidy)
-                of chrX is 1; chrY is haploid for either gender reference.""")
-P_rescale.add_argument('-o', '--output',
-        help="Output table file name (CNR-like table of segments, .cns).")
-P_rescale.set_defaults(func=_cmd_rescale)
-
-
 # call ------------------------------------------------------------------------
 
 def _cmd_call(args):
@@ -1181,52 +1124,6 @@ P_scatter.add_argument('--y-max', type=float, help="""y-axis upper limit.""")
 P_scatter.add_argument('-o', '--output',
         help="Output table file name.")
 P_scatter.set_defaults(func=_cmd_scatter)
-
-
-# loh -------------------------------------------------------------------------
-
-def _cmd_loh(args):
-    """[DEPRECATED] Plot allelic frequencies at each variant position in a VCF file.
-
-    Divergence from 0.5 indicates loss of heterozygosity in a tumor sample.
-
-    Instead, use the command "scatter -v".
-    """
-    variants = tabio.read(args.variants, "vcf",
-                          sample_id=args.sample_id, normal_id=args.normal_id,
-                          min_depth=args.min_depth, skip_hom=True,
-                          skip_somatic=True)
-    segments = tabio.read_cna(args.segment) if args.segment else None
-    _fig, axis = pyplot.subplots()
-    axis.set_title("Variant allele frequencies: %s" % variants.sample_id)
-    chrom_sizes = collections.OrderedDict(
-        (chrom, subarr["end"].max())
-        for chrom, subarr in variants.by_chromosome())
-    PAD = 2e7
-    plots.snv_on_genome(axis, variants, chrom_sizes, segments, args.trend, PAD)
-    if args.output:
-        pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
-    else:
-        pyplot.show()
-
-
-P_loh = AP_subparsers.add_parser('loh', help=_cmd_loh.__doc__)
-P_loh.add_argument('variants',
-        help="Sample variants in VCF format.")
-P_loh.add_argument('-s', '--segment',
-        help="Segmentation calls (.cns), the output of the 'segment' command.")
-P_loh.add_argument('-m', '--min-depth', type=int, default=20,
-        help="""Minimum read depth for a variant to be displayed.
-                [Default: %(default)s]""")
-P_loh.add_argument("-i", "--sample-id",
-        help="Sample name to use for LOH calculations from the input VCF.")
-P_loh.add_argument("-n", "--normal-id",
-        help="Corresponding normal sample ID in the input VCF.")
-P_loh.add_argument('-t', '--trend', action='store_true',
-        help="Draw a smoothed local trendline on the scatter plot.")
-P_loh.add_argument('-o', '--output',
-        help="Output PDF file name.")
-P_loh.set_defaults(func=_cmd_loh)
 
 
 # heatmap ---------------------------------------------------------------------
@@ -1739,11 +1636,6 @@ def _cmd_export_bed(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    if args.show_all and args.show == "ploidy":
-        # Until this option is removed, let it override the default
-        logging.warn("Option '--show-all' is deprecated; "
-                     "use '--show all' instead.")
-        args.show = "all"
     bed_tables = []
     for segfname in args.segments:
         segments = tabio.read_cna(segfname)
@@ -1779,9 +1671,6 @@ P_export_bed.add_argument("--show",
                 'variant' = CNA regions with non-neutral copy number;
                 'ploidy' = CNA regions with non-default ploidy.
                 [Default: %(default)s]""")
-P_export_bed.add_argument("--show-all", action="store_true",
-        help="""Write all segmented regions.
-                [DEPRECATED; use "--show all" instead]""")
 P_export_bed.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
@@ -1851,12 +1740,6 @@ P_export_vcf.set_defaults(func=_cmd_export_vcf)
 def _cmd_export_theta(args):
     """Convert segments to THetA2 input file format (*.input)."""
     tumor_cn = tabio.read_cna(args.tumor_segment)
-    # Handle deprecated positional reference
-    if args.normal_reference:
-        logging.warn("Second positional argument normal_reference is "
-                     "deprecated; use --reference instead.")
-        if not args.reference:
-            args.reference = args.normal_reference
     normal_cn = (tabio.read_cna(args.reference)
                  if args.reference else None)
     table = export.export_theta(tumor_cn, normal_cn)
@@ -1879,9 +1762,6 @@ P_export_theta = P_export_subparsers.add_parser('theta',
         help=_cmd_export_theta.__doc__)
 P_export_theta.add_argument('tumor_segment',
         help="""Tumor-sample segmentation file from CNVkit (.cns).""")
-P_export_theta.add_argument("normal_reference", nargs='?',
-        help="""Reference copy number profile (.cnn), or normal-sample bin-level
-                log2 copy ratios (.cnr). [DEPRECATED]""")
 P_export_theta.add_argument("-r", "--reference",
         help="""Reference copy number profile (.cnn), or normal-sample bin-level
                 log2 copy ratios (.cnr). Use if the tumor_segment input file

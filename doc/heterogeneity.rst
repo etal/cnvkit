@@ -104,14 +104,16 @@ to other formats using the :ref:`export` command.
 Adjusting copy ratios and segments for normal cell contamination
 ----------------------------------------------------------------
 
-CNVkit's :ref:`rescale` command uses an estimate of tumor fraction (from
+.. XXX TODO combine with `call` command details
+
+CNVkit's :ref:`call` command uses an estimate of tumor fraction (from
 any source) to directly rescale segment log2 ratio values to the value that
 would be seen a completely pure, uncontaminated sample. Example with tumor
 purity of 60% and a male reference::
 
-    cnvkit.py rescale Sample.cns --purity 0.6 -y -o Sample.rescale.cns
+    cnvkit.py call -m none Sample.cns --purity 0.6 -y -o Sample.call.cns
 
-CNVkit's :ref:`call` command then converts the segmented log2 ratio estimates to
+The :ref:`call` command can also convert the segmented log2 ratio estimates to
 absolute integer copy numbers. Note that the rescaling step is optional; either
 way, hard thresholds can be used::
 
@@ -126,7 +128,7 @@ the log2 ratios to the nearest integer copy number::
 
     cnvkit.py call -m clonal Sample.cns -y --purity 0.65 -o Sample.call.cns
     # Or, if already rescaled
-    cnvkit.py call -m clonal Sample.rescale.cns -y -o Sample.call.cns
+    cnvkit.py call -m clonal Sample.call.cns -y -o Sample.call.cns
 
 Export integer copy numbers as BED or VCF
 -----------------------------------------
@@ -139,3 +141,5 @@ the standard BED or VCF formats::
 
 The rounding of the .cns file's log2 ratios to integer copy numbers here is the
 same as in the :ref:`call` command with the ``clonal`` method.
+
+.. XXX TODO note if call was already run, takes copy numbers from the "cn" column

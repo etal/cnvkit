@@ -42,8 +42,8 @@ CNVkit currently uses VCF files in two ways:
 - To :ref:`export` CNVs, describing/encoding each CNV segment as a structural
   variant (SV).
 - To plot single-nucleotide variant (SNV) allele frequencies in the
-  :ref:`scatter` and :ref:`loh` commands, or export these allele frequencies to
-  the "nexus-ogt" format.
+  :ref:`scatter` command, or export these allele frequencies to the
+  "nexus-ogt" format.
 
 
 Target and antitarget bin-level coverages (.cnn)

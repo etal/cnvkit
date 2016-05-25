@@ -60,15 +60,6 @@ listed in a separate file and passed to the ``scattter`` command with the
 separately with the ``-c`` option and then combining the plots into a single
 multi-page PDF.
 
-Loss of heterozygosity (LOH) can be viewed alongside copy number by passing
-variants as a VCF file with the ``-v`` option. Heterozygous SNP allelic
-frequencies are shown in a subplot below the CNV scatter plot. (Also see the
-:ref:`loh` command.)
-
-::
-
-    cnvkit.py scatter Sample.cnr -s Sample.cns -v Sample.vcf
-
 The bin-level log2 ratios or coverages can also be plotted without segmentation
 calls::
 
@@ -83,20 +74,28 @@ fairly superfluous if a valid segment file is given, but could be helpful if the
 CBS dependency is not available, or if you're skeptical of the segmentation in a
 region.
 
+SNV b-allele frequencies
+````````````````````````
 
-.. _loh:
-
-loh
----
-
-Plot allelic frequencies at each variant position in a VCF file. Given segments,
-show the mean b-allele frequency values above and below 0.5 of SNVs falling
-within each segment. Divergence from 0.5 indicates LOH in the tumor sample.
+Loss of heterozygosity (LOH) can be viewed alongside copy number by passing
+variants as a VCF file with the ``-v`` option. Heterozygous SNP allelic
+frequencies are shown in a subplot below the CNV scatter plot.
 
 ::
 
-    cnvkit.py loh Sample.vcf
-    cnvkit.py loh Sample.vcf -s Sample.cns -i Sample_Tumor -n Sample_Normal
+    cnvkit.py scatter Sample.cnr -s Sample.cns -v Sample.vcf
+
+If only the VCF file is given by itself, just plot the allelic frequencies::
+
+    cnvkit.py scatter -v Sample.vcf
+
+Given segments, show the mean b-allele frequency values above and below 0.5 of
+SNVs falling within each segment. Divergence from 0.5 indicates LOH in the tumor
+sample.
+
+::
+
+    cnvkit.py scatter -s Sample.cns -v Sample.vcf -i TumorID -n NormalID
 
 Regions with LOH are reflected in heterozygous germline SNPs in the tumor sample
 with allele frequencies shifted away from the expected 0.5 value.
