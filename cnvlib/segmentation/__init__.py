@@ -1,5 +1,5 @@
 """Segmentation of copy number values."""
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 import logging
 import math
 import os.path
@@ -41,9 +41,9 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
             rscript = flasso.FLASSO_RSCRIPT
             threshold = threshold or 0.005
 
-        with tempfile.NamedTemporaryFile(suffix='.cnr') as tmp:
+        with tempfile.NamedTemporaryFile(suffix='.cnr', mode="w+t") as tmp:
             filtered_cn.data.to_csv(tmp, index=False, sep='\t',
-                                        float_format='%.6g')
+                                    float_format='%.6g', mode="w+t")
             tmp.flush()
             script_strings = {
                 'probes_fname': tmp.name,
@@ -51,13 +51,14 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                 'threshold': threshold,
                 'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
             }
-            with ngfrills.temp_write_text(rscript % script_strings) as script_fname:
+            with ngfrills.temp_write_text(rscript % script_strings,
+                                          mode="w+t") as script_fname:
                 seg_out = ngfrills.call_quiet('Rscript', script_fname)
             # ENH: run each chromosome separately
             # ENH: run each chrom. arm separately (via knownsegs)
         # Convert R dataframe contents (SEG) to a proper CopyNumArray
-        segarr = tabio.read(StringIO(seg_out), "seg", sample_id=0)
-        segarr.sort_columns()
+        segarr = tabio.read(StringIO(seg_out.decode()), "seg",
+                            sample_id=cnarr.sample_id)
         if method == 'flasso':
             segarr = squash_segments(segarr)
         segarr = repair_segments(segarr, cnarr)

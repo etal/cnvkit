@@ -104,12 +104,12 @@ def safe_write(outfile, verbose=True):
 
 
 @contextlib.contextmanager
-def temp_write_text(text):
+def temp_write_text(text, mode="w+b"):
     """Save text to a temporary file.
 
     NB: This won't work on Windows b/c the file stays open.
     """
-    with tempfile.NamedTemporaryFile() as tmp:
+    with tempfile.NamedTemporaryFile(mode=mode) as tmp:
         tmp.write(text)
         tmp.flush()
         yield tmp.name

@@ -52,6 +52,8 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
             meta["sample_id"] = sample_id
         elif isinstance(infile, basestring):
             meta["sample_id"] = core.fbase(infile)
+        elif hasattr(infile, "name"):
+            meta["sample_id"] = core.fbase(infile.name)
         else:
             meta["sample_id"] = "<unknown>"
     if fmt in ("seg", "vcf") and sample_id is not None:
