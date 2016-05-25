@@ -656,7 +656,7 @@ P_fix.set_defaults(func=_cmd_fix)
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     cnarr = tabio.read_cna(args.filename)
-    variants = (_VA.read_vcf(args.vcf, skip_hom=True, skip_somatic=True)
+    variants = (tabio.read(args.vcf, "vcf", skip_hom=True, skip_somatic=True)
                 if args.vcf else None)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
                                            variants=variants,
@@ -777,9 +777,8 @@ def _cmd_call(args):
                                           args.male_reference)
                         if args.purity and args.purity < 1.0
                         else None)
-    vcf = (_VA.read_vcf(args.vcf, skip_hom=True, skip_somatic=True)
-           if args.vcf
-           else None)
+    vcf = (tabio.read(args.vcf, "vcf", skip_hom=True, skip_somatic=True)
+           if args.vcf else None)
     cnarr = do_call(cnarr, vcf, args.method, args.ploidy, args.purity,
                     args.male_reference, is_sample_female, args.thresholds)
     tabio.write(cnarr, args.output or cnarr.sample_id + '.call.cns')
@@ -960,9 +959,11 @@ def _cmd_scatter(args):
     segarr = tabio.read_cna(args.segment) if args.segment else None
     if not args.sample_id and (cnarr or segarr):
         args.sample_id = (cnarr or segarr).sample_id
-    varr = _VA.read_vcf(args.vcf, args.sample_id, args.normal_id,
-                        args.min_variant_depth, skip_hom=True, skip_somatic=True
-                       ) if args.vcf else None
+    varr = (tabio.read(args.vcf, "vcf",
+                       sample_id=args.sample_id, normal_id=args.normal_id,
+                       min_depth=args.min_variant_depth, skip_hom=True,
+                       skip_somatic=True)
+            if args.vcf else None)
 
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
@@ -1178,8 +1179,10 @@ def _cmd_loh(args):
 
     Instead, use the command "scatter -v".
     """
-    variants = _VA.read_vcf(args.variants, args.sample_id, args.normal_id,
-                            args.min_depth, skip_hom=True, skip_somatic=True)
+    variants = tabio.read(args.variants, "vcf",
+                          sample_id=args.sample_id, normal_id=args.normal_id,
+                          min_depth=args.min_depth, skip_hom=True,
+                          skip_somatic=True)
     segments = tabio.read_cna(args.segment) if args.segment else None
     _fig, axis = pyplot.subplots()
     axis.set_title("Variant allele frequencies: %s" % variants.sample_id)
@@ -1844,10 +1847,10 @@ def _cmd_export_theta(args):
     table.to_csv(args.output, sep='\t', index=False)
     logging.info("Wrote %s", args.output)
     if args.vcf:
-        variants = _VA.read_vcf(args.vcf,
-                                sample_id=args.sample_id or tumor_cn.sample_id,
-                                normal_id=args.normal_id, min_depth=args.min_depth,
-                                skip_somatic=True, skip_hom=False)
+        variants = tabio.read(args.vcf, "vcf",
+                              sample_id=args.sample_id or tumor_cn.sample_id,
+                              normal_id=args.normal_id, min_depth=args.min_depth,
+                              skip_somatic=True, skip_hom=False)
         tumor_snps, normal_snps = export.export_theta_snps(variants)
         for title, table in [("tumor", tumor_snps), ("normal", normal_snps)]:
             out_fname = "{}.{}.snp_formatted.txt".format(tumor_cn.sample_id, title)

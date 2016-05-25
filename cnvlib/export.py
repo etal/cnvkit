@@ -121,8 +121,9 @@ def export_nexus_ogt(sample_fname, vcf_fname, sample_id,
         logging.info("Dropping %d bins with weight below %f",
                      mask_low_weight.sum(), min_weight)
         cnarr.data = cnarr.data[~mask_low_weight]
-    varr = VA.read_vcf(vcf_fname, sample_id=sample_id or cnarr.sample_id,
-                       min_depth=min_depth, skip_hom=True, skip_somatic=True)
+    varr = tabio.read(vcf_fname, "vcf",
+                      sample_id=sample_id or cnarr.sample_id,
+                      min_depth=min_depth, skip_hom=True, skip_somatic=True)
     bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
                                summary_func=mirrored_baf_median)
     logging.info("Placed %d variants into %d bins",
