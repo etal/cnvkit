@@ -182,7 +182,7 @@ segments are spurious. One possible heuristic for judging the overall noisiness
 of each sample in a table is to multiply the number of segments by the biweight
 midvariance -- the value will tend to be higher for unreliable samples.
 Check questionable samples for poor coverage (using e.g. `bedtools
-<http://bedtools.readthedocs.io`_, `chanjo <http://www.chanjo.co/>`_,
+<http://bedtools.readthedocs.io/>`_, `chanjo <http://www.chanjo.co/>`_,
 `IGV <http://www.broadinstitute.org/igv/>`_ or `Picard CalculateHsMetrics
 <http://broadinstitute.github.io/picard/command-line-overview.html#CalculateHsMetrics>`_).
 
@@ -215,8 +215,9 @@ Supported stats:
   deviation (``--mad``), inter-quartile range (``--iqr``), Tukey's biweight
   midvariance (``--bivar``)
 
-- confidence interval (``--ci``), estimated by bootstrap (100 resamples)
+- Confidence interval of the segment mean (``--ci``), estimated by bootstrap
+  (100 resamplings) of the bin-level log2 ratio values within the segment.
 
-- prediction interval (``--pi``), estimated by the range between the 2.5-97.5
-  percentiles of bin-level log2 ratio values within the segment.
+- Prediction interval (``--pi``), estimated by the range between the 2.5-97.5
+  percentiles of the segment's bin-level log2 ratios.
 

@@ -534,18 +534,36 @@ extracting b-allele frequencies from a VCF (if requested), but does not add a
 Transformations
 ```````````````
 
-With the ``--purity`` option, log2 ratios are rescaled using the same
-calculation as the :ref:`rescale` command. The observed log2 ratios in the input
-.cns file are treated as a mix of some fraction of tumor cells (specified by
-``--purity``), possibly with altered copy number, and a remainder of normal
-cells with neutral copy number (specified by ``--ploidy`` for autosomes; by
-default, diploid autosomes, haploid Y or X/Y depending on reference gender).
-This equation is rearranged to find the absolute copy number of the tumor cells
-alone, rounded to the nearest integer. The expected and observed ploidy of the
-sex chromosomes (X and Y) is different, so it's important to specify
-``-y``/``--male-reference`` if a male reference was used; the sample gender can
-be specified if known, otherwise it will be guessed from the average log2 ratio
-of chromosome X.
+If there is a known level of normal-cell DNA contamination in the analyzed tumor
+sample (see the page on :doc:`tumor heterogeneity <heterogeneity>`), you can
+opt to rescale the log2 copy ratio estimates in your .cnr or .cns file to remove
+the impact of this contamination, so the resulting log2 ratio values in the file
+match what would be observed in a completely pure tumor sample.
+
+With the ``--purity`` option, log2 ratios are rescaled to the value that would
+be seen a completely pure, uncontaminated sample.  The observed log2 ratios in
+the input .cns file are treated as a mix of some fraction of tumor cells
+(specified by ``--purity``), possibly with altered copy number, and a remainder
+of normal cells with neutral copy number (specified by ``--ploidy`` for
+autosomes; by default, diploid autosomes, haploid Y or X/Y depending on
+reference gender).  This equation is rearranged to find the absolute copy number
+of the tumor cells alone, rounded to the nearest integer.
+
+The expected and observed ploidy of the sex chromosomes (X and Y) is different,
+so it's important to specify ``-y``/``--male-reference`` if a male reference was
+used; the sample gender can be specified if known, otherwise it will be guessed
+from the average log2 ratio of chromosome X.
+
+..  The calculation of new log2 values for the sex chromosomes depends on the
+..  chromosomal gender of the sample and whether a male reference was used, while
+..  for autosomes the specified ploidy (default 2, diploid) is used. For example,
+..  with tumor purity of 60% and a male reference, letting CNVkit guess the sample's
+..  chromosomal gender::
+
+..      cnvkit.py call -m none Sample.cns --purity 0.6 -y -o Sample.rescaled.cns
+
+..  This can be done before or after segmentation, using a .cnr or .cns file; the
+..  resulting .cns file should be essentially the same.
 
 When a VCF file containing SNV calls for the same tumor sample (and optionally a
 matched normal) is given using the ``-v``/``--vcf`` option, the b-allele
@@ -554,35 +572,14 @@ segment are mirrored, averaged, and listed in the output .cns file as an
 additional "baf" column (using the same logic as ``export nexus-ogt``).
 If ``--purity`` was specified, then the BAF values are also rescaled.
 
-----
-
-Rescaling:
-
-If there is a known level of normal-cell DNA contamination in the analyzed tumor
-sample (see the page on :doc:`tumor heterogeneity <heterogeneity>`), you can
-opt to rescale the log2 copy ratio estimates in your .cnr or .cns file to remove
-the impact of this contamination, so the resulting log2 ratio values in the file
-match what would be observed in a completely pure tumor sample.
-
-The calculation of new log2 values for the sex chromosomes depends on the
-chromosomal gender of the sample and whether a male reference was used, while
-for autosomes the specified ploidy (default 2, diploid) is used. For example,
-with tumor purity of 60% and a male reference, letting CNVkit guess the sample's
-chromosomal gender::
-
-    cnvkit.py call -m none Sample.cns --purity 0.6 -y -o Sample.rescaled.cns
-
-This can be done before or after segmentation, using a .cnr or .cns file; the
-resulting .cns file should be essentially the same.
-
 The ``call`` command can also optionally re-center the log2 values, though
 this will typically not be needed since the .cnr files are automatically
 median-centered by the :ref:`fix` command when normalizing to a reference and
 correcting biases. However, if the analyzed genome is highly aneuploid and
-contains widespread copy number losses or gains unequally, median centering may
-place copy-number-neutral regions slightly off-center from the expected log2
-value of 0.0. To address such cases, alternative centering approaches can be
-specified with the ``--center`` option::
+contains widespread copy number losses or gains unequally, the default median
+centering may place copy-number-neutral regions slightly above or below the
+expected log2 value of 0.0. To address such cases, alternative centering
+approaches can be specified with the ``--center`` option::
 
     cnvkit.py call -m none Sample.cns --center mode
 
