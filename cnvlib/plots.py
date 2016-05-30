@@ -34,7 +34,7 @@ def setup_chromosome(axis, probes=None, segments=None, variants=None,
     min_x = np.inf
     max_x = 0
     for arr in (probes, segments, variants):
-        if arr:
+        if arr and len(arr):
             max_x = max(max_x, arr.end.iat[-1])
             min_x = min(min_x, arr.start.iat[0])
     if not max_x > min_x:
