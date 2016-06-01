@@ -144,6 +144,8 @@ def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
 WRITERS = {
     # Format name, formatter, show header
     "bed": (bedio.write_bed, False),
+    "bed3": (bedio.write_bed3, False),
+    "bed4": (bedio.write_bed4, False),
     "interval": (picard.write_interval, False),
     "picardhs": (picard.write_picard_hs, True),
     "seg": (seg.write_seg, True),
