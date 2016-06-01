@@ -174,18 +174,27 @@ def q_n(a):
 
 # Intervals
 
-def confidence_interval_bootstrap(bins, alpha, bootstraps=100):
+def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
     """Confidence interval for segment mean log2 value, estimated by bootstrap."""
     # Bootstrap for CI
     k = len(bins)
     rand_indices = np.random.randint(0, k, (bootstraps, k))
-    bootstraps = [bins.data.take(idx) for idx in rand_indices]
+    samples = [bins.data.take(idx) for idx in rand_indices]
+    if smoothed:
+        # Essentially, resample from a kernel density estimate of the data
+        # instead of the original data.
+        # Silverman's Rule for KDE bandwidth (roughly):
+        # std = biweight_midvariance(bins['log2'])
+        std = interquartile_range(bins['log2']) / 1.34
+        bw = std * (k*3/4) ** (-1/5)
+        samples = [samp.assign(log2=lambda x: x['log2'] + bw * np.random.randn(k))
+                   for samp in samples]
     # Recalculate segment means
     if 'weight' in bins:
-        bootstrap_dist = [np.average(boot['log2'], weights=boot['weight'])
-                            for boot in bootstraps]
+        bootstrap_dist = [np.average(samp['log2'], weights=samp['weight'])
+                            for samp in samples]
     else:
-        bootstrap_dist = [boot['log2'].mean() for boot in bootstraps]
+        bootstrap_dist = [samp['log2'].mean() for samp in samples]
     pct_lo = 100 * alpha / 2
     pct_hi = 100 * (1 - alpha / 2)
     return np.percentile(bootstrap_dist, [pct_lo, pct_hi])
