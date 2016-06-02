@@ -9,6 +9,8 @@ See:
 """
 from __future__ import division
 
+import logging
+
 import numpy as np
 from scipy import stats
 
@@ -70,7 +72,7 @@ def segment_mean(cnarr, skip_low=False):
     if skip_low:
         cnarr = cnarr.drop_low_coverage()
     if len(cnarr) == 0:
-        return None
+        return np.nan
     if 'weight' in cnarr:
         return np.average(cnarr['log2'], weights=cnarr['weight'])
     return cnarr['log2'].mean()
@@ -176,6 +178,13 @@ def q_n(a):
 
 def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
     """Confidence interval for segment mean log2 value, estimated by bootstrap."""
+    if not 0 < alpha < 1:
+        raise ValueError("alpha must be between 0 and 1; got %s" % alpha)
+    if bootstraps <= 2 / alpha:
+        new_boots = int(2 / alpha + 0.5)
+        logging.warn("%d bootstraps not enough to estimate CI alpha level %f; "
+                     "increasing to %d", bootstraps, alpha, new_boots)
+        bootstraps = new_boots
     # Bootstrap for CI
     k = len(bins)
     rand_indices = np.random.randint(0, k, (bootstraps, k))
@@ -190,14 +199,24 @@ def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
         samples = [samp.assign(log2=lambda x: x['log2'] + bw * np.random.randn(k))
                    for samp in samples]
     # Recalculate segment means
-    if 'weight' in bins:
-        bootstrap_dist = [np.average(samp['log2'], weights=samp['weight'])
-                            for samp in samples]
-    else:
-        bootstrap_dist = [samp['log2'].mean() for samp in samples]
-    pct_lo = 100 * alpha / 2
-    pct_hi = 100 * (1 - alpha / 2)
-    return np.percentile(bootstrap_dist, [pct_lo, pct_hi])
+    bootstrap_dist = np.array([segment_mean(samp) for samp in samples])
+    alphas = np.array([alpha / 2, 1 - alpha / 2])
+    if not smoothed:
+        # BCa correction (Efron 1987, "Better Bootstrap Confidence Intervals")
+        # http://www.tandfonline.com/doi/abs/10.1080/01621459.1987.10478410
+        # Ported from R package "bootstrap" function "bcanon"
+        orig_mean = segment_mean(bins)
+        z0 = stats.norm.ppf((bootstrap_dist < orig_mean).sum() / bootstraps)
+        zalpha = stats.norm.ppf(alphas)
+        # Jackknife influence values
+        u = np.array([segment_mean(bins.concat([bins[:i], bins[i+1:]]))
+                      for i in range(len(bins))])
+        uu = u.mean() - u
+        acc = (u**3).sum() / (6 * (uu**2).sum()**1.5)
+        alphas = stats.norm.cdf(z0 + (z0 + zalpha)
+                                        / (1 - acc * (z0 + zalpha)))
+    ci = np.percentile(bootstrap_dist, 100 * alphas)
+    return ci
 
 
 def prediction_interval(bins, alpha):
