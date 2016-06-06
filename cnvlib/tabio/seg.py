@@ -77,9 +77,10 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
     with as_handle(infile) as handle:
         n_tabs = None
         for line in handle:
-            if line.startswith(('[', "WARNING")):
-                continue
             n_tabs = line.count('\t')
+            if n_tabs == 0:
+                # Skip misc. R output (e.g. "WARNING...") before the header
+                continue
             if n_tabs == 5:
                 col_names = ["sample_id", "chromosome", "start", "end", "probes",
                              "log2"]
