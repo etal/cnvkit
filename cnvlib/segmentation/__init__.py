@@ -53,7 +53,8 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
             }
             with ngfrills.temp_write_text(rscript % script_strings,
                                           mode="w+t") as script_fname:
-                seg_out = ngfrills.call_quiet('Rscript', script_fname)
+                seg_out = ngfrills.call_quiet('Rscript', '--vanilla',
+                                              script_fname)
             # ENH: run each chromosome separately
             # ENH: run each chrom. arm separately (via knownsegs)
         # Convert R dataframe contents (SEG) to a proper CopyNumArray
