@@ -138,7 +138,7 @@ p2-9_2.vcf: build/p2-9_2.call.cns
 	$(cnvkit) export vcf $^ -y -o $@
 
 p2-9_2.theta2.input: build/p2-9_2.cns build/reference-picard.cnn
-	$(cnvkit) export theta $^ -o $@
+	$(cnvkit) export theta $< -r $(lastword $^) -o $@
 
 p2-9_2.nexus: build/p2-9_2.cnr
 	$(cnvkit) export nexus-basic $^ -o $@
