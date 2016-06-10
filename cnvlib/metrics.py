@@ -201,7 +201,7 @@ def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
     if not smoothed:
         # alphas = _bca_correct_alpha(bins, bootstrap_dist, alphas)
         pass
-    ci = np.percentile(bootstrap_dist, 100 * alphas)
+    ci = np.percentile(bootstrap_dist, list(100 * alphas))
     return ci
 
 
