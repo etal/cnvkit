@@ -68,6 +68,10 @@ def modal_location(arr):
 
     `arr` is a 1-D array of floating-point values, e.g. bin log2 ratio values.
     """
+    if not len(arr):
+        return np.nan
+    elif len(arr) == 1:
+        return arr[0]
     sarr = np.sort(arr)
     kde = stats.gaussian_kde(sarr)
     y = kde.evaluate(sarr)
