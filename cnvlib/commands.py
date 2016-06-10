@@ -1429,6 +1429,9 @@ def _cmd_segmetrics(args):
         raise RuntimeError("alpha must be between 0 and 1.")
 
     stats = {
+        'mean': np.mean,
+        'median': np.median,
+        'mode': metrics.modal_location,
         'stdev': np.std,
         'mad':  metrics.median_absolute_deviation,
         'iqr':  metrics.interquartile_range,
@@ -1446,21 +1449,25 @@ def _cmd_segmetrics(args):
     if args.drop_low_coverage:
         cnarr = cnarr.drop_low_coverage()
     segarr = tabio.read_cna(args.segments)
-    deviations = [segbins.log2 - segment.log2
-                  for segment, segbins in cnarr.by_ranges(segarr)]
+    segments, segbins = zip(*cnarr.by_ranges(segarr))
+    # Measures of location
+    for statname in ("mean", "median", "mode"):
+        if getattr(args, statname):
+            func = stats[statname]
+            segarr[statname] = np.asfarray([func(sb.log2) for sb in segbins])
     # Measures of spread
-    for statname in ("StDev", "MAD", "IQR", "BiVar"):
-        option = statname.lower()
-        if getattr(args, option):
-            func = stats[option]
+    deviations = [sb.log2 - seg.log2 for seg, sb in zip(segments, segbins)]
+    for statname in ("stdev", "mad", "iqr", "bivar"):
+        if getattr(args, statname):
+            func = stats[statname]
             segarr[statname] = np.asfarray([func(d) for d in deviations])
 
     # Interval calculations
     if args.ci:
-        segarr["CI_lo"], segarr["CI_hi"] = _segmetric_interval(segarr, cnarr,
+        segarr["ci_lo"], segarr["ci_hi"] = _segmetric_interval(segarr, cnarr,
                                                                stats['ci'])
     if args.pi:
-        segarr["PI_lo"], segarr["PI_hi"] = _segmetric_interval(segarr, cnarr,
+        segarr["pi_lo"], segarr["pi_hi"] = _segmetric_interval(segarr, cnarr,
                                                                stats['pi'])
 
     tabio.write(segarr, args.output or segarr.sample_id + ".segmetrics.cns")
@@ -1482,13 +1489,19 @@ P_segmetrics.add_argument('cnarray',
 P_segmetrics.add_argument('-s', '--segments', required=True,
         help="Segmentation data file (*.cns, output of the 'segment' command).")
 P_segmetrics.add_argument("--drop-low-coverage", action='store_true',
-        help="""Drop very-low-coverage bins before segmentation to avoid
-                false-positive deletions in poor-quality tumor samples.""")
+        help="""Drop very-low-coverage bins before calculations to avoid
+                negative bias in poor-quality tumor samples.""")
 P_segmetrics.add_argument('-o', '--output',
         help="Output table file name.")
 
 P_segmetrics_stats = P_segmetrics.add_argument_group(
     "Statistics available")
+P_segmetrics_stats.add_argument('--mean', action='store_true',
+        help="Mean log2 value (unweighted).")
+P_segmetrics_stats.add_argument('--median', action='store_true',
+        help="Median.")
+P_segmetrics_stats.add_argument('--mode', action='store_true',
+        help="Mode (i.e. peak density of log2 values).")
 P_segmetrics_stats.add_argument('--stdev', action='store_true',
         help="Standard deviation.")
 P_segmetrics_stats.add_argument('--mad', action='store_true',
