@@ -30,26 +30,34 @@ def ests_of_scale(deviations):
 
 # M-estimators of central location
 
-def biweight_location(a, initial=None, c=6.0, epsilon=1e-4):
+def biweight_location(a, initial=None, c=6.0, epsilon=1e-4, max_iter=5):
     """Compute the biweight location for an array.
 
     The biweight is a robust statistic for determining the central location of a
     distribution.
     """
+    def biloc_iter(a, initial):
+        # Weight the observations by distance from initial estimate
+        d = a - initial
+        w = d / max(c * median_absolute_deviation(a), epsilon)
+        w = (1 - w**2)**2
+        # Omit the outlier points
+        mask = (w < 1)
+        weightsum = w[mask].sum()
+        if weightsum == 0:
+            # Insufficient variation to improve the initial estimate
+            return initial
+        return initial + (d[mask] * w[mask]).sum() / weightsum
+
     a = np.asarray(a)
     if initial is None:
         initial = np.median(a)
-    # Weight the observations by distance from initial estimate
-    d = a - initial
-    w = d / max(c * median_absolute_deviation(a), epsilon)
-    w = (1 - w**2)**2
-    # Omit the outlier points
-    mask = (w < 1)
-    weightsum = w[mask].sum()
-    if weightsum == 0:
-        # Insufficient variation to improve the initial estimate
-        return initial
-    return initial + (d[mask] * w[mask]).sum() / weightsum
+    for _i in range(max_iter):
+        result = biloc_iter(a, initial)
+        if abs(result - initial) <= epsilon:
+            break
+        initial = result
+    return result
 
 
 def modal_location(arr):
@@ -80,7 +88,7 @@ def segment_mean(cnarr, skip_low=False):
 
 # Estimators of scale
 
-def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-4):
+def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-4, max_iter=5):
     """Compute the biweight midvariance for an array.
 
     The biweight midvariance is a robust statistic for determining the
@@ -90,19 +98,27 @@ def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-4):
     https://en.wikipedia.org/wiki/Robust_measures_of_scale#The_biweight_midvariance
     https://astropy.readthedocs.io/en/latest/_modules/astropy/stats/funcs.html
     """
+    def bivar_iter(a, initial):
+        # Difference of observations from initial estimate
+        d = a - initial
+        # Weighting (avoid dividing by zero)
+        w = d / max(c * median_absolute_deviation(a), epsilon)
+        w = w**2
+        # Omit the outlier points
+        mask = np.abs(w) < 1
+        n = mask.sum()
+        return (n**0.5 * (d[mask] * d[mask] * (1 - w[mask])**4).sum()**0.5
+                / np.abs(((1 - w[mask]) * (1 - 5 * w[mask])).sum()))
+
     a = np.asarray(a)
     if initial is None:
         initial = np.median(a)
-    # Difference of observations from initial estimate
-    d = a - initial
-    # Weighting (avoid dividing by zero)
-    w = d / max(c * median_absolute_deviation(a), epsilon)
-    w = w**2
-    # Omit the outlier points
-    mask = np.abs(w) < 1
-    n = mask.sum()
-    return (n**0.5 * (d[mask] * d[mask] * (1 - w[mask])**4).sum()**0.5
-            / np.abs(((1 - w[mask]) * (1 - 5 * w[mask])).sum()))
+    for _i in range(max_iter):
+        result = bivar_iter(a, initial)
+        if abs(result - initial) <= epsilon:
+            break
+        initial = result
+    return result
 
 
 def interquartile_range(a):
