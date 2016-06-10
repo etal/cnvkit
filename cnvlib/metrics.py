@@ -181,42 +181,84 @@ def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
     if not 0 < alpha < 1:
         raise ValueError("alpha must be between 0 and 1; got %s" % alpha)
     if bootstraps <= 2 / alpha:
-        new_boots = int(2 / alpha + 0.5)
+        new_boots = int(np.ceil(2 / alpha))
         logging.warn("%d bootstraps not enough to estimate CI alpha level %f; "
                      "increasing to %d", bootstraps, alpha, new_boots)
         bootstraps = new_boots
     # Bootstrap for CI
     k = len(bins)
+    if k < 2:
+        return np.array([bins["log2"][0], bins["log2"][0]])
+
     rand_indices = np.random.randint(0, k, (bootstraps, k))
     samples = [bins.data.take(idx) for idx in rand_indices]
     if smoothed:
-        # Essentially, resample from a kernel density estimate of the data
-        # instead of the original data.
-        # Silverman's Rule for KDE bandwidth (roughly):
-        # std = biweight_midvariance(bins['log2'])
-        std = interquartile_range(bins['log2']) / 1.34
-        bw = std * (k*3/4) ** (-1/5)
-        samples = [samp.assign(log2=lambda x: x['log2'] + bw * np.random.randn(k))
-                   for samp in samples]
+        # samples, smoothed = _smooth_samples(bins, samples, alpha)
+        pass
     # Recalculate segment means
     bootstrap_dist = np.array([segment_mean(samp) for samp in samples])
     alphas = np.array([alpha / 2, 1 - alpha / 2])
     if not smoothed:
-        # BCa correction (Efron 1987, "Better Bootstrap Confidence Intervals")
-        # http://www.tandfonline.com/doi/abs/10.1080/01621459.1987.10478410
-        # Ported from R package "bootstrap" function "bcanon"
-        orig_mean = segment_mean(bins)
-        z0 = stats.norm.ppf((bootstrap_dist < orig_mean).sum() / bootstraps)
-        zalpha = stats.norm.ppf(alphas)
-        # Jackknife influence values
-        u = np.array([segment_mean(bins.concat([bins[:i], bins[i+1:]]))
-                      for i in range(len(bins))])
-        uu = u.mean() - u
-        acc = (u**3).sum() / (6 * (uu**2).sum()**1.5)
-        alphas = stats.norm.cdf(z0 + (z0 + zalpha)
-                                        / (1 - acc * (z0 + zalpha)))
+        # alphas = _bca_correct_alpha(bins, bootstrap_dist, alphas)
+        pass
     ci = np.percentile(bootstrap_dist, 100 * alphas)
     return ci
+
+
+def _smooth_samples(bins, samples, alpha):
+    k = len(bins)
+    # Essentially, resample from a kernel density estimate of the data
+    # instead of the original data.
+    # Estimate KDE bandwidth (Polansky 1995)
+    resids = bins['log2'] - bins['log2'].mean()
+    s_hat = 1/k * (resids**2).sum()  # sigma^2 = E[X-theta]^2
+    y_hat = 1/k * abs((resids**3).sum())  # gamma = E[X-theta]^3
+    z = stats.norm.ppf(alpha / 2)  # or alpha?
+    bw = k**(-1/4) * np.sqrt(y_hat*(z**2 + 2) / (3*s_hat*z))
+    # NB: or, Silverman's Rule for KDE bandwidth (roughly):
+    # std = interquartile_range(bins['log2']) / 1.34
+    # bw = std * (k*3/4) ** (-1/5)
+    if bw > 0:
+        samples = [samp.assign(log2=lambda x:
+                                x['log2'] + bw * np.random.randn(k))
+                    for samp in samples]
+        logging.warn("Smoothing worked for this segment (bw=%s)", bw)
+    else:
+        logging.warn("Smoothing won't work for this segment (bw=%s)", bw)
+        smoothed = False
+    return samples, smoothed
+
+
+def _bca_correct_alpha(bins, bootstrap_dist, alphas):
+    # BCa correction (Efron 1987, "Better Bootstrap Confidence Intervals")
+    # http://www.tandfonline.com/doi/abs/10.1080/01621459.1987.10478410
+    # Ported from R package "bootstrap" function "bcanon"
+    n_boots = len(bootstrap_dist)
+    orig_mean = segment_mean(bins)
+    logging.warn("boot samples less: %s / %s",
+                 (bootstrap_dist < orig_mean).sum(),
+                 n_boots)
+    n_boots_below = (bootstrap_dist < orig_mean).sum()
+    if n_boots_below == 0:
+        logging.warn("boots mean %s, orig mean %s",
+                     bootstrap_dist.mean(), orig_mean)
+    else:
+        logging.warn("boot samples less: %s / %s",
+                     n_boots_below, n_boots)
+    z0 = stats.norm.ppf((bootstrap_dist < orig_mean).sum() / n_boots)
+    zalpha = stats.norm.ppf(alphas)
+    # Jackknife influence values
+    u = np.array([segment_mean(bins.concat([bins[:i], bins[i+1:]]))
+                    for i in range(len(bins))])
+    uu = u.mean() - u
+    acc = (u**3).sum() / (6 * (uu**2).sum()**1.5)
+    alphas = stats.norm.cdf(z0 + (z0 + zalpha)
+                                    / (1 - acc * (z0 + zalpha)))
+    logging.warn("New alphas: %s -- via z0=%s, za=%s, acc=%s",
+                    alphas, z0, zalpha, acc)
+    if not 0 < alphas[0] < 1 and 0 < alphas[1] < 1:
+        raise ValueError("CI alphas should be in (0,1); got %s" % alphas)
+    return alphas
 
 
 def prediction_interval(bins, alpha):
