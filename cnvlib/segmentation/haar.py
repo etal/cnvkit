@@ -74,7 +74,7 @@ def one_chrom(cnarr, fdr_q, chrom):
 
 def variants_in_segment(varr, segment, fdr_q):
     if len(varr):
-        values = varr.mirrored_baf()
+        values = varr.mirrored_baf(above_half=True, tumor_boost=True)
         segtable = haarSeg(values,
                            fdr_q,
                            W=None)  # weight by sqrt(DP)?

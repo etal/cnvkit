@@ -748,10 +748,7 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
 
     outarr = cnarr.copy()
     if variants:
-        # baf_median = lambda x: np.median(np.abs(x - .5)) + .5
-        baf_median = export.mirrored_baf_median
-        outarr["baf"] = outarr.match_to_bins(variants, 'alt_freq', np.nan,
-                                            summary_func=baf_median)
+        outarr["baf"] = variants.baf_by_ranges(outarr)
 
     if purity and purity < 1.0:
         logging.info("Rescaling sample with purity %g, ploidy %d",
@@ -780,11 +777,13 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
     if method != "none":
         outarr["cn"] = np.asarray(np.rint(absolutes), dtype=np.int_)
         if "baf" in outarr:
-            # Major and minor allelic copy numbers
-            outarr["cn1"] = np.asarray(np.rint(absolutes * outarr["baf"]),
-                                       dtype=np.int_).clip(0, outarr["cn"])
+            # Calculate major and minor allelic copy numbers (s.t. cn1 >= cn2)
+            upper_baf = np.abs(outarr["baf"] - .5) + .5
+            outarr["cn1"] = np.asarray(np.rint(absolutes * upper_baf)
+                                       .clip(0, outarr["cn"]),
+                                       dtype=np.int_)
             outarr["cn2"] = outarr["cn"] - outarr["cn1"]
-            is_null = outarr["baf"].isnull()
+            is_null = upper_baf.isnull()
             outarr[is_null, "cn1"] = np.nan
             outarr[is_null, "cn2"] = np.nan
     return outarr
