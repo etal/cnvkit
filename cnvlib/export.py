@@ -360,6 +360,10 @@ def export_theta(tumor_segs, normal_cn):
 
     where chromosome IDs ("chrm") are integers 1 through 24.
     """
+    out_columns = ["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]
+    if not tumor_segs:
+        return pd.DataFrame(columns=out_columns)
+
     # Drop any chromosomes that are not integer or XY
     # THetA hard-codes X & Y, so we can, too
     xy_names = (["chrX", "chrY"]
@@ -384,7 +388,7 @@ def export_theta(tumor_segs, normal_cn):
     ref_means, nbins = ref_means_nbins(tumor_segs, normal_cn)
     table["tumorCount"] = theta_read_counts(tumor_segs.log2, nbins)
     table["normalCount"] = theta_read_counts(ref_means, nbins)
-    return table[["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]]
+    return table[out_columns]
 
 
 def ref_means_nbins(tumor_segs, normal_cn):
