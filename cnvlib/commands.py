@@ -3,6 +3,8 @@
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
 from __future__ import absolute_import, division, print_function
+from builtins import map, range, zip
+
 import argparse
 import collections
 import logging
@@ -11,9 +13,6 @@ import sys
 
 import numpy as np
 import pandas as pd
-
-from Bio._py3k import map, range, zip
-iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 # If running headless, use a suitable GUI-less plotting backend
 if not os.environ.get('DISPLAY'):
@@ -1215,7 +1214,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
         chrom_offsets = plots.plot_x_dividers(axis, chrom_sizes, 1)
         # Plot the individual probe/segment coverages
         for i, sample in enumerate(sample_data):
-            for chrom, curr_offset in iteritems(chrom_offsets):
+            for chrom, curr_offset in chrom_offsets.items():
                 crow = sample[chrom]
                 crow["start"] += curr_offset
                 crow["end"] += curr_offset

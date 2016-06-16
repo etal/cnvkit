@@ -1,14 +1,10 @@
 """Supporting functions for the 'antitarget' command."""
 from __future__ import absolute_import, division, print_function
-from builtins import map
-from builtins import next
-from builtins import range
+from builtins import map, next, range
+
+import logging
 import re
 import sys
-import logging
-
-from Bio._py3k import range
-iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 from . import tabio
 from .params import INSERT_SIZE

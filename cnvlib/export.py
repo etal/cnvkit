@@ -1,8 +1,6 @@
 """Export CNVkit objects and files to other formats."""
 from __future__ import absolute_import, division, print_function
-from builtins import zip
-from builtins import str
-from builtins import range
+from builtins import map, range, str, zip
 
 import collections
 import logging
@@ -10,10 +8,8 @@ import time
 
 import numpy as np
 import pandas as pd
-from Bio._py3k import map, range, zip
 
 from . import call, core, params, tabio
-from .vary import VariantArray as VA
 from ._version import __version__
 
 

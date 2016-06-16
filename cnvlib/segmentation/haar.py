@@ -23,8 +23,7 @@ segmentation result.
 
 """
 from __future__ import absolute_import, division, print_function
-from builtins import zip
-from builtins import range
+from builtins import range, zip
 
 import logging
 import math
@@ -32,8 +31,6 @@ import math
 import numpy as np
 import pandas as pd
 from scipy import stats
-
-# from .. import params
 
 
 def segment_haar(cnarr, fdr_q):

@@ -1,12 +1,10 @@
 """Supporting functions for the 'reference' command."""
 from __future__ import absolute_import, division, print_function
-from builtins import zip
-from builtins import map
+from builtins import map, zip
 
 import logging
 
 import numpy as np
-from Bio._py3k import map, zip
 
 from . import core, fix, metrics, ngfrills, params, tabio
 from .cnary import CopyNumArray as CNA
