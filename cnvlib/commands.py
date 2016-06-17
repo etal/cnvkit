@@ -421,7 +421,7 @@ P_anti.add_argument('interval',
 P_anti.add_argument('-g', '--access',
         help="""Regions of accessible sequence on chromosomes (.bed), as
                 output by genome2access.py.""")
-P_anti.add_argument('-a', '--avg-size', type=int, default=100000,
+P_anti.add_argument('-a', '--avg-size', type=int, default=200000,
         help="""Average size of antitarget bins (results are approximate).
                 [Default: %(default)s]""")
 P_anti.add_argument('-m', '--min-size', type=int,
