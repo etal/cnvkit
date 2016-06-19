@@ -133,8 +133,8 @@ def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
         if isinstance(outfile, basestring):
             outfname = outfile
         elif hasattr(outfile, 'name') and outfile not in (sys.stdout,
-                                                            sys.stderr):
-            outfname = outfile.gene
+                                                          sys.stderr):
+            outfname = outfile.name
         else:
             # Probably stdout or stderr used in a pipeline -- don't pollute
             return

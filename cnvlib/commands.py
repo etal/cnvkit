@@ -72,7 +72,8 @@ def _cmd_batch(args):
                      "reference (" + ", ".join(bad_flags) +
                      ") should not be used." +
                      "\n(See: cnvkit.py batch -h)")
-    elif not args.targets or args.normal is None:
+    elif (args.normal is None or
+          (args.method in ('hybrid', 'amplicon') and not args.targets)):
         sys.exit("Options -n/--normal and -t/--targets (at least) must be "
                  "given to build a new reference if -r/--reference is not used."
                  "\n(See: cnvkit.py batch -h)")
@@ -93,7 +94,7 @@ def _cmd_batch(args):
             args.fasta, args.annotate, args.short_names, args.split,
             args.target_avg_size, args.access, args.antitarget_avg_size,
             args.antitarget_min_size, args.output_reference, args.output_dir,
-            args.processes, args.count_reads)
+            args.processes, args.count_reads, args.method)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = tabio.read_cna(args.reference)
@@ -123,10 +124,41 @@ def _cmd_batch(args):
 def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference,
                          fasta, annotate, short_names, split, target_avg_size,
                          access, antitarget_avg_size, antitarget_min_size,
-                         output_reference, output_dir, processes, by_count):
+                         output_reference, output_dir, processes, by_count,
+                         method):
     """Build the CN reference from normal samples, targets and antitargets."""
+    if method in ("wgs", "amplicon"):
+        if antitarget_bed:
+            raise ValueError("%r protocol: antitargets should not be "
+                             "given/specified." % method)
+        if access and target_bed and access != target_bed:
+            raise ValueError("%r protocol: targets and access should not be "
+                             "different." % method)
+
+    if method == "wgs":
+        if not annotate and (not target_bed or split):
+            # TODO check if target_bed has gene names
+            raise ValueError("WGS protocol: need '--annotate' option "
+                             "(e.g. refFlat.txt) to avoid later problems "
+                             "locating genes in data.")
+        if not target_bed:
+            if access:
+                target_bed = access
+            elif fasta:
+                # Run 'access' on the fly
+                access_arr = do_access(fasta)
+                # Take filename base from FASTA, lacking any other clue
+                target_bed = os.path.splitext(os.path.basename(fasta)
+                                             )[0] + ".bed"
+                tabio.write(access_arr, target_bed, "bed3")
+            else:
+                raise ValueError("WGS protocol: need to provide --targets, "
+                                 "--access, or --fasta options.")
+        # Tweak default parameters
+        target_avg_size = target_avg_size or 5000
+
     # To make temporary filenames for processed targets or antitargets
-    tgt_name_base, tgt_name_ext = os.path.splitext(os.path.basename(target_bed))
+    tgt_name_base, _tgt_ext = os.path.splitext(os.path.basename(target_bed))
     if output_dir:
         tgt_name_base = os.path.join(output_dir, tgt_name_base)
 
@@ -141,17 +173,21 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
         target_bed = new_target_fname
 
     if not antitarget_bed:
-        # Build antitarget BED from the given targets
-        anti_kwargs = {}
-        if access:
-            anti_kwargs['access_bed'] = access
-        if antitarget_avg_size:
-            anti_kwargs['avg_bin_size'] = antitarget_avg_size
-        if antitarget_min_size:
-            anti_kwargs['min_bin_size'] = antitarget_min_size
-        anti_arr = do_antitarget(target_bed, **anti_kwargs)
         # Devise a temporary antitarget filename
         antitarget_bed = tgt_name_base + '.antitarget.bed'
+        if method == "hybrid":
+            # Build antitarget BED from the given targets
+            anti_kwargs = {}
+            if access:
+                anti_kwargs['access_bed'] = access
+            if antitarget_avg_size:
+                anti_kwargs['avg_bin_size'] = antitarget_avg_size
+            if antitarget_min_size:
+                anti_kwargs['min_bin_size'] = antitarget_min_size
+            anti_arr = do_antitarget(target_bed, **anti_kwargs)
+        else:
+            # No antitargets for wgs, amplicon
+            anti_arr = _GA([])
         tabio.write(anti_arr, antitarget_bed, "bed4")
 
     if len(normal_bams) == 0:
@@ -235,6 +271,12 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
 P_batch = AP_subparsers.add_parser('batch', help=_cmd_batch.__doc__)
 P_batch.add_argument('bam_files', nargs='*',
         help="Mapped sequence reads (.bam)")
+P_batch.add_argument('-m', '--method',
+        choices=('hybrid', 'amplicon', 'wgs'), default='hybrid',
+        help="""Sequencing protocol: hybridization capture ('hybrid'), targeted
+                amplicon sequencing ('amplicon'), or whole genome sequencing
+                ('wgs'). Determines whether and how to use antitarget bins.
+                [Default: %(default)s]""")
 P_batch.add_argument('-y', '--male-reference', action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
                 log-CNR of chrX; otherwise male samples would have -1 chrX).""")
@@ -360,13 +402,8 @@ P_target.set_defaults(func=_cmd_target)
 
 def _cmd_access(args):
     """List the locations of accessible sequence regions in a FASTA file."""
-    # Closes over args.output
-    def write_row(chrom, run_start, run_end):
-        args.output.write("%s\t%s\t%s\n" % (chrom, run_start, run_end))
-        args.output.flush()
-
-    for row in do_access(args.fa_fname, args.exclude, args.min_gap_size):
-        write_row(*row)
+    access_arr = do_access(args.fa_fname, args.exclude, args.min_gap_size)
+    tabio.write(access_arr, args.output, "bed3")
 
 
 def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
@@ -374,8 +411,7 @@ def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
     access_regions = access.get_regions(fa_fname)
     for ex_fname in exclude_fnames:
         access_regions = access.exclude_regions(ex_fname, access_regions)
-    for row in access.join_regions(access_regions, min_gap_size):
-        yield row
+    return _GA.from_rows(access.join_regions(access_regions, min_gap_size))
 
 
 P_access = AP_subparsers.add_parser('access', help=_cmd_access.__doc__)
