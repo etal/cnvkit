@@ -1381,22 +1381,29 @@ P_gainloss.set_defaults(func=_cmd_gainloss)
 
 def _cmd_gender(args):
     """Guess samples' gender from the relative coverage of chromosome X."""
-    outrows = []
-    for fname in args.targets:
-        rel_chrx_cvg = tabio.read_cna(fname).get_relative_chrx_cvg()
-        if args.male_reference:
-            is_xx = (rel_chrx_cvg >= 0.5)
-        else:
-            is_xx = (rel_chrx_cvg >= -0.5)
-        outrows.append((fname,
-                        ("Female" if is_xx else "Male"),
-                        "%s%.3g" % ('+' if rel_chrx_cvg > 0 else '',
-                                    rel_chrx_cvg)))
-    core.write_tsv(args.output, outrows)
+    cnarrs = (tabio.read_cna(fname) for fname in args.filenames)
+    table = do_gender(cnarrs, args.male_reference)
+    core.write_dataframe(args.output, table, header=False)
+
+
+def do_gender(cnarrs, is_male_reference):
+    chrx_threshold = (0.5 if is_male_reference else -0.5)
+    def guess_and_format(cna):
+        rel_chrx_cvg = cna.get_relative_chrx_cvg()
+        is_xx = (rel_chrx_cvg >= chrx_threshold)
+        return (cna.meta["filename"] or cna.sample_id,
+                ("Female" if is_xx else "Male"),
+                "%s%.3g" % ('+' if rel_chrx_cvg > 0 else '',
+                            rel_chrx_cvg))
+
+    rows = (guess_and_format(cna) for cna in cnarrs)
+    columns = ["sample", "gender", "rel.chr.X"]
+    return pd.DataFrame.from_records(rows, columns=columns)
+
 
 
 P_gender = AP_subparsers.add_parser('gender', help=_cmd_gender.__doc__)
-P_gender.add_argument('targets', nargs='+',
+P_gender.add_argument('filenames', nargs='+',
         help="Copy number or copy ratio files (*.cnn, *.cnr).")
 P_gender.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already normalized to a male reference
@@ -1417,24 +1424,30 @@ def _cmd_metrics(args):
         raise ValueError("Number of coverage/segment filenames given must be "
                          "equal, if more than 1 segment file is given.")
 
-    # Repeat a single segment file to match the number of coverage files
-    if len(args.cnarrays) > 1 and len(args.segments) == 1:
-        args.segments = [args.segments[0] for _i in range(len(args.cnarrays))]
+    cnarrs = map(tabio.read_cna, args.cnarrays)
+    segments = map(tabio.read_cna, args.segments)
+    table = do_metrics(cnarrs, segments, args.drop_low_coverage)
+    core.write_dataframe(args.output, table)
 
-    # Calculate all metrics
-    outrows = []
-    for cna_fname, seg_fname in zip(args.cnarrays, args.segments):
-        cnarr = tabio.read_cna(cna_fname)
-        if args.drop_low_coverage:
-            cnarr = cnarr.drop_low_coverage()
-        segments = tabio.read_cna(seg_fname)
-        values = metrics.ests_of_scale(cnarr.residuals(segments))
-        outrows.append([core.rbase(cna_fname), len(segments)] +
-                       ["%.7f" % val for val in values])
 
-    core.write_tsv(args.output, outrows,
-                   colnames=("sample", "segments", "stdev", "mad", "iqr",
-                             "bivar"))
+def do_metrics(cnarrs, segments, skip_low=False):
+    # Catch if passed args are single CopyNumArrays instead of lists
+    if isinstance(cnarrs, _CNA):
+        cnarrs = [cnarrs]
+    if isinstance(segments, _CNA):
+        segments = [segments]
+    if skip_low:
+        cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
+
+    # Repeat a single segmentation to match the number of copy ratio inputs
+    if len(cnarrs) > 1 and len(segments) == 1:
+        segments = [segments[0] for _i in range(len(cnarrs))]
+
+    rows = ((cna.filename or cna.sample_id,
+             len(seg)) + metrics.ests_of_scale(cna.residuals(seg))
+            for cna, seg in zip(cnarrs, segments))
+    colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
+    return pd.DataFrame.from_records(rows, columns=colnames)
 
 
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
