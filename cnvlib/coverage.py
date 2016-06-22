@@ -1,8 +1,6 @@
 """Supporting functions for the 'antitarget' command."""
 from __future__ import absolute_import, division
-from builtins import zip
-from builtins import str
-from builtins import map
+from builtins import map, str, zip
 from past.builtins import basestring
 
 import logging
@@ -10,13 +8,11 @@ import math
 import os.path
 import time
 
-from Bio._py3k import map, zip
 import pysam
 
 from . import tabio
 from .cnary import CopyNumArray as CNA
 from .core import fbase
-
 from .params import NULL_LOG2_COVERAGE, READ_LEN
 
 

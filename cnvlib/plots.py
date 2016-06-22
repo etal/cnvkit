@@ -1,7 +1,6 @@
 """Plotting utilities."""
 from __future__ import absolute_import, division
-from builtins import str
-from builtins import zip
+from builtins import str, zip
 from past.builtins import basestring
 
 import collections
@@ -11,10 +10,8 @@ import sys
 
 import numpy as np
 
-from Bio._py3k import zip
-iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
-
 from . import core, params, smoothing
+
 
 SEG_COLOR = "darkorange"
 POINT_COLOR = '#606060'
@@ -271,7 +268,7 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, pad,
     x_posns_chrom = {}
     y_posns_chrom = {}
     trends = []
-    for chrom, curr_offset in iteritems(x_starts):
+    for chrom, curr_offset in x_starts.items():
         snvs = chrom_snvs.get(chrom, [])
         if not len(snvs):
             x_posns_chrom[chrom] = []
@@ -414,7 +411,7 @@ def partition_by_chrom(chrom_snvs):
     chromnames = set(chrom_snvs.keys())
     bins = {key: {'thisbin': [], 'otherbins': []}
             for key in chrom_snvs}
-    for thischrom, snvs in iteritems(chrom_snvs):
+    for thischrom, snvs in chrom_snvs.items():
         shiftvals = np.array([abs(v[2]) for v in snvs])
         bins[thischrom]['thisbin'].extend(shiftvals)
         for otherchrom in chromnames:
@@ -438,7 +435,7 @@ def test_loh(bins, alpha=0.0025):
         return []
 
     significant_chroms = []
-    for chrom, partitions in iteritems(bins):
+    for chrom, partitions in bins.items():
         these_shifts = np.array(partitions['thisbin'], np.float_)
         other_shifts = np.array(partitions['otherbins'], np.float_)
         if len(these_shifts) < 20:

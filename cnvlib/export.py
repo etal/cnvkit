@@ -1,8 +1,6 @@
 """Export CNVkit objects and files to other formats."""
 from __future__ import absolute_import, division, print_function
-from builtins import zip
-from builtins import str
-from builtins import range
+from builtins import map, range, str, zip
 
 import collections
 import logging
@@ -10,10 +8,8 @@ import time
 
 import numpy as np
 import pandas as pd
-from Bio._py3k import map, range, zip
 
 from . import call, core, params, tabio
-from .vary import VariantArray as VA
 from ._version import __version__
 
 
@@ -113,7 +109,8 @@ def export_nexus_ogt(sample_fname, vcf_fname, sample_id,
     To create the b-allele frequencies column, alterate allele frequencies from
     the VCF are aligned to the .cnr file bins.  Bins that contain no variants
     are left blank; if a bin contains multiple variants, then the frequencies
-    are all "mirrored" to be above .5, then the median of those values is taken.
+    are all "mirrored" to be above or below .5 (majority rules), then the median
+    of those values is taken.
     """
     cnarr = tabio.read_cna(sample_fname)
     if min_weight and "weight" in cnarr:
@@ -124,8 +121,7 @@ def export_nexus_ogt(sample_fname, vcf_fname, sample_id,
     varr = tabio.read(vcf_fname, "vcf",
                       sample_id=sample_id or cnarr.sample_id,
                       min_depth=min_depth, skip_hom=True, skip_somatic=True)
-    bafs = cnarr.match_to_bins(varr, 'alt_freq', np.nan,
-                               summary_func=mirrored_baf_median)
+    bafs = varr.baf_by_ranges(cnarr)
     logging.info("Placed %d variants into %d bins",
                  sum(~np.isnan(bafs)), len(cnarr))
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'log2']]
@@ -137,14 +133,6 @@ def export_nexus_ogt(sample_fname, vcf_fname, sample_id,
     })
     out_table["B-Allele Frequency"] = bafs
     return out_table
-
-
-def mirrored_baf_median(vals):
-    shift = np.median(np.abs(vals - .5))
-    if np.median(vals) > .5:
-        return .5 + shift
-    else:
-        return .5 - shift
 
 
 def export_seg(sample_fnames):
@@ -360,6 +348,10 @@ def export_theta(tumor_segs, normal_cn):
 
     where chromosome IDs ("chrm") are integers 1 through 24.
     """
+    out_columns = ["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]
+    if not tumor_segs:
+        return pd.DataFrame(columns=out_columns)
+
     # Drop any chromosomes that are not integer or XY
     # THetA hard-codes X & Y, so we can, too
     xy_names = (["chrX", "chrY"]
@@ -384,7 +376,7 @@ def export_theta(tumor_segs, normal_cn):
     ref_means, nbins = ref_means_nbins(tumor_segs, normal_cn)
     table["tumorCount"] = theta_read_counts(tumor_segs.log2, nbins)
     table["normalCount"] = theta_read_counts(ref_means, nbins)
-    return table[["#ID", "chrm", "start", "end", "tumorCount", "normalCount"]]
+    return table[out_columns]
 
 
 def ref_means_nbins(tumor_segs, normal_cn):

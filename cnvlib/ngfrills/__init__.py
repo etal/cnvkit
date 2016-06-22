@@ -1,6 +1,6 @@
 """NGS utilities."""
 from __future__ import absolute_import, division, print_function
-from builtins import str
+from builtins import map, str
 from past.builtins import basestring
 
 import contextlib
@@ -9,8 +9,6 @@ import os
 import subprocess
 import sys
 import tempfile
-
-from Bio._py3k import basestring, map
 
 from .faidx import *
 from .regions import *

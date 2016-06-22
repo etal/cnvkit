@@ -1,8 +1,6 @@
 """A generic array of genomic positions."""
 from __future__ import print_function, absolute_import, division
-from builtins import next
-from builtins import object
-from builtins import zip
+from builtins import next, object, zip
 from past.builtins import basestring
 
 import logging
@@ -13,7 +11,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from . import core, ngfrills
+from . import core
 
 
 class GenomicArray(object):

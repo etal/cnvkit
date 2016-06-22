@@ -1,16 +1,10 @@
 """An array of genomic intervals, treated as variant loci."""
 from __future__ import absolute_import, division, print_function
-from builtins import next
-from builtins import str
-from builtins import map
-from builtins import zip
+from builtins import map, next, str, zip
 from past.builtins import basestring
-
-import logging
 
 import numpy as np
 import pandas as pd
-import vcf
 
 from . import gary
 
@@ -27,24 +21,42 @@ class VariantArray(gary.GenomicArray):
     def __init__(self, data_table, meta_dict=None):
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
-    def mirrored_baf(self, above_half=True, tumor_boost=False):
-        """Mirrored B-allele frequencies (BAFs).
+    def baf_by_ranges(self, ranges, summary_func=np.nanmedian,
+                      above_half=None, tumor_boost=True):
+        """Aggregate variant (b-allele) frequencies in each given bin.
 
-        Flip BAFs to be all above 0.5 (if `above_half`) or below 0.5, for
-        consistency.
+        Get the average BAF in each of the bins of another genomic array:
+        BAFs are mirrored (see `mirrored_baf`), grouped in each bin of the
+        `ranges` genomic array (an instance of GenomicArray or a subclass),
+        and summarized with `summary_func`, by default the median.
 
-        With `tumor_boost`, normalize tumor-sample allele frequencies to the
-        matched normal allele frequencies.
+        Parameters `above_half` and `tumor_boost` are the same as in
+        `mirrored_baf`.
         """
         if tumor_boost and "n_alt_freq" in self:
-            alt_freqs = self.tumor_boost()
+            self = self.copy()
+            self["alt_freq"] = self.tumor_boost()
+        return np.asarray([
+            (summary_func(_mirrored_baf(subvarr["alt_freq"], above_half))
+             if len(subvarr) else np.nan)
+            for _bin, subvarr in self.by_ranges(ranges, mode='outer',
+                                                keep_empty=True)])
+
+    def mirrored_baf(self, above_half=None, tumor_boost=False):
+        """Mirrored B-allele frequencies (BAFs).
+
+        If `above_half` is set to True or False, flip BAFs to be all above 0.5
+        or below 0.5, respectively, for consistency. Otherwise mirror in the
+        direction of the majority of BAFs.
+
+        With `tumor_boost`, normalize tumor-sample allele frequencies to the
+        matched normal sample's allele frequencies.
+        """
+        if tumor_boost and "n_alt_freq" in self:
+            alt_freq = self.tumor_boost()
         else:
-            alt_freqs = self["alt_freq"]
-        fromhalf = np.abs(alt_freqs - 0.5)
-        if above_half:
-            return fromhalf + 0.5
-        else:
-            return 0.5 - fromhalf
+            alt_freq = self["alt_freq"]
+        return _mirrored_baf(alt_freq, above_half)
 
     def tumor_boost(self):
         """TumorBoost normalization of tumor-sample allele frequencies.
@@ -59,6 +71,16 @@ class VariantArray(gary.GenomicArray):
         t_freqs = self["alt_freq"]
         return _tumor_boost(t_freqs, n_freqs)
 
+
+
+def _mirrored_baf(vals, above_half=None):
+    shift = np.abs(vals - .5)
+    if above_half is None:
+        above_half = (np.nanmedian(vals) > .5)
+    if above_half:
+        return .5 + shift
+    else:
+        return .5 - shift
 
 
 def _tumor_boost(t_freqs, n_freqs):
@@ -85,9 +107,7 @@ def _allele_specific_copy_numbers(segarr, varr, ploidy=2):
     See: PSCBS, Bentsson et al. 2011
     """
     seg_depths = ploidy * np.exp2(segarr["log2"])
-    seg_bafs = np.asarray([(np.median(subvarr.mirrored_baf())
-                            if len(subvarr) else np.nan)
-                           for _seg, subvarr in varr.by_ranges(segarr)])
+    seg_bafs = varr.baf_by_ranges(segarr, above_half=True)
     cn1 = 0.5 * (1 - seg_bafs) * seg_depths
     cn2 = seg_depths - cn1
     # segout = segarr.copy()

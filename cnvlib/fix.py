@@ -217,13 +217,13 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     weights = sizes / sizes.max()
     if (np.abs(np.mod(ref_matched['log2'], 1)) > epsilon).any():
         # NB: Not used with a flat reference
-        logging.info("Weighting bins by relative coverage depths in reference")
+        logging.debug("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from neutral coverage
         flat_cvgs = ref_matched.expect_flat_cvg()
         weights *= np.exp2(-np.abs(ref_matched['log2'] - flat_cvgs))
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
-        logging.info("Weighting bins by coverage spread in reference")
+        logging.debug("Weighting bins by coverage spread in reference")
         # Inverse of variance, 0--1
         variances = ref_matched['spread'] ** 2
         invvars = 1.0 - (variances / variances.max())

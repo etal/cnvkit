@@ -75,7 +75,7 @@ def gainloss_by_gene(cnarr, threshold, skip_low=False):
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
     for row in group_by_genes(cnarr, skip_low):
-        if abs(row.log2) >= threshold:
+        if abs(row.log2) >= threshold and row.gene:
             yield row
 
 
@@ -108,7 +108,7 @@ def group_by_genes(cnarr, skip_low):
         [(gene, chrom, start, end, [coverages]), ...]
     """
     for gene, rows in cnarr.by_gene():
-        if not rows or gene == "Background":
+        if not rows or gene in ("Background", '', np.nan):
             continue
         segmean = metrics.segment_mean(rows, skip_low)
         if segmean is None:

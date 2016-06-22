@@ -1,12 +1,10 @@
 """Supporting functions for the 'reference' command."""
 from __future__ import absolute_import, division, print_function
-from builtins import zip
-from builtins import map
+from builtins import map, zip
 
 import logging
 
 import numpy as np
-from Bio._py3k import map, zip
 
 from . import core, fix, metrics, ngfrills, params, tabio
 from .cnary import CopyNumArray as CNA
@@ -137,15 +135,15 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
     cvg_centers = np.apply_along_axis(metrics.biweight_location, 0,
                                       all_coverages)
     logging.info("Calculating bin spreads")
-    spreads = np.apply_along_axis(metrics.biweight_midvariance, 0,
-                                  all_coverages)
-    columns['spread'] = spreads
+    spreads = np.asarray([metrics.biweight_midvariance(a, initial=i)
+                          for a, i in zip(all_coverages.T, cvg_centers)])
     columns.update({
         'chromosome': cnarr1.chromosome,
         'start': cnarr1.start,
         'end': cnarr1.end,
         'gene': cnarr1['gene'],
         'log2': cvg_centers,
+        'spread': spreads,
     })
     return CNA.from_columns(columns, {'sample_id': "reference"})
 

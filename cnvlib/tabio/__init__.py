@@ -55,7 +55,13 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         elif hasattr(infile, "name"):
             meta["sample_id"] = core.fbase(infile.name)
         else:
-            meta["sample_id"] = "<unknown>"
+            # meta["sample_id"] = "<unknown>"
+            pass
+    if "filename" not in meta:
+        if isinstance(infile, basestring):
+            meta["filename"] = infile
+        elif hasattr(infile, "name"):
+            meta["filename"] = infile.name
     if fmt in ("seg", "vcf") and sample_id is not None:
         # Multi-sample formats: choose one sample
         kwargs["sample_id"] = sample_id
@@ -133,8 +139,8 @@ def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
         if isinstance(outfile, basestring):
             outfname = outfile
         elif hasattr(outfile, 'name') and outfile not in (sys.stdout,
-                                                            sys.stderr):
-            outfname = outfile.gene
+                                                          sys.stderr):
+            outfname = outfile.name
         else:
             # Probably stdout or stderr used in a pipeline -- don't pollute
             return
