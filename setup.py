@@ -12,7 +12,7 @@ try:
     # Dependencies for easy_install and pip:
     setup_args.update(
         install_requires=[
-            'numpy >= 1.6',
+            'numpy >= 1.9',
             'scipy >= 0.9',
             'matplotlib >= 1.1',
             'pandas >= 0.18.1',
