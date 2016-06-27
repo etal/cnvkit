@@ -1287,16 +1287,17 @@ def _cmd_breaks(args):
     segarr = tabio.read_cna(args.segment)
     bpoints = do_breaks(cnarr, segarr, args.min_probes)
     logging.info("Found %d gene breakpoints", len(bpoints))
-    core.write_tsv(args.output, bpoints,
-                   colnames=['Gene', 'Chrom.', 'Location', 'Change',
-                             'ProbesLeft', 'ProbesRight'])
+    core.write_dataframe(args.output, bpoints)
 
 
 def do_breaks(probes, segments, min_probes=1):
     """List the targeted genes in which a copy number breakpoint occurs."""
     intervals = reports.get_gene_intervals(probes)
     bpoints = reports.get_breakpoints(intervals, segments, min_probes)
-    return bpoints
+    return pd.DataFrame.from_records(bpoints,
+                                     columns=['gene', 'chromosome',
+                                              'location', 'change',
+                                              'probes_left', 'probes_right'])
 
 
 P_breaks = AP_subparsers.add_parser('breaks', help=_cmd_breaks.__doc__)
