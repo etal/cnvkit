@@ -1440,10 +1440,12 @@ def do_metrics(cnarrs, segments, skip_low=False):
         cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
 
     # Repeat a single segmentation to match the number of copy ratio inputs
-    if len(cnarrs) > 1 and len(segments) == 1:
-        segments = [segments[0] for _i in range(len(cnarrs))]
+    if isinstance(segments, list) and len(segments) == 1:
+        cnarrs = list(cnarrs)
+        if len(cnarrs) > 1:
+            segments = [segments[0] for _i in range(len(cnarrs))]
 
-    rows = ((cna.filename or cna.sample_id,
+    rows = ((cna.meta.get("filename", cna.sample_id),
              len(seg)) + metrics.ests_of_scale(cna.residuals(seg))
             for cna, seg in zip(cnarrs, segments))
     colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
