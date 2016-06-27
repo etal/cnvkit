@@ -95,7 +95,7 @@ class CopyNumArray(gary.GenomicArray):
 
     # Manipulation
 
-    def center_all(self, estimator=np.median, skip_low=False):
+    def center_all(self, estimator=np.median, skip_low=False, by_chrom=True):
         """Recenter coverage values to the autosomes' average (in-place)."""
         est_funcs = {
             "mean": np.mean,
@@ -109,9 +109,15 @@ class CopyNumArray(gary.GenomicArray):
             else:
                 raise ValueError("Estimator must be a function or one of: %s"
                                  % ", ".join(map(repr, est_funcs)))
-        table = (self.drop_low_coverage() if skip_low else self).autosomes()
-        if table:
-            self.data['log2'] -= estimator(table['log2'])
+        cnarr = (self.drop_low_coverage() if skip_low else self).autosomes()
+        if cnarr:
+            if by_chrom:
+                values = np.array([estimator(subarr['log2'])
+                                   for _c, subarr in cnarr.by_chromosome()
+                                   if len(subarr)])
+            else:
+                values = cnarr['log2']
+            self.data['log2'] -= estimator(values)
 
     def drop_low_coverage(self):
         """Drop bins with extremely low log2 coverage values.
