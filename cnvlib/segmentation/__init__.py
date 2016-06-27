@@ -8,7 +8,7 @@ import tempfile
 import numpy as np
 import pandas as pd
 
-from .. import core, ngfrills, params, smoothing, tabio, vary
+from .. import core, params, smoothing, tabio, vary
 from ..cnary import CopyNumArray as CNA
 from . import cbs, flasso, haar
 
@@ -51,10 +51,9 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                 'threshold': threshold,
                 'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
             }
-            with ngfrills.temp_write_text(rscript % script_strings,
+            with core.temp_write_text(rscript % script_strings,
                                           mode="w+t") as script_fname:
-                seg_out = ngfrills.call_quiet('Rscript', '--vanilla',
-                                              script_fname)
+                seg_out = core.call_quiet('Rscript', '--vanilla', script_fname)
             # ENH: run each chromosome separately
             # ENH: run each chrom. arm separately (via knownsegs)
         # Convert R dataframe contents (SEG) to a proper CopyNumArray

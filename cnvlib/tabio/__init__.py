@@ -5,7 +5,6 @@ from past.builtins import basestring
 
 import logging
 import sys
-import types
 
 import pandas as pd
 from Bio.File import as_handle
@@ -131,7 +130,7 @@ def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
     if fmt in ("seg", "vcf"):
         kwargs["sample_id"] = garr.sample_id
     dframe = formatter(garr.data, **kwargs)
-    with ngfrills.safe_write(outfile or sys.stdout, verbose=False) as handle:
+    with core.safe_write(outfile or sys.stdout, verbose=False) as handle:
         dframe.to_csv(handle, header=show_header, index=False, sep='\t',
                       float_format='%.6g')
     if verbose:

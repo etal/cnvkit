@@ -218,7 +218,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
                                male_reference)
     if not output_reference:
         output_reference = os.path.join(output_dir, "reference.cnn")
-    ngfrills.ensure_path(output_reference)
+    core.ensure_path(output_reference)
     tabio.write(ref_arr, output_reference)
 
     return output_reference, target_bed, antitarget_bed
@@ -482,7 +482,7 @@ def _cmd_coverage(args):
         args.output = '%s.%s.cnn' % (bambase, tgtbase)
         if os.path.exists(args.output):
             args.output = '%s.%s.cnn' % (bambase, bedbase)
-    ngfrills.ensure_path(args.output)
+    core.ensure_path(args.output)
     tabio.write(pset, args.output)
 
 
@@ -542,7 +542,7 @@ def _cmd_reference(args):
         raise ValueError(usage_err_msg)
 
     ref_fname = args.output or "cnv_reference.cnn"
-    ngfrills.ensure_path(ref_fname)
+    core.ensure_path(ref_fname)
     tabio.write(ref_probes, ref_fname)
 
 

@@ -10,18 +10,6 @@ import shlex
 from Bio.File import as_handle
 
 
-def sniff_num_columns(bed_fname):
-    """Detect the number of columns in a BED/interval file.
-
-    Guidance:
-        3 cols => coordinates only;
-        5 cols => intervals file (coordinates, strand, name);
-        otherwise => Full or extended BED format
-    """
-    for firstrow in parse_regions(bed_fname):
-        return len(firstrow)
-
-
 def sniff_region_format(fname):
     """Guess whether the file format is BED, Picard interval list, or text.
 
