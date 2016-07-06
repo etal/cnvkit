@@ -813,12 +813,12 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
         outarr["cn"] = np.asarray(np.rint(absolutes), dtype=np.int_)
         if "baf" in outarr:
             # Calculate major and minor allelic copy numbers (s.t. cn1 >= cn2)
-            upper_baf = np.abs(outarr["baf"] - .5) + .5
+            upper_baf = (np.abs(outarr["baf"] - .5) + .5).fillna(1.0)
             outarr["cn1"] = np.asarray(np.rint(absolutes * upper_baf)
                                        .clip(0, outarr["cn"]),
                                        dtype=np.int_)
             outarr["cn2"] = outarr["cn"] - outarr["cn1"]
-            is_null = upper_baf.isnull()
+            is_null = (outarr["baf"].isnull() & (outarr["cn"] > 0))
             outarr[is_null, "cn1"] = np.nan
             outarr[is_null, "cn2"] = np.nan
     return outarr
