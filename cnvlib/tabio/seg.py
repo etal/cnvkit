@@ -17,6 +17,7 @@ from __future__ import absolute_import, division, print_function
 from builtins import next
 from past.builtins import basestring
 
+import csv
 import logging
 import math
 
@@ -92,27 +93,27 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
             break
         else:
             raise ValueError("SEG file contains no data")
-        # Parse the SEG file
-        # try:
-        dframe = pd.read_table(handle, names=col_names, header=None,
-                               # * pandas.io.common.CParserError: Error
-                               #   tokenizing data. C error: Calling
-                               #   read(nbytes) on source failed. Try
-                               #   engine='python'.
-                               engine="python",
-                               # * engine="c" only:
-                               # na_filter=False,
-                               # dtype={
-                               #     "sample_id": "str",
-                               #     "chromosome": "str",
-                               #     "start": "int",
-                               #     "end": "int",
-                               #     "log2": "float"
-                               # },
-                              )
-        # except pd.parser.CParserError:
-        #     raise ValueError("Unexpected dataframe contents:\n%s\n%s" %
-        #                      (line, next(handle)))
+        # Parse the SEG file contents
+        try:
+            dframe = pd.read_table(handle, names=col_names, header=None,
+                                # * pandas.io.common.CParserError: Error
+                                #   tokenizing data. C error: Calling
+                                #   read(nbytes) on source failed. Try
+                                #   engine='python'.
+                                engine='python',
+                                # * engine='c' only:
+                                # na_filter=False,
+                                # dtype={
+                                #     'sample_id': 'str',
+                                #     'chromosome': 'str',
+                                #     'start': 'int',
+                                #     'end': 'int',
+                                #     'log2': 'float'
+                                # },
+                                )
+        except (pd.parser.CParserError, csv.Error) as err:
+            raise ValueError("Unexpected dataframe contents:\n%s\n%s" %
+                             (line, next(handle)))
 
     # Calculate values for output columns
     dframe['chromosome'] = dframe['chromosome'].astype("str")
