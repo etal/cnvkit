@@ -116,7 +116,7 @@ def _cmd_batch(args):
                              (bam, args.targets, args.antitargets, args.reference,
                               args.output_dir, args.male_reference, args.scatter,
                               args.diagram, args.rlibpath, args.count_reads,
-                              args.drop_low_coverage))
+                              args.drop_low_coverage, args.method))
         pool.close()
         pool.join()
 
@@ -215,12 +215,12 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
         pool.join()
         # Build reference from *.cnn
         ref_arr = do_reference(target_fnames, antitarget_fnames, fasta,
-                               male_reference)
+                               male_reference, do_gc=True,
+                               do_edge=(method == "hybrid"), do_rmask=True)
     if not output_reference:
         output_reference = os.path.join(output_dir, "reference.cnn")
     core.ensure_path(output_reference)
     tabio.write(ref_arr, output_reference)
-
     return output_reference, target_bed, antitarget_bed
 
 
@@ -231,9 +231,8 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count):
 
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
-                     output_dir, male_reference=False, scatter=False,
-                     diagram=False, rlibpath=None, by_count=False,
-                     skip_low=False):
+                     output_dir, male_reference, scatter, diagram, rlibpath,
+                     by_count, skip_low, method):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
@@ -246,7 +245,8 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     raw_anti = do_coverage(antitarget_bed, bam_fname, by_count)
     tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
-    cnarr = do_fix(raw_tgt, raw_anti, tabio.read_cna(ref_fname))
+    cnarr = do_fix(raw_tgt, raw_anti, tabio.read_cna(ref_fname),
+                   do_gc=True, do_edge=(method == "hybrid"), do_rmask=True)
     tabio.write(cnarr, sample_pfx + '.cnr')
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
