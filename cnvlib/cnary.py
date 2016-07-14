@@ -6,6 +6,7 @@ from past.builtins import basestring
 import logging
 
 import numpy as np
+import pandas as pd
 
 from . import core, gary, metrics, params, smoothing
 
@@ -24,6 +25,27 @@ class CopyNumArray(gary.GenomicArray):
     # "gc", "rmask", "spread", "weight", "probes"
 
     def __init__(self, data_table, meta_dict=None):
+        if not isinstance(data_table, pd.DataFrame):
+            # Empty but conformant table
+            data_table = self._make_blank()
+        if "log2" in data_table.columns:
+            # Every bin needs a log2 value; the others can be NaN
+            d2 = data_table.dropna(subset=["log2"])
+            if len(d2) < len(data_table):
+                logging.warn("Dropped %d rows with missing log2 values",
+                             len(data_table) - len(d2))
+                data_table = d2
+        else:
+            # Shim to deprecate 'log2' values in favor of absolute scale
+            if 'ratio' in data_table.columns:
+                key = 'ratio'
+            elif 'depth' in data_table.columns:
+                key = 'depth'
+            else:
+                raise ValueError("Missing 'log2'/'ratio'/'depth' column")
+            data_table['log2'] = np.log2(data_table[key]
+                                         # Avoid log domain error
+                                         .replace(0, 2**-20))
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
     @property
