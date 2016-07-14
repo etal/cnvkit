@@ -62,7 +62,6 @@ def _cmd_batch(args):
                          (args.access,              '-g/--access'),
                          (args.annotate,            '--annotate'),
                          (args.short_names,         '--short-names'),
-                         (args.split,               '--split'),
                          (args.target_avg_size,     '--target-avg-size'),
                          (args.antitarget_avg_size, '--antitarget-avg-size'),
                          (args.antitarget_min_size, '--antitarget-min-size'),
@@ -91,10 +90,10 @@ def _cmd_batch(args):
         # Build a copy number reference; update (anti)targets upon request
         args.reference, args.targets, args.antitargets = batch_make_reference(
             args.normal, args.targets, args.antitargets, args.male_reference,
-            args.fasta, args.annotate, args.short_names, args.split,
-            args.target_avg_size, args.access, args.antitarget_avg_size,
-            args.antitarget_min_size, args.output_reference, args.output_dir,
-            args.processes, args.count_reads, args.method)
+            args.fasta, args.annotate, args.short_names, args.target_avg_size,
+            args.access, args.antitarget_avg_size, args.antitarget_min_size,
+            args.output_reference, args.output_dir, args.processes,
+            args.count_reads, args.method)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = tabio.read_cna(args.reference)
@@ -121,11 +120,11 @@ def _cmd_batch(args):
         pool.join()
 
 
-def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference,
-                         fasta, annotate, short_names, split, target_avg_size,
-                         access, antitarget_avg_size, antitarget_min_size,
-                         output_reference, output_dir, processes, by_count,
-                         method):
+def batch_make_reference(normal_bams, target_bed, antitarget_bed,
+                         male_reference, fasta, annotate, short_names,
+                         target_avg_size, access, antitarget_avg_size,
+                         antitarget_min_size, output_reference, output_dir,
+                         processes, by_count, method):
     """Build the CN reference from normal samples, targets and antitargets."""
     if method in ("wgs", "amplicon"):
         if antitarget_bed:
@@ -136,7 +135,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
                              "different." % method)
 
     if method == "wgs":
-        if not annotate and (not target_bed or split):
+        if not annotate:
             # TODO check if target_bed has gene names
             raise ValueError("WGS protocol: need '--annotate' option "
                              "(e.g. refFlat.txt) to avoid later problems "
@@ -162,15 +161,14 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed, male_reference
     if output_dir:
         tgt_name_base = os.path.join(output_dir, tgt_name_base)
 
-    if annotate or short_names or split:
-        # Pre-process baits/targets
-        new_target_fname = tgt_name_base + '.target.bed'
-        tgt_arr = do_targets(target_bed, annotate, short_names, split,
-                              **({'avg_size': target_avg_size}
-                                 if split and target_avg_size
-                                 else {}))
-        tabio.write(tgt_arr, new_target_fname, "bed4")
-        target_bed = new_target_fname
+    # Pre-process baits/targets
+    new_target_fname = tgt_name_base + '.target.bed'
+    tgt_arr = do_targets(target_bed, annotate, short_names, True,
+                         **({'avg_size': target_avg_size}
+                            if target_avg_size
+                            else {}))
+    tabio.write(tgt_arr, new_target_fname, "bed4")
+    target_bed = new_target_fname
 
     if not antitarget_bed:
         # Devise a temporary antitarget filename
@@ -250,8 +248,12 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     tabio.write(cnarr, sample_pfx + '.cnr')
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
-    segments = segmentation.do_segmentation(cnarr, 'cbs', rlibpath=rlibpath,
-                                            skip_low=skip_low)
+    segments = segmentation.do_segmentation(cnarr, 'cbs',
+                                            rlibpath=rlibpath,
+                                            skip_low=skip_low,
+                                            **({'threshold': 1e-6}
+                                               if method == 'wgs'
+                                               else {}))
     tabio.write(segments, sample_pfx + '.cns')
 
     if scatter:
@@ -313,8 +315,8 @@ P_batch_newref.add_argument('--annotate',
                 regions.""")
 P_batch_newref.add_argument('--short-names', action='store_true',
         help="Reduce multi-accession bait labels to be short and consistent.")
-P_batch_newref.add_argument('--split', action='store_true',
-        help="Split large tiled intervals into smaller, consecutive targets.")
+P_batch_newref.add_argument('--split', action='store_true', # DEPRECATED
+        help=argparse.SUPPRESS)
 P_batch_newref.add_argument('--target-avg-size', type=int,
         help="Average size of split target bins (results are approximate).")
 # For antitargets:
