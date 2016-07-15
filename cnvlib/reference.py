@@ -6,7 +6,7 @@ import logging
 
 import numpy as np
 
-from . import core, fix, metrics, ngfrills, params, tabio
+from . import core, fix, descriptives, ngfrills, params, tabio
 from .cnary import CopyNumArray as CNA
 
 
@@ -132,10 +132,10 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
     all_coverages = np.vstack(all_coverages)
 
     logging.info("Calculating average bin coverages")
-    cvg_centers = np.apply_along_axis(metrics.biweight_location, 0,
+    cvg_centers = np.apply_along_axis(descriptives.biweight_location, 0,
                                       all_coverages)
     logging.info("Calculating bin spreads")
-    spreads = np.asarray([metrics.biweight_midvariance(a, initial=i)
+    spreads = np.asarray([descriptives.biweight_midvariance(a, initial=i)
                           for a, i in zip(all_coverages.T, cvg_centers)])
     columns.update({
         'chromosome': cnarr1.chromosome,

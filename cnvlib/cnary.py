@@ -8,7 +8,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from . import core, gary, metrics, params, smoothing
+from . import core, gary, descriptives, params, smoothing
 
 
 class CopyNumArray(gary.GenomicArray):
@@ -75,22 +75,22 @@ class CopyNumArray(gary.GenomicArray):
     # More meta to store:
     #   is_sample_male = bool
     #   is_reference_male = bool
-    #   file_path
     #   * invalidate 'chr_x' if .chromosome/['chromosome'] is set
 
     # Traversal
 
-    # XXX hair: some genes overlap; some bins cover multiple genes
-    #   -> option: whether to split gene names on commas
     def by_gene(self, ignore=params.IGNORE_GENE_NAMES):
         """Iterate over probes grouped by gene name.
-
-        Emits pairs of (gene name, CNA of rows with same name)
 
         Groups each series of intergenic bins as a 'Background' gene; any
         'Background' bins within a gene are grouped with that gene.
         Bins with names in `ignore` are treated as 'Background' bins, but retain
         their name.
+
+        Bins' gene names are split on commas to accommodate overlapping genes
+        and bins that cover multiple genes.
+
+        Return an iterable of pairs of: (gene name, CNA of rows with same name)
         """
         start_idx = end_idx = None
         for _chrom, subgary in self.by_chromosome():
@@ -122,8 +122,8 @@ class CopyNumArray(gary.GenomicArray):
         est_funcs = {
             "mean": np.mean,
             "median": np.median,
-            "mode": metrics.modal_location,
-            "biweight": metrics.biweight_location,
+            "mode": descriptives.modal_location,
+            "biweight": descriptives.biweight_location,
         }
         if isinstance(estimator, basestring):
             if estimator in est_funcs:
@@ -152,7 +152,7 @@ class CopyNumArray(gary.GenomicArray):
                                            params.NULL_LOG2_COVERAGE -
                                            params.MIN_REF_COVERAGE])
 
-    def squash_genes(self, summary_func=metrics.biweight_location,
+    def squash_genes(self, summary_func=descriptives.biweight_location,
                      squash_background=False, ignore=params.IGNORE_GENE_NAMES):
         """Combine consecutive bins with the same targeted gene name.
 
@@ -320,7 +320,7 @@ class CopyNumArray(gary.GenomicArray):
         # Guess Poisson parameter from absolute-scale values
         y = np.exp2(y_log2)
         # ENH: use weight argument to these stats
-        loc = metrics.biweight_location(y)
-        spread = metrics.biweight_midvariance(y, loc)
+        loc = descriptives.biweight_location(y)
+        spread = descriptives.biweight_midvariance(y, loc)
         scale = loc / spread**2
         return scale
