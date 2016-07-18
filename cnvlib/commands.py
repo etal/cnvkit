@@ -27,7 +27,7 @@ from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
-from . import (core, ngfrills, parallel, params,
+from . import (core, ngfrills, parallel, params, descriptives,
                access, antitarget, call, coverage, export, fix, importers,
                metrics, plots, reference, reports, segmentation, target,
                tabio)
@@ -660,8 +660,8 @@ def do_fix(target_raw, antitarget_raw, reference,
                                            do_gc, False, do_rmask)
     if len(anti_cnarr):
         # Down-weight the more variable probe set (targets or antitargets)
-        tgt_iqr = metrics.interquartile_range(cnarr.drop_low_coverage().residuals())
-        anti_iqr = metrics.interquartile_range(anti_cnarr.drop_low_coverage().residuals())
+        tgt_iqr = descriptives.interquartile_range(cnarr.drop_low_coverage().residuals())
+        anti_iqr = descriptives.interquartile_range(anti_cnarr.drop_low_coverage().residuals())
         iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
         if iqr_ratio > 1:
             logging.info("Targets are %.2f x more variable than antitargets",
@@ -1483,11 +1483,11 @@ def _cmd_segmetrics(args):
     stats = {
         'mean': np.mean,
         'median': np.median,
-        'mode': metrics.modal_location,
+        'mode': descriptives.modal_location,
         'stdev': np.std,
-        'mad':  metrics.median_absolute_deviation,
-        'iqr':  metrics.interquartile_range,
-        'bivar': metrics.biweight_midvariance,
+        'mad':  descriptives.median_absolute_deviation,
+        'iqr':  descriptives.interquartile_range,
+        'bivar': descriptives.biweight_midvariance,
         'ci': lambda x: metrics.confidence_interval_bootstrap(x, args.alpha,
                                                               args.bootstrap),
         'pi': lambda x: metrics.prediction_interval(x, args.alpha),
