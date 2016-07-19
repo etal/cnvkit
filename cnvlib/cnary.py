@@ -20,8 +20,8 @@ class CopyNumArray(gary.GenomicArray):
     """
     _required_columns = ("chromosome", "start", "end", "gene", "log2")
     _required_dtypes = (str, int, int, str, float)
-    # ENH: make gene optional
-    # Extra columns, in order:
+    # Extra columns:
+    # "depth", "ratio",
     # "gc", "rmask", "spread", "weight", "probes"
 
     def __init__(self, data_table, meta_dict=None):
@@ -43,9 +43,8 @@ class CopyNumArray(gary.GenomicArray):
                 key = 'depth'
             else:
                 raise ValueError("Missing 'log2'/'ratio'/'depth' column")
-            data_table['log2'] = np.log2(data_table[key]
-                                         # Avoid log domain error
-                                         .replace(0, 2**-20))
+            data_table['log2'] = (np.log2(data_table[key])
+                                  .replace(-np.inf, params.NULL_LOG2_COVERAGE))
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
     @property
