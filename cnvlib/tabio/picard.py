@@ -60,20 +60,18 @@ def read_picard_hs(infile):
                       "start", "end", "length",
                       "gene", # name
                       "gc", # %gc
-                      "mean_coverage",
-                      "normalized_coverage",
+                      "depth",
+                      "ratio",
                      ]
     del dframe["length"]
     dframe["start"] -= 1
     dframe["gene"] = dframe["gene"].apply(unpipe_name)
-    # Avoid math domain error converting coverages to log2 scale
-    coverages = np.asarray(dframe['mean_coverage'])
-    no_cvg_idx = (coverages == 0)
-    if sum(no_cvg_idx) > TOO_MANY_NO_COVERAGE:
-        logging.warn("*WARNING* Sample %s has >%d bins with no coverage",
-                     str(infile), TOO_MANY_NO_COVERAGE)
-    coverages[no_cvg_idx] = 2**params.NULL_LOG2_COVERAGE
-    dframe["log2"] = np.log2(coverages)
+    coverages = np.asarray(dframe['depth'])
+    # Safety check
+    no_cvg_cnt = (coverages == 0).sum()
+    if no_cvg_cnt > TOO_MANY_NO_COVERAGE:
+        logging.warn("*WARNING* Sample %s has %d bins with no coverage",
+                     str(infile), no_cvg_cnt)
     return dframe
 
 
@@ -119,7 +117,14 @@ def write_interval(dframe):
 
 
 def write_picard_hs(dframe):
-    coverage = np.exp2(dframe["log2"])
+    if "depth" in dframe.columns:
+        coverage = dframe["depth"]
+    else:
+        coverage = np.exp2(dframe["log2"])
+    if "ratio" in dframe.columns:
+        norm = dframe["ratio"]
+    else:
+        norm = coverage / coverage.mean()
     return pd.DataFrame.from_items([
         ("chrom", dframe["chromosome"]),
         ("start", dframe["start"] + 1),
@@ -128,6 +133,6 @@ def write_picard_hs(dframe):
         ("name", dframe["gene"]),
         ("%gc", dframe["gc"]),
         ("mean_coverage", coverage),
-        ("normalized_coverage", coverage / coverage.mean()),
+        ("normalized_coverage", norm),
     ])
 
