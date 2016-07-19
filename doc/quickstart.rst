@@ -151,3 +151,52 @@ See the command-line usage pages for additional
 :doc:`visualization <plots>`,
 :doc:`reporting <reports>` and
 :doc:`import/export <importexport>` commands in CNVkit.
+
+
+Frequently Asked Questions (FAQ)
+--------------------------------
+
+Which BED file should I use?
+````````````````````````````
+
+- *target* vs. *bait* BED files: For hybrid capture, the targeted regions (or
+  "primary targets") are the genomic regions your capture kit attempts to ensure
+  are well covered, e.g.  exons of genes of interest. The baited regions (or
+  "capture targets") are the genomic regions your kit actually captures, usually
+  including about 50bp flanking either side of each target. Give CNVkit the
+  bait/capture BED file, not the primary targets.
+- For WGS, use the `batch --method wgs` option and optionally give the genome's
+  "access" file -- if not given, it will be calculated from the genome sequence
+  FASTA file.
+- For targeted amplicon sequencing (TAS), use the `batch --method amplicon`
+  option and give the target BED file.
+
+How does CNVkit handle sample gender? Why does chrX show a gain/loss?
+`````````````````````````````````````````````````````````````````````
+
+If you want copy number calls to be relative to a male reference with a single X
+chromosome but dipoid autosomes, use the `-y` option everywhere.
+Otherwise, X and all autosomes will be considered normally diploid. Chromosome Y
+will be considered haploid in either case.
+
+How should I deal with tumor samples?
+`````````````````````````````````````
+
+- Solid tumor samples: Use --drop-low-coverage in the `batch` and `segment`
+    commands. Virtually all tumor samples, even cancer cell lines, are
+    not completely homogeneous. Even in regions of homozygous deletion in
+    the largest tumor-cell clonal population, some sequencing reads will
+    be obtained from contaminating normal cells without the deletion.
+    Therefore, extremely low log2 copy ratio values (below -15) do not
+    indicate homozygous deletions but failed sequencing or mapping
+    in all cells regardless of copy number status at that site, which are
+    not informative for copy number.
+    This option in the `batch` command applies to segmentation; the
+    option is also available in the `segment`, `metrics`, `segmetrics`,
+    `gainloss` and `heterogeneity` commands.
+
+- If you have unpaired tumor samples, or no normal samples sequenced on the
+  same platform, see the :ref:`reference` command for strategies.
+
+..  How should I deal with germline clinical samples?
+..  `````````````````````````````````````````````````
