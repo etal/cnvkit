@@ -258,6 +258,23 @@ class IOTests(unittest.TestCase):
         self.assertEqual(len(regions), linecount(fname))
         self.assertEqual(regions.sample_id, "amplicon")
 
+    def test_read_vcf(self):
+        """Read the VCF format."""
+        fname = "formats/na12878_na12882_mix.vcf"
+        v1 = tabio.read(fname, "vcf")
+        self.assertLess(len(v1), linecount(fname))
+        self.assertLess(0, len(v1))
+        v2 = tabio.read(fname, "vcf", sample_id="NA12882")
+        self.assertEqual(v2.sample_id, "NA12882")
+        self.assertEqual(len(v1), len(v2))
+        for kwarg in ({'min_depth': 100},
+                      {'skip_hom': True},
+                      {'skip_somatic': True},
+                      {'skip_reject': True}):
+            v3 = tabio.read(fname, "vcf", **kwarg)
+            self.assertLess(len(v3), len(v1))
+            self.assertLess(0, len(v3))
+
 
 
 class CommandTests(unittest.TestCase):
