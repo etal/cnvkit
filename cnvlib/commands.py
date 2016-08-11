@@ -948,7 +948,8 @@ def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
     cnarr = tabio.read_cna(args.filename, sample_id=args.sample_id
                           ) if args.filename else None
-    segarr = tabio.read_cna(args.segment) if args.segment else None
+    segarr = tabio.read_cna(args.segment, sample_id=args.sample_id
+                           ) if args.segment else None
     if not args.sample_id and (cnarr or segarr):
         args.sample_id = (cnarr or segarr).sample_id
     varr = (tabio.read(args.vcf, "vcf",
@@ -959,18 +960,18 @@ def _cmd_scatter(args):
 
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
-            for chrom, start, end in tabio.read_auto(args.range_list).coords():
-                region = "{}:{}-{}".format(chrom, start, end)
-                do_scatter(cnarr, segarr, varr, region, False,
+            for region in tabio.read_auto(args.range_list).coords():
+                do_scatter(cnarr, segarr, varr, region, None,
                            args.background_marker, args.trend,
-                           args.width, args.y_min, args.y_max)
-                pyplot.title(region)
+                           args.width, args.y_min, args.y_max,
+                           ("%s %s" % (args.title, region.chromosome)
+                            if args.title else None))
                 pdf_out.savefig()
                 pyplot.close()
     else:
         do_scatter(cnarr, segarr, varr, args.chromosome, args.gene,
                    args.background_marker, args.trend, args.width,
-                   args.y_min, args.y_max)
+                   args.y_min, args.y_max, args.title)
         if args.output:
             pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
             logging.info("Wrote %s", args.output)
@@ -987,8 +988,6 @@ def do_scatter(cnarr, segments=None, variants=None,
     show_gene: name of gene to highligh
     show_range: chromosome name or coordinate string like "chr1:20-30"
     """
-    if title is None:
-        title = (cnarr or segments or variants).sample_id
 
     if not show_gene and not show_range:
         # Plot all chromosomes, concatenated on one plot
@@ -1005,6 +1004,8 @@ def do_scatter(cnarr, segments=None, variants=None,
                                 do_trend, PAD)
         else:
             _fig, axis = pyplot.subplots()
+        if title is None:
+            title = (cnarr or segments or variants).sample_id
         if cnarr or segments:
             axis.set_title(title)
             plots.cnv_on_genome(axis, cnarr, segments, PAD, do_trend, y_min, y_max)
@@ -1109,8 +1110,10 @@ def do_scatter(cnarr, segments=None, variants=None,
             _fig, axis = pyplot.subplots()
             axis.set_xlabel("Position (Mb)")
 
-        # Plot CNVs
-        axis.set_title("%s %s" % (title, chrom))
+        # Plot CNVs at chromosome level
+        if title is None:
+            title = "%s %s" % ((cnarr or segments or variants).sample_id, chrom)
+        axis.set_title(title)
         plots.cnv_on_chromosome(axis, sel_probes, sel_seg, genes,
                                 background_marker=background_marker,
                                 do_trend=do_trend, y_min=y_min, y_max=y_max)
@@ -1120,45 +1123,51 @@ P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
 P_scatter.add_argument('filename', nargs="?",
         help="""Processed bin-level copy ratios (*.cnr), the output
                 of the 'fix' sub-command.""")
-P_scatter.add_argument('-s', '--segment',
+P_scatter.add_argument('-s', '--segment', metavar="FILENAME",
         help="Segmentation calls (.cns), the output of the 'segment' command.")
-P_scatter.add_argument('-c', '--chromosome',
+P_scatter.add_argument('-v', '--vcf', metavar="FILENAME",
+        help="""VCF file name containing variants to plot for SNV b-allele
+                frequencies.""")
+P_scatter.add_argument("-i", "--sample-id",
+        help="""Specify the name of the sample in the VCF (-v/--vcf) to use for
+                b-allele frequency extraction and as the default plot title.""")
+P_scatter.add_argument("-n", "--normal-id",
+        help="""Corresponding normal sample ID in the input VCF (-v/--vcf).
+                This sample is used to select only germline SNVs to plot
+                b-allele frequencies.""")
+P_scatter.add_argument('-m', '--min-variant-depth', type=int, default=20,
+        help="""Minimum read depth for a SNV to be displayed in the b-allele
+                frequency plot. [Default: %(default)s]""")
+P_scatter.add_argument('-c', '--chromosome', metavar="RANGE",
         help="""Chromosome (e.g. 'chr1') or chromosomal range (e.g.
                 'chr1:2333000-2444000') to display. If a range is given,
                 all targeted genes in this range will be shown, unless
-                '--gene'/'-g' is already given.""")
+                -g/--gene is already given.""")
 P_scatter.add_argument('-g', '--gene',
         help="Name of gene or genes (comma-separated) to display.")
 P_scatter.add_argument('-l', '--range-list',
         help="""File listing the chromosomal ranges to display, as BED, interval
-                list or "chr:start-end" text. Creates focal plots similar to
+                list or 'chr:start-end' text. Creates focal plots similar to
                 -c/--chromosome for each listed region, combined into a
                 multi-page PDF.  The output filename must also be
                 specified (-o/--output).""")
-P_scatter.add_argument("-i", "--sample-id",
-        help="""Specify the name of the sample in the VCF to use for b-allele
-                frequency extraction and to show in plot title.""")
-P_scatter.add_argument("-n", "--normal-id",
-        help="Corresponding normal sample ID in the input VCF.")
-P_scatter.add_argument('-b', '--background-marker', default=None,
-        help="""Plot antitargets with this symbol, in zoomed/selected regions.
+P_scatter.add_argument('-b', '--background-marker', metavar='CHARACTER',
+        default=None,
+        help="""Plot antitargets using this symbol when plotting in a selected
+                chromosomal region (-g/--gene or -c/--chromosome).
                 [Default: same as targets]""")
 P_scatter.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
-P_scatter.add_argument('-v', '--vcf',
-        help="""VCF file name containing variants to plot for SNV allele
-                frequencies.""")
-P_scatter.add_argument('-m', '--min-variant-depth', type=int, default=20,
-        help="""Minimum read depth for a SNV to be displayed in the b-allele
-                frequency plot. [Default: %(default)s]""")
+P_scatter.add_argument('--title',
+        help="Plot title. [Default: sample ID, from filename or -i]")
 P_scatter.add_argument('-w', '--width', type=float, default=1e6,
-        help="""Width of margin to show around the selected gene or region
-                on the chromosome (use with --gene or --region).
-                [Default: %(default)d]""")
-P_scatter.add_argument('--y-min', type=float, help="""y-axis lower limit.""")
-P_scatter.add_argument('--y-max', type=float, help="""y-axis upper limit.""")
-P_scatter.add_argument('-o', '--output',
-        help="Output table file name.")
+        help="""Width of margin to show around the selected gene or chromosomal
+                region (-g/--gene or -c/--chromosome). [Default: %(default)d]
+                """)
+P_scatter.add_argument('--y-min', type=float, help="y-axis lower limit.")
+P_scatter.add_argument('--y-max', type=float, help="y-axis upper limit.")
+P_scatter.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output PDF file name.")
 P_scatter.set_defaults(func=_cmd_scatter)
 
 
