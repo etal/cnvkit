@@ -264,9 +264,10 @@ class IOTests(unittest.TestCase):
         v1 = tabio.read(fname, "vcf")
         self.assertLess(len(v1), linecount(fname))
         self.assertLess(0, len(v1))
-        v2 = tabio.read(fname, "vcf", sample_id="NA12882")
-        self.assertEqual(v2.sample_id, "NA12882")
-        self.assertEqual(len(v1), len(v2))
+        for sid in ("NA12882", "NA12878"):
+            v2 = tabio.read(fname, "vcf", sample_id=sid)
+            self.assertEqual(v2.sample_id, sid)
+            self.assertEqual(len(v1), len(v2))
         for kwarg in ({'min_depth': 100},
                       {'skip_hom': True},
                       {'skip_somatic': True},

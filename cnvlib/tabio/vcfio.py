@@ -151,6 +151,9 @@ def _iter_samples(vcf_reader, sample_id, normal_id):
     if sample_id:
         # Keep only the specified tumor/test sample
         pairs = [(s, n) for s, n in pairs if s == sample_id]
+    if not pairs:
+        # sample_id refers to a normal/control sample -- salvage it
+        pairs = [(sample_id, None)]
     for sid in set(chain(*pairs)) - {None}:
         _confirm_unique(sid, vcf_reader.samples)
     return pairs
