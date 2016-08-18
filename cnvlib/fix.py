@@ -15,7 +15,7 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
     """Load and filter probe coverages; correct using reference and GC."""
     if 'gc' in cnarr:
         # Don't choke on Picard-derived files that have the GC column
-        cnarr = cnarr.drop_extra_columns()
+        cnarr = cnarr.keep_columns(cnarr._required_columns + ('depth',))
 
     # No corrections needed if there are no data rows (e.g. no antitargets)
     if not len(cnarr):
@@ -221,7 +221,8 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
         logging.debug("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from neutral coverage
         flat_cvgs = ref_matched.expect_flat_cvg()
-        weights *= np.exp2(-np.abs(ref_matched['log2'] - flat_cvgs['log2']))
+        ratios = ref_matched['ratio'] / flat_cvgs['ratio']
+        weights *= np.minimum(ratios, 1 / ratios)
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
         logging.debug("Weighting bins by coverage spread in reference")
