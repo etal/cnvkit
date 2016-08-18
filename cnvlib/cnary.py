@@ -257,7 +257,6 @@ class CopyNumArray(gary.GenomicArray):
         """
         if is_male_reference is None:
             is_male_reference = not self.guess_xx(verbose=False)
-        cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
             idx = np.asarray((self.chromosome == self._chr_x_label) |
@@ -265,8 +264,15 @@ class CopyNumArray(gary.GenomicArray):
         else:
             # Y will be all noise, so replace with 1 "flat" copy
             idx = np.asarray(self.chromosome == self._chr_y_label)
-        cvg[idx] = -1.0
-        return cvg
+        # ENH: do math with ratio, then calculate log2 from it
+        ratio = np.ones(len(self), dtype=np.float_)
+        log2 = np.zeros(len(self), dtype=np.float_)
+        ratio[idx] = 0.5
+        log2[idx] = -1.0
+        depth = ratio * self.guess_average_depth()
+        return pd.DataFrame({'depth': depth,
+                             'log2': log2,
+                             'ratio': ratio})
 
     # Reporting
 

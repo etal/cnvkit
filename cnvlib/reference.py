@@ -39,7 +39,8 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
     cnarr1 = tabio.read_cna(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
-        col_names = ['chromosome', 'start', 'end', 'gene', 'log2']
+        col_names = ['chromosome', 'start', 'end', 'gene',
+                     'depth', 'ratio', 'log2']
         if 'gc' in cnarr1 or fa_fname:
             col_names.append('gc')
         if fa_fname:
@@ -84,14 +85,20 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
 
         """
         is_sample_female = cnarr.guess_xx()
-        cnarr['log2'] += flat_coverage
+        cnarr['ratio'] *= flat_coverage['ratio']
+        # cnarr['depth'] *= flat_coverage['ratio']
+        # cnarr['log2'] += flat_coverage['log2']
         if is_sample_female:
             # chrX already OK
             # No chrY; it's all noise, so just match the male
-            cnarr[is_chr_y, 'log2'] = -1.0
+            cnarr[is_chr_y, 'ratio'] *= 0.5
+            # cnarr[is_chr_y, 'depth'] *= 0.5
+            # cnarr[is_chr_y, 'log2'] = -1.0
         else:
             # 1/2 #copies of each sex chromosome
-            cnarr[is_chr_x | is_chr_y, 'log2'] += 1.0
+            cnarr[is_chr_x | is_chr_y, 'ratio'] *= 2.0
+            # cnarr[is_chr_x | is_chr_y, 'depth'] *= 2.0
+            # cnarr[is_chr_x | is_chr_y, 'log2'] += 1.0
 
     edge_bias = fix.get_edge_bias(cnarr1, params.INSERT_SIZE)
     def bias_correct_coverage(cnarr):
@@ -99,7 +106,8 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
         cnarr.center_all(skip_low=skip_low)
         shift_sex_chroms(cnarr)
         # Skip bias corrections if most bins have no coverage (e.g. user error)
-        if (cnarr['log2'] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+        if (cnarr['ratio'] > np.exp2(params.NULL_LOG2_COVERAGE -
+                                     params.MIN_REF_COVERAGE)
            ).sum() <= len(cnarr) // 2:
             logging.warn("WARNING: most bins have no or very low coverage; "
                          "check that the right BED file was used")
@@ -113,10 +121,10 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
             if fix_edge:
                 logging.info("Correcting for density bias...")
                 cnarr = fix.center_by_window(cnarr, .1, edge_bias)
-        return cnarr['log2']
+        return cnarr['ratio']
 
     # Pseudocount of 1 "flat" sample
-    all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
+    all_coverages = [flat_coverage['ratio'], bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         logging.info("Loading target %s", fname)
         cnarrx = tabio.read_cna(fname)
@@ -142,7 +150,9 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
         'start': cnarr1.start,
         'end': cnarr1.end,
         'gene': cnarr1['gene'],
-        'log2': cvg_centers,
+        'depth': cvg_centers * 100,  # XXX
+        'ratio': cvg_centers,
+        'log2': np.log2(np.maximum(cvg_centers, 2**params.NULL_LOG2_COVERAGE)),
         'spread': spreads,
     })
     return CNA.from_columns(columns, {'sample_id': "reference"})
@@ -171,13 +181,13 @@ def warn_bad_probes(probes):
                 gene = probe.gene
                 last_gene = gene
             if 'rmask' in probes:
-                logging.info("  %s  %s  coverage=%.3f  spread=%.3f  rmask=%.3f",
+                logging.info("  %s  %s  coverage=%.3fx  spread=%.3f  rmask=%.3f",
                              gene.ljust(gene_cols), label.ljust(chrom_cols),
-                             probe.log2, probe.spread, probe.rmask)
+                             probe.ratio, probe.spread, probe.rmask)
             else:
-                logging.info("  %s  %s  coverage=%.3f  spread=%.3f",
+                logging.info("  %s  %s  coverage=%.3fx  spread=%.3f",
                              gene.ljust(gene_cols), label.ljust(chrom_cols),
-                             probe.log2, probe.spread)
+                             probe.ratio, probe.spread)
 
     # Count the number of BG probes dropped, too (names are all "Background")
     bg_bad_probes = bad_probes[~fg_index]
