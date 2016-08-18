@@ -18,8 +18,9 @@ class CopyNumArray(gary.GenomicArray):
 
     Optional columns: gc, rmask, spread, weight, probes
     """
-    _required_columns = ("chromosome", "start", "end", "gene", "log2")
-    _required_dtypes = (str, int, int, str, float)
+    _required_columns = ('chromosome', 'start', 'end', 'gene',
+                         'log2', 'ratio')
+    _required_dtypes = (str, int, int, str, float, float)
     # Extra columns:
     # "depth", "ratio",
     # "gc", "rmask", "spread", "weight", "probes"
@@ -28,15 +29,16 @@ class CopyNumArray(gary.GenomicArray):
         if not isinstance(data_table, pd.DataFrame):
             # Empty but conformant table
             data_table = self._make_blank()
-        if "log2" in data_table.columns:
+        # NB: 'log2' values are deprecated in favor of 'ratio' (absolute scale)
+        if 'log2' in data_table.columns:
             # Every bin needs a log2 value; the others can be NaN
-            d2 = data_table.dropna(subset=["log2"])
+            d2 = data_table.dropna(subset=['log2'])
             if len(d2) < len(data_table):
                 logging.warn("Dropped %d rows with missing log2 values",
                              len(data_table) - len(d2))
                 data_table = d2
         else:
-            # Shim to deprecate 'log2' values in favor of absolute scale
+            # Shim to provide log2 column for functions that need it
             if 'ratio' in data_table.columns:
                 key = 'ratio'
             elif 'depth' in data_table.columns:
@@ -45,6 +47,21 @@ class CopyNumArray(gary.GenomicArray):
                 raise ValueError("Missing 'log2'/'ratio'/'depth' column")
             data_table['log2'] = (np.log2(data_table[key])
                                   .replace(-np.inf, params.NULL_LOG2_COVERAGE))
+        if 'ratio' not in data_table.columns:
+            # Shim to load files created before 'ratio' was introduced
+            if 'log2' in data_table.columns:
+                data_table['ratio'] = np.exp2(data_table['log2'])
+            elif 'depth' in data_table.columns:
+                data_table['ratio'] = data_table['depth'] #/ data_table['depth'].median()
+                # Likely .cnn: handle targets & antitargets like 'reference'
+                bg_mask = data_table['gene'] == 'Background'
+                bg_cna = CopyNumArray(data_table[bg_mask])
+                fg_cna = CopyNumArray(data_table[~bg_mask])
+                bg_cna.center_all(skip_low=False)
+                fg_cna.center_all(skip_low=True)
+                full_cna = fg_cna.concat([fg_cna, bg_cna])
+                data_table = full_cna.data
+
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
     @property

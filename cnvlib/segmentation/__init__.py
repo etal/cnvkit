@@ -147,7 +147,7 @@ def squash_segments(seg_pset):
             if curr_cnt:
                 squashed_rows.append((curr_chrom, curr_start, curr_end,
                                       ",".join(pd.unique(curr_genes)),
-                                      curr_val, curr_cnt))
+                                      curr_val, 2 ** curr_val, curr_cnt))
             # Start a new segment
             curr_chrom = row.chromosome
             curr_start = row.start
@@ -158,7 +158,7 @@ def squash_segments(seg_pset):
     # Remainder
     squashed_rows.append((curr_chrom, curr_start, curr_end,
                           ",".join(pd.unique(curr_genes)),
-                          curr_val, curr_cnt))
+                          curr_val, 2** curr_val, curr_cnt))
     return seg_pset.as_rows(squashed_rows)
 
 
