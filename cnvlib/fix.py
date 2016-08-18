@@ -10,55 +10,54 @@ import pandas as pd
 from . import params, smoothing
 
 
-def load_adjust_coverages(pset, ref_pset, skip_low,
+def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
                           fix_gc, fix_edge, fix_rmask):
     """Load and filter probe coverages; correct using reference and GC."""
-    if 'gc' in pset:
+    if 'gc' in cnarr:
         # Don't choke on Picard-derived files that have the GC column
-        pset = pset.drop_extra_columns()
+        cnarr = cnarr.drop_extra_columns()
 
     # No corrections needed if there are no data rows (e.g. no antitargets)
-    if not len(pset):
-        return pset
+    if not len(cnarr):
+        return cnarr
 
-    ref_matched = match_ref_to_probes(ref_pset, pset)
+    ref_matched = match_ref_to_probes(ref_cnarr, cnarr)
 
     # Drop probes that had poor coverage in the pooled reference
     ok_cvg_indices = ~mask_bad_probes(ref_matched)
     logging.info("Keeping %d of %d bins", sum(ok_cvg_indices), len(ref_matched))
-    pset = pset[ok_cvg_indices]
+    cnarr = cnarr[ok_cvg_indices]
     ref_matched = ref_matched[ok_cvg_indices]
 
     # Apply corrections for known systematic biases in coverage
-    pset.center_all(skip_low=skip_low)
+    cnarr.center_all(skip_low=skip_low)
     # Skip bias corrections if most bins have no coverage (e.g. user error)
-    if (pset['log2'] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
-        ).sum() <= len(pset) // 2:
-            logging.warn("WARNING: most bins have no or very low coverage; "
-                         "check that the right BED file was used")
+    if (cnarr['ratio'] > params.LOW_COVERAGE).sum() <= len(cnarr) // 2:
+        logging.warn("WARNING: most bins have no or very low coverage; "
+                     "check that the right BED file was used")
     else:
         if fix_gc:
             if 'gc' in ref_matched:
                 logging.info("Correcting for GC bias...")
-                pset = center_by_window(pset, .1, ref_matched['gc'])
+                cnarr = center_by_window(cnarr, .1, ref_matched['gc'])
             else:
                 logging.warn("WARNING: Skipping correction for GC bias")
         if fix_edge:
             logging.info("Correcting for density bias...")
-            edge_bias = get_edge_bias(pset, params.INSERT_SIZE)
-            pset = center_by_window(pset, .1, edge_bias)
+            edge_bias = get_edge_bias(cnarr, params.INSERT_SIZE)
+            cnarr = center_by_window(cnarr, .1, edge_bias)
         if fix_rmask:
             if 'rmask' in ref_matched:
                 logging.info("Correcting for RepeatMasker bias...")
-                pset = center_by_window(pset, .1, ref_matched['rmask'])
+                cnarr = center_by_window(cnarr, .1, ref_matched['rmask'])
             else:
                 logging.warn("WARNING: Skipping correction for RepeatMasker bias")
 
     # Normalize coverages according to the reference
-    # (Subtract the reference log2 copy number to get the log2 ratio)
-    pset.data['log2'] -= ref_matched['log2']
-    pset.center_all(skip_low=skip_low)
-    return apply_weights(pset, ref_matched)
+    cnarr['ratio'] /= ref_matched['ratio']
+    cnarr['log2'] = cnarr._log2_ratio  # Shim
+    cnarr.center_all(skip_low=skip_low)
+    return apply_weights(cnarr, ref_matched)
 
 
 def mask_bad_probes(probes):
@@ -66,8 +65,10 @@ def mask_bad_probes(probes):
 
     Returns a bool array where True indicates probes that failed the checks.
     """
-    mask = ((probes['log2'] < params.MIN_REF_COVERAGE) |
-            (probes['log2'] > -params.MIN_REF_COVERAGE) |
+    min_ratio = 2 ** params.MIN_REF_COVERAGE
+    max_ratio = 2 ** (-params.MIN_REF_COVERAGE)
+    mask = ((probes['ratio'] < min_ratio) |
+            (probes['ratio'] > max_ratio) |
             (probes['spread'] > params.MAX_REF_SPREAD))
     return mask
 

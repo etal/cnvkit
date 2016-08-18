@@ -31,7 +31,7 @@ class CopyNumArray(gary.GenomicArray):
             data_table = self._make_blank()
         # NB: 'log2' values are deprecated in favor of 'ratio' (absolute scale)
         if 'log2' in data_table.columns:
-            # Every bin needs a log2 value; the others can be NaN
+            # Every bin needs a log2 value; other columns can have NaN
             d2 = data_table.dropna(subset=['log2'])
             if len(d2) < len(data_table):
                 logging.warn("Dropped %d rows with missing log2 values",
@@ -71,6 +71,11 @@ class CopyNumArray(gary.GenomicArray):
     @log2.setter
     def log2(self, value):
         self.data["log2"] = value
+
+    @property
+    def _log2_ratio(self):
+        return (np.exp2(self.data['ratio'])
+                .replace(-np.inf, params.NULL_LOG2_COVERAGE))
 
     @property
     def _chr_x_label(self):
@@ -150,23 +155,23 @@ class CopyNumArray(gary.GenomicArray):
         cnarr = (self.drop_low_coverage() if skip_low else self).autosomes()
         if cnarr:
             if by_chrom:
-                values = np.array([estimator(subarr['log2'])
+                values = np.array([estimator(subarr['ratio'])
                                    for _c, subarr in cnarr.by_chromosome()
                                    if len(subarr)])
             else:
-                values = cnarr['log2']
-            self.data['log2'] -= estimator(values)
+                values = cnarr['ratio']
+            self.data['ratio'] /= estimator(values)
+            self.data['log2'] = self._log2_ratio  # Shim
 
     def drop_low_coverage(self):
-        """Drop bins with extremely low log2 coverage values.
+        """Drop bins with extremely low coverage-ratio values.
 
-        These are generally bins that had no reads mapped, and so were
-        substituted with a small dummy log2 value to avoid divide-by-zero
-        errors.
+        These are generally bins that had no reads mapped due to sample-specific
+        issues. A very small coverage value (log2 or ratio) may have been
+        substituted to avoid domain or divide-by-zero errors.
         """
-        return self.as_dataframe(self.data[self.data['log2'] >
-                                           params.NULL_LOG2_COVERAGE -
-                                           params.MIN_REF_COVERAGE])
+        return self.as_dataframe(
+            self.data[self.data['ratio'] > params.LOW_COVERAGE])
 
     def squash_genes(self, summary_func=descriptives.biweight_location,
                      squash_background=False, ignore=params.IGNORE_GENE_NAMES):
@@ -344,5 +349,6 @@ class CopyNumArray(gary.GenomicArray):
         # ENH: use weight argument to these stats
         loc = descriptives.biweight_location(y)
         spread = descriptives.biweight_midvariance(y, loc)
-        scale = loc / spread**2
-        return scale
+        if spread > 0:
+            return loc / spread**2
+        return 1.0

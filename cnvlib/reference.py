@@ -16,6 +16,7 @@ def bed2probes(bed_fname):
     table = regions.data.loc[:, ("chromosome", "start", "end")]
     table["gene"] = (regions.data["gene"] if "gene" in regions.data else '-')
     table["log2"] = 0.0
+    table["ratio"] = 1.0
     table["spread"] = 0.0
     return CNA(table, {"sample_id": core.fbase(bed_fname)})
 
@@ -40,7 +41,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
     if not len(cnarr1):
         # Just create an empty array with the right columns
         col_names = ['chromosome', 'start', 'end', 'gene',
-                     'depth', 'ratio', 'log2']
+                     'log2', 'ratio', 'depth']
         if 'gc' in cnarr1 or fa_fname:
             col_names.append('gc')
         if fa_fname:
@@ -106,9 +107,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
         cnarr.center_all(skip_low=skip_low)
         shift_sex_chroms(cnarr)
         # Skip bias corrections if most bins have no coverage (e.g. user error)
-        if (cnarr['ratio'] > np.exp2(params.NULL_LOG2_COVERAGE -
-                                     params.MIN_REF_COVERAGE)
-           ).sum() <= len(cnarr) // 2:
+        if (cnarr['ratio'] > params.LOW_COVERAGE).sum() <= len(cnarr) // 2:
             logging.warn("WARNING: most bins have no or very low coverage; "
                          "check that the right BED file was used")
         else:
@@ -125,6 +124,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
 
     # Pseudocount of 1 "flat" sample
     all_coverages = [flat_coverage['ratio'], bias_correct_coverage(cnarr1)]
+    all_depths = [cnarr1['depth']]
     for fname in filenames[1:]:
         logging.info("Loading target %s", fname)
         cnarrx = tabio.read_cna(fname)
@@ -137,11 +137,14 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
             raise RuntimeError("%s probes do not match those in %s"
                                % (fname, filenames[0]))
         all_coverages.append(bias_correct_coverage(cnarrx))
+        all_depths.append(cnarrx['depth'])
     all_coverages = np.vstack(all_coverages)
 
     logging.info("Calculating average bin coverages")
     cvg_centers = np.apply_along_axis(descriptives.biweight_location, 0,
                                       all_coverages)
+    depth_centers = np.apply_along_axis(descriptives.biweight_location, 0,
+                                        np.vstack(all_depths))
     logging.info("Calculating bin spreads")
     spreads = np.asarray([descriptives.biweight_midvariance(a, initial=i)
                           for a, i in zip(all_coverages.T, cvg_centers)])
@@ -150,9 +153,9 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
         'start': cnarr1.start,
         'end': cnarr1.end,
         'gene': cnarr1['gene'],
-        'depth': cvg_centers * 100,  # XXX
+        'depth': depth_centers,
         'ratio': cvg_centers,
-        'log2': np.log2(np.maximum(cvg_centers, 2**params.NULL_LOG2_COVERAGE)),
+        'log2': np.log2(np.maximum(cvg_centers, params.NULL_COVERAGE)),
         'spread': spreads,
     })
     return CNA.from_columns(columns, {'sample_id': "reference"})
