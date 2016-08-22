@@ -21,10 +21,10 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
     if not len(cnarr):
         return cnarr
 
-    ref_matched = match_ref_to_probes(ref_cnarr, cnarr)
+    ref_matched = match_ref_to_sample(ref_cnarr, cnarr)
 
-    # Drop probes that had poor coverage in the pooled reference
-    ok_cvg_indices = ~mask_bad_probes(ref_matched)
+    # Drop bins that had poor coverage in the pooled reference
+    ok_cvg_indices = ~mask_bad_bins(ref_matched)
     logging.info("Keeping %d of %d bins", sum(ok_cvg_indices), len(ref_matched))
     cnarr = cnarr[ok_cvg_indices]
     ref_matched = ref_matched[ok_cvg_indices]
@@ -32,9 +32,10 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
     # Apply corrections for known systematic biases in coverage
     cnarr.center_all(skip_low=skip_low)
     # Skip bias corrections if most bins have no coverage (e.g. user error)
-    if (cnarr['ratio'] > params.LOW_COVERAGE).sum() <= len(cnarr) // 2:
-        logging.warn("WARNING: most bins have no or very low coverage; "
-                     "check that the right BED file was used")
+    if (cnarr['log2'] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+        ).sum() <= len(cnarr) // 2:
+            logging.warn("WARNING: most bins have no or very low coverage; "
+                         "check that the right BED file was used")
     else:
         if fix_gc:
             if 'gc' in ref_matched:
@@ -54,55 +55,52 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
                 logging.warn("WARNING: Skipping correction for RepeatMasker bias")
 
     # Normalize coverages according to the reference
-    cnarr['ratio'] /= ref_matched['ratio']
-    cnarr['log2'] = cnarr._log2_ratio  # Shim
+    # (Subtract the reference log2 copy number to get the log2 ratio)
+    cnarr.data['log2'] -= ref_matched['log2']
     cnarr.center_all(skip_low=skip_low)
     return apply_weights(cnarr, ref_matched)
 
 
-def mask_bad_probes(probes):
-    """Flag the probes with excessively low or inconsistent coverage.
+def mask_bad_bins(cnarr):
+    """Flag the bins with excessively low or inconsistent coverage.
 
-    Returns a bool array where True indicates probes that failed the checks.
+    Returns a bool array where True indicates bins that failed the checks.
     """
-    min_ratio = 2 ** params.MIN_REF_COVERAGE
-    max_ratio = 2 ** (-params.MIN_REF_COVERAGE)
-    mask = ((probes['ratio'] < min_ratio) |
-            (probes['ratio'] > max_ratio) |
-            (probes['spread'] > params.MAX_REF_SPREAD))
+    mask = ((cnarr['log2'] < params.MIN_REF_COVERAGE) |
+            (cnarr['log2'] > -params.MIN_REF_COVERAGE) |
+            (cnarr['spread'] > params.MAX_REF_SPREAD))
     return mask
 
 
-def match_ref_to_probes(ref_pset, probes):
-    """Filter the reference probes to match the target or antitarget probe set.
-    """
-    probes_labeled = probes.data.set_index(pd.Index(probes.coords()))
-    ref_labeled = ref_pset.data.set_index(pd.Index(ref_pset.coords()))
+def match_ref_to_sample(ref_cnarr, samp_cnarr):
+    """Filter the reference bins to match the sample (target or antitarget)."""
+    samp_labeled = samp_cnarr.data.set_index(pd.Index(samp_cnarr.coords()))
+    ref_labeled = ref_cnarr.data.set_index(pd.Index(ref_cnarr.coords()))
     # Safety
-    for dset, name in ((probes_labeled, "probe"),
+    for dset, name in ((samp_labeled, "sample"),
                        (ref_labeled, "reference")):
         dupes = dset.index.duplicated()
         if dupes.any():
             raise ValueError("Duplicated genomic coordinates in " + name +
                              " set:\n" + "\n".join(map(str, dset.index[dupes])))
-    ref_matched = ref_labeled.reindex(index=probes_labeled.index)
+    ref_matched = ref_labeled.reindex(index=samp_labeled.index)
     # Check for signs that the wrong reference was used
     num_missing = pd.isnull(ref_matched.start).sum()
     if num_missing > 0:
         raise ValueError("Reference is missing %d bins found in %s"
-                         % (num_missing, probes.sample_id))
-    return ref_pset.as_dataframe(ref_matched.reset_index(drop=True))
+                         % (num_missing, samp_cnarr.sample_id))
+    return ref_cnarr.as_dataframe(ref_matched.reset_index(drop=True))
 
 
 def center_by_window(cnarr, fraction, sort_key):
     """Smooth out biases according to the trait specified by sort_key.
 
-    E.g. correct GC-biased probes by windowed averaging across similar-GC
-    probes; or for similar interval sizes.
+    E.g. correct GC-biased bins by windowed averaging across similar-GC
+    bins; or for similar interval sizes.
     """
-    # Separate neighboring probes that could have the same key
+    # Separate neighboring bins that could have the same key
     # (to avoid re-centering actual CNV regions -- only want an independently
-    # sampled subset of presumably overall-CN-neutral probes)
+    # sampled subset of presumably overall-CN-neutral bins)
     df = cnarr.data.reset_index(drop=True)
     shuffle_order = np.random.permutation(df.index)
     df = df.reindex(shuffle_order)
@@ -220,9 +218,8 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
         # NB: Not used with a flat reference
         logging.debug("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from neutral coverage
-        flat_cvgs = ref_matched.expect_flat_cvg()
-        ratios = ref_matched['ratio'] / flat_cvgs['ratio']
-        weights *= np.minimum(ratios, 1 / ratios)
+        flat_cvgs = ref_matched.expect_flat_log2()
+        weights *= np.exp2(-np.abs(ref_matched['log2'] - flat_cvgs))
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
         logging.debug("Weighting bins by coverage spread in reference")

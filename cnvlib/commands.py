@@ -581,10 +581,8 @@ def do_reference_flat(targets, antitargets, fa_fname=None,
     ref_probes = reference.bed2probes(targets)
     ref_probes.add(reference.bed2probes(antitargets))
     # Set sex chromosomes by "reference" gender
-    expect_flat = ref_probes.expect_flat_cvg(male_reference)
-    ref_probes['log2'] = expect_flat['log2']
-    ref_probes['ratio'] = expect_flat['ratio']
-    ref_probes['depth'] = expect_flat['ratio']  # XXX
+    ref_probes['log2'] = ref_probes.expect_flat_log2(male_reference)
+    ref_probes['depth'] = np.exp2(ref_probes['log2'])  # Shim
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
         gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)

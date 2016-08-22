@@ -4,6 +4,7 @@ from builtins import map, str, zip
 from past.builtins import basestring
 
 import logging
+import math
 import os.path
 import time
 
@@ -12,7 +13,7 @@ import pysam
 from . import tabio
 from .cnary import CopyNumArray as CNA
 from .core import fbase
-from .params import READ_LEN
+from .params import NULL_LOG2_COVERAGE, READ_LEN
 
 
 def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
@@ -58,6 +59,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
         logging.info("(Couldn't calculate total number of mapped reads)")
 
     return CNA.from_rows(list(cna_rows),
+                         columns=CNA._required_columns + ('depth',),
                          meta_dict={'sample_id': fbase(bam_fname)})
 
 
@@ -70,7 +72,9 @@ def interval_coverages_count(bed_fname, bam_fname, min_mapq):
         for _chrom, start, end, gene, in subregions.coords(["gene"]):
             count, depth = region_depth_count(bamfile, chrom, start, end,
                                               min_mapq)
-            yield count, (chrom, start, end, gene, depth)
+            yield [count,
+                   (chrom, start, end, gene,
+                    math.log(depth, 2) if depth else NULL_LOG2_COVERAGE, depth)]
 
 
 def region_depth_count(bamfile, chrom, start, end, min_mapq):
@@ -105,7 +109,9 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq):
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
     for chrom, start, end, gene, count, depth in bedcov(bed_fname, bam_fname,
                                                         min_mapq):
-        yield count, (chrom, start, end, gene, depth)
+        yield [count,
+               (chrom, start, end, gene,
+                math.log(depth, 2) if depth else NULL_LOG2_COVERAGE, depth)]
 
 
 def bedcov(bed_fname, bam_fname, min_mapq):

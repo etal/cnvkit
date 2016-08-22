@@ -6,7 +6,6 @@ from past.builtins import basestring
 import logging
 
 import numpy as np
-import pandas as pd
 
 from . import core, gary, descriptives, params, smoothing
 
@@ -18,50 +17,13 @@ class CopyNumArray(gary.GenomicArray):
 
     Optional columns: gc, rmask, spread, weight, probes
     """
-    _required_columns = ('chromosome', 'start', 'end', 'gene',
-                         'log2', 'ratio')
-    _required_dtypes = (str, int, int, str, float, float)
-    # Extra columns:
-    # "depth", "ratio",
-    # "gc", "rmask", "spread", "weight", "probes"
+    _required_columns = ("chromosome", "start", "end", "gene", "log2")
+    _required_dtypes = (str, int, int, str, float)
+    # ENH: make gene optional
+    # Extra columns, in order:
+    # "depth", "gc", "rmask", "spread", "weight", "probes"
 
     def __init__(self, data_table, meta_dict=None):
-        if not isinstance(data_table, pd.DataFrame):
-            # Empty but conformant table
-            data_table = self._make_blank()
-        # NB: 'log2' values are deprecated in favor of 'ratio' (absolute scale)
-        if 'log2' in data_table.columns:
-            # Every bin needs a log2 value; other columns can have NaN
-            d2 = data_table.dropna(subset=['log2'])
-            if len(d2) < len(data_table):
-                logging.warn("Dropped %d rows with missing log2 values",
-                             len(data_table) - len(d2))
-                data_table = d2
-        else:
-            # Shim to provide log2 column for functions that need it
-            if 'ratio' in data_table.columns:
-                key = 'ratio'
-            elif 'depth' in data_table.columns:
-                key = 'depth'
-            else:
-                raise ValueError("Missing 'log2'/'ratio'/'depth' column")
-            data_table['log2'] = (np.log2(data_table[key])
-                                  .replace(-np.inf, params.NULL_LOG2_COVERAGE))
-        if 'ratio' not in data_table.columns:
-            # Shim to load files created before 'ratio' was introduced
-            if 'log2' in data_table.columns:
-                data_table['ratio'] = np.exp2(data_table['log2'])
-            elif 'depth' in data_table.columns:
-                data_table['ratio'] = data_table['depth'] #/ data_table['depth'].median()
-                # Likely .cnn: handle targets & antitargets like 'reference'
-                bg_mask = data_table['gene'] == 'Background'
-                bg_cna = CopyNumArray(data_table[bg_mask])
-                fg_cna = CopyNumArray(data_table[~bg_mask])
-                bg_cna.center_all(skip_low=False)
-                fg_cna.center_all(skip_low=True)
-                full_cna = fg_cna.concat([fg_cna, bg_cna])
-                data_table = full_cna.data
-
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
     @property
@@ -71,11 +33,6 @@ class CopyNumArray(gary.GenomicArray):
     @log2.setter
     def log2(self, value):
         self.data["log2"] = value
-
-    @property
-    def _log2_ratio(self):
-        return (np.exp2(self.data['ratio'])
-                .replace(-np.inf, params.NULL_LOG2_COVERAGE))
 
     @property
     def _chr_x_label(self):
@@ -155,23 +112,23 @@ class CopyNumArray(gary.GenomicArray):
         cnarr = (self.drop_low_coverage() if skip_low else self).autosomes()
         if cnarr:
             if by_chrom:
-                values = np.array([estimator(subarr['ratio'])
+                values = np.array([estimator(subarr['log2'])
                                    for _c, subarr in cnarr.by_chromosome()
                                    if len(subarr)])
             else:
-                values = cnarr['ratio']
-            self.data['ratio'] /= estimator(values)
-            self.data['log2'] = self._log2_ratio  # Shim
+                values = cnarr['log2']
+            self.data['log2'] -= estimator(values)
 
     def drop_low_coverage(self):
-        """Drop bins with extremely low coverage-ratio values.
+        """Drop bins with extremely low log2 coverage values.
 
-        These are generally bins that had no reads mapped due to sample-specific
-        issues. A very small coverage value (log2 or ratio) may have been
-        substituted to avoid domain or divide-by-zero errors.
+        These are generally bins that had no reads mapped due to
+        sample-specific issues. A very small coverage value (log2 ratio) may
+        have been substituted to avoid domain or divide-by-zero errors.
         """
-        return self.as_dataframe(
-            self.data[self.data['ratio'] > params.LOW_COVERAGE])
+        return self.as_dataframe(self.data[self.data['log2'] >
+                                           params.NULL_LOG2_COVERAGE -
+                                           params.MIN_REF_COVERAGE])
 
     def squash_genes(self, summary_func=descriptives.biweight_location,
                      squash_background=False, ignore=params.IGNORE_GENE_NAMES):
@@ -269,7 +226,7 @@ class CopyNumArray(gary.GenomicArray):
             rel_chrx_cvg = np.median(x_cvgs) - np.median(auto_cvgs)
         return rel_chrx_cvg
 
-    def expect_flat_cvg(self, is_male_reference=None):
+    def expect_flat_log2(self, is_male_reference=None):
         """Get the uninformed expected copy ratios of each bin.
 
         Create an array of log2 coverages like a "flat" reference.
@@ -279,6 +236,7 @@ class CopyNumArray(gary.GenomicArray):
         """
         if is_male_reference is None:
             is_male_reference = not self.guess_xx(verbose=False)
+        cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
             idx = np.asarray((self.chromosome == self._chr_x_label) |
@@ -286,15 +244,8 @@ class CopyNumArray(gary.GenomicArray):
         else:
             # Y will be all noise, so replace with 1 "flat" copy
             idx = np.asarray(self.chromosome == self._chr_y_label)
-        # ENH: do math with ratio, then calculate log2 from it
-        ratio = np.ones(len(self), dtype=np.float_)
-        log2 = np.zeros(len(self), dtype=np.float_)
-        ratio[idx] = 0.5
-        log2[idx] = -1.0
-        depth = ratio * self.guess_average_depth()
-        return pd.DataFrame({'depth': depth,
-                             'log2': log2,
-                             'ratio': ratio})
+        cvg[idx] = -1.0
+        return cvg
 
     # Reporting
 
@@ -351,4 +302,4 @@ class CopyNumArray(gary.GenomicArray):
         spread = descriptives.biweight_midvariance(y, loc)
         if spread > 0:
             return loc / spread**2
-        return 1.0
+        return loc

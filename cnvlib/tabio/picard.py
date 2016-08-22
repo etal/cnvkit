@@ -60,18 +60,18 @@ def read_picard_hs(infile):
                       "start", "end", "length",
                       "gene", # name
                       "gc", # %gc
-                      "depth",
-                      "ratio",
-                     ]
+                      "depth", "ratio"]
     del dframe["length"]
     dframe["start"] -= 1
     dframe["gene"] = dframe["gene"].apply(unpipe_name)
-    coverages = np.asarray(dframe['depth'])
-    # Safety check
-    no_cvg_cnt = (coverages == 0).sum()
-    if no_cvg_cnt > TOO_MANY_NO_COVERAGE:
-        logging.warn("*WARNING* Sample %s has %d bins with no coverage",
-                     str(infile), no_cvg_cnt)
+    # Avoid math domain error converting coverages to log2 scale
+    coverages = dframe["ratio"].copy()
+    no_cvg_idx = (coverages == 0)
+    if no_cvg_idx.sum() > TOO_MANY_NO_COVERAGE:
+        logging.warn("*WARNING* Sample %s has >%d bins with no coverage",
+                     str(infile), TOO_MANY_NO_COVERAGE)
+    coverages[no_cvg_idx] = 2**params.NULL_LOG2_COVERAGE
+    dframe["log2"] = np.log2(coverages)
     return dframe
 
 
@@ -119,12 +119,10 @@ def write_interval(dframe):
 def write_picard_hs(dframe):
     if "depth" in dframe.columns:
         coverage = dframe["depth"]
+        norm = coverage / coverage.mean()
     else:
         coverage = np.exp2(dframe["log2"])
-    if "ratio" in dframe.columns:
-        norm = dframe["ratio"]
-    else:
-        norm = coverage / coverage.mean()
+        norm = coverage
     return pd.DataFrame.from_items([
         ("chrom", dframe["chromosome"]),
         ("start", dframe["start"] + 1),

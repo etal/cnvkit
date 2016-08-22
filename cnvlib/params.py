@@ -4,10 +4,6 @@ MIN_REF_COVERAGE = -5.0
 MAX_REF_SPREAD = 1.0
 NULL_LOG2_COVERAGE = -20.0
 
-# Shims for using 'ratio' instead of 'log2' values (absolute scale)
-NULL_COVERAGE = 2 ** NULL_LOG2_COVERAGE
-LOW_COVERAGE = 2 ** (NULL_LOG2_COVERAGE - MIN_REF_COVERAGE)
-
 # Sequencing read length (or average, if it varies)
 READ_LEN = 100
 
