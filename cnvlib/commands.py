@@ -974,7 +974,8 @@ def _cmd_scatter(args):
                    args.background_marker, args.trend, args.width,
                    args.y_min, args.y_max, args.title)
         if args.output:
-            pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
+            oformat = os.path.splitext(args.output)[-1].replace(".", "")
+            pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
             logging.info("Wrote %s", args.output)
         else:
             pyplot.show()
