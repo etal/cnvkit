@@ -269,7 +269,7 @@ class CopyNumArray(gary.GenomicArray):
                       for _seg, subcna in self.by_ranges(segments)]
         return np.concatenate(resids) if resids else np.array([])
 
-    def guess_average_depth(self, segments=None, window=100):
+    def _guess_average_depth(self, segments=None, window=100):
         """Estimate the effective average read depth from variance.
 
         Assume read depths are Poisson distributed, converting log2 values to
