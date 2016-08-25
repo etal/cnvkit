@@ -5,8 +5,13 @@ from past.builtins import basestring
 
 import logging
 import math
+import os
 import os.path
+import atexit
+import tempfile
 import time
+import gzip
+from concurrent import futures
 
 import pysam
 
@@ -63,18 +68,21 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
                          meta_dict={'sample_id': fbase(bam_fname)})
 
 
-def interval_coverages_count(bed_fname, bam_fname, min_mapq):
+def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=12):
     """Calculate log2 coverages in the BAM file at each interval."""
     bamfile = pysam.Samfile(bam_fname, 'rb')
-    for chrom, subregions in tabio.read_auto(bed_fname).by_chromosome():
-        logging.info("Processing chromosome %s of %s",
-                     chrom, os.path.basename(bam_fname))
-        for _chrom, start, end, gene, in subregions.coords(["gene"]):
-            count, depth = region_depth_count(bamfile, chrom, start, end,
-                                              min_mapq)
-            yield [count,
-                   (chrom, start, end, gene,
-                    math.log(depth, 2) if depth else NULL_LOG2_COVERAGE, depth)]
+    with futures.ProcessPoolExecutor(procs) as pool:
+
+        for chrom, subregions in tabio.read_auto(bed_fname).by_chromosome():
+            logging.info("Processing chromosome %s of %s",
+                         chrom, os.path.basename(bam_fname))
+
+            for count, depth in pool.map(region_depth_count, (
+                                         (bamfile, chrom, start, end, min_mapq)
+                                         for _chrom, start, end, gene in subregions.coords["gene"])):
+                yield [count,
+                       (chrom, start, end, gene,
+                        math.log(depth, 2) if depth else NULL_LOG2_COVERAGE, depth)]
 
 
 def region_depth_count(bamfile, chrom, start, end, min_mapq):
@@ -104,15 +112,60 @@ def region_depth_count(bamfile, chrom, start, end, min_mapq):
     return count, depth
 
 
-def interval_coverages_pileup(bed_fname, bam_fname, min_mapq):
+def rm(path):
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+def to_chunks(bed_fname, chunk_size=5000):
+    """Split the bed-file into chunks for parallelization"""
+
+    k, chunk = 0, 0
+    fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
+    fh = os.fdopen(fd, "w")
+    atexit.register(rm, name)
+
+    for line in (gzip.open if bed_fname.endswith(".gz") else open)(bed_fname):
+        if line[0] == "#": continue
+        k += 1
+        fh.write(line)
+
+
+        if k % chunk_size == 0:
+            fh.close()
+            yield name
+            chunk += 1
+            fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
+            fh = os.fdopen(fd, "w")
+    fh.close()
+    if k % chunk_size:
+        yield name
+
+
+def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=10):
     """Calculate log2 coverages in the BAM file at each interval."""
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
-    for chrom, start, end, gene, count, depth in bedcov(bed_fname, bam_fname,
-                                                        min_mapq):
-        yield [count,
-               (chrom, start, end, gene,
-                math.log(depth, 2) if depth else NULL_LOG2_COVERAGE, depth)]
+    if procs == 1:
+        for chrom, start, end, gene, count, depth in bedcov(bed_fname, bam_fname,
+                                                            min_mapq):
+            yield [count,
+                   (chrom, start, end, gene,
+                    math.log(depth, 2) if depth else NULL_LOG2_COVERAGE, depth)]
+        raise StopIteration
 
+    with futures.ProcessPoolExecutor(procs) as pool:
+        for biter in pool.map(_bedcov, ((bed_chrom, bam_fname, min_mapq) for
+                                       bed_chrom in to_chunks(bed_fname))):
+            for chrom, start, end, gene, count, depth in biter:
+                yield [count,
+                       (chrom, start, end, gene,
+                        math.log(depth, 2) if depth else NULL_LOG2_COVERAGE, depth)]
+
+
+def _bedcov(args):
+    """Wrapper for parallel."""
+    return list(bedcov(*args))
 
 def bedcov(bed_fname, bam_fname, min_mapq):
     """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
@@ -136,7 +189,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     if isinstance(lines, basestring):
         lines = lines.splitlines()
     for line in lines:
-        fields = line.split('\t')
+        fields = line.split('\t', 5)
         if len(fields) == 5:
             chrom, start_s, end_s, gene, basecount_s = fields
         elif len(fields) == 4:
