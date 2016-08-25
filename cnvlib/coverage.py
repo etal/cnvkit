@@ -162,7 +162,7 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=10):
                 yield [count,
                        (chrom, start, end, gene,
                         math.log(depth, 2) if depth else NULL_LOG2_COVERAGE, depth)]
-
+            rm(bed_chrom)
 
 def _bedcov(args):
     """Wrapper for parallel."""
