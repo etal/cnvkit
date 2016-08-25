@@ -2,7 +2,6 @@
 from __future__ import absolute_import, division
 
 import math
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -27,43 +26,31 @@ def check_inputs(x, width):
     if wing > len(x):
         wing = len(x) - 1
     assert wing > 0, "Wing must be greater than 0 (got %s)" % wing
-    return x, wing
+    # Pad the edges of the original array with mirror copies
+    signal = pd.Series(np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1])))
+    return x, wing, signal
 
 
 def rolling_median(x, width):
     """Rolling median with mirrored edges."""
-    x, wing = check_inputs(x, width)
-    # Pad the edges of the original array with mirror copies
-    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
-    with warnings.catch_warnings():
-        # NB: in pandas 0.18+ this function is deprecated
-        warnings.simplefilter("ignore", FutureWarning)
-        rolled = pd.rolling_median(signal, 2 * wing + 1, center=True)
+    x, wing, signal = check_inputs(x, width)
+    if signal.hasnans:
+        signal = signal.interpolate()
+    rolled = signal.rolling(2 * wing + 1, center=True).median()
     return rolled[wing:-wing]
 
 
 def rolling_quantile(x, width, quantile):
     """Rolling quantile (0--1) with mirrored edges."""
-    x, wing = check_inputs(x, width)
-    # Pad the edges of the original array with mirror copies
-    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
-    with warnings.catch_warnings():
-        # NB: in pandas 0.18+ this function is deprecated
-        warnings.simplefilter("ignore", FutureWarning)
-        rolled = pd.rolling_quantile(signal, 2 * wing + 1, quantile,
-                                     center=True)
+    x, wing, signal = check_inputs(x, width)
+    rolled = signal.rolling(2 * wing + 1, center=True).quantile(quantile)
     return rolled[wing:-wing]
 
 
 def rolling_std(x, width):
     """Rolling quantile (0--1) with mirrored edges."""
-    x, wing = check_inputs(x, width)
-    # Pad the edges of the original array with mirror copies
-    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
-    with warnings.catch_warnings():
-        # NB: in pandas 0.18+ this function is deprecated
-        warnings.simplefilter("ignore", FutureWarning)
-        rolled = pd.rolling_std(signal, 2 * wing + 1, center=True)
+    x, wing, signal = check_inputs(x, width)
+    rolled = signal.rolling(2 * wing + 1, center=True).std()
     return rolled[wing:-wing]
 
 
@@ -80,9 +67,7 @@ def smoothed(x, width, do_fit_edges=False):
         Fraction of x's total length to include in the rolling window (i.e. the
         proportional window width), or the integer size of the window.
     """
-    x, wing = check_inputs(x, width)
-    # Pad the edges with mirror-image copies of the array
-    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
+    x, wing, signal = check_inputs(x, width)
     # Apply signal smoothing
     window = np.kaiser(2 * wing + 1, 14)
     y = np.convolve(window / window.sum(), signal, mode='same')
