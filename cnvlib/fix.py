@@ -34,8 +34,8 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
     # Skip bias corrections if most bins have no coverage (e.g. user error)
     if (cnarr['log2'] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
         ).sum() <= len(cnarr) // 2:
-            logging.warn("WARNING: most bins have no or very low coverage; "
-                         "check that the right BED file was used")
+        logging.warn("WARNING: most bins have no or very low coverage; "
+                     "check that the right BED file was used")
     else:
         if fix_gc:
             if 'gc' in ref_matched:
