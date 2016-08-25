@@ -140,6 +140,7 @@ def to_chunks(bed_fname, chunk_size=5000):
             fh = os.fdopen(fd, "w")
     fh.close()
     if k % chunk_size:
+        fh.close()
         yield name
 
 
