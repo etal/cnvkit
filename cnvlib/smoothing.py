@@ -34,23 +34,23 @@ def check_inputs(x, width):
 def rolling_median(x, width):
     """Rolling median with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
-    if signal.hasnans:
-        signal = signal.interpolate()
-    rolled = signal.rolling(2 * wing + 1, center=True).median()
+    rolled = signal.rolling(2 * wing + 1, 1, center=True).median()
+    # if rolled.hasnans:
+    #     rolled = rolled.interpolate()
     return rolled[wing:-wing]
 
 
 def rolling_quantile(x, width, quantile):
     """Rolling quantile (0--1) with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
-    rolled = signal.rolling(2 * wing + 1, center=True).quantile(quantile)
+    rolled = signal.rolling(2 * wing + 1, 2, center=True).quantile(quantile)
     return rolled[wing:-wing]
 
 
 def rolling_std(x, width):
     """Rolling quantile (0--1) with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
-    rolled = signal.rolling(2 * wing + 1, center=True).std()
+    rolled = signal.rolling(2 * wing + 1, 2, center=True).std()
     return rolled[wing:-wing]
 
 

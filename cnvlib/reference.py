@@ -87,7 +87,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
         cnarr['log2'] += flat_coverage
         if is_sample_female:
             # chrX has same ploidy as autosomes; chrY is just unusable noise
-            cnarr[is_chr_y, 'log2'] = -1.0  # np.nan
+            cnarr[is_chr_y, 'log2'] = -1.0  # np.nan is worse
         else:
             # 1/2 #copies of each sex chromosome
             cnarr[is_chr_x | is_chr_y, 'log2'] += 1.0
