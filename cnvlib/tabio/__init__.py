@@ -72,7 +72,9 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         logging.info("Blank file?: %s", infile)
         suggest_into = GA
         dframe = []
-    return (into or suggest_into)(dframe, meta)
+    result = (into or suggest_into)(dframe, meta)
+    result.sort_columns()
+    return result
     # ENH CategoricalIndex ---
     # if dframe:
     # dframe['chromosome'] = pd.Categorical(dframe['chromosome'],
