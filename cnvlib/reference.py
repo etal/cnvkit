@@ -86,9 +86,8 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
         is_sample_female = cnarr.guess_xx()
         cnarr['log2'] += flat_coverage
         if is_sample_female:
-            # chrX already OK
-            # No chrY; it's all noise, so just match the male
-            cnarr[is_chr_y, 'log2'] = -1.0
+            # chrX has same ploidy as autosomes; chrY is just unusable noise
+            cnarr[is_chr_y, 'log2'] = -1.0  # np.nan
         else:
             # 1/2 #copies of each sex chromosome
             cnarr[is_chr_x | is_chr_y, 'log2'] += 1.0
@@ -116,9 +115,9 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
         return cnarr['log2']
 
     # Pseudocount of 1 "flat" sample
-    all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     all_depths = [cnarr1['depth'] if 'depth' in cnarr1
                   else np.exp2(cnarr1['log2'])]
+    all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         logging.info("Loading target %s", fname)
         cnarrx = tabio.read_cna(fname)
@@ -130,9 +129,9 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
                 and (cnarr1['gene'] == cnarrx['gene']).all()):
             raise RuntimeError("%s probes do not match those in %s"
                                % (fname, filenames[0]))
-        all_coverages.append(bias_correct_coverage(cnarrx))
         all_depths.append(cnarrx['depth'] if 'depth' in cnarrx
                           else np.exp2(cnarrx['log2']))
+        all_coverages.append(bias_correct_coverage(cnarrx))
     all_coverages = np.vstack(all_coverages)
 
     logging.info("Calculating average bin coverages")
