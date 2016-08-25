@@ -95,11 +95,11 @@ class CopyNumArray(gary.GenomicArray):
 
     # Manipulation
 
-    def center_all(self, estimator=np.median, skip_low=False, by_chrom=True):
+    def center_all(self, estimator=np.nanmedian, skip_low=False, by_chrom=True):
         """Recenter coverage values to the autosomes' average (in-place)."""
         est_funcs = {
-            "mean": np.mean,
-            "median": np.median,
+            "mean": np.nanmean,
+            "median": np.nanmedian,
             "mode": descriptives.modal_location,
             "biweight": descriptives.biweight_location,
         }

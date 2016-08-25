@@ -11,6 +11,11 @@ import numpy as np
 from scipy import stats
 
 
+def narray(a):
+    a = np.asarray(a)
+    return a[~np.isnan(a)]
+
+
 # M-estimators of central location
 
 def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
@@ -19,6 +24,10 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
     The biweight is a robust statistic for determining the central location of a
     distribution.
     """
+    a = narray(a)
+    if not len(a):
+        return np.nan
+
     def biloc_iter(a, initial):
         # Weight the observations by distance from initial estimate
         d = a - initial
@@ -32,7 +41,6 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
             return initial
         return initial + (d[mask] * w[mask]).sum() / weightsum
 
-    a = np.asarray(a)
     if initial is None:
         initial = np.median(a)
     for _i in range(max_iter):
@@ -43,19 +51,20 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
     return result
 
 
-def modal_location(arr):
+def modal_location(a):
     """Return the modal value of an array's values.
 
     The "mode" is the location of peak density among the values, estimated using
     a Gaussian kernel density estimator.
 
-    `arr` is a 1-D array of floating-point values, e.g. bin log2 ratio values.
+    `a` is a 1-D array of floating-point values, e.g. bin log2 ratio values.
     """
-    if not len(arr):
+    a = narray(a)
+    if not len(a):
         return np.nan
-    elif len(arr) == 1:
-        return arr[0]
-    sarr = np.sort(arr)
+    elif len(a) == 1:
+        return a[0]
+    sarr = np.sort(a)
     kde = stats.gaussian_kde(sarr)
     y = kde.evaluate(sarr)
     peak = sarr[y.argmax()]
@@ -74,7 +83,10 @@ def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-3):
     https://en.wikipedia.org/wiki/Robust_measures_of_scale#The_biweight_midvariance
     https://astropy.readthedocs.io/en/latest/_modules/astropy/stats/funcs.html
     """
-    a = np.asarray(a)
+    a = narray(a)
+    if not len(a):
+        return np.nan
+
     if initial is None:
         initial = biweight_location(a)
     # Difference of observations from initial location estimate
@@ -101,6 +113,7 @@ def gapper_scale(a):
         - Wainer & Thissen (1976)
         - Beers, Flynn, and Gebhardt (1990)
     """
+    a = narray(a)
     gaps = np.diff(np.sort(a))
     n = len(a)
     idx = np.arange(1, n)
@@ -110,7 +123,9 @@ def gapper_scale(a):
 
 def interquartile_range(a):
     """Compute the difference between the array's first and third quartiles."""
-    a = np.asarray(a)
+    a = narray(a)
+    if not len(a):
+        return np.nan
     return np.percentile(a, 75) - np.percentile(a, 25)
 
 
@@ -121,7 +136,9 @@ def median_absolute_deviation(a, scale_to_sd=True):
 
     See: https://en.wikipedia.org/wiki/Median_absolute_deviation
     """
-    a = np.asarray(a)
+    a = narray(a)
+    if not len(a):
+        return np.nan
     a_median = np.median(a)
     mad = np.median(np.abs(a - a_median))
     if scale_to_sd:
@@ -150,7 +167,9 @@ def q_n(a):
         200 1.019
 
     """
-    a = np.asarray(a)
+    a = narray(a)
+    if not len(a):
+        return np.nan
 
     # First quartile of: (|x_i - x_j|: i < j)
     vals = []
