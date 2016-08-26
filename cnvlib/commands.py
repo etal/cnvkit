@@ -1437,8 +1437,7 @@ P_gender.set_defaults(func=_cmd_gender)
 # metrics ---------------------------------------------------------------------
 
 def _cmd_metrics(args):
-    """Compute coverage deviations and other metrics for self-evaluation.
-    """
+    """Compute coverage deviations and other metrics for self-evaluation."""
     if (len(args.cnarrays) > 1 and len(args.segments) > 1 and
         len(args.cnarrays) != len(args.segments)):
         raise ValueError("Number of coverage/segment filenames given must be "
@@ -1451,25 +1450,38 @@ def _cmd_metrics(args):
 
 
 def do_metrics(cnarrs, segments, skip_low=False):
+    """Compute coverage deviations and other metrics for self-evaluation."""
     # Catch if passed args are single CopyNumArrays instead of lists
     if isinstance(cnarrs, _CNA):
         cnarrs = [cnarrs]
     if isinstance(segments, _CNA):
         segments = [segments]
+    else:
+        segments = list(segments)
     if skip_low:
         cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
-
-    # Repeat a single segmentation to match the number of copy ratio inputs
-    if isinstance(segments, list) and len(segments) == 1:
-        cnarrs = list(cnarrs)
-        if len(cnarrs) > 1:
-            segments = [segments[0] for _i in range(len(cnarrs))]
-
     rows = ((cna.meta.get("filename", cna.sample_id),
              len(seg)) + metrics.ests_of_scale(cna.residuals(seg))
-            for cna, seg in zip(cnarrs, segments))
+            for cna, seg in zip_repeater(cnarrs, segments))
     colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
     return pd.DataFrame.from_records(rows, columns=colnames)
+
+
+def zip_repeater(iterable, repeatable):
+    """Repeat a single segmentation to match the number of copy ratio inputs"""
+    rpt_len = len(repeatable)
+    if rpt_len == 1:
+        rpt = repeatable[0]
+        for it in iterable:
+            yield it, rpt
+    else:
+        i = -1
+        for i, (it, rpt) in enumerate(zip(iterable, repeatable)):
+            yield it, rpt
+        # Require lengths to match
+        if not i == rpt_len:
+            raise ValueError("""Number of unsegmented and segmented input files
+                             did not match (%d vs. %d)""" % (i, rpt_len))
 
 
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)

@@ -12,8 +12,9 @@ from scipy import stats
 
 
 def narray(a):
-    a = np.asarray(a)
+    a = np.asfarray(a)
     return a[~np.isnan(a)]
+
 
 
 # M-estimators of central location
