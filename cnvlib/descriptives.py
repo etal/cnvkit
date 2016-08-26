@@ -31,7 +31,8 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
     def biloc_iter(a, initial):
         # Weight the observations by distance from initial estimate
         d = a - initial
-        w = d / max(c * median_absolute_deviation(a, False), epsilon)
+        mad = np.median(np.abs(d))
+        w = d / max(c * mad, epsilon)
         w = (1 - w**2)**2
         # Omit the outlier points
         mask = (w < 1)
@@ -92,12 +93,13 @@ def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-3):
     # Difference of observations from initial location estimate
     d = a - initial
     # Weighting (avoid dividing by zero)
-    w = d / max(c * median_absolute_deviation(a, False), epsilon)
+    mad = np.median(np.abs(d))
+    w = d / max(c * mad, epsilon)
     # Omit the outlier points
     mask = np.abs(w) < 1
     if w[mask].sum() == 0:
         # Insufficient variation to improve on MAD
-        return np.median(np.abs(d)) * 1.4826
+        return mad * 1.4826
     n = mask.sum()
     d_ = d[mask]
     w_ = (w**2)[mask]
