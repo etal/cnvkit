@@ -195,36 +195,42 @@ class CopyNumArray(gary.GenomicArray):
         cutoff = 0.5 if male_reference else -0.5
         # ENH - better coverage approach: take Z-scores or rank of +1,0 or 0,-1
         # based on the available probes, then choose which is more probable
-        rel_chrx_cvg = self.get_relative_chrx_cvg()
-        if rel_chrx_cvg is None:
+        chrx_logr, chry_logr = self.get_relative_chrx_chry_cvg()
+        if chrx_logr is None:
             return
-        is_xx = (rel_chrx_cvg >= cutoff)
+        is_xx = (chrx_logr >= cutoff)
         if verbose:
             logging.info("Relative log2 coverage of X chromosome: %g "
                          "(assuming %s)",
-                         rel_chrx_cvg, ('male', 'female')[is_xx])
+                         chrx_logr, ('male', 'female')[is_xx])
         return is_xx
 
-    def get_relative_chrx_cvg(self):
+    def get_relative_chrx_chry_cvg(self):
         """Get the relative log-coverage of chrX in a sample."""
-        chromosome_x = self[self.chromosome == self._chr_x_label]
-        if not len(chromosome_x):
+        chr_x = self[self.chromosome == self._chr_x_label]
+        if not len(chr_x):
             logging.warn("*WARNING* No %s found in probes; check the input",
                          self._chr_x_label)
             return
+        chr_y = self[self.chromosome == self._chr_y_label]
         autosomes = self.autosomes()
         auto_cvgs = autosomes['log2']
-        x_cvgs = chromosome_x['log2']
+        x_cvgs = chr_x['log2']
+        y_cvgs = chr_y['log2']
         if 'probes' in self:
             # Weight segments by number of probes to ensure good behavior
-            auto_sizes = autosomes['probes']
-            x_sizes = chromosome_x['probes']
             # ENH: weighted median
-            rel_chrx_cvg = (np.average(x_cvgs, weights=x_sizes) -
-                            np.average(auto_cvgs, weights=auto_sizes))
+            avg_auto = np.average(auto_cvgs, weights=autosomes['probes'])
+            avg_chrx = np.average(x_cvgs, weights=chr_x['probes'])
+            avg_chry = (np.average(y_cvgs, weights=chr_y['probes'])
+                        if len(y_cvgs) else None)
         else:
-            rel_chrx_cvg = np.median(x_cvgs) - np.median(auto_cvgs)
-        return rel_chrx_cvg
+            avg_auto = np.median(auto_cvgs)
+            avg_chrx = np.median(x_cvgs)
+            avg_chry = (np.median(y_cvgs) if len(y_cvgs) else None)
+        chrx_logratio = avg_chrx - avg_auto
+        chry_logratio = avg_chry - avg_auto if avg_chry else None
+        return chrx_logratio, chry_logratio
 
     def expect_flat_log2(self, is_male_reference=None):
         """Get the uninformed expected copy ratios of each bin.

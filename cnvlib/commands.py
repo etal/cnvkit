@@ -1397,21 +1397,27 @@ def _cmd_gender(args):
     """Guess samples' gender from the relative coverage of chromosome X."""
     cnarrs = (tabio.read_cna(fname) for fname in args.filenames)
     table = do_gender(cnarrs, args.male_reference)
-    core.write_dataframe(args.output, table, header=False)
+    core.write_dataframe(args.output, table, header=True)
 
 
 def do_gender(cnarrs, is_male_reference):
+    """Guess samples' gender from the relative coverage of chromosome X."""
+    def strsign(num):
+        if num > 0:
+            return "+%.3g" % num
+        return "%.3g" % num
+
     chrx_threshold = (0.5 if is_male_reference else -0.5)
     def guess_and_format(cna):
-        rel_chrx_cvg = cna.get_relative_chrx_cvg()
-        is_xx = (rel_chrx_cvg >= chrx_threshold)
+        chrx_logr, chry_logr = cna.get_relative_chrx_chry_cvg()
+        is_xx = (chrx_logr >= chrx_threshold)
         return (cna.meta["filename"] or cna.sample_id,
-                ("Female" if is_xx else "Male"),
-                "%s%.3g" % ('+' if rel_chrx_cvg > 0 else '',
-                            rel_chrx_cvg))
+                ("Male", "Female")[is_xx],
+                strsign(chrx_logr),
+                strsign(chry_logr))
 
     rows = (guess_and_format(cna) for cna in cnarrs)
-    columns = ["sample", "gender", "rel.chr.X"]
+    columns = ["sample", "gender", "rel.chr.X", "rel.chr.Y"]
     return pd.DataFrame.from_records(rows, columns=columns)
 
 
