@@ -21,7 +21,7 @@ from .core import fbase
 from .params import NULL_LOG2_COVERAGE, READ_LEN
 
 
-def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
+def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
     """Calculate log2 coverages in the BAM file at each interval."""
     start_time = time.time()
 
@@ -38,7 +38,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
     # Calculate average read depth in each bin
     ic_func = (interval_coverages_count if by_count
                else interval_coverages_pileup)
-    results = ic_func(bed_fname, bam_fname, min_mapq)
+    results = ic_func(bed_fname, bam_fname, min_mapq, processes)
     read_counts, cna_rows = list(zip(*list(results)))
 
     # Log some stats
@@ -68,7 +68,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq):
                          meta_dict={'sample_id': fbase(bam_fname)})
 
 
-def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=12):
+def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1):
     """Calculate log2 coverages in the BAM file at each interval."""
     bamfile = pysam.Samfile(bam_fname, 'rb')
     with futures.ProcessPoolExecutor(procs) as pool:
@@ -144,7 +144,7 @@ def to_chunks(bed_fname, chunk_size=5000):
         yield name
 
 
-def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=10):
+def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1):
     """Calculate log2 coverages in the BAM file at each interval."""
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
     if procs == 1:

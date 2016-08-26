@@ -473,7 +473,7 @@ P_anti.set_defaults(func=_cmd_antitarget)
 
 def _cmd_coverage(args):
     """Calculate coverage in the given regions from BAM read depths."""
-    pset = do_coverage(args.interval, args.bam_file, args.count, args.min_mapq)
+    pset = do_coverage(args.interval, args.bam_file, args.count, args.min_mapq, args.processes)
     if not args.output:
         # Create an informative but unique name for the coverage output file
         bambase = core.fbase(args.bam_file)
@@ -488,7 +488,7 @@ def _cmd_coverage(args):
     tabio.write(pset, args.output)
 
 
-def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0):
+def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1):
     """Calculate coverage in the given regions from BAM read depths."""
     if not ngfrills.ensure_bam_sorted(bam_fname):
         raise RuntimeError("BAM file %s must be sorted by coordinates"
@@ -496,7 +496,7 @@ def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0):
     ngfrills.ensure_bam_index(bam_fname)
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
     cnarr = coverage.interval_coverages(bed_fname, bam_fname, by_count,
-                                        min_mapq)
+                                        min_mapq, processes)
     return cnarr
 
 
@@ -510,6 +510,10 @@ P_coverage.add_argument('-q', '--min-mapq', type=int, default=0,
         help="""Minimum mapping quality score (phred scale 0-60) to count a read
                 for coverage depth.  [Default: %(default)s]""")
 P_coverage.add_argument('-o', '--output', help="""Output file name.""")
+P_coverage.add_argument('-p', '--processes', type=int, default=1,
+        help="""Number of subprocesses to calculate coverage in parallel.
+                Give 0 or a negative value to use the maximum number
+                of available CPUs. [Default: use 1 process]""")
 P_coverage.set_defaults(func=_cmd_coverage)
 
 
