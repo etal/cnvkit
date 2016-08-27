@@ -1408,17 +1408,15 @@ def do_gender(cnarrs, is_male_reference):
             return "+%.3g" % num
         return "%.3g" % num
 
-    chrx_threshold = (0.5 if is_male_reference else -0.5)
     def guess_and_format(cna):
-        chrx_logr, chry_logr = cna.get_relative_chrx_chry_cvg()
-        is_xx = (chrx_logr >= chrx_threshold)
+        is_xy, stats = cna.compare_sex_chromosomes(is_male_reference)
         return (cna.meta["filename"] or cna.sample_id,
-                ("Male", "Female")[is_xx],
-                strsign(chrx_logr),
-                strsign(chry_logr))
+                ("Female", "Male")[is_xy],
+                strsign(stats['chrx_ratio']),
+                strsign(stats['chry_ratio']))
 
     rows = (guess_and_format(cna) for cna in cnarrs)
-    columns = ["sample", "gender", "rel.chr.X", "rel.chr.Y"]
+    columns = ["sample", "gender", "X_logratio", "Y_logratio"]
     return pd.DataFrame.from_records(rows, columns=columns)
 
 

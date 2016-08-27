@@ -6,8 +6,10 @@ from past.builtins import basestring
 import logging
 
 import numpy as np
+from scipy.stats import mannwhitneyu
 
 from . import core, gary, descriptives, params, smoothing
+from .metrics import segment_mean
 
 
 class CopyNumArray(gary.GenomicArray):
@@ -192,45 +194,76 @@ class CopyNumArray(gary.GenomicArray):
             -0.5 -- raw target data, not yet corrected
             +0.5 -- probe data already corrected on a male profile
         """
-        cutoff = 0.5 if male_reference else -0.5
-        # ENH - better coverage approach: take Z-scores or rank of +1,0 or 0,-1
-        # based on the available probes, then choose which is more probable
-        chrx_logr, chry_logr = self.get_relative_chrx_chry_cvg()
-        if chrx_logr is None:
-            return
-        is_xx = (chrx_logr >= cutoff)
-        if verbose:
-            logging.info("Relative log2 coverage of X chromosome: %g "
-                         "(assuming %s)",
-                         chrx_logr, ('male', 'female')[is_xx])
-        return is_xx
+        is_xy, stats = self.compare_sex_chromosomes(male_reference)
+        if is_xy is None:
+            return None
+        elif verbose:
+            logging.info("Relative log2 coverage of X=%g (maleness=%g), "
+                        "Y=%g (maleness=%g) --> assuming %s",
+                        stats['chrx_ratio'],
+                        stats['chrx_male_lr'],
+                        stats['chry_ratio'],
+                        stats['chry_male_lr'],
+                        ('female', 'male')[is_xy])
+        return ~is_xy
 
-    def get_relative_chrx_chry_cvg(self):
-        """Get the relative log-coverage of chrX in a sample."""
-        chr_x = self[self.chromosome == self._chr_x_label]
-        if not len(chr_x):
+    def compare_sex_chromosomes(self, male_reference=False, skip_low=False):
+        """Compare coverage ratios of sex chromosomes versus autosomes."""
+        # Expectations:
+        # -------------
+        #       log2
+        #  A   X   Y
+        # * male reference
+        #  0   0   0  :male sample, male reference
+        #  0  +1  -19 :female sample, male reference
+        # * female reference, chrY = -1
+        #  0  -1   0  :male sample, female reference
+        #  0   0  -19 :female sample, female reference
+        # ENH: use np.abs to make tests 1-way
+        # For completeness; this doesn't help much since M-W is nonparametric
+        cnarr = (self.drop_low_coverage() if skip_low else self)
+        chrx = cnarr[cnarr.chromosome == self._chr_x_label]
+        if not len(chrx):
             logging.warn("*WARNING* No %s found in probes; check the input",
                          self._chr_x_label)
-            return
-        chr_y = self[self.chromosome == self._chr_y_label]
-        autosomes = self.autosomes()
-        auto_cvgs = autosomes['log2']
-        x_cvgs = chr_x['log2']
-        y_cvgs = chr_y['log2']
-        if 'probes' in self:
-            # Weight segments by number of probes to ensure good behavior
-            # ENH: weighted median
-            avg_auto = np.average(auto_cvgs, weights=autosomes['probes'])
-            avg_chrx = np.average(x_cvgs, weights=chr_x['probes'])
-            avg_chry = (np.average(y_cvgs, weights=chr_y['probes'])
-                        if len(y_cvgs) else None)
+            return None, {}
+        chrx_l = chrx['log2']
+        auto = cnarr.autosomes()
+        auto_l = auto['log2']
+        if male_reference:
+            female_chrx_u = mannwhitneyu(auto_l, chrx_l - 1)[0]
+            male_chrx_u = mannwhitneyu(auto_l, chrx_l)[0]
         else:
-            avg_auto = np.median(auto_cvgs)
-            avg_chrx = np.median(x_cvgs)
-            avg_chry = (np.median(y_cvgs) if len(y_cvgs) else None)
-        chrx_logratio = avg_chrx - avg_auto
-        chry_logratio = avg_chry - avg_auto if avg_chry else None
-        return chrx_logratio, chry_logratio
+            female_chrx_u = mannwhitneyu(auto_l, chrx_l)[0]
+            male_chrx_u = mannwhitneyu(auto_l, chrx_l + 1)[0]
+        # Mann-Whitney U score is greater for similar-mean sets
+        chrx_male_lr = male_chrx_u / female_chrx_u
+        # Similar for chrY if it's present
+        chry = cnarr[cnarr.chromosome == self._chr_y_label]
+        if len(chry):
+            chry_l = chry['log2']
+            male_chry_u = mannwhitneyu(auto_l, chry_l)[0]
+            female_chry_u = mannwhitneyu(auto_l, chry_l + 3)[0]
+            chry_male_lr = male_chry_u / female_chry_u
+        else:
+            # If chrY is missing, don't sabotage the inference
+            male_chry_u = female_chry_u = np.nan
+            chry_male_lr = 1.0
+        # Relative log2 values, for convenient reporting
+        auto_mean = segment_mean(auto, skip_low=skip_low)
+        chrx_mean = segment_mean(chrx, skip_low=skip_low)
+        chry_mean = segment_mean(chry, skip_low=skip_low)
+        return (chrx_male_lr * chry_male_lr > 1.0,
+                dict(chrx_ratio=chrx_mean - auto_mean,
+                     chry_ratio=chry_mean - auto_mean,
+                     # For debugging, mainly
+                     chrx_male_lr=chrx_male_lr,
+                     chry_male_lr=chry_male_lr,
+                     female_chrx_u=female_chrx_u,
+                     male_chrx_u=male_chrx_u,
+                     female_chry_u=female_chry_u,
+                     male_chry_u=male_chry_u,
+                    ))
 
     def expect_flat_log2(self, is_male_reference=None):
         """Get the uninformed expected copy ratios of each bin.
