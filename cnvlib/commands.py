@@ -1478,7 +1478,7 @@ def zip_repeater(iterable, repeatable):
         for i, (it, rpt) in enumerate(zip(iterable, repeatable)):
             yield it, rpt
         # Require lengths to match
-        if not i == rpt_len:
+        if not i+1 == rpt_len:
             raise ValueError("""Number of unsegmented and segmented input files
                              did not match (%d vs. %d)""" % (i, rpt_len))
 
