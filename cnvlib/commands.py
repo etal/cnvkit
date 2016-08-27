@@ -1265,9 +1265,10 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
         for i, sample in enumerate(sample_data):
             for chrom, curr_offset in chrom_offsets.items():
                 crow = sample[chrom]
-                crow["start"] += curr_offset
-                crow["end"] += curr_offset
-                plot_sample_chrom(i, crow)
+                if len(crow):
+                    crow["start"] += curr_offset
+                    crow["end"] += curr_offset
+                    plot_sample_chrom(i, crow)
 
     return axis
 
