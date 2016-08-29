@@ -29,6 +29,7 @@ requirements:
     - r-cghflasso
     - pyfaidx
     - future
+    - futures
 
 test:
   imports:
