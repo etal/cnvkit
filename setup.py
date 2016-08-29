@@ -21,7 +21,8 @@ try:
             'reportlab >= 3.0',
             'biopython >= 1.62',
             'pyfaidx >= 0.4.7',
-            'future >= 0.15.2'
+            'future >= 0.15.2',
+            'futures',
         ])
 except ImportError:
     from distutils.core import setup
