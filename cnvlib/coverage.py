@@ -72,7 +72,7 @@ def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1):
     """Calculate log2 coverages in the BAM file at each interval."""
     regions = tabio.read_auto(bed_fname)
     # if procs == 1:
-    if True:  # XXX the unchunked parallel version is too slow
+    if True:  # XXX the parallel version is too slow
         bamfile = pysam.Samfile(bam_fname, 'rb')
         for chrom, subregions in regions.by_chromosome():
             logging.info("Processing chromosome %s of %s",
@@ -82,11 +82,12 @@ def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1):
                                                 gene, min_mapq)
                 yield [count, row]
     else:
+        # XXX very slow regardless of chunksize -- lock contention issue?
+        chunksize = (len(regions) // procs) + 1
         with futures.ProcessPoolExecutor(procs) as pool:
-            # TODO - chunk the regions -- very slow otherwise
             args_iter = ((bam_fname, chrom, start, end, gene, min_mapq)
                          for chrom, start, end, gene in regions.coords(["gene"]))
-            for count, row in pool.map(_rdc, args_iter):
+            for count, row in pool.map(_rdc, args_iter, chunksize=chunksize):
                 yield [count, row]
 
 
