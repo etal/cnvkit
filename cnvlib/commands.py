@@ -1184,7 +1184,8 @@ def _cmd_heatmap(args):
     cnarrs = [tabio.read_cna(f) for f in args.filenames]
     do_heatmap(cnarrs, args.chromosome, args.desaturate)
     if args.output:
-        pyplot.savefig(args.output, format='pdf', bbox_inches="tight")
+        oformat = os.path.splitext(args.output)[-1].replace(".", "")
+        pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
         logging.info("Wrote %s", args.output)
     else:
         pyplot.show()
