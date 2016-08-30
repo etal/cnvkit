@@ -175,6 +175,7 @@ def _parse_pedigrees(vcf_reader):
                 yield sample_id, normal_id
 
     elif "GATKCommandLine" in vcf_reader.metadata:
+        # GATK 3.0(?) and earlier
         for tag in vcf_reader.metadata["GATKCommandLine"]:
             if tag.get("ID") == "MuTect":  # any others OK?
                 options = dict(kv.split("=", 1)
@@ -186,6 +187,11 @@ def _parse_pedigrees(vcf_reader):
                               "%s in the MuTect VCF header",
                               sample_id, normal_id)
                 yield sample_id, normal_id
+
+    elif "GATKCommandLine.MuTect2" in vcf_reader.metadata:
+        # GATK 3+ metadata is suboptimal. Apparent convention:
+        # Tumor is the first sample, normal is the second.
+        yield tuple(vcf_reader.samples)
 
 
 def _confirm_unique(sample_id, samples):
@@ -257,7 +263,7 @@ def _extract_genotype(sample):
 def _get_alt_count(sample):
     """Get the alternative allele count from a sample in a VCF record."""
     if "AD" in sample.data._fields and sample.data.AD is not None:
-        # GATK and other callers
+        # GATK and other callers: (ref depth, alt depth)
         if isinstance(sample.data.AD, (list, tuple)):
             alt_count = float(sample.data.AD[1])
         # VarScan
