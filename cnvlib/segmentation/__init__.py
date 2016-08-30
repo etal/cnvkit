@@ -4,6 +4,7 @@ import logging
 import math
 import os.path
 import tempfile
+import locale
 
 import numpy as np
 import pandas as pd
@@ -16,15 +17,24 @@ from concurrent import futures
 
 from Bio._py3k import StringIO
 
+def _to_str(s, enc=locale.getpreferredencoding()):
+    if isinstance(s, bytes):
+        return s.decode(enc)
+    return s
+
 def do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10,
                     save_dataframe=False, rlibpath=None,
                     processes=1):
     """Infer copy number segments from the given coverage table."""
     if processes == 1:
-        return _do_segmentation(cnarr, method, threshold, variants,
+        cna = _do_segmentation(cnarr, method, threshold, variants,
                                 skip_low, skip_outliers,
                                 save_dataframe, rlibpath)
+        if save_dataframe:
+            cna, seg_out = cna
+            return cna, _to_str(seg_out)
+        return cna
 
     rets = []
     # TODO: handle save_dataframe=True
@@ -33,9 +43,9 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                                    threshold, variants, skip_low, skip_outliers,
                                    save_dataframe, rlibpath) for _, ca in cnarr.by_chromosome())))
     if save_dataframe:
-        rstr = [rets[0][1]]
+        rstr = [_to_str(rets[0][1])]
         for ret in rets[1:]:
-            r = ret[1]
+            r = _to_str(ret[1])
             rstr.append(r[r.index('\n') + 1:])
         rets = [ret[0] for ret in rets]
 

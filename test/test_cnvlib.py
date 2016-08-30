@@ -474,6 +474,7 @@ class CommandTests(unittest.TestCase):
 
         self.assertEqual(psegments.data.shape, ssegments.data.shape)
         self.assertEqual(len(psegments.meta), len(ssegments.meta))
+
         self.assertEqual(prstr, srstr)
 
     def test_segmetrics(self):
