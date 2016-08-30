@@ -42,6 +42,27 @@ class VariantArray(gary.GenomicArray):
             for _bin, subvarr in self.by_ranges(ranges, mode='outer',
                                                 keep_empty=True)])
 
+    def heterozygous(self, min_freq=None, max_freq=None):
+        if min_freq is None and max_freq is None:
+            # Use existing genotype/zygosity info
+            zygosity = self["n_zygosity" if "n_zygosity" in self
+                            else "zygosity"]
+            idx_het = (zygosity != 0.0) & (zygosity != 1.0)
+        else:
+            # Decide zygosity from allele frequency
+            freq = self["n_alt_freq" if "n_alt_freq" in self
+                        else "alt_freq"]
+            idx_het = True
+            if min_freq:
+                idx_het = idx_het & (freq >= min_freq)
+            if max_freq:
+                idx_het = idx_het & (freq <= max_freq)
+        if idx_het.any():
+            return self[idx_het]
+        else:
+            # Fallback -- ought to return something
+            return self
+
     def mirrored_baf(self, above_half=None, tumor_boost=False):
         """Mirrored B-allele frequencies (BAFs).
 

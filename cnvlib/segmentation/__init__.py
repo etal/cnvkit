@@ -67,6 +67,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         raise ValueError("Unknown method %r" % method)
 
     if variants:
+        variants = variants.heterozygous()
         # Re-segment the variant allele freqs within each segment
         newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
                    for segment, subvarr in variants.by_ranges(segarr)]

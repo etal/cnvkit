@@ -711,7 +711,7 @@ P_fix.set_defaults(func=_cmd_fix)
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     cnarr = tabio.read_cna(args.filename)
-    variants = (tabio.read(args.vcf, "vcf", skip_hom=True, skip_somatic=True)
+    variants = (tabio.read(args.vcf, "vcf", skip_somatic=True)
                 if args.vcf else None)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
                                            variants=variants,
@@ -775,7 +775,7 @@ def _cmd_call(args):
                                           args.male_reference)
                         if args.purity and args.purity < 1.0
                         else None)
-    vcf = (tabio.read(args.vcf, "vcf", skip_hom=True, skip_somatic=True)
+    vcf = (tabio.read(args.vcf, "vcf", skip_somatic=True)
            if args.vcf else None)
     cnarr = do_call(cnarr, vcf, args.method, args.ploidy, args.purity,
                     args.male_reference, is_sample_female, args.thresholds)
@@ -790,6 +790,7 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
 
     outarr = cnarr.copy()
     if variants:
+        variants = variants.heterozygous()
         outarr["baf"] = variants.baf_by_ranges(outarr)
 
     if purity and purity < 1.0:
@@ -955,12 +956,11 @@ def _cmd_scatter(args):
                           ) if args.filename else None
     segarr = tabio.read_cna(args.segment, sample_id=args.sample_id
                            ) if args.segment else None
-    if not args.sample_id and (cnarr or segarr):
-        args.sample_id = (cnarr or segarr).sample_id
+    # if not args.sample_id and (cnarr or segarr):
+    #     args.sample_id = (cnarr or segarr).sample_id
     varr = (tabio.read(args.vcf, "vcf",
                        sample_id=args.sample_id, normal_id=args.normal_id,
-                       min_depth=args.min_variant_depth, skip_hom=True,
-                       skip_somatic=True)
+                       min_depth=args.min_variant_depth, skip_somatic=True)
             if args.vcf else None)
 
     if args.range_list:
@@ -994,6 +994,8 @@ def do_scatter(cnarr, segments=None, variants=None,
     show_gene: name of gene to highligh
     show_range: chromosome name or coordinate string like "chr1:20-30"
     """
+    if variants:
+        variants = variants.heterozygous()
 
     if not show_gene and not show_range:
         # Plot all chromosomes, concatenated on one plot
@@ -1848,9 +1850,9 @@ def _cmd_export_theta(args):
     logging.info("Wrote %s", args.output)
     if args.vcf:
         variants = tabio.read(args.vcf, "vcf",
-                              sample_id=args.sample_id or tumor_cn.sample_id,
+                              sample_id=args.sample_id, # or tumor_cn.sample_id,
                               normal_id=args.normal_id, min_depth=args.min_depth,
-                              skip_somatic=True, skip_hom=False)
+                              skip_somatic=True)
         tumor_snps, normal_snps = export.export_theta_snps(variants)
         for title, table in [("tumor", tumor_snps), ("normal", normal_snps)]:
             out_fname = "{}.{}.snp_formatted.txt".format(tumor_cn.sample_id, title)

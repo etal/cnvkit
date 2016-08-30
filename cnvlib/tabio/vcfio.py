@@ -12,8 +12,7 @@ from ..vary import VariantArray as VA
 
 
 def read_vcf(infile, sample_id=None, normal_id=None,
-             min_depth=None, skip_hom=False, skip_reject=False,
-             skip_somatic=False):
+             min_depth=None, skip_reject=False, skip_somatic=False):
     """Read one tumor-normal pair or unmatched sample from a VCF file.
 
     By default, return the first tumor-normal pair or unmatched sample in the
@@ -22,7 +21,7 @@ def read_vcf(infile, sample_id=None, normal_id=None,
     sample or pair at that index position, counting from 0.
     """
     results = parse_vcf(infile, sample_id, normal_id, min_depth,
-                        skip_hom, skip_reject, skip_somatic)
+                        skip_reject, skip_somatic)
     sid, nid, dframe = next(results)
     try:
         next(results)
@@ -45,7 +44,7 @@ def read_vcf(infile, sample_id=None, normal_id=None,
 
 
 def parse_vcf(infile, sample_id=None, normal_id=None, min_depth=None,
-             skip_hom=False, skip_reject=False, skip_somatic=False):
+              skip_reject=False, skip_somatic=False):
     """Variant Call Format (VCF) for SNV loci."""
     if isinstance(infile, basestring):
         vcf_reader = vcf.Reader(filename=infile)
@@ -71,24 +70,21 @@ def parse_vcf(infile, sample_id=None, normal_id=None, min_depth=None,
             table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
         table = table.fillna({col: 0.0 for col in table.columns[6:]})
         # Filter out records as requested
-        cnt_depth = cnt_hom = cnt_som = 0
+        cnt_depth = cnt_som = 0
         if min_depth:
-            dkey = "n_depth" if "n_depth" in table else "depth"
-            idx_depth = table[dkey] >= min_depth
-            cnt_depth = (~idx_depth).sum()
-            table = table[idx_depth]
-        if skip_hom:
-            # XXX drop this option
-            zkey = "n_zygosity" if "n_zygosity" in table else "zygosity"
-            idx_het = (table[zkey] != 0.0) & (table[zkey] != 1.0)
-            cnt_hom = (~idx_het).sum()
-            table = table[idx_het]
+            if table["depth"].any():
+                dkey = "n_depth" if "n_depth" in table else "depth"
+                idx_depth = table[dkey] >= min_depth
+                cnt_depth = (~idx_depth).sum()
+                table = table[idx_depth]
+            else:
+                logging.warn("Depth info not available for filtering")
         if skip_somatic:
             idx_som = table["somatic"]
             cnt_som = idx_som.sum()
             table = table[~idx_som]
-        logging.info("Skipped records: %d somatic, %d depth, %d homozygous",
-                        cnt_som, cnt_depth, cnt_hom)
+        logging.info("Loaded %d records; skipped: %d somatic, %d depth",
+                     len(table), cnt_som, cnt_depth)
         yield sid, nid, table
 
 

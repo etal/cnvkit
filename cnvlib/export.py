@@ -120,8 +120,8 @@ def export_nexus_ogt(sample_fname, vcf_fname, sample_id,
         cnarr.data = cnarr.data[~mask_low_weight]
     varr = tabio.read(vcf_fname, "vcf",
                       sample_id=sample_id or cnarr.sample_id,
-                      min_depth=min_depth, skip_hom=True, skip_somatic=True)
-    bafs = varr.baf_by_ranges(cnarr)
+                      min_depth=min_depth, skip_somatic=True)
+    bafs = varr.heterozygous().baf_by_ranges(cnarr)
     logging.info("Placed %d variants into %d bins",
                  sum(~np.isnan(bafs)), len(cnarr))
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'log2']]
