@@ -12,10 +12,41 @@ from .. import core, params, smoothing, tabio, vary
 from ..cnary import CopyNumArray as CNA
 from . import cbs, flasso, haar
 
+from concurrent import futures
+
 from Bio._py3k import StringIO
 
-
 def do_segmentation(cnarr, method, threshold=None, variants=None,
+                    skip_low=False, skip_outliers=10,
+                    save_dataframe=False, rlibpath=None,
+                    processes=1):
+    """Infer copy number segments from the given coverage table."""
+    if processes == 1:
+        return _do_segmentation(cnarr, method, threshold, variants,
+                                skip_low, skip_outliers,
+                                save_dataframe, rlibpath)
+
+    chroms = cnarr.chromosome.unique()
+    rets = []
+    # TODO: handle save_dataframe=True
+    with futures.ProcessPoolExecutor(processes) as pool:
+        for ret in pool.map(_ds, ((cnarr[cnarr.chromosome == c], method,
+                                   threshold, variants, skip_low, skip_outliers,
+                                   False, rlibpath) for c in chroms)):
+            rets.append(ret)
+    data = pd.concat([r.data for r in rets])
+    meta = rets[0].meta
+    for r in rets[1:]:
+        meta.update(r.meta)
+    return CNA(data, meta)
+
+
+
+def _ds(args):
+    """Wrapper for parallel map"""
+    return _do_segmentation(*args)
+
+def _do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10,
                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""

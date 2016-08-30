@@ -718,7 +718,8 @@ def _cmd_segment(args):
                                            skip_low=args.drop_low_coverage,
                                            skip_outliers=args.drop_outliers,
                                            save_dataframe=bool(args.dataframe),
-                                           rlibpath=args.rlibpath)
+                                           rlibpath=args.rlibpath,
+                                           processes=args.processes)
     if args.dataframe:
         segments, dframe = results
         with open(args.dataframe, 'w') as handle:
@@ -758,6 +759,10 @@ P_segment.add_argument("--drop-outliers",
                 [Default: %(default)g]""")
 P_segment.add_argument("--rlibpath",
         help="Path to an alternative site-library to use for R packages.")
+P_segment.add_argument('-p', '--processes', type=int, default=1,
+        help="""Number of subprocesses to segment in parallel.
+                Give 0 or a negative value to use the maximum number
+                of available CPUs. [Default: use 1 process]""")
 P_segment.set_defaults(func=_cmd_segment)
 
 
