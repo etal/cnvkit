@@ -469,12 +469,12 @@ class CommandTests(unittest.TestCase):
         """The 'segment' command."""
         cnarr = tabio.read_cna("formats/amplicon.cnr")
         # R methods are in another script
-        psegments = segmentation.do_segmentation(cnarr, "haar", processes=2)
-        ssegments = segmentation.do_segmentation(cnarr, "haar", processes=1)
+        psegments, prstr = segmentation.do_segmentation(cnarr, "cbs", processes=2, save_dataframe=True)
+        ssegments, srstr = segmentation.do_segmentation(cnarr, "cbs", processes=1, save_dataframe=True)
 
         self.assertEqual(psegments.data.shape, ssegments.data.shape)
         self.assertEqual(len(psegments.meta), len(ssegments.meta))
-
+        self.assertEqual(prstr, srstr)
 
     def test_segmetrics(self):
         """The 'segmetrics' command."""
