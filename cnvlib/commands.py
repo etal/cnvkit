@@ -1035,7 +1035,8 @@ def do_scatter(cnarr, segments=None, variants=None,
         if show_gene:
             gene_names = show_gene.split(',')
             # Scan for probes matching the specified gene
-            gene_coords = plots.gene_coords_by_name(cnarr, gene_names)
+            gene_coords = plots.gene_coords_by_name(cnarr or segments,
+                                                    gene_names)
             if not len(gene_coords) == 1:
                 raise ValueError("Genes %s are split across chromosomes %s"
                                  % (show_gene, list(gene_coords.keys())))
