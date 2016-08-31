@@ -464,6 +464,18 @@ class CommandTests(unittest.TestCase):
                                                 skip_low=True)
         self.assertGreater(len(segments), 0)
 
+    def test_parallel_segment(self):
+        """The 'segment' command."""
+        cnarr = tabio.read_cna("formats/amplicon.cnr")
+        # R methods are in another script
+        psegments, prstr = segmentation.do_segmentation(cnarr, "cbs", processes=2, save_dataframe=True)
+        ssegments, srstr = segmentation.do_segmentation(cnarr, "cbs", processes=1, save_dataframe=True)
+
+        self.assertEqual(psegments.data.shape, ssegments.data.shape)
+        self.assertEqual(len(psegments.meta), len(ssegments.meta))
+
+        self.assertEqual(prstr, srstr)
+
     def test_segmetrics(self):
         """The 'segmetrics' command."""
         cnarr = tabio.read_cna("formats/amplicon.cnr")

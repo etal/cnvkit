@@ -4,6 +4,7 @@ import logging
 import math
 import os.path
 import tempfile
+import locale
 
 import numpy as np
 import pandas as pd
@@ -12,10 +13,58 @@ from .. import core, params, smoothing, tabio, vary
 from ..cnary import CopyNumArray as CNA
 from . import cbs, flasso, haar
 
+from concurrent import futures
+
 from Bio._py3k import StringIO
 
+def _to_str(s, enc=locale.getpreferredencoding()):
+    if isinstance(s, bytes):
+        return s.decode(enc)
+    return s
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
+                    skip_low=False, skip_outliers=10,
+                    save_dataframe=False, rlibpath=None,
+                    processes=1):
+    """Infer copy number segments from the given coverage table."""
+    if processes == 1:
+        cna = _do_segmentation(cnarr, method, threshold, variants,
+                                skip_low, skip_outliers,
+                                save_dataframe, rlibpath)
+        if save_dataframe:
+            cna, seg_out = cna
+            return cna, _to_str(seg_out)
+        return cna
+
+    rets = []
+    # TODO: handle save_dataframe=True
+    with futures.ProcessPoolExecutor(processes) as pool:
+        rets = list(pool.map(_ds, ((ca, method,
+                                   threshold, variants, skip_low, skip_outliers,
+                                   save_dataframe, rlibpath) for _, ca in cnarr.by_chromosome())))
+    if save_dataframe:
+        rstr = [_to_str(rets[0][1])]
+        for ret in rets[1:]:
+            r = _to_str(ret[1])
+            rstr.append(r[r.index('\n') + 1:])
+        rets = [ret[0] for ret in rets]
+
+    data = pd.concat([r.data for r in rets])
+    meta = rets[0].meta
+    for r in rets[1:]:
+        meta.update(r.meta)
+    cna = CNA(data, meta)
+    if save_dataframe:
+        return cna, "".join(rstr)
+    return cna
+
+
+
+def _ds(args):
+    """Wrapper for parallel map"""
+    return _do_segmentation(*args)
+
+def _do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10,
                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
@@ -27,6 +76,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
     if skip_outliers:
         filtered_cn = drop_outliers(filtered_cn, 50, skip_outliers)
 
+    seg_out = ""
     if method == 'haar':
         threshold = threshold or 0.001
         segarr = haar.segment_haar(filtered_cn, threshold)
