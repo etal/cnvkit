@@ -29,8 +29,8 @@ pyplot.ioff()
 
 from . import (core, ngfrills, parallel, params, descriptives,
                access, antitarget, call, coverage, export, fix, importers,
-               metrics, plots, reference, reports, segmentation, target,
-               tabio)
+               metrics, plots, reference, reports, segfilters, segmentation,
+               target, tabio)
 from .cnary import CopyNumArray as _CNA
 from .vary import VariantArray as _VA
 from .gary import GenomicArray as _GA
@@ -783,12 +783,13 @@ def _cmd_call(args):
     vcf = (tabio.read(args.vcf, "vcf", skip_somatic=True)
            if args.vcf else None)
     cnarr = do_call(cnarr, vcf, args.method, args.ploidy, args.purity,
-                    args.male_reference, is_sample_female, args.thresholds)
+                    args.male_reference, is_sample_female, args.filters,
+                    args.thresholds)
     tabio.write(cnarr, args.output or cnarr.sample_id + '.call.cns')
 
 
 def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
-            is_reference_male=False, is_sample_female=False,
+            is_reference_male=False, is_sample_female=False, filters=None,
             thresholds=(-1.1, -0.25, 0.2, 0.7)):
     if method not in ("threshold", "clonal", "none"):
         raise ValueError("Argument `method` must be one of: clonal, threshold")
@@ -834,6 +835,12 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
             is_null = (outarr["baf"].isnull() & (outarr["cn"] > 0))
             outarr[is_null, "cn1"] = np.nan
             outarr[is_null, "cn2"] = np.nan
+
+    if filters:
+        for filt in filters:
+            logging.info("Applying filter '%s'", filt)
+            outarr = getattr(segfilters, filt)(outarr)
+
     return outarr
 
 
@@ -877,6 +884,11 @@ P_call.add_argument("--center",
         choices=('mean', 'median', 'mode', 'biweight'),
         help="""Re-center the log2 ratio values using this estimate of the
                 center or average value.""")
+P_call.add_argument('--filter', action='append', default=[], dest='filters',
+        choices=('ampdel', 'cn', 'ci', 'sem', # 'bic'
+                ),
+        help="""Merge segments flagged by the specified filter(s) with the
+                adjacent segment(s).""")
 P_call.add_argument('-m', '--method',
         choices=('threshold', 'clonal', 'none'), default='threshold',
         help="""Calling method. [Default: %(default)s]""")
