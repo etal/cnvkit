@@ -38,9 +38,9 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         return cna
 
     with futures.ProcessPoolExecutor(processes) as pool:
-        rets = list(pool.map(_ds, ((ca, method,
-                                   threshold, variants, skip_low, skip_outliers,
-                                   save_dataframe, rlibpath) for _, ca in cnarr.by_chromosome())))
+        rets = list(pool.map(_ds, ((ca, method, threshold, variants, skip_low,
+                                    skip_outliers, save_dataframe, rlibpath)
+                                   for _, ca in cnarr.by_chromosome())))
     if save_dataframe:
         rstr = [_to_str(rets[0][1])]
         for ret in rets[1:]:
@@ -56,10 +56,10 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
     return cna
 
 
-
 def _ds(args):
     """Wrapper for parallel map"""
     return _do_segmentation(*args)
+
 
 def _do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10,
@@ -77,7 +77,8 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
     if method == 'haar':
         threshold = threshold or 0.001
         segarr = haar.segment_haar(filtered_cn, threshold)
-        segarr['gene'], segarr['weight'] = transfer_names_weights(segarr, cnarr)
+        segarr['gene'], segarr['weight'], segarr['depth'] = \
+                transfer_fields(segarr, cnarr)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
@@ -124,7 +125,8 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
         allelics = vary._allele_specific_copy_numbers(segarr, variants)
         segarr.data = pd.concat([segarr.data, allelics], axis=1, copy=False)
 
-    segarr['gene'], segarr['weight'] = transfer_names_weights(segarr, cnarr)
+    segarr['gene'], segarr['weight'], segarr['depth'] = \
+            transfer_fields(segarr, cnarr)
 
     if save_dataframe:
         return segarr, seg_out
@@ -156,22 +158,31 @@ def drop_outliers(cnarr, width, factor):
     return cnarr[~outlier_mask]
 
 
-def transfer_names_weights(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
-    """Copy gene names from `cnarr` to the segmented `segarr`.
+def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
+    """Map gene names, weights, depths from `cnarr` bins to `segarr` segments.
 
-    Segment name is the comma-separated list of bin gene names.
+    Segment gene name is the comma-separated list of bin gene names. Segment
+    weight is the sum of bin weights, and depth is the (weighted) mean of bin
+    depths.
     """
+    if not len(cnarr):
+        return [], [], []
+
     ignore += ("Background",)
-    segnames = ['-'] * len(segments)
+    if 'weight' not in cnarr:
+        cnarr['weight'] = 1
+    if 'depth' not in cnarr:
+        cnarr['depth'] = np.exp2(cnarr['log2'])
+    seggenes = ['-'] * len(segments)
     segweights = np.zeros(len(segments))
+    segdepths = np.zeros(len(segments))
     for i, (_seg, subprobes) in enumerate(cnarr.by_ranges(segments)):
-        segweights[i] = (subprobes['weight'].sum()
-                         if "weight" in cnarr
-                         else len(subprobes))
+        segweights[i] = subprobes['weight'].sum()
+        segdepths[i] = np.average(subprobes['depth'], weights=subprobes['weight'])
         subgenes = [g for g in pd.unique(subprobes['gene']) if g not in ignore]
         if subgenes:
-            segnames[i] = ",".join(subgenes)
-    return segnames, segweights
+            seggenes[i] = ",".join(subgenes)
+    return seggenes, segweights, segdepths
 
 
 def squash_segments(seg_pset):
