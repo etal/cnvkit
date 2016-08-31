@@ -1521,12 +1521,16 @@ def _cmd_segmetrics(args):
     if not 0.0 < args.alpha <= 1.0:
         raise RuntimeError("alpha must be between 0 and 1.")
 
+    from scipy.stats import sem
+
     stats = {
         'mean': np.mean,
         'median': np.median,
         'mode': descriptives.modal_location,
         'stdev': np.std,
+        'sem': sem,
         'mad':  descriptives.median_absolute_deviation,
+        'mse':  descriptives.mean_squared_error,
         'iqr':  descriptives.interquartile_range,
         'bivar': descriptives.biweight_midvariance,
         'ci': lambda x: metrics.confidence_interval_bootstrap(x, args.alpha,
@@ -1550,7 +1554,7 @@ def _cmd_segmetrics(args):
             segarr[statname] = np.asfarray([func(sb.log2) for sb in segbins])
     # Measures of spread
     deviations = [sb.log2 - seg.log2 for seg, sb in zip(segments, segbins)]
-    for statname in ("stdev", "mad", "iqr", "bivar"):
+    for statname in ("stdev", "sem", "mad", "mse", "iqr", "bivar"):
         if getattr(args, statname):
             func = stats[statname]
             segarr[statname] = np.asfarray([func(d) for d in deviations])
@@ -1597,8 +1601,12 @@ P_segmetrics_stats.add_argument('--mode', action='store_true',
         help="Mode (i.e. peak density of log2 values).")
 P_segmetrics_stats.add_argument('--stdev', action='store_true',
         help="Standard deviation.")
+P_segmetrics_stats.add_argument('--sem', action='store_true',
+        help="Standard error of the mean.")
 P_segmetrics_stats.add_argument('--mad', action='store_true',
         help="Median absolute deviation (standardized).")
+P_segmetrics_stats.add_argument('--mse', action='store_true',
+        help="Mean squared error.")
 P_segmetrics_stats.add_argument('--iqr', action='store_true',
         help="Inter-quartile range.")
 P_segmetrics_stats.add_argument('--bivar', action='store_true',

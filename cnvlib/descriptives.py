@@ -149,6 +149,21 @@ def median_absolute_deviation(a, scale_to_sd=True):
     return mad
 
 
+def mean_squared_error(a, initial=None):
+    """Mean squared error (MSE).
+
+    By default, assume the input array `a` is the residuals/deviations/error,
+    so MSE is calculated from zero. Another reference point for calculating the
+    error can be specified with `initial`.
+    """
+    a = narray(a)
+    if not len(a):
+        return np.nan
+    if initial:
+        a = a - initial
+    return (a ** 2).mean()
+
+
 def q_n(a):
     """Rousseeuw & Croux's (1993) Q_n, an alternative to MAD.
 
