@@ -71,29 +71,32 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
 def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1):
     """Calculate log2 coverages in the BAM file at each interval."""
     regions = tabio.read_auto(bed_fname)
-    # if procs == 1:
-    if True:  # XXX the parallel version is too slow
+    if procs == 1:
         bamfile = pysam.Samfile(bam_fname, 'rb')
         for chrom, subregions in regions.by_chromosome():
             logging.info("Processing chromosome %s of %s",
                          chrom, os.path.basename(bam_fname))
-            for _c, start, end, gene in subregions.coords(["gene"]):
-                count, row = region_depth_count(bamfile, chrom, start, end,
-                                                gene, min_mapq)
+            for count, row in _rdc_chunk(bamfile, subregions, min_mapq):
                 yield [count, row]
     else:
-        # XXX very slow regardless of chunksize -- lock contention issue?
-        chunksize = (len(regions) // procs) + 1
         with futures.ProcessPoolExecutor(procs) as pool:
-            args_iter = ((bam_fname, chrom, start, end, gene, min_mapq)
-                         for chrom, start, end, gene in regions.coords(["gene"]))
-            for count, row in pool.map(_rdc, args_iter, chunksize=chunksize):
-                yield [count, row]
+            args_iter = ((bam_fname, subr, min_mapq)
+                         for _c, subr in regions.by_chromosome())
+            for chunk in pool.map(_rdc, args_iter):
+                for count, row in chunk:
+                    yield [count, row]
 
 
 def _rdc(args):
     """Wrapper for parallel."""
-    return region_depth_count(*args)
+    return list(_rdc_chunk(*args))
+
+
+def _rdc_chunk(bamfile, regions, min_mapq):
+    if isinstance(bamfile, basestring):
+        bamfile = pysam.Samfile(bamfile, 'rb')
+    for chrom, start, end, gene in regions.coords(["gene"]):
+        yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)
 
 
 def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
@@ -112,8 +115,6 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
                     or read.is_qcfail
                     or read.mapq < min_mapq)
 
-    if isinstance(bamfile, basestring):
-        bamfile = pysam.Samfile(bamfile, 'rb')
     # Count the number of read midpoints in the interval
     count = sum((start <= (read.pos + .5*read.rlen) <= end and filter_read(read))
                 for read in bamfile.fetch(reference=chrom,
