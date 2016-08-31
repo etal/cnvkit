@@ -27,7 +27,8 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                     save_dataframe=False, rlibpath=None,
                     processes=1):
     """Infer copy number segments from the given coverage table."""
-    if processes == 1:
+    if processes == 1 or method == 'flasso':
+        # XXX parallel flasso crashes within R
         cna = _do_segmentation(cnarr, method, threshold, variants,
                                 skip_low, skip_outliers,
                                 save_dataframe, rlibpath)
@@ -36,8 +37,6 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
             return cna, _to_str(seg_out)
         return cna
 
-    rets = []
-    # TODO: handle save_dataframe=True
     with futures.ProcessPoolExecutor(processes) as pool:
         rets = list(pool.map(_ds, ((ca, method,
                                    threshold, variants, skip_low, skip_outliers,
@@ -51,8 +50,6 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
 
     data = pd.concat([r.data for r in rets])
     meta = rets[0].meta
-    for r in rets[1:]:
-        meta.update(r.meta)
     cna = CNA(data, meta)
     if save_dataframe:
         return cna, "".join(rstr)

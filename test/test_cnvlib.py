@@ -457,24 +457,20 @@ class CommandTests(unittest.TestCase):
     def test_segment(self):
         """The 'segment' command."""
         cnarr = tabio.read_cna("formats/amplicon.cnr")
-        # R methods are in another script
+        # NB: R methods are in another script; haar is pure-Python
         segments = segmentation.do_segmentation(cnarr, "haar")
         self.assertGreater(len(segments), 0)
         segments = segmentation.do_segmentation(cnarr, "haar", threshold=.001,
                                                 skip_low=True)
         self.assertGreater(len(segments), 0)
 
-    def test_parallel_segment(self):
-        """The 'segment' command."""
+    def test_segment_parallel(self):
+        """The 'segment' command, in parallel."""
         cnarr = tabio.read_cna("formats/amplicon.cnr")
-        # R methods are in another script
-        psegments, prstr = segmentation.do_segmentation(cnarr, "cbs", processes=2, save_dataframe=True)
-        ssegments, srstr = segmentation.do_segmentation(cnarr, "cbs", processes=1, save_dataframe=True)
-
+        psegments = segmentation.do_segmentation(cnarr, "haar", processes=2)
+        ssegments = segmentation.do_segmentation(cnarr, "haar", processes=1)
         self.assertEqual(psegments.data.shape, ssegments.data.shape)
         self.assertEqual(len(psegments.meta), len(ssegments.meta))
-
-        self.assertEqual(prstr, srstr)
 
     def test_segmetrics(self):
         """The 'segmetrics' command."""
