@@ -170,7 +170,7 @@ class CopyNumArray(gary.GenomicArray):
                 outrows.append(squash_rows(name, subarr.data))
         return self.as_rows(outrows)
 
-    # Chromosomal gender
+    # Chromosomal sex (gender)
 
     def shift_xx(self, male_reference=False, is_xx=None):
         """Adjust chrX coverages (divide in half) for apparent female samples."""
@@ -219,7 +219,8 @@ class CopyNumArray(gary.GenomicArray):
         # * female reference, chrY = -1
         #  0  -1   0  :male sample, female reference
         #  0   0  -19 :female sample, female reference
-        # ENH: use np.abs to make tests 1-way
+        # ENH: use scipy.stats.ttest_ind(a, b, equal_var=False)
+
         # For completeness; this doesn't help much since M-W is nonparametric
         cnarr = (self.drop_low_coverage() if skip_low else self)
         chrx = cnarr[cnarr.chromosome == self._chr_x_label]

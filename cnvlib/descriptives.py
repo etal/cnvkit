@@ -159,6 +159,8 @@ def mean_squared_error(a, initial=None):
     a = narray(a)
     if not len(a):
         return np.nan
+    if initial is None:
+        initial = a.mean()
     if initial:
         a = a - initial
     return (a ** 2).mean()

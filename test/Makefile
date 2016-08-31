@@ -123,8 +123,10 @@ p2-20-metrics.csv: $(addprefix build/p2-20_,$(addsuffix .cns,1 2 3 4 5))
 	$(cnvkit) metrics $(^:.cns=.cnr) -s $^ -o $@
 
 p2-9_2-segmetrics.cns: build/p2-9_2.cns build/p2-9_2.cnr
-	$(cnvkit) segmetrics -s $^ -o $@ --stdev --mad --iqr --bivar --ci --pi
-
+	$(cnvkit) segmetrics -s $^ -o $@ \
+		--mean --median --mode \
+		--stdev --mad --mse --iqr --bivar \
+		--ci --pi --sem
 
 # == Export to other formats
 
