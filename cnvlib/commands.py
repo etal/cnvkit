@@ -840,6 +840,7 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
         for filt in filters:
             logging.info("Applying filter '%s'", filt)
             outarr = getattr(segfilters, filt)(outarr)
+        outarr.sort_columns()
 
     return outarr
 
