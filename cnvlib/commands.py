@@ -809,7 +809,7 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
                                           is_reference_male)
         if variants:
             # Rescale b-allele frequencies for purity
-            outarr["baf"] = rescale_baf(purity, outarr["baf"])
+            outarr["baf"] = call.rescale_baf(purity, outarr["baf"])
     elif method == "clonal":
         # Estimate absolute copy numbers from the original log2 values
         logging.info("Calling copy number with clonal ploidy %d", ploidy)
@@ -843,20 +843,6 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
         outarr.sort_columns()
 
     return outarr
-
-
-def rescale_baf(purity, observed_baf, normal_baf=0.5):
-    """Adjust B-allele frequencies for sample purity.
-
-    Math:
-        t_baf*purity + n_baf*(1-purity) = obs_baf
-        obs_baf - n_baf * (1-purity) = t_baf * purity
-        t_baf = (obs_baf - n_baf * (1-purity))/purity
-    """
-    # ENH: use normal_baf array if available
-    tumor_baf = (observed_baf - normal_baf * (1-purity)) / purity
-    # ENH: warn if tumor_baf < 0 -- purity estimate may be too low
-    return tumor_baf
 
 
 def csvstring(text):

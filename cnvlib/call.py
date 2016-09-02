@@ -221,3 +221,17 @@ def _log2_ratio_to_absolute_pure(log2_ratio, ref_copies):
     """
     ncopies = ref_copies * 2 ** log2_ratio
     return ncopies
+
+
+def rescale_baf(purity, observed_baf, normal_baf=0.5):
+    """Adjust B-allele frequencies for sample purity.
+
+    Math:
+        t_baf*purity + n_baf*(1-purity) = obs_baf
+        obs_baf - n_baf * (1-purity) = t_baf * purity
+        t_baf = (obs_baf - n_baf * (1-purity))/purity
+    """
+    # ENH: use normal_baf array if available
+    tumor_baf = (observed_baf - normal_baf * (1-purity)) / purity
+    # ENH: warn if tumor_baf < 0 -- purity estimate may be too low
+    return tumor_baf
