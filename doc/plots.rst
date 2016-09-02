@@ -184,3 +184,31 @@ or chromosomal region at a time, using the ``-c`` option::
 If an output file name is not specified with the ``-o`` option, an interactive
 matplotlib window will open, allowing you to select smaller regions, zoom in,
 and save the image as a PDF or PNG file.
+
+The samples are shown in the order there's given on the command line.
+If you use "\*.cns" then the filenames might always be fetched
+alphabetically (depending on your operating system), but if you type
+them out in the order you like, it should keep that order. You can use
+the Unix shell to pull the names out of a file on the fly, e.g.::
+
+    cnvkit.py heatmap `cat filenames.txt`
+
+
+Customizing plots
+-----------------
+
+The plots generated with the :ref:`scatter` and :ref:`heatmap` commands use the
+Python plotting library matplotlib. You can customize font sizes and other
+aspects of the plots by `configuring matplotlib
+<http://matplotlib.org/users/customizing.html>`_.
+
+If you're running CNVkit on the command line and not using it as a Python
+library, then you can just create a file in your home directory (or the same
+directory as ``cnvkit.py``) called ``.matplotlibrc``.  For example, to shrink
+the font size of the x- and y-axis labels, put this line in the configuration
+file::
+
+    axes.labelsize      : small
+
+Alternatively, use the `cnvlib.commands` module in Python to create the
+plots and then modify the plot elements using matplotlib.pyplot.
