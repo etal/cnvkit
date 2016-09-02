@@ -9,9 +9,10 @@ import pandas as pd
 
 
 def require_column(*colnames):
-    """Ensure these columns are in the CopyNumArray the wrapped function takes.
+    """Wrapper to coordinate the segment-filtering functions.
 
-    Also log the number of rows in the array before and after filtration.
+    Verify that the given columns are in the CopyNumArray the wrapped function
+    takes. Also log the number of rows in the array before and after filtration.
     """
     if len(colnames) == 1:
         msg = "'{}' filter requires column '{}'"
@@ -30,6 +31,35 @@ def require_column(*colnames):
             return result
         return wrapped_f
     return wrap
+
+
+def squash_by_groups(cnarr, levels):
+    """Reduce CopyNumArray rows to a single row within each given level."""
+    # Enumerate runs of identical values
+    change_levels = enumerate_changes(levels)
+    # Enumerate chromosomes
+    chrom_names = cnarr['chromosome'].unique()
+    change_levels += cnarr['chromosome'].replace(chrom_names,
+                                                 np.arange(len(chrom_names)))
+    data = cnarr.data.assign(_group=change_levels)
+    if 'cn1' in cnarr:
+        # Keep allele-specific CNAs separate
+        data['_g1'] = enumerate_changes(cnarr['cn1'])
+        data['_g2'] = enumerate_changes(cnarr['cn2'])
+        groupkey = ['_group', '_g1', '_g2']
+    else:
+        groupkey = '_group'
+    data = data.groupby(groupkey, as_index=False, group_keys=False, sort=False
+                       ).apply(squash_region)
+    return cnarr.as_dataframe(data)
+
+
+def enumerate_changes(levels):
+    """Assign a unique integer to each run of identical values.
+
+    Repeated but non-consecutive values will be assigned different integers.
+    """
+    return levels.diff().fillna(0).abs().cumsum().astype(int)
 
 
 def squash_region(cnarr):
@@ -59,18 +89,6 @@ def squash_region(cnarr):
     return pd.DataFrame(out)
 
 
-def enumerate_changes(value_arr, chrom_arr=None):
-    """Assign a unique integer to each run of values per chromosome."""
-    # Enumerate runs of identical values
-    change_levels = value_arr.diff().fillna(0).abs().cumsum().astype(int)
-    if chrom_arr is not None:
-        # Enumerate chromosomes
-        chrom_names = chrom_arr.unique()
-        chrom_nums = np.arange(len(chrom_names))
-        change_levels += chrom_arr.replace(chrom_names, chrom_nums)
-    return change_levels
-
-
 @require_column('cn')
 def ampdel(segarr):
     """Merge segments by amplified/deleted/neutral copy number status.
@@ -89,48 +107,47 @@ def ampdel(segarr):
     levels[segarr['cn'] == 0] = -1
     levels[segarr['cn'] >= 5] = 1
     # or: segarr['log2'] >= np.log2(2.5)
-    # TODO - handle a/b allele amplifications separately
-    #   i.e. don't merge amplified segments if cn1, cn2 are not the same
-    groups = enumerate_changes(levels, segarr['chromosome'])
-    squashed = (segarr.data.assign(group=groups)
-                .groupby('group', as_index=False, group_keys=False, sort=False)
-                .apply(squash_region))
-    return segarr.as_dataframe(squashed)
+    return squash_by_groups(segarr, levels)
 
 
 @require_column('depth')
 def bic(segarr):
     """Merge segments by Bayesian Information Criterion.
 
-    See: BIC-seq
+    See: BIC-seq (Xi 2011), doi:10.1073/pnas.1110574108
     """
-    return segarr
+    return NotImplemented
 
 
 @require_column('ci_lo', 'ci_hi')
 def ci(segarr):
-    """Merge segments by confidence interval (overlapping 0)."""
-    return segarr
+    """Merge segments by confidence interval (overlapping 0).
+
+    Segments with lower CI above 0 are kept as gains, upper CI below 0 as
+    losses, and the rest with CI overlapping zero are collapsed as neutral.
+    """
+    levels = pd.Series(np.zeros(len(segarr)))
+    levels[segarr['ci_lo'] > 0] = 1
+    levels[segarr['ci_hi'] < 0] = -1
+    return squash_by_groups(segarr, levels)
 
 
 @require_column('cn')
 def cn(segarr):
     """Merge segments by integer copy number."""
-    groups = enumerate_changes(segarr['cn'], segarr['chromosome'])
-    data = segarr.data.assign(group=groups)
-    if 'cn1' in segarr:
-        # Keep allele-specific CNAs separate
-        data['g1'] = enumerate_changes(segarr['cn1'])
-        data['g2'] = enumerate_changes(segarr['cn2'])
-        groupkey = ['group', 'g1', 'g2']
-    else:
-        groupkey = 'group'
-    data = data.groupby(groupkey, sort=False, as_index=False, group_keys=False
-                       ).apply(squash_region)
-    return segarr.as_dataframe(data)
+    return squash_by_groups(segarr, segarr['cn'])
 
 
 @require_column('sem')
-def sem(segarr):
-    """Merge segments by Standard Error of the Mean (SEM)."""
-    return segarr
+def sem(segarr, zscore=1.96):
+    """Merge segments by Standard Error of the Mean (SEM).
+
+    Use each segment's SEM value to estimate a 95% confidence interval (via
+    `zscore`). Segments with lower CI above 0 are kept as gains, upper CI below
+    0 as losses, and the rest with CI overlapping zero are collapsed as neutral.
+    """
+    margin = segarr['sem'] * zscore
+    levels = pd.Series(np.zeros(len(segarr)))
+    levels[segarr['log2'] - margin > 0] = 1
+    levels[segarr['log2'] + margin < 0] = -1
+    return squash_by_groups(segarr, levels)
