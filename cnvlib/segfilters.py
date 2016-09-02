@@ -46,6 +46,14 @@ def squash_region(cnarr):
     out['weight'] = cnarr['weight'].sum()
     if 'depth' in cnarr:
         out['depth'] = np.average(cnarr['depth'], weights=cnarr['weight'])
+    if 'baf' in cnarr:
+        out['baf'] = np.average(cnarr['baf'], weights=cnarr['weight'])
+    if 'cn' in cnarr:
+        # TODO/ENH: weighted median
+        out['cn'] = np.median(cnarr['cn'])
+        if 'cn1' in cnarr:
+            out['cn1'] = np.median(cnarr['cn1'])
+            out['cn2'] = out['cn'] - out['cn1']
     return pd.DataFrame(out)
 
 
