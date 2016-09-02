@@ -324,6 +324,21 @@ class CommandTests(unittest.TestCase):
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(cl_cns), len(cl_none))
 
+    def test_call_filter(self):
+        segments = cnvlib.read("formats/tr95t.segmetrics.cns")
+        variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        # Each filter individually, then all filters together
+        for filters in (['ampdel'], ['cn'], ['ci'], ['sem'],
+                        ['sem', 'cn', 'ampdel'],
+                        ['ci', 'cn', 'ampdel']):
+            result = commands.do_call(segments, variants, method="threshold",
+                                      purity=.9, is_reference_male=True,
+                                      is_sample_female=True, filters=filters)
+            self.assertLessEqual(len(result), len(segments))
+            self.assertLessEqual(len(segments.chromosome.unique()), len(result))
+            for colname in 'baf', 'cn', 'cn1', 'cn2':
+                self.assertIn(colname, result)
+
     def test_call_gender(self):
         """Test each 'call' method on allosomes."""
         for (fname, sample_is_f, ref_is_m,
