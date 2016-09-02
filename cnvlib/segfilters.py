@@ -7,6 +7,8 @@ import logging
 import numpy as np
 import pandas as pd
 
+from .descriptives import weighted_median
+
 
 def require_column(*colnames):
     """Wrapper to coordinate the segment-filtering functions.
@@ -81,10 +83,9 @@ def squash_region(cnarr):
     if 'baf' in cnarr:
         out['baf'] = np.average(cnarr['baf'], weights=cnarr['weight'])
     if 'cn' in cnarr:
-        # TODO/ENH: weighted median
-        out['cn'] = np.median(cnarr['cn'])
+        out['cn'] = weighted_median(cnarr['cn'], cnarr['weight'])
         if 'cn1' in cnarr:
-            out['cn1'] = np.median(cnarr['cn1'])
+            out['cn1'] = weighted_median(cnarr['cn1'], cnarr['weight'])
             out['cn2'] = out['cn'] - out['cn1']
     return pd.DataFrame(out)
 
