@@ -7,7 +7,6 @@ import logging
 import numpy as np
 import pandas as pd
 
-from .metrics import segment_mean
 
 def require_column(*colnames):
     """Ensure these columns are in the CopyNumArray the wrapped function takes.
@@ -34,7 +33,10 @@ def require_column(*colnames):
 
 
 def squash_region(cnarr):
-    """Reduce a CopyNumArray to 1 row, keeping fields sensible."""
+    """Reduce a CopyNumArray to 1 row, keeping fields sensible.
+
+    Most fields added by the `segmetrics` command will be dropped.
+    """
     assert 'weight' in cnarr and 'probes' in cnarr
     out = {'chromosome': [cnarr['chromosome'].iat[0]],
            'start': cnarr['start'].iat[0],
@@ -57,10 +59,16 @@ def squash_region(cnarr):
     return pd.DataFrame(out)
 
 
-def enumerate_chroms(chroms):
-    names = chroms.unique()
-    nums = np.arange(len(names))
-    return chroms.replace(names, nums)
+def enumerate_changes(value_arr, chrom_arr=None):
+    """Assign a unique integer to each run of values per chromosome."""
+    # Enumerate runs of identical values
+    change_levels = value_arr.diff().fillna(0).abs().cumsum().astype(int)
+    if chrom_arr is not None:
+        # Enumerate chromosomes
+        chrom_names = chrom_arr.unique()
+        chrom_nums = np.arange(len(chrom_names))
+        change_levels += chrom_arr.replace(chrom_names, chrom_nums)
+    return change_levels
 
 
 @require_column('cn')
@@ -83,10 +91,7 @@ def ampdel(segarr):
     # or: segarr['log2'] >= np.log2(2.5)
     # TODO - handle a/b allele amplifications separately
     #   i.e. don't merge amplified segments if cn1, cn2 are not the same
-
-    groups = levels.diff().fillna(0).abs().cumsum().astype(int)
-    groups += enumerate_chroms(segarr['chromosome'])
-
+    groups = enumerate_changes(levels, segarr['chromosome'])
     squashed = (segarr.data.assign(group=groups)
                 .groupby('group', as_index=False, group_keys=False, sort=False)
                 .apply(squash_region))
@@ -111,7 +116,18 @@ def ci(segarr):
 @require_column('cn')
 def cn(segarr):
     """Merge segments by integer copy number."""
-    return segarr
+    groups = enumerate_changes(segarr['cn'], segarr['chromosome'])
+    data = segarr.data.assign(group=groups)
+    if 'cn1' in segarr:
+        # Keep allele-specific CNAs separate
+        data['g1'] = enumerate_changes(segarr['cn1'])
+        data['g2'] = enumerate_changes(segarr['cn2'])
+        groupkey = ['group', 'g1', 'g2']
+    else:
+        groupkey = 'group'
+    data = data.groupby(groupkey, sort=False, as_index=False, group_keys=False
+                       ).apply(squash_region)
+    return segarr.as_dataframe(data)
 
 
 @require_column('sem')
