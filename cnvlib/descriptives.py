@@ -6,15 +6,40 @@ See:
 
 """
 from __future__ import division
+import sys
 
 import numpy as np
 from scipy import stats
 
 
 def narray(a):
+    """Ensure `a` is a numpy array with no missing/NaN values."""
     a = np.asfarray(a)
     return a[~np.isnan(a)]
 
+
+def warray(a, w):
+    """Ensure `a` and `w` are equal-length numpy arrays with no NaN values.
+
+    For weighted descriptives -- `a` is the array of values, `w` is weights.
+
+    1. Drop any cells in `a` that are NaN from both `a` and `w`
+    2. Replace any remaining NaN cells in `w` with 0.
+    """
+    assert len(a) == len(w), \
+            "Unequal array lengths: a=%d, w=%d" % (len(a), len(w))
+    a = np.asfarray(a)
+    w = np.asfarray(w)
+    # Drop a's NaN indices from both arrays
+    a_nan = np.isnan(a)
+    if a_nan.any():
+        a = a[~a_nan]
+        w = w[~a_nan]
+    # Fill w's NaN indices
+    w_nan = np.isnan(w)
+    if w_nan.any():
+        w[w_nan] = 0.0
+    return a, w
 
 
 # M-estimators of central location
@@ -71,6 +96,29 @@ def modal_location(a):
     y = kde.evaluate(sarr)
     peak = sarr[y.argmax()]
     return peak
+
+
+def weighted_median(a, weights):
+    """Weighted median."""
+    if not len(a):
+        return np.nan
+    elif len(a) == 1:
+        return np.float(list(a)[0])
+    a, weights = warray(a, weights)
+    order = a.argsort()
+    a = a[order]
+    weights = weights[order]
+    midpoint = 0.5 * weights.sum()
+    if (weights > midpoint).any():
+        # Any point with the majority of total weight must be the median
+        return a[weights.argmax()]
+    cumulative_weight = weights.cumsum()
+    midpoint_idx = cumulative_weight.searchsorted(midpoint)
+    if (midpoint_idx > 0 and
+        cumulative_weight[midpoint_idx-1] - midpoint < sys.float_info.epsilon):
+        # Midpoint of 2 array values
+        return a[midpoint_idx-1 : midpoint_idx+1].mean()
+    return a[midpoint_idx]
 
 
 # Estimators of scale
