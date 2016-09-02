@@ -39,11 +39,26 @@ See the `VCF specifications <https://github.com/samtools/hts-specs>`_.
 
 CNVkit currently uses VCF files in two ways:
 
+- To extract single-nucleotide variant (SNV) allele frequencies, which can be
+  plotted in the :ref:`scatter` command, used to assign allele-specific copy
+  number in the :ref:`call` command, or exported along with bin-level copy
+  ratios to the "nexus-ogt" format.
 - To :ref:`export` CNVs, describing/encoding each CNV segment as a structural
   variant (SV).
-- To plot single-nucleotide variant (SNV) allele frequencies in the
-  :ref:`scatter` command, or export these allele frequencies to the
-  "nexus-ogt" format.
+
+For the former -- investigating allelic imbalance and loss of heterozygosity
+(LOH) -- it's most useful to perform paired calling on matched tumor/normal
+samples. You can use a separate SNV caller such as FreeBayes, VarDict, or MuTect
+to do this. For best results, ensure that:
+
+- Both the tumor and normal samples are present in the same VCF file.
+- Include both germline and somatic variants (if any) in the VCF file.
+  (For MuTect, this means keeping the "REJECT" records.)
+  Mark somatic variants with the "SOMATIC" flag in the INFO column.
+- Add a PEDIGREE tag to the VCF header declaring the tumor sample(s) as
+  "Derived" and the normal as "Original". Without this tag, you'll need to tell
+  CNVkit which sample is which using the `-i` and `-n` options in each command.
+
 
 
 Target and antitarget bin-level coverages (.cnn)
