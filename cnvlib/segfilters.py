@@ -24,7 +24,7 @@ def require_column(*colnames):
     def wrap(func):
         @functools.wraps(func)
         def wrapped_f(segarr):
-            filtname = func.func_name
+            filtname = func.__name__
             if any(c not in segarr for c in colnames):
                 raise ValueError(msg.format(filtname, *colnames))
             result = func(segarr)
@@ -44,15 +44,13 @@ def squash_by_groups(cnarr, levels):
     change_levels += cnarr['chromosome'].replace(chrom_names,
                                                  np.arange(len(chrom_names)))
     data = cnarr.data.assign(_group=change_levels)
+    groupkey = ['_group']
     if 'cn1' in cnarr:
         # Keep allele-specific CNAs separate
         data['_g1'] = enumerate_changes(cnarr['cn1'])
         data['_g2'] = enumerate_changes(cnarr['cn2'])
-        groupkey = ['_group', '_g1', '_g2']
-    else:
-        groupkey = '_group'
-    data = data.groupby(groupkey, as_index=False, group_keys=False, sort=False
-                       ).apply(squash_region)
+        groupkey.extend(['_g1', '_g2'])
+    data = data.groupby(groupkey, sort=False).apply(squash_region)
     return cnarr.as_dataframe(data)
 
 
