@@ -83,9 +83,9 @@ visualize each of them with :ref:`scatter`::
 gender
 ------
 
-Guess samples' gender from the relative coverage of chromoxsome X. 
-A table of the sample name (derived from the filename), guessed chromosomal
-gender (string "Female" or "Male"), and log2 ratio value of chromosome X is
+Guess samples' gender from the relative coverage of chromosomes X and Y.
+A table of the sample name (derived from the filename), detected chromosomal
+sex (string "Female" or "Male"), and log2 ratio value of chromosomes X and Y is
 printed.
 
 ::
@@ -196,7 +196,6 @@ be trusted.
 segmetrics
 ----------
 
-
 Calculate summary statistics of the residual bin-level log2 ratio estimates
 from the segment means, similar to the existing :ref:`metrics` command, but for each
 segment individually.
@@ -211,13 +210,23 @@ with the stat names and calculated values printed in additional columns.
 
 Supported stats:
 
+- Alternative estimators of segment mean, which ignore bin weights: ``--mean``,
+  ``-median``, ``--mode``.
+
 - As in :ref:`metrics`: standard deviation (``--std``), median absolute
   deviation (``--mad``), inter-quartile range (``--iqr``), Tukey's biweight
   midvariance (``--bivar``)
 
+- Additionally: mean squared error (``--mse``), standard error of the mean
+  (``-sem``).
+
 - Confidence interval of the segment mean (``--ci``), estimated by bootstrap
-  (100 resamplings) of the bin-level log2 ratio values within the segment.
+  (100 resamplings) of the bin-level log2 ratio values within the segment. The
+  upper and lower bounds are output as separate columns ``ci_lo`` and ``ci_hi``.
 
 - Prediction interval (``--pi``), estimated by the range between the 2.5-97.5
-  percentiles of the segment's bin-level log2 ratios.
+  percentiles of the segment's bin-level log2 ratios. The upper and lower bounds
+  are output as columns ``pi_lo`` and ``pi_hi``.
 
+The ``--ci`` and ``--sem`` values obtained here can also be used in the
+:ref:`call` command for filtering segments.

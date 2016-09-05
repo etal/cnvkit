@@ -102,7 +102,7 @@ command could be::
 
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
         --targets my_baits.bed --fasta hg19.fasta \
-        --split --access data/access-5kb-mappable.hg19.bed \
+        --access data/access-5kb-mappable.hg19.bed \
         --output-reference my_reference.cnn --output-dir example/
 
 See the built-in help message to see what these options do, and for additional
@@ -115,7 +115,7 @@ reference which assumes equal coverage in all bins by using the ``--normal/-n``
 flag without specifying any additional BAM files::
 
     cnvkit.py batch *Tumor.bam -n -t my_baits.bed -f hg19.fasta \
-        --split --access data/access-5kb-mappable.hg19.bed \
+        --access data/access-5kb-mappable.hg19.bed \
         --output-reference my_flat_reference.cnn -d example2/
 
 In either case, you should run this command with the reference genome sequence
@@ -127,7 +127,7 @@ If your targets are missing gene names, you can add them here with the
 ``--annotate`` argument::
 
     cnvkit.py batch *Tumor.bam -n *Normal.bam -t my_baits.bed -f hg19.fasta \
-        --annotate refFlat.txt --split --access data/access-5kb-mappable.hg19.bed \
+        --annotate refFlat.txt --access data/access-5kb-mappable.hg19.bed \
         --output-reference my_flat_reference.cnn -d example3/
 
 
@@ -153,8 +153,8 @@ See the command-line usage pages for additional
 :doc:`import/export <importexport>` commands in CNVkit.
 
 
-Frequently Asked Questions (FAQ)
---------------------------------
+Common Questions
+----------------
 
 Which BED file should I use?
 ````````````````````````````

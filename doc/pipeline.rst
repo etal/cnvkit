@@ -27,7 +27,7 @@ Run the CNVkit pipeline on one or more BAM files::
 
     # From baits and tumor/normal BAMs
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
-        --targets my_baits.bed --split --annotate refFlat.txt \
+        --targets my_baits.bed --annotate refFlat.txt \
         --fasta hg19.fasta --access data/access-5kb-mappable.hg19.bed \
         --output-reference my_reference.cnn --output-dir results/ \
         --diagram --scatter
@@ -51,7 +51,7 @@ complete sooner.
 
 The pipeline executed by the ``batch`` command is equivalent to::
 
-    cnvkit.py target baits.bed [--split --annotate --short-names] -o my_targets.bed
+    cnvkit.py target baits.bed --split [--annotate --short-names] -o my_targets.bed
     cnvkit.py antitarget my_targets.bed [--access] -o my_antitargets.bed
 
     # For each sample...
@@ -69,6 +69,11 @@ The pipeline executed by the ``batch`` command is equivalent to::
     # Optionally, with --scatter and --diagram
     cnvkit.py scatter Sample.cnr -s Sample.cns -o Sample-scatter.pdf
     cnvkit.py diagram Sample.cnr -s Sample.cns [--male-reference] -o Sample-diagram.pdf
+
+This is for hybrid capture protocols in which both on- and off-target reads can
+be used for copy number detection. To run alternative pipelines for targeted
+amplicon sequencing or whole genome sequencing, use the ``--method`` option with
+value ``amplicon`` or ``wgs``, respectively. The default is ``hybrid``.
 
 See the rest of the commands below to learn about each of these steps and other
 functionality in CNVkit.
@@ -657,11 +662,34 @@ Allele frequencies and counts
 `````````````````````````````
 
 If a VCF file is given using the ``-v``/``--vcf`` option, then for each segment
-with a BAF value (i.e. where SNVs were available), allele-specific integer copy
-number values are inferred from the total copy number and BAF, and output in
-columns "cn1" and "cn2". This calculation uses the same method as `PSCBS
+containing SNVs in the VCF, an average b-allele frequency (BAF) within that
+segment is calculated, and output in the "baf" column.
+Allele-specific integer copy number values are then inferred from the total copy
+number and BAF, and output in columns "cn1" and "cn2".
+This calculation uses the same method as `PSCBS
 <http://bioinformatics.oxfordjournals.org/content/27/15/2038.short>`_:
 total copy number is multiplied by the BAF, and rounded to the nearest integer.
 
 Allelic imbalance, including copy-number-neutral loss of heterozygosity (LOH),
 is then apparent when a segment's "cn1" and "cn2" fields have different values.
+
+Filtering segments
+``````````````````
+
+*New in version 0.8.0.*
+
+Finally, segments can be filtered according to several criteria, which may be
+combined:
+
+- Integer copy number (``cn``), merging adjacent with the same called value.
+- Keeping only high-level amplifications (5 copies or more) and homozygous
+  deletions (0 copies) (``ampdel``).
+- Confidence interval overlapping zero (``ci``).
+- Standard error of the mean (``sem``), a parametric estimate of confidence
+  intervals which behaves similarly.
+
+In each case, adjacent segments with the same value according to the given
+criteria are merged together and the column values are recalculated
+appropriately. Segments on different chromosomes or with different
+allele-specific copy number values will not be merged, even if the total copy
+number is the same.
