@@ -171,14 +171,6 @@ Which BED file should I use?
 - For targeted amplicon sequencing (TAS), use the `batch --method amplicon`
   option and give the target BED file.
 
-How does CNVkit handle sample gender? Why does chrX show a gain/loss?
-`````````````````````````````````````````````````````````````````````
-
-If you want copy number calls to be relative to a male reference with a single X
-chromosome but dipoid autosomes, use the `-y` option everywhere.
-Otherwise, X and all autosomes will be considered normally diploid. Chromosome Y
-will be considered haploid in either case.
-
 How should I deal with tumor samples?
 `````````````````````````````````````
 
@@ -200,3 +192,11 @@ How should I deal with tumor samples?
 
 ..  How should I deal with germline clinical samples?
 ..  `````````````````````````````````````````````````
+
+How does CNVkit handle sample gender? Why does chrX show a gain/loss?
+`````````````````````````````````````````````````````````````````````
+
+If you want copy number calls to be relative to a male reference with a single X
+chromosome but dipoid autosomes, use the `-y` option everywhere.
+Otherwise, X and all autosomes will be considered normally diploid. Chromosome Y
+will be considered haploid in either case.

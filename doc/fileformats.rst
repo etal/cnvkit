@@ -60,21 +60,22 @@ to do this. For best results, ensure that:
   CNVkit which sample is which using the `-i` and `-n` options in each command.
 
 
-
 Target and antitarget bin-level coverages (.cnn)
 ------------------------------------------------
 
-Coverage of binned regions is saved in a tabular format similar to BED but with
-additional columns. Each row in the file indicates an on-target or off-target
-(antitarget, background) bin. Genomic coordinates are 0-indexed, like BED.
+CNVkit saves its information in a tabular format similar to BED, but with
+additional columns.  Each row in the file indicates an on-target or off-target
+(a.k.a. "antitarget" or "background") bin. Genomic coordinates are 0-indexed,
+like BED. Column names are shown as the first line of the file.
 
-Column names are shown as the first line of the file:
+In the output of the :ref:`coverage` command, the columns are:
 
 * Chromosome or reference sequence name (``chromosome``)
 * Start position (``start``)
 * End position (``end``)
 * Gene name (``gene``)
 * Log2 mean coverage depth (``log2``)
+* Absolute-scale mean coverage depth (``depth``)
 
 Essentially the same tabular file format is used for coverages (.cnn), ratios
 (.cnr) and segments (.cns) emitted by CNVkit.
@@ -90,14 +91,16 @@ the reference .cnn file has the columns:
 * RepeatMasker-masked proportion of the sequence region (``rmask``)
 * Statistical spread or dispersion (``spread``)
 
-The log2 coverage depth is the weighted average of coverage depths, excluding
-extreme outliers, observed at the corresponding bin in each the sample .cnn
-files used to construct the reference. The spread is a similarly weighted
-estimate of the standard deviation of normalized coverages in the bin.
+The **log2** coverage depth is the robust average of coverage depths,
+excluding extreme outliers, observed at the corresponding bin in each the sample
+.cnn files used to construct the :ref:`reference`. The **spread** is a similarly
+robust estimate of the standard deviation of normalized log2 coverages in the
+bin. The **depth** column is the robust average of absolute-scale coverage
+depths from the input .cnn files, but without any bias corrections.
 
-To manually review potentially problematic genes in the built reference, you can
-sort the file by the "spread" column; bins with higher values are the noisy
-ones.
+To manually review potentially problematic targets in the built reference, you
+can sort the file by the **spread** column; bins with higher values are the
+noisy ones.
 
 It is important to keep the copy number reference file consistent for the
 duration of a project, reusing the same reference for bias correction of all
@@ -110,13 +113,11 @@ new protocol.
 Bin-level log2 ratios (.cnr)
 ----------------------------
 
-In addition to the BED-like ``chromosome``, ``start``, ``end`` and ``gene``
-columns present in .cnn files, the .cnr file has the columns:
+In addition to the ``chromosome``, ``start``, ``end``, ``gene``, ``log2`` and
+``depth`` columns present in .cnn files, the .cnr file includes each bin's
+proportional weight or reliability (``weight``).
 
-* Log2 ratio (``log2``)
-* Proportional weight to be used for segmentation (``weight``)
-
-The weight value is derived from several sources:
+The **weight** value is derived from several sources:
 
 - The size of the bin relative to the average bin size (for targets or
   antitargets, separately)
@@ -136,10 +137,12 @@ small point indicates a less reliable bin.
 Segmented log2 ratios (.cns)
 ----------------------------
 
-In addition to the ``chromosome``, ``start``, ``end``, ``gene`` and ``log2``
-columns present in .cnr files, the .cns file format has the additional column
-``probes``, indicating the number of bins covered by the segment.
+In addition to the ``chromosome``, ``start``, ``end``, ``gene``, ``log2``,
+``depth`` and ``weight`` columns present in .cnr files, the .cns file format has
+the additional column ``probes``, indicating the number of bins covered by the
+segment.
 
-The ``gene`` column concatenates the gene names of all the bins that the segment
-covers. The ``weight`` column sums the bin-level weights.
-
+The **gene** column concatenates the gene names of all the bins that the segment
+covers. The **weight** column sums the bin-level weights, and the **depth** and
+**log2** is the weighted mean of the input bin-level values corresponding to
+the segment.
