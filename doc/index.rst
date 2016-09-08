@@ -3,10 +3,10 @@ CNVkit: Genome-wide copy number from targeted DNA sequencing
 
 :Author: Eric Talevich
 :Contact: eric.talevich@ucsf.edu
-:Article: `PLOS Computational Biology <http://dx.doi.org/10.1371/journal.pcbi.1004873>`_
-:License: `Apache License 2.0 <http://www.apache.org/licenses/LICENSE-2.0>`_
 :Source code: `GitHub <https://github.com/etal/cnvkit>`_
+:License: `Apache License 2.0 <http://www.apache.org/licenses/LICENSE-2.0>`_
 :Packages: `PyPI <https://pypi.python.org/pypi/CNVkit>`_ | `Docker <https://hub.docker.com/r/etal/cnvkit/>`_ | `Galaxy <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ | `DNAnexus <https://platform.dnanexus.com/app/cnvkit_batch>`_
+:Article: `PLOS Computational Biology <http://dx.doi.org/10.1371/journal.pcbi.1004873>`_
 :Q&A: `Biostars <https://www.biostars.org/t/CNVkit/>`_ | `SeqAnswers <http://seqanswers.com/forums/showthread.php?t=47910>`_
 
 
@@ -39,13 +39,16 @@ FAQ & How To
 ------------
 
 .. toctree::
-    :maxdepth: 3
+    :maxdepth: 2
 
-    fileformats
-    bias
     calling
+    gender
+    tumor
     heterogeneity
+    germline
     nonhybrid
+    bias
+    fileformats
 
 
 Python API
@@ -60,8 +63,8 @@ Python API
 Citation
 ========
 
-We have published a manuscript describing CNVkit.
-If you use this software in a publication, please cite our paper like so:
+We have published a paper describing CNVkit.
+If you use this software in a publication, please cite:
 
     Talevich, E., Shain, A.H., Botton, T., & Bastian, B.C. (2014).
     `CNVkit: Genome-wide copy number detection and visualization from targeted sequencing.
@@ -71,13 +74,12 @@ If you use this software in a publication, please cite our paper like so:
 A poster presentation can be viewed at `F1000 Research
 <http://f1000research.com/posters/1096236>`_.
 
-Who is using CNVkit?
---------------------
+Who else is using CNVkit?
+-------------------------
 
 `Google Scholar
 <https://scholar.google.com/scholar?cites=4696125388809243311&as_sdt=2005&sciodt=0,5&hl=en>`_
-lists some of the references where CNVkit has been used by other researchers.
-
+lists some of the studies where CNVkit has been used by other researchers.
 We'd like to highlight:
 
 * McCreery, M.Q. *et al.* (2015).
@@ -94,12 +96,19 @@ We'd like to highlight:
   <http://dx.doi.org/10.1056/NEJMoa1502583>`_
   *New England Journal of Medicine*, 373(20), 1926-1936
 
-Specific support for CNVkit is included in `bcbio-nextgen
-<https://bcbio-nextgen.readthedocs.io/>`_, `THetA2
-<http://compbio.cs.brown.edu/projects/theta/>`_, and `MetaSV
-<http://bioinform.github.io/metasv/>`_;
-CNVkit can also :ref:`export` files to several standard formats that can be used
-with many other software packages.
+Specific support for CNVkit is included in
+`bcbio-nextgen <https://bcbio-nextgen.readthedocs.io/>`_,
+`THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_,
+and `MetaSV <http://bioinform.github.io/metasv/>`_.
+CNVkit is also available on the commercial platforms
+`DNAnexus <http://www.dnanexus.com/>`_,
+`Bina RAVE <http://www.bina.com/rave>`_, and
+`Diploid InHelix <http://www.diploid.com/inhelix>`_.
+
+Finally, CNVkit can :ref:`export` files to several standard formats that can be
+used with many other software packages, including `BioDiscovery Nexus Copy
+Number <http://www.biodiscovery.com/nexus-copy-number/>`_ and `Integrative
+Genomics Viewer (IGV) <http://software.broadinstitute.org/software/igv/>`_.
 
 
 Indices and tables

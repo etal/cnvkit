@@ -10,6 +10,7 @@ command-line options.
 The :ref:`batch` command supports these workflows through the
 ``-m``/``--method`` option.
 
+.. _wgs:
 
 Whole-Genome Sequencing (WGS)
 -----------------------------
@@ -35,6 +36,7 @@ Equivalently::
     cnvkit.py reference *.targetcoverage.cnn *.antitargetcoverage.cnn -o ref-wgs.cnn
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn ref-wgs.cnn --no-edge
 
+.. _tas:
 
 Targeted Amplicon Sequencing (TAS)
 ----------------------------------
@@ -42,7 +44,7 @@ Targeted Amplicon Sequencing (TAS)
 When amplicon sequencing is used as a targeted capture method, no off-target
 reads are sequenced. While this limits the copy number information available in
 the sequencing data versus hybrid capture, CNVkit can analyze TAS data using
-only target coverages and excluding all off-target regions from the analysis.
+only on-target coverages and excluding all off-target regions from the analysis.
 
 The ``batch -m amplicon`` option uses the given targets to infer coverage, and
 leaves the antitarget coverage file empty::
@@ -61,6 +63,6 @@ Equivalently::
 
 This approach does not collect any copy number information between targeted
 regions, so it should only be used if you have in fact prepared your samples
-with a targeted amplicon sequencing protocol.  It also does not attempt to
+with a targeted amplicon sequencing protocol. It also does not attempt to
 normalize each amplicon at the gene level, though this may be addressed in a
 future version of CNVkit.
