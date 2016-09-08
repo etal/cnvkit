@@ -29,10 +29,13 @@ class GenomicArray(object):
             if not all(c in data_table.columns for c in self._required_columns):
                 raise ValueError("data table must have at least columns "
                                  + repr(self._required_columns))
-            # Ensure chromosomes are strings to avoid integer conversion of 1, 2...
-            if not isinstance(data_table.chromosome.iat[0], basestring):
-                data_table["chromosome"] = (data_table["chromosome"]
-                                            .astype("str"))
+            # Ensure columns are the right type
+            # (in case they've been automatically converted to the wrong type,
+            # e.g. chromosome names as integers; genome coordinates as floats)
+            for col, dtype in zip(self._required_columns, self._required_dtypes):
+                # if data_table[col].dtype != np.dtype(dtype):
+                if not isinstance(data_table[col].iat[0], dtype):
+                    data_table[col] = data_table[col].astype(dtype)
         elif not isinstance(data_table, pd.DataFrame):
             # Empty but conformant table
             data_table = self._make_blank()
