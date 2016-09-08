@@ -178,7 +178,8 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     segdepths = np.zeros(len(segments))
     for i, (_seg, subprobes) in enumerate(cnarr.by_ranges(segments)):
         segweights[i] = subprobes['weight'].sum()
-        segdepths[i] = np.average(subprobes['depth'], weights=subprobes['weight'])
+        if subprobes['weight'].sum() > 0:
+            segdepths[i] = np.average(subprobes['depth'], weights=subprobes['weight'])
         subgenes = [g for g in pd.unique(subprobes['gene']) if g not in ignore]
         if subgenes:
             seggenes[i] = ",".join(subgenes)
