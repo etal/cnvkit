@@ -198,13 +198,13 @@ class CopyNumArray(gary.GenomicArray):
         if is_xy is None:
             return None
         elif verbose:
-            logging.info("Relative log2 coverage of X=%g (maleness=%g), "
-                        "Y=%g (maleness=%g) --> assuming %s",
-                        stats['chrx_ratio'],
-                        stats['chrx_male_lr'],
-                        stats['chry_ratio'],
-                        stats['chry_male_lr'],
-                        ('female', 'male')[is_xy])
+            logging.info("Relative log2 coverage of %s=%.3g, %s=%.3g "
+                         "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
+                         self._chr_x_label, stats['chrx_ratio'],
+                         self._chr_y_label, stats['chry_ratio'],
+                         stats['chrx_male_lr'], stats['chry_male_lr'],
+                         stats['chrx_male_lr'] * stats['chry_male_lr'],
+                         ('female', 'male')[is_xy])
         return ~is_xy
 
     def compare_sex_chromosomes(self, male_reference=False, skip_low=False):
