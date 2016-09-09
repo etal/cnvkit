@@ -62,6 +62,7 @@ def _cmd_batch(args):
                          (args.access,              '-g/--access'),
                          (args.annotate,            '--annotate'),
                          (args.short_names,         '--short-names'),
+                         (args.split,               '--split'),
                          (args.target_avg_size,     '--target-avg-size'),
                          (args.antitarget_avg_size, '--antitarget-avg-size'),
                          (args.antitarget_min_size, '--antitarget-min-size'),
@@ -109,15 +110,13 @@ def _cmd_batch(args):
                      len(args.bam_files),
                      ("serial" if args.processes == 1
                       else ("%d processes" % args.processes)))
-        pool = parallel.pick_pool(args.processes)
-        for bam in args.bam_files:
-            pool.apply_async(batch_run_sample,
-                             (bam, args.targets, args.antitargets, args.reference,
-                              args.output_dir, args.male_reference, args.scatter,
-                              args.diagram, args.rlibpath, args.count_reads,
-                              args.drop_low_coverage, args.method))
-        pool.close()
-        pool.join()
+        with parallel.pick_pool(args.processes) as pool:
+            for bam in args.bam_files:
+                pool.submit(batch_run_sample,
+                            bam, args.targets, args.antitargets, args.reference,
+                            args.output_dir, args.male_reference, args.scatter,
+                            args.diagram, args.rlibpath, args.count_reads,
+                            args.drop_low_coverage, args.method)
 
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed,
@@ -194,23 +193,26 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                                     male_reference)
     else:
         logging.info("Building a copy number reference from normal samples...")
-        target_fnames = []
-        antitarget_fnames = []
         # Run coverage on all normals
-        pool = parallel.pick_pool(processes)
-        for nbam in normal_bams:
-            sample_id = core.fbase(nbam)
-            sample_pfx = os.path.join(output_dir, sample_id)
-            tgt_fname = sample_pfx + '.targetcoverage.cnn'
-            pool.apply_async(batch_write_coverage,
-                             (target_bed, nbam, tgt_fname, by_count))
-            target_fnames.append(tgt_fname)
-            anti_fname = sample_pfx + '.antitargetcoverage.cnn'
-            pool.apply_async(batch_write_coverage,
-                             (antitarget_bed, nbam, anti_fname, by_count))
-            antitarget_fnames.append(anti_fname)
-        pool.close()
-        pool.join()
+        with parallel.pick_pool(processes) as pool:
+            tgt_futures = []
+            anti_futures = []
+            for nbam in normal_bams:
+                sample_id = core.fbase(nbam)
+                sample_pfx = os.path.join(output_dir, sample_id)
+                tgt_futures.append(
+                    pool.submit(batch_write_coverage,
+                                target_bed, nbam,
+                                sample_pfx + '.targetcoverage.cnn',
+                                by_count))
+                anti_futures.append(
+                    pool.submit(batch_write_coverage,
+                                antitarget_bed, nbam,
+                                sample_pfx + '.antitargetcoverage.cnn',
+                                by_count))
+
+        target_fnames = [tf.result() for tf in tgt_futures]
+        antitarget_fnames = [af.result() for af in anti_futures]
         # Build reference from *.cnn
         ref_arr = do_reference(target_fnames, antitarget_fnames, fasta,
                                male_reference, do_gc=True,
@@ -226,6 +228,7 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count):
     """Run coverage on one sample, write to file."""
     cnarr = do_coverage(bed_fname, bam_fname, by_count)
     tabio.write(cnarr, out_fname)
+    return out_fname
 
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,

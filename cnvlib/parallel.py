@@ -1,27 +1,50 @@
 """Utilities for multi-core parallel processing."""
 from __future__ import absolute_import, division, print_function
 from builtins import object
-import multiprocessing
+from contextlib import contextmanager
+
+from concurrent import futures
+from concurrent.futures import wait
 
 
 class SerialPool(object):
-    """Mimic the multiprocessing.Pool interface, but run in serial."""
+    """Mimic the concurrent.futures.Executor interface, but run in serial."""
 
     def __init__(self):
         pass
 
-    def apply_async(self, func, args):
-        """Just call the function."""
-        func(*args)
+    def submit(self, func, *args):
+        """Just call the function on the arguments."""
+        return SerialFuture(func(*args))
 
-    # No-ops to mimic multiprocessing.Pool
-    def close(self): pass
-    def join(self): pass
+    def map(self, func, iterable):
+        """Just apply the function to `iterable`."""
+        return map(SerialFuture, map(func, iterable))
+
+    def shutdown(self, wait=True):
+        """Do nothing."""
+        pass
 
 
+
+class SerialFuture(object):
+    """Mimic the concurrent.futures.Future interface."""
+
+    def __init__(self, result):
+        self._result = result
+
+    def result(self):
+        return self._result
+
+
+
+@contextmanager
 def pick_pool(nprocs):
     if nprocs == 1:
-        return SerialPool()
+        yield SerialPool()
+        raise StopIteration
+
     if nprocs < 1:
-        nprocs = multiprocessing.cpu_count()
-    return multiprocessing.Pool(nprocs)
+        nprocs = None
+    with futures.ProcessPoolExecutor(max_workers=nprocs) as pool:
+        yield pool
