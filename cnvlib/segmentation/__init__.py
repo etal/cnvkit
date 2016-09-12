@@ -114,6 +114,7 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
     else:
         raise ValueError("Unknown method %r" % method)
 
+    segarr.sort_columns()
     if variants:
         variants = variants.heterozygous()
         # Re-segment the variant allele freqs within each segment
@@ -186,49 +187,50 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     return seggenes, segweights, segdepths
 
 
-def squash_segments(seg_pset):
+def squash_segments(segments):
     """Combine contiguous segments."""
     curr_chrom = None
     curr_start = None
     curr_end = None
     curr_genes = []
-    curr_val = None
-    curr_cnt = 0
+    curr_log2 = None
+    curr_probes = 0
     squashed_rows = []
-    for row in seg_pset:
-        if row.chromosome == curr_chrom and row.log2 == curr_val:
+    for row in segments:
+        if row.chromosome == curr_chrom and row.log2 == curr_log2:
             # Continue the current segment
             curr_end = row.end
             curr_genes.append(row.gene)
-            curr_cnt += 1
+            curr_probes += 1
         else:
             # Segment break
             # Finish the current segment
-            if curr_cnt:
+            if curr_probes:
                 squashed_rows.append((curr_chrom, curr_start, curr_end,
                                       ",".join(pd.unique(curr_genes)),
-                                      curr_val, curr_cnt))
+                                      curr_log2, curr_probes))
             # Start a new segment
             curr_chrom = row.chromosome
             curr_start = row.start
             curr_end = row.end
             curr_genes = []
-            curr_val = row.log2
-            curr_cnt = 1
+            curr_log2 = row.log2
+            curr_probes = 1
     # Remainder
     squashed_rows.append((curr_chrom, curr_start, curr_end,
                           ",".join(pd.unique(curr_genes)),
-                          curr_val, curr_cnt))
-    return seg_pset.as_rows(squashed_rows)
+                          curr_log2, curr_probes))
+    return segments.as_rows(squashed_rows)
 
 
+# TODO/ENH combine with transfer_fields
+# Recalculate segment means, weights, depths here instead of in R
 def repair_segments(segments, orig_probes):
     """Post-process segmentation output.
 
     1. Ensure every chromosome has at least one segment.
     2. Ensure first and last segment ends match 1st/last bin ends
        (but keep log2 as-is).
-    3. Store probe-level gene names, comma-separated, as the segment name.
     """
     segments = segments.copy()
     extra_segments = []
@@ -245,5 +247,4 @@ def repair_segments(segments, orig_probes):
             extra_segments.append(null_segment)
     if extra_segments:
         segments.add(segments.as_rows(extra_segments))
-    # ENH: Recalculate segment means here instead of in R
     return segments

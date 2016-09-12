@@ -25,7 +25,13 @@ class GenomicArray(object):
 
     def __init__(self, data_table, meta_dict=None):
         # Validation
-        if len(data_table):
+        if data_table is None or not len(data_table):
+            # Empty but conformant table
+            data_table = self._make_blank()
+        else:
+            if not isinstance(data_table, pd.DataFrame):
+                # Rarely if ever needed -- prefer from_rows, from_columns, etc.
+                data_table = pd.DataFrame(data_table)
             if not all(c in data_table.columns for c in self._required_columns):
                 raise ValueError("data table must have at least columns "
                                  + repr(self._required_columns))
@@ -36,9 +42,7 @@ class GenomicArray(object):
                 # if data_table[col].dtype != np.dtype(dtype):
                 if not isinstance(data_table[col].iat[0], dtype):
                     data_table[col] = data_table[col].astype(dtype)
-        elif not isinstance(data_table, pd.DataFrame):
-            # Empty but conformant table
-            data_table = self._make_blank()
+
         self.data = data_table
         self.meta = (dict(meta_dict)
                      if meta_dict is not None and len(meta_dict)

@@ -44,11 +44,16 @@ def read_seg(infile, sample_id=None,
         for i, (_sid, dframe) in enumerate(results):
             if i == sample_id:
                 return dframe
+        else:
+            raise IndexError("No sample index %d found in SEG file" % sample_id)
+
     elif isinstance(sample_id, basestring):
         # Select sample by name
         for sid, dframe in results:
             if sid == sample_id:
                 return dframe
+        else:
+            raise IndexError("No sample ID '%s' found in SEG file" % sample_id)
     else:
         # Select the first sample
         sid, dframe = next(results)
@@ -111,27 +116,25 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
                                 #     'log2': 'float'
                                 # },
                                 )
+            dframe['sample_id'] = dframe['sample_id'].astype("str")
+            dframe['chromosome'] = dframe['chromosome'].astype("str")
         except (pd.parser.CParserError, csv.Error) as err:
             raise ValueError("Unexpected dataframe contents:\n%s\n%s" %
                              (line, next(handle)))
 
     # Calculate values for output columns
-    dframe['chromosome'] = dframe['chromosome'].astype("str")
     if chrom_names:
-        dframe['chromosome'] = dframe['chromosome'].apply(lambda c:
-                                                          chrom_names.get(c, c))
+        dframe['chromosome'] = dframe['chromosome'].replace(chrom_names)
     if chrom_prefix:
         dframe['chromosome'] = dframe['chromosome'].apply(lambda c:
                                                           chrom_prefix + c)
     if from_log10:
         dframe['log2'] *= LOG2_10
-    dframe['gene'] = "-" # ["G" if mean >= 0 else "L" for mean in dframe['log2']]
-    dframe["start"] -= 1
-    for sid, sample in dframe.groupby(by="sample_id", sort=False):
-        reindex_cols = list(CNA._required_columns)
-        if "probes" in sample:
-            reindex_cols.append("probes")
-        yield sid, sample.reindex(columns=reindex_cols)
+    dframe['gene'] = "-"
+    dframe['start'] -= 1
+    keep_columns = dframe.columns.drop(['sample_id'])
+    for sid, sample in dframe.groupby(by='sample_id', sort=False):
+        yield sid, sample.loc[:, keep_columns]
 
 
 def write_seg(dframe, sample_id=None):
