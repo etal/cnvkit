@@ -154,8 +154,6 @@ def drop_outliers(cnarr, width, factor):
                      n_outliers,
                      cnarr[outlier_mask].data.head(20),
                      "\n..." if n_outliers > 20 else "")
-    else:
-        logging.info("No outlier bins")
     return cnarr[~outlier_mask]
 
 

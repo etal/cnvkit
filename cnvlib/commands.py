@@ -116,7 +116,7 @@ def _cmd_batch(args):
                             bam, args.targets, args.antitargets, args.reference,
                             args.output_dir, args.male_reference, args.scatter,
                             args.diagram, args.rlibpath, args.count_reads,
-                            args.drop_low_coverage, args.method)
+                            args.drop_low_coverage, args.method, args.processes)
 
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed,
@@ -204,12 +204,12 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                     pool.submit(batch_write_coverage,
                                 target_bed, nbam,
                                 sample_pfx + '.targetcoverage.cnn',
-                                by_count))
+                                by_count, processes))
                 anti_futures.append(
                     pool.submit(batch_write_coverage,
                                 antitarget_bed, nbam,
                                 sample_pfx + '.antitargetcoverage.cnn',
-                                by_count))
+                                by_count, processes))
 
         target_fnames = [tf.result() for tf in tgt_futures]
         antitarget_fnames = [af.result() for af in anti_futures]
@@ -224,26 +224,26 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
     return output_reference, target_bed, antitarget_bed
 
 
-def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count):
+def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes):
     """Run coverage on one sample, write to file."""
-    cnarr = do_coverage(bed_fname, bam_fname, by_count)
+    cnarr = do_coverage(bed_fname, bam_fname, by_count, 0, processes)
     tabio.write(cnarr, out_fname)
     return out_fname
 
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                      output_dir, male_reference, scatter, diagram, rlibpath,
-                     by_count, skip_low, method):
+                     by_count, skip_low, method, processes):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
     sample_id = core.fbase(bam_fname)
     sample_pfx = os.path.join(output_dir, sample_id)
 
-    raw_tgt = do_coverage(target_bed, bam_fname, by_count)
+    raw_tgt = do_coverage(target_bed, bam_fname, by_count, 0, processes)
     tabio.write(raw_tgt, sample_pfx + '.targetcoverage.cnn')
 
-    raw_anti = do_coverage(antitarget_bed, bam_fname, by_count)
+    raw_anti = do_coverage(antitarget_bed, bam_fname, by_count, 0, processes)
     tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
     cnarr = do_fix(raw_tgt, raw_anti, tabio.read_cna(ref_fname),
@@ -254,6 +254,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     segments = segmentation.do_segmentation(cnarr, 'cbs',
                                             rlibpath=rlibpath,
                                             skip_low=skip_low,
+                                            processes=processes,
                                             **({'threshold': 1e-6}
                                                if method == 'wgs'
                                                else {}))
