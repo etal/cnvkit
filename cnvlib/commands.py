@@ -1525,6 +1525,9 @@ def _cmd_segmetrics(args):
         raise RuntimeError("alpha must be between 0 and 1.")
 
     from scipy.stats import sem
+    # silence sem's "Degrees of freedom <= 0 for slice"; NaN is OK
+    import warnings
+    warnings.simplefilter("ignore", RuntimeWarning)
 
     stats = {
         'mean': np.mean,
