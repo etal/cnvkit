@@ -42,11 +42,11 @@ FAQ & How To
     :maxdepth: 2
 
     calling
-    gender
     tumor
     heterogeneity
     germline
     nonhybrid
+    gender
     bias
     fileformats
 

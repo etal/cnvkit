@@ -145,8 +145,8 @@ If your targets are missing gene names, you can add them here with the
       target BED file.
 
 
-Process more tumor samples
---------------------------
+Next steps
+----------
 
 You can reuse the reference file you've previously constructed to extract copy
 number information from additional tumor sample BAM files, without repeating the
@@ -160,6 +160,31 @@ generate some figures)::
 The coordinates of the target and antitarget bins, the gene names for the
 targets, and the GC and RepeatMasker information for bias corrections are
 automatically extracted from the reference .cnn file you've built.
+
+Now, starting a project from scratch, you could follow any of these approaches:
+
+- Run ``batch`` as above with all tumor/test and normal/control samples
+  specified as they are, and hope for the best. (This should usually work fine.)
+- *For the careful:* Run ``batch`` with just the normal samples specified as
+  normal, yielding coverage .cnn files and a **pooled reference**. Inspect the
+  coverages of all samples with the :ref:`metrics` command, eliminating any
+  poor-quality samples and choosing a larger or smaller antitarget bin size if
+  necessary. Build an updated pooled reference using :ref:`batch` or
+  :ref:`coverage` and :ref:`reference` (see :doc:`pipeline`), coordinating your
+  work in a `Makefile <https://en.wikipedia.org/wiki/Makefile>`_, Rakefile, or
+  similar build tool.
+
+    - See also: `Ten Simple Rules for Reproducible Computational Research
+      <http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003285>`_
+
+- *For the power user:* Run ``batch`` with all samples specified as tumor
+  samples, using ``-n`` by itself to build a **flat reference**, yielding
+  coverages, copy ratios, segments and optionally plots for all samples, both
+  tumor and normal. Inspect the "rough draft" outputs and determine an
+  appropriate strategy to build and use a **pooled reference** to re-analyze the
+  samples -- ideally coordinated with a build tool as above.
+- Use a framework like `bcbio-nextgen <https://bcbio-nextgen.readthedocs.io/>`_
+  to coordinate the complete sequencing data analysis pipeline.
 
 See the command-line usage pages for additional
 :doc:`visualization <plots>`,
