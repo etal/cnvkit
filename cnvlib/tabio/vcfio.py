@@ -37,7 +37,7 @@ def read_vcf(infile, sample_id=None, normal_id=None,
                          "returning the first sample '%s'", sid)
 
     if dframe is None or len(dframe) == 0:
-        raise ValueError("No sample(s) %s found in VCF file" % sample_id or '')
+        raise IndexError("No sample(s) %s found in VCF file" % sample_id or '')
     logging.info("Selected test sample " + str(sid) +
                  (" and control sample %s" % (nid if nid else '')))
     return dframe
@@ -124,7 +124,7 @@ def _iter_samples(vcf_reader, sample_id, normal_id):
         normal_id = vcf_reader.samples[normal_id]
     for sid in (sample_id, normal_id):
         if sid and sid not in vcf_reader.samples:
-            raise ValueError("Specified sample %s not in VCF file"
+            raise IndexError("Specified sample %s not in VCF file"
                              % sid)
     pairs = None
     peds = list(_parse_pedigrees(vcf_reader))
@@ -136,7 +136,7 @@ def _iter_samples(vcf_reader, sample_id, normal_id):
         try:
             other_ids = [s for s in vcf_reader.samples if s != normal_id]
         except StopIteration:
-            raise ValueError(
+            raise IndexError(
                 "No other sample in VCF besides the specified normal " +
                 normal_id + "; did you mean to use this as the sample_id "
                 "instead?")
@@ -193,7 +193,7 @@ def _parse_pedigrees(vcf_reader):
 def _confirm_unique(sample_id, samples):
     occurrences = [s for s in samples if s == sample_id]
     if len(occurrences) != 1:
-        raise ValueError(
+        raise IndexError(
             "Did not find a single sample ID '%s' in: %s"
             % (sample_id, samples))
 
