@@ -12,17 +12,17 @@ try:
     # Dependencies for easy_install and pip:
     setup_args.update(
         install_requires=[
-            'numpy >= 1.9',
-            'scipy >= 0.9',
+            'biopython >= 1.62',
+            'future >= 0.15.2',
+            'futures >= 3.0',
             'matplotlib >= 1.1',
+            'numpy >= 1.9',
             'pandas >= 0.18.1',
+            'pyfaidx >= 0.4.7',
             'pysam >= 0.8, != 0.9.1.1',
             'pyvcf >= 0.5',
             'reportlab >= 3.0',
-            'biopython >= 1.62',
-            'pyfaidx >= 0.4.7',
-            'future >= 0.15.2',
-            'futures',
+            'scipy >= 0.9',
         ])
 except ImportError:
     from distutils.core import setup
