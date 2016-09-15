@@ -66,6 +66,14 @@ The public API for each of the commands defined in the CNVkit workflow.
 The following modules implement lower-level functionality specific to each of
 the CNVkit sub-commands.
 
+``access``
+~~~~~~~~~~~~~~
+
+.. automodule:: cnvlib.access
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 ``antitarget``
 ~~~~~~~~~~~~~~
 
@@ -122,6 +130,14 @@ the CNVkit sub-commands.
     :undoc-members:
     :show-inheritance:
 
+``metrics``
+~~~~~~~~~~~
+
+.. automodule:: cnvlib.metrics
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 ``reference``
 ~~~~~~~~~~~~~~~~
 
@@ -168,10 +184,10 @@ Helper modules
     :undoc-members:
     :show-inheritance:
 
-``metrics``
-~~~~~~~~~~~
+``descriptives``
+~~~~~~~~~~~~~~~~
 
-.. automodule:: cnvlib.metrics
+.. automodule:: cnvlib.descriptives
     :members:
     :undoc-members:
     :show-inheritance:
@@ -206,6 +222,14 @@ Defines several constants used in the pipeline.
 ~~~~~~~~~
 
 .. automodule:: cnvlib.plots
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``segfilters``
+~~~~~~~~~~~~~~
+
+.. automodule:: cnvlib.segfilters
     :members:
     :undoc-members:
     :show-inheritance:

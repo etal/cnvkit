@@ -120,7 +120,7 @@ def exclude_regions(bed_fname, access_rows):
             if chrom in ex_by_chrom:
                 logging.info("%s: Subtracting excluded regions", chrom)
                 exclude_rows = iter(ex_by_chrom[chrom])
-                ex_start, ex_end = next_or_inf(exclude_rows)
+                ex_start, ex_end = _next_or_inf(exclude_rows)
                 for a_start, a_end in a_rows:
                     for row in exclude_in_region(exclude_rows, chrom, a_start,
                                                  a_end, ex_start, ex_end):
@@ -134,13 +134,16 @@ def exclude_regions(bed_fname, access_rows):
 def exclude_in_region(exclude_rows, chrom, a_start, a_end, ex_start, ex_end):
     """Take region exclusions from an iterable and apply, perhaps recursively.
 
-    Returns an iterable (usually length 1) of two tuples:
-        (accessible chromosome, start, end)
-        (current exclusion start, end)
+    Yields
+    ------
+    tuple
+        A pair of tuples:
+            - (accessible chromosome, start, end)
+            - (current exclusion start, end)
     """
     # If we've leapfrogged the excluded area, catch up
     while ex_end <= a_start:
-        ex_start, ex_end = next_or_inf(exclude_rows)
+        ex_start, ex_end = _next_or_inf(exclude_rows)
     if a_end <= ex_start:
         # Excluded area does not overlap this one
         yield (chrom, a_start, a_end)
@@ -165,9 +168,8 @@ def exclude_in_region(exclude_rows, chrom, a_start, a_end, ex_start, ex_end):
             # Otherwise: Exclusion covers this region's right (end) edge only
 
 
-def next_or_inf(iterable):
+def _next_or_inf(iterable):
     try:
         return next(iterable)
     except StopIteration:
         return float("Inf"), float("Inf")
-
