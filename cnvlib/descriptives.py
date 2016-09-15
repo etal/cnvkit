@@ -47,7 +47,7 @@ def warray(a, w):
 def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
     """Compute the biweight location for an array.
 
-    The biweight is a robust statistic for determining the central location of a
+    The biweight is a robust statistic for estimating the central location of a
     distribution.
     """
     a = narray(a)
@@ -84,7 +84,10 @@ def modal_location(a):
     The "mode" is the location of peak density among the values, estimated using
     a Gaussian kernel density estimator.
 
-    `a` is a 1-D array of floating-point values, e.g. bin log2 ratio values.
+    Parameters
+    ----------
+    a : np.array
+        A 1-D array of floating-point values, e.g. bin log2 ratio values.
     """
     a = narray(a)
     if not len(a):
@@ -99,7 +102,7 @@ def modal_location(a):
 
 
 def weighted_median(a, weights):
-    """Weighted median."""
+    """Weighted median of a 1-D numeric array."""
     if not len(a):
         return np.nan
     elif len(a) == 1:
@@ -130,8 +133,9 @@ def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-3):
     midvariance (i.e. the standard deviation) of a distribution.
 
     See:
-    https://en.wikipedia.org/wiki/Robust_measures_of_scale#The_biweight_midvariance
-    https://astropy.readthedocs.io/en/latest/_modules/astropy/stats/funcs.html
+
+    - https://en.wikipedia.org/wiki/Robust_measures_of_scale#The_biweight_midvariance
+    - https://astropy.readthedocs.io/en/latest/_modules/astropy/stats/funcs.html
     """
     a = narray(a)
     if not len(a):
@@ -161,8 +165,8 @@ def gapper_scale(a):
 
     See:
 
-        - Wainer & Thissen (1976)
-        - Beers, Flynn, and Gebhardt (1990)
+    - Wainer & Thissen (1976)
+    - Beers, Flynn, and Gebhardt (1990)
     """
     a = narray(a)
     gaps = np.diff(np.sort(a))

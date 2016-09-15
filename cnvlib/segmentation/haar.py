@@ -38,9 +38,18 @@ def segment_haar(cnarr, fdr_q):
 
     Calculate copy number segmentation by HaarSeg
     (http://haarseg.r-forge.r-project.org/)
-    Input: log2 coverage data in Nexus 'basic' format
-    Output: the CBS data table
 
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Binned, normalized copy ratios.
+    fdr_q : float
+        False discovery rate q-value.
+
+    Returns
+    -------
+    CopyNumArray
+        The CBS data table as a CNVkit object.
     """
     # Segment each chromosome individually
     # ENH - skip large gaps (segment chrom. arms separately)
@@ -125,43 +134,43 @@ def haarSeg(I, breaksFdrQ,
             haarEndLevel=5):
     r"""Perform segmentation according to the HaarSeg algorithm.
 
-    Arguments:
-
-    I
+    Parameters
+    ----------
+    I : array
         A 1D array of log-ratio values, sorted according to their genomic
         location.
-    W
+    W : array
         Weight matrix, corresponding to quality of measurement, with values
         :math:`1/(\sigma^2)`. Must have the same size as I.
-    rawI
+    rawI : array
         The minimum between the raw test-sample and control-sample coverages
         (before applying log ratio, but after any background reduction and/or
         normalization). These raw red / green measurments are used to detect
         low-value probes, which are more sensitive to noise.
         Used for the non-stationary variance compensation.
         Must have the same size as I.
-    breaksFdrQ
+    breaksFdrQ : float
         The FDR q parameter. This value should lie between 0 and 0.5. The
         smaller this value is, the less sensitive the segmentation result will
         be.
         For example, we will detect fewer segmentation breaks when using Q =
         1e-4, compared to when using Q = 1e-3.
         Common used values are 1e-2, 1e-3, 1e-4.
-    haarStartLevel
+    haarStartLevel : int
         The detail subband from which we start to detect peaks. The higher this
         value is, the less sensitive we are to short segments. The default is
         value is 1, corresponding to segments of 2 probes.
-    haarEndLevel
+    haarEndLevel : int
         The detail subband until which we use to detect peaks. The higher this
         value is, the more sensitive we are to large trends in the data. This
         value DOES NOT indicate the largest possible segment that can be
         detected.  The default is value is 5, corresponding to step of 32 probes
         in each direction.
 
-
-    Returns:
-
-    A tuple of two elements:
+    Returns
+    -------
+    tuple
+        Two elements:
         1. Segments result table, a list of tuples:
             (segment start index, segment size, segment value)
         2. Segmented signal array (same size as I)
@@ -240,8 +249,12 @@ def FDRThres(x, q, stdev):
 def SegmentByPeaks(data, peaks, weights=None):
     """Average the values of the probes within each segment.
 
-    `data` : the probe array values
-    `peaks` : array of copy number breakpoints
+    Parameters
+    ----------
+    data : array
+        the probe array values
+    peaks : array
+        Positions of copy number breakpoints in the original array
 
     Source: SegmentByPeaks.R
     """
@@ -269,14 +282,16 @@ def HaarConv(signal, #const double * signal,
             ):
     """Convolve haar wavelet function with a signal, applying circular padding.
 
-    Params:
+    Parameters
+    ----------
+    signal : const array of floats
+    weight : const array of floats (optional)
+    stepHalfSize : int
 
-        signal: const array of floats
-        weight: const array of floats (optional)
-        stepHalfSize: int
-
-    Output:
-        result: array of floats
+    Returns
+    -------
+    array
+        Of floats, representing the convolved signal.
 
     Source: HaarSeg.c
     """
@@ -335,12 +350,14 @@ def FindLocalPeaks(signal, #const double * signal,
 
     First and last index are never considered extramum.
 
-    Parameters:
+    Parameters
+    ----------
+    signal : const array of floats
 
-        signal: const array of floats
-
-    Output:
-        peakLoc: array of ints
+    Returns
+    -------
+    peakLoc : array of ints
+        Locations of extrema in `signal`
 
     Source: HaarSeg.c
     """
@@ -389,15 +406,15 @@ def UnifyLevels(baseLevel, #const int * baseLevel,
     Merge the two lists of breakpoints, but drop addonLevel values that are too
     close to baseLevel values.
 
-    Parameters:
+    Parameters
+    ----------
+    baseLevel : const array of ints
+    addonLevel : const array of ints
+    windowSize : int
 
-        baseLevel: const array of ints
-        addonLevel: const array of ints
-        windowSize: int
-
-    Output:
-
-        joinedLevel: array of ints
+    Returns
+    -------
+    joinedLevel : array of ints
 
     Source: HaarSeg.c
     """
@@ -442,13 +459,14 @@ def PulseConv(signal, #const double * signal,
 
     Used for non-stationary variance compensation.
 
-    Parameters:
+    Parameters
+    ----------
+    signal: const array of floats
+    pulseSize: int
 
-        signal: const array of floats
-        pulseSize: int
-
-    Output:
-        result: modifiable array of floats
+    Returns
+    -------
+    array of floats
 
     Source: HaarSeg.c
     """
@@ -491,10 +509,10 @@ def AdjustBreaks(signal, #const double * signal,
     We try to move each break 1 sample left/right, choosing the offset which
     leads to minimum data error.
 
-    Parameters:
-
-        signal: const array of floats
-        peakLoc: const array of ints
+    Parameters
+    ----------
+    signal: const array of floats
+    peakLoc: const array of ints
 
     Source: HaarSeg.c
     """

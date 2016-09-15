@@ -64,7 +64,10 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
 def mask_bad_bins(cnarr):
     """Flag the bins with excessively low or inconsistent coverage.
 
-    Returns a bool array where True indicates bins that failed the checks.
+    Returns
+    -------
+    np.array
+        A boolean array where True indicates bins that failed the checks.
     """
     mask = ((cnarr['log2'] < params.MIN_REF_COVERAGE) |
             (cnarr['log2'] > -params.MIN_REF_COVERAGE) |
@@ -154,13 +157,13 @@ def edge_losses(target_sizes, insert_size):
     """Calculate coverage losses at the edges of baited regions.
 
     Letting i = insert size and t = target size, the proportional loss of
-    coverage near the two edges of the baited region (combined) is::
+    coverage near the two edges of the baited region (combined) is:
 
-        i/2t
+    .. math :: i/2t
 
-    If the "shoulders" extend outside the bait $(t < i), reduce by::
+    If the "shoulders" extend outside the bait $(t < i), reduce by:
 
-        (i-t)^2 / 4it
+    .. math :: (i-t)^2 / 4it
 
     on each side, or (i-t)^2 / 2it total.
     """
@@ -179,11 +182,11 @@ def edge_gains(target_sizes, gap_sizes, insert_size):
     Letting i = insert size, t = target size, g = gap to neighboring bait,
     the gain of coverage due to a nearby bait, if g < i, is::
 
-        (i-g)^2 / 4it
+    .. math :: (i-g)^2 / 4it
 
     If the neighbor flank extends beyond the target (t+g < i), reduce by::
 
-        (i-t-g)^2 / 4it
+    .. math :: (i-t-g)^2 / 4it
 
     If a neighbor overlaps the target, treat it as adjacent (gap size 0).
     """
@@ -230,4 +233,3 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     # Avoid 0-value bins -- CBS doesn't like these
     weights = np.maximum(weights, epsilon)
     return cnarr.add_columns(weight=weights)
-

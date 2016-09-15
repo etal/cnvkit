@@ -148,8 +148,11 @@ def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male)
     sample and a male reference, on chromosome X the "reference" value is 1 but
     "expect" is 2.
 
-    Return a pair of integers: number of copies in the reference, and expected in
-    the sample.
+    Returns
+    -------
+    tuple
+        A pair of integers: number of copies in the reference, and expected in
+        the sample.
     """
     chrom = chrom.lower()
     if chrom in ["chrx", "x"]:
@@ -166,7 +169,10 @@ def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male)
 def _reference_copies_pure(chrom, ploidy, is_reference_male):
     """Determine the reference number of chromosome copies (pure sample).
 
-    Return the integer number of copies in the reference.
+    Returns
+    -------
+    int
+        Number of copies in the reference.
     """
     chrom = chrom.lower()
     if chrom in ["chry", "y"] or (is_reference_male and chrom in ["chrx", "x"]):
@@ -215,9 +221,7 @@ def _log2_ratio_to_absolute_pure(log2_ratio, ref_copies):
     Purity adjustment is skipped. This is appropriate if the sample is germline
     or if scaling for tumor heterogeneity was done beforehand.
 
-    Math::
-
-        n = r*2^v
+    .. math :: n = r*2^v
     """
     ncopies = ref_copies * 2 ** log2_ratio
     return ncopies
@@ -226,7 +230,8 @@ def _log2_ratio_to_absolute_pure(log2_ratio, ref_copies):
 def rescale_baf(purity, observed_baf, normal_baf=0.5):
     """Adjust B-allele frequencies for sample purity.
 
-    Math:
+    Math::
+
         t_baf*purity + n_baf*(1-purity) = obs_baf
         obs_baf - n_baf * (1-purity) = t_baf * purity
         t_baf = (obs_baf - n_baf * (1-purity))/purity

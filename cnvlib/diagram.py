@@ -148,9 +148,15 @@ def bc_organism_draw(org, title, wrap=12):
     Instead of stacking chromosomes horizontally (along the x-axis), stack rows
     vertically, then proceed with the chromosomes within each row.
 
-    Arguments:
-
-    - title: The output title of the produced document.
+    Parameters
+    ----------
+    org :
+        The chromosome diagram object being modified.
+    title : str
+        The output title of the produced document.
+    wrap : int
+        Maximum number of chromosomes per row; the remainder will be wrapped to
+        the next row(s).
     """
     margin_top = 1.25*inch
     margin_bottom = 0.1*inch

@@ -59,8 +59,8 @@ def smoothed(x, width, do_fit_edges=False):
 
     See: https://en.wikipedia.org/wiki/Kaiser_window
 
-    Parameters:
-
+    Parameters
+    ----------
     x : array-like
         1-dimensional numeric data set.
     width : float
@@ -131,8 +131,6 @@ def outlier_iqr(a, c=3.0):
 def outlier_mad_median(a):
     """MAD-Median rule for detecting outliers.
 
-    Returns: a boolean array of the same size, where outlier indices are True.
-
     X_i is an outlier if::
 
          | X_i - M |
@@ -146,8 +144,13 @@ def outlier_mad_median(a):
 
     This is a very robust rule with the highest possible breakdown point of 0.5.
 
-    See:
+    Returns
+    -------
+    np.array
+        A boolean array of the same size as `a`, where outlier indices are True.
 
+    References
+    ----------
     - Davies & Gather (1993) The Identification of Multiple Outliers.
     - Rand R. Wilcox (2012) Introduction to robust estimation and hypothesis
       testing. Ch.3: Estimating measures of location and scale.
@@ -178,7 +181,7 @@ def rolling_outlier_iqr(x, width, c=3.0):
 
 
 def rolling_outlier_quantile(x, width, q, m):
-    """Return a boolean mask of outliers by multiples of a quantile in a window.
+    """Detect outliers by multiples of a quantile in a window.
 
     Outliers are the array elements outside `m` times the `q`'th
     quantile of deviations from the smoothed trend line, as calculated from
@@ -188,6 +191,11 @@ def rolling_outlier_quantile(x, width, q, m):
 
     This is the smoothing method used in BIC-seq (doi:10.1073/pnas.1110574108)
     with the parameters width=200, q=.95, m=5 for WGS.
+
+    Returns
+    -------
+    np.array
+        A boolean array of the same size as `x`, where outlier indices are True.
     """
     if len(x) <= width:
         return np.zeros(len(x), dtype=np.bool_)
@@ -198,10 +206,15 @@ def rolling_outlier_quantile(x, width, q, m):
 
 
 def rolling_outlier_std(x, width, stdevs):
-    """Return a boolean mask of outliers by stdev within a rolling window.
+    """Detect outliers by stdev within a rolling window.
 
     Outliers are the array elements outside `stdevs` standard deviations from
     the smoothed trend line, as calculated from the trend line residuals.
+
+    Returns
+    -------
+    np.array
+        A boolean array of the same size as `x`, where outlier indices are True.
     """
     if len(x) <= width:
         return np.zeros(len(x), dtype=np.bool_)

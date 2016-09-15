@@ -25,8 +25,12 @@ def setup_chromosome(axis, probes=None, segments=None, variants=None,
                      y_min=None, y_max=None, y_label=None):
     """Configure axes for plotting a single chromosome's data.
 
-    `probes`, `segments`, and `variants` should already be subsetted to the
-    region that will be plotted.
+    Parameters
+    ----------
+    probes : CopyNumArray
+    segments : CopyNumArray
+    variants : VariantArray
+        All should already be subsetted to the region that will be plotted.
     """
     min_x = np.inf
     max_x = 0
@@ -60,7 +64,10 @@ def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
                       do_trend=False, y_min=None, y_max=None):
     """Draw a scatter plot of probe values with CBS calls overlaid.
 
-    Argument 'genes' is a list of tuples: (start, end, gene name)
+    Parameters
+    ----------
+    genes : list
+        Of tuples: (start, end, gene name)
     """
     # Get scatter plot coordinates
     x = 0.5 * (probes['start'] + probes['end']) * MB # bin midpoints
@@ -245,8 +252,11 @@ def cnv_on_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
 def _smooth_genome_log2(cnarr, smooth_func, width):
     """Fit a trendline through bin log2 ratios, handling chromosome boundaries.
 
-    Returns an array of smoothed log2 values, calculated with `smooth_func`
-    and `width`, equal in length to `cnarr`.
+    Returns
+    -------
+    np.array
+        Smoothed log2 values, calculated with `smooth_func` and `width`, equal
+        in length to `cnarr`.
     """
     # ENH: also split by centromeres (long internal gaps -- see PSCBS)
     # ENH: use pandas groupby
@@ -338,7 +348,10 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, pad,
 def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom=None):
     """Group SNP allele frequencies by segment.
 
-    Return an iterable of: start, end, value.
+    Yields
+    ------
+    tuple
+        (start, end, value)
     """
     if chrom:
         segments = segments.select(chromosome=chrom)
@@ -361,12 +374,15 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom=None):
 def plot_x_dividers(axis, chrom_sizes, pad):
     """Plot vertical dividers and x-axis labels given the chromosome sizes.
 
-    Returns a table of the x-position offsets of each chromosome.
-
     Draws vertical black lines between each chromosome, with padding.
     Labels each chromosome range with the chromosome name, centered in the
     region, under a tick.
     Sets the x-axis limits to the covered range.
+
+    Returns
+    -------
+    OrderedDict
+        A table of the x-position offsets of each chromosome.
     """
     assert isinstance(chrom_sizes, collections.OrderedDict)
 
@@ -482,7 +498,10 @@ def cvg2rgb(cvg, desaturate):
 def gene_coords_by_name(probes, names):
     """Find the chromosomal position of each named gene in probes.
 
-    Returns a dict: {chromosome: [(start, end, gene name), ...]}
+    Returns
+    -------
+    dict
+        Of: {chromosome: [(start, end, gene name), ...]}
     """
     # Create an index of gene names
     gene_index = collections.defaultdict(set)
@@ -517,7 +536,10 @@ def gene_coords_by_range(probes, chrom, start, end,
                          ignore=params.IGNORE_GENE_NAMES):
     """Find the chromosomal position of all genes in a range.
 
-    Returns a dict: {chromosome: [(start, end, gene), ...]}
+    Returns
+    -------
+    dict
+        Of: {chromosome: [(start, end, gene), ...]}
     """
     ignore += ('Background',)
     # Tabulate the genes in the selected region
@@ -538,7 +560,7 @@ def gene_coords_by_range(probes, chrom, start, end,
 def unpack_range(a_range):
     """Extract chromosome, start, end from a string or tuple.
 
-    Examples:
+    Examples::
 
         "chr1" -> ("chr1", None, None)
         "chr1:100-123" -> ("chr1", 100, 123)
@@ -558,8 +580,12 @@ def unpack_range(a_range):
 def parse_range_text(text):
     """Parse a chromosomal range specification.
 
-    Range spec string should look like ``chr1:1234-5678`` or ``chr1:1234-`` or
-    ``chr1:-5678``, where missing start becomes 0 and missing end becomes None.
+    Parameters
+    ----------
+    text : string
+        Range specification, which should look like ``chr1:1234-5678`` or
+        ``chr1:1234-`` or ``chr1:-5678``, where missing start becomes 0 and
+        missing end becomes None.
     """
     try:
         chrom, rest = text.split(':')
