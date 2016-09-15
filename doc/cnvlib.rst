@@ -9,11 +9,17 @@ Module ``cnvlib`` contents
     :undoc-members:
     :show-inheritance:
 
-The one function exposed at the top level, read, loads a file in CNVkit's native
-format and returns a CopyNumArray instance.  For your own scripting, you can
-usually accomplish what you need using the CopyNumArray and GenomicArray methods
-available on this returned object.
+The one function exposed at the top level, `read`, loads a file in CNVkit's
+BED-like tabular format and returns a CopyNumArray instance. For your own
+scripting, you can usually accomplish what you need using just the CopyNumArray
+and GenomicArray methods available on this returned object (see
+:ref:`api_classes`).
 
+To load other file formats, see :ref:`api_tabio`. To run functions equivalent to
+CNVkit commands within Python, see :ref:`api_commands`.
+
+
+.. _api_classes:
 
 Core classes
 ------------
@@ -48,6 +54,22 @@ manipulations that aren't already provided by methods in the wrapper class.
     :undoc-members:
     :show-inheritance:
 
+
+.. _api_tabio:
+
+Tabular file I/O
+----------------
+
+``tabio``
+~~~~~~~~~
+
+.. automodule:: cnvlib.tabio
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. _api_commands:
 
 Interface to CNVkit sub-commands
 --------------------------------
@@ -172,6 +194,8 @@ Supports the sub-commands :ref:`breaks` and :ref:`gainloss`.
     :undoc-members:
     :show-inheritance:
 
+
+.. _api_helpers:
 
 Helper modules
 --------------

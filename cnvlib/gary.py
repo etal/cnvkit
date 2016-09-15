@@ -469,7 +469,21 @@ class GenomicArray(object):
         return self.as_dataframe(self.data.copy())
 
     def add_columns(self, **columns):
-        """Create a new CNA, adding the specified extra columns to this CNA."""
+        """Add the given columns to a copy of this GenomicArray.
+
+        Parameters
+        ----------
+        **columns : array
+            Keyword arguments where the key is the new column's name and the
+            value is an array of the same length as `self` which will be the new
+            column's values.
+
+        Returns
+        -------
+        GenomicArray or subclass
+            A new instance of `self` with the given columns included in the
+            underlying dataframe.
+        """
         # return self.as_dataframe(self.data.assign(**columns))
         result = self.copy()
         for key, values in columns.items():
@@ -501,7 +515,7 @@ class GenomicArray(object):
         selector : callable
             A boolean function which will be applied to each row to select rows
             where the result is True.
-        kwargs : string
+        **kwargs : string
             Keyword arguments like ``chromosome="chr7"`` or
             ``gene="Background"``, which will select rows where the keyed field
             equals the specified value.

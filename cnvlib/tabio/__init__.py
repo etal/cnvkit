@@ -19,27 +19,33 @@ from . import bedio, picard, seg, tab, textcoord, vcfio
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     """Read tabular data from a file or stream into a genome object.
 
-    Supported formats: see READERS
+    Supported formats: see `READERS`
 
     If a format supports multiple samples, return the sample specified by
     `sample_id`, or if unspecified, return the first sample and warn if there
     were other samples present in the file.
 
-    :Parameters:
-        infile : handle or string
-            Filename or opened file-like object to read.
-        fmt : string
-            File format.
-        into : class
-            GenomicArray class or subclass to instantiate, overriding the
-            default for the target file format.
-        sample_id : string
-            Sample identifier.
-        meta : dict
-            Metadata, as arbitrary key-value pairs.
-        **kwargs :
-            Additional keyword arguments to the format-specific reader function.
+    Parameters
+    ----------
+    infile : handle or string
+        Filename or opened file-like object to read.
+    fmt : string
+        File format.
+    into : class
+        GenomicArray class or subclass to instantiate, overriding the
+        default for the target file format.
+    sample_id : string
+        Sample identifier.
+    meta : dict
+        Metadata, as arbitrary key-value pairs.
+    **kwargs :
+        Additional keyword arguments to the format-specific reader function.
 
+    Returns
+    -------
+    GenomicArray or subclass
+        The data from the given file instantiated as `into`, if specified, or
+        the default base class for the given file format (usually GenomicArray).
     """
     if fmt not in READERS:
         raise ValueError("Unknown format: %s" % fmt)
@@ -85,7 +91,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
 
 
 def read_auto(infile):
-    """Auto-detect file format, and return an appropriate parser function."""
+    """Auto-detect a file's format and use an appropriate parser to read it."""
     if not isinstance(infile, basestring) and not hasattr(infile, "seek"):
         raise ValueError("Can only auto-detect format from filename or "
                          "seekable (local, on-disk) files, which %s is not"
