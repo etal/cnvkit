@@ -26,12 +26,26 @@ class VariantArray(gary.GenomicArray):
         """Aggregate variant (b-allele) frequencies in each given bin.
 
         Get the average BAF in each of the bins of another genomic array:
-        BAFs are mirrored (see `mirrored_baf`), grouped in each bin of the
-        `ranges` genomic array (an instance of GenomicArray or a subclass),
+        BAFs are mirrored (see `mirrored_baf`), grouped in each bin of `ranges`,
         and summarized with `summary_func`, by default the median.
 
-        Parameters `above_half` and `tumor_boost` are the same as in
-        `mirrored_baf`.
+        Parameters
+        ----------
+        ranges : GenomicArray or subclass
+            Bins for grouping the variants in `self`.
+        summary_func : callable
+            Function to reduce BAF values to one number; by default the mirrored
+            BAF median.
+        above_half : bool
+            The same as in `mirrored_baf`.
+        tumor_boost : bool
+            The same as in `mirrored_baf`.
+
+        Returns
+        -------
+        float array
+            Average b-allele frequency in each range; same length as `ranges`.
+            May contain NaN values where no variants overlap a range.
         """
         if tumor_boost and "n_alt_freq" in self:
             self = self.copy()
@@ -43,6 +57,26 @@ class VariantArray(gary.GenomicArray):
                                                 keep_empty=True)])
 
     def heterozygous(self, min_freq=None, max_freq=None):
+        """Subset to only heterozygous variants.
+
+        If `min_freq` and `max_freq` are not specified, use "zygosity" genotype
+        values, excludes variants with value 0.0 or 1.0.
+
+        Parameters
+        ----------
+        min_freq : float
+            Return only variants with alt allele frequency of at least this
+            value.
+        max_freq : float
+            Return only variants with alt allele frequency of at most this
+            value.
+
+        Returns
+        -------
+        VariantArray
+            The subset of `self` with heterozygous genotype, or allele frequency
+            between the specified thresholds.
+        """
         if min_freq is None and max_freq is None:
             # Use existing genotype/zygosity info
             zygosity = self["n_zygosity" if "n_zygosity" in self
@@ -66,12 +100,21 @@ class VariantArray(gary.GenomicArray):
     def mirrored_baf(self, above_half=None, tumor_boost=False):
         """Mirrored B-allele frequencies (BAFs).
 
-        If `above_half` is set to True or False, flip BAFs to be all above 0.5
-        or below 0.5, respectively, for consistency. Otherwise mirror in the
-        direction of the majority of BAFs.
+        Parameters
+        ----------
+        above_half : bool or None
+            If specified, flip BAFs to be all above 0.5 (True) or below 0.5
+            (False), respectively, for consistency. Otherwise, if None, mirror
+            in the direction of the majority of BAFs.
+        tumor_boost : bool
+            Normalize tumor-sample allele frequencies to the matched normal
+            sample's allele frequencies.
 
-        With `tumor_boost`, normalize tumor-sample allele frequencies to the
-        matched normal sample's allele frequencies.
+        Returns
+        -------
+        float array
+            Mirrored b-allele frequencies, the same length as `self`. May
+            contain NaN values.
         """
         if tumor_boost and "n_alt_freq" in self:
             alt_freq = self.tumor_boost()
@@ -83,6 +126,8 @@ class VariantArray(gary.GenomicArray):
         """TumorBoost normalization of tumor-sample allele frequencies.
 
         De-noises the signal for detecting LOH.
+
+        See: TumorBoost, Bengtsson et al. 2010
         """
         if "n_alt_freq" in self:
             n_freqs = self["n_alt_freq"]

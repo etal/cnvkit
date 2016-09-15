@@ -62,15 +62,23 @@ class CopyNumArray(gary.GenomicArray):
     def by_gene(self, ignore=params.IGNORE_GENE_NAMES):
         """Iterate over probes grouped by gene name.
 
-        Groups each series of intergenic bins as a 'Background' gene; any
-        'Background' bins within a gene are grouped with that gene.
-        Bins with names in `ignore` are treated as 'Background' bins, but retain
-        their name.
+        Group each series of intergenic bins as a "Background" gene; any
+        "Background" bins within a gene are grouped with that gene.
 
         Bins' gene names are split on commas to accommodate overlapping genes
         and bins that cover multiple genes.
 
-        Return an iterable of pairs of: (gene name, CNA of rows with same name)
+        Parameters
+        ----------
+        ignore : list or tuple of str
+            Gene names to treat as "Background" bins instead of real genes,
+            grouping these bins with the surrounding gene or background region.
+            These bins will still retain their name in the output.
+
+        Yields
+        ------
+        tuple
+            Pairs of: (gene name, CNA of rows with same name)
         """
         start_idx = end_idx = None
         for _chrom, subgary in self.by_chromosome():
@@ -98,7 +106,23 @@ class CopyNumArray(gary.GenomicArray):
     # Manipulation
 
     def center_all(self, estimator=np.nanmedian, skip_low=False, by_chrom=True):
-        """Recenter coverage values to the autosomes' average (in-place)."""
+        """Re-center log2 values to the autosomes' average (in-place).
+
+        Parameters
+        ----------
+        estimator : str or callable
+            Function to estimate central tendency. If a string, must be one of
+            'mean', 'median', 'mode', 'biweight' (for biweight location). Median
+            by default.
+        skip_low : bool
+            Whether to drop very-low-coverage bins (via `drop_low_coverage`)
+            before estimating the center value.
+        by_chrom : bool
+            If True, first apply `estimator` to each chromosome separately, then
+            apply `estimator` to the per-chromosome values, to reduce the impact
+            of uneven targeting or extreme aneuploidy. Otherwise, apply
+            `estimator` to all log2 values directly.
+        """
         est_funcs = {
             "mean": np.nanmean,
             "median": np.nanmedian,
@@ -122,11 +146,11 @@ class CopyNumArray(gary.GenomicArray):
             self.data['log2'] -= estimator(values)
 
     def drop_low_coverage(self):
-        """Drop bins with extremely low log2 coverage values.
+        """Drop bins with extremely low log2 coverage or copy ratio values.
 
-        These are generally bins that had no reads mapped due to
-        sample-specific issues. A very small coverage value (log2 ratio) may
-        have been substituted to avoid domain or divide-by-zero errors.
+        These are generally bins that had no reads mapped due to sample-specific
+        issues. A very small log2 ratio or coverage value may have been
+        substituted to avoid domain or divide-by-zero errors.
         """
         return self.as_dataframe(self.data[self.data['log2'] >
                                            params.NULL_LOG2_COVERAGE -
@@ -136,13 +160,25 @@ class CopyNumArray(gary.GenomicArray):
                      squash_background=False, ignore=params.IGNORE_GENE_NAMES):
         """Combine consecutive bins with the same targeted gene name.
 
-        The `ignore` parameter lists bin names that not be counted as genes to
-        be output.
+        Parameters
+        ----------
+        summary_func : callable
+            Function to summarize an array of log2 values to produce a
+            new log2 value for a "squashed" (i.e. reduced) region. By default
+            this is the biweight location, but you might want median, mean, max,
+            min or something else in some cases.
+        squash_background : bool
+            If True, also reduce consecutive "Background" bins into a single
+            bin. Otherwise, keep "Background" and ignored bins as they are in
+            the output.
+        ignore : list or tuple of str
+            Bin names to be treated as "Background" instead of as unique genes.
 
-        Parameter `summary_func` is a function that summarizes an array of
-        coverage values to produce the "squashed" gene's coverage value. By
-        default this is the biweight location, but you might want median, mean,
-        max, min or something else in some cases.
+        Return
+        ------
+        CopyNumArray
+            Another, usually smaller, copy of `self` with each gene's bins
+            reduced to a single bin with appropriate values.
         """
         def squash_rows(name, rows):
             """Combine multiple rows (for the same gene) into one row."""
@@ -188,11 +224,25 @@ class CopyNumArray(gary.GenomicArray):
         return outprobes
 
     def guess_xx(self, male_reference=False, verbose=True):
-        """Guess whether a sample is female from chrX relative coverages.
+        """Detect chromosomal sex; return True if a sample is probably female.
 
-        Recommended cutoff values:
-            -0.5 -- raw target data, not yet corrected
-            +0.5 -- probe data already corrected on a male profile
+        Uses `compare_sex_chromosomes` to calculate coverage ratios of the X and
+        Y chromosomes versus autosomes.
+
+        Parameters
+        ----------
+        male_reference : bool
+            Was this sample normalized to a male reference copy number profile?
+        verbose : bool
+            If True, print (i.e. log to console) the ratios of the log2
+            coverages of the X and Y chromosomes versus autosomes, the
+            "maleness" ratio of male vs. female expectations for each sex
+            chromosome, and the inferred chromosomal sex.
+
+        Returns
+        -------
+        bool
+            True if the coverage ratios indicate the sample is female.
         """
         is_xy, stats = self.compare_sex_chromosomes(male_reference)
         if is_xy is None:
@@ -208,20 +258,38 @@ class CopyNumArray(gary.GenomicArray):
         return ~is_xy
 
     def compare_sex_chromosomes(self, male_reference=False, skip_low=False):
-        """Compare coverage ratios of sex chromosomes versus autosomes."""
-        # Expectations:
-        # -------------
-        #       log2
-        #  A   X   Y
-        # * male reference
-        #  0   0   0  :male sample, male reference
-        #  0  +1  -19 :female sample, male reference
-        # * female reference, chrY = -1
-        #  0  -1   0  :male sample, female reference
-        #  0   0  -19 :female sample, female reference
-        # ENH: use scipy.stats.ttest_ind(a, b, equal_var=False)
+        """Compare coverage ratios of sex chromosomes versus autosomes.
 
-        # For completeness; this doesn't help much since M-W is nonparametric
+        Perform 4 Mann-Whitney tests of the log2 coverages on chromosomes X and
+        Y, separately shifting for assumed male and female chromosomal sex.
+        Compare the U values obtained to infer whether the male or female
+        assumption fits the data better. 
+
+        Parameters
+        ----------
+        male_reference : bool
+            Whether a male reference copy number profile was used to normalize
+            the data. If so, a male sample should have log2 values of 0 on X and
+            Y, and female +1 on X, deep negative (below -3) on Y. Otherwise, a
+            male sample should have log2 values of -1 on X and 0 on
+            Y, and female 0 on X, deep negative (below -3) on Y.
+        skip_low : bool
+            If True, drop very-low-coverage bins (via `drop_low_coverage`)
+            before comparing log2 coverage ratios. Included for completeness,
+            but shouldn't affect the result much since the M-W test is
+            nonparametric and p-values are not used here.
+
+        Returns
+        -------
+        bool
+            True if the sample appears male.
+        dict
+            Calculated values used for the inference: relative log2 ratios of
+            chromosomes X and Y versus the autosomes; the Mann-Whitney U values
+            from each test; and ratios of U values for male vs. female
+            assumption on chromosomes X and Y.
+        """
+        # ENH: use scipy.stats.ttest_ind(a, b, equal_var=False)
         cnarr = (self.drop_low_coverage() if skip_low else self)
         chrx = cnarr[cnarr.chromosome == self._chr_x_label]
         if not len(chrx):
@@ -292,11 +360,22 @@ class CopyNumArray(gary.GenomicArray):
     def residuals(self, segments=None):
         """Difference in log2 value of each bin from its segment mean.
 
-        If segments are just regions (e.g. GenomicArray) with no log2 values
-        precalculated, subtract the median of this array's log2 values within
-        each region. If no segments are given, subtract each chromosome's
-        median.
+        Parameters
+        ----------
+        segments : GenomicArray, CopyNumArray, or None
+            Determines the "mean" value to which `self` log2 values are relative:
 
+            - If CopyNumArray, use the log2 values as the segment means to
+              subtract.
+            - If GenomicArray with no log2 values, group `self` by these ranges
+              and subtract each group's median log2 value.
+            - If None, subtract each chromosome's median.
+
+        Returns
+        -------
+        array
+            Residual log2 values from `self` relative to `segments`; same length
+            as `self`.
         """
         if not segments:
             resids = [subcna.log2 - subcna.log2.median()

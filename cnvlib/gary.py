@@ -1,4 +1,4 @@
-"""A generic array of genomic positions."""
+"""Base class for an array of annotated genomic regions."""
 from __future__ import print_function, absolute_import, division
 from builtins import next, object, zip
 from past.builtins import basestring
@@ -150,9 +150,7 @@ class GenomicArray(object):
             # return self.as_dataframe(self.data.take(index))
 
     def __setitem__(self, index, value):
-        """Assign to a portion of the data.
-        """
-        # self.data[index] = value
+        """Assign to a portion of the data."""
         if isinstance(index, int):
             self.data.iloc[index] = value
         elif isinstance(index, basestring):
@@ -219,19 +217,31 @@ class GenomicArray(object):
     def by_ranges(self, other, mode='inner', keep_empty=True):
         """Group rows by another GenomicArray's bin coordinate ranges.
 
-        Returns an iterable of (bin, GenomicArray of overlapping rows)). Usually
-        used for grouping probes or SNVs by CNV segments.
-
-        `mode` determines what to do with bins that overlap a boundary of the
-        selection.  Values are:
-
-        - ``inner``: Drop the bins on the selection boundary, don't emit them.
-        - ``outer``: Keep/emit those bins as they are.
-        - ``trim``: Emit those bins but alter their boundaries to match the
-          selection; the bin start or end position is replaced with the
-          selection boundary position.
+        For example, this can be used to group SNVs by CNV segments.
 
         Bins in this array that fall outside the other array's bins are skipped.
+
+        Parameters
+        ----------
+        other : GenomicArray
+            Another GA instance.
+        mode : string
+            Determines what to do with bins that overlap a boundary of the
+            selection. Possible values are:
+
+            - ``inner``: Drop the bins on the selection boundary, don't emit them.
+            - ``outer``: Keep/emit those bins as they are.
+            - ``trim``: Emit those bins but alter their boundaries to match the
+              selection; the bin start or end position is replaced with the
+              selection boundary position.
+        keep_empty : bool
+            Whether to also yield `other` bins with no overlapping bins in
+            `self`, or to skip them when iterating.
+
+        Yields
+        ------
+        tuple
+            (other bin, GenomicArray of overlapping rows in self)
         """
         chrom_lookup = dict(self.by_chromosome())
         for chrom, bin_rows in other.by_chromosome():
@@ -248,7 +258,11 @@ class GenomicArray(object):
     def coords(self, also=()):
         """Iterate over plain coordinates of each bin: chromosome, start, end.
 
-        With `also`, also include those columns.
+        Parameters
+        ----------
+        also : str, or iterable of strings
+            Also include these columns from `self`, in addition to chromosome,
+            start, and end.
 
         Example, yielding rows in BED format:
 
@@ -269,10 +283,27 @@ class GenomicArray(object):
     def in_range(self, chrom=None, start=None, end=None, mode='inner'):
         """Get the GenomicArray portion within the given genomic range.
 
-        `mode` works as in `by_ranges`: ``outer`` includes bins straddling the
-        range boundaries, ``trim`` additionally alters the straddling bins'
-        endpoints to match the range boundaries, and ``inner`` excludes those
-        bins.
+        Parameters
+        ----------
+        chrom : str or None
+            Chromosome name to select. Use None if `self` has only one
+            chromosome.
+        start : int or None
+            Start coordinate of range to select, in 0-based coordinates.
+            If None, start from 0.
+        end : int or None
+            End coordinate of range to select. If None, select to the end of the
+            chromosome.
+        mode : str
+            As in `by_ranges`: ``outer`` includes bins straddling the range
+            boundaries, ``trim`` additionally alters the straddling bins'
+            endpoints to match the range boundaries, and ``inner`` excludes
+            those bins.
+
+        Returns
+        -------
+        GenomicArray
+            The subset of `self` enclosed by the specified range.
         """
         if isinstance(start, (int, np.int64, float, np.float64)):
             start = [int(start)]
@@ -284,8 +315,32 @@ class GenomicArray(object):
     def in_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
         """Get the GenomicArray portion within the specified ranges.
 
-        Same as `in_ranges` but the `starts` and `ends` are arrays of equal
-        length, and the output concatenates all the selected bins.
+        Similar to `in_ranges`, but concatenating the selections of all the
+        regions specified by the `starts` and `ends` arrays.
+
+        Parameters
+        ----------
+        chrom : str or None
+            Chromosome name to select. Use None if `self` has only one
+            chromosome.
+        starts : int array, or None
+            Start coordinates of ranges to select, in 0-based coordinates.
+            If None, start from 0.
+        ends : int array, or None
+            End coordinates of ranges to select. If None, select to the end of the
+            chromosome. If `starts` and `ends` are both specified, they must be
+            arrays of equal length.
+        mode : str
+            As in `by_ranges`: ``outer`` includes bins straddling the range
+            boundaries, ``trim`` additionally alters the straddling bins'
+            endpoints to match the range boundaries, and ``inner`` excludes
+            those bins.
+
+        Returns
+        -------
+        GenomicArray
+            Concatenation of all the subsets of `self` enclosed by the specified
+            ranges.
         """
         return self.concat(self._iter_ranges(chrom, starts, ends, mode))
 
@@ -349,11 +404,29 @@ class GenomicArray(object):
                       summary_func=np.median):
         """Take values of the other array at each of this array's bins.
 
-        Assign `default` to indices that fall outside the other array's bins, or
-        chromosomes that appear in `self` but not `other`.
+        For example, group SNVs (other) by CNV segments (self) and calculate the
+        median of each SNV group's allele frequencies.
 
-        Return an array of the `key` column values in `other` corresponding to this
-        array's bin locations, the same length as this array.
+        Parameters
+        ----------
+        other : GenomicArray
+        key : str
+            Column name containing the values to be summarized within each bin.
+        default : object
+            Value assigned to indices that fall outside the `other` array's bins,
+            or chromosomes that appear in `self` but not `other`. Should be the
+            same type as the column specified by `key`, or compatible.
+        fill : bool
+            Not used.
+        summary_func : callable
+            Function to summarize the `key` values in `other` within each of
+            the ranges in `self`. A descriptive statistic; default median.
+
+        Returns
+        -------
+        array
+            The `key` column values in `other` corresponding to this array's bin
+            locations, the same length as `self`.
         """
         def rows2value(rows):
             if len(rows) == 0:
@@ -410,8 +483,12 @@ class GenomicArray(object):
     def drop_extra_columns(self):
         """Remove any optional columns from this GenomicArray.
 
-        Returns a new copy with only the core columns retained:
-            log2 value, chromosome, start, end, bin name.
+        Returns
+        -------
+        GenomicArray or subclass
+            A new copy with only the minimal set of columns required by the
+            class (e.g. chromosome, start, end for GenomicArray; may be more for
+            subclasses).
         """
         table = self.data.loc[:, self._required_columns]
         return self.as_dataframe(table)
@@ -419,10 +496,20 @@ class GenomicArray(object):
     def select(self, selector=None, **kwargs):
         """Take a subset of rows where the given condition is true.
 
-        Arguments can be a function (lambda expression) returning a bool, which
-        will be used to select True rows, and/or keyword arguments like
-        gene="Background" or chromosome="chr7", which will select rows where the
-        keyed field equals the specified value.
+        Parameters
+        ----------
+        selector : callable
+            A boolean function which will be applied to each row to select rows
+            where the result is True.
+        kwargs : string
+            Keyword arguments like ``chromosome="chr7"`` or
+            ``gene="Background"``, which will select rows where the keyed field
+            equals the specified value.
+
+        Return
+        ------
+        GenomicArray
+            Subset of `self` where the specified condition is True.
         """
         table = self.data
         if selector is not None:
@@ -459,12 +546,14 @@ class GenomicArray(object):
         self.data = self.data.reindex(columns=sorted_colnames)
 
     def _get_gene_map(self):
-        """
-        Returns a (ordered) dictionary of unique gene names and the data indices
-        of their segments in the order of occurrence (genomic order)
-        :return: OrderedDict
-        """
+        """Map unique gene names to their indices in `self`.
 
+        Returns
+        -------
+        OrderedDict
+            An (ordered) dictionary of unique gene names and the data indices of
+            their segments in the order of occurrence (genomic order).
+        """
         if 'gene' not in self.data:
             return OrderedDict()
 
