@@ -799,6 +799,14 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
         raise ValueError("Argument `method` must be one of: clonal, threshold")
 
     outarr = cnarr.copy()
+    if filters:
+        # Apply any filters that use segmetrics but not cn fields
+        for filt in ('ci', 'sem'):
+            if filt in filters:
+                logging.info("Applying filter '%s'", filt)
+                outarr = getattr(segfilters, filt)(outarr)
+                filters.remove(filt)
+
     if variants:
         variants = variants.heterozygous()
         outarr["baf"] = variants.baf_by_ranges(outarr)
@@ -841,11 +849,12 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
             outarr[is_null, "cn2"] = np.nan
 
     if filters:
+        # Apply the remaining cn-based filters
         for filt in filters:
             logging.info("Applying filter '%s'", filt)
             outarr = getattr(segfilters, filt)(outarr)
-        outarr.sort_columns()
 
+    outarr.sort_columns()
     return outarr
 
 
