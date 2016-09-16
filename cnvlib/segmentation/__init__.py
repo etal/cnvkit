@@ -15,7 +15,7 @@ from . import cbs, flasso, haar
 
 from concurrent import futures
 
-from Bio._py3k import StringIO
+from Bio._py3k import StringIO, map
 
 def _to_str(s, enc=locale.getpreferredencoding()):
     if isinstance(s, bytes):
@@ -27,11 +27,14 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                     save_dataframe=False, rlibpath=None,
                     processes=1):
     """Infer copy number segments from the given coverage table."""
-    if processes == 1 or method == 'flasso':
+    if method == 'flasso' and processes != 1:
         # XXX parallel flasso crashes within R
+        processes = 1
+
+    if processes == 1:
         cna = _do_segmentation(cnarr, method, threshold, variants,
-                                skip_low, skip_outliers,
-                                save_dataframe, rlibpath)
+                               skip_low, skip_outliers,
+                               save_dataframe, rlibpath)
         if save_dataframe:
             cna, seg_out = cna
             return cna, _to_str(seg_out)
@@ -42,15 +45,14 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                                     skip_outliers, save_dataframe, rlibpath)
                                    for _, ca in cnarr.by_chromosome())))
     if save_dataframe:
-        rstr = [_to_str(rets[0][1])]
-        for ret in rets[1:]:
-            r = _to_str(ret[1])
-            rstr.append(r[r.index('\n') + 1:])
-        rets = [ret[0] for ret in rets]
+        # rets is a list of (CNA, R dataframe string) -- unpack
+        rets, r_dframe_strings = zip(*rets)
+        # Strip the header line from all but the first dataframe, then combine
+        r_dframe_strings = map(_to_str, r_dframe_strings)
+        rstr = [next(r_dframe_strings)]
+        rstr.extend(r[r.index('\n') + 1:] for r in r_dframe_strings)
 
-    data = pd.concat([r.data for r in rets])
-    meta = rets[0].meta
-    cna = CNA(data, meta)
+    cna = cnarr.concat(rets)
     if save_dataframe:
         return cna, "".join(rstr)
     return cna
@@ -114,6 +116,7 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
     else:
         raise ValueError("Unknown method %r" % method)
 
+    segarr.meta = cnarr.meta.copy()
     segarr.sort_columns()
     if variants:
         variants = variants.heterozygous()
