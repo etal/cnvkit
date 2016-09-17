@@ -1,18 +1,16 @@
 FLASSO_RSCRIPT = """\
 #!/usr/bin/env Rscript
 
-# Calculate copy number segmentation by CBS.
-# Input: log2 coverage data in Nexus 'basic' format
-# Output: the CBS data table
+# Calculate copy number segmentation by Fused Lasso.
+# Input: log2 coverage data in CNVkit's tabular format
+# Output: the CBS-style SEG data table
 
 %(rlibpath)s
 library('cghFLasso')
 
 tbl <- read.delim("%(probes_fname)s")
-# Ignore low-coverage probes
-positions <- (tbl$start + tbl$end) * 0.5
 
-write("Segmenting the probe data", stderr())
+write(paste("Segmenting", levels(tbl$chromosome)), stderr())
 fit <- cghFLasso(tbl$log2, FDR=%(threshold)g)
 
 # Reformat the output table as SEG

@@ -27,34 +27,31 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                     save_dataframe=False, rlibpath=None,
                     processes=1):
     """Infer copy number segments from the given coverage table."""
-    if method == 'flasso' and processes != 1:
-        # XXX parallel flasso crashes within R
-        processes = 1
-
-    if processes == 1:
-        cna = _do_segmentation(cnarr, method, threshold, variants,
-                               skip_low, skip_outliers,
-                               save_dataframe, rlibpath)
+    # XXX parallel flasso segfaults in R when run on a single chromosome
+    if processes == 1 or method == 'flasso':
+        cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
+                               skip_outliers, save_dataframe, rlibpath)
         if save_dataframe:
-            cna, seg_out = cna
-            return cna, _to_str(seg_out)
-        return cna
+            cna, rstr = cna
+            rstr = _to_str(rstr)
 
-    with futures.ProcessPoolExecutor(processes) as pool:
-        rets = list(pool.map(_ds, ((ca, method, threshold, variants, skip_low,
-                                    skip_outliers, save_dataframe, rlibpath)
-                                   for _, ca in cnarr.by_chromosome())))
-    if save_dataframe:
-        # rets is a list of (CNA, R dataframe string) -- unpack
-        rets, r_dframe_strings = zip(*rets)
-        # Strip the header line from all but the first dataframe, then combine
-        r_dframe_strings = map(_to_str, r_dframe_strings)
-        rstr = [next(r_dframe_strings)]
-        rstr.extend(r[r.index('\n') + 1:] for r in r_dframe_strings)
+    else:
+        with futures.ProcessPoolExecutor(processes) as pool:
+            rets = list(pool.map(_ds, ((ca, method, threshold, variants, skip_low,
+                                        skip_outliers, save_dataframe, rlibpath)
+                                    for _, ca in cnarr.by_chromosome())))
+        if save_dataframe:
+            # rets is a list of (CNA, R dataframe string) -- unpack
+            rets, r_dframe_strings = zip(*rets)
+            # Strip the header line from all but the first dataframe, then combine
+            r_dframe_strings = map(_to_str, r_dframe_strings)
+            rstr = [next(r_dframe_strings)]
+            rstr.extend(r[r.index('\n') + 1:] for r in r_dframe_strings)
+            rstr = "".join(rstr)
+        cna = cnarr.concat(rets)
 
-    cna = cnarr.concat(rets)
     if save_dataframe:
-        return cna, "".join(rstr)
+        return cna, rstr
     return cna
 
 

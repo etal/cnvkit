@@ -2,8 +2,8 @@ CBS_RSCRIPT = """\
 #!/usr/bin/env Rscript
 
 # Calculate copy number segmentation by CBS.
-# Input: log2 coverage data in Nexus 'basic' format
-# Output: the CBS data table
+# Input: log2 coverage data in CNVkit's tabular format
+# Output: the CBS data table (SEG)
 
 %(rlibpath)s
 library('PSCBS') # Requires: R.utils, R.oo, R.methodsS3

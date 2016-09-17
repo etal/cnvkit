@@ -19,7 +19,7 @@ class SerialPool(object):
 
     def map(self, func, iterable):
         """Just apply the function to `iterable`."""
-        return map(SerialFuture, map(func, iterable))
+        return map(func, iterable)
 
     def shutdown(self, wait=True):
         """Do nothing."""
