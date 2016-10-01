@@ -72,7 +72,7 @@ This approach is preferred on Mac OS X, and is a solid choice on Linux, too.
 
 To download and install CNVkit and its Python dependencies::
 
-    conda install -c bioconda -c r cnvkit
+    conda install cnvkit -c bioconda -c r -c conda-forge
 
 
 From a Python package repository
@@ -81,7 +81,7 @@ From a Python package repository
 Reasonably up-to-date CNVkit packages are available on `PyPI
 <https://pypi.python.org/pypi/CNVkit>`_ and can be installed using `pip
 <https://pip.pypa.io/en/latest/installing.html>`_ (usually works on Linux if the
-dependencies listed below are installed)::
+system dependencies listed below are installed)::
 
     pip install cnvkit
 

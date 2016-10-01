@@ -78,6 +78,10 @@ def _cmd_batch(args):
                  "given to build a new reference if -r/--reference is not used."
                  "\n(See: cnvkit.py batch -h)")
 
+    if args.processes < 1:
+        import multiprocessing
+        args.processes = multiprocessing.cpu_count()
+
     # Ensure sample IDs are unique to avoid overwriting outputs
     seen_sids = {}
     for fname in (args.bam_files or []) + (args.normal or []):
@@ -106,17 +110,22 @@ def _cmd_batch(args):
         core.write_tsv(args.antitargets, antitarget_coords)
 
     if args.bam_files:
-        logging.info("Running %d samples in %s",
-                     len(args.bam_files),
-                     ("serial" if args.processes == 1
-                      else ("%d processes" % args.processes)))
+        if args.processes == 1:
+            procs_per_bam = 1
+            logging.info("Running %d samples in serial", len(args.bam_files))
+        else:
+            procs_per_bam = max(1, args.processes // len(args.bam_files))
+            logging.info("Running %d samples in %d processes",
+                         len(args.bam_files), args.processes)
+            logging.info("(That's %d processes per bam)", procs_per_bam)
+
         with parallel.pick_pool(args.processes) as pool:
             for bam in args.bam_files:
                 pool.submit(batch_run_sample,
                             bam, args.targets, args.antitargets, args.reference,
                             args.output_dir, args.male_reference, args.scatter,
                             args.diagram, args.rlibpath, args.count_reads,
-                            args.drop_low_coverage, args.method, args.processes)
+                            args.drop_low_coverage, args.method, procs_per_bam)
 
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed,
@@ -197,6 +206,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
         with parallel.pick_pool(processes) as pool:
             tgt_futures = []
             anti_futures = []
+            procs_per_cnn = max(1, processes // (2 * len(normal_bams)))
             for nbam in normal_bams:
                 sample_id = core.fbase(nbam)
                 sample_pfx = os.path.join(output_dir, sample_id)
@@ -204,12 +214,12 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                     pool.submit(batch_write_coverage,
                                 target_bed, nbam,
                                 sample_pfx + '.targetcoverage.cnn',
-                                by_count, processes))
+                                by_count, procs_per_cnn))
                 anti_futures.append(
                     pool.submit(batch_write_coverage,
                                 antitarget_bed, nbam,
                                 sample_pfx + '.antitargetcoverage.cnn',
-                                by_count, processes))
+                                by_count, procs_per_cnn))
 
         target_fnames = [tf.result() for tf in tgt_futures]
         antitarget_fnames = [af.result() for af in anti_futures]

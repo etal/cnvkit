@@ -206,13 +206,11 @@ def warn_bad_probes(probes):
                      len(bg_bad_probes), "%.4f" % bad_pct + '%')
 
 
-def get_fasta_stats(probes, fa_fname):
+def get_fasta_stats(cnarr, fa_fname):
     """Calculate GC and RepeatMasker content of each bin in the FASTA genome."""
-    fa_coords = list(zip(probes.chromosome, probes.start, probes.end))
     logging.info("Calculating GC and RepeatMasker content in %s ...", fa_fname)
     gc_rm_vals = [calculate_gc_lo(subseq)
-                  for subseq in ngfrills.fasta_extract_regions(fa_fname,
-                                                               fa_coords)]
+                  for subseq in ngfrills.fasta_extract_regions(fa_fname, cnarr)]
     gc_vals, rm_vals = list(zip(*gc_rm_vals))
     return np.asfarray(gc_vals), np.asfarray(rm_vals)
 
