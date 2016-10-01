@@ -10,6 +10,7 @@ command-line options.
 The :ref:`batch` command supports these workflows through the
 ``-m``/``--method`` option.
 
+
 .. _wgs:
 
 Whole-Genome Sequencing (WGS)
@@ -24,7 +25,7 @@ calculated on the fly if not provided. No "antitarget" regions are used.
 Since the input does not contain useful per-target gene labels, a  gene
 annotation database is required and used to label genes in the outputs::
 
-    cnvkit.py batch *.bam -m wgs -g data/access-5kb-mappable.hg19.bed --annotate refFlat.txt
+    cnvkit.py batch -m wgs -g data/access-5kb-mappable.hg19.bed --annotate refFlat.txt *.bam
 
 Equivalently::
 
@@ -35,6 +36,23 @@ Equivalently::
     head -n1 Sample.targetcoverage.cnn -o Sample.antitargetcoverage.cnn
     cnvkit.py reference *.targetcoverage.cnn *.antitargetcoverage.cnn -o ref-wgs.cnn
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn ref-wgs.cnn --no-edge
+
+To speed up WGS analyses, try any or all of the following:
+
+- Instead of analyzing the whole genome, use the "access" or "target" BED file
+  to limit the analysis to just the genic regions. You can get such a BED file
+  from the [UCSC Genome Browser](https://genome.ucsc.edu/cgi-bin/hgTables), for
+  example.
+- Increase the "target" average bin size to 500 or 1000 bases.
+- Specify a smaller p-value threshold (``segment -t``). For the CBS method,
+  ``1e-6`` may work well.
+- Use the ``-p/--processes`` option in the :ref:`batch`, :ref:`coverage` and
+  :ref:`segment` commands to ensure all available CPUs are used.
+- Ensure you are using the most recent version of CNVkit. Each release includes
+  some performance improvements.
+
+The ``batch -m wgs`` option does all of these except the first automatically.
+
 
 .. _tas:
 
@@ -49,7 +67,7 @@ only on-target coverages and excluding all off-target regions from the analysis.
 The ``batch -m amplicon`` option uses the given targets to infer coverage, and
 leaves the antitarget coverage file empty::
 
-    cnvkit.py batch -m amplicon -t targets.bed
+    cnvkit.py batch -m amplicon -t targets.bed *.bam
 
 Equivalently::
 
