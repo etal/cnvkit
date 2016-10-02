@@ -290,7 +290,15 @@ class CopyNumArray(gary.GenomicArray):
             assumption on chromosomes X and Y.
         """
         # ENH: use scipy.stats.ttest_ind(a, b, equal_var=False)
-        cnarr = (self.drop_low_coverage() if skip_low else self)
+        if skip_low:
+            cnarr = self.drop_low_coverage()
+        else:
+            cnarr = self
+        if not cnarr['log2'].diff().any():
+            logging.warn("*WARNING* All bin log2 values are equal; "
+                         "check the input -- might have no coverage")
+            return None, {}
+
         chrx = cnarr[cnarr.chromosome == self._chr_x_label]
         if not len(chrx):
             logging.warn("*WARNING* No %s found in probes; check the input",
@@ -300,19 +308,25 @@ class CopyNumArray(gary.GenomicArray):
         auto = cnarr.autosomes()
         auto_l = auto['log2']
         if male_reference:
-            female_chrx_u = mannwhitneyu(auto_l, chrx_l - 1)[0]
-            male_chrx_u = mannwhitneyu(auto_l, chrx_l)[0]
+            female_chrx_u = mannwhitneyu(auto_l, chrx_l - 1,
+                                         alternative='two-sided')[0]
+            male_chrx_u = mannwhitneyu(auto_l, chrx_l,
+                                       alternative='two-sided')[0]
         else:
-            female_chrx_u = mannwhitneyu(auto_l, chrx_l)[0]
-            male_chrx_u = mannwhitneyu(auto_l, chrx_l + 1)[0]
+            female_chrx_u = mannwhitneyu(auto_l, chrx_l,
+                                         alternative='two-sided')[0]
+            male_chrx_u = mannwhitneyu(auto_l, chrx_l + 1,
+                                       alternative='two-sided')[0]
         # Mann-Whitney U score is greater for similar-mean sets
         chrx_male_lr = male_chrx_u / female_chrx_u
         # Similar for chrY if it's present
         chry = cnarr[cnarr.chromosome == self._chr_y_label]
         if len(chry):
             chry_l = chry['log2']
-            male_chry_u = mannwhitneyu(auto_l, chry_l)[0]
-            female_chry_u = mannwhitneyu(auto_l, chry_l + 3)[0]
+            male_chry_u = mannwhitneyu(auto_l, chry_l,
+                                       alternative='two-sided')[0]
+            female_chry_u = mannwhitneyu(auto_l, chry_l + 3,
+                                         alternative='two-sided')[0]
             chry_male_lr = male_chry_u / female_chry_u
         else:
             # If chrY is missing, don't sabotage the inference
