@@ -6,7 +6,7 @@ from past.builtins import basestring
 import logging
 
 import numpy as np
-from scipy.stats import mannwhitneyu
+from scipy.stats import mannwhitneyu, rankdata
 
 from . import core, gary, descriptives, params, smoothing
 from .metrics import segment_mean
@@ -263,7 +263,7 @@ class CopyNumArray(gary.GenomicArray):
         Perform 4 Mann-Whitney tests of the log2 coverages on chromosomes X and
         Y, separately shifting for assumed male and female chromosomal sex.
         Compare the U values obtained to infer whether the male or female
-        assumption fits the data better. 
+        assumption fits the data better.
 
         Parameters
         ----------
@@ -289,44 +289,43 @@ class CopyNumArray(gary.GenomicArray):
             from each test; and ratios of U values for male vs. female
             assumption on chromosomes X and Y.
         """
-        # ENH: use scipy.stats.ttest_ind(a, b, equal_var=False)
-        if skip_low:
-            cnarr = self.drop_low_coverage()
-        else:
-            cnarr = self
-        if not cnarr['log2'].diff().any():
-            logging.warn("*WARNING* All bin log2 values are equal; "
-                         "check the input -- might have no coverage")
-            return None, {}
-
+        cnarr = self.drop_low_coverage() if skip_low else self
         chrx = cnarr[cnarr.chromosome == self._chr_x_label]
         if not len(chrx):
             logging.warn("*WARNING* No %s found in probes; check the input",
                          self._chr_x_label)
             return None, {}
-        chrx_l = chrx['log2']
+
+        chrx_l = chrx['log2'].values
         auto = cnarr.autosomes()
-        auto_l = auto['log2']
+        auto_l = auto['log2'].values
+
+        # ENH: use scipy.stats.ttest_ind(a, b, equal_var=False)
+        def compare_to_auto(vals):
+            # u = mannwhitneyu(auto_l, vals, alternative='two-sided')[0]
+            # From scipy.stats.mannwhitneyu -- skip the p-value calculation
+            # (the tiebreaker there can raise an irrelevant error)
+            n1 = len(auto_l)
+            n2 = len(vals)
+            ranked = rankdata(np.concatenate((auto_l, vals)))
+            rankx = ranked[0:n1]  # get the x-ranks
+            u1 = n1*n2 + (n1*(n1+1))/2.0 - np.sum(rankx, axis=0)  # calc U for x
+            return n1*n2 - u1 # remainder is U for y
+
         if male_reference:
-            female_chrx_u = mannwhitneyu(auto_l, chrx_l - 1,
-                                         alternative='two-sided')[0]
-            male_chrx_u = mannwhitneyu(auto_l, chrx_l,
-                                       alternative='two-sided')[0]
+            female_chrx_u = compare_to_auto(chrx_l - 1)
+            male_chrx_u = compare_to_auto(chrx_l)
         else:
-            female_chrx_u = mannwhitneyu(auto_l, chrx_l,
-                                         alternative='two-sided')[0]
-            male_chrx_u = mannwhitneyu(auto_l, chrx_l + 1,
-                                       alternative='two-sided')[0]
+            female_chrx_u = compare_to_auto(chrx_l)
+            male_chrx_u = compare_to_auto(chrx_l + 1)
         # Mann-Whitney U score is greater for similar-mean sets
         chrx_male_lr = male_chrx_u / female_chrx_u
         # Similar for chrY if it's present
         chry = cnarr[cnarr.chromosome == self._chr_y_label]
         if len(chry):
             chry_l = chry['log2']
-            male_chry_u = mannwhitneyu(auto_l, chry_l,
-                                       alternative='two-sided')[0]
-            female_chry_u = mannwhitneyu(auto_l, chry_l + 3,
-                                         alternative='two-sided')[0]
+            male_chry_u = compare_to_auto(chry_l)
+            female_chry_u = compare_to_auto(chry_l + 3)
             chry_male_lr = male_chry_u / female_chry_u
         else:
             # If chrY is missing, don't sabotage the inference
