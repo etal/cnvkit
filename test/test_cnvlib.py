@@ -280,6 +280,21 @@ class IOTests(unittest.TestCase):
 class CommandTests(unittest.TestCase):
     """Tests for top-level commands."""
 
+    def test_access(self):
+        fasta = "formats/chrM-Y-trunc.hg19.fa"
+        for min_gap_size, expect_nrows in ((None, 3),
+                                           (500, 3),
+                                           (1000, 2)):
+            acc = commands.do_access(fasta, [], min_gap_size)
+            self.assertEqual(len(acc), expect_nrows)
+        excludes = ["formats/dac-my.bed", "formats/duke-my.bed"]
+        for min_gap_size, expect_nrows in ((None, 5),
+                                           (2, 5),
+                                           (20, 4),
+                                           (200, 3),
+                                           (2000, 2)):
+            commands.do_access(fasta, excludes, min_gap_size)
+
     def test_antitarget(self):
         """The 'antitarget' command."""
         baits_fname = "formats/nv2_baits.interval_list"
