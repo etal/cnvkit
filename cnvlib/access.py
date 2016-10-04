@@ -49,7 +49,7 @@ def get_regions(fasta_fname):
                     else:
                         # Slow route: line is a mix of N and non-N chars
                         line_chars = np.array(line, dtype='c')
-                        n_indices = np.where(line_chars == 'N')[0]
+                        n_indices = np.where(line_chars == b'N')[0]
                         # Emit the first block of non-N chars, if any
                         if run_start is not None:
                             yield log_this(chrom, run_start, cursor + n_indices[0])
@@ -85,6 +85,7 @@ def group_regions_by_chromosome(rows):
 
 def join_regions(regions, min_gap_size):
     """Filter regions, joining those separated by small gaps."""
+    min_gap_size = min_gap_size or 0
     for chrom, coords in group_regions_by_chromosome(regions):
         logging.info("%s: Joining over small gaps", chrom)
         coords = iter(coords)
