@@ -32,9 +32,14 @@ from . import (core, ngfrills, parallel, params, descriptives,
                metrics, plots, reference, reports, segfilters, segmentation,
                target, tabio)
 from .cnary import CopyNumArray as _CNA
-from .vary import VariantArray as _VA
 from .gary import GenomicArray as _GA
 from ._version import __version__
+
+
+__all__ = []
+def public(fn):
+    __all__.append(fn.__name__)
+    return fn
 
 
 AP = argparse.ArgumentParser(
@@ -373,6 +378,7 @@ def _cmd_target(args):
     tabio.write(rarr, args.output, "bed4")
 
 
+@public
 def do_targets(bed_fname, annotate=None, do_short_names=False, do_split=False,
                avg_size=200/.75):
     """Transform bait intervals into targets more suitable for CNVkit."""
@@ -422,6 +428,7 @@ def _cmd_access(args):
     tabio.write(access_arr, args.output, "bed3")
 
 
+@public
 def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
     """List the locations of accessible sequence regions in a FASTA file."""
     access_regions = access.get_regions(fa_fname)
@@ -458,6 +465,7 @@ def _cmd_antitarget(args):
     tabio.write(out_arr, args.output, "bed4")
 
 
+@public
 def do_antitarget(target_bed, access_bed=None, avg_bin_size=100000,
                   min_bin_size=None):
     """Derive a background/antitarget BED file from a target BED file."""
@@ -502,6 +510,7 @@ def _cmd_coverage(args):
     tabio.write(pset, args.output)
 
 
+@public
 def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1):
     """Calculate coverage in the given regions from BAM read depths."""
     if not ngfrills.ensure_bam_sorted(bam_fname):
@@ -566,6 +575,7 @@ def _cmd_reference(args):
     tabio.write(ref_probes, ref_fname)
 
 
+@public
 def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
                  male_reference=False, do_gc=True, do_edge=True, do_rmask=True):
     """Compile a coverage reference from the given files (normal samples)."""
@@ -589,6 +599,7 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
     return ref_probes
 
 
+@public
 def do_reference_flat(targets, antitargets, fa_fname=None,
                       male_reference=False):
     """Compile a neutral-coverage reference from the given intervals.
@@ -667,6 +678,7 @@ def _cmd_fix(args):
     tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
 
 
+@public
 def do_fix(target_raw, antitarget_raw, reference,
            do_gc=True, do_edge=True, do_rmask=True):
     """Combine target and antitarget coverages and correct for biases."""
@@ -802,6 +814,7 @@ def _cmd_call(args):
     tabio.write(cnarr, args.output or cnarr.sample_id + '.call.cns')
 
 
+@public
 def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
             is_reference_male=False, is_sample_female=False, filters=None,
             thresholds=(-1.1, -0.25, 0.2, 0.7)):
@@ -1012,6 +1025,7 @@ def _cmd_scatter(args):
             pyplot.show()
 
 
+@public
 def do_scatter(cnarr, segments=None, variants=None,
                show_range=None, show_gene=None,
                background_marker=None, do_trend=False, window_width=1e6,
@@ -1221,6 +1235,7 @@ def _cmd_heatmap(args):
         pyplot.show()
 
 
+@public
 def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     """Plot copy number for multiple samples as a heatmap."""
     from matplotlib.collections import BrokenBarHCollection
@@ -1339,6 +1354,7 @@ def _cmd_breaks(args):
     core.write_dataframe(args.output, bpoints)
 
 
+@public
 def do_breaks(probes, segments, min_probes=1):
     """List the targeted genes in which a copy number breakpoint occurs."""
     intervals = reports.get_gene_intervals(probes)
@@ -1378,6 +1394,7 @@ def _cmd_gainloss(args):
     core.write_dataframe(args.output, gainloss)
 
 
+@public
 def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
                 skip_low=False, male_reference=False, is_sample_female=None):
     """Identify targeted genes with copy number gain or loss."""
@@ -1436,6 +1453,7 @@ def _cmd_gender(args):
     core.write_dataframe(args.output, table, header=True)
 
 
+@public
 def do_gender(cnarrs, is_male_reference):
     """Guess samples' gender from the relative coverage of chromosome X."""
     def strsign(num):
@@ -1483,6 +1501,7 @@ def _cmd_metrics(args):
     core.write_dataframe(args.output, table)
 
 
+@public
 def do_metrics(cnarrs, segments, skip_low=False):
     """Compute coverage deviations and other metrics for self-evaluation."""
     # Catch if passed args are single CopyNumArrays instead of lists
@@ -1734,6 +1753,7 @@ def _cmd_import_theta(args):
                                                          i + 1)))
 
 
+@public
 def do_import_theta(segarr, theta_results_fname, ploidy=2):
     theta = importers.parse_theta_results(theta_results_fname)
     for copies in theta['C']:

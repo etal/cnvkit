@@ -59,7 +59,7 @@ $(picard_cnrs): %.cnr: %.targetcoverage.cnn %.antitargetcoverage.cnn build/refer
 	$(cnvkit) fix $^ -o $@
 
 $(picard_segs): %.cns: %.cnr
-	$(cnvkit) segment -p `nproc` --drop-low-coverage -t .01 $< -o $@
+	$(cnvkit) segment -p 2 --drop-low-coverage -t .01 $< -o $@
 
 $(picard_segs:.cns=.call.cns): build/%.call.cns: build/%.cns
 	$(cnvkit) call $^ -y -m clonal --purity 0.65 -o $@
