@@ -490,8 +490,11 @@ class CommandTests(unittest.TestCase):
         # NB: R methods are in another script; haar is pure-Python
         segments = segmentation.do_segmentation(cnarr, "haar")
         self.assertGreater(len(segments), 0)
-        segments = segmentation.do_segmentation(cnarr, "haar", threshold=.001,
+        segments = segmentation.do_segmentation(cnarr, "haar", threshold=.0001,
                                                 skip_low=True)
+        self.assertGreater(len(segments), 0)
+        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
         self.assertGreater(len(segments), 0)
 
     def test_segment_parallel(self):

@@ -51,8 +51,7 @@ def parse_vcf(infile, sample_id=None, normal_id=None, min_depth=None,
     else:
         vcf_reader = vcf.Reader(infile)
     if not vcf_reader.samples:
-        logging.warn("VCF file %s has no samples; parsing minimal info",
-                        infile)
+        logging.warn("VCF file %s has no samples; parsing minimal info", infile)
         yield sample_id, normal_id, _read_vcf_nosample(infile, skip_reject)
         raise StopIteration
 
