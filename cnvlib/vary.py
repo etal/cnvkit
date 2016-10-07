@@ -21,7 +21,7 @@ class VariantArray(gary.GenomicArray):
     def __init__(self, data_table, meta_dict=None):
         gary.GenomicArray.__init__(self, data_table, meta_dict)
 
-    def baf_by_ranges(self, ranges, summary_func=np.nanmedian,
+    def baf_by_ranges(self, ranges, summary_func=pd.Series.median,
                       above_half=None, tumor_boost=True):
         """Aggregate variant (b-allele) frequencies in each given bin.
 
@@ -77,21 +77,23 @@ class VariantArray(gary.GenomicArray):
             The subset of `self` with heterozygous genotype, or allele frequency
             between the specified thresholds.
         """
-        if min_freq is None and max_freq is None:
+        idx_het = None
+        if 'zygosity' in self and min_freq is None and max_freq is None:
             # Use existing genotype/zygosity info
-            zygosity = self["n_zygosity" if "n_zygosity" in self
-                            else "zygosity"]
+            zygosity = self['n_zygosity' if 'n_zygosity' in self
+                            else 'zygosity']
             idx_het = (zygosity != 0.0) & (zygosity != 1.0)
-        else:
+        elif 'alt_freq' in self and (min_freq or max_freq):
             # Decide zygosity from allele frequency
-            freq = self["n_alt_freq" if "n_alt_freq" in self
-                        else "alt_freq"]
+            freq = self['n_alt_freq' if 'n_alt_freq' in self
+                        else 'alt_freq']
             idx_het = True
             if min_freq:
                 idx_het = idx_het & (freq >= min_freq)
             if max_freq:
                 idx_het = idx_het & (freq <= max_freq)
-        if idx_het.any():
+
+        if idx_het is not None and idx_het.any():
             return self[idx_het]
         else:
             # Fallback -- ought to return something
@@ -140,9 +142,9 @@ class VariantArray(gary.GenomicArray):
 
 
 def _mirrored_baf(vals, above_half=None):
-    shift = np.abs(vals - .5)
+    shift = (vals - .5).abs()
     if above_half is None:
-        above_half = (np.nanmedian(vals) > .5)
+        above_half = (vals.median() > .5)
     if above_half:
         return .5 + shift
     else:
@@ -160,7 +162,7 @@ def _tumor_boost(t_freqs, n_freqs):
     lt_mask = (t_freqs < n_freqs)
     lt_idx = np.nonzero(lt_mask)[0]
     gt_idx = np.nonzero(~lt_mask)[0]
-    out = np.zeros_like(t_freqs)
+    out = pd.Series(np.zeros_like(t_freqs))
     out[lt_idx] = 0.5 * t_freqs.take(lt_idx) / n_freqs.take(lt_idx)
     out[gt_idx] = 1 - 0.5 * (1 - t_freqs.take(gt_idx)
                             ) / (1 - n_freqs.take(gt_idx))

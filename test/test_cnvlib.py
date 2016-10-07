@@ -260,6 +260,7 @@ class IOTests(unittest.TestCase):
 
     def test_read_vcf(self):
         """Read the VCF format."""
+        # Paired VCF with full info
         fname = "formats/na12878_na12882_mix.vcf"
         v1 = tabio.read(fname, "vcf")
         self.assertLess(len(v1), linecount(fname))
@@ -274,6 +275,14 @@ class IOTests(unittest.TestCase):
             v3 = tabio.read(fname, "vcf", **kwarg)
             self.assertLess(len(v3), len(v1))
             self.assertLess(0, len(v3))
+        # VCF header, no samples, no records
+        v4 = tabio.read('formats/nosample.vcf', 'vcf')
+        self.assertEqual(len(v4), 0)
+        self.assertEqual(v4.sample_id, 'nosample')
+        # VCF with 1 sample, no records
+        v5 = tabio.read('formats/blank.vcf', 'vcf', sample_id='Blank')
+        self.assertEqual(len(v5), 0)
+        self.assertEqual(v5.sample_id, 'Blank')
 
 
 

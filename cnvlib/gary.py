@@ -55,10 +55,13 @@ class GenomicArray(object):
     @classmethod
     def _make_blank(cls):
         """Create an empty dataframe with the columns required by this class."""
-        table = pd.DataFrame({key: [] for key in cls._required_columns})
-        for col, dtype in zip(cls._required_columns, cls._required_dtypes):
-            table[col] = table[col].astype(dtype)
-        return table
+        spec = list(zip(cls._required_columns, cls._required_dtypes))
+        try:
+            arr = np.zeros(0, dtype=spec)
+            return pd.DataFrame(arr)
+        except TypeError as exc:
+            logging.info("%s", locals())
+            raise
 
     @classmethod
     def from_columns(cls, columns, meta_dict=None):

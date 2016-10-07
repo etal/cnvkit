@@ -8,8 +8,6 @@ import pandas as pd
 import numpy as np
 import vcf
 
-from ..vary import VariantArray as VA
-
 
 def read_vcf(infile, sample_id=None, normal_id=None,
              min_depth=None, skip_reject=False, skip_somatic=False):
@@ -36,8 +34,6 @@ def read_vcf(infile, sample_id=None, normal_id=None,
             logging.warn("WARNING: VCF file contains multiple samples; "
                          "returning the first sample '%s'", sid)
 
-    if dframe is None or len(dframe) == 0:
-        raise IndexError("No sample(s) %s found in VCF file" % sample_id or '')
     logging.info("Selected test sample " + str(sid) +
                  (" and control sample %s" % (nid if nid else '')))
     return dframe
@@ -88,8 +84,10 @@ def parse_vcf(infile, sample_id=None, normal_id=None, min_depth=None,
 
 
 def _read_vcf_nosample(vcf_file, skip_reject=False):
-    columns = VA._required_columns
-    dtypes = VA._required_dtypes
+    columns = ['chromosome', 'start', 'ref', 'alt', # 'filter', 'info',
+              ]
+    dtypes = [str, int, str, str, # str, str
+             ]
     table = pd.read_table(vcf_file,
                           comment="#",
                           header=None,
@@ -97,16 +95,14 @@ def _read_vcf_nosample(vcf_file, skip_reject=False):
                           names=["chromosome", "start", "_ID", "ref", "alt",
                                  "_QUAL", "filter", "info"],
                           usecols=columns,
-                          # # usecols=["chromosome", "start", "ref", "alt",
-                          # #          # "filter", "info",
-                          # #         ],
-                          # # ENH: converters=func -> to parse each col
+                          # ENH: converters={'info': func to parse it}
                           dtype=dict(zip(columns, dtypes)),
                          )
     # ENH: do things with filter, info
     # if skip_reject and record.FILTER and len(record.FILTER) > 0:
     table['end'] = table['start'] + table["alt"].str.len()  # ENH: INFO["END"]
     table['start'] -= 1
+    logging.info("Loaded %d plain records", len(table))
     return table.loc[:, columns]
 
 

@@ -6,6 +6,7 @@ from past.builtins import basestring
 import logging
 
 import numpy as np
+import pandas as pd
 from scipy.stats import mannwhitneyu, rankdata
 
 from . import core, gary, descriptives, params, smoothing
@@ -105,7 +106,7 @@ class CopyNumArray(gary.GenomicArray):
 
     # Manipulation
 
-    def center_all(self, estimator=np.nanmedian, skip_low=False, by_chrom=True):
+    def center_all(self, estimator=pd.Series.median, skip_low=False, by_chrom=True):
         """Re-center log2 values to the autosomes' average (in-place).
 
         Parameters
@@ -124,8 +125,8 @@ class CopyNumArray(gary.GenomicArray):
             `estimator` to all log2 values directly.
         """
         est_funcs = {
-            "mean": np.nanmean,
-            "median": np.nanmedian,
+            "mean": pd.Series.mean,
+            "median": pd.Series.median,
             "mode": descriptives.modal_location,
             "biweight": descriptives.biweight_location,
         }
@@ -138,9 +139,9 @@ class CopyNumArray(gary.GenomicArray):
         cnarr = (self.drop_low_coverage() if skip_low else self).autosomes()
         if cnarr:
             if by_chrom:
-                values = np.array([estimator(subarr['log2'])
-                                   for _c, subarr in cnarr.by_chromosome()
-                                   if len(subarr)])
+                values = pd.Series([estimator(subarr['log2'])
+                                    for _c, subarr in cnarr.by_chromosome()
+                                    if len(subarr)])
             else:
                 values = cnarr['log2']
             self.data['log2'] -= estimator(values)

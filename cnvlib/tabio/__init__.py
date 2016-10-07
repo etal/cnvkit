@@ -47,7 +47,9 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         The data from the given file instantiated as `into`, if specified, or
         the default base class for the given file format (usually GenomicArray).
     """
-    if fmt not in READERS:
+    if fmt in READERS:
+        reader, suggest_into = READERS[fmt]
+    else:
         raise ValueError("Unknown format: %s" % fmt)
 
     if meta is None:
@@ -71,12 +73,10 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         # Multi-sample formats: choose one sample
         kwargs["sample_id"] = sample_id
     try:
-        reader, suggest_into = READERS[fmt]
         dframe = reader(infile, **kwargs)
     except ValueError:
         # File is blank/empty, most likely
-        logging.info("Blank file?: %s", infile)
-        suggest_into = GA
+        logging.info("Blank %s file?: %s", fmt, infile)
         dframe = []
     result = (into or suggest_into)(dframe, meta)
     result.sort_columns()
