@@ -103,22 +103,23 @@ def variants_in_segment(varr, segment, fdr_q):
             'chromosome': segment.chromosome,
             'start': starts,
             'end': ends,
-            # 'baf': segtable['mean'],
-            'gene': '-', #segment.gene,
+            'baf': segtable['mean'],
+            'gene': segment.gene, # '-'
             'log2': segment.log2,
             'probes': segtable['size'],
-            # 'weight': segment.weight * segtable['size'] / segment.size,
+            'weight': (segment.weight * segtable['size']
+                       / (segment.end - segment.start)),
         })
     else:
         table = pd.DataFrame({
             'chromosome': segment.chromosome,
             'start': segment.start,
             'end': segment.end,
-            # 'baf': np.median(values),
-            'gene': '-', #segment.gene,
+            'baf': np.median(values),
+            'gene': segment.gene, #'-',
             'log2': segment.log2,
             'probes': segment.probes,
-            # 'weight': segment.weight,
+            'weight': segment.weight,
         }, index=[0])
 
     return table
