@@ -17,10 +17,12 @@ from concurrent import futures
 
 from Bio._py3k import StringIO, map
 
+
 def _to_str(s, enc=locale.getpreferredencoding()):
     if isinstance(s, bytes):
         return s.decode(enc)
     return s
+
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10,
@@ -114,21 +116,19 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
         raise ValueError("Unknown method %r" % method)
 
     segarr.meta = cnarr.meta.copy()
-    segarr.sort_columns()
     if variants:
         variants = variants.heterozygous()
         # Re-segment the variant allele freqs within each segment
         newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
                    for segment, subvarr in variants.by_ranges(segarr)]
         segarr = segarr.as_dataframe(pd.concat(newsegs))
-        segarr.sort_columns()
         # TODO fix ploidy on allosomes
         allelics = vary._allele_specific_copy_numbers(segarr, variants)
         segarr.data = pd.concat([segarr.data, allelics], axis=1, copy=False)
 
     segarr['gene'], segarr['weight'], segarr['depth'] = \
             transfer_fields(segarr, cnarr)
-
+    segarr.sort_columns()
     if save_dataframe:
         return segarr, seg_out
     else:
@@ -176,6 +176,8 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     segweights = np.zeros(len(segments))
     segdepths = np.zeros(len(segments))
     for i, (_seg, subprobes) in enumerate(cnarr.by_ranges(segments)):
+        if not len(subprobes):
+            continue
         segweights[i] = subprobes['weight'].sum()
         if subprobes['weight'].sum() > 0:
             segdepths[i] = np.average(subprobes['depth'], weights=subprobes['weight'])

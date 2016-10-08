@@ -85,9 +85,9 @@ def variants_in_segment(varr, segment, fdr_q):
                            fdr_q,
                            W=None)  # weight by sqrt(DP)?
     else:
-        values = []
-        segtable = []
-    if segtable and len(segtable['start']) > 1:
+        values = pd.Series()
+        segtable = None
+    if segtable is not None and len(segtable['start']) > 1:
         logging.info("Segmented on allele freqs in %s:%d-%d",
                      segment.chromosome, segment.start, segment.end)
         # Ensure breakpoint locations make sense
@@ -103,23 +103,23 @@ def variants_in_segment(varr, segment, fdr_q):
             'chromosome': segment.chromosome,
             'start': starts,
             'end': ends,
-            'baf': segtable['mean'],
+            # 'baf': segtable['mean'],
             'gene': segment.gene, # '-'
             'log2': segment.log2,
             'probes': segtable['size'],
-            'weight': (segment.weight * segtable['size']
-                       / (segment.end - segment.start)),
+            # 'weight': (segment.weight * segtable['size']
+            #            / (segment.end - segment.start)),
         })
     else:
         table = pd.DataFrame({
             'chromosome': segment.chromosome,
             'start': segment.start,
             'end': segment.end,
-            'baf': np.median(values),
+            # 'baf': values.median(),
             'gene': segment.gene, #'-',
             'log2': segment.log2,
             'probes': segment.probes,
-            'weight': segment.weight,
+            # 'weight': segment.weight,
         }, index=[0])
 
     return table
@@ -182,9 +182,9 @@ def haarSeg(I, breaksFdrQ,
         """Median absolute deviation, with deviations given."""
         if len(diff_vals) == 0:
             return 0.
-        return np.median(np.abs(diff_vals)) * 1.4826
+        return diff_vals.abs().median() * 1.4826
 
-    diffI = HaarConv(I, None, 1)
+    diffI = pd.Series(HaarConv(I, None, 1))
     if rawI:
         # Non-stationary variance empirical threshold set to 50
         NSV_TH = 50
