@@ -187,8 +187,6 @@ class CNATests(unittest.TestCase):
                 ("formats/reference-tr.cnn", False, False),
             ):
             cnarr = tabio.read_cna(fname)
-            if sample_is_f != cnarr.guess_xx(ref_is_m):
-                print("Gender issue:", fname, sample_is_f, ref_is_m)
             self.assertEqual(sample_is_f, cnarr.guess_xx(ref_is_m))
 
     def test_residuals(self):
@@ -210,9 +208,19 @@ class IOTests(unittest.TestCase):
 
     def test_empty(self):
         """Instantiate from an empty file."""
-        for fmt in ("auto", "tab", "bed", "interval", "text"):
+        for fmt in ("auto", "bed", #"bed3", "bed4",
+                    "interval", "tab", "text"):
             regions = tabio.read("formats/empty", fmt=fmt)
             self.assertEqual(len(regions), 0)
+
+    def test_read_auto(self):
+        for fname, nrows in (("formats/empty", 0),
+                             ("formats/amplicon.bed",
+                              linecount("formats/amplicon.bed")),
+                              ("formats/nv2_baits.interval_list", 6809)):
+            self.assertEqual(len(tabio.read_auto(fname)), nrows)
+            with open(fname) as handle:
+                self.assertEqual(len(tabio.read_auto(handle)), nrows)
 
     def test_read_bed(self):
         """Read the BED format."""

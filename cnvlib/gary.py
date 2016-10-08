@@ -25,22 +25,30 @@ class GenomicArray(object):
 
     def __init__(self, data_table, meta_dict=None):
         # Validation
-        if data_table is None or not len(data_table):
-            # Empty but conformant table
+        if (data_table is None or
+            (isinstance(data_table, (list, tuple)) and not len(data_table)) or
+            (isinstance(data_table, pd.DataFrame) and not len(data_table.columns))
+           ):
             data_table = self._make_blank()
         else:
             if not isinstance(data_table, pd.DataFrame):
                 # Rarely if ever needed -- prefer from_rows, from_columns, etc.
                 data_table = pd.DataFrame(data_table)
             if not all(c in data_table.columns for c in self._required_columns):
-                raise ValueError("data table must have at least columns "
-                                 + repr(self._required_columns))
+                raise ValueError("data table must have at least columns %r;"
+                                 "got %r" % (self._required_columns,
+                                             data_table.columns))
             # Ensure columns are the right type
             # (in case they've been automatically converted to the wrong type,
             # e.g. chromosome names as integers; genome coordinates as floats)
+            if len(data_table):
+                def ok_dtype(col, dt):
+                    return isinstance(data_table[col].iat[0], dt)
+            else:
+                def ok_dtype(col, dt):
+                    return data_table[col].dtype == np.dtype(dt)
             for col, dtype in zip(self._required_columns, self._required_dtypes):
-                # if data_table[col].dtype != np.dtype(dtype):
-                if not isinstance(data_table[col].iat[0], dtype):
+                if not ok_dtype(col, dtype):
                     data_table[col] = data_table[col].astype(dtype)
 
         self.data = data_table
@@ -60,8 +68,7 @@ class GenomicArray(object):
             arr = np.zeros(0, dtype=spec)
             return pd.DataFrame(arr)
         except TypeError as exc:
-            logging.info("%s", locals())
-            raise
+            raise TypeError("{}: {}".format(exc, spec))
 
     @classmethod
     def from_columns(cls, columns, meta_dict=None):

@@ -47,7 +47,9 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         The data from the given file instantiated as `into`, if specified, or
         the default base class for the given file format (usually GenomicArray).
     """
-    if fmt in READERS:
+    if fmt == 'auto':
+        return read_auto(infile)
+    elif fmt in READERS:
         reader, suggest_into = READERS[fmt]
     else:
         raise ValueError("Unknown format: %s" % fmt)
@@ -74,7 +76,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         kwargs["sample_id"] = sample_id
     try:
         dframe = reader(infile, **kwargs)
-    except ValueError:
+    except pd.io.common.EmptyDataError:
         # File is blank/empty, most likely
         logging.info("Blank %s file?: %s", fmt, infile)
         dframe = []

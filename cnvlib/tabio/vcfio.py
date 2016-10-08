@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 import vcf
 
+from ..vary import VariantArray as VA
+
 
 def read_vcf(infile, sample_id=None, normal_id=None,
              min_depth=None, skip_reject=False, skip_somatic=False):
@@ -103,7 +105,7 @@ def _read_vcf_nosample(vcf_file, skip_reject=False):
     table['end'] = table['start'] + table["alt"].str.len()  # ENH: INFO["END"]
     table['start'] -= 1
     logging.info("Loaded %d plain records", len(table))
-    return table.loc[:, columns]
+    return table.loc[:, VA._required_columns]
 
 
 def _iter_samples(vcf_reader, sample_id, normal_id):

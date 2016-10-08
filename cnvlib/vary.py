@@ -181,4 +181,4 @@ def _allele_specific_copy_numbers(segarr, varr, ploidy=2):
     # segout = segarr.copy()
     # segout.update({"baf": seg_bafs, "CN1": cn1, "CN2": cn2})
     # return segout
-    return pd.DataFrame({"baf": seg_bafs, "CN1": cn1, "CN2": cn2})
+    return pd.DataFrame({"baf": seg_bafs, "cn1": cn1, "cn2": cn2})

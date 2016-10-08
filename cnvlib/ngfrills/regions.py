@@ -15,7 +15,7 @@ def sniff_region_format(fname):
 
     Returns a tuple of the format name (str) or None if the file is empty.
     """
-    with open(fname, 'rU') as handle:
+    with as_handle(fname, 'rU') as handle:
         for line in handle:
             if not line.strip():
                 continue
