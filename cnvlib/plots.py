@@ -354,7 +354,7 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom=None):
         (start, end, value)
     """
     if chrom:
-        segments = segments.select(chromosome=chrom)
+        segments = segments.filter(chromosome=chrom)
     seg_starts = segments.start
     # Assign a segment number to each variant, basically
     indices = np.maximum(seg_starts.searchsorted(snv_posns), 1) - 1

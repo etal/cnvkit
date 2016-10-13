@@ -1101,7 +1101,7 @@ def do_scatter(cnarr, segments=None, variants=None,
             # Default selection endpoint to the maximum chromosome position
             if not end:
                 end = (cnarr or segments or variants
-                      ).select(chromosome=chrom).end.iat[-1]
+                      ).filter(chromosome=chrom).end.iat[-1]
             if window_coords:
                 # Genes were specified, & window was set around them
                 if start > window_coords[0] or end < window_coords[1]:
