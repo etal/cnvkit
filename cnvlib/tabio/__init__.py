@@ -13,7 +13,7 @@ from .. import core, ngfrills
 from ..gary import GenomicArray as GA
 from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
-from . import bedio, picard, seg, tab, textcoord, vcfio
+from . import bedio, genepred, picard, seg, tab, textcoord, vcfio
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
@@ -124,6 +124,7 @@ READERS = {
     "bed4": (bedio.read_bed4, GA),
     "bed6": (bedio.read_bed6, GA),
     "interval": (picard.read_interval, GA),
+    'refflat': (genepred.read_refflat, GA),
     "picardhs": (picard.read_picard_hs, CNA),
     "seg": (seg.read_seg, CNA),
     "tab": (tab.read_tab, GA),
