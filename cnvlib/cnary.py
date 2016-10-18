@@ -7,7 +7,7 @@ import logging
 
 import numpy as np
 import pandas as pd
-from scipy.stats import mannwhitneyu, rankdata
+from scipy.stats import median_test
 
 from . import core, gary, descriptives, params, smoothing
 from .metrics import segment_mean
@@ -290,62 +290,64 @@ class CopyNumArray(gary.GenomicArray):
             from each test; and ratios of U values for male vs. female
             assumption on chromosomes X and Y.
         """
-        cnarr = self.drop_low_coverage() if skip_low else self
-        chrx = cnarr[cnarr.chromosome == self._chr_x_label]
+        chrx = self[self.chromosome == self._chr_x_label]
         if not len(chrx):
             logging.warn("*WARNING* No %s found in probes; check the input",
                          self._chr_x_label)
             return None, {}
 
+        auto = self.autosomes()
+        if skip_low:
+            chrx = chrx.drop_low_coverage()
+            auto = auto.drop_low_coverage()
         chrx_l = chrx['log2'].values
-        auto = cnarr.autosomes()
         auto_l = auto['log2'].values
 
-        # ENH: use scipy.stats.ttest_ind(a, b, equal_var=False)
         def compare_to_auto(vals):
-            # u = mannwhitneyu(auto_l, vals, alternative='two-sided')[0]
-            # From scipy.stats.mannwhitneyu -- skip the p-value calculation
-            # (the tiebreaker there can raise an irrelevant error)
-            n1 = len(auto_l)
-            n2 = len(vals)
-            ranked = rankdata(np.concatenate((auto_l, vals)))
-            rankx = ranked[0:n1]  # get the x-ranks
-            u1 = n1*n2 + (n1*(n1+1))/2.0 - np.sum(rankx, axis=0)  # calc U for x
-            return n1*n2 - u1 # remainder is U for y
+            # Mood's median test stat is chisq -- near 0 for similar median
+            stat, p, med, cont = median_test(auto_l, vals, ties='ignore',
+                                             lambda_='log-likelihood')
+            if stat == 0 and 0 in cont:
+                # Bigfail
+                return abs(np.median(auto_l) - np.median(vals))
+            return stat
 
         if male_reference:
-            female_chrx_u = compare_to_auto(chrx_l - 1)
-            male_chrx_u = compare_to_auto(chrx_l)
+            female_chrx_stat = compare_to_auto(chrx_l - 1)
+            male_chrx_stat = compare_to_auto(chrx_l)
         else:
-            female_chrx_u = compare_to_auto(chrx_l)
-            male_chrx_u = compare_to_auto(chrx_l + 1)
-        # Mann-Whitney U score is greater for similar-mean sets
-        chrx_male_lr = male_chrx_u / female_chrx_u
+            female_chrx_stat = compare_to_auto(chrx_l)
+            male_chrx_stat = compare_to_auto(chrx_l + 1)
+        # Statistic is smaller for similar-median sets
+        chrx_male_lr = female_chrx_stat / male_chrx_stat
+        combined_score = chrx_male_lr
         # Similar for chrY if it's present
-        chry = cnarr[cnarr.chromosome == self._chr_y_label]
+        chry = self[self.chromosome == self._chr_y_label]
         if len(chry):
             chry_l = chry['log2']
-            male_chry_u = compare_to_auto(chry_l)
-            female_chry_u = compare_to_auto(chry_l + 3)
-            chry_male_lr = male_chry_u / female_chry_u
+            male_chry_stat = compare_to_auto(chry_l)
+            female_chry_stat = compare_to_auto(chry_l + 4)
+            chry_male_lr = female_chry_stat / male_chry_stat
+            if np.isfinite(chry_male_lr):
+                combined_score *= chry_male_lr
         else:
             # If chrY is missing, don't sabotage the inference
-            male_chry_u = female_chry_u = np.nan
-            chry_male_lr = 1.0
+            chry_male_lr = male_chry_stat = female_chry_stat = np.nan
         # Relative log2 values, for convenient reporting
         auto_mean = segment_mean(auto, skip_low=skip_low)
         chrx_mean = segment_mean(chrx, skip_low=skip_low)
         chry_mean = segment_mean(chry, skip_low=skip_low)
-        return (chrx_male_lr * chry_male_lr > 1.0,
+        return (combined_score > 1.0,
                 dict(chrx_ratio=chrx_mean - auto_mean,
                      chry_ratio=chry_mean - auto_mean,
+                     combined_score=combined_score,
                      # For debugging, mainly
                      chrx_male_lr=chrx_male_lr,
                      chry_male_lr=chry_male_lr,
-                     female_chrx_u=female_chrx_u,
-                     male_chrx_u=male_chrx_u,
-                     female_chry_u=female_chry_u,
-                     male_chry_u=male_chry_u,
+                     female_chrx_stat=female_chrx_stat,
+                     male_chrx_stat=male_chrx_stat,
+                     female_chry_stat=female_chry_stat,
+                     male_chry_stat=male_chry_stat,
                     ))
 
     def expect_flat_log2(self, is_male_reference=None):
