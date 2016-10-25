@@ -112,29 +112,30 @@ def read_refflat(infile, cds=False, exons=False):
     if cds and exons:
         raise ValueError("Arguments 'cds' and 'exons' are mutually exclusive")
 
-    col_names = [
-        'gene',
-        'accession',
-        'chromosome',
-        'strand',
-        'start',    # Transcription
-        'end',
-        'start_cds', # Coding region
-        'end_cds',
-        'exon_count',
-        'exon_starts',
-        'exon_ends',
-    ]
-
+    cols_shared = ['gene', 'accession', 'chromosome', 'strand']
+    if exons:
+        cols_rest = ['_start_tx', '_end_tx',  # Transcription
+                     '_start_cds', '_end_cds',  # Coding region
+                     'exon_count', 'exon_starts', 'exon_ends']
+    elif cds:
+        # Use CDS instead of transcription region
+        cols_rest = ['_start_tx', '_end_tx',
+                     'start', 'end',
+                     '_exon_count', '_exon_starts', '_exon_ends']
+    else:
+        cols_rest = ['start', 'end',
+                     '_start_cds', '_end_cds',
+                     '_exon_count', '_exon_starts', '_exon_ends']
+    colnames = cols_shared + cols_rest
+    usecols = [c for c in colnames if not c.startswith('_')]
     # Parse the file contents
     try:
-        dframe = pd.read_table(infile, names=col_names, header=None)
+        dframe = pd.read_table(infile,  header=None,
+                               names=colnames, usecols=usecols,
+                               dtype={c: str for c in cols_shared})
     except (pd.parser.CParserError, csv.Error) as err:
         raise ValueError("Unexpected dataframe contents:\n%s\n%s" %
                             (line, next(infile)))
-
-    dframe['chromosome'] = dframe['chromosome'].astype('str')
-    dframe = dframe.sort_values(['chromosome', 'start', 'end'])
 
     # Calculate values for output columns
     if exons:
@@ -145,21 +146,14 @@ def read_refflat(infile, cds=False, exons=False):
         # dframe.apply,applymap,...
         raise NotImplementedError
     else:
-        if cds:
-            # Use CDS instead of transcription region
-            dframe['start'] = dframe['start_cds'].astype('int') - 1
-            dframe['end'] = dframe['end_cds'].astype('int')
-        else:
-            dframe['start'] = dframe['start'].astype('int') - 1
-            dframe['end'] = dframe['end'].astype('int')
+        dframe = dframe.sort_values(['chromosome', 'start', 'end'])
+        dframe['start'] -= 1
 
-    for key in ('start_cds', 'end_cds', 'exon_starts', 'exon_ends'):
-        del dframe[key]
     # NB: same gene name can appear on alt. contigs
     dframe = (dframe.groupby(by=['chromosome', 'strand', 'gene'],
                              as_index=False, group_keys=False, sort=False)
               .apply(_merge_overlapping))
-    return dframe.reindex()
+    return dframe
 
 
 def _merge_overlapping(dframe):
