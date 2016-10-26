@@ -458,9 +458,9 @@ def theta_read_counts(log2_ratio, nbins,
 def export_theta_snps(varr):
     """Generate THetA's SNP per-allele read count "formatted.txt" files."""
     # Drop any chromosomes that are not integer or XY
-    varr = varr.autosomes(also=(["chrX", "chrY"]
-                       if varr.chromosome.iat[0].startswith("chr")
-                       else ["X", "Y"]))
+    varr = varr.autosomes(also=(['chrX', 'chrY']
+                                if varr.chromosome.iat[0].startswith('chr')
+                                else ['X', 'Y']))
     # Skip indels
     varr = varr[(varr["ref"].str.len() == 1) & (varr["alt"].str.len() == 1)]
     # Drop rows with any NaN
@@ -473,10 +473,12 @@ def export_theta_snps(varr):
     for depth_key, alt_key in (("depth", "alt_count"),
                                ("n_depth", "n_alt_count")):
         # Extract the SNP allele counts that THetA2 uses
-        table = varr.data.loc[:, ("chromosome", "start", depth_key, alt_key)]
-        table["ref_depth"] = (table[depth_key] - table[alt_key]).astype("int")
-        table[alt_key] = table[alt_key].astype("int")
-        table = table.loc[:, ("chromosome", "start", "ref_depth", alt_key)]
+        table = varr.data.loc[:, ('chromosome', 'start', depth_key, alt_key)]
+        table = (table.assign(ref_depth=table[depth_key] - table[alt_key])
+                 .loc[:, ('chromosome', 'start', 'ref_depth', alt_key)]
+                 .dropna())
+        table['ref_depth'] = table['ref_depth'].astype('int')
+        table[alt_key] = table[alt_key].astype('int')
         table.columns = ["#Chrm", "Pos", "Ref_Allele", "Mut_Allele"]
         yield table
 

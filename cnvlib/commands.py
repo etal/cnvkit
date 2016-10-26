@@ -1911,7 +1911,13 @@ def _cmd_export_theta(args):
                               sample_id=args.sample_id, # or tumor_cn.sample_id,
                               normal_id=args.normal_id, min_depth=args.min_depth,
                               skip_somatic=True)
-        tumor_snps, normal_snps = export.export_theta_snps(variants)
+        if not len(variants):
+            raise ValueError("VCF contains no usable SNV records")
+        try:
+            tumor_snps, normal_snps = export.export_theta_snps(variants)
+        except ValueError:
+            raise ValueError("VCF does not contain any tumor/normal paired "
+                             "samples")
         for title, table in [("tumor", tumor_snps), ("normal", normal_snps)]:
             out_fname = "{}.{}.snp_formatted.txt".format(tumor_cn.sample_id, title)
             table.to_csv(out_fname, sep='\t', index=False)
