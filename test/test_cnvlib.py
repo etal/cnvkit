@@ -67,6 +67,14 @@ class GaryTests(unittest.TestCase):
 
     # def test_concat(self):
 
+    def test_filter(self):
+        """Test sugary selection of a subset of the data array."""
+        num_bg_rows = len(self.ex_cnr[self.ex_cnr['gene'] == 'Background'])
+        self.assertEqual(len(self.ex_cnr.filter(gene='Background')),
+                         num_bg_rows)
+        selector = lambda row: row['gene'] == 'Background'
+        self.assertEqual(len(self.ex_cnr.filter(selector)), num_bg_rows)
+
     def test_ranges(self):
         """Test range methods: by_ranges, in_range, in_ranges."""
         cnarr = tabio.read_cna("formats/amplicon.cnr")
@@ -99,14 +107,6 @@ class GaryTests(unittest.TestCase):
             self.assertEqual(len(subarr), len(
                 subarr.in_ranges(starts=subsegarr['start'],
                                  ends=subsegarr['end'], mode="trim")))
-
-    def test_select(self):
-        """Test sugary selection of a subset of the data array."""
-        num_bg_rows = len(self.ex_cnr[self.ex_cnr['gene'] == 'Background'])
-        self.assertEqual(len(self.ex_cnr.select(gene='Background')),
-                         num_bg_rows)
-        selector = lambda row: row['gene'] == 'Background'
-        self.assertEqual(len(self.ex_cnr.select(selector)), num_bg_rows)
 
     def test_shuffle_sort(self):
         """Test shuffling and re-sorting the data array."""
@@ -181,7 +181,7 @@ class CNATests(unittest.TestCase):
                 ("formats/f-on-m.cns", True, True),
                 ("formats/m-on-f.cns", False, False),
                 ("formats/m-on-m.cns", False, True),
-                # ("formats/amplicon.cnr", False, True),
+                ("formats/amplicon.cnr", False, True),
                 ("formats/cl_seq.cns", True, True),
                 ("formats/tr95t.cns", True, True),
                 ("formats/reference-tr.cnn", False, False),

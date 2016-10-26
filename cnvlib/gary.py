@@ -517,17 +517,17 @@ class GenomicArray(object):
         table = self.data.loc[:, self._required_columns]
         return self.as_dataframe(table)
 
-    def select(self, selector=None, **kwargs):
+    def filter(self, func=None, **kwargs):
         """Take a subset of rows where the given condition is true.
 
         Parameters
         ----------
-        selector : callable
-            A boolean function which will be applied to each row to select rows
+        func : callable
+            A boolean function which will be applied to each row to keep rows
             where the result is True.
         **kwargs : string
             Keyword arguments like ``chromosome="chr7"`` or
-            ``gene="Background"``, which will select rows where the keyed field
+            ``gene="Background"``, which will keep rows where the keyed field
             equals the specified value.
 
         Return
@@ -536,8 +536,8 @@ class GenomicArray(object):
             Subset of `self` where the specified condition is True.
         """
         table = self.data
-        if selector is not None:
-            table = table[table.apply(selector, axis=1)]
+        if func is not None:
+            table = table[table.apply(func, axis=1)]
         for key, val in list(kwargs.items()):
             assert key in self
             table = table[table[key] == val]
