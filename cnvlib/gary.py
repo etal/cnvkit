@@ -4,7 +4,6 @@ from builtins import next, object, zip
 from past.builtins import basestring
 
 import logging
-import sys
 import warnings
 from collections import OrderedDict
 
@@ -12,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import core
+from ._intersect import _iter_ranges
 
 
 class GenomicArray(object):
@@ -256,10 +256,11 @@ class GenomicArray(object):
         chrom_lookup = dict(self.by_chromosome())
         for chrom, bin_rows in other.by_chromosome():
             if chrom in chrom_lookup:
-                subranges = chrom_lookup[chrom]._iter_ranges(
-                    None, bin_rows['start'], bin_rows['end'], mode)
+                subranges = _iter_ranges(chrom_lookup[chrom].data, None,
+                                         bin_rows['start'], bin_rows['end'],
+                                         mode)
                 for bin_row, subrange in zip(bin_rows, subranges):
-                    yield bin_row, subrange
+                    yield bin_row, self.as_dataframe(subrange)
             else:
                 if keep_empty:
                     for bin_row in bin_rows:
@@ -319,8 +320,8 @@ class GenomicArray(object):
             start = [int(start)]
         if isinstance(end, (int, np.int64, float, np.float64)):
             end = [int(end)]
-        results = self._iter_ranges(chrom, start, end, mode)
-        return next(results)
+        results = _iter_ranges(self.data, chrom, start, end, mode)
+        return self.as_dataframe(next(results))
 
     def in_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
         """Get the GenomicArray portion within the specified ranges.
@@ -352,63 +353,8 @@ class GenomicArray(object):
             Concatenation of all the subsets of `self` enclosed by the specified
             ranges.
         """
-        return self.concat(self._iter_ranges(chrom, starts, ends, mode))
-
-    def _iter_ranges(self, chrom, starts, ends, mode):
-        """Iterate through sub-ranges."""
-        assert mode in ('inner', 'outer', 'trim')
-        if chrom:
-            assert isinstance(chrom, basestring)  # ENH: accept array?
-            try:
-                table = self.data[self.data['chromosome'] == chrom]
-            except KeyError:
-                raise KeyError("Chromosome %s is not in this probe set" % chrom)
-        else:
-            # Unsafe, but faster if we've already subsetted by chromosome
-            table = self.data
-
-        # Edge cases
-        if not len(table):
-            yield self.as_rows([])
-            raise StopIteration
-
-        if starts is None and ends is None:
-            yield self.as_dataframe(table)
-            raise StopIteration
-
-        if starts is not None and len(starts):
-            if mode == 'inner':
-                # Only rows entirely after the start point
-                start_idxs = table.start.searchsorted(starts)
-            else:
-                # Include all rows overlapping the start point
-                start_idxs = table.end.searchsorted(starts, 'right')
-        else:
-            starts = np.zeros(len(ends) if ends is not None else 1,
-                              dtype=np.int_)
-            start_idxs = starts.copy()
-
-        if ends is not None and len(ends):
-            if mode == 'inner':
-                end_idxs = table.end.searchsorted(ends, 'right')
-            else:
-                end_idxs = table.start.searchsorted(ends)
-        else:
-            end_idxs = np.repeat(len(table), len(starts))
-            ends = [None] * len(starts)
-
-        for start_idx, start_val, end_idx, end_val in zip(start_idxs, starts,
-                                                          end_idxs, ends):
-            subtable = table[start_idx:end_idx]
-            if mode == 'trim':
-                subtable = subtable.copy()
-                # Update 5' endpoints to the boundary
-                if start_val:
-                    subtable.start = subtable.start.clip_lower(start_val)
-                # Update 3' endpoints to the boundary
-                if end_val:
-                    subtable.end = subtable.end.clip_upper(end_val)
-            yield self.as_dataframe(subtable)
+        table = pd.concat(_iter_ranges(self.data, chrom, starts, ends, mode))
+        return self.as_dataframe(table)
 
     def match_to_bins(self, other, key, default=0.0, fill=False,
                       summary_func=np.median):
