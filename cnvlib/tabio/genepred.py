@@ -4,22 +4,17 @@ The formats are tabular, with no header row, and columns defined by the SQL
 table definitions shown with each function. In alternative-splicing situations,
 each transcript has a row in these tables.
 
+Note: The parsers here load the gene information in each row and deduplicate
+identical rows, but do not merge non-identical rows.
+
 Generally the more-standard GFF or GTF would be used for this information; these
 formats are essentially UCSC Genome Browser database dumps.
 
 See: https://genome.ucsc.edu/FAQ/FAQformat.html#format9
 """
 from __future__ import absolute_import, division, print_function
-from builtins import next
-from past.builtins import basestring
 
-import csv
-import logging
-import math
-
-import numpy as np
 import pandas as pd
-from Bio.File import as_handle
 
 
 def read_genepred(infile, exons=False):
@@ -78,16 +73,12 @@ def read_genepred_ext(infile, exons=False):
 
 
 def read_refflat(infile, cds=False, exons=False):
-    """UCSC "flat" gene annotation format, e.g. refFlat.txt.
+    """Gene predictions and RefSeq genes with gene names (e.g. refFlat.txt).
 
-    Parse genes; merge those with same name and overlapping regions.
-
-    "Gene Predictions and RefSeq Genes with Gene Names"
-
-    UCSC refFlat: RefSeq genes, with additional name (as it appears in Genome
-    Browser) field.  A version of genePred that associates the gene name with
-    the gene prediction information. 
-
+    This version of genePred associates the gene name with the gene prediction
+    information. For example, the UCSC "refFlat" database lists HGNC gene names
+    and RefSeq accessions for each gene, alongside the gene model coordinates
+    for transcription region, coding region, and exons.
 
     ::
 
@@ -107,16 +98,27 @@ def read_refflat(infile, cds=False, exons=False):
             uint[exonCount] exonEnds;   "Exon end positions"
             )
 
+    Parameters
+    ----------
+    cds : bool
+        Emit each gene's CDS region (coding and introns, but not UTRs) instead
+        of the full transcript region (default).
+    exons : bool
+        Emit individual exonic regions for each gene instead of the full
+        transcribed genomic region (default). Mutually exclusive with `cds`.
+
     """
-    # ENH: choice of regions=('transcript', 'cds', 'exon') instead of bool args?
+    # ENH: choice of regions=('transcript', 'cds', 'exons') instead of flags?
     if cds and exons:
         raise ValueError("Arguments 'cds' and 'exons' are mutually exclusive")
 
     cols_shared = ['gene', 'accession', 'chromosome', 'strand']
+    converters = None
     if exons:
         cols_rest = ['_start_tx', '_end_tx',  # Transcription
                      '_start_cds', '_end_cds',  # Coding region
-                     'exon_count', 'exon_starts', 'exon_ends']
+                     '_exon_count', 'exon_starts', 'exon_ends']
+        converters = {'exon_starts': _split_commas, 'exon_ends': _split_commas}
     elif cds:
         # Use CDS instead of transcription region
         cols_rest = ['_start_tx', '_end_tx',
@@ -129,61 +131,30 @@ def read_refflat(infile, cds=False, exons=False):
     colnames = cols_shared + cols_rest
     usecols = [c for c in colnames if not c.startswith('_')]
     # Parse the file contents
-    try:
-        dframe = pd.read_table(infile,  header=None,
-                               names=colnames, usecols=usecols,
-                               dtype={c: str for c in cols_shared})
-    except (pd.parser.CParserError, csv.Error) as err:
-        raise ValueError("Unexpected dataframe contents:\n%s\n%s" %
-                            (line, next(infile)))
+    dframe = pd.read_table(infile,  header=None, na_filter=False,
+                           names=colnames, usecols=usecols,
+                           dtype={c: str for c in cols_shared},
+                           converters=converters)
 
     # Calculate values for output columns
     if exons:
-        # TODO -- pandas trickery; then _merge_overlapping
-        # es = dframe['exon_starts'].str.rstrip(',').str.split(',')
-        # ee = dframe['exon_ends'].str.rstrip(',').str.split(',')
-        # exons = list(zip(es, ee))
-        # dframe.apply,applymap,...
-        raise NotImplementedError
-    else:
-        dframe = dframe.sort_values(['chromosome', 'start', 'end'])
-        dframe['start'] -= 1
+        dframe = pd.DataFrame.from_records(_split_exons(dframe),
+                                           columns=cols_shared + ['start', 'end'])
+        dframe['start'] = dframe['start'].astype('int')
+        dframe['end'] = dframe['end'].astype('int')
 
-    # NB: same gene name can appear on alt. contigs
-    dframe = (dframe.groupby(by=['chromosome', 'strand', 'gene'],
-                             as_index=False, group_keys=False, sort=False)
-              .apply(_merge_overlapping))
-    return dframe
+    return (dframe.assign(start=dframe.start - 1)
+            .sort_values(['chromosome', 'start', 'end'])
+            .reset_index(drop=True))
 
 
-def _merge_overlapping(dframe):
-    """Merge overlapping regions within a group."""
-    # Short-circuit the simple, common cases
-    if len(dframe) == 1:
-        return dframe
-    if dframe['start'].nunique() == dframe['end'].nunique() == 1:
-        return _squash_rows(dframe, accession=_join_strings)
-    # Identify & enumerate (non)overlapping groups of rows
-    overlap_sizes = dframe.end.cummax().values[:-1] - dframe.start.values[1:]
-    non_overlapping = np.r_[False, (overlap_sizes <= 0)]
-    # Squash rows within each non-overlapping group
-    return (dframe.groupby(non_overlapping * np.arange(len(non_overlapping)),
-                           as_index=False, group_keys=False, sort=False)
-            .apply(_squash_rows,
-                   accession=_join_strings,
-                   start=pd.Series.min,
-                   end=pd.Series.max))
+def _split_commas(field):
+    return field.rstrip(',').split(',')
 
 
-def _squash_rows(dframe, **kwargs):
-    """Reduce multiple rows into one, combining 'accession' field."""
-    i = dframe.first_valid_index()
-    row = dframe.loc[i:i, :]
-    for key, combiner in kwargs.viewitems():
-        row[key] = combiner(dframe[key])
-    return row
-
-
-def _join_strings(ser):
-    return ','.join(ser.unique())
-
+def _split_exons(dframe):
+    """Split exons into individual rows."""
+    for row in dframe.itertuples(index=False):
+        shared = row[:4]
+        for start, end in zip(row.exon_starts, row.exon_ends):
+            yield shared + (start, end)
