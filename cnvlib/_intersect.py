@@ -7,6 +7,8 @@ GenomicArray types.
 
 """
 from __future__ import print_function, absolute_import, division
+from builtins import zip
+from past.builtins import basestring
 
 import numpy as np
 
