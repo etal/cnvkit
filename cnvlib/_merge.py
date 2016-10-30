@@ -8,18 +8,23 @@ GenomicArray types.
 """
 from __future__ import print_function, absolute_import, division
 
+import itertools
+
 import numpy as np
 import pandas as pd
 
-    # NB: same gene name can appear on alt. contigs
 
 # Merge overlapping rows
 # XXX see also target.py
 
 def _merge(table, stranded=False, combiners=None):
     cmb = {
-        'start': lambda ser: ser.iat[0], # pd.Series.min,
-        'end': lambda ser: ser.iat[-1], # pd.Series.max,
+        # # For pandas.Series instances
+        # 'start': lambda ser: ser.iat[0],
+        # 'end': lambda ser: ser.iat[-1],
+        # For Python lists
+        'start': lambda a: a[0],
+        'end': lambda a: a[-1],
         'gene': join_strings,
         'accession': join_strings,
     }
@@ -27,55 +32,97 @@ def _merge(table, stranded=False, combiners=None):
         cmb.update(combiners)
     if stranded:
         groupkey = ['chromosome', 'strand']
-        if 'strand' not in combiners:
-            combiners['strand'] = lambda ser: ser.iat[0]
+        if 'strand' not in cmb:
+            # cmb['strand'] = lambda ser: ser.iat[0]  # pd.Series
+            cmb['strand'] = lambda a: a[0]  # Py list
     else:
+        # NB: same gene name can appear on alt. contigs
         groupkey = ['chromosome']
-        if 'strand' not in combiners:
-            combiners['strand'] = merge_strands
+        if 'strand' not in cmb:
+            cmb['strand'] = merge_strands
+    table = table.sort_values(groupkey + ['start', 'end'])
     return (table.groupby(by=groupkey,
                           as_index=False, group_keys=False, sort=False)
             .apply(_merge_overlapping, cmb))
 
 
 def _merge_overlapping(table, combiners):
-    """Merge overlapping regions within a group."""
-    # Short-circuit the simple, common cases
-    if len(table) == 1:
-        return table
-    if table['start'].nunique() == table['end'].nunique() == 1:
-        return _squash_rows(table, combiners)
-    # Identify & enumerate (non)overlapping groups of rows
-    overlap_sizes = table.end.cummax().values[:-1] - table.start.values[1:]
-    non_overlapping = np.r_[False, (overlap_sizes <= 0)]
-    # Squash rows within each non-overlapping group
-    return (table.groupby(non_overlapping * np.arange(len(non_overlapping)),
-                          as_index=False, group_keys=False, sort=False)
-            .apply(_squash_rows, combiners))
+    """Merge overlapping regions within a chromosome/strand.
+
+    Assume chromosome and (if relevant) strand are already identical, so only
+    start and end coordinates are considered.
+    """
+    # NB: pandas groupby seems like the obvious choice over itertools, but it is
+    # very slow -- probably because it traverses the whole table (i.e.
+    # chromosome) again to select groups, redoing the various inferences that
+    # would be worthwhile outside this inner loop. With itertools, we take
+    # advantage of the grouping and sorting already done, and don't repeat
+    # pandas' traversal and inferences.
+    # ENH: Find & use a lower-level, 1-pass pandas function
+    keyed_groups = itertools.izip(_nonoverlapping_groups(table),
+                                  table.itertuples(index=False))
+    merged_rows = [_squash_tuples(row_group, combiners)
+                   for _key, row_group in itertools.groupby(keyed_groups,
+                                                            lambda x: x[0])]
+    return pd.DataFrame.from_records(merged_rows, columns=merged_rows[0]._fields)
+
+
+def _nonoverlapping_groups(table):
+    """Identify and enumerate groups of overlapping rows.
+
+    That is, increment the group ID after each non-negative gap between
+    intervals. Intervals (rows) will be merged if any bases overlap.
+    """
+    # Examples:
+    #
+    #  gap?     F  T  F  F  T  T  T  F
+    #  group  0  1  1  2  3  3  3  3  4
+    #
+    #  gap?     T  F  T  T  F  F  F  T
+    #  group  0  0  1  1  1  2  3  4  4
+    gap_sizes = table.start.values[1:] - table.end.cummax().values[:-1]
+    return np.r_[False, gap_sizes >= 0].cumsum()
 
 
 # Squash rows according to a given grouping criterion
 # XXX see also segfilter.py
 
-def _squash_rows(table, combiners):
-    """Reduce multiple rows into one, combining 'accession' field."""
-    i = table.first_valid_index()
-    row = table.loc[i:i, :]
-    for key, combiner in combiners.viewitems():
-        row[key] = combiner(table[key])
-    return row
+def _squash_tuples(keyed_rows, combiners):
+    """Combine multiple rows into one NamedTuple."""
+    rows = [kr[1] for kr in keyed_rows] #list(rows)
+    firsttup = rows[0]
+    if len(rows) == 1:
+        return firsttup
+    newfields = {key: combiner([getattr(r, key) for r in rows])
+                 for key, combiner in combiners.viewitems()}
+    return firsttup._replace(**newfields)
 
 
 # Combiners
 
-def join_strings(ser):
+def join_strings(elems):
     """Join a Series of strings by commas."""
     # TODO if ser elements are also comma-separated, split+uniq those too
-    return ','.join(ser.unique())
+    return ','.join(pd.unique(elems))
 
 
-def merge_strands(ser):
-    strands = ser.drop_duplicates()
+def merge_strands(elems):
+    strands = set(elems)
     if len(strands) > 1:
         return '.'
-    return strands.iat[0]
+    return elems[0]
+
+
+# Combiners -- for pandas.Series instances
+
+# def join_strings(ser):
+#     """Join a Series of strings by commas."""
+#     # TODO if ser elements are also comma-separated, split+uniq those too
+#     return ','.join(ser.unique())
+
+
+# def merge_strands(ser):
+#     strands = ser.drop_duplicates()
+#     if len(strands) > 1:
+#         return '.'
+#     return strands.iat[0]

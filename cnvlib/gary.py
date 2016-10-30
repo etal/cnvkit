@@ -12,6 +12,7 @@ import pandas as pd
 
 from . import core
 from ._intersect import _iter_ranges
+from ._merge import _merge
 
 
 class GenomicArray(object):
@@ -488,6 +489,10 @@ class GenomicArray(object):
             assert key in self
             table = table[table[key] == val]
         return self.as_dataframe(table)
+
+    def merge(self, combiners=None):
+        """Merge overlapping regions into single rows, similar to bedtools merge."""
+        return self.as_dataframe(_merge(self.data, combiners=combiners))
 
     def shuffle(self):
         """Randomize the order of bins in this array (in-place)."""
