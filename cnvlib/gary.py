@@ -490,10 +490,6 @@ class GenomicArray(object):
             table = table[table[key] == val]
         return self.as_dataframe(table)
 
-    def merge(self, combiners=None):
-        """Merge overlapping regions into single rows, similar to bedtools merge."""
-        return self.as_dataframe(_merge(self.data, combiners=combiners))
-
     def shuffle(self):
         """Randomize the order of bins in this array (in-place)."""
         np.random.seed(0xA5EED)  # For reproducible results
@@ -519,6 +515,32 @@ class GenomicArray(object):
         sorted_colnames = list(self._required_columns) + sorted(extra_cols)
         assert len(sorted_colnames) == len(self.data.columns)
         self.data = self.data.reindex(columns=sorted_colnames)
+
+    # Genome arithmetic
+
+    def cut(self, other):
+        """Split this array's regions at the boundaries in `other`."""
+        # TODO
+        return NotImplemented
+
+    def merge(self, combiners=None):
+        """Merge overlapping regions into single rows, similar to bedtools merge."""
+        return self.as_dataframe(_merge(self.data, combiners=combiners))
+
+    def squash(self, **kwargs):
+        """Combine some sets of rows, by some criteria, into single rows."""
+        # TODO
+        return NotImplemented
+
+    def subdivide(self, avg_size, min_size=0):
+        """Split this array's regions into roughly equal-sized sub-regions."""
+        # TODO
+        return NotImplemented
+
+    def subtract(self, other):
+        """Remove the overlapping regions in `other` from this array."""
+        # TODO
+        return NotImplemented
 
     def _get_gene_map(self):
         """Map unique gene names to their indices in `self`.
