@@ -261,10 +261,10 @@ class CopyNumArray(gary.GenomicArray):
     def compare_sex_chromosomes(self, male_reference=False, skip_low=False):
         """Compare coverage ratios of sex chromosomes versus autosomes.
 
-        Perform 4 Mann-Whitney tests of the log2 coverages on chromosomes X and
+        Perform 4 Mood's median tests of the log2 coverages on chromosomes X and
         Y, separately shifting for assumed male and female chromosomal sex.
-        Compare the U values obtained to infer whether the male or female
-        assumption fits the data better.
+        Compare the chi-squared values obtained to infer whether the male or
+        female assumption fits the data better.
 
         Parameters
         ----------
@@ -300,39 +300,63 @@ class CopyNumArray(gary.GenomicArray):
         if skip_low:
             chrx = chrx.drop_low_coverage()
             auto = auto.drop_low_coverage()
-        chrx_l = chrx['log2'].values
         auto_l = auto['log2'].values
+        use_weight = ('weight' in self)
+        auto_w = auto['weight'].values if use_weight else None
 
-        def compare_to_auto(vals):
+        def compare_to_auto(vals, weights):
             # Mood's median test stat is chisq -- near 0 for similar median
-            stat, p, med, cont = median_test(auto_l, vals, ties='ignore',
-                                             lambda_='log-likelihood')
-            if stat == 0 and 0 in cont:
-                # Bigfail
-                return abs(np.median(auto_l) - np.median(vals))
-            return stat
+            try:
+                stat, _p, _med, cont = median_test(auto_l, vals, ties='ignore',
+                                                   lambda_='log-likelihood')
+            except ValueError:
+                # "All values are below the grand median (0.0)"
+                stat = None
+            else:
+                if stat == 0 and 0 in cont:
+                    stat = None
+            # In case Mood's test failed for either sex
+            if use_weight:
+                med_diff = abs(descriptives.weighted_median(auto_l, auto_w) -
+                               descriptives.weighted_median(vals, weights))
+            else:
+                med_diff = abs(np.median(auto_l) - np.median(vals))
+            return (stat, med_diff)
 
-        if male_reference:
-            female_chrx_stat = compare_to_auto(chrx_l - 1)
-            male_chrx_stat = compare_to_auto(chrx_l)
-        else:
-            female_chrx_stat = compare_to_auto(chrx_l)
-            male_chrx_stat = compare_to_auto(chrx_l + 1)
-        # Statistic is smaller for similar-median sets
-        chrx_male_lr = female_chrx_stat / male_chrx_stat
+        def compare_chrom(vals, weights, female_shift, male_shift):
+            """Calculate "maleness" ratio of test statistics.
+
+            The ratio is of the female vs. male chi-square test statistics from
+            the median test. If the median test fails for either sex, (due to
+            flat/trivial input), use the ratio of the absolute difference in
+            medians.
+            """
+            female_stat, f_diff = compare_to_auto(vals + female_shift, weights)
+            male_stat, m_diff = compare_to_auto(vals + male_shift, weights)
+            # Statistic is smaller for similar-median sets
+            if female_stat is not None and male_stat is not None:
+                return female_stat / male_stat
+            # Difference in medians is also smaller for similar-median sets
+            return f_diff / max(m_diff, 0.01)
+
+        female_x_shift, male_x_shift = (-1, 0) if male_reference else (0, +1)
+        chrx_male_lr = compare_chrom(chrx['log2'].values,
+                                     (chrx['weight'].values if use_weight
+                                      else None),
+                                     female_x_shift, male_x_shift)
         combined_score = chrx_male_lr
         # Similar for chrY if it's present
         chry = self[self.chromosome == self._chr_y_label]
         if len(chry):
-            chry_l = chry['log2']
-            male_chry_stat = compare_to_auto(chry_l)
-            female_chry_stat = compare_to_auto(chry_l + 4)
-            chry_male_lr = female_chry_stat / male_chry_stat
+            chry_male_lr = compare_chrom(chry['log2'].values,
+                                         (chry['weight'].values if use_weight
+                                          else None),
+                                         +3, 0)
             if np.isfinite(chry_male_lr):
                 combined_score *= chry_male_lr
         else:
             # If chrY is missing, don't sabotage the inference
-            chry_male_lr = male_chry_stat = female_chry_stat = np.nan
+            chry_male_lr = np.nan
         # Relative log2 values, for convenient reporting
         auto_mean = segment_mean(auto, skip_low=skip_low)
         chrx_mean = segment_mean(chrx, skip_low=skip_low)
@@ -344,10 +368,6 @@ class CopyNumArray(gary.GenomicArray):
                      # For debugging, mainly
                      chrx_male_lr=chrx_male_lr,
                      chry_male_lr=chry_male_lr,
-                     female_chrx_stat=female_chrx_stat,
-                     male_chrx_stat=male_chrx_stat,
-                     female_chry_stat=female_chry_stat,
-                     male_chry_stat=male_chry_stat,
                     ))
 
     def expect_flat_log2(self, is_male_reference=None):
