@@ -189,7 +189,7 @@ def setup_genome(axis, probes, segments, variants, y_min=None, y_max=None):
     pass
 
 
-def cnv_on_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
+def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
                   y_max=None):
     """Plot coverages and CBS calls for all chromosomes on one plot."""
     # Group probes by chromosome (to calculate plotting coordinates)
@@ -205,7 +205,7 @@ def cnv_on_genome(axis, probes, segments, pad, do_trend=False, y_min=None,
                         for chrom, rows in segments.by_chromosome()
                        } if segments else {}
 
-    x_starts = plot_x_dividers(axis, chrom_sizes, pad)
+    x_starts = plot_x_dividers(axis, chrom_sizes)
     x = []
     seg_lines = []  # y-val, x-start, x-end
     for chrom, curr_offset in list(x_starts.items()):
@@ -266,12 +266,12 @@ def _smooth_genome_log2(cnarr, smooth_func, width):
         [out[chrom] for chrom in sorted(out, key=core.sorter_chrom)])
 
 
-def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, pad,
+def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend,
                   do_boost=False):
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
-    x_starts = plot_x_dividers(axis, chrom_sizes, pad)
+    x_starts = plot_x_dividers(axis, chrom_sizes)
 
     # Calculate the coordinates of plot components
     chrom_snvs = dict(variants.by_chromosome())
@@ -371,7 +371,7 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom=None):
                        np.median(freqs[mask_vaf]))
 
 
-def plot_x_dividers(axis, chrom_sizes, pad):
+def plot_x_dividers(axis, chrom_sizes):
     """Plot vertical dividers and x-axis labels given the chromosome sizes.
 
     Draws vertical black lines between each chromosome, with padding.
@@ -385,7 +385,7 @@ def plot_x_dividers(axis, chrom_sizes, pad):
         A table of the x-position offsets of each chromosome.
     """
     assert isinstance(chrom_sizes, collections.OrderedDict)
-
+    pad = 0.003 * sum(chrom_sizes.values())
     x_dividers = []
     x_centers = []
     x_starts = collections.OrderedDict()

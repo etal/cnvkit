@@ -1040,7 +1040,6 @@ def do_scatter(cnarr, segments=None, variants=None,
 
     if not show_gene and not show_range:
         # Plot all chromosomes, concatenated on one plot
-        PAD = 1e7
         if (cnarr or segments) and variants:
             # Lay out top 3/5 for the CN scatter, bottom 2/5 for SNP plot
             axgrid = pyplot.GridSpec(5, 1, hspace=.85)
@@ -1050,21 +1049,20 @@ def do_scatter(cnarr, segments=None, variants=None,
             axis2.tick_params(labelbottom=False)
             chrom_sizes = plots.chromosome_sizes(cnarr or segments)
             plots.snv_on_genome(axis2, variants, chrom_sizes, segments,
-                                do_trend, PAD)
+                                do_trend)
         else:
             _fig, axis = pyplot.subplots()
         if title is None:
             title = (cnarr or segments or variants).sample_id
         if cnarr or segments:
             axis.set_title(title)
-            plots.cnv_on_genome(axis, cnarr, segments, PAD, do_trend, y_min, y_max)
+            plots.cnv_on_genome(axis, cnarr, segments, do_trend, y_min, y_max)
         else:
             axis.set_title("Variant allele frequencies: %s" % title)
             chrom_sizes = collections.OrderedDict(
                 (chrom, subarr["end"].max())
                 for chrom, subarr in variants.by_chromosome())
-            plots.snv_on_genome(axis, variants, chrom_sizes, segments, do_trend,
-                                PAD)
+            plots.snv_on_genome(axis, variants, chrom_sizes, segments, do_trend)
 
     else:
         # Plot a specified region on one chromosome
