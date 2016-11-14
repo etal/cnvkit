@@ -202,7 +202,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     # Return an iterable...
     if isinstance(lines, basestring):
         lines = lines.splitlines()
-    for line in lines:
+    for line in map(str, lines):
         fields = line.split('\t', 5)
         if len(fields) >= 5:
             chrom, start_s, end_s, gene, basecount_s = fields[:5]
