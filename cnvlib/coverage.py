@@ -200,7 +200,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
         raise ValueError("BED file %r sequence IDs don't match any in BAM file %r"
                          % (bed_fname, bam_fname))
     # Return an iterable...
-    if isinstance(lines, basestring):
+    if isinstance(lines, (basestring, str, bytes)):
         lines = lines.splitlines()
     for line in map(str, lines):
         fields = line.split('\t', 5)
@@ -211,7 +211,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
             gene = "-"
         else:
             raise RuntimeError("Bad line from bedcov:\n" + line)
-        start, end, basecount = list(map(int, (start_s, end_s, basecount_s.strip())))
+        start, end, basecount = map(int, (start_s, end_s, basecount_s.strip()))
         span = end - start
         if span > 0:
             # Algebra from above
