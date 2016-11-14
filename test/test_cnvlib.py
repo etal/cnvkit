@@ -414,6 +414,20 @@ class CommandTests(unittest.TestCase):
                               is_sample_female=sample_is_f)
             test_chrom_means(cns_p99)
 
+    def test_coverage(self):
+        """The 'coverage' command."""
+        # fa = 'formats/chrM-Y-trunc.hg19.fa'
+        bed = 'formats/duke-my.bed'
+        bam = 'formats/na12878-chrM-Y-trunc.bam'
+        for by_count in (False, True):
+            for min_mapq in (0, 30):
+                for nprocs in (1, 2):
+                    cna = commands.do_coverage(bed, bam,
+                                               by_count=by_count,
+                                               min_mapq=min_mapq,
+                                               processes=nprocs)
+                    self.assertEqual(len(cna), 4)
+
     def test_export(self):
         """Run the 'export' command with each format."""
         # SEG

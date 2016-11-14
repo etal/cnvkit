@@ -188,7 +188,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     """
     # Count bases in each region; exclude low-MAPQ reads
     if min_mapq > 0:
-        bedcov_args = ['-Q', str(min_mapq)]
+        bedcov_args = ['-Q', bytes(min_mapq)]
     else:
         bedcov_args = []
     try:
@@ -204,8 +204,8 @@ def bedcov(bed_fname, bam_fname, min_mapq):
         lines = lines.splitlines()
     for line in lines:
         fields = line.split('\t', 5)
-        if len(fields) == 5:
-            chrom, start_s, end_s, gene, basecount_s = fields
+        if len(fields) >= 5:
+            chrom, start_s, end_s, gene, basecount_s = fields[:5]
         elif len(fields) == 4:
             chrom, start_s, end_s, basecount_s = fields
             gene = "-"
