@@ -201,9 +201,9 @@ def bedcov(bed_fname, bam_fname, min_mapq):
                          % (bed_fname, bam_fname))
     # Return an iterable...
     if isinstance(lines, (basestring, str, bytes)):
-        lines = lines.splitlines()
+        lines = str(lines).splitlines()
     for line in lines:
-        fields = unicode(line).split('\t', 5)
+        fields = str(line).split('\t', 5)
         if len(fields) >= 5:
             chrom, start_s, end_s, gene, basecount_s = fields[:5]
         elif len(fields) == 4:
