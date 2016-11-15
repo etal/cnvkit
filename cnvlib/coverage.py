@@ -202,15 +202,15 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     # Return an iterable...
     if isinstance(lines, (basestring, str, bytes)):
         lines = lines.splitlines()
-    for line in map(str, lines):
-        fields = line.split('\t', 5)
+    for line in lines:
+        fields = unicode(line).split('\t', 5)
         if len(fields) >= 5:
             chrom, start_s, end_s, gene, basecount_s = fields[:5]
         elif len(fields) == 4:
             chrom, start_s, end_s, basecount_s = fields
             gene = "-"
         else:
-            raise RuntimeError("Bad line from bedcov:\n" + line)
+            raise RuntimeError("Bad line from bedcov:\n%r" % line)
         start, end, basecount = map(int, (start_s, end_s, basecount_s.strip()))
         span = end - start
         if span > 0:
