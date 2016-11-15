@@ -34,6 +34,7 @@ clean:
 .PHONY: test
 test:
 	python test_cnvlib.py
+	python test_io.py
 	python test_r.py
 
 
