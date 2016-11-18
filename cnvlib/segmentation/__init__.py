@@ -122,9 +122,7 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
         newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
                    for segment, subvarr in variants.by_ranges(segarr)]
         segarr = segarr.as_dataframe(pd.concat(newsegs))
-        # TODO fix ploidy on allosomes
-        allelics = vary._allele_specific_copy_numbers(segarr, variants)
-        segarr.data = pd.concat([segarr.data, allelics], axis=1, copy=False)
+        segarr['baf'] = variants.baf_by_ranges(segarr)
 
     segarr['gene'], segarr['weight'], segarr['depth'] = \
             transfer_fields(segarr, cnarr)
