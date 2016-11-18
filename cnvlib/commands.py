@@ -230,7 +230,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
         antitarget_fnames = [af.result() for af in anti_futures]
         # Build reference from *.cnn
         ref_arr = do_reference(target_fnames, antitarget_fnames, fasta,
-                               male_reference, do_gc=True,
+                               male_reference, None, do_gc=True,
                                do_edge=(method == "hybrid"), do_rmask=True)
     if not output_reference:
         output_reference = os.path.join(output_dir, "reference.cnn")
@@ -564,8 +564,10 @@ def _cmd_reference(args):
         antitargets = [f for f in filenames if 'antitarget' in f]
         logging.info("Number of target and antitarget files: %d, %d",
                      len(targets), len(antitargets))
+        female_samples = ((args.gender.lower() not in ['m', 'male'])
+                          if args.gender else None)
         ref_probes = do_reference(targets, antitargets, args.fasta,
-                                  args.male_reference,
+                                  args.male_reference, female_samples,
                                   args.do_gc, args.do_edge, args.do_rmask)
     else:
         raise ValueError(usage_err_msg)
@@ -577,7 +579,8 @@ def _cmd_reference(args):
 
 @public
 def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
-                 male_reference=False, do_gc=True, do_edge=True, do_rmask=True):
+                 male_reference=False, female_samples=None,
+                 do_gc=True, do_edge=True, do_rmask=True):
     """Compile a coverage reference from the given files (normal samples)."""
     core.assert_equal("Unequal number of target and antitarget files given",
                       targets=len(target_fnames),
@@ -588,11 +591,11 @@ def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
 
     # Calculate & save probe centers
     ref_probes = reference.combine_probes(target_fnames, fa_fname,
-                                          male_reference, True,
-                                          do_gc, do_edge, False)
+                                          male_reference, female_samples,
+                                          True, do_gc, do_edge, False)
     ref_probes.add(reference.combine_probes(antitarget_fnames, fa_fname,
-                                            male_reference, False,
-                                            do_gc, False, do_rmask))
+                                            male_reference, female_samples,
+                                            False, do_gc, False, do_rmask))
     ref_probes.center_all(skip_low=True)
     ref_probes.sort_columns()
     reference.warn_bad_probes(ref_probes)
@@ -637,6 +640,11 @@ P_reference.add_argument('-y', '--male-reference', action='store_true',
                 log-coverage by -1, so the reference chrX average is -1.
                 Otherwise, shift male samples' chrX by +1, so the reference chrX
                 average is 0.""")
+P_reference.add_argument('-g', '--gender',
+        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+        help="""Specify the chromosomal sex of all given samples as male or
+                female. (Default: guess each sample from ploidy of X and Y
+                chromosomes).""")
 
 P_reference_flat = P_reference.add_argument_group(
     "To construct a generic, \"flat\" copy number reference with neutral "

@@ -20,8 +20,8 @@ def bed2probes(bed_fname):
     return CNA(table, {"sample_id": core.fbase(bed_fname)})
 
 
-def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
-                   fix_gc, fix_edge, fix_rmask):
+def combine_probes(filenames, fa_fname, is_male_reference, is_female_sample,
+                   skip_low, fix_gc, fix_edge, fix_rmask):
     """Calculate the median coverage of each bin across multiple samples.
 
     Parameters
@@ -96,9 +96,10 @@ def combine_probes(filenames, fa_fname, is_male_reference, skip_low,
             xy sample, xy ref: 0    (from -1)   +1
 
         """
-        is_sample_female = cnarr.guess_xx()
+        is_xx = (cnarr.guess_xx() if is_female_sample is None
+                 else is_female_sample)
         cnarr['log2'] += flat_coverage
-        if is_sample_female:
+        if is_xx:
             # chrX has same ploidy as autosomes; chrY is just unusable noise
             cnarr[is_chr_y, 'log2'] = -1.0  # np.nan is worse
         else:
