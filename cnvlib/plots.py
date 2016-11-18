@@ -371,7 +371,7 @@ def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom=None):
                        np.median(freqs[mask_vaf]))
 
 
-def plot_x_dividers(axis, chrom_sizes):
+def plot_x_dividers(axis, chrom_sizes, pad=None):
     """Plot vertical dividers and x-axis labels given the chromosome sizes.
 
     Draws vertical black lines between each chromosome, with padding.
@@ -385,7 +385,8 @@ def plot_x_dividers(axis, chrom_sizes):
         A table of the x-position offsets of each chromosome.
     """
     assert isinstance(chrom_sizes, collections.OrderedDict)
-    pad = 0.003 * sum(chrom_sizes.values())
+    if pad is None:
+        pad = 0.003 * sum(chrom_sizes.values())
     x_dividers = []
     x_centers = []
     x_starts = collections.OrderedDict()
