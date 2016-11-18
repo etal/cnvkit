@@ -543,7 +543,7 @@ class GenomicArray(object):
         return NotImplemented
 
     def _get_gene_map(self):
-        """Map unique gene names to their indices in `self`.
+        """Map unique gene names to their indices in this array.
 
         Returns
         -------
@@ -555,11 +555,11 @@ class GenomicArray(object):
             return OrderedDict()
 
         genes = OrderedDict()
-        for ix, row in self.data.iterrows():
+        for row in self.data.itertuples():
             if pd.isnull(row.gene):
                 continue
             for gene in row.gene.split(','):
                 if gene not in genes:
                     genes[gene] = []
-                genes[gene].append(ix)
+                genes[gene].append(row.Index)
         return genes
