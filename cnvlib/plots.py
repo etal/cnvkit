@@ -6,7 +6,6 @@ from past.builtins import basestring
 import collections
 import logging
 import math
-import sys
 
 import numpy as np
 
@@ -38,7 +37,7 @@ def setup_chromosome(axis, probes=None, segments=None, variants=None,
         if arr and len(arr):
             max_x = max(max_x, arr.end.iat[-1])
             min_x = min(min_x, arr.start.iat[0])
-    if not max_x > min_x:
+    if max_x <= min_x:
         if any((probes, segments, variants)):
             logging.warn("*WARNING* selection start %s > end %s (%s); did you "
                          "correctly sort the input file by genomic location?",
@@ -61,7 +60,8 @@ def setup_chromosome(axis, probes=None, segments=None, variants=None,
 
 
 def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
-                      do_trend=False, y_min=None, y_max=None):
+                      do_trend=False, y_min=None, y_max=None,
+                      segment_color=SEG_COLOR):
     """Draw a scatter plot of probe values with CBS calls overlaid.
 
     Parameters
@@ -148,7 +148,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
         for row in segments:
             axis.plot((row.start * MB, row.end * MB),
                       (row.log2, row.log2),
-                      color=SEG_COLOR, linewidth=4, solid_capstyle='round')
+                      color=segment_color, linewidth=4, solid_capstyle='round')
 
 
 def snv_on_chromosome(axis, variants, segments, genes,
@@ -190,7 +190,7 @@ def setup_genome(axis, probes, segments, variants, y_min=None, y_max=None):
 
 
 def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
-                  y_max=None):
+                  y_max=None, segment_color=SEG_COLOR):
     """Plot coverages and CBS calls for all chromosomes on one plot."""
     # Group probes by chromosome (to calculate plotting coordinates)
     if probes:
@@ -246,7 +246,7 @@ def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
     for seg_line in seg_lines:
         y1, x1, x2 = seg_line
         axis.plot((x1, x2), (y1, y1),
-                  color=SEG_COLOR, linewidth=3, solid_capstyle='round')
+                  color=segment_color, linewidth=3, solid_capstyle='round')
 
 
 def _smooth_genome_log2(cnarr, smooth_func, width):

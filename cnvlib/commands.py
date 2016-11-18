@@ -1010,13 +1010,14 @@ def _cmd_scatter(args):
                            args.background_marker, args.trend,
                            args.width, args.y_min, args.y_max,
                            ("%s %s" % (args.title, region.chromosome)
-                            if args.title else None))
+                            if args.title else None),
+                           args.segment_color)
                 pdf_out.savefig()
                 pyplot.close()
     else:
         do_scatter(cnarr, segarr, varr, args.chromosome, args.gene,
                    args.background_marker, args.trend, args.width,
-                   args.y_min, args.y_max, args.title)
+                   args.y_min, args.y_max, args.title, args.segment_color)
         if args.output:
             oformat = os.path.splitext(args.output)[-1].replace(".", "")
             pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
@@ -1029,7 +1030,8 @@ def _cmd_scatter(args):
 def do_scatter(cnarr, segments=None, variants=None,
                show_range=None, show_gene=None,
                background_marker=None, do_trend=False, window_width=1e6,
-               y_min=None, y_max=None, title=None):
+               y_min=None, y_max=None, title=None,
+               segment_color=plots.SEG_COLOR):
     """Plot probe log2 coverages and CBS calls together.
 
     show_gene: name of gene to highligh
@@ -1056,7 +1058,8 @@ def do_scatter(cnarr, segments=None, variants=None,
             title = (cnarr or segments or variants).sample_id
         if cnarr or segments:
             axis.set_title(title)
-            plots.cnv_on_genome(axis, cnarr, segments, do_trend, y_min, y_max)
+            plots.cnv_on_genome(axis, cnarr, segments, do_trend, y_min, y_max,
+                                segment_color=segment_color)
         else:
             axis.set_title("Variant allele frequencies: %s" % title)
             chrom_sizes = collections.OrderedDict(
@@ -1078,7 +1081,7 @@ def do_scatter(cnarr, segments=None, variants=None,
             # Scan for probes matching the specified gene
             gene_coords = plots.gene_coords_by_name(cnarr or segments,
                                                     gene_names)
-            if not len(gene_coords) == 1:
+            if len(gene_coords) != 1:
                 raise ValueError("Genes %s are split across chromosomes %s"
                                  % (show_gene, list(gene_coords.keys())))
             g_chrom, genes = gene_coords.popitem()
@@ -1164,7 +1167,8 @@ def do_scatter(cnarr, segments=None, variants=None,
         axis.set_title(title)
         plots.cnv_on_chromosome(axis, sel_probes, sel_seg, genes,
                                 background_marker=background_marker,
-                                do_trend=do_trend, y_min=y_min, y_max=y_max)
+                                do_trend=do_trend, y_min=y_min, y_max=y_max,
+                                segment_color=segment_color)
 
 
 P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
@@ -1204,6 +1208,9 @@ P_scatter.add_argument('-b', '--background-marker', metavar='CHARACTER',
         help="""Plot antitargets using this symbol when plotting in a selected
                 chromosomal region (-g/--gene or -c/--chromosome).
                 [Default: same as targets]""")
+P_scatter.add_argument('--segment-color', default=plots.SEG_COLOR,
+        help="""Plot segment lines in this color. Value can be any string
+                accepted by matplotlib.""")
 P_scatter.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_scatter.add_argument('--title',
