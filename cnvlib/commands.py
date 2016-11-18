@@ -1488,31 +1488,36 @@ P_gender.set_defaults(func=_cmd_gender)
 
 def _cmd_metrics(args):
     """Compute coverage deviations and other metrics for self-evaluation."""
-    if (len(args.cnarrays) > 1 and len(args.segments) > 1 and
+    if (len(args.cnarrays) > 1 and
+        args.segments and len(args.segments) > 1 and
         len(args.cnarrays) != len(args.segments)):
         raise ValueError("Number of coverage/segment filenames given must be "
                          "equal, if more than 1 segment file is given.")
 
     cnarrs = map(tabio.read_cna, args.cnarrays)
-    segments = map(tabio.read_cna, args.segments)
-    table = do_metrics(cnarrs, segments, args.drop_low_coverage)
+    if args.segments:
+        args.segments = map(tabio.read_cna, args.segments)
+    table = do_metrics(cnarrs, args.segments, args.drop_low_coverage)
     core.write_dataframe(args.output, table)
 
 
 @public
-def do_metrics(cnarrs, segments, skip_low=False):
+def do_metrics(cnarrs, segments=None, skip_low=False):
     """Compute coverage deviations and other metrics for self-evaluation."""
     # Catch if passed args are single CopyNumArrays instead of lists
     if isinstance(cnarrs, _CNA):
         cnarrs = [cnarrs]
     if isinstance(segments, _CNA):
         segments = [segments]
+    elif segments is None:
+        segments = [None]
     else:
         segments = list(segments)
     if skip_low:
         cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
     rows = ((cna.meta.get("filename", cna.sample_id),
-             len(seg)) + metrics.ests_of_scale(cna.residuals(seg))
+             len(seg) if seg is not None else '-'
+            ) + metrics.ests_of_scale(cna.residuals(seg))
             for cna, seg in zip_repeater(cnarrs, segments))
     colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
     return pd.DataFrame.from_records(rows, columns=colnames)
@@ -1530,7 +1535,7 @@ def zip_repeater(iterable, repeatable):
         for i, (it, rpt) in enumerate(zip(iterable, repeatable)):
             yield it, rpt
         # Require lengths to match
-        if not i+1 == rpt_len:
+        if i + 1 != rpt_len:
             raise ValueError("""Number of unsegmented and segmented input files
                              did not match (%d vs. %d)""" % (i, rpt_len))
 
@@ -1538,7 +1543,7 @@ def zip_repeater(iterable, repeatable):
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
 P_metrics.add_argument('cnarrays', nargs='+',
         help="""One or more bin-level coverage data files (*.cnn, *.cnr).""")
-P_metrics.add_argument('-s', '--segments', nargs='+', required=True,
+P_metrics.add_argument('-s', '--segments', nargs='+',
         help="""One or more segmentation data files (*.cns, output of the
                 'segment' command).  If more than one file is given, the number
                 must match the coverage data files, in which case the input
