@@ -66,7 +66,7 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10,
                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
-    filtered_cn = cnarr
+    filtered_cn = cnarr.copy()
     if skip_low:
         before = len(filtered_cn)
         filtered_cn = filtered_cn.drop_low_coverage()
@@ -90,6 +90,7 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
             rscript = flasso.FLASSO_RSCRIPT
             threshold = threshold or 0.005
 
+        filtered_cn['start'] += 1  # Convert to 1-indexed coordinates for R
         with tempfile.NamedTemporaryFile(suffix='.cnr', mode="w+t") as tmp:
             filtered_cn.data.to_csv(tmp, index=False, sep='\t',
                                     float_format='%.6g', mode="w+t")
@@ -101,11 +102,12 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
                 'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
             }
             with core.temp_write_text(rscript % script_strings,
-                                          mode="w+t") as script_fname:
+                                      mode='w+t') as script_fname:
                 seg_out = core.call_quiet('Rscript', '--vanilla', script_fname)
             # ENH: run each chromosome separately
             # ENH: run each chrom. arm separately (via knownsegs)
         # Convert R dataframe contents (SEG) to a proper CopyNumArray
+        # NB: Automatically shifts 'start' back from 1- to 0-indexed
         segarr = tabio.read(StringIO(seg_out.decode()), "seg",
                             sample_id=cnarr.sample_id)
         if method == 'flasso':

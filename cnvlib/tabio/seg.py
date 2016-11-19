@@ -24,8 +24,6 @@ import math
 import pandas as pd
 from Bio.File import as_handle
 
-from ..cnary import CopyNumArray as CNA
-
 
 LOG2_10 = math.log(10, 2)   # To convert log10 values to log2
 
@@ -33,10 +31,23 @@ def read_seg(infile, sample_id=None,
              chrom_names=None, chrom_prefix=None, from_log10=False):
     """Read one sample from a SEG file.
 
-    By default, return the first sample in the file.
-    If `sample_id` is a string identifier, return the sample matching that ID.
-    If `sample_id` is a positive integer, return the sample at that index
-    position, counting from 0.
+    Parameters
+    ----------
+    sample_id : string, int or None
+        If a string identifier, return the sample matching that ID.  If a
+        positive integer, return the sample at that index position, counting
+        from 0. If None (default), return the first sample in the file.
+    chrom_names : dict
+        Map (string) chromosome IDs to names. (Applied before chrom_prefix.)
+        e.g. {'23': 'X', '24': 'Y', '25': 'M'}
+    chrom_prefix : str
+        Prepend this string to chromosome names. (Usually 'chr' or None)
+    from_log10 : bool
+        Convert values from log10 to log2.
+
+    Returns
+    -------
+    DataFrame of the selected sample's segments.
     """
     results = parse_seg(infile, chrom_names, chrom_prefix, from_log10)
     if isinstance(sample_id, int):
@@ -70,14 +81,22 @@ def read_seg(infile, sample_id=None,
 def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
     """Parse a SEG file as an iterable of samples.
 
-    `chrom_names`:
+    Coordinates are automatically converted from 1-indexed to half-open
+    0-indexed (Python-style indexing).
+
+    Parameters
+    ----------
+    chrom_names : dict
         Map (string) chromosome IDs to names. (Applied before chrom_prefix.)
         e.g. {'23': 'X', '24': 'Y', '25': 'M'}
+    chrom_prefix : str
+        Prepend this string to chromosome names. (Usually 'chr' or None)
+    from_log10 : bool
+        Convert values from log10 to log2.
 
-    `chrom_prefix`: prepend this string to chromosome names
-        (usually 'chr' or None)
-
-    `from_log10`: Convert values from log10 to log2.
+    Yields
+    ------
+    Tuple of (string sample ID, DataFrame of segments)
     """
     # Scan through any leading garbage to find the header
     with as_handle(infile) as handle:
@@ -120,7 +139,7 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
             dframe['chromosome'] = dframe['chromosome'].astype("str")
         except (pd.parser.CParserError, csv.Error) as err:
             raise ValueError("Unexpected dataframe contents:\n%s\n%s" %
-                             (line, next(handle)))
+                             (err, next(handle)))
 
     # Calculate values for output columns
     if chrom_names:
