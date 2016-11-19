@@ -620,7 +620,7 @@ def do_reference_flat(targets, antitargets, fa_fname=None,
         gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
         ref_probes['gc'] = gc
         ref_probes['rmask'] = rmask
-        reference.warn_bad_probes(ref_probes)
+        # reference.warn_bad_probes(ref_probes)
     else:
         logging.info("No FASTA reference genome provided; "
                      "skipping GC, RM calculations")

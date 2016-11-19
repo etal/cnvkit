@@ -168,7 +168,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, is_female_sample,
     return CNA.from_columns(columns, {'sample_id': "reference"})
 
 
-def warn_bad_probes(probes):
+def warn_bad_probes(probes, max_name_width=50):
     """Warn about target probes where coverage is poor.
 
     Prints a formatted table to stderr.
@@ -180,9 +180,9 @@ def warn_bad_probes(probes):
         bad_pct = 100 * len(fg_bad_probes) / sum(probes['gene'] != 'Background')
         logging.info("Targets: %d (%s) bins failed filters:",
                      len(fg_bad_probes), "%.4f" % bad_pct + '%')
-        gene_cols = max(list(map(len, fg_bad_probes['gene'])))
+        gene_cols = min(max_name_width, max(map(len, fg_bad_probes['gene'])))
         labels = list(map(CNA.row2label, fg_bad_probes))
-        chrom_cols = max(list(map(len, labels)))
+        chrom_cols = max(map(len, labels))
         last_gene = None
         for label, probe in zip(labels, fg_bad_probes):
             if probe.gene == last_gene:
@@ -190,6 +190,8 @@ def warn_bad_probes(probes):
             else:
                 gene = probe.gene
                 last_gene = gene
+            if len(gene) > max_name_width:
+                gene = gene[:max_name_width-3] + '...'
             if 'rmask' in probes:
                 logging.info("  %s  %s  log2=%.3f  spread=%.3f  rmask=%.3f",
                              gene.ljust(gene_cols), label.ljust(chrom_cols),
@@ -212,7 +214,7 @@ def get_fasta_stats(cnarr, fa_fname):
     logging.info("Calculating GC and RepeatMasker content in %s ...", fa_fname)
     gc_rm_vals = [calculate_gc_lo(subseq)
                   for subseq in ngfrills.fasta_extract_regions(fa_fname, cnarr)]
-    gc_vals, rm_vals = list(zip(*gc_rm_vals))
+    gc_vals, rm_vals = zip(*gc_rm_vals)
     return np.asfarray(gc_vals), np.asfarray(rm_vals)
 
 
@@ -231,27 +233,12 @@ def calculate_gc_lo(subseq):
 
 
 def reference2regions(reference, coord_only=False):
-    """Extract iterables of target and antitarget regions from a reference.
+    """Split reference into iterables of target and antitarget regions.
 
     Like loading two BED files with ngfrills.parse_regions.
     """
-    cna2rows = (_cna2coords if coord_only else _cna2regions)
-    return list(map(cna2rows, _ref_split_targets(reference)))
-
-
-def _cna2coords(cnarr):
-    """Extract the coordinate columns from a CopyNumberArray"""
-    return list(zip(cnarr['chromosome'], cnarr['start'], cnarr['end']))
-
-
-def _cna2regions(cnarr):
-    """Extract the region columns (including genes) from a CopyNumberArray"""
-    return list(zip(cnarr['chromosome'], cnarr['start'], cnarr['end'], cnarr['gene']))
-
-
-def _ref_split_targets(ref_arr):
-    """Split reference into 2 sub-arrays of targets/antitargets."""
-    is_bg = (ref_arr['gene'] == 'Background')
-    targets = ref_arr[~is_bg]
-    antitargets = ref_arr[is_bg]
-    return targets, antitargets
+    coord_kw = {} if coord_only else {'also': ['gene']}
+    is_bg = (reference['gene'] == 'Background')
+    targets = reference[~is_bg]
+    antitargets = reference[is_bg]
+    return targets.coords(**coord_kw), antitargets.coords(**coord_kw)
