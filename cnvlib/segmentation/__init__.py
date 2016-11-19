@@ -29,6 +29,8 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                     save_dataframe=False, rlibpath=None,
                     processes=1):
     """Infer copy number segments from the given coverage table."""
+    if variants:
+        variants = variants.heterozygous()
     # XXX parallel flasso segfaults in R when run on a single chromosome
     if processes == 1 or method == 'flasso':
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
@@ -119,7 +121,6 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
 
     segarr.meta = cnarr.meta.copy()
     if variants:
-        variants = variants.heterozygous()
         # Re-segment the variant allele freqs within each segment
         newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
                    for segment, subvarr in variants.by_ranges(segarr)]
