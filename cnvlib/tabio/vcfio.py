@@ -238,8 +238,10 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
 
 
 def _extract_genotype(sample):
-    if "DP" in sample.data._fields:
+    if 'DP' in sample.data._fields:
         depth = sample.data.DP
+    elif 'AD' in sample.data._fields and isinstance(sample.data.AD, list):
+        depth = sum(sample.data.AD)
     else:
         # SV or not called, probably
         depth = alt_count = np.nan #0.0
