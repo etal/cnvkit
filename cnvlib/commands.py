@@ -1004,12 +1004,20 @@ def _cmd_scatter(args):
                           ) if args.filename else None
     segarr = tabio.read_cna(args.segment, sample_id=args.sample_id
                            ) if args.segment else None
-    # if not args.sample_id and (cnarr or segarr):
-    #     args.sample_id = (cnarr or segarr).sample_id
-    varr = (tabio.read(args.vcf, "vcf",
-                       sample_id=args.sample_id, normal_id=args.normal_id,
-                       min_depth=args.min_variant_depth, skip_somatic=True)
-            if args.vcf else None)
+    if args.vcf:
+        varr = tabio.read(args.vcf, "vcf",
+                          sample_id=args.sample_id, normal_id=args.normal_id,
+                          min_depth=args.min_variant_depth, skip_somatic=True)
+        logging.warn('%r', args.zygosity_freq)
+        if args.zygosity_freq is not None:
+            varr = varr.zygosity_from_freq(args.zygosity_freq,
+                                           1 - args.zygosity_freq)
+        orig_len = len(varr)
+        varr = varr.heterozygous()
+        logging.info("Kept %d heterozygous of %d VCF records",
+                     len(varr), orig_len)
+    else:
+        varr = None
 
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
@@ -1040,14 +1048,7 @@ def do_scatter(cnarr, segments=None, variants=None,
                background_marker=None, do_trend=False, window_width=1e6,
                y_min=None, y_max=None, title=None,
                segment_color=plots.SEG_COLOR):
-    """Plot probe log2 coverages and CBS calls together.
-
-    show_gene: name of gene to highligh
-    show_range: chromosome name or coordinate string like "chr1:20-30"
-    """
-    if variants:
-        variants = variants.heterozygous()
-
+    """Plot probe log2 coverages and segmentation calls together."""
     if not show_gene and not show_range:
         # Plot all chromosomes, concatenated on one plot
         if (cnarr or segments) and variants:
@@ -1198,6 +1199,11 @@ P_scatter.add_argument("-n", "--normal-id",
 P_scatter.add_argument('-m', '--min-variant-depth', type=int, default=20,
         help="""Minimum read depth for a SNV to be displayed in the b-allele
                 frequency plot. [Default: %(default)s]""")
+P_scatter.add_argument('-z', '--zygosity-freq', metavar="ALT_FREQ",
+        nargs='?', const=0.25, type=float,
+        help="""Ignore VCF's genotypes (GT field) and instead infer zygosity
+                from allele frequencies.  [Default if used without a number:
+                %(const)s]""")
 P_scatter.add_argument('-c', '--chromosome', metavar="RANGE",
         help="""Chromosome (e.g. 'chr1') or chromosomal range (e.g.
                 'chr1:2333000-2444000') to display. If a range is given,

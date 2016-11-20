@@ -56,20 +56,41 @@ class VariantArray(gary.GenomicArray):
             for _bin, subvarr in self.by_ranges(ranges, mode='outer',
                                                 keep_empty=True)])
 
-    def heterozygous(self, min_freq=None, max_freq=None):
-        """Subset to only heterozygous variants.
+    def zygosity_from_freq(self, het_freq=0.0, hom_freq=1.0):
+        """Set zygosity (genotype) according to allele frequencies.
 
-        If `min_freq` and `max_freq` are not specified, use "zygosity" genotype
-        values, excludes variants with value 0.0 or 1.0.
+        Creates or replaces 'zygosity' column if 'alt_freq' column is present,
+        and 'n_zygosity' if 'n_alt_freq' is present.
 
         Parameters
         ----------
-        min_freq : float
-            Return only variants with alt allele frequency of at least this
+        het_freq : float
+            Assign zygosity 0.5 (heterozygous), otherwise 0.0 (i.e. reference
+            genotype), to variants with alt allele frequency of at least this
             value.
-        max_freq : float
-            Return only variants with alt allele frequency of at most this
-            value.
+        hom_freq : float
+            Assign zygosity 1.0 (homozygous) to variants with alt allele
+            frequency of at least this value.
+        """
+        assert 0.0 <= het_freq <= hom_freq <= 1.0
+        self = self.copy()  # Don't modify the original
+        for freq_key, zyg_key in (('alt_freq', 'zygosity'),
+                                  ('n_alt_freq', 'n_zygosity')):
+            if zyg_key in self:
+                zyg = np.repeat(0.5, len(self))
+                vals = self[freq_key].values
+                zyg[vals >= hom_freq] = 1.0
+                zyg[vals < het_freq] = 0.0
+                self[zyg_key] = zyg
+        return self
+
+    def heterozygous(self):
+        """Subset to only heterozygous variants.
+
+        Use 'zygosity' or 'n_zygosity' genotype values (if present) to exclude
+        variants with value 0.0 or 1.0.
+        If these columns are missing, or there are no heterozygous variants,
+        then return the full (input) set of variants.
 
         Returns
         -------
@@ -77,27 +98,15 @@ class VariantArray(gary.GenomicArray):
             The subset of `self` with heterozygous genotype, or allele frequency
             between the specified thresholds.
         """
-        idx_het = None
-        if 'zygosity' in self and min_freq is None and max_freq is None:
+        if 'zygosity' in self:
             # Use existing genotype/zygosity info
             zygosity = self['n_zygosity' if 'n_zygosity' in self
                             else 'zygosity']
-            idx_het = (zygosity != 0.0) & (zygosity != 1.0)
-        elif 'alt_freq' in self and (min_freq or max_freq):
-            # Decide zygosity from allele frequency
-            freq = self['n_alt_freq' if 'n_alt_freq' in self
-                        else 'alt_freq']
-            idx_het = True
-            if min_freq:
-                idx_het = idx_het & (freq >= min_freq)
-            if max_freq:
-                idx_het = idx_het & (freq <= max_freq)
-
-        if idx_het is not None and idx_het.any():
-            return self[idx_het]
-        else:
-            # Fallback -- ought to return something
-            return self
+            het_idx = (zygosity != 0.0) & (zygosity != 1.0)
+            if het_idx.any():
+                # Only take het. subset if the subset is not empty
+                self = self[het_idx]
+        return self
 
     def mirrored_baf(self, above_half=None, tumor_boost=False):
         """Mirrored B-allele frequencies (BAFs).
