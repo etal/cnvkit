@@ -9,10 +9,11 @@ import numpy as np
 
 # Import all modules as a smoke test
 import cnvlib
+from cnvlib.genome.gary import GenomicArray
 from cnvlib import (access, antitarget, commands, core, coverage, diagram,
                     export, fix, importers, metrics, ngfrills, params, plots,
                     reference, reports, segmentation, smoothing, tabio,
-                    gary, cnary, vary)
+                    cnary, vary)
 
 
 class GaryTests(unittest.TestCase):
@@ -191,7 +192,7 @@ class CNATests(unittest.TestCase):
     def test_residuals(self):
         cnarr = tabio.read_cna("formats/amplicon.cnr")
         segments = tabio.read_cna("formats/amplicon.cns")
-        regions = gary.GenomicArray(segments.data).drop_extra_columns()
+        regions = GenomicArray(segments.data).drop_extra_columns()
         for arg in (None, segments, regions):
             resid = cnarr.residuals(arg)
             self.assertAlmostEqual(0, resid.mean(), delta=.3)
