@@ -32,7 +32,7 @@ from . import (core, ngfrills, parallel, params, descriptives,
                metrics, plots, reference, reports, segfilters, segmentation,
                target, tabio)
 from .cnary import CopyNumArray as _CNA
-from .gary import GenomicArray as _GA
+from .genome.gary import GenomicArray as _GA
 from ._version import __version__
 
 

@@ -8,7 +8,7 @@ import sys
 
 from . import tabio
 from .params import INSERT_SIZE
-from .gary import GenomicArray as GA
+from .genome.gary import GenomicArray as GA
 
 
 def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):

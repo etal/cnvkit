@@ -9,11 +9,12 @@ import numpy as np
 import pandas as pd
 from scipy.stats import median_test
 
-from . import core, gary, descriptives, params, smoothing
+from . import core, descriptives, params, smoothing
 from .metrics import segment_mean
+from .genome.gary import GenomicArray
 
 
-class CopyNumArray(gary.GenomicArray):
+class CopyNumArray(GenomicArray):
     """An array of genomic intervals, treated like aCGH probes.
 
     Required columns: chromosome, start, end, gene, log2
@@ -27,7 +28,7 @@ class CopyNumArray(gary.GenomicArray):
     # "depth", "gc", "rmask", "spread", "weight", "probes"
 
     def __init__(self, data_table, meta_dict=None):
-        gary.GenomicArray.__init__(self, data_table, meta_dict)
+        GenomicArray.__init__(self, data_table, meta_dict)
 
     @property
     def log2(self):

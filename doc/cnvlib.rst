@@ -32,7 +32,7 @@ manipulations that aren't already provided by methods in the wrapper class.
 ``gary``
 ~~~~~~~~~
 
-.. automodule:: cnvlib.gary
+.. automodule:: cnvlib.genome.gary
     :members:
     :undoc-members:
     :show-inheritance:

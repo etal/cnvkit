@@ -40,6 +40,7 @@ setup_args.update(
     url='http://github.com/etal/cnvkit',
     packages=[
         'cnvlib',
+        'cnvlib.genome',
         'cnvlib.ngfrills',
         'cnvlib.segmentation',
         'cnvlib.tabio',

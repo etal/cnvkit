@@ -10,7 +10,7 @@ import pandas as pd
 from Bio.File import as_handle
 
 from .. import core, ngfrills
-from ..gary import GenomicArray as GA
+from ..genome.gary import GenomicArray as GA
 from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
 from . import bedio, genepred, picard, seg, tab, textcoord, vcfio

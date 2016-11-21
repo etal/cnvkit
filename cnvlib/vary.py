@@ -6,10 +6,10 @@ from past.builtins import basestring
 import numpy as np
 import pandas as pd
 
-from . import gary
+from .genome.gary import GenomicArray
 
 
-class VariantArray(gary.GenomicArray):
+class VariantArray(GenomicArray):
     """An array of genomic intervals, treated as variant loci.
 
     Required columns: chromosome, start, end, ref, alt
@@ -19,7 +19,7 @@ class VariantArray(gary.GenomicArray):
     # Extra: somatic, zygosity, depth, alt_count, alt_freq
 
     def __init__(self, data_table, meta_dict=None):
-        gary.GenomicArray.__init__(self, data_table, meta_dict)
+        GenomicArray.__init__(self, data_table, meta_dict)
 
     def baf_by_ranges(self, ranges, summary_func=pd.Series.median,
                       above_half=None, tumor_boost=True):

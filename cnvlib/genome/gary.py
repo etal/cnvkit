@@ -10,7 +10,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from . import core
+from .. import core
 from ._intersect import _iter_ranges
 from ._merge import _merge
 
@@ -57,6 +57,7 @@ class GenomicArray(object):
                      if meta_dict is not None and len(meta_dict)
                      else {})
 
+    # XXX involve tabio.textcoord here?
     @staticmethod
     def row2label(row):
         return "{}:{}-{}".format(row.chromosome, row.start, row.end)
