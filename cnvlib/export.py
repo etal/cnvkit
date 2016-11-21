@@ -91,19 +91,17 @@ def fmt_jtv(sample_ids, table):
 
 # Special cases
 
-def export_nexus_basic(sample_fname):
+def export_nexus_basic(cnarr):
     """Biodiscovery Nexus Copy Number "basic" format.
 
     Only represents one sample per file.
     """
-    cnarr = tabio.read_cna(sample_fname)
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'gene', 'log2']]
     out_table['probe'] = cnarr.labels()
     return out_table
 
 
-def export_nexus_ogt(sample_fname, vcf_fname, sample_id,
-                     min_depth=20, min_weight=0.0):
+def export_nexus_ogt(cnarr, varr, min_weight=0.0):
     """Biodiscovery Nexus Copy Number "Custom-OGT" format.
 
     To create the b-allele frequencies column, alterate allele frequencies from
@@ -112,16 +110,12 @@ def export_nexus_ogt(sample_fname, vcf_fname, sample_id,
     are all "mirrored" to be above or below .5 (majority rules), then the median
     of those values is taken.
     """
-    cnarr = tabio.read_cna(sample_fname)
     if min_weight and "weight" in cnarr:
         mask_low_weight = (cnarr["weight"] < min_weight)
         logging.info("Dropping %d bins with weight below %f",
                      mask_low_weight.sum(), min_weight)
         cnarr.data = cnarr.data[~mask_low_weight]
-    varr = tabio.read(vcf_fname, "vcf",
-                      sample_id=sample_id or cnarr.sample_id,
-                      min_depth=min_depth, skip_somatic=True)
-    bafs = varr.heterozygous().baf_by_ranges(cnarr)
+    bafs = varr.baf_by_ranges(cnarr)
     logging.info("Placed %d variants into %d bins",
                  sum(~np.isnan(bafs)), len(cnarr))
     out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'log2']]

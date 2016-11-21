@@ -745,8 +745,8 @@ P_fix.set_defaults(func=_cmd_fix)
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     cnarr = tabio.read_cna(args.filename)
-    variants = (tabio.read(args.vcf, "vcf", skip_somatic=True)
-                if args.vcf else None)
+    variants = load_het_snps(args.vcf, args.sample_id, args.normal_id,
+                             args.min_variant_depth, args.zygosity_freq)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
                                            variants=variants,
                                            skip_low=args.drop_low_coverage,
@@ -779,9 +779,6 @@ P_segment.add_argument('-m', '--method',
 P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
                 accept breakpoints during segmentation.""")
-P_segment.add_argument('-v', '--vcf',
-        help="""VCF file name containing variants for segmentation by allele
-                frequencies.""")
 P_segment.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
@@ -797,6 +794,28 @@ P_segment.add_argument('-p', '--processes', type=int, default=1,
         help="""Number of subprocesses to segment in parallel.
                 Give 0 or a negative value to use the maximum number
                 of available CPUs. [Default: use 1 process]""")
+
+P_segment_vcf = P_segment.add_argument_group(
+    "To additionally segment SNP b-allele frequencies")
+P_segment_vcf.add_argument('-v', '--vcf', metavar="FILENAME",
+        help="""VCF file name containing variants for segmentation by allele
+                frequencies.""")
+P_segment_vcf.add_argument('-i', '--sample-id',
+        help="""Specify the name of the sample in the VCF (-v/--vcf) to use for
+                b-allele frequency extraction and as the default plot title.""")
+P_segment_vcf.add_argument('-n', '--normal-id',
+        help="""Corresponding normal sample ID in the input VCF (-v/--vcf).
+                This sample is used to select only germline SNVs to plot
+                b-allele frequencies.""")
+P_segment_vcf.add_argument('--min-variant-depth', type=int, default=20,
+        help="""Minimum read depth for a SNV to be displayed in the b-allele
+                frequency plot. [Default: %(default)s]""")
+P_segment_vcf.add_argument('-z', '--zygosity-freq',
+        metavar='ALT_FREQ', nargs='?', type=float, const=0.25,
+        help="""Ignore VCF's genotypes (GT field) and instead infer zygosity
+                from allele frequencies.  [Default if used without a number:
+                %(const)s]""")
+
 P_segment.set_defaults(func=_cmd_segment)
 
 
@@ -810,13 +829,13 @@ def _cmd_call(args):
     cnarr = tabio.read_cna(args.filename)
     if args.center:
         cnarr.center_all(args.center)
+    varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
+                         args.min_variant_depth, args.zygosity_freq)
     is_sample_female = (verify_gender_arg(cnarr, args.gender,
                                           args.male_reference)
                         if args.purity and args.purity < 1.0
                         else None)
-    vcf = (tabio.read(args.vcf, "vcf", skip_somatic=True)
-           if args.vcf else None)
-    cnarr = do_call(cnarr, vcf, args.method, args.ploidy, args.purity,
+    cnarr = do_call(cnarr, varr, args.method, args.ploidy, args.purity,
                     args.male_reference, is_sample_female, args.filters,
                     args.thresholds)
     tabio.write(cnarr, args.output or cnarr.sample_id + '.call.cns')
@@ -839,7 +858,6 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
                 filters.remove(filt)
 
     if variants:
-        variants = variants.heterozygous()
         outarr["baf"] = variants.baf_by_ranges(outarr)
 
     if purity and purity < 1.0:
@@ -893,21 +911,6 @@ def csvstring(text):
     return tuple(map(float, text.split(",")))
 
 
-def verify_gender_arg(cnarr, gender_arg, is_male_reference):
-    is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
-    if gender_arg:
-        is_sample_female_given = (gender_arg.lower() not in ["m", "male"])
-        if is_sample_female != is_sample_female_given:
-            logging.info("Sample gender specified as %s "
-                         "but chrX copy number looks like %s",
-                         gender_arg,
-                         "female" if is_sample_female else "male")
-            is_sample_female = is_sample_female_given
-    logging.info("Treating sample gender as %s",
-                 "female" if is_sample_female else "male")
-    return is_sample_female
-
-
 P_call = AP_subparsers.add_parser('call', help=_cmd_call.__doc__)
 P_call.add_argument('filename',
         help="Copy ratios (.cnr or .cns).")
@@ -932,9 +935,6 @@ P_call.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_call.add_argument("--purity", type=float,
         help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
-P_call.add_argument('-v', '--vcf',
-        help="""VCF file name containing variants for assigning allele
-                frequencies and copy number.""")
 P_call.add_argument("-g", "--gender",
         choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
@@ -946,6 +946,28 @@ P_call.add_argument('-y', '--male-reference', action='store_true',
                 of chrX is 1; chrY is haploid for either gender reference.""")
 P_call.add_argument('-o', '--output',
         help="Output table file name (CNR-like table of segments, .cns).")
+
+P_call_vcf = P_call.add_argument_group(
+    "To additionally process SNP b-allele frequencies for allelic copy number")
+P_call_vcf.add_argument('-v', '--vcf', metavar="FILENAME",
+        help="""VCF file name containing variants for calculation of b-allele
+                frequencies.""")
+P_call_vcf.add_argument('-i', '--sample-id',
+        help="""Name of the sample in the VCF (-v/--vcf) to use for b-allele
+                frequency extraction.""")
+P_call_vcf.add_argument('-n', '--normal-id',
+        help="""Corresponding normal sample ID in the input VCF (-v/--vcf).
+                This sample is used to select only germline SNVs to calculate
+                b-allele frequencies.""")
+P_call_vcf.add_argument('--min-variant-depth', type=int, default=20,
+        help="""Minimum read depth for a SNV to be used in the b-allele
+                frequency calculation. [Default: %(default)s]""")
+P_call_vcf.add_argument('-z', '--zygosity-freq',
+        metavar='ALT_FREQ', nargs='?', type=float, const=0.25,
+        help="""Ignore VCF's genotypes (GT field) and instead infer zygosity
+                from allele frequencies.  [Default if used without a number:
+                %(const)s]""")
+
 P_call.set_defaults(func=_cmd_call)
 
 
@@ -1004,21 +1026,8 @@ def _cmd_scatter(args):
                           ) if args.filename else None
     segarr = tabio.read_cna(args.segment, sample_id=args.sample_id
                            ) if args.segment else None
-    if args.vcf:
-        varr = tabio.read(args.vcf, "vcf",
-                          sample_id=args.sample_id, normal_id=args.normal_id,
-                          min_depth=args.min_variant_depth, skip_somatic=True)
-        logging.warn('%r', args.zygosity_freq)
-        if args.zygosity_freq is not None:
-            varr = varr.zygosity_from_freq(args.zygosity_freq,
-                                           1 - args.zygosity_freq)
-        orig_len = len(varr)
-        varr = varr.heterozygous()
-        logging.info("Kept %d heterozygous of %d VCF records",
-                     len(varr), orig_len)
-    else:
-        varr = None
-
+    varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
+                         args.min_variant_depth, args.zygosity_freq)
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
             for region in tabio.read_auto(args.range_list).coords():
@@ -1186,24 +1195,6 @@ P_scatter.add_argument('filename', nargs="?",
                 of the 'fix' sub-command.""")
 P_scatter.add_argument('-s', '--segment', metavar="FILENAME",
         help="Segmentation calls (.cns), the output of the 'segment' command.")
-P_scatter.add_argument('-v', '--vcf', metavar="FILENAME",
-        help="""VCF file name containing variants to plot for SNV b-allele
-                frequencies.""")
-P_scatter.add_argument("-i", "--sample-id",
-        help="""Specify the name of the sample in the VCF (-v/--vcf) to use for
-                b-allele frequency extraction and as the default plot title.""")
-P_scatter.add_argument("-n", "--normal-id",
-        help="""Corresponding normal sample ID in the input VCF (-v/--vcf).
-                This sample is used to select only germline SNVs to plot
-                b-allele frequencies.""")
-P_scatter.add_argument('-m', '--min-variant-depth', type=int, default=20,
-        help="""Minimum read depth for a SNV to be displayed in the b-allele
-                frequency plot. [Default: %(default)s]""")
-P_scatter.add_argument('-z', '--zygosity-freq', metavar="ALT_FREQ",
-        nargs='?', const=0.25, type=float,
-        help="""Ignore VCF's genotypes (GT field) and instead infer zygosity
-                from allele frequencies.  [Default if used without a number:
-                %(const)s]""")
 P_scatter.add_argument('-c', '--chromosome', metavar="RANGE",
         help="""Chromosome (e.g. 'chr1') or chromosomal range (e.g.
                 'chr1:2333000-2444000') to display. If a range is given,
@@ -1217,26 +1208,49 @@ P_scatter.add_argument('-l', '--range-list',
                 -c/--chromosome for each listed region, combined into a
                 multi-page PDF.  The output filename must also be
                 specified (-o/--output).""")
-P_scatter.add_argument('-b', '--background-marker', metavar='CHARACTER',
-        default=None,
-        help="""Plot antitargets using this symbol when plotting in a selected
-                chromosomal region (-g/--gene or -c/--chromosome).
-                [Default: same as targets]""")
-P_scatter.add_argument('--segment-color', default=plots.SEG_COLOR,
-        help="""Plot segment lines in this color. Value can be any string
-                accepted by matplotlib.""")
-P_scatter.add_argument('-t', '--trend', action='store_true',
-        help="Draw a smoothed local trendline on the scatter plot.")
-P_scatter.add_argument('--title',
-        help="Plot title. [Default: sample ID, from filename or -i]")
 P_scatter.add_argument('-w', '--width', type=float, default=1e6,
         help="""Width of margin to show around the selected gene or chromosomal
                 region (-g/--gene or -c/--chromosome). [Default: %(default)d]
                 """)
-P_scatter.add_argument('--y-min', type=float, help="y-axis lower limit.")
-P_scatter.add_argument('--y-max', type=float, help="y-axis upper limit.")
 P_scatter.add_argument('-o', '--output', metavar="FILENAME",
         help="Output PDF file name.")
+
+P_scatter_aes = P_scatter.add_argument_group("Plot aesthetics")
+P_scatter_aes.add_argument('-b', '--background-marker', metavar='CHARACTER',
+        default=None,
+        help="""Plot antitargets using this symbol when plotting in a selected
+                chromosomal region (-g/--gene or -c/--chromosome).
+                [Default: same as targets]""")
+P_scatter_aes.add_argument('--segment-color', default=plots.SEG_COLOR,
+        help="""Plot segment lines in this color. Value can be any string
+                accepted by matplotlib.""")
+P_scatter_aes.add_argument('--title',
+        help="Plot title. [Default: sample ID, from filename or -i]")
+P_scatter_aes.add_argument('-t', '--trend', action='store_true',
+        help="Draw a smoothed local trendline on the scatter plot.")
+P_scatter_aes.add_argument('--y-min', type=float, help="y-axis lower limit.")
+P_scatter_aes.add_argument('--y-max', type=float, help="y-axis upper limit.")
+
+P_scatter_vcf = P_scatter.add_argument_group(
+    "To plot SNP b-allele frequencies")
+P_scatter_vcf.add_argument('-v', '--vcf', metavar="FILENAME",
+        help="""VCF file name containing variants to plot for SNV b-allele
+                frequencies.""")
+P_scatter_vcf.add_argument('-i', '--sample-id',
+        help="""Name of the sample in the VCF to use for b-allele frequency
+                extraction and as the default plot title.""")
+P_scatter_vcf.add_argument('-n', '--normal-id',
+        help="""Corresponding normal sample ID in the input VCF. This sample is
+                used to select only germline SNVs to plot.""")
+P_scatter_vcf.add_argument('-m', '--min-variant-depth', type=int, default=20,
+        help="""Minimum read depth for a SNV to be used in the b-allele
+                frequency calculation. [Default: %(default)s]""")
+P_scatter_vcf.add_argument('-z', '--zygosity-freq',
+        metavar='ALT_FREQ', nargs='?', type=float, const=0.25,
+        help="""Ignore VCF's genotypes (GT field) and instead infer zygosity
+                from allele frequencies.  [Default if used without a number:
+                %(const)s]""")
+
 P_scatter.set_defaults(func=_cmd_scatter)
 
 
@@ -1931,10 +1945,10 @@ def _cmd_export_theta(args):
     table.to_csv(args.output, sep='\t', index=False)
     logging.info("Wrote %s", args.output)
     if args.vcf:
-        variants = tabio.read(args.vcf, "vcf",
-                              sample_id=args.sample_id, # or tumor_cn.sample_id,
-                              normal_id=args.normal_id, min_depth=args.min_depth,
-                              skip_somatic=True)
+        variants = load_het_snps(args.vcf,
+                                 args.sample_id,  # or tumor_cn.sample_id,
+                                 args.normal_id, args.min_variant_depth,
+                                 args.zygosity_freq)
         if not len(variants):
             raise ValueError("VCF contains no usable SNV records")
         try:
@@ -1951,30 +1965,40 @@ P_export_theta = P_export_subparsers.add_parser('theta',
         help=_cmd_export_theta.__doc__)
 P_export_theta.add_argument('tumor_segment',
         help="""Tumor-sample segmentation file from CNVkit (.cns).""")
-P_export_theta.add_argument("-r", "--reference",
+P_export_theta.add_argument('-r', '--reference',
         help="""Reference copy number profile (.cnn), or normal-sample bin-level
                 log2 copy ratios (.cnr). Use if the tumor_segment input file
                 does not contain a "weight" column.""")
-P_export_theta.add_argument("-v", "--vcf",
+P_export_theta.add_argument('-o', '--output', help="Output file name.")
+
+P_extheta_vcf = P_export_theta.add_argument_group(
+    "To also output tables of SNP b-allele frequencies for THetA2")
+P_extheta_vcf.add_argument('-v', '--vcf',
         help="""VCF file containing SNVs observed in both the tumor and normal
                 samples. Tumor sample ID should match the `tumor_segment`
                 filename or be specified with -i/--sample-id.""")
-P_export_theta.add_argument("-i", "--sample-id",
+P_extheta_vcf.add_argument('-i', '--sample-id',
         help="""Specify the name of the tumor sample in the VCF (given with
                 -v/--vcf). [Default: taken the tumor_segment file name]""")
-P_export_theta.add_argument("-n", "--normal-id",
+P_extheta_vcf.add_argument('-n', '--normal-id',
         help="Corresponding normal sample ID in the input VCF.")
-P_export_theta.add_argument('-m', '--min-depth', type=int, default=20,
+P_extheta_vcf.add_argument('-m', '--min-depth', type=int, default=20,
         help="""Minimum read depth for a SNP in the VCF to be counted.
                 [Default: %(default)s]""")
-P_export_theta.add_argument('-o', '--output', help="Output file name.")
+P_extheta_vcf.add_argument('-z', '--zygosity-freq',
+        metavar='ALT_FREQ', nargs='?', type=float, const=0.25,
+        help="""Ignore VCF's genotypes (GT field) and instead infer zygosity
+                from allele frequencies.  [Default if used without a number:
+                %(const)s]""")
+
 P_export_theta.set_defaults(func=_cmd_export_theta)
 
 
 # Nexus "basic" special case: can only represent 1 sample
 def _cmd_export_nb(args):
     """Convert bin-level log2 ratios to Nexus Copy Number "basic" format."""
-    table = export.export_nexus_basic(args.filename)
+    cnarr = tabio.read_cna(args.filename)
+    table = export.export_nexus_basic(cnarr)
     core.write_dataframe(args.output, table)
 
 P_export_nb = P_export_subparsers.add_parser('nexus-basic',
@@ -1989,8 +2013,10 @@ P_export_nb.set_defaults(func=_cmd_export_nb)
 # Nexus "Custom-OGT" special case: can only represent 1 sample
 def _cmd_export_nbo(args):
     """Convert log2 ratios and b-allele freqs to Nexus "Custom-OGT" format."""
-    table = export.export_nexus_ogt(args.filename, args.vcf, args.sample_id,
-                                   args.min_variant_depth, args.min_weight)
+    cnarr = tabio.read_cna(args.filename)
+    varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
+                         args.min_variant_depth, args.zygosity_freq)
+    table = export.export_nexus_ogt(cnarr, varr, args.min_weight)
     core.write_dataframe(args.output, table)
 
 P_export_nbo = P_export_subparsers.add_parser('nexus-ogt',
@@ -2001,12 +2027,19 @@ P_export_nbo.add_argument('filename',
 P_export_nbo.add_argument('vcf',
         help="""VCF of SNVs for the same sample, to calculate b-allele
                 frequencies.""")
-P_export_nbo.add_argument("-i", "--sample-id",
+P_export_nbo.add_argument('-i', '--sample-id',
         help="""Specify the name of the sample in the VCF to use to extract
                 b-allele frequencies.""")
+P_export_nbo.add_argument('-n', '--normal-id',
+        help="Corresponding normal sample ID in the input VCF.")
 P_export_nbo.add_argument('-m', '--min-variant-depth', type=int, default=20,
         help="""Minimum read depth for a SNV to be included in the b-allele
                 frequency calculation. [Default: %(default)s]""")
+P_export_nbo.add_argument('-z', '--zygosity-freq',
+        metavar='ALT_FREQ', nargs='?', type=float, const=0.25,
+        help="""Ignore VCF's genotypes (GT field) and instead infer zygosity
+                from allele frequencies.  [Default if used without a number:
+                %(const)s]""")
 P_export_nbo.add_argument('-w', '--min-weight', type=float, default=0.0,
         help="""Minimum weight (between 0 and 1) for a bin to be included in
                 the output. [Default: %(default)s]""")
@@ -2046,6 +2079,42 @@ def print_version(_args):
 
 P_version = AP_subparsers.add_parser('version', help=print_version.__doc__)
 P_version.set_defaults(func=print_version)
+
+
+# _____________________________________________________________________________
+# Functions reused within this module
+
+def load_het_snps(vcf_fname, sample_id, normal_id, min_variant_depth,
+                  zygosity_freq):
+    if vcf_fname is None:
+        return None
+    varr = tabio.read(vcf_fname, 'vcf',
+                      sample_id=sample_id, # or tumor_cn.sample_id,
+                      normal_id=normal_id,
+                      min_depth=min_variant_depth,
+                      skip_somatic=True)
+    if zygosity_freq is not None:
+        varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)
+    orig_len = len(varr)
+    varr = varr.heterozygous()
+    logging.info("Kept %d heterozygous of %d VCF records",
+                 len(varr), orig_len)
+    return varr
+
+
+def verify_gender_arg(cnarr, gender_arg, is_male_reference):
+    is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
+    if gender_arg:
+        is_sample_female_given = (gender_arg.lower() not in ["m", "male"])
+        if is_sample_female != is_sample_female_given:
+            logging.info("Sample gender specified as %s "
+                         "but chrX copy number looks like %s",
+                         gender_arg,
+                         "female" if is_sample_female else "male")
+            is_sample_female = is_sample_female_given
+    logging.info("Treating sample gender as %s",
+                 "female" if is_sample_female else "male")
+    return is_sample_female
 
 
 # _____________________________________________________________________________
