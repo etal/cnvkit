@@ -431,9 +431,10 @@ def _cmd_access(args):
 @public
 def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
     """List the locations of accessible sequence regions in a FASTA file."""
-    access_regions = access.get_regions(fa_fname)
+    access_regions = _GA.from_rows(access.get_regions(fa_fname))
     for ex_fname in exclude_fnames:
-        access_regions = access.exclude_regions(ex_fname, access_regions)
+        excluded = tabio.read(ex_fname, 'bed3')
+        access_regions = access_regions.subtract(excluded)
     return _GA.from_rows(access.join_regions(access_regions, min_gap_size))
 
 

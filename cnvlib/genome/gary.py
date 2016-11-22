@@ -13,6 +13,7 @@ import pandas as pd
 from .. import core
 from ._intersect import _iter_ranges
 from ._merge import _merge
+from ._subtract import _subtract
 
 
 class GenomicArray(object):
@@ -540,8 +541,7 @@ class GenomicArray(object):
 
     def subtract(self, other):
         """Remove the overlapping regions in `other` from this array."""
-        # TODO
-        return NotImplemented
+        return self.as_dataframe(_subtract(self.data, other.data))
 
     def _get_gene_map(self):
         """Map unique gene names to their indices in this array.

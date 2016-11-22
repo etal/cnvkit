@@ -9,12 +9,9 @@ coordinates of the accessible regions (those between the long spans of N's).
 from __future__ import absolute_import, division, print_function
 from builtins import next, zip
 
-import itertools
 import logging
 
 import numpy as np
-
-from cnvlib.ngfrills import parse_regions
 
 
 def log_this(chrom, run_start, run_end):
@@ -77,18 +74,12 @@ def get_regions(fasta_fname):
             yield log_this(chrom, run_start, cursor)
 
 
-def group_regions_by_chromosome(rows):
-    """Iterate through BED3 rows: (chrom, BED3-rows-in-this-chrom)"""
-    for chrom, rows in itertools.groupby(rows, lambda bed3: bed3[0]):
-        yield chrom, [(start, end) for _chrom, start, end in rows]
-
-
 def join_regions(regions, min_gap_size):
     """Filter regions, joining those separated by small gaps."""
     min_gap_size = min_gap_size or 0
-    for chrom, coords in group_regions_by_chromosome(regions):
+    for chrom, rows in regions.by_chromosome():
         logging.info("%s: Joining over small gaps", chrom)
-        coords = iter(coords)
+        coords = iter(zip(rows['start'], rows['end']))
         prev_start, prev_end = next(coords)
         for start, end in coords:
             gap = start - prev_end
@@ -106,71 +97,3 @@ def join_regions(regions, min_gap_size):
                 yield (chrom, prev_start, prev_end)
                 prev_start, prev_end = start, end
         yield (chrom, prev_start, prev_end)
-
-
-def exclude_regions(bed_fname, access_rows):
-    ex_by_chrom = dict(group_regions_by_chromosome(
-        parse_regions(bed_fname, coord_only=True)))
-    if len(ex_by_chrom) == 0:
-        # Nothing to exclude -> emit the input regions unmodified
-        for row in access_rows:
-            yield row
-    else:
-        # Check if each input region overlaps an excluded region
-        for chrom, a_rows in group_regions_by_chromosome(access_rows):
-            if chrom in ex_by_chrom:
-                logging.info("%s: Subtracting excluded regions", chrom)
-                exclude_rows = iter(ex_by_chrom[chrom])
-                ex_start, ex_end = _next_or_inf(exclude_rows)
-                for a_start, a_end in a_rows:
-                    for row in exclude_in_region(exclude_rows, chrom, a_start,
-                                                 a_end, ex_start, ex_end):
-                        yield row
-            else:
-                logging.info("%s: No excluded regions", chrom)
-                for a_start, a_end in a_rows:
-                    yield (chrom, a_start, a_end)
-
-
-def exclude_in_region(exclude_rows, chrom, a_start, a_end, ex_start, ex_end):
-    """Take region exclusions from an iterable and apply, perhaps recursively.
-
-    Yields
-    ------
-    tuple
-        A pair of tuples:
-            - (accessible chromosome, start, end)
-            - (current exclusion start, end)
-    """
-    # If we've leapfrogged the excluded area, catch up
-    while ex_end <= a_start:
-        ex_start, ex_end = _next_or_inf(exclude_rows)
-    if a_end <= ex_start:
-        # Excluded area does not overlap this one
-        yield (chrom, a_start, a_end)
-    else:
-        # Excluded area overlaps this one -> trim this region
-        logging.info("\tExclusion %s:%d-%d overlaps accessible region %d-%d",
-                     chrom, ex_start, ex_end, a_start, a_end)
-        if ex_start <= a_start:
-            if ex_end < a_end:
-                # Exclusion covers this region's left (start) edge only
-                for row in exclude_in_region(exclude_rows, chrom, ex_end, a_end,
-                                             ex_start, ex_end):
-                    yield row
-            # Otherwise: Exclusion covers the whole region
-        else:
-            yield (chrom, a_start, ex_start)
-            if ex_end < a_end:
-                # Exclusion is in the middle of this region
-                for row in exclude_in_region(exclude_rows, chrom, ex_end,
-                                             a_end, ex_start, ex_end):
-                    yield row
-            # Otherwise: Exclusion covers this region's right (end) edge only
-
-
-def _next_or_inf(iterable):
-    try:
-        return next(iterable)
-    except StopIteration:
-        return float("Inf"), float("Inf")
