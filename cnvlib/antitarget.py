@@ -4,7 +4,6 @@ from builtins import map, next, range
 
 import logging
 import re
-import sys
 
 from . import tabio
 from .params import INSERT_SIZE
@@ -45,7 +44,7 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
                               if not is_canonical.match(c)]
         else:
             # Alternative contigs have long names -- skip them
-            max_tgt_chr_name_len = max(list(map(len, target_chroms)))
+            max_tgt_chr_name_len = max(map(len, target_chroms))
             chroms_to_skip = [c for c in untgt_chroms
                               if len(c) > max_tgt_chr_name_len]
         for untgt_chr in chroms_to_skip:
@@ -61,29 +60,9 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
     backgrounds = find_background_regions(access_chroms, target_chroms,
                                           2 * INSERT_SIZE)
     bg_arr = GA.from_rows(backgrounds)
-    bg_arr.sort()
-
-    # Emit regions as antitarget bins according to avg_bin_size and min_bin_size
-    out_rows = []
-    for chrom, start, end in bg_arr.coords():
-        span = end - start
-        if span >= min_bin_size:
-            nbins = int(round(span / avg_bin_size)) or 1
-            if nbins == 1:
-                out_rows.append((chrom, start, end))
-            else:
-                # Divide the background region into equal-sized bins
-                bin_size = span / nbins
-                bin_start = start
-                bin_end = None
-                for i in range(1, nbins):
-                    bin_end = start + int(i * bin_size)
-                    out_rows.append((chrom, bin_start, bin_end))
-                    bin_start = bin_end
-                out_rows.append((chrom, bin_start, end))
-    out_arr = GA.from_rows(out_rows)
-    out_arr["gene"] = "Background"
-    return out_arr
+    bg_arr = bg_arr.subdivide(avg_bin_size, min_bin_size)
+    bg_arr['gene'] = 'Background'
+    return bg_arr
 
 
 def guess_chromosome_regions(target_chroms, telomere_size):

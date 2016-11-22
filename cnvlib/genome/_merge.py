@@ -13,11 +13,10 @@ import itertools
 import numpy as np
 import pandas as pd
 
-
-# Merge overlapping rows
-# XXX see also target.py
+from ..core import sorter_chrom
 
 def _merge(table, stranded=False, combiners=None):
+    """Merge overlapping rows in a DataFrame."""
     cmb = {
         # # For pandas.Series instances
         # 'start': lambda ser: ser.iat[0],
@@ -41,9 +40,14 @@ def _merge(table, stranded=False, combiners=None):
         if 'strand' not in cmb:
             cmb['strand'] = merge_strands
     table = table.sort_values(groupkey + ['start', 'end'])
-    return (table.groupby(by=groupkey,
-                          as_index=False, group_keys=False, sort=False)
-            .apply(_merge_overlapping, cmb))
+    cmb = {k: v for k, v in cmb.viewitems() if k in table}
+    out = (table.groupby(by=groupkey,
+                         as_index=False, group_keys=False, sort=False)
+           .apply(_merge_overlapping, cmb)
+           .reset_index(drop=True))
+    # Re-sort chromosomes cleverly instead of lexicographically
+    return out.reindex(out.chromosome.apply(sorter_chrom)
+                       .sort_values(kind='mergesort').index)
 
 
 def _merge_overlapping(table, combiners):

@@ -1,8 +1,6 @@
 """Transform bait intervals into targets more suitable for CNVkit."""
 from __future__ import division, absolute_import
-from builtins import zip
-from builtins import str
-from builtins import next
+from builtins import next, zip
 
 import logging
 import collections
@@ -132,7 +130,7 @@ def parse_refflat_line(line):
     # start, end = fields[6:8]
     exon_count, exon_starts, exon_ends = fields[8:11]
     exons = list(zip(exon_starts.rstrip(',').split(','),
-                exon_ends.rstrip(',').split(',')))
+                     exon_ends.rstrip(',').split(',')))
     assert len(exons) == int(exon_count), (
         "Exon count mismatch at %s: file says %s, but counted %d intervals"
         % (name, exon_count, len(exons)))
@@ -265,62 +263,3 @@ def shortest_name(names):
         # Split 'DB|accession' and extract the accession sans-DB
         name = name.split('|')[-1]
     return name
-
-
-# _____________________________________________________________________________
-# Split targets
-
-# ENH - fix overlapping bins at midpoint of overlap? try to equalize bin size?
-#   - or just concatenate the bins & divide evenly?
-#       - do this for adjacent bins too?
-#       e.g. --balance-adjacent
-def split_targets(region_rows, avg_size):
-    """Split large tiled intervals into smaller, consecutive targets.
-
-    For each of the tiled regions:
-
-        - Divide into equal-size (tile_size/avg_size) portions
-        - Emit the (chrom, start, end) coords of each portion
-
-    Bin the regions according to avg_size.
-    """
-    prev_chrom = None
-    prev_start = None
-    prev_end = -1
-    for chrom, start, end, name in region_rows:
-        if (chrom, start, end) == (prev_chrom, prev_start, prev_end):
-            # Skip duplicate regions, even if names differ
-            # ENH - Update the name?
-            logging.info("Duplicate row %s %s:%d-%d", name, chrom, start, end)
-            continue
-        if chrom == prev_chrom and start <= prev_end:
-            if end > prev_end:
-                # Partial overlap: already handled the initial part of this bin
-                start = prev_end
-            else:
-                # Complete overlap: nothing to do on this bin
-                logging.info("Bin %s %s:%s-%s fully covered by previous bin"
-                             "%s:%s-%s",
-                             name, chrom, start, end,
-                             prev_chrom, prev_start, prev_end)
-                continue
-        prev_chrom = chrom
-        prev_start = start
-        span = end - start
-        if span >= avg_size * 1.5:
-            logging.info("Splitting: %s %s",
-                         name.ljust(15), str(end - start + 1).rjust(6))
-            # Divide the background region into equal-sized bins
-            nbins = round(span / avg_size) or 1
-            bin_size = span / nbins
-            # Locate & emit background bins
-            bin_start = start
-            while bin_start < (end - 2):
-                bin_end = bin_start + bin_size
-                yield (chrom, int(bin_start), int(bin_end), name)
-                prev_end = int(bin_end)
-                bin_start = bin_end
-        else:
-            yield (chrom, start, end, name)
-            prev_end = end
-

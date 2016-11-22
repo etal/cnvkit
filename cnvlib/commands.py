@@ -390,12 +390,10 @@ def do_targets(bed_fname, annotate=None, do_short_names=False, do_split=False,
     if do_short_names:
         logging.info("Shortening interval labels")
         bed_rows = target.shorten_labels(bed_rows)
+    bed_arr = _GA.from_rows(bed_rows, ['chromosome', 'start', 'end', 'gene'])
     if do_split:
         logging.info("Splitting large targets")
-        bed_rows = target.split_targets(bed_rows, avg_size)
-    bed_arr = _GA.from_rows(bed_rows,
-                             ['chromosome', 'start', 'end', 'gene'])
-    bed_arr.sort()
+        bed_arr = bed_arr.subdivide(avg_size, 0, verbose=True)
     return bed_arr
 
 
@@ -763,6 +761,10 @@ def _cmd_segment(args):
     else:
         segments = results
     tabio.write(segments, args.output or segments.sample_id + '.cns')
+
+
+# For the API
+do_segmentation = public(segmentation.do_segmentation)
 
 
 P_segment = AP_subparsers.add_parser('segment', help=_cmd_segment.__doc__)

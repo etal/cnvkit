@@ -14,6 +14,7 @@ from .. import core
 from ._intersect import _iter_ranges
 from ._merge import _merge
 from ._subtract import _subtract
+from ._subdivide import _subdivide
 
 
 class GenomicArray(object):
@@ -502,11 +503,11 @@ class GenomicArray(object):
 
     def sort(self):
         """Sort this array's bins in-place, with smart chromosome ordering."""
-        table = self.data.copy()
-        table['SORT_KEY'] = self.chromosome.apply(core.sorter_chrom)
-        table.sort_values(by=['SORT_KEY', 'start'], inplace=True)
-        del table['SORT_KEY']
-        self.data = table.reset_index(drop=True)
+        sort_key = self.data.chromosome.apply(core.sorter_chrom)
+        self.data = (self.data.assign(_sort_key_=sort_key)
+                     .sort_values(by=['_sort_key_', 'start'], kind='mergesort')
+                     .drop('_sort_key_', axis=1)
+                     .reset_index(drop=True))
 
     def sort_columns(self):
         """Sort this array's columns in-place, per class definition."""
@@ -534,10 +535,10 @@ class GenomicArray(object):
         # TODO
         return NotImplemented
 
-    def subdivide(self, avg_size, min_size=0):
+    def subdivide(self, avg_size, min_size=0, verbose=False):
         """Split this array's regions into roughly equal-sized sub-regions."""
-        # TODO
-        return NotImplemented
+        return self.as_dataframe(
+            _subdivide(self.data, avg_size, min_size, verbose))
 
     def subtract(self, other):
         """Remove the overlapping regions in `other` from this array."""
