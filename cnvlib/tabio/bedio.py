@@ -47,14 +47,17 @@ def read_bed(infile):
                                                         "end", "gene", "strand"])
 
 
-# TODO - would these be useful?
 def read_bed3(infile):
     """3-column BED format: chromosome, start, end."""
-    return NotImplemented
+    table = read_bed(infile)
+    return table.loc[:, ['chromosome', 'start', 'end']]
+
 
 def read_bed4(infile):
     """4-column BED format: chromosome, start, end, name."""
-    return NotImplemented
+    table = read_bed(infile)
+    return table.loc[:, ['chromosome', 'start', 'end', 'gene']]
+
 
 def read_bed6(infile):
     """6-column BED format: chromosome, start, end, name, score, strand."""
