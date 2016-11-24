@@ -15,7 +15,7 @@ def log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
     """
     # Round absolute copy numbers to integer values
     if round_to_int:
-        absolutes = np.rint(absolutes)
+        absolutes = absolutes.round()
     # Avoid a logarithm domain error
     ratios = np.log2(np.maximum(absolutes / ploidy, min_abs_val))
     # Adjust sex chromosomes to be relative to the reference

@@ -14,16 +14,14 @@ import numpy as np
 import pandas as pd
 
 from ..core import sorter_chrom
+from ._combiners import first_of, last_of, join_strings, merge_strands
+
 
 def _merge(table, stranded=False, combiners=None):
     """Merge overlapping rows in a DataFrame."""
     cmb = {
-        # # For pandas.Series instances
-        # 'start': lambda ser: ser.iat[0],
-        # 'end': lambda ser: ser.iat[-1],
-        # For Python lists
-        'start': lambda a: a[0],
-        'end': lambda a: a[-1],
+        'start': first_of,
+        'end': last_of,
         'gene': join_strings,
         'accession': join_strings,
     }
@@ -32,8 +30,7 @@ def _merge(table, stranded=False, combiners=None):
     if stranded:
         groupkey = ['chromosome', 'strand']
         if 'strand' not in cmb:
-            # cmb['strand'] = lambda ser: ser.iat[0]  # pd.Series
-            cmb['strand'] = lambda a: a[0]  # Py list
+            cmb['strand'] = first_of
     else:
         # NB: same gene name can appear on alt. contigs
         groupkey = ['chromosome']
@@ -67,8 +64,9 @@ def _merge_overlapping(table, combiners):
                                   table.itertuples(index=False))
     merged_rows = [_squash_tuples(row_group, combiners)
                    for _key, row_group in itertools.groupby(keyed_groups,
-                                                            lambda x: x[0])]
-    return pd.DataFrame.from_records(merged_rows, columns=merged_rows[0]._fields)
+                                                            first_of)]
+    return pd.DataFrame.from_records(merged_rows,
+                                     columns=merged_rows[0]._fields)
 
 
 def _nonoverlapping_groups(table):
@@ -100,33 +98,3 @@ def _squash_tuples(keyed_rows, combiners):
     newfields = {key: combiner([getattr(r, key) for r in rows])
                  for key, combiner in combiners.viewitems()}
     return firsttup._replace(**newfields)
-
-
-# Combiners
-
-def join_strings(elems):
-    """Join a Series of strings by commas."""
-    # TODO if ser elements are also comma-separated, split+uniq those too
-    return ','.join(pd.unique(elems))
-
-
-def merge_strands(elems):
-    strands = set(elems)
-    if len(strands) > 1:
-        return '.'
-    return elems[0]
-
-
-# Combiners -- for pandas.Series instances
-
-# def join_strings(ser):
-#     """Join a Series of strings by commas."""
-#     # TODO if ser elements are also comma-separated, split+uniq those too
-#     return ','.join(ser.unique())
-
-
-# def merge_strands(ser):
-#     strands = ser.drop_duplicates()
-#     if len(strands) > 1:
-#         return '.'
-#     return strands.iat[0]

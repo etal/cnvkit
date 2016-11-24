@@ -197,8 +197,8 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female,
     out = segments.data.loc[:, ["chromosome", "start", "end"]]
     out["label"] = label
     out["ncopies"] = (segments["cn"] if "cn" in segments
-                      else np.rint(call.absolute_pure(segments, ploidy,
-                                                      is_reference_male)))
+                      else call.absolute_pure(segments, ploidy, is_reference_male)
+                           .round().astype('int'))
     if show == "ploidy":
         # Skip regions of default ploidy
         out = out[out["ncopies"] != ploidy]
@@ -269,7 +269,7 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
         abs_dframe = call.absolute_dataframe(segments, ploidy, 1.0,
                                              is_reference_male,
                                              is_sample_female)
-        out_dframe["ncopies"] = np.rint(abs_dframe["absolute"])
+        out_dframe["ncopies"] = abs_dframe["absolute"].round().astype('int')
         abs_expect = abs_dframe["expect"]
     idx_losses = (out_dframe["ncopies"] < abs_expect)
 

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .. import core
-from ._intersect import _iter_ranges
+from ._intersect import _by_ranges, _into_ranges, _iter_ranges
 from ._merge import _merge
 from ._subtract import _subtract
 from ._subdivide import _subdivide
@@ -257,18 +257,12 @@ class GenomicArray(object):
         tuple
             (other bin, GenomicArray of overlapping rows in self)
         """
-        chrom_lookup = dict(self.by_chromosome())
-        for chrom, bin_rows in other.by_chromosome():
-            if chrom in chrom_lookup:
-                subranges = _iter_ranges(chrom_lookup[chrom].data, None,
-                                         bin_rows['start'], bin_rows['end'],
-                                         mode)
-                for bin_row, subrange in zip(bin_rows, subranges):
-                    yield bin_row, self.as_dataframe(subrange)
-            else:
-                if keep_empty:
-                    for bin_row in bin_rows:
-                        yield bin_row, self.as_rows([])
+        for bin_row, subrange in _by_ranges(self.data, other.data,
+                                            mode, keep_empty):
+            if len(subrange):
+                yield bin_row, self.as_dataframe(subrange)
+            elif keep_empty:
+                yield bin_row, self.as_rows(subrange)
 
     def coords(self, also=()):
         """Iterate over plain coordinates of each bin: chromosome, start, end.
@@ -360,45 +354,49 @@ class GenomicArray(object):
         table = pd.concat(_iter_ranges(self.data, chrom, starts, ends, mode))
         return self.as_dataframe(table)
 
-    def match_to_bins(self, other, key, default=0.0, fill=False,
-                      summary_func=np.median):
-        """Take values of the other array at each of this array's bins.
+    def into_ranges(self, other, column, default, summary_func=None):
+        """Re-bin values from `column` into the corresponding ranges in `other`.
 
-        For example, group SNVs (other) by CNV segments (self) and calculate the
-        median of each SNV group's allele frequencies.
+        Match overlapping/intersecting rows from `other` to each row in `self`.
+        Then, within each range in `other`, extract the value(s) from `column`
+        in `self`, using the function `summary_func` to produce a single value
+        if multiple bins in `self` map to a single range in `other`.
+
+        For example, group SNVs (self) by CNV segments (other) and calculate the
+        median (summary_func) of each SNV group's allele frequencies.
 
         Parameters
         ----------
         other : GenomicArray
-        key : str
-            Column name containing the values to be summarized within each bin.
-        default : object
-            Value assigned to indices that fall outside the `other` array's bins,
-            or chromosomes that appear in `self` but not `other`. Should be the
-            same type as the column specified by `key`, or compatible.
-        fill : bool
-            Not used.
-        summary_func : callable
-            Function to summarize the `key` values in `other` within each of
-            the ranges in `self`. A descriptive statistic; default median.
+            Bins to
+        column : string
+            Column name in `self` to extract values from.
+        default
+            Value to assign to indices in `other` that do not overlap any bins in
+            `self`. Type should be the same as or compatible with the output
+            field specified by `column`, or the output of `summary_func`.
+        summary_func : callable, dict of string-to-callable, or None
+            Specify how to reduce 1 or more `other` rows into a single value for
+            the corresponding row in `self`.
+
+                - If callable, apply to the `column` field each group of rows in
+                  `other` column.
+                - If a single-element dict of column name to callable, apply to that
+                  field in `other` instead of `column`.
+                - If None, use an appropriate summarizing function for the datatype
+                  of the `column` column in `other` (e.g. median of numbers,
+                  concatenation of strings).
+                - If some other value, assign that value to `self` wherever there is
+                  an overlap.
 
         Returns
         -------
-        array
-            The `key` column values in `other` corresponding to this array's bin
-            locations, the same length as `self`.
+        pd.Series
+            The extracted and summarized values from `self` corresponding to
+            other's genomic ranges, the same length as `other`.
         """
-        def rows2value(rows):
-            if len(rows) == 0:
-                return default
-            elif len(rows) == 1:
-                return rows[0, key]
-            else:
-                return summary_func(rows[key])
-
-        all_out_vals = [rows2value(other_rows) for _bin, other_rows in
-                        other.by_ranges(self, mode='outer', keep_empty=True)]
-        return np.asarray(all_out_vals)
+        return _into_ranges(self.data, other.data, column, default,
+                            summary_func)
 
     # Modification
 

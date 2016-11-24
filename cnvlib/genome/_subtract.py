@@ -13,22 +13,23 @@ import logging
 
 import pandas as pd
 
+from ._intersect import _by_shared_chroms
+
 
 def _subtract(table, other):
     if not len(other):
         return table
 
-    other_chroms = {c: o for c, o in other.groupby(['chromosome'], sort=False)}
     done_chroms = []
-    for chrom, ctable in table.groupby('chromosome', sort=False):
-        if chrom in other_chroms:
-            logging.info("%s: Subtracting excluded regions", chrom)
-            newrows = subtract_chrom(ctable, other_chroms[chrom])
-            done_chroms.append(
-                pd.DataFrame.from_records(newrows, columns=table.columns))
-        else:
+    for chrom, ctable, otable in _by_shared_chroms(table, other):
+        if otable is None:
             logging.info("%s: No excluded regions", chrom)
             done_chroms.append(ctable)
+        else:
+            logging.info("%s: Subtracting excluded regions", chrom)
+            newrows = subtract_chrom(ctable, otable)
+            done_chroms.append(
+                pd.DataFrame.from_records(newrows, columns=table.columns))
 
     return pd.concat(done_chroms)
 

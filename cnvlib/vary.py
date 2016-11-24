@@ -1,7 +1,6 @@
 """An array of genomic intervals, treated as variant loci."""
 from __future__ import absolute_import, division, print_function
-from builtins import map, next, str, zip
-from past.builtins import basestring
+from builtins import str
 
 import numpy as np
 import pandas as pd
@@ -21,21 +20,19 @@ class VariantArray(GenomicArray):
     def __init__(self, data_table, meta_dict=None):
         GenomicArray.__init__(self, data_table, meta_dict)
 
-    def baf_by_ranges(self, ranges, summary_func=pd.Series.median,
-                      above_half=None, tumor_boost=True):
+    def baf_by_ranges(self, ranges, summary_func=np.nanmedian, above_half=None,
+                      tumor_boost=True):
         """Aggregate variant (b-allele) frequencies in each given bin.
 
         Get the average BAF in each of the bins of another genomic array:
-        BAFs are mirrored (see `mirrored_baf`), grouped in each bin of `ranges`,
-        and summarized with `summary_func`, by default the median.
+        BAFs are mirrored above/below 0.5 (per `above_half`), grouped in each
+        bin of `ranges`, and summarized into one value per bin with
+        `summary_func` (default median).
 
         Parameters
         ----------
         ranges : GenomicArray or subclass
             Bins for grouping the variants in `self`.
-        summary_func : callable
-            Function to reduce BAF values to one number; by default the mirrored
-            BAF median.
         above_half : bool
             The same as in `mirrored_baf`.
         tumor_boost : bool
@@ -47,14 +44,13 @@ class VariantArray(GenomicArray):
             Average b-allele frequency in each range; same length as `ranges`.
             May contain NaN values where no variants overlap a range.
         """
-        if tumor_boost and "n_alt_freq" in self:
+        def summarize(vals):
+            return summary_func(_mirrored_baf(vals, above_half))
+
+        if tumor_boost and 'n_alt_freq' in self:
             self = self.copy()
-            self["alt_freq"] = self.tumor_boost()
-        return np.asarray([
-            (summary_func(_mirrored_baf(subvarr["alt_freq"], above_half))
-             if len(subvarr) else np.nan)
-            for _bin, subvarr in self.by_ranges(ranges, mode='outer',
-                                                keep_empty=True)])
+            self['alt_freq'] = self.tumor_boost()
+        return self.into_ranges(ranges, 'alt_freq', np.nan, summarize)
 
     def zygosity_from_freq(self, het_freq=0.0, hom_freq=1.0):
         """Set zygosity (genotype) according to allele frequencies.
