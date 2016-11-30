@@ -14,10 +14,10 @@ import numpy as np
 import pandas as pd
 
 from ..core import sorter_chrom
-from ._combiners import first_of, last_of, join_strings, merge_strands
+from .combiners import first_of, last_of, join_strings, merge_strands
 
 
-def _merge(table, stranded=False, combiners=None):
+def merge(table, stranded=False, combiners=None):
     """Merge overlapping rows in a DataFrame."""
     cmb = {
         'start': first_of,

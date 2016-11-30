@@ -13,39 +13,39 @@ import logging
 
 import pandas as pd
 
-from ._intersect import _by_shared_chroms
+from .intersect import by_shared_chroms
 
 
-def _subtract(table, other):
+def subtract(table, other):
     if not len(other):
         return table
 
     done_chroms = []
-    for chrom, ctable, otable in _by_shared_chroms(table, other):
+    for chrom, ctable, otable in by_shared_chroms(table, other):
         if otable is None:
             logging.info("%s: No excluded regions", chrom)
             done_chroms.append(ctable)
         else:
             logging.info("%s: Subtracting excluded regions", chrom)
-            newrows = subtract_chrom(ctable, otable)
+            newrows = _subtract_chrom(ctable, otable)
             done_chroms.append(
                 pd.DataFrame.from_records(newrows, columns=table.columns))
 
     return pd.concat(done_chroms)
 
 
-def subtract_chrom(rows, other_rows):
+def _subtract_chrom(rows, other_rows):
     exclude_rows = iter(other_rows.itertuples(index=False))
     ex_start, ex_end = _next_or_inf(exclude_rows)
     for row in rows.itertuples(index=False):
-        for _c, start, end in exclude_in_region(exclude_rows, row.chromosome,
-                                                row.start, row.end,
-                                                ex_start, ex_end):
+        for _c, start, end in _exclude_in_region(exclude_rows, row.chromosome,
+                                                 row.start, row.end,
+                                                 ex_start, ex_end):
             yield row._replace(start=start, end=end)
 
 
 # TODO - rewrite non-recursively (#150)
-def exclude_in_region(exclude_rows, chrom, a_start, a_end, ex_start, ex_end):
+def _exclude_in_region(exclude_rows, chrom, a_start, a_end, ex_start, ex_end):
     """Take region exclusions from an iterable and apply, perhaps recursively.
 
     Yields
@@ -68,7 +68,7 @@ def exclude_in_region(exclude_rows, chrom, a_start, a_end, ex_start, ex_end):
         if ex_start <= a_start:
             if ex_end < a_end:
                 # Exclusion covers this region's left (start) edge only
-                for cse in exclude_in_region(exclude_rows, chrom, ex_end, a_end,
+                for cse in _exclude_in_region(exclude_rows, chrom, ex_end, a_end,
                                              ex_start, ex_end):
                     yield cse
             # Otherwise: Exclusion covers the whole region
@@ -76,8 +76,8 @@ def exclude_in_region(exclude_rows, chrom, a_start, a_end, ex_start, ex_end):
             yield (chrom, a_start, ex_start)
             if ex_end < a_end:
                 # Exclusion is in the middle of this region
-                for cse in exclude_in_region(exclude_rows, chrom, ex_end,
-                                             a_end, ex_start, ex_end):
+                for cse in _exclude_in_region(exclude_rows, chrom, ex_end,
+                                              a_end, ex_start, ex_end):
                     yield cse
             # Otherwise: Exclusion covers this region's right (end) edge only
 

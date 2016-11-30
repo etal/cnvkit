@@ -13,16 +13,16 @@ import logging
 
 import pandas as pd
 
-from ._merge import _merge
+from .merge import merge
 
 
-def _subdivide(table, avg_size, min_size=0, verbose=False):
+def subdivide(table, avg_size, min_size=0, verbose=False):
     return pd.DataFrame.from_records(
-        split_targets(table, avg_size, min_size, verbose),
+        _split_targets(table, avg_size, min_size, verbose),
         columns=table.columns)
 
 
-def split_targets(regions, avg_size, min_size, verbose):
+def _split_targets(regions, avg_size, min_size, verbose):
     """Split large regions into smaller, consecutive regions.
 
     Output bin metadata and additional columns match the input dataframe.
@@ -40,7 +40,7 @@ def split_targets(regions, avg_size, min_size, verbose):
         Print a log message when subdividing a region.
 
     """
-    for row in _merge(regions).itertuples(index=False):
+    for row in merge(regions).itertuples(index=False):
         span = row.end - row.start
         if span >= min_size:
             nbins = int(round(span / avg_size)) or 1

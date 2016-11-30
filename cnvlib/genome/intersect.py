@@ -15,17 +15,16 @@ import logging
 import numpy as np
 import pandas as pd
 
-from ._combiners import first_of, join_strings, make_const
+from .combiners import first_of, join_strings, make_const
 
 
-def _by_ranges(table, other, mode, keep_empty):
+def by_ranges(table, other, mode, keep_empty):
     """Group rows by another GenomicArray's bin coordinate ranges."""
-    for _chrom, bin_rows, src_rows in _by_shared_chroms(other, table,
-                                                        keep_empty):
+    for _chrom, bin_rows, src_rows in by_shared_chroms(other, table,
+                                                       keep_empty):
         if src_rows is not None:
-            subranges = _iter_ranges(src_rows, None,
-                                     bin_rows['start'], bin_rows['end'],
-                                     mode)
+            subranges = iter_ranges(src_rows, None, bin_rows['start'],
+                                    bin_rows['end'], mode)
             for bin_row, subrange in zip(bin_rows.itertuples(index=False),
                                          subranges):
                 yield bin_row, subrange
@@ -34,7 +33,7 @@ def _by_ranges(table, other, mode, keep_empty):
                 yield bin_row, []  # ENH: empty dframe matching table
 
 
-def _by_shared_chroms(table, other, keep_empty=True):
+def by_shared_chroms(table, other, keep_empty=True):
     other_chroms = {c: o for c, o in other.groupby(['chromosome'], sort=False)}
     for chrom, ctable in table.groupby(['chromosome'], sort=False):
         if chrom in other_chroms:
@@ -44,7 +43,7 @@ def _by_shared_chroms(table, other, keep_empty=True):
             yield chrom, ctable, None
 
 
-def _into_ranges(source, dest, src_col, default, summary_func):
+def into_ranges(source, dest, src_col, default, summary_func):
     """Assign to `dest` from aligned rows in `source`."""
     if summary_func is None:
         # Choose a type-appropriate summary function
@@ -66,11 +65,11 @@ def _into_ranges(source, dest, src_col, default, summary_func):
 
     return pd.Series([(series2value(src_rows[src_col])
                        if len(src_rows) else default)
-                      for _bin, src_rows in _by_ranges(source, dest,
-                                                       'outer', True)])
+                      for _bin, src_rows in by_ranges(source, dest, 'outer',
+                                                      True)])
 
 
-def _iter_ranges(table, chrom, starts, ends, mode):
+def iter_ranges(table, chrom, starts, ends, mode):
     """Iterate through sub-ranges."""
     assert mode in ('inner', 'outer', 'trim')
     # Optional if we've already subsetted by chromosome (not checked!)

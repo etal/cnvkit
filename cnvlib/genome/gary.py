@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 
 from .. import core
-from ._intersect import _by_ranges, _into_ranges, _iter_ranges
-from ._merge import _merge
-from ._subtract import _subtract
-from ._subdivide import _subdivide
+from .intersect import by_ranges, into_ranges, iter_ranges
+from .merge import merge
+from .subtract import subtract
+from .subdivide import subdivide
 
 
 class GenomicArray(object):
@@ -257,8 +257,8 @@ class GenomicArray(object):
         tuple
             (other bin, GenomicArray of overlapping rows in self)
         """
-        for bin_row, subrange in _by_ranges(self.data, other.data,
-                                            mode, keep_empty):
+        for bin_row, subrange in by_ranges(self.data, other.data,
+                                           mode, keep_empty):
             if len(subrange):
                 yield bin_row, self.as_dataframe(subrange)
             elif keep_empty:
@@ -318,7 +318,7 @@ class GenomicArray(object):
             start = [int(start)]
         if isinstance(end, (int, np.int64, float, np.float64)):
             end = [int(end)]
-        results = _iter_ranges(self.data, chrom, start, end, mode)
+        results = iter_ranges(self.data, chrom, start, end, mode)
         return self.as_dataframe(next(results))
 
     def in_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
@@ -351,7 +351,7 @@ class GenomicArray(object):
             Concatenation of all the subsets of `self` enclosed by the specified
             ranges.
         """
-        table = pd.concat(_iter_ranges(self.data, chrom, starts, ends, mode))
+        table = pd.concat(iter_ranges(self.data, chrom, starts, ends, mode))
         return self.as_dataframe(table)
 
     def into_ranges(self, other, column, default, summary_func=None):
@@ -395,8 +395,7 @@ class GenomicArray(object):
             The extracted and summarized values from `self` corresponding to
             other's genomic ranges, the same length as `other`.
         """
-        return _into_ranges(self.data, other.data, column, default,
-                            summary_func)
+        return into_ranges(self.data, other.data, column, default, summary_func)
 
     # Modification
 
@@ -526,7 +525,7 @@ class GenomicArray(object):
 
     def merge(self, combiners=None):
         """Merge overlapping regions into single rows, similar to bedtools merge."""
-        return self.as_dataframe(_merge(self.data, combiners=combiners))
+        return self.as_dataframe(merge(self.data, combiners=combiners))
 
     def resize_ranges(self, bp, chrom_sizes=None):
         """Resize each genomic bin by a fixed number of bases at each end.
@@ -565,12 +564,12 @@ class GenomicArray(object):
 
     def subdivide(self, avg_size, min_size=0, verbose=False):
         """Split this array's regions into roughly equal-sized sub-regions."""
-        return self.as_dataframe(
-            _subdivide(self.data, avg_size, min_size, verbose))
+        return self.as_dataframe(subdivide(self.data, avg_size, min_size,
+                                           verbose))
 
     def subtract(self, other):
         """Remove the overlapping regions in `other` from this array."""
-        return self.as_dataframe(_subtract(self.data, other.data))
+        return self.as_dataframe(subtract(self.data, other.data))
 
     def _get_gene_map(self):
         """Map unique gene names to their indices in this array.

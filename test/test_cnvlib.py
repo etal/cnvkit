@@ -9,7 +9,7 @@ import numpy as np
 
 # Import all modules as a smoke test
 import cnvlib
-from cnvlib.genome.gary import GenomicArray
+from cnvlib.genome import GenomicArray
 from cnvlib import (access, antitarget, commands, core, coverage, diagram,
                     export, fix, importers, metrics, ngfrills, params, plots,
                     reference, reports, segmentation, smoothing, tabio,

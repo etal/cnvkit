@@ -4,7 +4,7 @@ import pandas as pd
 from Bio.File import as_handle
 
 from .. import ngfrills
-from ..genome.gary import GenomicArray as GA
+from ..genome import GenomicArray as GA
 
 
 def read_text(infile):

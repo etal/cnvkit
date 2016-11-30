@@ -5,7 +5,7 @@ from builtins import str
 import numpy as np
 import pandas as pd
 
-from .genome.gary import GenomicArray
+from .genome import GenomicArray
 
 
 class VariantArray(GenomicArray):
