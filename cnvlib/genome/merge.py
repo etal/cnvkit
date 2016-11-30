@@ -7,6 +7,7 @@ GenomicArray types.
 
 """
 from __future__ import print_function, absolute_import, division
+from builtins import zip
 
 import itertools
 
@@ -60,8 +61,8 @@ def _merge_overlapping(table, combiners):
     # advantage of the grouping and sorting already done, and don't repeat
     # pandas' traversal and inferences.
     # ENH: Find & use a lower-level, 1-pass pandas function
-    keyed_groups = itertools.izip(_nonoverlapping_groups(table),
-                                  table.itertuples(index=False))
+    keyed_groups = zip(_nonoverlapping_groups(table),
+                       table.itertuples(index=False))
     merged_rows = [_squash_tuples(row_group, combiners)
                    for _key, row_group in itertools.groupby(keyed_groups,
                                                             first_of)]
