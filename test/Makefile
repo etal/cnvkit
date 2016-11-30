@@ -23,7 +23,7 @@ picard_targets= build/reference-picard.cnn $(picard_cnrs) $(picard_segs) \
 # ------------------------------------------------------------------------------
 #  Action!
 
-all: $(picard_targets) p2-5_5-metrics.txt p2-9_2-metrics.txt p2-20-metrics.csv
+all: $(picard_targets) p2-5_5-metrics.tsv p2-9_2-metrics.tsv p2-20-metrics.tsv
 
 
 .PHONY: clean
@@ -117,10 +117,10 @@ p2-9_2-gainloss.txt: build/p2-9_2.cns build/p2-9_2.cnr
 gender-picard.txt: build/p2-5_5.cnr  build/p2-5_5.cns build/p2-9_2.cnr build/p2-9_2.cns build/p2-20_5.cnr build/p2-20_5.cns
 	$(cnvkit) gender -y $^ -o $@
 
-p2-5_5-metrics.txt p2-9_2-metrics.txt: %-metrics.txt: build/%.cnr build/%.cns
+p2-5_5-metrics.tsv p2-9_2-metrics.tsv: %-metrics.tsv: build/%.cnr build/%.cns
 	$(cnvkit) metrics  $< -s $(lastword $^) -o $@
 
-p2-20-metrics.csv: $(addprefix build/p2-20_,$(addsuffix .cns,1 2 3 4 5))
+p2-20-metrics.tsv: $(addprefix build/p2-20_,$(addsuffix .cns,1 2 3 4 5))
 	$(cnvkit) metrics $(^:.cns=.cnr) -s $^ -o $@
 
 p2-9_2-segmetrics.cns: build/p2-9_2.cns build/p2-9_2.cnr
