@@ -37,7 +37,7 @@ def merge(table, stranded=False, combiners=None):
         if 'strand' not in cmb:
             cmb['strand'] = merge_strands
     table = table.sort_values(groupkey + ['start', 'end'])
-    cmb = {k: v for k, v in cmb.viewitems() if k in table}
+    cmb = {k: v for k, v in cmb.items() if k in table}
     out = (table.groupby(by=groupkey,
                          as_index=False, group_keys=False, sort=False)
            .apply(_merge_overlapping, cmb)
@@ -96,5 +96,5 @@ def _squash_tuples(keyed_rows, combiners):
     if len(rows) == 1:
         return firsttup
     newfields = {key: combiner([getattr(r, key) for r in rows])
-                 for key, combiner in combiners.viewitems()}
+                 for key, combiner in combiners.items()}
     return firsttup._replace(**newfields)
