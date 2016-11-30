@@ -528,8 +528,38 @@ class GenomicArray(object):
         """Merge overlapping regions into single rows, similar to bedtools merge."""
         return self.as_dataframe(_merge(self.data, combiners=combiners))
 
+    def resize_ranges(self, bp, chrom_sizes=None):
+        """Resize each genomic bin by a fixed number of bases at each end.
+
+        Bin 'start' values have a minimum of 0, and `chrom_sizes` can
+        specify each chromosome's maximum 'end' value.
+
+        Similar to 'bedtools slop'.
+
+        Parameters
+        ----------
+        bp : int
+            Number of bases in each direction to expand or shrink each bin.
+            Applies to 'start' and 'end' values symmetrically, and may be
+            positive (expand) or negative (shrink).
+        chrom_sizes : dict of string-to-int
+            Chromosome name to length in base pairs. If given, all chromosomes
+            in `self` must be included.
+        """
+        table = self.data
+        limits = dict(lower=0)
+        if chrom_sizes:
+            limits['upper'] = self.chromosome.replace(chrom_sizes)
+        table = table.assign(start=(table['start'] - bp).clip(**limits),
+                             end=(table['end'] + bp).clip(**limits))
+        if bp > 0:
+            # Drop any bins that now have zero or negative size
+            table = table[table['end'] - table['start'] > 0]
+        # Don't modify the original
+        return self.as_dataframe(table.copy())
+
     def squash(self, **kwargs):
-        """Combine some sets of rows, by some criteria, into single rows."""
+        """Combine some groups of rows, by some criteria, into single rows."""
         # TODO
         return NotImplemented
 
