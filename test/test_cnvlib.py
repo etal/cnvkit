@@ -218,8 +218,10 @@ class CNATests(unittest.TestCase):
                 ("formats/tr95t.cns", True, True),
                 ("formats/reference-tr.cnn", False, False),
             ):
-            cnarr = tabio.read_cna(fname)
-            self.assertEqual(sample_is_f, cnarr.guess_xx(ref_is_m))
+            guess = tabio.read_cna(fname).guess_xx(ref_is_m)
+            self.assertEqual(guess, sample_is_f,
+                             "%s: guessed XX %s but is %s"
+                             % (fname, guess, sample_is_f))
 
     def test_residuals(self):
         cnarr = tabio.read_cna("formats/amplicon.cnr")

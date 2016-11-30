@@ -336,7 +336,7 @@ class CopyNumArray(GenomicArray):
             male_stat, m_diff = compare_to_auto(vals + male_shift, weights)
             # Statistic is smaller for similar-median sets
             if female_stat is not None and male_stat is not None:
-                return female_stat / male_stat
+                return female_stat / max(male_stat, 0.01)
             # Difference in medians is also smaller for similar-median sets
             return f_diff / max(m_diff, 0.01)
 
