@@ -78,8 +78,8 @@ Then, run THetA2 (assuming the program was unpacked at ``/path/to/theta2/``)::
 
     # Generates Sample_T.BEST.results:
     /path/to/theta2/bin/RunTHetA Sample_T.interval_count \
-        --TUMOR_SNP Sample_T.tumor.snp_formatted.txt \
-        --NORMAL_SNP Sample_T.normal.snp_formatted.txt \
+        --TUMOR_FILE Sample_T.tumor.snp_formatted.txt \
+        --NORMAL_FILE Sample_T.normal.snp_formatted.txt \
         --BAF --NUM_PROCESSES `nproc` --FORCE
 
 Finally, import THetA2's results back into CNVkit's .cns format, matching the
