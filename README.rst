@@ -114,7 +114,6 @@ these Python packages via ``pip`` or ``conda``:
 - `Pandas <http://pandas.pydata.org/>`_
 - `pyfaidx <https://github.com/mdshw5/pyfaidx>`_
 - `pysam <https://github.com/pysam-developers/pysam>`_
-- `PyVCF <https://github.com/jamescasbon/PyVCF>`_
 
 On Ubuntu or Debian Linux::
 

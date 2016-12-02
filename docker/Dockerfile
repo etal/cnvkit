@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     python-tk \
     r-base-core \
     zlib1g-dev
-RUN pip install future futures pandas pysam pyvcf pyfaidx
+RUN pip install future futures pandas pysam pyfaidx
 RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('PSCBS', 'cghFLasso')"
 RUN pip install cnvkit
 
