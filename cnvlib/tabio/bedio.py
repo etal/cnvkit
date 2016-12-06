@@ -2,10 +2,12 @@
 from __future__ import absolute_import, division, print_function
 from builtins import map, next
 
+import shlex
+
 import pandas as pd
 from Bio.File import as_handle
 
-from .. import ngfrills
+from .util import report_bad_line
 
 
 def read_bed(infile):
@@ -20,7 +22,7 @@ def read_bed(infile):
     after encountering a track line other than the first one in the file.
     """
     # ENH: just pd.read_table, skip 'track'
-    @ngfrills.report_bad_line
+    @report_bad_line
     def _parse_line(line):
         fields = line.split('\t', 6)
         chrom, start, end = fields[:3]
@@ -64,6 +66,42 @@ def read_bed6(infile):
     return NotImplemented
 
 
+def parse_bed_track(line):
+    """Parse the "name" field of a BED track definition line.
+
+    Example:
+    track name=146793_BastianLabv2_P2_target_region description="146793_BastianLabv2_P2_target_region"
+    """
+    fields = shlex.split(line)  # raises ValueError if line is corrupted
+    assert fields[0] == 'track'
+    for field in fields[1:]:
+        if '=' in field:
+            key, val = field.split('=', 1)
+            if key == 'name':
+                return val
+    raise ValueError("No name defined for this track")
+
+
+def group_bed_tracks(bedfile):
+    """Group the parsed rows in a BED file by track.
+
+    Yields (track_name, iterable_of_lines), much like itertools.groupby.
+    """
+    # ENH - make this memory-efficient w/ generators or something
+    with as_handle(bedfile, 'r') as handle:
+        curr_track = 'DEFAULT'
+        curr_lines = []
+        for line in handle:
+            if line.startswith('track'):
+                if curr_lines:
+                    yield curr_track, curr_lines
+                    curr_lines = []
+                curr_track = parse_bed_track(line)
+            else:
+                curr_lines.append(line)
+        yield curr_track, curr_lines
+
+
 # _____________________________________________________________________
 
 def write_bed(dframe):
@@ -85,4 +123,3 @@ def write_bed4(dframe):
     if "gene" not in dframe:
         dframe["gene"] = '-'
     return dframe.loc[:, ["chromosome", "start", "end", "gene"]]
-

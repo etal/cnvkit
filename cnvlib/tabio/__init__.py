@@ -9,11 +9,11 @@ import sys
 import pandas as pd
 from Bio.File import as_handle
 
-from .. import core, ngfrills
+from .. import core
 from ..genome import GenomicArray as GA
 from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
-from . import bedio, genepred, picard, seg, tab, textcoord, vcfio
+from . import bedio, genepred, picard, seg, tab, textcoord, vcfio, util
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
@@ -99,7 +99,7 @@ def read_auto(infile):
                          "seekable (local, on-disk) files, which %s is not"
                          % infile)
 
-    fmt = ngfrills.sniff_region_format(infile)
+    fmt = util.sniff_region_format(infile)
     if hasattr(infile, "seek"):
         infile.seek(0)
     if fmt is None:

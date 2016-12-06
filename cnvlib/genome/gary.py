@@ -10,7 +10,7 @@ from collections import OrderedDict
 import numpy as np
 import pandas as pd
 
-from .. import core
+from .chromsort import sorter_chrom
 from .intersect import by_ranges, into_ranges, iter_ranges
 from .merge import merge
 from .subtract import subtract
@@ -500,7 +500,7 @@ class GenomicArray(object):
 
     def sort(self):
         """Sort this array's bins in-place, with smart chromosome ordering."""
-        sort_key = self.data.chromosome.apply(core.sorter_chrom)
+        sort_key = self.data.chromosome.apply(sorter_chrom)
         self.data = (self.data.assign(_sort_key_=sort_key)
                      .sort_values(by=['_sort_key_', 'start'], kind='mergesort')
                      .drop('_sort_key_', axis=1)

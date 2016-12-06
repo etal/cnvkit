@@ -14,7 +14,7 @@ import itertools
 import numpy as np
 import pandas as pd
 
-from ..core import sorter_chrom
+from .chromsort import sorter_chrom
 from .combiners import first_of, last_of, join_strings, merge_strands
 
 

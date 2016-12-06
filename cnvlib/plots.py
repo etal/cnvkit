@@ -260,10 +260,9 @@ def _smooth_genome_log2(cnarr, smooth_func, width):
     """
     # ENH: also split by centromeres (long internal gaps -- see PSCBS)
     # ENH: use pandas groupby
-    out = {chrom: smooth_func(subcna['log2'], width)
-           for chrom, subcna in cnarr.by_chromosome()}
-    return np.concatenate(
-        [out[chrom] for chrom in sorted(out, key=core.sorter_chrom)])
+    out = [smooth_func(subcna['log2'], width)
+           for _chrom, subcna in cnarr.by_chromosome()]
+    return np.concatenate(out)
 
 
 def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend,

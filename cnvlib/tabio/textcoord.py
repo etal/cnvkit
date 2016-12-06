@@ -3,7 +3,7 @@ from __future__ import absolute_import, division, print_function
 import pandas as pd
 from Bio.File import as_handle
 
-from .. import ngfrills
+from .util import report_bad_line
 from ..genome import GenomicArray as GA
 
 
@@ -14,7 +14,7 @@ def read_text(infile):
 
     Coordinate indexing is assumed to be from 1.
     """
-    @ngfrills.report_bad_line
+    @report_bad_line
     def _parse_line(line):
         fields = line.split(':')
         if len(fields) == 3:
