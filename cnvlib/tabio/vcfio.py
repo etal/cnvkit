@@ -210,7 +210,8 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
     cnt_reject = 0  # For logging
     for record in records:
         is_som = False
-        if skip_reject and record.filter and len(record.filter) > 0:
+        if (skip_reject and record.filter and len(record.filter) > 0
+            and len(set(record.filter) - {'PASS', '.'})):
             cnt_reject += 1
             continue
         if record.info.get("SOMATIC"):

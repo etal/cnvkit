@@ -87,7 +87,9 @@ class IOTests(unittest.TestCase):
                       {'skip_reject': True}):
             v3 = tabio.read(fname, "vcf", **kwarg)
             self.assertLess(len(v3), len(v1))
-            self.assertLess(0, len(v3))
+            self.assertLess(0, len(v3),
+                            "%d variants left after filter %r"
+                            % (len(v3), list(kwarg)[0]))
         # VCF header, no samples, no records
         v4 = tabio.read('formats/nosample.vcf', 'vcf')
         self.assertEqual(len(v4), 0)
