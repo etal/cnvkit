@@ -498,7 +498,7 @@ def _cmd_coverage(args):
     if not args.output:
         # Create an informative but unique name for the coverage output file
         bambase = core.fbase(args.bam_file)
-        bedbase = core.rbase(args.interval)
+        bedbase = core.fbase(args.interval)
         tgtbase = ('antitargetcoverage'
                    if 'anti' in bedbase.lower()
                    else 'targetcoverage')

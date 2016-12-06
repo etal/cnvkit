@@ -207,9 +207,20 @@ def check_unique(items, title):
 
 def fbase(fname):
     """Strip directory and all extensions from a filename."""
-    return os.path.basename(fname).split('.', 1)[0]
-
-
-def rbase(fname):
-    """Strip directory and final extension from a filename."""
-    return os.path.basename(fname).rsplit('.', 1)[0]
+    base = os.path.basename(fname)
+    # Gzip extension usually follows another extension
+    if base.endswith('.gz'):
+        base = base[:-3]
+    # Cases to drop more than just the last dot
+    known_multipart_exts = (
+        '.antitargetcoverage.cnn', '.targetcoverage.cnn',
+        # Pipeline suffixes
+        '.recal.bam', '.deduplicated.realign.bam',
+    )
+    for ext in known_multipart_exts:
+        if base.endswith(ext):
+            base = base[:-len(ext)]
+            break
+    else:
+        base = base.rsplit('.', 1)[0]
+    return base
