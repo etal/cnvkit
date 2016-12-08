@@ -47,6 +47,13 @@ class IOTests(unittest.TestCase):
         self.assertEqual(len(cna), linecount(fname) - 1)
         self.assertEqual(cna.sample_id, "p2-5_5")
 
+    def test_read_refflat(self):
+        """Read the UCSC 'refFlat' format."""
+        fname = "formats/refflat-mini.txt"
+        regions = tabio.read(fname, 'refflat')
+        self.assertEqual(len(regions), linecount(fname))
+        self.assertEqual(13, regions.chromosome.nunique())
+
     def test_read_seg(self):
         """Read the SEG format."""
         for fname, header_len, args in (
