@@ -38,7 +38,7 @@ def read_vcf(infile, sample_id=None, normal_id=None,
 
     sid, nid = _choose_samples(vcf_reader, sample_id, normal_id)
     logging.info("Selected test sample " + str(sid) +
-                 (" and control sample %s" % (nid if nid else '')))
+                 (" and control sample %s" % nid if nid else ''))
     # NB: in-place
     vcf_reader.subset_samples(list(filter(None, (sid, nid))))
 
