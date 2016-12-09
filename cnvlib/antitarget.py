@@ -1,6 +1,6 @@
 """Supporting functions for the 'antitarget' command."""
 from __future__ import absolute_import, division, print_function
-from builtins import map, next, range
+from builtins import map
 
 import logging
 import re
@@ -24,92 +24,54 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
         - Divide into equal-size (region_size/avg_bin_size) portions
         - Emit the (chrom, start, end) coords of each portion
     """
-    target_chroms = dict(tabio.read_auto(target_bed).by_chromosome())
+    targets = tabio.read_auto(target_bed)
+    target_chroms = set(targets.chromosome.unique())
     if access_bed:
         # Chromosomes' accessible sequence regions are given -- use them
-        access_chroms = dict(tabio.read_auto(access_bed).by_chromosome())
-        if access_chroms and set(access_chroms).isdisjoint(target_chroms):
+        accessible = tabio.read_auto(access_bed)
+        access_chroms = set(accessible.chromosome.unique())
+        if access_chroms and access_chroms.isdisjoint(target_chroms):
             raise ValueError("Chromosome names in the accessible regions file "
                              "%s %r do not match those in targets %s %r"
-                             % (access_bed,
-                                tuple(sorted(access_chroms.keys())[:3]),
-                                target_bed,
-                                tuple(sorted(target_chroms.keys())[:3])))
+                             % (access_bed, tuple(sorted(access_chroms)[:3]),
+                                target_bed, tuple(sorted(target_chroms)[:3])))
         # But filter out untargeted alternative contigs and mitochondria
-        untgt_chroms = set(access_chroms) - set(target_chroms)
+        untgt_chroms = access_chroms - target_chroms
         # Autosomes typically have numeric names, allosomes are X and Y
         is_canonical = re.compile(r"(chr)?(\d+|[XYxy])$")
         if any(is_canonical.match(c) for c in target_chroms):
             chroms_to_skip = [c for c in untgt_chroms
                               if not is_canonical.match(c)]
         else:
-            # Alternative contigs have long names -- skip them
+            # Alternative contigs have longer names -- skip them
             max_tgt_chr_name_len = max(map(len, target_chroms))
             chroms_to_skip = [c for c in untgt_chroms
                               if len(c) > max_tgt_chr_name_len]
-        for untgt_chr in chroms_to_skip:
-            logging.info("Skipping untargeted chromosome %s", untgt_chr)
-            del access_chroms[untgt_chr]
+        if chroms_to_skip:
+            logging.info("Skipping untargeted chromosomes %s",
+                         ' '.join(sorted(chroms_to_skip)))
+            skip_idx = accessible.chromosome.isin(chroms_to_skip)
+            accessible = accessible[~skip_idx]
     else:
         # Chromosome accessible sequence regions not known -- use heuristics
         # (chromosome length is endpoint of last probe; skip initial
         # <magic number> of bases that are probably telomeric)
         TELOMERE_SIZE = 150000
-        access_chroms = guess_chromosome_regions(target_chroms, TELOMERE_SIZE)
+        accessible = guess_chromosome_regions(targets, TELOMERE_SIZE)
 
-    backgrounds = find_background_regions(access_chroms, target_chroms,
-                                          2 * INSERT_SIZE)
-    bg_arr = GA.from_rows(backgrounds)
+    pad_size = 2 * INSERT_SIZE
+    bg_arr = (accessible.resize_ranges(-pad_size)
+              .subtract(targets.resize_ranges(pad_size)))
     bg_arr = bg_arr.subdivide(avg_bin_size, min_bin_size)
     bg_arr['gene'] = 'Background'
     return bg_arr
 
 
-def guess_chromosome_regions(target_chroms, telomere_size):
+def guess_chromosome_regions(targets, telomere_size):
     """Determine (minimum) chromosome lengths from target coordinates."""
-    endpoints = [target_region[len(target_region) - 1, 'end']
-                 for _chrom, target_region in target_chroms.items()]
-    whole_chroms = GA.from_columns({"chromosome": list(target_chroms.keys()),
-                                    "start": telomere_size,
-                                    "end": endpoints})
-    return dict(whole_chroms.by_chromosome())
-
-
-def find_background_regions(access_chroms, target_chroms, pad_size):
-    """Take coordinates of accessible regions and targets; emit antitargets."""
-    for chrom, access_arr in access_chroms.items():
-        if chrom in target_chroms:
-            target_regions = target_chroms[chrom].coords()
-
-            # Split each access_region at the targets it contains
-            _, tgt_start, tgt_end = next(target_regions)
-            assert tgt_start < tgt_end
-            for _, acc_start, acc_end in access_arr.coords():
-                if acc_end - acc_start <= 2 * pad_size:
-                    # Accessible region is way too small
-                    continue
-
-                bg_start = acc_start + pad_size
-                while tgt_start < acc_end:
-                    # There may be at least one more target in this region
-                    if tgt_end + pad_size > bg_start:
-                        # Yes, there is a target in this region
-                        if tgt_start - pad_size > bg_start:
-                            # Split the background region at this target
-                            yield (chrom, bg_start, tgt_start - pad_size)
-                        bg_start = tgt_end + pad_size
-
-                    # Done splitting that target; is there another?
-                    try:
-                        _, tgt_start, tgt_end = next(target_regions)
-                    except StopIteration:
-                        # Ensure all the remaining access_regions are unbroken
-                        tgt_start = tgt_end = float('Inf')
-
-                # No remaining targets in this region - emit the rest of it
-                if acc_end - pad_size - bg_start > 0:
-                    yield (chrom, bg_start, acc_end - pad_size)
-        else:
-            for _, acc_start, acc_end in access_arr.coords():
-                yield (chrom, acc_start + pad_size, acc_end - pad_size)
-
+    endpoints = [subarr.end.iat[-1] for _c, subarr in targets.by_chromosome()]
+    whole_chroms = GA.from_columns({
+        'chromosome': targets.chromosome.drop_duplicates(),
+        'start': telomere_size,
+        'end': endpoints})
+    return whole_chroms

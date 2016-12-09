@@ -551,9 +551,11 @@ class GenomicArray(object):
             limits['upper'] = self.chromosome.replace(chrom_sizes)
         table = table.assign(start=(table['start'] - bp).clip(**limits),
                              end=(table['end'] + bp).clip(**limits))
-        if bp > 0:
+        if bp < 0:
             # Drop any bins that now have zero or negative size
-            table = table[table['end'] - table['start'] > 0]
+            ok_size = table['end'] - table['start'] > 0
+            logging.debug("Dropping %d bins with size <= 0", (~ok_size).sum())
+            table = table[ok_size]
         # Don't modify the original
         return self.as_dataframe(table.copy())
 

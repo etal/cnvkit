@@ -7,84 +7,55 @@ GenomicArray types.
 
 """
 from __future__ import print_function, absolute_import, division
-from builtins import next
 
 import logging
 
+import numpy as np
 import pandas as pd
 
-from .intersect import by_shared_chroms
+from .intersect import by_ranges
 
 
 def subtract(table, other):
     if not len(other):
         return table
+    return pd.DataFrame.from_records(_subtraction(table, other),
+                                     columns=table.columns)
 
-    done_chroms = []
-    for chrom, ctable, otable in by_shared_chroms(table, other):
-        if otable is None:
-            logging.info("%s: No excluded regions", chrom)
-            done_chroms.append(ctable)
+
+def _subtraction(table, other):
+    for keeper, rows_to_exclude in by_ranges(other, table, 'outer', True):
+        if len(rows_to_exclude):
+            logging.info(" %s:%d-%d : Subtracting %d excluded regions",
+                         keeper.chromosome, keeper.start, keeper.end,
+                         len(rows_to_exclude))
+
+            keep_left = (keeper.start < rows_to_exclude.start.iat[0])
+            keep_right = (keeper.end > rows_to_exclude.end.iat[-1])
+            if keep_left and keep_right:
+                starts = np.r_[keeper.start, rows_to_exclude.end.values]
+                ends = np.r_[rows_to_exclude.start.values, keeper.end]
+            elif keep_left:
+                # Exclusion overlaps only the right side
+                starts = np.r_[keeper.start, rows_to_exclude.end.values[:-1]]
+                ends = np.r_[rows_to_exclude.start.values]
+            elif keep_right:
+                # Exclusion overlaps only the left side
+                starts = np.r_[rows_to_exclude.end.values]
+                ends = np.r_[rows_to_exclude.start.values[1:], keeper.end]
+            elif len(rows_to_exclude) > 1:
+                # Exclusion overlaps both edges
+                starts = np.r_[rows_to_exclude.end.values[1:-1]]
+                ends = np.r_[rows_to_exclude.start.values[1:-1]]
+            else:
+                # Exclusion covers the whole region
+                continue
+
+            for start, end in zip(starts, ends):
+                if end > start:
+                    yield keeper._replace(start=start, end=end)
+
         else:
-            logging.info("%s: Subtracting excluded regions", chrom)
-            newrows = _subtract_chrom(ctable, otable)
-            done_chroms.append(
-                pd.DataFrame.from_records(newrows, columns=table.columns))
-
-    return pd.concat(done_chroms)
-
-
-def _subtract_chrom(rows, other_rows):
-    exclude_rows = iter(other_rows.itertuples(index=False))
-    ex_start, ex_end = _next_or_inf(exclude_rows)
-    for row in rows.itertuples(index=False):
-        for _c, start, end in _exclude_in_region(exclude_rows, row.chromosome,
-                                                 row.start, row.end,
-                                                 ex_start, ex_end):
-            yield row._replace(start=start, end=end)
-
-
-# TODO - rewrite non-recursively (#150)
-def _exclude_in_region(exclude_rows, chrom, a_start, a_end, ex_start, ex_end):
-    """Take region exclusions from an iterable and apply, perhaps recursively.
-
-    Yields
-    ------
-    tuple
-        A pair of tuples:
-            - (accessible chromosome, start, end)
-            - (current exclusion start, end)
-    """
-    # If we've leapfrogged the excluded area, catch up
-    while ex_end <= a_start:
-        ex_start, ex_end = _next_or_inf(exclude_rows)
-    if a_end <= ex_start:
-        # Excluded area does not overlap this one
-        yield (chrom, a_start, a_end)
-    else:
-        # Excluded area overlaps this one -> trim this region
-        logging.info("\tExclusion %s:%d-%d overlaps accessible region %d-%d",
-                     chrom, ex_start, ex_end, a_start, a_end)
-        if ex_start <= a_start:
-            if ex_end < a_end:
-                # Exclusion covers this region's left (start) edge only
-                for cse in _exclude_in_region(exclude_rows, chrom, ex_end, a_end,
-                                             ex_start, ex_end):
-                    yield cse
-            # Otherwise: Exclusion covers the whole region
-        else:
-            yield (chrom, a_start, ex_start)
-            if ex_end < a_end:
-                # Exclusion is in the middle of this region
-                for cse in _exclude_in_region(exclude_rows, chrom, ex_end,
-                                              a_end, ex_start, ex_end):
-                    yield cse
-            # Otherwise: Exclusion covers this region's right (end) edge only
-
-
-def _next_or_inf(iterable):
-    try:
-        ex = next(iterable)
-        return ex.start, ex.end
-    except StopIteration:
-        return float("Inf"), float("Inf")
+            logging.info(" %s:%d-%d : No excluded regions",
+                         keeper.chromosome, keeper.start, keeper.end)
+            yield keeper
