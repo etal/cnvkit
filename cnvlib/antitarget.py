@@ -25,11 +25,11 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
         - Emit the (chrom, start, end) coords of each portion
     """
     targets = tabio.read_auto(target_bed)
-    target_chroms = set(targets.chromosome.unique())
     if access_bed:
         # Chromosomes' accessible sequence regions are given -- use them
         accessible = tabio.read_auto(access_bed)
         access_chroms = set(accessible.chromosome.unique())
+        target_chroms = set(targets.chromosome.unique())
         if access_chroms and access_chroms.isdisjoint(target_chroms):
             raise ValueError("Chromosome names in the accessible regions file "
                              "%s %r do not match those in targets %s %r"
@@ -61,8 +61,8 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
 
     pad_size = 2 * INSERT_SIZE
     bg_arr = (accessible.resize_ranges(-pad_size)
-              .subtract(targets.resize_ranges(pad_size)))
-    bg_arr = bg_arr.subdivide(avg_bin_size, min_bin_size)
+              .subtract(targets.resize_ranges(pad_size))
+              .subdivide(avg_bin_size, min_bin_size))
     bg_arr['gene'] = 'Background'
     return bg_arr
 
