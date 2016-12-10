@@ -18,7 +18,10 @@ before_script:
     - pip install codecov
 
 script:
+    - coverage run test_io.py
+    - coverage run test_genome.py
     - coverage run test_cnvlib.py
+    - coverage run test_r.py
 
 after_success:
     - coverage report
