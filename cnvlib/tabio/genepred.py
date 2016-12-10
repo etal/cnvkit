@@ -10,7 +10,10 @@ identical rows, but do not merge non-identical rows.
 Generally the more-standard GFF or GTF would be used for this information; these
 formats are essentially UCSC Genome Browser database dumps.
 
-See: https://genome.ucsc.edu/FAQ/FAQformat.html#format9
+See:
+
+- https://genome.ucsc.edu/FAQ/FAQformat.html#format9
+- ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/
 """
 from __future__ import absolute_import, division, print_function
 

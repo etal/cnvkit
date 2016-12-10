@@ -359,12 +359,26 @@ class CommandTests(unittest.TestCase):
 
     def test_target(self):
         """The 'target' command."""
-        # ENH: annotate w/ mini-refFlat
-        r = commands.do_targets("formats/nv2_baits.interval_list")
-        self.assertGreater(len(r), 0)
-        r = commands.do_targets("formats/amplicon.bed", do_short_names=True,
-                                do_split=True, avg_size=100)
-        self.assertGreater(len(r), 0)
+        annot_fname = "formats/refflat-mini.txt"
+        for bait_fname in ("formats/nv2_baits.interval_list",
+                           "formats/amplicon.bed"):
+            baits = tabio.read_auto(bait_fname)
+            bait_len = len(baits)
+            # No splitting: w/ and w/o re-annotation
+            r1 = commands.do_targets(baits)
+            self.assertEqual(len(r1), bait_len)
+            r1a = commands.do_targets(baits, do_short_names=True,
+                                      annotate=annot_fname)
+            self.assertEqual(len(r1a), len(r1))
+            # Splitting
+            r2 = commands.do_targets(baits, do_short_names=True, do_split=True,
+                                     avg_size=100)
+            self.assertGreater(len(r2), len(r1))
+            r2a = commands.do_targets(baits, do_short_names=True, do_split=True,
+                                      avg_size=100, annotate=annot_fname)
+            self.assertEqual(len(r2a), len(r2))
+            # Original regions object should be unmodified
+            self.assertEqual(len(baits), bait_len)
 
 
 

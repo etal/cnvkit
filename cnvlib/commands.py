@@ -176,7 +176,9 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
 
     # Pre-process baits/targets
     new_target_fname = tgt_name_base + '.target.bed'
-    tgt_arr = do_targets(target_bed, annotate, short_names, True,
+    bait_arr = tabio.read_auto(target_bed)
+    bait_arr.sort()
+    tgt_arr = do_targets(bait_arr, annotate, short_names, True,
                          **({'avg_size': target_avg_size}
                             if target_avg_size
                             else {}))
@@ -373,29 +375,29 @@ P_batch.set_defaults(func=_cmd_batch)
 
 def _cmd_target(args):
     """Transform bait intervals into targets more suitable for CNVkit."""
-    rarr = do_targets(args.interval, args.annotate, args.short_names,
-                      args.split, args.avg_size)
-    tabio.write(rarr, args.output, "bed4")
+    regions = tabio.read_auto(args.interval)
+    regions.sort()
+    regions = do_targets(regions, args.annotate, args.short_names,
+                         args.split, args.avg_size)
+    tabio.write(regions, args.output, "bed4")
 
 
 @public
-def do_targets(bed_fname, annotate=None, do_short_names=False, do_split=False,
+def do_targets(bait_arr, annotate=None, do_short_names=False, do_split=False,
                avg_size=200/.75):
     """Transform bait intervals into targets more suitable for CNVkit."""
-    bed_arr = tabio.read_auto(bed_fname)
-    bed_arr.sort()
-    bed_rows = bed_arr.coords(also=['gene', 'strand'] if annotate else ['gene'])
+    tgt_arr = bait_arr.copy()
     if annotate:
         logging.info("Applying annotations as target names")
-        bed_rows = target.add_refflat_names(bed_rows, annotate)
+        annotation = tabio.read(annotate, 'refflat')
+        tgt_arr['gene'] = annotation.into_ranges(bait_arr, 'gene', '-')
     if do_short_names:
-        logging.info("Shortening interval labels")
-        bed_rows = target.shorten_labels(bed_rows)
-    bed_arr = _GA.from_rows(bed_rows, ['chromosome', 'start', 'end', 'gene'])
+        logging.info("Shortening target interval labels")
+        tgt_arr['gene'] = list(target.shorten_labels(tgt_arr['gene']))
     if do_split:
         logging.info("Splitting large targets")
-        bed_arr = bed_arr.subdivide(avg_size, 0, verbose=True)
-    return bed_arr
+        tgt_arr = tgt_arr.subdivide(avg_size, 0, verbose=True)
+    return tgt_arr
 
 
 P_target = AP_subparsers.add_parser('target', help=_cmd_target.__doc__)

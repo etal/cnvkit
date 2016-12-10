@@ -16,7 +16,7 @@ def last_of(elems):
 
 def join_strings(elems, sep=','):
     """Join a Series of strings by commas."""
-    # ENH if ser elements are also comma-separated, split+uniq those too
+    # ENH if elements are also comma-separated, split+uniq those too
     return sep.join(pd.unique(elems))
 
 
@@ -28,7 +28,6 @@ def merge_strands(elems):
 
 
 def make_const(val):
-    def const(elems):
+    def const(_elems):
         return val
     return const
-
