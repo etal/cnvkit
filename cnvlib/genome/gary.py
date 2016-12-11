@@ -518,14 +518,17 @@ class GenomicArray(object):
 
     # Genome arithmetic
 
-    def cut(self, other):
+    def cut(self, other, combine=None):
         """Split this array's regions at the boundaries in `other`."""
         # TODO
         return NotImplemented
 
-    def merge(self, combiners=None):
-        """Merge overlapping regions into single rows, similar to bedtools merge."""
-        return self.as_dataframe(merge(self.data, combiners=combiners))
+    def merge(self, combine=None):
+        """Merge overlapping regions into single rows.
+
+        Similar to 'bedtools merge'.
+        """
+        return self.as_dataframe(merge(self.data, combine=combine))
 
     def resize_ranges(self, bp, chrom_sizes=None):
         """Resize each genomic bin by a fixed number of bases at each end.
@@ -559,7 +562,7 @@ class GenomicArray(object):
         # Don't modify the original
         return self.as_dataframe(table.copy())
 
-    def squash(self, **kwargs):
+    def squash(self, combine=None):
         """Combine some groups of rows, by some criteria, into single rows."""
         # TODO
         return NotImplemented

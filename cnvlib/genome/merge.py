@@ -18,7 +18,7 @@ from .chromsort import sorter_chrom
 from .combiners import first_of, last_of, join_strings, merge_strands
 
 
-def merge(table, stranded=False, combiners=None):
+def merge(table, stranded=False, combine=None):
     """Merge overlapping rows in a DataFrame."""
     cmb = {
         'start': first_of,
@@ -26,8 +26,8 @@ def merge(table, stranded=False, combiners=None):
         'gene': join_strings,
         'accession': join_strings,
     }
-    if combiners:
-        cmb.update(combiners)
+    if combine:
+        cmb.update(combine)
     if stranded:
         groupkey = ['chromosome', 'strand']
         if 'strand' not in cmb:
@@ -48,7 +48,7 @@ def merge(table, stranded=False, combiners=None):
                        .sort_values(kind='mergesort').index)
 
 
-def _merge_overlapping(table, combiners):
+def _merge_overlapping(table, combine):
     """Merge overlapping regions within a chromosome/strand.
 
     Assume chromosome and (if relevant) strand are already identical, so only
@@ -63,7 +63,7 @@ def _merge_overlapping(table, combiners):
     # ENH: Find & use a lower-level, 1-pass pandas function
     keyed_groups = zip(_nonoverlapping_groups(table),
                        table.itertuples(index=False))
-    merged_rows = [_squash_tuples(row_group, combiners)
+    merged_rows = [_squash_tuples(row_group, combine)
                    for _key, row_group in itertools.groupby(keyed_groups,
                                                             first_of)]
     return pd.DataFrame.from_records(merged_rows,
@@ -90,12 +90,12 @@ def _nonoverlapping_groups(table):
 # Squash rows according to a given grouping criterion
 # XXX see also segfilter.py
 
-def _squash_tuples(keyed_rows, combiners):
+def _squash_tuples(keyed_rows, combine):
     """Combine multiple rows into one NamedTuple."""
     rows = [kr[1] for kr in keyed_rows] #list(rows)
     firsttup = rows[0]
     if len(rows) == 1:
         return firsttup
     newfields = {key: combiner([getattr(r, key) for r in rows])
-                 for key, combiner in combiners.items()}
+                 for key, combiner in combine.items()}
     return firsttup._replace(**newfields)
