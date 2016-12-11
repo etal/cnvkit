@@ -192,7 +192,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
             # Build antitarget BED from the given targets
             anti_kwargs = {}
             if access:
-                anti_kwargs['access_bed'] = access
+                anti_kwargs['access'] = tabio.read_auto(access)
             if antitarget_avg_size:
                 anti_kwargs['avg_bin_size'] = antitarget_avg_size
             if antitarget_min_size:
@@ -460,7 +460,8 @@ P_access.set_defaults(func=_cmd_access)
 def _cmd_antitarget(args):
     """Derive a background/antitarget BED file from a target BED file."""
     targets = tabio.read_auto(args.targets)
-    out_arr = do_antitarget(targets, args.access, args.avg_size, args.min_size)
+    access = tabio.read_auto(args.access)
+    out_arr = do_antitarget(targets, access, args.avg_size, args.min_size)
     if not args.output:
         base, ext = args.interval.rsplit('.', 1)
         args.output = base + '.antitarget.' + ext
@@ -468,12 +469,12 @@ def _cmd_antitarget(args):
 
 
 @public
-def do_antitarget(targets, access_bed=None, avg_bin_size=150000,
+def do_antitarget(targets, access=None, avg_bin_size=150000,
                   min_bin_size=None):
     """Derive a background/antitarget BED file from a target BED file."""
     if not min_bin_size:
         min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_REF_COVERAGE))
-    return antitarget.get_background(targets, access_bed, avg_bin_size,
+    return antitarget.get_background(targets, access, avg_bin_size,
                                      min_bin_size)
 
 

@@ -118,13 +118,12 @@ class CommandTests(unittest.TestCase):
     def test_antitarget(self):
         """The 'antitarget' command."""
         baits = tabio.read_auto('formats/nv2_baits.interval_list')
-        access_fname = "../data/access-5k-mappable.hg19.bed"
+        access = tabio.read_auto('../data/access-5k-mappable.hg19.bed')
         self.assertLess(0, len(commands.do_antitarget(baits)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access_fname)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access_fname,
-                                                      200000)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access_fname,
-                                                      10000, 5000)))
+        self.assertLess(0, len(commands.do_antitarget(baits, access)))
+        self.assertLess(0, len(commands.do_antitarget(baits, access, 200000)))
+        self.assertLess(0, len(commands.do_antitarget(baits, access, 10000,
+                                                      5000)))
 
     def test_breaks(self):
         """The 'breaks' command."""

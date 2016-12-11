@@ -5,12 +5,11 @@ from builtins import map
 import logging
 import re
 
-from . import tabio
 from .params import INSERT_SIZE
 from .genome import GenomicArray as GA
 
 
-def get_background(targets, access_bed, avg_bin_size, min_bin_size):
+def get_background(targets, accessible, avg_bin_size, min_bin_size):
     """Generate background intervals from target intervals.
 
     Procedure:
@@ -24,15 +23,15 @@ def get_background(targets, access_bed, avg_bin_size, min_bin_size):
         - Divide into equal-size (region_size/avg_bin_size) portions
         - Emit the (chrom, start, end) coords of each portion
     """
-    if access_bed:
+    if accessible:
         # Chromosomes' accessible sequence regions are given -- use them
-        accessible = tabio.read_auto(access_bed)
         access_chroms = set(accessible.chromosome.unique())
         target_chroms = set(targets.chromosome.unique())
         if access_chroms and access_chroms.isdisjoint(target_chroms):
             raise ValueError("Chromosome names in the accessible regions file "
                              "%s %r do not match those in targets %s %r"
-                             % (access_bed, tuple(sorted(access_chroms)[:3]),
+                             % (accessible.meta.get('filename', ''),
+                                tuple(sorted(access_chroms)[:3]),
                                 targets.meta.get('filename', ''),
                                 tuple(sorted(target_chroms)[:3])))
         # But filter out untargeted alternative contigs and mitochondria
