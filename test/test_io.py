@@ -33,6 +33,13 @@ class IOTests(unittest.TestCase):
         self.assertEqual(len(regions), linecount(fname))
         self.assertEqual(regions.sample_id, "amplicon")
 
+    def test_read_gff(self):
+        """Read the GFF format."""
+        fname = 'formats/example.gff'
+        regions = tabio.read(fname, 'gff')
+        self.assertEqual(len(regions), linecount(fname) - 2)
+        self.assertEqual(regions.sample_id, 'example')
+
     def test_read_ilist(self):
         """Read the interval list format."""
         regions = tabio.read("formats/nv2_baits.interval_list", "interval")

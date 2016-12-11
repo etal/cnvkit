@@ -1,0 +1,8 @@
+##gff-version 3
+# Source: http://gmod.org/wiki/GFF3
+ctg123	.	mRNA	1300	9000	.	+	.	ID=mrna0001;Name=sonichedgehog
+ctg123	.	exon	1300	1500	.	+	.	ID=exon00001;Parent=mrna0001
+ctg123	.	exon	1050	1500	.	+	.	ID=exon00002;Parent=mrna0001
+ctg123	.	exon	3000	3902	.	+	.	ID=exon00003;Parent=mrna0001
+ctg123	.	exon	5000	5500	.	+	.	ID=exon00004;Parent=mrna0001
+ctg123	.	exon	7000	9000	.	+	.	ID=exon00005;Parent=mrna0001
