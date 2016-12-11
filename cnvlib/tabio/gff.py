@@ -30,11 +30,11 @@ def read_gff(infile):
     coltypes = ['str', 'str', 'str', 'int', 'int',
                 'str', 'str', 'str', 'str']
     dframe = pd.read_table(infile, comment='#', header=None, na_filter=False,
-                           names=colnames, dtype=dict(zip(colnames, coltypes)),
-                           converters={'attribute': _parse_name})
+                           names=colnames, dtype=dict(zip(colnames, coltypes)))
     return (dframe
             .assign(start=dframe.start - 1,
-                    score=dframe.score.replace('.', 'nan').astype('float'))
+                    score=dframe.score.replace('.', 'nan').astype('float'),
+                    gene=dframe.attribute.apply(_parse_name))
             .sort_values(['chromosome', 'start', 'end'])
             .reset_index(drop=True))
 
