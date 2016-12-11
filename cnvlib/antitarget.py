@@ -10,7 +10,7 @@ from .params import INSERT_SIZE
 from .genome import GenomicArray as GA
 
 
-def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
+def get_background(targets, access_bed, avg_bin_size, min_bin_size):
     """Generate background intervals from target intervals.
 
     Procedure:
@@ -24,7 +24,6 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
         - Divide into equal-size (region_size/avg_bin_size) portions
         - Emit the (chrom, start, end) coords of each portion
     """
-    targets = tabio.read_auto(target_bed)
     if access_bed:
         # Chromosomes' accessible sequence regions are given -- use them
         accessible = tabio.read_auto(access_bed)
@@ -34,7 +33,8 @@ def get_background(target_bed, access_bed, avg_bin_size, min_bin_size):
             raise ValueError("Chromosome names in the accessible regions file "
                              "%s %r do not match those in targets %s %r"
                              % (access_bed, tuple(sorted(access_chroms)[:3]),
-                                target_bed, tuple(sorted(target_chroms)[:3])))
+                                targets.meta.get('filename', ''),
+                                tuple(sorted(target_chroms)[:3])))
         # But filter out untargeted alternative contigs and mitochondria
         untgt_chroms = access_chroms - target_chroms
         # Autosomes typically have numeric names, allosomes are X and Y

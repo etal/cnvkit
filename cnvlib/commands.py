@@ -178,11 +178,11 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
     new_target_fname = tgt_name_base + '.target.bed'
     bait_arr = tabio.read_auto(target_bed)
     bait_arr.sort()
-    tgt_arr = do_targets(bait_arr, annotate, short_names, True,
-                         **({'avg_size': target_avg_size}
-                            if target_avg_size
-                            else {}))
-    tabio.write(tgt_arr, new_target_fname, "bed4")
+    target_arr = do_target(bait_arr, annotate, short_names, True,
+                        **({'avg_size': target_avg_size}
+                           if target_avg_size
+                           else {}))
+    tabio.write(target_arr, new_target_fname, 'bed4')
     target_bed = new_target_fname
 
     if not antitarget_bed:
@@ -197,7 +197,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 anti_kwargs['avg_bin_size'] = antitarget_avg_size
             if antitarget_min_size:
                 anti_kwargs['min_bin_size'] = antitarget_min_size
-            anti_arr = do_antitarget(target_bed, **anti_kwargs)
+            anti_arr = do_antitarget(target_arr, **anti_kwargs)
         else:
             # No antitargets for wgs, amplicon
             anti_arr = _GA([])
@@ -377,14 +377,14 @@ def _cmd_target(args):
     """Transform bait intervals into targets more suitable for CNVkit."""
     regions = tabio.read_auto(args.interval)
     regions.sort()
-    regions = do_targets(regions, args.annotate, args.short_names,
-                         args.split, args.avg_size)
+    regions = do_target(regions, args.annotate, args.short_names, args.split,
+                        args.avg_size)
     tabio.write(regions, args.output, "bed4")
 
 
 @public
-def do_targets(bait_arr, annotate=None, do_short_names=False, do_split=False,
-               avg_size=200/.75):
+def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
+              avg_size=200/.75):
     """Transform bait intervals into targets more suitable for CNVkit."""
     tgt_arr = bait_arr.copy()
     if annotate:
@@ -459,8 +459,8 @@ P_access.set_defaults(func=_cmd_access)
 
 def _cmd_antitarget(args):
     """Derive a background/antitarget BED file from a target BED file."""
-    out_arr = do_antitarget(args.interval, args.access,
-                            args.avg_size, args.min_size)
+    targets = tabio.read_auto(args.targets)
+    out_arr = do_antitarget(targets, args.access, args.avg_size, args.min_size)
     if not args.output:
         base, ext = args.interval.rsplit('.', 1)
         args.output = base + '.antitarget.' + ext
@@ -468,17 +468,17 @@ def _cmd_antitarget(args):
 
 
 @public
-def do_antitarget(target_bed, access_bed=None, avg_bin_size=150000,
+def do_antitarget(targets, access_bed=None, avg_bin_size=150000,
                   min_bin_size=None):
     """Derive a background/antitarget BED file from a target BED file."""
     if not min_bin_size:
         min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_REF_COVERAGE))
-    return antitarget.get_background(target_bed, access_bed, avg_bin_size,
+    return antitarget.get_background(targets, access_bed, avg_bin_size,
                                      min_bin_size)
 
 
 P_anti = AP_subparsers.add_parser('antitarget', help=_cmd_antitarget.__doc__)
-P_anti.add_argument('interval',
+P_anti.add_argument('targets',
         help="""BED or interval file listing the targeted regions.""")
 P_anti.add_argument('-g', '--access',
         help="""Regions of accessible sequence on chromosomes (.bed), as

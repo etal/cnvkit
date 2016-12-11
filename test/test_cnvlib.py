@@ -117,15 +117,14 @@ class CommandTests(unittest.TestCase):
 
     def test_antitarget(self):
         """The 'antitarget' command."""
-        baits_fname = "formats/nv2_baits.interval_list"
+        baits = tabio.read_auto('formats/nv2_baits.interval_list')
         access_fname = "../data/access-5k-mappable.hg19.bed"
-        self.assertLess(0, len(commands.do_antitarget(baits_fname)))
-        self.assertLess(0, len(
-            commands.do_antitarget(baits_fname, access_fname)))
-        self.assertLess(0, len(
-            commands.do_antitarget(baits_fname, access_fname, 200000)))
-        self.assertLess(0, len(
-            commands.do_antitarget(baits_fname, access_fname, 10000, 5000)))
+        self.assertLess(0, len(commands.do_antitarget(baits)))
+        self.assertLess(0, len(commands.do_antitarget(baits, access_fname)))
+        self.assertLess(0, len(commands.do_antitarget(baits, access_fname,
+                                                      200000)))
+        self.assertLess(0, len(commands.do_antitarget(baits, access_fname,
+                                                      10000, 5000)))
 
     def test_breaks(self):
         """The 'breaks' command."""
@@ -365,17 +364,17 @@ class CommandTests(unittest.TestCase):
             baits = tabio.read_auto(bait_fname)
             bait_len = len(baits)
             # No splitting: w/ and w/o re-annotation
-            r1 = commands.do_targets(baits)
+            r1 = commands.do_target(baits)
             self.assertEqual(len(r1), bait_len)
-            r1a = commands.do_targets(baits, do_short_names=True,
-                                      annotate=annot_fname)
+            r1a = commands.do_target(baits, do_short_names=True,
+                                     annotate=annot_fname)
             self.assertEqual(len(r1a), len(r1))
             # Splitting
-            r2 = commands.do_targets(baits, do_short_names=True, do_split=True,
-                                     avg_size=100)
+            r2 = commands.do_target(baits, do_short_names=True, do_split=True,
+                                    avg_size=100)
             self.assertGreater(len(r2), len(r1))
-            r2a = commands.do_targets(baits, do_short_names=True, do_split=True,
-                                      avg_size=100, annotate=annot_fname)
+            r2a = commands.do_target(baits, do_short_names=True, do_split=True,
+                                     avg_size=100, annotate=annot_fname)
             self.assertEqual(len(r2a), len(r2))
             # Original regions object should be unmodified
             self.assertEqual(len(baits), bait_len)
