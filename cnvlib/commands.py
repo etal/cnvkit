@@ -177,7 +177,6 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
     # Pre-process baits/targets
     new_target_fname = tgt_name_base + '.target.bed'
     bait_arr = tabio.read_auto(target_bed)
-    bait_arr.sort()
     target_arr = do_target(bait_arr, annotate, short_names, True,
                         **({'avg_size': target_avg_size}
                            if target_avg_size
@@ -376,7 +375,6 @@ P_batch.set_defaults(func=_cmd_batch)
 def _cmd_target(args):
     """Transform bait intervals into targets more suitable for CNVkit."""
     regions = tabio.read_auto(args.interval)
-    regions.sort()
     regions = do_target(regions, args.annotate, args.short_names, args.split,
                         args.avg_size)
     tabio.write(regions, args.output, "bed4")
@@ -390,6 +388,7 @@ def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
     if annotate:
         logging.info("Applying annotations as target names")
         annotation = tabio.read_auto(annotate)
+        antitarget.compare_chrom_names(bait_arr, annotation)
         tgt_arr['gene'] = annotation.into_ranges(bait_arr, 'gene', '-')
     if do_short_names:
         logging.info("Shortening target interval labels")

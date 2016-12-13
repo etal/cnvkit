@@ -84,6 +84,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         dframe = []
     result = (into or suggest_into)(dframe, meta)
     result.sort_columns()
+    result.sort()
     return result
     # ENH CategoricalIndex ---
     # if dframe:
@@ -205,14 +206,14 @@ def sniff_region_format(fname):
             # Formats that need to be guessed solely by regex
             if format_patterns['text'].match(line):
                 return 'text'
+            if format_patterns['tab'].match(line):
+                return 'tab'
             if line.startswith('@') or format_patterns['interval'].match(line):
                 return 'interval'
             if format_patterns['refflat'].match(line):
                 return 'refflat'
             if format_patterns['bed'].match(line):
                 return 'bed'
-            if format_patterns['tab'].match(line):
-                return 'tab'
 
             raise ValueError("File %r does not appear to be a recognized "
                              "format! (Any of: %s)\n"
@@ -221,18 +222,18 @@ def sniff_region_format(fname):
 
 
 format_patterns = collections.OrderedDict([
-    ('gff', re.compile('\t'.join((
-        r'\w+', r'\S+', r'\w+', r'\d+', r'\d+',
-        r'\S+', r'[.?+-]', r'[012.]', r'.*')))),
+    #  ('genepred', re.compile()),
+    #  ('genepredext', re.compile()),
+    ('text', re.compile(r'\w+:\d*-\d*.*')),
+    ('tab', re.compile('\t'.join(('chromosome', 'start', 'end')))),
     ('interval', re.compile('\t'.join((
         r'\w+', r'\d+', r'\d+', r'[.+-]', r'\S+$')))),
-    ('text', re.compile(r'\w+:\d*-\d*.*')),
-    ('bed', re.compile('\t'.join((r'\w+', r'\d+', r'\d+')))),
     ('refflat', re.compile('\t'.join((
         r'\S+', r'\S+', r'\w+', r'[+-]',
         r'\d+', r'\d+', r'\d+', r'\d+', r'\d+',
         r'(\d+,)+', r'(\d+,)+$')))),
-    #  ('genepred', re.compile()),
-    #  ('genepredext', re.compile()),
-    ('tab', re.compile('\t'.join(('chromosome', 'start', 'end')))),
+    ('gff', re.compile('\t'.join((
+        r'\w+', r'\S+', r'\w+', r'\d+', r'\d+',
+        r'\S+', r'[.?+-]', r'[012.]', r'.*')))),
+    ('bed', re.compile('\t'.join((r'\w+', r'\d+', r'\d+')))),
 ])

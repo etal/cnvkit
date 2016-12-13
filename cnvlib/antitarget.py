@@ -25,15 +25,7 @@ def get_background(targets, accessible, avg_bin_size, min_bin_size):
     """
     if accessible:
         # Chromosomes' accessible sequence regions are given -- use them
-        access_chroms = set(accessible.chromosome.unique())
-        target_chroms = set(targets.chromosome.unique())
-        if access_chroms and access_chroms.isdisjoint(target_chroms):
-            raise ValueError("Chromosome names in the accessible regions file "
-                             "%s %r do not match those in targets %s %r"
-                             % (accessible.meta.get('filename', ''),
-                                tuple(sorted(access_chroms)[:3]),
-                                targets.meta.get('filename', ''),
-                                tuple(sorted(target_chroms)[:3])))
+        access_chroms, target_chroms = compare_chrom_names(accessible, targets)
         # But filter out untargeted alternative contigs and mitochondria
         untgt_chroms = access_chroms - target_chroms
         # Autosomes typically have numeric names, allosomes are X and Y
@@ -64,6 +56,21 @@ def get_background(targets, accessible, avg_bin_size, min_bin_size):
               .subdivide(avg_bin_size, min_bin_size))
     bg_arr['gene'] = 'Background'
     return bg_arr
+
+
+def compare_chrom_names(a_regions, b_regions):
+    a_chroms = set(a_regions.chromosome.unique())
+    b_chroms = set(b_regions.chromosome.unique())
+    if a_chroms and a_chroms.isdisjoint(b_chroms):
+        msg = "Chromosome names do not match between files"
+        a_fname = a_regions.meta.get('filename')
+        b_fname = b_regions.meta.get('filename')
+        if a_fname and b_fname:
+            msg += " {} and {}".format(a_fname, b_fname)
+        msg += ": {} vs. {}".format(', '.join(map(repr, sorted(a_chroms)[:3])),
+                                    ', '.join(map(repr, sorted(b_chroms)[:3])))
+        raise ValueError(msg)
+    return a_chroms, b_chroms
 
 
 def guess_chromosome_regions(targets, telomere_size):
