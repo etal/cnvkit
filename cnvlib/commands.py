@@ -1802,7 +1802,11 @@ def _cmd_import_theta(args):
 @public
 def do_import_theta(segarr, theta_results_fname, ploidy=2):
     theta = importers.parse_theta_results(theta_results_fname)
+    # THetA doesn't handle sex chromosomes well
+    segarr = segarr.autosomes()
     for copies in theta['C']:
+        if len(copies) != len(segarr):
+            copies = copies[:len(segarr)]
         # Drop any segments where the C value is None
         mask_drop = np.array([c is None for c in copies], dtype='bool')
         segarr = segarr[~mask_drop].copy()

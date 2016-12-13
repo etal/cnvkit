@@ -348,9 +348,11 @@ def export_theta(tumor_segs, normal_cn):
 
     # Drop any chromosomes that are not integer or XY
     # THetA hard-codes X & Y, so we can, too
-    xy_names = (["chrX", "chrY"]
-                if tumor_segs.chromosome.iat[0].startswith('chr')
-                else ["X", "Y"])
+    #  xy_names = (["chrX", "chrY"]
+    #              if tumor_segs.chromosome.iat[0].startswith('chr')
+    #              else ["X", "Y"])
+    # NB: THetA2 now apparently just drops X and Y (#153)
+    xy_names = []
     tumor_segs = tumor_segs.autosomes(also=xy_names)
     if normal_cn:
         normal_cn = normal_cn.autosomes(also=xy_names)
@@ -359,7 +361,7 @@ def export_theta(tumor_segs, normal_cn):
 
     # Convert chromosome names to 1-based integer indices
     chr2idx = {c: i+1
-            for i, c in enumerate(tumor_segs.chromosome.drop_duplicates())}
+               for i, c in enumerate(tumor_segs.chromosome.drop_duplicates())}
     table["chrm"] = tumor_segs.chromosome.replace(chr2idx)
     # Unique string identifier for each row, e.g. "start_1_93709:end_1_19208166"
     table["#ID"] = ["start_%d_%d:end_%d_%d"
