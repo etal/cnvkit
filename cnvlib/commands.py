@@ -385,6 +385,11 @@ def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
               avg_size=200/.75):
     """Transform bait intervals into targets more suitable for CNVkit."""
     tgt_arr = bait_arr.copy()
+    # Drop zero-width regions
+    tgt_arr = tgt_arr[tgt_arr.start != tgt_arr.end]
+    if do_split:
+        logging.info("Splitting large targets")
+        tgt_arr = tgt_arr.subdivide(avg_size, 0, verbose=True)
     if annotate:
         logging.info("Applying annotations as target names")
         annotation = tabio.read_auto(annotate)
@@ -393,9 +398,6 @@ def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
     if do_short_names:
         logging.info("Shortening target interval labels")
         tgt_arr['gene'] = list(target.shorten_labels(tgt_arr['gene']))
-    if do_split:
-        logging.info("Splitting large targets")
-        tgt_arr = tgt_arr.subdivide(avg_size, 0, verbose=True)
     return tgt_arr
 
 
