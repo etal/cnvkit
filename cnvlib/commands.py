@@ -393,8 +393,8 @@ def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
     if annotate:
         logging.info("Applying annotations as target names")
         annotation = tabio.read_auto(annotate)
-        antitarget.compare_chrom_names(bait_arr, annotation)
-        tgt_arr['gene'] = annotation.into_ranges(bait_arr, 'gene', '-')
+        antitarget.compare_chrom_names(tgt_arr, annotation)
+        tgt_arr['gene'] = annotation.into_ranges(tgt_arr, 'gene', '-')
     if do_short_names:
         logging.info("Shortening target interval labels")
         tgt_arr['gene'] = list(target.shorten_labels(tgt_arr['gene']))
