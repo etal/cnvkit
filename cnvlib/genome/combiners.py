@@ -4,6 +4,36 @@ from __future__ import print_function, absolute_import, division
 import pandas as pd
 
 
+def get_combiners(table, stranded=False, combine=None):
+    """Get a `combine` lookup suitable for `table`.
+
+    Parameters
+    ----------
+    table : DataFrame
+    stranded : bool
+    combine : dict or None
+        Column names to their value-combining functions, replacing or in
+        addition to the defaults.
+
+    Returns
+    -------
+    dict:
+        Column names to their value-combining functions.
+    """
+    cmb = {
+        'chromosome': first_of,
+        'start': first_of,
+        'end': last_of,
+        'gene': join_strings,
+        'accession': join_strings,
+    }
+    if combine:
+        cmb.update(combine)
+    if 'strand' not in cmb:
+        cmb['strand'] = first_of if stranded else merge_strands
+    return {k: v for k, v in cmb.items() if k in table.columns}
+
+
 def first_of(elems):
     """Return the first element of the input."""
     return elems[0]

@@ -12,7 +12,7 @@ import pandas as pd
 
 from .chromsort import sorter_chrom
 from .intersect import by_ranges, into_ranges, iter_ranges
-from .merge import merge
+from .merge import flatten, merge
 from .subtract import subtract
 from .subdivide import subdivide
 
@@ -522,6 +522,10 @@ class GenomicArray(object):
         """Split this array's regions at the boundaries in `other`."""
         # TODO
         return NotImplemented
+
+    def flatten(self, combine=None):
+        """Split this array's regions where they overlap."""
+        return self.as_dataframe(flatten(self.data, combine=combine))
 
     def merge(self, combine=None):
         """Merge overlapping regions into single rows.

@@ -15,30 +15,90 @@ import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
-from .combiners import first_of, last_of, join_strings, merge_strands
+from .combiners import get_combiners, first_of
+
+
+def flatten(table, combine=None):
+    # # Input should already be sorted like this
+    table = table.sort_values(['chromosome', 'start', 'end'])
+    cmb = get_combiners(table, False, combine)
+    out = (table.groupby(by='chromosome',
+                         as_index=False, group_keys=False, sort=False)
+           .apply(_flatten_overlapping, cmb)
+           .reset_index(drop=True))
+    return out.reindex(out.chromosome.apply(sorter_chrom)
+                       .sort_values(kind='mergesort').index)
+
+
+def _flatten_overlapping(table, combine):
+    """Merge overlapping regions within a chromosome/strand.
+
+    Assume chromosome and (if relevant) strand are already identical, so only
+    start and end coordinates are considered.
+    """
+    keyed_groups = zip(_nonoverlapping_groups(table),
+                       table.itertuples(index=False))
+    #  flat_rows = itertools.chain(
+    #      *(_flatten_tuples(row_group, combine)
+    #        for _key, row_group in itertools.groupby(keyed_groups, first_of)))
+    #  out =  pd.DataFrame.from_records(list(flat_rows),
+    #                                   columns=table.columns)
+    #                                   #  columns=flat_rows[0]._fields)
+    bits = [pd.DataFrame.from_records(list(_flatten_tuples(row_group, combine)),
+                                      columns=table.columns)
+            for _key, row_group in itertools.groupby(keyed_groups, first_of)]
+    out = pd.concat(bits)
+
+    return out
+
+
+def _flatten_tuples(keyed_rows, combine):
+    """Divide multiple rows where they overlap.
+
+    Parameters
+    ----------
+    keyed_rows : iterable
+        pairs of (non-overlapping-group index, overlapping rows)
+    combine : dict
+
+    Returns
+    -------
+    DataFrame
+    """
+    # TODO speed this up!
+    rows = [kr[1] for kr in keyed_rows]
+    first_row = rows[0]
+    if len(rows) == 1:
+        yield first_row
+        raise StopIteration
+
+    extra_cols = first_row._fields[3:]
+    breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
+    for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
+        # Find the row(s) overlapping this region
+        # i.e. any not already seen and not already passed
+        rows_in_play = []
+        for row in rows:
+            if row.start <= bp_start and row.end >= bp_end:
+                rows_in_play.append(row)
+
+        # Combine the extra fields of the overlapping regions
+        extra_fields = {key: combine[key]([getattr(r, key)
+                                           for r in rows_in_play])
+                        for key in extra_cols}
+        yield first_row._replace(start=bp_start, end=bp_end,
+                                 **extra_fields)
 
 
 def merge(table, stranded=False, combine=None):
     """Merge overlapping rows in a DataFrame."""
-    cmb = {
-        'start': first_of,
-        'end': last_of,
-        'gene': join_strings,
-        'accession': join_strings,
-    }
-    if combine:
-        cmb.update(combine)
     if stranded:
         groupkey = ['chromosome', 'strand']
-        if 'strand' not in cmb:
-            cmb['strand'] = first_of
     else:
         # NB: same gene name can appear on alt. contigs
         groupkey = ['chromosome']
-        if 'strand' not in cmb:
-            cmb['strand'] = merge_strands
     table = table.sort_values(groupkey + ['start', 'end'])
-    cmb = {k: v for k, v in cmb.items() if k in table}
+    cmb = get_combiners(table, stranded, combine)
     out = (table.groupby(by=groupkey,
                          as_index=False, group_keys=False, sort=False)
            .apply(_merge_overlapping, cmb)
@@ -89,9 +149,19 @@ def _nonoverlapping_groups(table):
 
 # Squash rows according to a given grouping criterion
 # XXX see also segfilter.py
-
 def _squash_tuples(keyed_rows, combine):
-    """Combine multiple rows into one NamedTuple."""
+    """Combine multiple rows into one NamedTuple.
+
+    Parameters
+    ----------
+    keyed_rows : iterable
+        pairs of (non-overlapping-group index, overlapping rows)
+    combine : dict
+
+    Returns
+    -------
+    namedtuple
+    """
     rows = [kr[1] for kr in keyed_rows] #list(rows)
     firsttup = rows[0]
     if len(rows) == 1:
