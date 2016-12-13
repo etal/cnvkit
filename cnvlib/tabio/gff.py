@@ -2,15 +2,15 @@
 
 Columns:
 
-1. seqid, reference, seqname, chromosome
+1. seqid/reference/seqname/chromosome
 2. source
-3. type, method, feature
+3. type/method/feature
 4. start: in 1-based integer coordinates
 5. end: in 1-based integer coordinates
 6. score: float or '.' (for NA)
 7. strand: [+-.?]
-8. phase, frame: [012.]
-9. attribute, group: string
+8. phase/frame: [012.]
+9. attribute/group: string
 
 Specs:
 

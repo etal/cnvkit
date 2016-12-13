@@ -19,9 +19,12 @@ class IOTests(unittest.TestCase):
 
     def test_read_auto(self):
         for fname, nrows in (("formats/empty", 0),
-                             ("formats/amplicon.bed",
-                              linecount("formats/amplicon.bed")),
-                              ("formats/nv2_baits.interval_list", 6809)):
+                             ("formats/amplicon.bed", 1433),
+                             ("formats/amplicon.text", 1433),
+                             ("formats/nv2_baits.interval_list", 6809),
+                             ("formats/refflat-mini.txt", 100),
+                             ("formats/example.gff", 6),
+                            ):
             self.assertEqual(len(tabio.read_auto(fname)), nrows)
             with open(fname) as handle:
                 self.assertEqual(len(tabio.read_auto(handle)), nrows)

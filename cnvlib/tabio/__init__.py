@@ -3,7 +3,9 @@
 from __future__ import absolute_import, division, print_function
 from past.builtins import basestring
 
+import collections
 import logging
+import re
 import sys
 
 import pandas as pd
@@ -13,7 +15,7 @@ from .. import core
 from ..genome import GenomicArray as GA
 from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
-from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio, util
+from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
@@ -99,16 +101,15 @@ def read_auto(infile):
                          "seekable (local, on-disk) files, which %s is not"
                          % infile)
 
-    fmt = util.sniff_region_format(infile)
+    fmt = sniff_region_format(infile)
     if hasattr(infile, "seek"):
         infile.seek(0)
-    if fmt is None:
-        fmt = "tab"
-    if fmt == "bed":
-        logging.info("Detected file format: BED")
-    elif fmt == "interval":
-        logging.info("Detected file format: interval list")
-    return read(infile, fmt)
+    if fmt:
+        logging.info("Detected file format: " + fmt)
+    else:
+        # File is blank -- simple BED will handle this OK
+        fmt = "bed3"
+    return read(infile, fmt or 'tab')
 
 
 def read_cna(infile, sample_id=None, meta=None):
@@ -171,3 +172,67 @@ WRITERS = {
     "text": (textcoord.write_text, False),
     "vcf": (vcfio.write_vcf, True),
 }
+
+
+# _____________________________________________________________________
+
+def sniff_region_format(fname):
+    """Guess the format of the given file by reading the first line.
+
+    Returns
+    -------
+    str or None
+        The detected format name, or None if the file is empty.
+    """
+    # has_track = False
+    with as_handle(fname, 'rU') as handle:
+        for line in handle:
+            if not line.strip():
+                # Skip blank lines
+                continue
+            if line.startswith('track'):
+                # NB: Could be UCSC BED or Ensembl GFF
+                # has_track = True
+                continue
+            # Formats that (may) declare themselves in an initial '#' comment
+            if (line.startswith('##gff-version') or
+                format_patterns['gff'].match(line)):
+                return 'gff'
+            if line.startswith(('##fileformat=VCF', '#CHROM\tPOS\tID')):
+                return 'vcf'
+            if line.startswith('#'):
+                continue
+            # Formats that need to be guessed solely by regex
+            if format_patterns['text'].match(line):
+                return 'text'
+            if line.startswith('@') or format_patterns['interval'].match(line):
+                return 'interval'
+            if format_patterns['refflat'].match(line):
+                return 'refflat'
+            if format_patterns['bed'].match(line):
+                return 'bed'
+            if format_patterns['tab'].match(line):
+                return 'tab'
+
+            raise ValueError("File %r does not appear to be a recognized "
+                             "format! (Any of: %s)\n"
+                             "First non-blank line:\n%s"
+                             % (fname, ', '.join(format_patterns.keys()), line))
+
+
+format_patterns = collections.OrderedDict([
+    ('gff', re.compile('\t'.join((
+        r'\w+', r'\S+', r'\w+', r'\d+', r'\d+',
+        r'\S+', r'[.?+-]', r'[012.]', r'.*')))),
+    ('interval', re.compile('\t'.join((
+        r'\w+', r'\d+', r'\d+', r'[.+-]', r'\S+$')))),
+    ('text', re.compile(r'\w+:\d*-\d*.*')),
+    ('bed', re.compile('\t'.join((r'\w+', r'\d+', r'\d+')))),
+    ('refflat', re.compile('\t'.join((
+        r'\S+', r'\S+', r'\w+', r'[+-]',
+        r'\d+', r'\d+', r'\d+', r'\d+', r'\d+',
+        r'(\d+,)+', r'(\d+,)+$')))),
+    #  ('genepred', re.compile()),
+    #  ('genepredext', re.compile()),
+    ('tab', re.compile('\t'.join(('chromosome', 'start', 'end')))),
+])

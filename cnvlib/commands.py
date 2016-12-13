@@ -331,9 +331,9 @@ P_batch_newref.add_argument('-a', '--antitargets', #required=True,
         help="Antitarget intervals (.bed or .list)")
 # For pre-processing targets
 P_batch_newref.add_argument('--annotate',
-        help="""UCSC refFlat.txt or ensFlat.txt file for the reference genome.
-                Pull gene names from this file and assign them to the target
-                regions.""")
+        help="""Use gene models from this file to assign names to the target
+                regions. Format: UCSC refFlat.txt or ensFlat.txt file
+                (preferred), or BED, interval list, GFF, or similar.""")
 P_batch_newref.add_argument('--short-names', action='store_true',
         help="Reduce multi-accession bait labels to be short and consistent.")
 P_batch_newref.add_argument('--split', action='store_true', # DEPRECATED
@@ -389,7 +389,7 @@ def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
     tgt_arr = bait_arr.copy()
     if annotate:
         logging.info("Applying annotations as target names")
-        annotation = tabio.read(annotate, 'refflat')
+        annotation = tabio.read_auto(annotate)
         tgt_arr['gene'] = annotation.into_ranges(bait_arr, 'gene', '-')
     if do_short_names:
         logging.info("Shortening target interval labels")
@@ -404,9 +404,9 @@ P_target = AP_subparsers.add_parser('target', help=_cmd_target.__doc__)
 P_target.add_argument('interval',
         help="""BED or interval file listing the targeted regions.""")
 P_target.add_argument('--annotate',
-        help="""UCSC refFlat.txt or ensFlat.txt file for the reference genome.
-                Pull gene names from this file and assign them to the target
-                regions.""")
+        help="""Use gene models from this file to assign names to the target
+                regions. Format: UCSC refFlat.txt or ensFlat.txt file
+                (preferred), or BED, interval list, GFF, or similar.""")
 P_target.add_argument('--short-names', action='store_true',
         help="Reduce multi-accession bait labels to be short and consistent.")
 P_target.add_argument('--split', action='store_true',
