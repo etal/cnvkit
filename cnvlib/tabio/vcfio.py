@@ -219,10 +219,11 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
 
         sample = record.samples[sample_id]
         try:
-            depth, zygosity, alt_count = _extract_genotype(sample)
+            depth, zygosity, alt_count = _extract_genotype(sample, record)
             if normal_id:
                 normal = record.samples[normal_id]
-                n_depth, n_zygosity, n_alt_count = _extract_genotype(normal)
+                n_depth, n_zygosity, n_alt_count = _extract_genotype(normal,
+                                                                     record)
                 if n_zygosity == 0:
                     is_som = True
         # if alt_count is np.nan:
@@ -249,11 +250,14 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
         logging.info('Filtered out %d records', cnt_reject)
 
 
-def _extract_genotype(sample):
+def _extract_genotype(sample, record):
     if 'DP' in sample:
         depth = sample['DP']
     elif 'AD' in sample and isinstance(sample['AD'], tuple):
         depth = _safesum(sample['AD'])
+    elif 'DP' in record.info:
+        logging.warn("Using INFO DP") # XXX DBG
+        depth = record.info['DP']
     else:
         # SV or not called, probably
         depth = np.nan  #0.0
