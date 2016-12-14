@@ -36,7 +36,7 @@ def _flatten_overlapping(table, combine):
     Assume chromosome and (if relevant) strand are already identical, so only
     start and end coordinates are considered.
     """
-    keyed_groups = zip(_nonoverlapping_groups(table),
+    keyed_groups = zip(_nonoverlapping_groups(table, 0),
                        table.itertuples(index=False))
     #  flat_rows = itertools.chain(
     #      *(_flatten_tuples(row_group, combine)
@@ -90,7 +90,7 @@ def _flatten_tuples(keyed_rows, combine):
                                  **extra_fields)
 
 
-def merge(table, stranded=False, combine=None):
+def merge(table, bp, stranded, combine):
     """Merge overlapping rows in a DataFrame."""
     if stranded:
         groupkey = ['chromosome', 'strand']
@@ -101,14 +101,14 @@ def merge(table, stranded=False, combine=None):
     cmb = get_combiners(table, stranded, combine)
     out = (table.groupby(by=groupkey,
                          as_index=False, group_keys=False, sort=False)
-           .apply(_merge_overlapping, cmb)
+           .apply(_merge_overlapping, bp, cmb)
            .reset_index(drop=True))
     # Re-sort chromosomes cleverly instead of lexicographically
     return out.reindex(out.chromosome.apply(sorter_chrom)
                        .sort_values(kind='mergesort').index)
 
 
-def _merge_overlapping(table, combine):
+def _merge_overlapping(table, bp, combine):
     """Merge overlapping regions within a chromosome/strand.
 
     Assume chromosome and (if relevant) strand are already identical, so only
@@ -121,7 +121,7 @@ def _merge_overlapping(table, combine):
     # advantage of the grouping and sorting already done, and don't repeat
     # pandas' traversal and inferences.
     # ENH: Find & use a lower-level, 1-pass pandas function
-    keyed_groups = zip(_nonoverlapping_groups(table),
+    keyed_groups = zip(_nonoverlapping_groups(table, bp),
                        table.itertuples(index=False))
     merged_rows = [_squash_tuples(row_group, combine)
                    for _key, row_group in itertools.groupby(keyed_groups,
@@ -130,11 +130,12 @@ def _merge_overlapping(table, combine):
                                      columns=merged_rows[0]._fields)
 
 
-def _nonoverlapping_groups(table):
+def _nonoverlapping_groups(table, bp):
     """Identify and enumerate groups of overlapping rows.
 
     That is, increment the group ID after each non-negative gap between
-    intervals. Intervals (rows) will be merged if any bases overlap.
+    intervals. Intervals (rows) will be merged if any bases overlap by at least
+    `bp`.
     """
     # Examples:
     #
@@ -144,7 +145,7 @@ def _nonoverlapping_groups(table):
     #  gap?     T  F  T  T  F  F  F  T
     #  group  0  0  1  1  1  2  3  4  4
     gap_sizes = table.start.values[1:] - table.end.cummax().values[:-1]
-    return np.r_[False, gap_sizes >= 0].cumsum()
+    return np.r_[False, gap_sizes > (-bp)].cumsum()
 
 
 # Squash rows according to a given grouping criterion

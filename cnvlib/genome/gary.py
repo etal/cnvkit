@@ -527,12 +527,12 @@ class GenomicArray(object):
         """Split this array's regions where they overlap."""
         return self.as_dataframe(flatten(self.data, combine=combine))
 
-    def merge(self, combine=None):
+    def merge(self, bp=0, stranded=False, combine=None):
         """Merge overlapping regions into single rows.
 
         Similar to 'bedtools merge'.
         """
-        return self.as_dataframe(merge(self.data, combine=combine))
+        return self.as_dataframe(merge(self.data, bp, stranded, combine))
 
     def resize_ranges(self, bp, chrom_sizes=None):
         """Resize each genomic bin by a fixed number of bases at each end.
