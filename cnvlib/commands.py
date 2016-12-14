@@ -1231,13 +1231,13 @@ P_scatter_aes.add_argument('-b', '--background-marker', metavar='CHARACTER',
                 [Default: same as targets]""")
 P_scatter_aes.add_argument('--segment-color', default=plots.SEG_COLOR,
         help="""Plot segment lines in this color. Value can be any string
-                accepted by matplotlib.""")
+                accepted by matplotlib, e.g. 'red' or '#CC0000'.""")
 P_scatter_aes.add_argument('--title',
         help="Plot title. [Default: sample ID, from filename or -i]")
 P_scatter_aes.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
-P_scatter_aes.add_argument('--y-min', type=float, help="y-axis lower limit.")
 P_scatter_aes.add_argument('--y-max', type=float, help="y-axis upper limit.")
+P_scatter_aes.add_argument('--y-min', type=float, help="y-axis lower limit.")
 
 P_scatter_vcf = P_scatter.add_argument_group(
     "To plot SNP b-allele frequencies")
