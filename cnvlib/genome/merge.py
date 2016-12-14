@@ -90,7 +90,7 @@ def _flatten_tuples(keyed_rows, combine):
                                  **extra_fields)
 
 
-def merge(table, bp, stranded, combine):
+def merge(table, bp=0, stranded=False, combine=None):
     """Merge overlapping rows in a DataFrame."""
     if stranded:
         groupkey = ['chromosome', 'strand']
