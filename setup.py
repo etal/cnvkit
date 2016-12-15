@@ -21,7 +21,7 @@ try:
             'pyfaidx >= 0.4.7',
             'pysam >= 0.9.1.4',
             'reportlab >= 3.0',
-            'scipy >= 0.9',
+            'scipy >= 0.15.0',
         ])
 except ImportError:
     from distutils.core import setup
