@@ -194,11 +194,11 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     try:
         lines = pysam.bedcov(bed_fname, bam_fname, *bedcov_args)
     except pysam.SamtoolsError as exc:
-        raise ValueError("Failed processing %r coverages in %r regions. PySAM error: %s"
-                         % (bam_fname, bed_fname, exc))
+        raise ValueError("Failed processing %r coverages in %r regions. "
+                         "PySAM error: %s" % (bam_fname, bed_fname, exc))
     if not lines:
-        raise ValueError("BED file %r sequence IDs don't match any in BAM file %r"
-                         % (bed_fname, bam_fname))
+        raise ValueError("BED file %r chromosome names don't match any in "
+                         "BAM file %r" % (bed_fname, bam_fname))
     # Return an iterable...
     if isinstance(lines, (basestring, str, bytes)):
         lines = str(lines).splitlines()
