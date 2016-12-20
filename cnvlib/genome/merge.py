@@ -92,6 +92,9 @@ def _flatten_tuples(keyed_rows, combine):
 
 def merge(table, bp=0, stranded=False, combine=None):
     """Merge overlapping rows in a DataFrame."""
+    if not len(table):
+        return table
+
     if stranded:
         groupkey = ['chromosome', 'strand']
     else:
