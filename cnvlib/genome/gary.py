@@ -409,7 +409,7 @@ class GenomicArray(object):
                              % (type(other), self.__class__))
         if not len(other.data):
             return self.copy()
-        self.data = pd.concat([self.data, other.data])
+        self.data = self.data.append(other.data, ignore_index=True)
         self.sort()
 
     def concat(self, others):
@@ -417,7 +417,8 @@ class GenomicArray(object):
 
         This array's data table is not implicitly included in the result.
         """
-        result = self.as_dataframe(pd.concat([otr.data for otr in others]))
+        table = pd.concat([otr.data for otr in others], ignore_index=True)
+        result = self.as_dataframe(table)
         result.sort()
         return result
 
