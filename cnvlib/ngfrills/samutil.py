@@ -7,8 +7,6 @@ from itertools import islice
 
 import pysam
 
-from .shared import is_newer_than
-
 
 def ensure_bam_index(bam_fname):
     """Ensure a BAM file is indexed, to enable fast traversal & lookup.
@@ -62,3 +60,9 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50):
             return False
         last_read = read
     return True
+
+
+def is_newer_than(target_fname, orig_fname):
+    if not os.path.isfile(target_fname):
+        return False
+    return (os.stat(target_fname).st_mtime >= os.stat(orig_fname).st_mtime)
