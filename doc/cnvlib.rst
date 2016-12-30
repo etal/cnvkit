@@ -216,14 +216,6 @@ Helper modules
     :undoc-members:
     :show-inheritance:
 
-``ngfrills``
-~~~~~~~~~~~~
-
-.. automodule:: cnvlib.ngfrills
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 ``parallel``
 ~~~~~~~~~~~~
 
@@ -246,6 +238,14 @@ Defines several constants used in the pipeline.
 ~~~~~~~~~
 
 .. automodule:: cnvlib.plots
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``samutil``
+~~~~~~~~~~~~
+
+.. automodule:: cnvlib.samutil
     :members:
     :undoc-members:
     :show-inheritance:

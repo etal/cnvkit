@@ -27,10 +27,9 @@ from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
-from . import (core, ngfrills, parallel, params, descriptives,
+from . import (core, descriptives, parallel, params, plots, samutil, tabio,
                access, antitarget, call, coverage, export, fix, importers,
-               metrics, plots, reference, reports, segfilters, segmentation,
-               target, tabio)
+               metrics, reference, reports, segfilters, segmentation, target)
 from .cnary import CopyNumArray as _CNA
 from .genome import GenomicArray as _GA
 from ._version import __version__
@@ -107,12 +106,12 @@ def _cmd_batch(args):
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = tabio.read_cna(args.reference)
-        target_coords, antitarget_coords = reference.reference2regions(ref_arr)
+        targets, antitargets = reference.reference2regions(ref_arr)
         ref_pfx = os.path.join(args.output_dir, core.fbase(args.reference))
         args.targets = ref_pfx + '.target-tmp.bed'
         args.antitargets = ref_pfx + '.antitarget-tmp.bed'
-        core.write_tsv(args.targets, target_coords)
-        core.write_tsv(args.antitargets, antitarget_coords)
+        tabio.write(args.targets, targets, 'bed4')
+        tabio.write(args.antitargets, antitargets, 'bed4')
 
     if args.bam_files:
         if args.processes == 1:
@@ -517,10 +516,10 @@ def _cmd_coverage(args):
 @public
 def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1):
     """Calculate coverage in the given regions from BAM read depths."""
-    if not ngfrills.ensure_bam_sorted(bam_fname):
+    if not samutil.ensure_bam_sorted(bam_fname):
         raise RuntimeError("BAM file %s must be sorted by coordinates"
                             % bam_fname)
-    ngfrills.ensure_bam_index(bam_fname)
+    samutil.ensure_bam_index(bam_fname)
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
     cnarr = coverage.interval_coverages(bed_fname, bam_fname, by_count,
                                         min_mapq, processes)

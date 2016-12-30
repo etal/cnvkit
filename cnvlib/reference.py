@@ -246,13 +246,10 @@ def fasta_extract_regions(fa_fname, intervals):
                 yield fa_file[_chrom][start.item():end.item()]
 
 
-def reference2regions(reference, coord_only=False):
-    """Split reference into iterables of target and antitarget regions.
-
-    Returns two iterables of target and antitarget region coordinates.
-    """
-    coord_kw = {} if coord_only else {'also': ['gene']}
+def reference2regions(reference):
+    """Split reference into target and antitarget regions."""
     is_bg = (reference['gene'] == 'Background')
-    targets = reference[~is_bg]
-    antitargets = reference[is_bg]
-    return targets.coords(**coord_kw), antitargets.coords(**coord_kw)
+    regions = reference.keep_columns(['chromosome', 'start', 'end', 'gene'])
+    targets = regions[~is_bg]
+    antitargets = regions[is_bg]
+    return targets, antitargets

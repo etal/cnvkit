@@ -40,7 +40,6 @@ setup_args.update(
     packages=[
         'cnvlib',
         'cnvlib.genome',
-        'cnvlib.ngfrills',
         'cnvlib.segmentation',
         'cnvlib.tabio',
     ],

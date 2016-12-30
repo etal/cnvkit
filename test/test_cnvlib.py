@@ -9,10 +9,9 @@ import numpy as np
 import cnvlib
 from cnvlib.genome import GenomicArray
 # Import all modules as a smoke test
-from cnvlib import (access, antitarget, commands, core, coverage, diagram,
-                    export, fix, importers, metrics, ngfrills, params, plots,
-                    reference, reports, segmentation, smoothing, tabio,
-                    cnary, vary)
+from cnvlib import (access, antitarget, cnary, commands, core, coverage,
+                    diagram, export, fix, importers, metrics, params, plots,
+                    reference, reports, segmentation, smoothing, tabio, vary)
 
 
 class CNATests(unittest.TestCase):
