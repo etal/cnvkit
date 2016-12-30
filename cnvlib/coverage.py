@@ -19,6 +19,7 @@ from . import tabio
 from .cnary import CopyNumArray as CNA
 from .core import fbase
 from .params import NULL_LOG2_COVERAGE, READ_LEN
+from .samutil import bam_total_reads
 
 
 def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
@@ -224,19 +225,3 @@ def bedcov(bed_fname, bam_fname, min_mapq):
                math.log(mean_depth, 2) if mean_depth else NULL_LOG2_COVERAGE,
                mean_depth)
         yield count, row
-
-
-def bam_total_reads(bam_fname):
-    """Count the total number of mapped reads in a BAM file.
-
-    Uses the BAM index to do this quickly.
-    """
-    lines = pysam.idxstats(bam_fname)
-    if isinstance(lines, basestring):
-        lines = lines.splitlines()
-    tot_mapped_reads = 0
-    for line in lines:
-        _seqname, _seqlen, nmapped, _nunmapped = line.split()
-        tot_mapped_reads += int(nmapped)
-    return tot_mapped_reads
-

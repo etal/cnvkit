@@ -8,6 +8,21 @@ from itertools import islice
 import pysam
 
 
+def bam_total_reads(bam_fname):
+    """Count the total number of mapped reads in a BAM file.
+
+    Uses the BAM index to do this quickly.
+    """
+    lines = pysam.idxstats(bam_fname)
+    if isinstance(lines, basestring):
+        lines = lines.splitlines()
+    tot_mapped_reads = 0
+    for line in lines:
+        _seqname, _seqlen, nmapped, _nunmapped = line.split()
+        tot_mapped_reads += int(nmapped)
+    return tot_mapped_reads
+
+
 def ensure_bam_index(bam_fname):
     """Ensure a BAM file is indexed, to enable fast traversal & lookup.
 
