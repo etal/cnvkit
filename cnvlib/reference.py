@@ -5,8 +5,9 @@ from builtins import map, zip
 import logging
 
 import numpy as np
+import pyfaidx
 
-from . import core, fix, descriptives, ngfrills, params, tabio
+from . import core, fix, descriptives, params, tabio
 from .cnary import CopyNumArray as CNA
 
 
@@ -213,7 +214,7 @@ def get_fasta_stats(cnarr, fa_fname):
     """Calculate GC and RepeatMasker content of each bin in the FASTA genome."""
     logging.info("Calculating GC and RepeatMasker content in %s ...", fa_fname)
     gc_rm_vals = [calculate_gc_lo(subseq)
-                  for subseq in ngfrills.fasta_extract_regions(fa_fname, cnarr)]
+                  for subseq in fasta_extract_regions(fa_fname, cnarr)]
     gc_vals, rm_vals = zip(*gc_rm_vals)
     return np.asfarray(gc_vals), np.asfarray(rm_vals)
 
@@ -232,10 +233,23 @@ def calculate_gc_lo(subseq):
     return frac_gc, frac_lo
 
 
+def fasta_extract_regions(fa_fname, intervals):
+    """Extract an iterable of regions from an indexed FASTA file.
+
+    Input: FASTA file name; iterable of (seq_id, start, end) (1-based)
+    Output: iterable of string sequences.
+    """
+    with pyfaidx.Fasta(fa_fname, as_raw=True) as fa_file:
+        for chrom, subarr in intervals.by_chromosome():
+            logging.info("Extracting sequences from chromosome %s", chrom)
+            for _chrom, start, end in subarr.coords():
+                yield fa_file[_chrom][start.item():end.item()]
+
+
 def reference2regions(reference, coord_only=False):
     """Split reference into iterables of target and antitarget regions.
 
-    Like loading two BED files with ngfrills.parse_regions.
+    Returns two iterables of target and antitarget region coordinates.
     """
     coord_kw = {} if coord_only else {'also': ['gene']}
     is_bg = (reference['gene'] == 'Background')
