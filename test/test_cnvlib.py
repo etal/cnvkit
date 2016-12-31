@@ -227,6 +227,8 @@ class CommandTests(unittest.TestCase):
                                                min_mapq=min_mapq,
                                                processes=nprocs)
                     self.assertEqual(len(cna), 4)
+                    self.assertTrue((cna.log2 != 0).any())
+                    self.assertGreater(cna.log2.nunique(), 1)
 
     def test_export(self):
         """Run the 'export' command with each format."""
