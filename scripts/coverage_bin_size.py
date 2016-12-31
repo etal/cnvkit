@@ -222,7 +222,7 @@ if __name__ == '__main__':
                     help="""Potentially targeted genomic regions, e.g. all
                     possible exons for the reference genome. Format: BED,
                     interval list, etc.""")
-    AP.add_argument('-b', '--bp-per-bin', type=int, default=150000,
+    AP.add_argument('-b', '--bp-per-bin', type=float, default=100000.,
                     help="""Desired average number of bases per bin.
                     [Default: %(default)s]""")
     AP.add_argument('-o', '--output', help="Output filename.")
