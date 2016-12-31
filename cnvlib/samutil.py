@@ -1,11 +1,30 @@
 """BAM utilities."""
 from __future__ import absolute_import, division, print_function
+#  from builtins import str
+from past.builtins import basestring
 
 import logging
 import os
+from io import BytesIO
 from itertools import islice
 
+import numpy as np
+import pandas as pd
 import pysam
+
+
+def bam_read_counts(bam_fname, drop_unmapped=False):
+    """Get chromosome names, lengths, and number of mapped/unmapped reads.
+
+    Use the BAM index (.bai) to get the number of reads and size of each
+    chromosome. Contigs with no mapped reads are skipped.
+    """
+    handle = BytesIO(pysam.idxstats(bam_fname, split_lines=False))
+    table = pd.read_table(handle, header=None,
+                          names=['chromosome', 'length', 'mapped', 'unmapped'])
+    if drop_unmapped:
+        table = table[table.mapped != 0].drop('unmapped', axis=1)
+    return table
 
 
 def bam_total_reads(bam_fname):
@@ -13,14 +32,8 @@ def bam_total_reads(bam_fname):
 
     Uses the BAM index to do this quickly.
     """
-    lines = pysam.idxstats(bam_fname)
-    if isinstance(lines, basestring):
-        lines = lines.splitlines()
-    tot_mapped_reads = 0
-    for line in lines:
-        _seqname, _seqlen, nmapped, _nunmapped = line.split()
-        tot_mapped_reads += int(nmapped)
-    return tot_mapped_reads
+    table = bam_read_counts(bam_fname, drop_unmapped=True)
+    return table.mapped.sum()
 
 
 def ensure_bam_index(bam_fname):
@@ -78,6 +91,31 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50):
 
 
 def is_newer_than(target_fname, orig_fname):
+    """Compare file modification times."""
     if not os.path.isfile(target_fname):
         return False
     return (os.stat(target_fname).st_mtime >= os.stat(orig_fname).st_mtime)
+
+
+def get_read_length(bam, span=1000):
+    """Get (median) read length from first few reads in a BAM file.
+
+    Illumina reads all have the same length; other sequencers might not.
+
+    Parameters
+    ----------
+    bam : str or pysam.Samfile
+        Filename or pysam-opened BAM file.
+    n : int
+        Number of reads used to calculate median read length.
+    """
+    was_open = False
+    if isinstance(bam, basestring):
+        bam = pysam.Samfile(bam, 'rb')
+    else:
+        was_open = True
+    lengths = [read.query_length for read in islice(bam, span)
+               if read.query_length > 0]
+    if was_open:
+        bam.seek(0)
+    return np.median(lengths)
