@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 """Estimate on- and off-target coverages to calculate good average bin sizes."""
 from __future__ import absolute_import, division, print_function
+
 import argparse
 import logging
+import tempfile
 from io import BytesIO
 
 import numpy as np
@@ -14,13 +16,6 @@ from cnvlib.descriptives import weighted_median
 from cnvlib.genome.gary import GenomicArray as GA
 
 logging.basicConfig(level=logging.WARN, format="%(message)s")
-
-# Desired average number of bases per bin
-# E.g.
-#  reads-per-bin * read-length == binsize * depth = 50kbp
-#  binsize = 50kbp / depth
-#  depth = 500 -> binsize = 50,000 / 500  == 100
-BP_PER_BIN = 50000.0
 
 
 def main(args):
@@ -42,11 +37,23 @@ def main(args):
     targets = read_regions(args.targets)
     # Dispatch
     if args.method == 'amplicon':
-        amplicon(rc_table, read_len, args.bam, targets)
+        fields = amplicon(rc_table, read_len, args.bam, targets)
     elif args.method == 'hybrid':
-        hybrid(rc_table, read_len, args.bam, targets, access)
+        fields = hybrid(rc_table, read_len, args.bam, targets, access)
     elif args.method == 'wgs':
-        wgs(rc_table, read_len, access)
+        fields = wgs(rc_table, read_len, access)
+    print_table(fields, args.bp_per_bin)
+
+
+def print_table(fields, bp_per_bin):
+    """Print label-depth pairs as a table, with calculated bin size."""
+    width = max(len(label) for label, _ in fields)
+    print(' ' * width, "Depth", "Bin size", sep='\t')
+    for label, depth in fields:
+        print(label.ljust(width),
+              format(depth, '.3f'),
+              int(round(bp_per_bin / depth)),
+              sep='\t')
 
 
 def amplicon(rc_table, read_len, bam_fname, targets):
@@ -57,18 +64,10 @@ def amplicon(rc_table, read_len, bam_fname, targets):
         chrom mean cvg = read count / sum(target sizes)
     """
     rc_table = update_chrom_length(rc_table, targets)
-    depth = average_depth(rc_table, read_len)
-    print("          ", "Depth", "Bin size", sep='\t')
-    print("On-target:", depth, BP_PER_BIN / depth, sep='\t')
-    # DBG: Compare to sample_region_depths
-    #  print("\nALTERNATIVELY --")
-    #  depth = sample_region_depths(bam_fname, targets)
-    #  print("          ", "Depth", "Bin size", sep='\t')
-    #  print("On-target:", depth, BP_PER_BIN / depth, sep='\t')
-    #  print("\nALTERNATIVELY --")
-    #  depth = sample_region_cov(bam_fname, targets)
-    #  print("          ", "Depth", "Bin size", sep='\t')
-    #  print("On-target:", depth, BP_PER_BIN / depth, sep='\t')
+    bai_depth = average_depth(rc_table, read_len)
+    cov_depth = sample_region_cov(bam_fname, targets)
+    return (("Targets (bam index):", bai_depth),
+            ("Targets (sampling):", cov_depth))
 
 
 def hybrid(rc_table, read_len, bam_fname, targets, access=None):
@@ -84,12 +83,10 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None):
                     (in middle 50% of sizes)
     """
     # Only examine chromosomes present in all 2-3 input datasets
-
     ok_chroms = shared_chroms([rc_table, targets] +
                               [access] if access is not None else [])
     rc_table = rc_table[rc_table.chromosome.isin(ok_chroms)]
     targets = targets[targets.chromosome.isin(ok_chroms)]
-
     # Identify off-target regions
     if access is None:
         access = idxstats2ga(rc_table)
@@ -104,20 +101,8 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None):
     target_reads = (target_length * target_depth / read_len).values
     anti_table = anti_table.assign(mapped=anti_table.mapped - target_reads)
     anti_depth = average_depth(anti_table, read_len)
-    print("           ", "Depth", "Bin size", sep='\t')
-    print("On-target: ", target_depth, BP_PER_BIN / target_depth, sep='\t')
-    print("Off-target:", anti_depth, BP_PER_BIN / anti_depth, sep='\t')
-    # DBG
-    #  print("ALTERNATIVELY --")
-    #  anti_length = anti_table['length']
-    #  anti_depth = sample_region_cov(bam_fname, antitargets)
-    #  anti_reads = (anti_length * anti_depth / read_len).values
-    #  tgt_table = update_chrom_length(rc_table, targets)
-    #  tgt_table = tgt_table.assign(mapped=tgt_table.mapped - anti_reads)
-    #  tgt_depth = average_depth(tgt_table, read_len)
-    #  print("           ", "Depth", "Bin size", sep='\t')
-    #  print("On-target: ", tgt_depth, BP_PER_BIN / tgt_depth, sep='\t')
-    #  print("Off-target:", anti_depth, BP_PER_BIN / anti_depth, sep='\t')
+    return (("On-target: ", target_depth),
+            ("Off-target:", anti_depth))
 
 
 def wgs(rc_table, read_len, access=None):
@@ -129,8 +114,7 @@ def wgs(rc_table, read_len, access=None):
     if access is not None and len(access):
         rc_table = update_chrom_length(rc_table, access)
     depth = average_depth(rc_table, read_len)
-    print("       ", "Depth", "Bin size", sep='\t')
-    print("Genome:", depth, BP_PER_BIN / depth, sep='\t')
+    return (("Genome:", depth),)
 
 
 # ---
@@ -167,7 +151,7 @@ def total_region_size(regions):
     return (regions.end - regions.start).sum()
 
 
-def average_depth(table, read_length=100):
+def average_depth(table, read_length):
     """Estimate the average read depth across the genome.
 
     Returns
@@ -180,45 +164,30 @@ def average_depth(table, read_length=100):
     return weighted_median(mean_depths, table.length)
 
 
-def sample_region_depths(bam_fname, regions, max_num=100):
-    """."""
-    bam = pysam.Samfile(bam_fname, 'rb')
-    sizes = regions.end - regions.start
-    lo_size, hi_size = np.percentile(sizes, [25, 75])
-    midsize_regions = regions.data[(sizes >= lo_size) & (sizes <= hi_size)]
-    if len(midsize_regions) > max_num:
-        midsize_regions = midsize_regions.sample(max_num)
-    counter = 0
-    for reg in midsize_regions.itertuples(index=False):
-        counter += bam.count(reg.chromosome, reg.start, reg.end)
-    return counter / len(midsize_regions)
-
-
 def sample_region_cov(bam_fname, regions, max_num=100):
-    """."""
-    sizes = regions.end - regions.start
-    lo_size, hi_size = np.percentile(sizes, [25, 75])
-    midsize_regions = regions.data[(sizes >= lo_size) & (sizes <= hi_size)]
-    if len(midsize_regions) > max_num:
-        midsize_regions = midsize_regions.sample(max_num)
-    # XXX
-    import tempfile
+    """Calculate read depth in a randomly sampled subset of regions."""
+    midsize_regions = sample_midsize_regions(regions, max_num)
     with tempfile.NamedTemporaryFile(suffix='.bed', # mode='w+t'
                                     ) as f:
-        #  f.name
         tabio.write(regions.as_dataframe(midsize_regions), f, 'bed4')
         f.flush()
         #  cnvlib.coverage.bedcov(f.name, bam_fname, 0)
         raw = pysam.bedcov(f.name, bam_fname)
         table = pd.read_table(BytesIO(raw),
                               names=['chrom', 'start', 'end', 'gene', 'bp'])
-    assert len(table), table
     table = table[(table.end > table.start) & (table.bp > 0)]  # Safety
-    assert len(table), table
     depths = table.bp / (table.end - table.start)
-    avg_depth = depths.mean()
-    assert avg_depth > 0, table
-    return avg_depth
+    return depths.median()
+
+
+def sample_midsize_regions(regions, max_num):
+    """Randomly select a subset of up to `max_num` regions."""
+    sizes = regions.end - regions.start
+    lo_size, hi_size = np.percentile(sizes, [25, 75])
+    midsize_regions = regions.data[(sizes >= lo_size) & (sizes <= hi_size)]
+    if len(midsize_regions) > max_num:
+        midsize_regions = midsize_regions.sample(max_num)
+    return midsize_regions
 
 
 def shared_chroms(tables):
@@ -253,5 +222,8 @@ if __name__ == '__main__':
                     help="""Potentially targeted genomic regions, e.g. all
                     possible exons for the reference genome. Format: BED,
                     interval list, etc.""")
+    AP.add_argument('-b', '--bp-per-bin', type=int, default=150000,
+                    help="""Desired average number of bases per bin.
+                    [Default: %(default)s]""")
     AP.add_argument('-o', '--output', help="Output filename.")
     main(AP.parse_args())
