@@ -1,6 +1,6 @@
 """Supporting functions for the 'antitarget' command."""
-from __future__ import absolute_import, division
-from builtins import map, str, zip
+from __future__ import absolute_import, division, print_function
+from builtins import zip
 from past.builtins import basestring
 
 import atexit
@@ -12,7 +12,10 @@ import os.path
 import tempfile
 import time
 from concurrent import futures
+from io import StringIO
 
+import numpy as np
+import pandas as pd
 import pysam
 
 from . import tabio
@@ -188,40 +191,49 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     i.e. mean pileup depth across each region.
     """
     # Count bases in each region; exclude low-MAPQ reads
-    if min_mapq > 0:
-        bedcov_args = ['-Q', bytes(min_mapq)]
-    else:
-        bedcov_args = []
+    cmd = [bed_fname, bam_fname]
+    if min_mapq and min_mapq > 0:
+        cmd.extend(['-Q', bytes(min_mapq)])
     try:
-        lines = pysam.bedcov(bed_fname, bam_fname, *bedcov_args)
+        raw = pysam.bedcov(*cmd)
     except pysam.SamtoolsError as exc:
         raise ValueError("Failed processing %r coverages in %r regions. "
                          "PySAM error: %s" % (bam_fname, bed_fname, exc))
-    if not lines:
+    if not raw:
         raise ValueError("BED file %r chromosome names don't match any in "
                          "BAM file %r" % (bed_fname, bam_fname))
+    columns = detect_bedcov_columns(raw)
+    table = pd.read_table(StringIO(raw), names=columns, usecols=columns)
+    if 'gene' in table:
+        table['gene'] = table['gene'].fillna('-')
+    else:
+        table['gene'] = '-'
+    spans = table.end - table.start
+    # NB: User-supplied bins might be zero-width or reversed -- skip those
+    ok_idx = (spans > 0)
+    table = table.assign(count=0, mean_depth=0, log2=NULL_LOG2_COVERAGE)
+    table.loc[ok_idx, 'mean_depth'] = (table.loc[ok_idx, 'basecount']
+                                       / spans[ok_idx])
+    table.loc[ok_idx, 'log2'] = np.log2(table.loc[ok_idx, 'mean_depth'])
+    table.loc[ok_idx, 'count'] = table.loc[ok_idx, 'basecount'] / READ_LEN
     # Return an iterable...
-    if isinstance(lines, (basestring, str, bytes)):
-        lines = str(lines).splitlines()
-    for line in lines:
-        fields = str(line).split('\t', 5)
-        if len(fields) >= 5:
-            chrom, start_s, end_s, gene, basecount_s = fields[:5]
-        elif len(fields) == 4:
-            chrom, start_s, end_s, basecount_s = fields
-            gene = "-"
-        else:
-            raise RuntimeError("Bad line from bedcov:\n%r" % line)
-        start, end, basecount = map(int, (start_s, end_s, basecount_s.strip()))
-        span = end - start
-        if span > 0:
-            # Algebra from above
-            count = basecount / READ_LEN
-            mean_depth = basecount / span
-        else:
-            # User-supplied bins might be oddly constructed
-            count = mean_depth = 0
-        row = (chrom, start, end, gene,
-               math.log(mean_depth, 2) if mean_depth else NULL_LOG2_COVERAGE,
-               mean_depth)
-        yield count, row
+    # ENH: return dframe here and above; pd.concat
+    #   skip emitting count; calculate as: (depth * span)/READ_LEN
+    for row in table.itertuples(index=False):
+        yield row.count, (row.chromosome,
+                          row.start,
+                          row.end,
+                          row.gene,
+                          row.log2,
+                          row.mean_depth)
+
+
+def detect_bedcov_columns(text):
+    # NB: gene is optional; may be trailing cols
+    firstline = text[:text.index('\n')]
+    tabcount = firstline.count('\t')
+    if tabcount >= 4:
+        return ['chromosome', 'start', 'end', 'gene', 'basecount']
+    elif tabcount == 3:
+        return ['chromosome', 'start', 'end', 'basecount']
+    raise RuntimeError("Bad line from bedcov:\n%r" % firstline)
