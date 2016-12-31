@@ -3,16 +3,17 @@
 """Extract canonical gene coordinates from UCSC's refFlat.txt.
 
 Usage:
-    refFlat2bed.py /path/to/refFlat.txt > genes.bed
-    refFlat2bed.py -e /path/to/refFlat.txt > exons.bed
+    refFlat2bed.py /path/to/refFlat.txt -f > genes.bed
+    refFlat2bed.py /path/to/refFlat.txt -e -m > exons.bed
 """
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 import argparse
-import sys
+import logging
 
 from cnvlib import tabio
 
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 AP = argparse.ArgumentParser(description=__doc__)
 AP.add_argument('refflat',
@@ -37,4 +38,4 @@ if args.flatten:
     regions = regions.flatten()
 elif args.merge:
     regions = regions.merge(bp=args.merge)
-tabio.write(regions, args.output or sys.stdout, 'bed4')
+tabio.write(regions, args.output, 'bed4')

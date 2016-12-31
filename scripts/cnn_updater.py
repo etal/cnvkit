@@ -9,7 +9,7 @@ run this script on the old .cnn files to convert them to the new format,
 calculating 'depth' from 'log2'.
 
 """
-from __future__ import division, print_function
+from __future__ import absolute_import, division, print_function
 
 import argparse
 import logging
@@ -32,7 +32,6 @@ AP.add_argument("-s", "--suffix", default=".updated",
         help="""Filename suffix to add before the '.cnn' extension in output
                 files. [Default: %(default)s]""")
 args = AP.parse_args()
-
 
 for fname in args.cnn_files:
     cnarr = cnvlib.read(fname)
