@@ -594,11 +594,11 @@ class GenomicArray(object):
             return OrderedDict()
 
         genes = OrderedDict()
-        for row in self.data.itertuples():
-            if pd.isnull(row.gene):
+        for idx, genestr in self.data['gene'].iteritems():
+            if pd.isnull(genestr):
                 continue
-            for gene in row.gene.split(','):
+            for gene in genestr.split(','):
                 if gene not in genes:
                     genes[gene] = []
-                genes[gene].append(row.Index)
+                genes[gene].append(idx)
         return genes
