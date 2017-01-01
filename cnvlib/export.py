@@ -1,6 +1,6 @@
 """Export CNVkit objects and files to other formats."""
 from __future__ import absolute_import, division, print_function
-from builtins import map, range, str, zip
+from builtins import range, str, zip
 
 import collections
 import logging
@@ -213,7 +213,7 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female,
 # VCF
 
 VCF_HEADER = """\
-##fileformat=VCFv4.0
+##fileformat=VCFv4.2
 ##fileDate={date}
 ##source=CNVkit v{version}
 ##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END for imprecise variants">
@@ -315,6 +315,7 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
                          "FOLD_CHANGE=%f" % 2.0 ** out_row.log2,
                          "FOLD_CHANGE_LOG=%f" % out_row.log2,
                          "PROBES=%d" % out_row.probes
+                         # TODO - VCF fuzzy start/end (#72)
                          # CIPOS=-56,20;CIEND=-10,62
                         ])
 
@@ -430,9 +431,9 @@ def ref_means_nbins(tumor_segs, normal_cn):
 
 
 def theta_read_counts(log2_ratio, nbins,
-                      # These two scaling factors don't meaningfully affect
+                      # These scaling factors don't meaningfully affect
                       # THetA's calculation unless they're too small
-                      avg_depth=500, avg_bin_width=200):
+                      avg_depth=500, avg_bin_width=200, read_len=100):
     """Calculate segments' read counts from log2-ratios.
 
     Math:
@@ -447,7 +448,7 @@ def theta_read_counts(log2_ratio, nbins,
         read_count = bin_width * read_depth / read_length
     """
     read_depth = (2 ** log2_ratio) * avg_depth
-    read_count = nbins * avg_bin_width * read_depth / params.READ_LEN
+    read_count = nbins * avg_bin_width * read_depth / read_len
     return read_count.round().astype('int')
 
 

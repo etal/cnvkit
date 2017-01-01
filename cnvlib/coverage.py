@@ -18,16 +18,14 @@ import pandas as pd
 import pysam
 from Bio._py3k import StringIO
 
-from . import tabio
+from . import core, samutil, tabio
 from .cnary import CopyNumArray as CNA
-from .core import fbase
-from .params import NULL_LOG2_COVERAGE, READ_LEN
-from .samutil import bam_total_reads
+from .params import NULL_LOG2_COVERAGE
 
 
 def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
     """Calculate log2 coverages in the BAM file at each interval."""
-    meta = {'sample_id': fbase(bam_fname)}
+    meta = {'sample_id': core.fbase(bam_fname)}
     start_time = time.time()
 
     # Skip processing if the BED file is empty
@@ -52,7 +50,8 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
     else:
         table = interval_coverages_pileup(bed_fname, bam_fname, min_mapq,
                                           processes)
-        read_counts = table['basecount'] / READ_LEN # OR: depth*span/READ_LEN
+        read_len = samutil.get_read_length(bam_fname)
+        read_counts = table['basecount'] / read_len
         table = table.drop('basecount', axis=1)
         cnarr = CNA(table, meta)
 
@@ -70,7 +69,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
                  (tot_reads / len(read_counts)),
                  read_counts.min(),
                  read_counts.max())
-    tot_mapped_reads = bam_total_reads(bam_fname)
+    tot_mapped_reads = samutil.bam_total_reads(bam_fname)
     if tot_mapped_reads:
         logging.info("Percent reads in regions: %.3f (of %d mapped)",
                      100. * tot_reads / tot_mapped_reads,

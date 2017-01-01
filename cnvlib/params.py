@@ -4,9 +4,6 @@ MIN_REF_COVERAGE = -5.0
 MAX_REF_SPREAD = 1.0
 NULL_LOG2_COVERAGE = -20.0
 
-# Sequencing read length (or average, if it varies)
-READ_LEN = 100
-
 # Fragment size for paired-end reads
 INSERT_SIZE = 250
 
