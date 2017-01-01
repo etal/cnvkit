@@ -5,12 +5,12 @@ from past.builtins import basestring
 
 import logging
 import os
-from io import BytesIO
 from itertools import islice
 
 import numpy as np
 import pandas as pd
 import pysam
+from Bio._py3k import StringIO
 
 
 def bam_read_counts(bam_fname, drop_unmapped=False):
@@ -19,7 +19,7 @@ def bam_read_counts(bam_fname, drop_unmapped=False):
     Use the BAM index (.bai) to get the number of reads and size of each
     chromosome. Contigs with no mapped reads are skipped.
     """
-    handle = BytesIO(pysam.idxstats(bam_fname, split_lines=False))
+    handle = StringIO(pysam.idxstats(bam_fname, split_lines=False))
     table = pd.read_table(handle, header=None,
                           names=['chromosome', 'length', 'mapped', 'unmapped'])
     if drop_unmapped:
