@@ -1,7 +1,7 @@
 """Supporting functions for the 'antitarget' command."""
 from __future__ import absolute_import, division, print_function
 from builtins import str, zip
-from past.builtins import basestring
+from past.builtins import basestring, unicode
 
 import atexit
 import gzip
@@ -203,7 +203,8 @@ def bedcov(bed_fname, bam_fname, min_mapq):
         raise ValueError("BED file %r chromosome names don't match any in "
                          "BAM file %r" % (bed_fname, bam_fname))
     columns = detect_bedcov_columns(raw)
-    table = pd.read_table(StringIO(str(raw)), names=columns, usecols=columns)
+    table = pd.read_table(StringIO(unicode(raw)),
+                          names=columns, usecols=columns)
     if 'gene' in table:
         table['gene'] = table['gene'].fillna('-')
     else:
