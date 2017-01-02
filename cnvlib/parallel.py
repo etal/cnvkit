@@ -1,10 +1,14 @@
 """Utilities for multi-core parallel processing."""
 from __future__ import absolute_import, division, print_function
 from builtins import object
-from contextlib import contextmanager
 
+import atexit
+import tempfile
+import gzip
+import os
+from contextlib import contextmanager
 from concurrent import futures
-from concurrent.futures import wait
+#  from concurrent.futures import wait
 
 
 class SerialPool(object):
@@ -48,3 +52,34 @@ def pick_pool(nprocs):
         nprocs = None
     with futures.ProcessPoolExecutor(max_workers=nprocs) as pool:
         yield pool
+
+
+def rm(path):
+    """Safely remove a file."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+def to_chunks(bed_fname, chunk_size=5000):
+    """Split the bed-file into chunks for parallelization"""
+    k, chunk = 0, 0
+    fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
+    fh = os.fdopen(fd, "w")
+    atexit.register(rm, name)
+    for line in (gzip.open if bed_fname.endswith(".gz") else open)(bed_fname):
+        if line[0] == "#":
+            continue
+        k += 1
+        fh.write(line)
+        if k % chunk_size == 0:
+            fh.close()
+            yield name
+            chunk += 1
+            fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
+            fh = os.fdopen(fd, "w")
+    fh.close()
+    if k % chunk_size:
+        fh.close()
+        yield name

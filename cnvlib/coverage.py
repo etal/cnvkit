@@ -3,13 +3,9 @@ from __future__ import absolute_import, division, print_function
 from builtins import zip
 from past.builtins import basestring
 
-import atexit
-import gzip
 import logging
 import math
-import os
 import os.path
-import tempfile
 import time
 from concurrent import futures
 
@@ -20,6 +16,7 @@ from Bio._py3k import StringIO
 
 from . import core, samutil, tabio
 from .cnary import CopyNumArray as CNA
+from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 
@@ -146,37 +143,6 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
            math.log(depth, 2) if depth else NULL_LOG2_COVERAGE,
            depth)
     return count, row
-
-
-def rm(path):
-    """Safely remove a file."""
-    try:
-        os.unlink(path)
-    except OSError:
-        pass
-
-
-def to_chunks(bed_fname, chunk_size=5000):
-    """Split the bed-file into chunks for parallelization"""
-    k, chunk = 0, 0
-    fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
-    fh = os.fdopen(fd, "w")
-    atexit.register(rm, name)
-    for line in (gzip.open if bed_fname.endswith(".gz") else open)(bed_fname):
-        if line[0] == "#":
-            continue
-        k += 1
-        fh.write(line)
-        if k % chunk_size == 0:
-            fh.close()
-            yield name
-            chunk += 1
-            fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
-            fh = os.fdopen(fd, "w")
-    fh.close()
-    if k % chunk_size:
-        fh.close()
-        yield name
 
 
 def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1):
