@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 import pysam
 
-from ..vary import VariantArray as VA
+from . import simplevcf
 
 
 def read_vcf(infile, sample_id=None, normal_id=None,
@@ -34,7 +34,8 @@ def read_vcf(infile, sample_id=None, normal_id=None,
     if not vcf_reader.header.samples:
         logging.warn("VCF file %s has no samples; parsing minimal info", infile)
         # return sample_id, normal_id, _read_vcf_nosample(infile, skip_reject)
-        return _read_vcf_nosample(infile, skip_reject)
+        return (simplevcf.read_vcf(infile, skip_reject)
+                .assign(depth=0., alt_count=0., alt_freq=0.))
 
     sid, nid = _choose_samples(vcf_reader, sample_id, normal_id)
     logging.info("Selected test sample " + str(sid) +
@@ -72,29 +73,6 @@ def read_vcf(infile, sample_id=None, normal_id=None,
                  len(table), cnt_som, cnt_depth)
     # return sid, nid, table
     return table
-
-
-def _read_vcf_nosample(vcf_file, skip_reject=False):
-    columns = ['chromosome', 'start', 'ref', 'alt', # 'filter', 'info',
-              ]
-    dtypes = [str, int, str, str, # str, str
-             ]
-    table = pd.read_table(vcf_file,
-                          comment="#",
-                          header=None,
-                          na_filter=False,
-                          names=["chromosome", "start", "_ID", "ref", "alt",
-                                 "_QUAL", "filter", "info"],
-                          usecols=columns,
-                          # ENH: converters={'info': func to parse it}
-                          dtype=dict(zip(columns, dtypes)),
-                         )
-    # ENH: do things with filter, info
-    # if skip_reject and record.FILTER and len(record.FILTER) > 0:
-    table['end'] = table['start'] + table["alt"].str.len()  # ENH: INFO["END"]
-    table['start'] -= 1
-    logging.info("Loaded %d plain records", len(table))
-    return table.loc[:, VA._required_columns]
 
 
 def _choose_samples(vcf_reader, sample_id, normal_id):
