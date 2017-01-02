@@ -181,7 +181,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 # Choose median-size normal bam or tumor bam
                 bam_fname = sorted(normal_bams, key=lambda f: os.stat(f).st_size
                                   )[len(normal_bams) // 2 - 1]
-                rc_table = samutil.bam_read_counts(bam_fname, drop_unmapped=True)
+                rc_table = samutil.idxstats(bam_fname, drop_unmapped=True)
                 rc_table = autobin.update_chrom_length(rc_table, access_arr)
                 read_length = samutil.get_read_length(bam_fname)
                 wgs_depth = autobin.average_depth(rc_table, read_length)

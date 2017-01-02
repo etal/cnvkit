@@ -145,7 +145,7 @@ if args.method == 'amplicon' and args.access:
 samutil.ensure_bam_index(args.bam)
 
 # Prep
-rc_table = samutil.bam_read_counts(args.bam, drop_unmapped=True)
+rc_table = samutil.idxstats(args.bam, drop_unmapped=True)
 read_len = samutil.get_read_length(args.bam)
 logging.warn("Estimated read length %s", read_len)
 access = read_regions(args.access)

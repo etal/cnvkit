@@ -13,7 +13,7 @@ import pysam
 from Bio._py3k import StringIO
 
 
-def bam_read_counts(bam_fname, drop_unmapped=False):
+def idxstats(bam_fname, drop_unmapped=False):
     """Get chromosome names, lengths, and number of mapped/unmapped reads.
 
     Use the BAM index (.bai) to get the number of reads and size of each
@@ -32,7 +32,7 @@ def bam_total_reads(bam_fname):
 
     Uses the BAM index to do this quickly.
     """
-    table = bam_read_counts(bam_fname, drop_unmapped=True)
+    table = idxstats(bam_fname, drop_unmapped=True)
     return table.mapped.sum()
 
 
