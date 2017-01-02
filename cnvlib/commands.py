@@ -27,9 +27,10 @@ from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
-from . import (core, descriptives, parallel, params, plots, samutil, tabio,
-               access, antitarget, call, coverage, export, fix, importers,
-               metrics, reference, reports, segfilters, segmentation, target)
+from . import (access, antitarget, autobin, call, core, coverage, descriptives,
+               export, fix, importers, metrics, parallel, params, plots,
+               reference, reports, samutil, segfilters, segmentation, tabio,
+               target)
 from .cnary import CopyNumArray as _CNA
 from .genome import GenomicArray as _GA
 from ._version import __version__
@@ -134,7 +135,7 @@ def _cmd_batch(args):
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                          male_reference, fasta, annotate, short_names,
-                         target_avg_size, access, antitarget_avg_size,
+                         target_avg_size, access_bed, antitarget_avg_size,
                          antitarget_min_size, output_reference, output_dir,
                          processes, by_count, method):
     """Build the CN reference from normal samples, targets and antitargets."""
@@ -142,7 +143,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
         if antitarget_bed:
             raise ValueError("%r protocol: antitargets should not be "
                              "given/specified." % method)
-        if access and target_bed and access != target_bed:
+        if access_bed and target_bed and access_bed != target_bed:
             raise ValueError("%r protocol: targets and access should not be "
                              "different." % method)
 
@@ -152,9 +153,11 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
             raise ValueError("WGS protocol: need '--annotate' option "
                              "(e.g. refFlat.txt) to avoid later problems "
                              "locating genes in data.")
+        access_arr = None
         if not target_bed:
-            if access:
-                target_bed = access
+            # TODO - drop weird contigs before writing, see antitargets.py
+            if access_bed:
+                target_bed = access_bed
             elif fasta:
                 # Run 'access' on the fly
                 access_arr = do_access(fasta)
@@ -166,7 +169,29 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 raise ValueError("WGS protocol: need to provide --targets, "
                                  "--access, or --fasta options.")
         # Tweak default parameters
-        target_avg_size = target_avg_size or 5000
+        if not target_avg_size:
+            if normal_bams:
+                # Estimate from .bai & access
+                # NB: Always calculate wgs_depth from all sequencing-accessible
+                # area (it doesn't take that long compared to WGS coverage);
+                # user-provided access might be something else that excludes a
+                # significant number of mapped reads.
+                if not access_arr:
+                    access_arr = do_access(fasta)
+                # Choose median-size normal bam or tumor bam
+                bam_fname = sorted(normal_bams, key=lambda f: os.stat(f).st_size
+                                  )[len(normal_bams) // 2 - 1]
+                rc_table = samutil.bam_read_counts(bam_fname, drop_unmapped=True)
+                rc_table = autobin.update_chrom_length(rc_table, access_arr)
+                read_length = samutil.get_read_length(bam_fname)
+                wgs_depth = autobin.average_depth(rc_table, read_length)
+                target_avg_size = int(round(50000. / wgs_depth))
+                logging.info("WGS average depth %.2f --> using bin size %d",
+                             wgs_depth, target_avg_size)
+
+            else:
+                # Good down to 10x
+                target_avg_size = 5000
 
     # To make temporary filenames for processed targets or antitargets
     tgt_name_base, _tgt_ext = os.path.splitext(os.path.basename(target_bed))
@@ -189,8 +214,8 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
         if method == "hybrid":
             # Build antitarget BED from the given targets
             anti_kwargs = {}
-            if access:
-                anti_kwargs['access'] = tabio.read_auto(access)
+            if access_bed:
+                anti_kwargs['access'] = tabio.read_auto(access_bed)
             if antitarget_avg_size:
                 anti_kwargs['avg_bin_size'] = antitarget_avg_size
             if antitarget_min_size:
