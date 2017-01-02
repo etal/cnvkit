@@ -1,27 +1,21 @@
 """Segmentation of copy number values."""
 from __future__ import absolute_import, division, print_function
+from builtins import map
+
+import locale
 import logging
 import math
 import os.path
 import tempfile
-import locale
+from concurrent import futures
 
 import numpy as np
 import pandas as pd
+from Bio._py3k import StringIO
 
 from .. import core, params, smoothing, tabio, vary
 from ..cnary import CopyNumArray as CNA
 from . import cbs, flasso, haar
-
-from concurrent import futures
-
-from Bio._py3k import StringIO, map
-
-
-def _to_str(s, enc=locale.getpreferredencoding()):
-    if isinstance(s, bytes):
-        return s.decode(enc)
-    return s
 
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
@@ -57,6 +51,12 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
     if save_dataframe:
         return cna, rstr
     return cna
+
+
+def _to_str(s, enc=locale.getpreferredencoding()):
+    if isinstance(s, bytes):
+        return s.decode(enc)
+    return s
 
 
 def _ds(args):
