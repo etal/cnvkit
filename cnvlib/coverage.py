@@ -149,7 +149,7 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1):
     """Calculate log2 coverages in the BAM file at each interval."""
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
     if procs == 1:
-        return bedcov(bed_fname, bam_fname, min_mapq)
+        table = bedcov(bed_fname, bam_fname, min_mapq)
     else:
         chunks = []
         with futures.ProcessPoolExecutor(procs) as pool:
@@ -158,7 +158,21 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1):
             for bed_chunk_fname, table in pool.map(_bedcov, args_iter):
                 chunks.append(table)
                 rm(bed_chunk_fname)
-        return pd.concat(chunks, ignore_index=True)
+        table = pd.concat(chunks, ignore_index=True)
+    # Fill in CNA required columns
+    if 'gene' in table:
+        table['gene'] = table['gene'].fillna('-')
+    else:
+        table['gene'] = '-'
+    # NB: User-supplied bins might be zero-width or reversed -- skip those
+    spans = table.end - table.start
+    ok_idx = (spans > 0)
+    table = table.assign(depth=0, log2=NULL_LOG2_COVERAGE)
+    table.loc[ok_idx, 'depth'] = (table.loc[ok_idx, 'basecount']
+                                    / spans[ok_idx])
+    ok_idx = (table['depth'] > 0)
+    table.loc[ok_idx, 'log2'] = np.log2(table.loc[ok_idx, 'depth'])
+    return table
 
 
 def _bedcov(args):
@@ -187,17 +201,6 @@ def bedcov(bed_fname, bam_fname, min_mapq):
                          "BAM file %r" % (bed_fname, bam_fname))
     columns = detect_bedcov_columns(raw)
     table = pd.read_table(StringIO(raw), names=columns, usecols=columns)
-    if 'gene' in table:
-        table['gene'] = table['gene'].fillna('-')
-    else:
-        table['gene'] = '-'
-    # NB: User-supplied bins might be zero-width or reversed -- skip those
-    spans = table.end - table.start
-    ok_idx = (spans > 0)
-    table = table.assign(depth=0, log2=NULL_LOG2_COVERAGE)
-    table.loc[ok_idx, 'depth'] = (table.loc[ok_idx, 'basecount']
-                                  / spans[ok_idx])
-    table.loc[ok_idx, 'log2'] = np.log2(table.loc[ok_idx, 'depth'])
     return table
 
 

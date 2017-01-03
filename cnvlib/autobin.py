@@ -54,15 +54,14 @@ def sample_region_cov(bam_fname, regions, max_num=100):
         tabio.write(regions.as_dataframe(midsize_regions), f, 'bed4')
         f.flush()
         table = coverage.bedcov(f.name, bam_fname, 0)
-    table = table[(table.end > table.start) & (table.basecount > 0)]  # Safety
-    depths = table.basecount / (table.end - table.start)
-    return depths.median()
+    # Mean read depth across all sampled regions
+    return table.basecount.sum() / (table.end - table.start).sum()
 
 
 def sample_midsize_regions(regions, max_num):
     """Randomly select a subset of up to `max_num` regions."""
     sizes = regions.end - regions.start
-    lo_size, hi_size = np.percentile(sizes, [25, 75])
+    lo_size, hi_size = np.percentile(sizes[sizes > 0], [25, 75])
     midsize_regions = regions.data[(sizes >= lo_size) & (sizes <= hi_size)]
     if len(midsize_regions) > max_num:
         midsize_regions = midsize_regions.sample(max_num)
