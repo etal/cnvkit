@@ -332,10 +332,11 @@ P_batch.add_argument('-c', '--count-reads', action='store_true',
 P_batch.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
-P_batch.add_argument('-p', '--processes', type=int, default=1,
+P_batch.add_argument('-p', '--processes',
+        nargs='?', type=int, const=0, default=1,
         help="""Number of subprocesses used to running each of the BAM files in
-                parallel. Give 0 or a negative value to use the maximum number
-                of available CPUs. [Default: process each BAM in serial]""")
+                parallel. Without an argument, use the maximum number of
+                available CPUs. [Default: process each BAM in serial]""")
 P_batch.add_argument("--rlibpath",
         help="Path to an alternative site-library to use for R packages.")
 
@@ -561,10 +562,11 @@ P_coverage.add_argument('-q', '--min-mapq', type=int, default=0,
         help="""Minimum mapping quality score (phred scale 0-60) to count a read
                 for coverage depth.  [Default: %(default)s]""")
 P_coverage.add_argument('-o', '--output', help="""Output file name.""")
-P_coverage.add_argument('-p', '--processes', type=int, default=1,
+P_coverage.add_argument('-p', '--processes',
+        nargs='?', type=int, const=0, default=1,
         help="""Number of subprocesses to calculate coverage in parallel.
-                Give 0 or a negative value to use the maximum number
-                of available CPUs. [Default: use 1 process]""")
+                Without an argument, use the maximum number of available CPUs.
+                [Default: use 1 process]""")
 P_coverage.set_defaults(func=_cmd_coverage)
 
 
@@ -822,7 +824,8 @@ P_segment.add_argument("--drop-outliers",
                 [Default: %(default)g]""")
 P_segment.add_argument("--rlibpath",
         help="Path to an alternative site-library to use for R packages.")
-P_segment.add_argument('-p', '--processes', type=int, default=1,
+P_segment.add_argument('-p', '--processes',
+        nargs='?', type=int, const=0, default=1,
         help="""Number of subprocesses to segment in parallel.
                 Give 0 or a negative value to use the maximum number
                 of available CPUs. [Default: use 1 process]""")
