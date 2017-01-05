@@ -1,10 +1,38 @@
-"""Utilities."""
+"""Operations on chromosome/contig/sequence names."""
 from __future__ import absolute_import, division, print_function
 
 from itertools import takewhile
 
-# __________________________________________________________________________
-# Sorting key functions
+import numpy as np
+import pandas as pd
+
+
+def detect_big_chroms(sizes):
+    """Determine the number of "big" chromosomes from their lengths.
+
+    In the human genome, this returns 24, where the canonical chromosomes 1-22,
+    X, and Y are considered "big", while mitochrondria and the alternative
+    contigs are not. This allows us to exclude the non-canonical chromosomes
+    from an analysis where they're not relevant.
+
+    Returns
+    -------
+    n_big : int
+        Number of "big" chromosomes in the genome.
+    thresh : int
+        Length of the smallest "big" chromosomes.
+    """
+    sizes = pd.Series(sizes).sort(ascending=False)
+    reldiff = sizes.diff().abs().values[1:] / sizes.values[:-1]
+    changepoints = np.where(reldiff > .5)
+    if changepoints:
+        n_big = changepoints[0] + 1
+        thresh = sizes[n_big - 1]
+    else:
+        n_big = len(sizes)
+        thresh = sizes[-1]
+    return n_big, thresh
+
 
 def sorter_chrom(label):
     """Create a sorting key from chromosome label.
