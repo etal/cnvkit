@@ -1066,12 +1066,17 @@ def _cmd_scatter(args):
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
             for region in tabio.read_auto(args.range_list).coords():
-                do_scatter(cnarr, segarr, varr, region, None,
-                           args.background_marker, args.trend,
-                           args.width, args.y_min, args.y_max,
-                           ("%s %s" % (args.title, region.chromosome)
-                            if args.title else None),
-                           args.segment_color)
+                try:
+                    do_scatter(cnarr, segarr, varr, region, None,
+                            args.background_marker, args.trend,
+                            args.width, args.y_min, args.y_max,
+                            ("%s %s" % (args.title, region.chromosome)
+                                if args.title else None),
+                            args.segment_color)
+                except ValueError as exc:
+                    # Probably no bins in the selected region
+                    logging.warn("Not plotting region %r: %s",
+                                 _GA.row2label(region), exc)
                 pdf_out.savefig()
                 pyplot.close()
     else:

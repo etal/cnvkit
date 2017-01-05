@@ -62,7 +62,7 @@ class GenomicArray(object):
     # XXX involve tabio.textcoord here?
     @staticmethod
     def row2label(row):
-        return "{}:{}-{}".format(row.chromosome, row.start, row.end)
+        return "{}:{}-{}".format(row.chromosome, row.start + 1, row.end)
 
     @classmethod
     def _make_blank(cls):

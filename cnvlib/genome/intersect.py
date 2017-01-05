@@ -81,11 +81,7 @@ def iter_ranges(table, chrom, starts, ends, mode):
             raise KeyError("Chromosome %s is not in this probe set" % chrom)
 
     # Edge cases
-    if not len(table):
-        yield []
-        raise StopIteration
-
-    if starts is None and ends is None:
+    if not len(table) or (starts is None and ends is None):
         yield table
         raise StopIteration
 
