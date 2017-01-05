@@ -529,7 +529,7 @@ class GenomicArray(object):
         return self.as_dataframe(flatten(self.data, combine=combine))
 
     def merge(self, bp=0, stranded=False, combine=None):
-        """Merge overlapping regions into single rows.
+        """Merge adjacent or overlapping regions into single rows.
 
         Similar to 'bedtools merge'.
         """
@@ -580,6 +580,13 @@ class GenomicArray(object):
     def subtract(self, other):
         """Remove the overlapping regions in `other` from this array."""
         return self.as_dataframe(subtract(self.data, other.data))
+
+    def total_range_size(self):
+        """Total number of bases covered by all (merged) regions."""
+        if not len(self):
+            return 0
+        regions = merge(self.data, bp=1)
+        return regions.end.sum() - regions.start.sum()
 
     def _get_gene_map(self):
         """Map unique gene names to their indices in this array.

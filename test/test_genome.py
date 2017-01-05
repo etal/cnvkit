@@ -131,6 +131,18 @@ class GaryTests(unittest.TestCase):
             self.assertLessEqual(0, arr.start.min())
             self.assertLessEqual(arr.end.max(), chrom_sizes[chrom])
 
+    def test_total_range_size(self):
+        """Test total region coverage calculation."""
+        for fname, area in (
+            ('formats/empty', 0),
+            ('formats/duke-my.bed', 103),
+            ('formats/dac-my.bed', 148),
+            ('formats/example.gff', 7951),
+            ('formats/refflat-mini.txt', 695404),
+        ):
+            regions = tabio.read_auto(fname)
+            self.assertEqual(regions.total_range_size(), area)
+
     def test_shuffle_sort(self):
         """Test shuffling and re-sorting the data array."""
         orig_cvg = tuple(self.ex_cnr['log2'][:10])

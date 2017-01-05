@@ -19,7 +19,11 @@ from .combiners import get_combiners, first_of
 
 
 def flatten(table, combine=None):
-    # # Input should already be sorted like this
+    if not len(table):
+        return table
+    if (table.start.values[1:] >= table.end.cummax().values[:-1]).all():
+        return table
+    # NB: Input should already be sorted like this
     table = table.sort_values(['chromosome', 'start', 'end'])
     cmb = get_combiners(table, False, combine)
     out = (table.groupby(by='chromosome',
@@ -93,6 +97,9 @@ def _flatten_tuples(keyed_rows, combine):
 def merge(table, bp=0, stranded=False, combine=None):
     """Merge overlapping rows in a DataFrame."""
     if not len(table):
+        return table
+    gap_sizes = table.start.values[1:] - table.end.cummax().values[:-1]
+    if (gap_sizes > -bp).all():
         return table
 
     if stranded:
