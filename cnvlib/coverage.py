@@ -124,12 +124,10 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
                     or read.is_qcfail
                     or read.mapq < min_mapq)
 
-    # Count reads with midpoint aligned within the interval
     count = 0
     bases = 0
     for read in bamfile.fetch(reference=chrom, start=start, end=end):
-        if (start <= (read.pos + .5*read.query_length) <= end
-            and filter_read(read)):
+        if filter_read(read):
             count += 1
             # Only count the bases aligned to the region
             rlen = read.query_length
