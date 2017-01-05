@@ -31,18 +31,16 @@ def read_vcf(infile, sample_id=None, normal_id=None,
     except Exception as exc:
         raise ValueError("Must give a VCF filename, not open file handle: %s"
                          % exc)
-    if not vcf_reader.header.samples:
-        logging.warn("VCF file %s has no samples; parsing minimal info", infile)
-        # return sample_id, normal_id, _read_vcf_nosample(infile, skip_reject)
-        return (simplevcf.read_vcf(infile, skip_reject)
-                .assign(depth=0., alt_count=0., alt_freq=0.))
-
-    sid, nid = _choose_samples(vcf_reader, sample_id, normal_id)
-    logging.info("Selected test sample " + str(sid) +
-                 (" and control sample %s" % nid if nid else ''))
-    # NB: in-place
-    vcf_reader.subset_samples(list(filter(None, (sid, nid))))
-
+    if vcf_reader.header.samples:
+        sid, nid = _choose_samples(vcf_reader, sample_id, normal_id)
+        logging.info("Selected test sample " + str(sid) +
+                    (" and control sample %s" % nid if nid else ''))
+        # NB: in-place
+        vcf_reader.subset_samples(list(filter(None, (sid, nid))))
+    else:
+        logging.warn("VCF file %s has no sample genotypes", infile)
+        sid = sample_id
+        nid = None
 
     columns = ['chromosome', 'start', 'end', 'ref', 'alt', 'somatic',
                'zygosity', 'depth', 'alt_count']
@@ -195,20 +193,37 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
         if record.info.get("SOMATIC"):
             is_som = True
 
-        sample = record.samples[sample_id]
-        try:
-            depth, zygosity, alt_count = _extract_genotype(sample, record)
-            if normal_id:
-                normal = record.samples[normal_id]
-                n_depth, n_zygosity, n_alt_count = _extract_genotype(normal,
-                                                                     record)
-                if n_zygosity == 0:
-                    is_som = True
-        # if alt_count is np.nan:
-        except Exception as exc:
-            logging.error("Skipping %s:%d %s @ %s; %s",
-                          record.chrom, record.pos, record.ref, sample.name, exc)
-            raise
+        if record.samples:
+            sample = record.samples[sample_id]
+            try:
+                depth, zygosity, alt_count = _extract_genotype(sample, record)
+                if normal_id:
+                    normal = record.samples[normal_id]
+                    n_depth, n_zygosity, n_alt_count = _extract_genotype(normal,
+                                                                         record)
+                    if n_zygosity == 0:
+                        is_som = True
+            except Exception as exc:
+                logging.error("Skipping %s:%d %s @ %s; %s",
+                              record.chrom, record.pos, record.ref, sample_id,
+                              exc)
+                raise
+        else:
+            # Assume unpaired tumor; take DP, AF from INFO (e.g. LoFreq)
+            depth = record.info.get('DP', 0.0)
+            if 'AF' in record.info:
+                alt_freq = record.info['AF']
+                alt_count = int(round(alt_freq * depth))
+                # NB: No genotype, so crudely guess from allele frequency
+                if alt_freq < 0.25:
+                    zygosity = 0.0
+                elif alt_freq < 0.75:
+                    zygosity = 0.5
+                else:
+                    zygosity = 1.0
+            else:
+                alt_count = 0
+                zygosity = 0.0
 
         # Split multiallelics?
         # XXX Ensure sample genotypes are handled properly
