@@ -23,14 +23,12 @@ import collections
 import logging
 import subprocess
 import sys
-from concurrent import futures
 
 import numpy as np
 import pandas as pd
 
 import cnvlib
-from cnvlib import tabio
-from cnvlib.parallel import to_chunks, rm
+from cnvlib import parallel, tabio
 from cnvlib.descriptives import modal_location
 from cnvlib.genome import GenomicArray as GA
 
@@ -40,27 +38,17 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 # ___________________________________________
 # Guided method: guess from potential targets
 
-def filter_targets(target_bed, sample_bams, min_depth, procs):
+def filter_targets(target_bed, sample_bams, procs):
     """Check if each potential target has significant coverage."""
     baits = tabio.read_auto(target_bed)
     # Loop over BAMs to calculate weighted averages of bin coverage depths
     total_depths = np.zeros(len(baits), dtype=np.float_)
     for bam_fname in sample_bams:
-        logging.info("Scanning targets in %s", bam_fname)
+        logging.info("Evaluating targets in %s", bam_fname)
         sample = cnvlib.do_coverage(target_bed, bam_fname, processes=procs)
         total_depths += sample['depth'].values
-    min_total_depth = min_depth * len(sample_bams)
-    # Normalize depths to a neutral value of 1.0
-    mode_dp = modal_location(total_depths[total_depths > min_total_depth])
     baits['depth'] = total_depths / len(sample_bams)
-    norm_depth = total_depths / mode_dp
-    baits['log2'] = np.log2(norm_depth)
-    # Drop low-coverage targets
-    ok_idx = (norm_depth >= 0.1)  # Require at least 10x enrichment
-    logging.info("Keeping %d/%d bins with average coverage depth >= %f, "
-                 "(initially %f), mode %f",
-                 ok_idx.sum(), len(ok_idx), mode_dp * 0.1, min_depth, mode_dp)
-    return baits[ok_idx]
+    return baits
 
 
 # _________________________________________
@@ -70,17 +58,19 @@ def scan_targets(access_bed, sample_bams, min_depth, min_gap, min_length,
                  procs):
     """Estimate baited regions from a genome-wide, per-base depth profile."""
     bait_chunks = []
-    # ENH: context manager to call rm on bed chunks?
+    # ENH: context manager to call rm on bed chunks? with to_chunks as pool, ck?
     logging.info("Scanning for enriched regions in:\n  %s",
                  '\n  '.join(sample_bams))
-    with futures.ProcessPoolExecutor(procs) as pool:
+    #  with futures.ProcessPoolExecutor(procs) as pool:
+    with parallel.pick_pool(procs) as pool:
         args_iter = ((bed_chunk, sample_bams,
                     min_depth, min_gap, min_length)
-                    for bed_chunk in to_chunks(access_bed))
+                    for bed_chunk in parallel.to_chunks(access_bed))
         for bed_chunk_fname, bait_chunk in pool.map(_scan_depth, args_iter):
             bait_chunks.append(bait_chunk)
-            rm(bed_chunk_fname)
+            parallel.rm(bed_chunk_fname)
     baits = GA(pd.concat(bait_chunks))
+    baits['depth'] /= len(sample_bams)
     return baits
 
 
@@ -106,13 +96,15 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
     """
     Region = collections.namedtuple('Region', 'chromosome start end depth')
 
-    if len(bam_fnames) == 1:
+    nsamples = len(bam_fnames)
+    if nsamples == 1:
         def get_depth(depths):
             return int(depths[0])
     else:
-        # ENH: take multiple BAMs; samtools emits add'l cols
+        min_depth *= nsamples
+        # NB: samtools emits additional BAMs' depths as trailing columns
         def get_depth(depths):
-            return np.median(map(int, depths))
+            return sum(map(int, depths))
 
     proc = subprocess.Popen(['samtools', 'depth',
                              '-Q',  '1',  # Skip pseudogenes
@@ -122,37 +114,36 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
                             shell=False)
 
     # Detect runs of >= min_depth; emit their coordinates
-    # ENH: Use the depth profile within each candidate region to choose a
-    # cutoff for the bait boundary, e.g. 1/2 the region's peak.
-    curr_chrom = start = end = None
-    tot_depth = 0
+    chrom = start = depths = None
     for line in proc.stdout:
         fields = line.split('\t')
-        chrom = fields[0]
-        pos = int(fields[1])
         depth = get_depth(fields[2:])
         is_enriched = (depth >= min_depth)
         if start is None:
             if is_enriched:
                 # Entering a new captured region
-                curr_chrom = chrom
-                start = pos - 1
-                end = pos
-                tot_depth = depth
+                chrom = fields[0]
+                start = int(fields[1]) - 1
+                depths = [depth]
             else:
                 # Still not in a captured region
                 continue
+        elif is_enriched and fields[0] == chrom:
+            # Still in a captured region -- extend it
+            depths.append(depth)
         else:
-            if is_enriched and chrom == curr_chrom:
-                # Still in a captured region -- extend it
-                end = pos
-                tot_depth += depth
-            else:
-                # Exiting a captured region
-                yield Region(curr_chrom, start, end,
-                             tot_depth / (end - start))
-                curr_chrom = start = end = None
-                tot_depth = 0
+            # Exiting a captured region
+            # Update target region boundaries
+            darr = np.asarray(depths)
+            half_depth = 0.5 * darr.max()
+            ok_dp_idx = np.nonzero(darr >= half_depth)[0]
+            start_idx = ok_dp_idx[0]
+            end_idx = ok_dp_idx[-1] + 1
+            yield Region(chrom,
+                            start + start_idx,
+                            start + end_idx,
+                            darr[start_idx:end_idx].mean())
+            chrom = start = depths = None
 
 
 def merge_gaps(regions, min_gap):
@@ -176,38 +167,57 @@ def drop_small(regions, min_length):
             if reg.end - reg.start >= min_length)
 
 
+# ___________________________________________
+# Shared
+
+def normalize_depth_log2_filter(baits, min_depth, enrich_ratio=0.1):
+    """Calculate normalized depth, add log2 column, filter by enrich_ratio."""
+    # Normalize depths to a neutral value of 1.0
+    dp_mode = modal_location(baits.data.loc[baits['depth'] > min_depth,
+                                            'depth'].values)
+    norm_depth = baits['depth'] / dp_mode
+    # Drop low-coverage targets
+    keep_idx = (norm_depth >= enrich_ratio)
+    logging.info("Keeping %d/%d bins with coverage depth >= %f, modal depth %f",
+                 keep_idx.sum(), len(keep_idx), dp_mode * enrich_ratio, dp_mode)
+    return baits[keep_idx]
+
+
 
 if __name__ == '__main__':
     AP = argparse.ArgumentParser(description=__doc__)
     AP.add_argument('sample_bams', nargs='+',
-                    # default="R15-08280_kapa-NGv3-PE100-NGv3-ready.bam",
-                    help="""Sample BAM file to test for target coverage""")
-    AP.add_argument('-o', '--output')
-    AP.add_argument('-c', '--coverage',
+                    help="""Sample BAM file(s) to test for target coverage""")
+    AP.add_argument('-o', '--output', metavar='FILENAME',
+                    help="""The inferred targets, in BED format.""")
+    AP.add_argument('-c', '--coverage', metavar='FILENAME',
                     help="""Filename to output average coverage depths in .cnn
                     format.""")
-    AP.add_argument('-p', '--processes', nargs='?', type=int, const=0, default=1,
+    AP.add_argument('-p', '--processes',
+                    metavar='CPU', nargs='?', type=int, const=0, default=1,
                     help="""Number of subprocesses to segment in parallel.
                     If given without an argument, use the maximum number
                     of available CPUs. [Default: use 1 process]""")
 
     AP_x = AP.add_mutually_exclusive_group(required=True)
     AP_x.add_argument('-t', '--targets', metavar='TARGET_BED',
-                    help="""Potentially targeted genomic regions, e.g. all
-                    possible exons for the reference genome.""")
+                      help="""Potentially targeted genomic regions, e.g. all
+                      possible exons for the reference genome. (Faster
+                      method)""")
     AP_x.add_argument('-a', '--access', metavar='ACCESS_BED',
-                    # default="~/code/cnvkit/data/access-5k-mappable.grch37.bed",
-                    help="""Sequencing-accessible genomic regions, or exons to
-                    use as possible targets (e.g. output of refFlat2bed.py)""")
+                      # default="../data/access-5k-mappable.grch37.bed",
+                      help="""Sequencing-accessible genomic regions, or exons to
+                      use as possible targets, e.g. output of refFlat2bed.py.
+                      (Slower method)""")
 
-    AP.add_argument('-d', '--min-depth', type=int, default=5,
+    AP.add_argument('-d', '--min-depth', metavar='DEPTH', type=int, default=5,
                     help="Minimum sequencing read depth to accept as captured.")
     # Just for --access
-    AP.add_argument('-g', '--min-gap', type=int, default=25,
-                    help="Merge regions with gaps below this threshold.")
-    AP.add_argument('-l', '--min-length', type=int, default=100,
+    AP.add_argument('-g', '--min-gap', metavar='GAP_SIZE', type=int, default=25,
+                    help="Merge regions separated by gaps smaller than this.")
+    AP.add_argument('-l', '--min-length',
+                    metavar='TARGET_SIZE', type=int, default=50,
                     help="Minimum region length to accept as captured.")
-    # ENH: for -t, another option to include each intron in testing
 
     args = AP.parse_args()
 
@@ -216,11 +226,12 @@ if __name__ == '__main__':
         args.processes = None
 
     if args.targets:
-        baits = filter_targets(args.targets, args.sample_bams, args.min_depth,
-                               args.processes)
+        baits = filter_targets(args.targets, args.sample_bams, args.processes)
     else:
-        baits = scan_targets(args.access, args.sample_bams, args.min_depth,
+        baits = scan_targets(args.access, args.sample_bams,
+                             0.5 * args.min_depth,  # More sensitive 1st pass
                              args.min_gap, args.min_length, args.processes)
+    baits = normalize_depth_log2_filter(baits, args.min_depth)
     tabio.write(baits, args.output or sys.stdout, 'bed')
     if args.coverage:
         baits['log2'] = np.log2(baits['depth'] / baits['depth'].median())
