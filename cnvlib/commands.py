@@ -2026,7 +2026,7 @@ P_extheta_vcf.add_argument('-i', '--sample-id',
                 -v/--vcf). [Default: taken the tumor_segment file name]""")
 P_extheta_vcf.add_argument('-n', '--normal-id',
         help="Corresponding normal sample ID in the input VCF.")
-P_extheta_vcf.add_argument('-m', '--min-depth', type=int, default=20,
+P_extheta_vcf.add_argument('-m', '--min-variant-depth', type=int, default=20,
         help="""Minimum read depth for a SNP in the VCF to be counted.
                 [Default: %(default)s]""")
 P_extheta_vcf.add_argument('-z', '--zygosity-freq',
