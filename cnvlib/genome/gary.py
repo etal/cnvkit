@@ -38,9 +38,9 @@ class GenomicArray(object):
                 # Rarely if ever needed -- prefer from_rows, from_columns, etc.
                 data_table = pd.DataFrame(data_table)
             if not all(c in data_table.columns for c in self._required_columns):
-                raise ValueError("data table must have at least columns %r;"
+                raise ValueError("data table must have at least columns %r; "
                                  "got %r" % (self._required_columns,
-                                             data_table.columns))
+                                             tuple(data_table.columns)))
             # Ensure columns are the right type
             # (in case they've been automatically converted to the wrong type,
             # e.g. chromosome names as integers; genome coordinates as floats)

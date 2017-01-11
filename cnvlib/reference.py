@@ -9,6 +9,7 @@ import pyfaidx
 
 from . import core, fix, descriptives, params, tabio
 from .cnary import CopyNumArray as CNA
+from .genome import GenomicArray as GA
 
 
 def bed2probes(bed_fname):
@@ -249,7 +250,8 @@ def fasta_extract_regions(fa_fname, intervals):
 def reference2regions(reference):
     """Split reference into target and antitarget regions."""
     is_bg = (reference['gene'] == 'Background')
-    regions = reference.keep_columns(['chromosome', 'start', 'end', 'gene'])
+    regions = GA(reference.data.loc[:, ('chromosome', 'start', 'end', 'gene')],
+                 {'sample_id': 'reference'})
     targets = regions[~is_bg]
     antitargets = regions[is_bg]
     return targets, antitargets

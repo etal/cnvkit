@@ -111,8 +111,8 @@ def _cmd_batch(args):
         ref_pfx = os.path.join(args.output_dir, core.fbase(args.reference))
         args.targets = ref_pfx + '.target-tmp.bed'
         args.antitargets = ref_pfx + '.antitarget-tmp.bed'
-        tabio.write(args.targets, targets, 'bed4')
-        tabio.write(args.antitargets, antitargets, 'bed4')
+        tabio.write(targets, args.targets, 'bed4')
+        tabio.write(antitargets, args.antitargets, 'bed4')
 
     if args.bam_files:
         if args.processes == 1:
@@ -120,9 +120,9 @@ def _cmd_batch(args):
             logging.info("Running %d samples in serial", len(args.bam_files))
         else:
             procs_per_bam = max(1, args.processes // len(args.bam_files))
-            logging.info("Running %d samples in %d processes",
-                         len(args.bam_files), args.processes)
-            logging.info("(That's %d processes per bam)", procs_per_bam)
+            logging.info("Running %d samples in %d processes "
+                         "(that's %d processes per bam)",
+                         len(args.bam_files), args.processes, procs_per_bam)
 
         with parallel.pick_pool(args.processes) as pool:
             for bam in args.bam_files:
