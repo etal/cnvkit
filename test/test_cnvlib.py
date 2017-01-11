@@ -17,9 +17,6 @@ from cnvlib import (access, antitarget, cnary, commands, core, coverage,
 class CNATests(unittest.TestCase):
     """Tests for the CopyNumArray class."""
 
-    def setUp(self):
-        self.ex_cnr = tabio.read_cna('formats/reference-tr.cnn')
-
     def test_empty(self):
         """Instantiate from an empty file."""
         cnarr = tabio.read_cna("formats/empty")
@@ -27,24 +24,26 @@ class CNATests(unittest.TestCase):
 
     def test_basic(self):
         """Test basic container functionality and magic methods."""
+        cna = tabio.read_cna('formats/reference-tr.cnn')
         # Length
-        self.assertEqual(len(self.ex_cnr),
+        self.assertEqual(len(cna),
                          linecount('formats/reference-tr.cnn') - 1)
         # Equality
         same = tabio.read_cna('formats/reference-tr.cnn')
-        self.assertEqual(self.ex_cnr, same)
+        self.assertEqual(cna, same)
         # Item access
-        orig = self.ex_cnr[0]
-        self.ex_cnr[0] = orig
-        self.ex_cnr[3:4] = self.ex_cnr[3:4]
-        self.ex_cnr[6:10] = self.ex_cnr[6:10]
-        self.assertEqual(tuple(self.ex_cnr[0]), tuple(same[0]))
-        self.assertEqual(self.ex_cnr[3:6], same[3:6])
+        orig = cna[0]
+        cna[0] = orig
+        cna[3:4] = cna[3:4]
+        cna[6:10] = cna[6:10]
+        self.assertEqual(tuple(cna[0]), tuple(same[0]))
+        self.assertEqual(cna[3:6], same[3:6])
 
     def test_center_all(self):
         """Test recentering."""
+        cna = tabio.read_cna('formats/reference-tr.cnn')
         # Median-centering an already median-centered array -> no change
-        chr1 = self.ex_cnr.in_range('chr1')
+        chr1 = cna.in_range('chr1')
         self.assertAlmostEqual(0, np.median(chr1['log2']), places=1)
         chr1.center_all()
         orig_chr1_cvg = np.median(chr1['log2'])
@@ -62,10 +61,11 @@ class CNATests(unittest.TestCase):
 
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""
-        self.assertIn('gc', self.ex_cnr)
-        cleaned = self.ex_cnr.drop_extra_columns()
+        cna = tabio.read_cna('formats/reference-tr.cnn')
+        self.assertIn('gc', cna)
+        cleaned = cna.drop_extra_columns()
         self.assertNotIn('gc', cleaned)
-        self.assertTrue((cleaned['log2'] == self.ex_cnr['log2']).all())
+        self.assertTrue((cleaned['log2'] == cna['log2']).all())
 
     def test_gender(self):
         """Guess chromosomal gender from chrX log2 ratio value."""
@@ -123,6 +123,14 @@ class CommandTests(unittest.TestCase):
         self.assertLess(0, len(commands.do_antitarget(baits, access, 200000)))
         self.assertLess(0, len(commands.do_antitarget(baits, access, 10000,
                                                       5000)))
+
+    def test_batch_reference(self):
+        """The 'batch' command with an existing reference."""
+        ref = cnvlib.read('formats/reference-tr.cnn')
+        targets, antitargets = reference.reference2regions(ref)
+        self.assertLess(0, len(antitargets))
+        self.assertEqual(len(antitargets), (ref['gene'] == 'Background').sum())
+        self.assertEqual(len(targets), len(ref) - len(antitargets))
 
     def test_breaks(self):
         """The 'breaks' command."""
