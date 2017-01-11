@@ -42,6 +42,7 @@ FAQ & How To
     :maxdepth: 2
 
     calling
+    baf
     tumor
     heterogeneity
     germline
