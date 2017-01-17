@@ -166,7 +166,9 @@ def _parse_pedigrees(vcf_reader):
     elif "GATKCommandLine.MuTect2" in meta:
         # GATK 3+ metadata is suboptimal. Apparent convention:
         # Tumor is the first sample, normal is the second.
-        yield tuple(vcf_reader.header.samples)
+        # Mutect2 can also run in tumor-only mode (safe fallback)
+        if len(vcf_reader.header.samples) == 2:
+            yield tuple(vcf_reader.header.samples)
 
 
 def _confirm_unique(sample_id, samples):
