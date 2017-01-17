@@ -20,8 +20,8 @@ POINT_COLOR = '#606060'
 HIGHLIGHT_COLOR = 'gold'
 MB = 1e-6  # To rescale from bases to megabases
 
-def setup_chromosome(axis, probes=None, segments=None, variants=None,
-                     y_min=None, y_max=None, y_label=None):
+
+def set_xlim_from(axis, probes=None, segments=None, variants=None):
     """Configure axes for plotting a single chromosome's data.
 
     Parameters
@@ -48,6 +48,10 @@ def setup_chromosome(axis, probes=None, segments=None, variants=None,
                             len(segments) if segments else 0,
                             len(variants) if variants else 0))
     axis.set_xlim(min_x * MB, max_x * MB)
+
+
+def setup_chromosome(axis, y_min=None, y_max=None, y_label=None):
+    """Configure axes for plotting a single chromosome's data."""
     if y_min and y_max:
         axis.set_ylim(y_min, y_max)
         if y_min < 0 < y_max:
@@ -60,7 +64,7 @@ def setup_chromosome(axis, probes=None, segments=None, variants=None,
 
 
 def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
-                      do_trend=False, y_min=None, y_max=None,
+                      do_trend=False, x_limits=None, y_min=None, y_max=None,
                       segment_color=SEG_COLOR):
     """Draw a scatter plot of probe values with CBS calls overlaid.
 
@@ -84,8 +88,12 @@ def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
         y_min = max(-5.0, min(y.min() - .1, -.3)) if len(y) else -1.1
     if not y_max:
         y_max = max(.3, y.max() + (.25 if genes else .1)) if len(y) else 1.1
-    setup_chromosome(axis, probes, segments, None, y_min, y_max,
-                     "Copy ratio (log2)")
+    if x_limits:
+        x_min, x_max = x_limits
+        axis.set_xlim(x_min * MB, x_max * MB)
+    else:
+        set_xlim_from(axis, probes, segments)
+    setup_chromosome(axis, y_min, y_max, "Copy ratio (log2)")
     if genes:
         # Rotate text in proportion to gene density
         ngenes = len(genes)
@@ -151,11 +159,10 @@ def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
                       color=segment_color, linewidth=4, solid_capstyle='round')
 
 
-def snv_on_chromosome(axis, variants, segments, genes,
-                      do_trend, do_boost=False):
-    # XXX only set x-limits if not already done for probes/segments
-    # setup_chromosome(axis, None, segments, variants,
-    #                  0.0, 1.0, "VAF")
+def snv_on_chromosome(axis, variants, segments, genes, do_trend):
+    # TODO set x-limits if not already done for probes/segments
+    # set_xlim_from(axis, None, segments, variants)
+    # setup_chromosome(axis, 0.0, 1.0, "VAF")
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
     axis.set_xlabel("Position (Mb)")
@@ -164,17 +171,14 @@ def snv_on_chromosome(axis, variants, segments, genes,
     axis.tick_params(which='both', direction='out',
                      labelbottom=False, labeltop=False)
 
-    x_mb = variants["start"] * MB
-    if do_boost:
-        y = variants.tumor_boost()
-    else:
-        y = np.asfarray(variants["alt_freq"])
+    x_mb = variants['start'] * MB
+    y = variants['alt_freq'].values
     axis.scatter(x_mb, y, color=POINT_COLOR, alpha=0.3)
     # TODO - highlight genes/selection
     if segments:
         # Draw average VAF within each segment
-        posns = np.asfarray(variants["start"]) # * MB
-        y = np.asfarray(y)
+        # TODO coordinate this w/ do_trend
+        posns = variants['start'].values # * MB
         for v_start, v_end, v_freq in group_snvs_by_segments(posns, y,
                                                              segments):
             # ENH: color by segment gain/loss
@@ -265,8 +269,7 @@ def _smooth_genome_log2(cnarr, smooth_func, width):
     return np.concatenate(out)
 
 
-def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend,
-                  do_boost=False):
+def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend):
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
@@ -283,12 +286,9 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend,
             x_posns_chrom[chrom] = []
             y_posns_chrom[chrom] = []
             continue
-        posns = np.asfarray(snvs["start"])
+        posns = snvs['start'].values
         x_posns = posns + curr_offset
-        if do_boost:
-            vafs = snvs.tumor_boost()
-        else:
-            vafs = np.asfarray(snvs["alt_freq"])
+        vafs = snvs['alt_freq'].values
         x_posns_chrom[chrom] = x_posns
         y_posns_chrom[chrom] = vafs
         # Trend bars: always calculated, only shown on request
