@@ -31,7 +31,7 @@ from . import (access, antitarget, autobin, call, core, coverage, descriptives,
                export, fix, importers, metrics, parallel, params, plots,
                reference, reports, samutil, segfilters, segmentation, tabio,
                target)
-from .scatter import do_scatter
+from .scatter import do_scatter, SEG_COLOR
 from .cnary import CopyNumArray as _CNA
 from .genome import GenomicArray as _GA
 from ._version import __version__
@@ -1069,11 +1069,11 @@ def _cmd_scatter(args):
             for region in tabio.read_auto(args.range_list).coords():
                 try:
                     do_scatter(cnarr, segarr, varr, region, None,
-                            args.background_marker, args.trend,
-                            args.width, args.y_min, args.y_max,
-                            ("%s %s" % (args.title, region.chromosome)
+                               args.background_marker, args.trend,
+                               args.width, args.y_min, args.y_max,
+                               ("%s %s" % (args.title, region.chromosome)
                                 if args.title else None),
-                            args.segment_color)
+                               args.segment_color)
                 except ValueError as exc:
                     # Probably no bins in the selected region
                     logging.warn("Not plotting region %r: %s",
@@ -1127,7 +1127,7 @@ P_scatter_aes.add_argument('-b', '--background-marker', metavar='CHARACTER',
         help="""Plot antitargets using this symbol when plotting in a selected
                 chromosomal region (-g/--gene or -c/--chromosome).
                 [Default: same as targets]""")
-P_scatter_aes.add_argument('--segment-color', default=plots.SEG_COLOR,
+P_scatter_aes.add_argument('--segment-color', default=SEG_COLOR,
         help="""Plot segment lines in this color. Value can be any string
                 accepted by matplotlib, e.g. 'red' or '#CC0000'.""")
 P_scatter_aes.add_argument('--title',
