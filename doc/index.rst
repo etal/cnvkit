@@ -64,8 +64,7 @@ Python API
 Citation
 ========
 
-We have published a paper describing CNVkit.
-If you use this software in a publication, please cite:
+If you use this software in a publication, please cite our paper describing CNVkit:
 
     Talevich, E., Shain, A.H., Botton, T., & Bastian, B.C. (2014).
     `CNVkit: Genome-wide copy number detection and visualization from targeted sequencing.

@@ -37,19 +37,23 @@ Equivalently::
     cnvkit.py reference *.targetcoverage.cnn *.antitargetcoverage.cnn -o ref-wgs.cnn
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn ref-wgs.cnn --no-edge
 
-To speed up WGS analyses, try any or all of the following:
+To speed up and/or improve the accuracy of WGS analyses, try any or all of the
+following:
 
-- Instead of analyzing the whole genome, use the "access" or "target" BED file
+- Instead of analyzing the whole genome, use the "target" BED file
   to limit the analysis to just the genic regions. You can get such a BED file
   from the [UCSC Genome Browser](https://genome.ucsc.edu/cgi-bin/hgTables), for
   example.
-- Increase the "target" average bin size to 500 or 1000 bases.
+- Increase the "target" average bin size, e.g. to at least 1000 bases for 30x
+  coverage, or proportionally more for lower-coverage sequencing.
 - Specify a smaller p-value threshold (``segment -t``). For the CBS method,
-  ``1e-6`` may work well.
+  ``1e-6`` may work well. Or, try the ``haar`` segmentation method.
 - Use the ``-p/--processes`` option in the :ref:`batch`, :ref:`coverage` and
   :ref:`segment` commands to ensure all available CPUs are used.
 - Ensure you are using the most recent version of CNVkit. Each release includes
   some performance improvements.
+- Turn off the "edge" bias correction in the :ref:`reference` and :ref:`fix`
+  commands (`--no-edge`).
 
 The ``batch -m wgs`` option does all of these except the first automatically.
 
@@ -76,7 +80,7 @@ Equivalently::
     cnvkit.py coverage Sample.bam targets.split.bed -p 0 -o Sample.targetcoverage.cnn
     # Create an empty antitarget coverage file, header only
     head -n1 Sample.targetcoverage.cnn -o Sample.antitargetcoverage.cnn
-    cnvkit.py reference *.targetcoverage.cnn *.antitargetcoverage.cnn -o ref-tas.cnn
+    cnvkit.py reference *.targetcoverage.cnn *.antitargetcoverage.cnn --no-edge -o ref-tas.cnn
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn ref-tas.cnn --no-edge
 
 This approach does not collect any copy number information between targeted
