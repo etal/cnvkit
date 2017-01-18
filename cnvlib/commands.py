@@ -29,9 +29,8 @@ pyplot.ioff()
 
 from . import (access, antitarget, autobin, call, core, coverage, descriptives,
                export, fix, importers, metrics, parallel, params, plots,
-               reference, reports, samutil, segfilters, segmentation, tabio,
-               target)
-from .scatter import do_scatter, SEG_COLOR
+               reference, reports, samutil, scatter, segfilters, segmentation,
+               tabio, target)
 from .cnary import CopyNumArray as _CNA
 from .genome import GenomicArray as _GA
 from ._version import __version__
@@ -302,7 +301,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     tabio.write(segments, sample_pfx + '.cns')
 
     if plot_scatter:
-        do_scatter(cnarr, segments)
+        scatter.do_scatter(cnarr, segments)
         pyplot.savefig(sample_pfx + '-scatter.pdf', format='pdf',
                        bbox_inches="tight")
         logging.info("Wrote %s-scatter.pdf", sample_pfx)
@@ -1068,12 +1067,13 @@ def _cmd_scatter(args):
         with PdfPages(args.output) as pdf_out:
             for region in tabio.read_auto(args.range_list).coords():
                 try:
-                    do_scatter(cnarr, segarr, varr, region, None,
-                               args.background_marker, args.trend,
-                               args.width, args.y_min, args.y_max,
-                               ("%s %s" % (args.title, region.chromosome)
-                                if args.title else None),
-                               args.segment_color)
+                    scatter.do_scatter(cnarr, segarr, varr, region, None,
+                                       args.background_marker, args.trend,
+                                       args.width, args.y_min, args.y_max,
+                                       ("%s %s" % (args.title,
+                                                   region.chromosome)
+                                        if args.title else None),
+                                       args.segment_color)
                 except ValueError as exc:
                     # Probably no bins in the selected region
                     logging.warn("Not plotting region %r: %s",
@@ -1081,9 +1081,10 @@ def _cmd_scatter(args):
                 pdf_out.savefig()
                 pyplot.close()
     else:
-        do_scatter(cnarr, segarr, varr, args.chromosome, args.gene,
-                   args.background_marker, args.trend, args.width,
-                   args.y_min, args.y_max, args.title, args.segment_color)
+        scatter.do_scatter(cnarr, segarr, varr, args.chromosome, args.gene,
+                           args.background_marker, args.trend, args.width,
+                           args.y_min, args.y_max, args.title,
+                           args.segment_color)
         if args.output:
             oformat = os.path.splitext(args.output)[-1].replace(".", "")
             pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
@@ -1092,7 +1093,7 @@ def _cmd_scatter(args):
             pyplot.show()
 
 
-do_scatter = public(do_scatter)
+do_scatter = public(scatter.do_scatter)
 
 
 P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)
@@ -1127,7 +1128,7 @@ P_scatter_aes.add_argument('-b', '--background-marker', metavar='CHARACTER',
         help="""Plot antitargets using this symbol when plotting in a selected
                 chromosomal region (-g/--gene or -c/--chromosome).
                 [Default: same as targets]""")
-P_scatter_aes.add_argument('--segment-color', default=SEG_COLOR,
+P_scatter_aes.add_argument('--segment-color', default=scatter.SEG_COLOR,
         help="""Plot segment lines in this color. Value can be any string
                 accepted by matplotlib, e.g. 'red' or '#CC0000'.""")
 P_scatter_aes.add_argument('--title',
