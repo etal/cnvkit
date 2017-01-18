@@ -1,8 +1,77 @@
 """Call copy number variants from segmented log2 ratios."""
 from __future__ import absolute_import, division, print_function
 
+import logging
+
 import numpy as np
 import pandas as pd
+
+from . import segfilters
+
+
+def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
+            is_reference_male=False, is_sample_female=False, filters=None,
+            thresholds=(-1.1, -0.25, 0.2, 0.7)):
+    if method not in ("threshold", "clonal", "none"):
+        raise ValueError("Argument `method` must be one of: clonal, threshold")
+
+    outarr = cnarr.copy()
+    if filters:
+        # Apply any filters that use segmetrics but not cn fields
+        for filt in ('ci', 'sem'):
+            if filt in filters:
+                logging.info("Applying filter '%s'", filt)
+                outarr = getattr(segfilters, filt)(outarr)
+                filters.remove(filt)
+
+    if variants:
+        outarr["baf"] = variants.baf_by_ranges(outarr)
+
+    if purity and purity < 1.0:
+        logging.info("Rescaling sample with purity %g, ploidy %d",
+                     purity, ploidy)
+        absolutes = absolute_clonal(outarr, ploidy, purity,
+                                    is_reference_male, is_sample_female)
+        # Recalculate sample log2 ratios after rescaling for purity
+        outarr["log2"] = log2_ratios(outarr, absolutes, ploidy,
+                                     is_reference_male)
+        if variants:
+            # Rescale b-allele frequencies for purity
+            outarr["baf"] = rescale_baf(purity, outarr["baf"])
+    elif method == "clonal":
+        # Estimate absolute copy numbers from the original log2 values
+        logging.info("Calling copy number with clonal ploidy %d", ploidy)
+        absolutes = absolute_pure(outarr, ploidy, is_reference_male)
+
+    if method == "threshold":
+        # Apply cutoffs to either original or rescaled log2 values
+        tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
+        logging.info("Calling copy number with thresholds: %s",
+                     ", ".join(tokens))
+        absolutes = absolute_threshold(outarr, ploidy, thresholds,
+                                       is_reference_male)
+
+    if method != 'none':
+        outarr['cn'] = absolutes.round().astype('int')
+        if 'baf' in outarr:
+            # Calculate major and minor allelic copy numbers (s.t. cn1 >= cn2)
+            upper_baf = ((outarr['baf'] - .5).abs() + .5).fillna(1.0).values
+            outarr['cn1'] = ((absolutes * upper_baf).round()
+                             .clip(0, outarr['cn'])
+                             .astype('int'))
+            outarr['cn2'] = outarr['cn'] - outarr['cn1']
+            is_null = (outarr['baf'].isnull() & (outarr['cn'] > 0))
+            outarr[is_null, 'cn1'] = np.nan
+            outarr[is_null, 'cn2'] = np.nan
+
+    if filters:
+        # Apply the remaining cn-based filters
+        for filt in filters:
+            logging.info("Applying filter '%s'", filt)
+            outarr = getattr(segfilters, filt)(outarr)
+
+    outarr.sort_columns()
+    return outarr
 
 
 def log2_ratios(cnarr, absolutes, ploidy, is_reference_male,

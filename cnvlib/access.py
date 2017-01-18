@@ -13,12 +13,16 @@ import logging
 
 import numpy as np
 
+from . import tabio
+from .genome import GenomicArray as GA
 
-def log_this(chrom, run_start, run_end):
-    """Log a coordinate range, then return it as a tuple."""
-    logging.info("\tAccessible region %s:%d-%d (size %d)",
-                 chrom, run_start, run_end, run_end - run_start)
-    return (chrom, run_start, run_end)
+def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
+    """List the locations of accessible sequence regions in a FASTA file."""
+    access_regions = GA.from_rows(get_regions(fa_fname))
+    for ex_fname in exclude_fnames:
+        excluded = tabio.read(ex_fname, 'bed3')
+        access_regions = access_regions.subtract(excluded)
+    return GA.from_rows(join_regions(access_regions, min_gap_size))
 
 
 def get_regions(fasta_fname):
@@ -72,6 +76,13 @@ def get_regions(fasta_fname):
         # Emit the last run if it's accessible (i.e. not a telomere)
         if run_start is not None:
             yield log_this(chrom, run_start, cursor)
+
+
+def log_this(chrom, run_start, run_end):
+    """Log a coordinate range, then return it as a tuple."""
+    logging.info("\tAccessible region %s:%d-%d (size %d)",
+                 chrom, run_start, run_end, run_end - run_start)
+    return (chrom, run_start, run_end)
 
 
 def join_regions(regions, min_gap_size):

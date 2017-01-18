@@ -20,6 +20,18 @@ from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 
+def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1):
+    """Calculate coverage in the given regions from BAM read depths."""
+    if not samutil.ensure_bam_sorted(bam_fname):
+        raise RuntimeError("BAM file %s must be sorted by coordinates"
+                            % bam_fname)
+    samutil.ensure_bam_index(bam_fname)
+    # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
+    cnarr = interval_coverages(bed_fname, bam_fname, by_count, min_mapq,
+                               processes)
+    return cnarr
+
+
 def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
     """Calculate log2 coverages in the BAM file at each interval."""
     meta = {'sample_id': core.fbase(bam_fname)}

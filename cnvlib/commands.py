@@ -28,9 +28,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 from . import (access, antitarget, autobin, call, core, coverage, descriptives,
-               export, fix, importers, metrics, parallel, params, plots,
-               reference, reports, samutil, scatter, segfilters, segmentation,
-               tabio, target)
+               export, fix, importers, metrics, parallel, plots, reference,
+               reports, samutil, scatter, segmentation, tabio, target)
 from .cnary import CopyNumArray as _CNA
 from .genome import GenomicArray as _GA
 from ._version import __version__
@@ -160,7 +159,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 target_bed = access_bed
             elif fasta:
                 # Run 'access' on the fly
-                access_arr = do_access(fasta)
+                access_arr = access.do_access(fasta)
                 # Take filename base from FASTA, lacking any other clue
                 target_bed = os.path.splitext(os.path.basename(fasta)
                                              )[0] + ".bed"
@@ -177,7 +176,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 # user-provided access might be something else that excludes a
                 # significant number of mapped reads.
                 if not access_arr:
-                    access_arr = do_access(fasta)
+                    access_arr = access.do_access(fasta)
                 # Choose median-size normal bam or tumor bam
                 bam_fname = sorted(normal_bams, key=lambda f: os.stat(f).st_size
                                   )[len(normal_bams) // 2 - 1]
@@ -201,10 +200,10 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
     # Pre-process baits/targets
     new_target_fname = tgt_name_base + '.target.bed'
     bait_arr = tabio.read_auto(target_bed)
-    target_arr = do_target(bait_arr, annotate, short_names, True,
-                        **({'avg_size': target_avg_size}
-                           if target_avg_size
-                           else {}))
+    target_arr = target.do_target(bait_arr, annotate, short_names, True,
+                                  **({'avg_size': target_avg_size}
+                                     if target_avg_size
+                                     else {}))
     tabio.write(target_arr, new_target_fname, 'bed4')
     target_bed = new_target_fname
 
@@ -220,7 +219,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 anti_kwargs['avg_bin_size'] = antitarget_avg_size
             if antitarget_min_size:
                 anti_kwargs['min_bin_size'] = antitarget_min_size
-            anti_arr = do_antitarget(target_arr, **anti_kwargs)
+            anti_arr = antitarget.do_antitarget(target_arr, **anti_kwargs)
         else:
             # No antitargets for wgs, amplicon
             anti_arr = _GA([])
@@ -228,8 +227,8 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
 
     if len(normal_bams) == 0:
         logging.info("Building a flat reference...")
-        ref_arr = do_reference_flat(target_bed, antitarget_bed, fasta,
-                                    male_reference)
+        ref_arr = reference.do_reference_flat(target_bed, antitarget_bed, fasta,
+                                              male_reference)
     else:
         logging.info("Building a copy number reference from normal samples...")
         # Run coverage on all normals
@@ -254,9 +253,11 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
         target_fnames = [tf.result() for tf in tgt_futures]
         antitarget_fnames = [af.result() for af in anti_futures]
         # Build reference from *.cnn
-        ref_arr = do_reference(target_fnames, antitarget_fnames, fasta,
-                               male_reference, None, do_gc=True,
-                               do_edge=(method == "hybrid"), do_rmask=True)
+        ref_arr = reference.do_reference(target_fnames, antitarget_fnames,
+                                         fasta, male_reference, None,
+                                         do_gc=True,
+                                         do_edge=(method == "hybrid"),
+                                         do_rmask=True)
     if not output_reference:
         output_reference = os.path.join(output_dir, "reference.cnn")
     core.ensure_path(output_reference)
@@ -266,7 +267,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
 
 def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes):
     """Run coverage on one sample, write to file."""
-    cnarr = do_coverage(bed_fname, bam_fname, by_count, 0, processes)
+    cnarr = coverage.do_coverage(bed_fname, bam_fname, by_count, 0, processes)
     tabio.write(cnarr, out_fname)
     return out_fname
 
@@ -280,14 +281,16 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     sample_id = core.fbase(bam_fname)
     sample_pfx = os.path.join(output_dir, sample_id)
 
-    raw_tgt = do_coverage(target_bed, bam_fname, by_count, 0, processes)
+    raw_tgt = coverage.do_coverage(target_bed, bam_fname, by_count, 0,
+                                   processes)
     tabio.write(raw_tgt, sample_pfx + '.targetcoverage.cnn')
 
-    raw_anti = do_coverage(antitarget_bed, bam_fname, by_count, 0, processes)
+    raw_anti = coverage.do_coverage(antitarget_bed, bam_fname, by_count, 0,
+                                    processes)
     tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
-    cnarr = do_fix(raw_tgt, raw_anti, tabio.read_cna(ref_fname),
-                   do_gc=True, do_edge=(method == "hybrid"), do_rmask=True)
+    cnarr = fix.do_fix(raw_tgt, raw_anti, tabio.read_cna(ref_fname),
+                       do_gc=True, do_edge=(method == "hybrid"), do_rmask=True)
     tabio.write(cnarr, sample_pfx + '.cnr')
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
@@ -397,33 +400,15 @@ P_batch.set_defaults(func=_cmd_batch)
 
 # target ----------------------------------------------------------------------
 
+do_target = public(target.do_target)
+
+
 def _cmd_target(args):
     """Transform bait intervals into targets more suitable for CNVkit."""
     regions = tabio.read_auto(args.interval)
-    regions = do_target(regions, args.annotate, args.short_names, args.split,
-                        args.avg_size)
+    regions = target.do_target(regions, args.annotate, args.short_names,
+                               args.split, args.avg_size)
     tabio.write(regions, args.output, "bed4")
-
-
-@public
-def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
-              avg_size=200/.75):
-    """Transform bait intervals into targets more suitable for CNVkit."""
-    tgt_arr = bait_arr.copy()
-    # Drop zero-width regions
-    tgt_arr = tgt_arr[tgt_arr.start != tgt_arr.end]
-    if do_split:
-        logging.info("Splitting large targets")
-        tgt_arr = tgt_arr.subdivide(avg_size, 0, verbose=True)
-    if annotate:
-        logging.info("Applying annotations as target names")
-        annotation = tabio.read_auto(annotate)
-        antitarget.compare_chrom_names(tgt_arr, annotation)
-        tgt_arr['gene'] = annotation.into_ranges(tgt_arr, 'gene', '-')
-    if do_short_names:
-        logging.info("Shortening target interval labels")
-        tgt_arr['gene'] = list(target.shorten_labels(tgt_arr['gene']))
-    return tgt_arr
 
 
 P_target = AP_subparsers.add_parser('target', help=_cmd_target.__doc__)
@@ -449,20 +434,14 @@ P_target.set_defaults(func=_cmd_target)
 
 # access ----------------------------------------------------------------------
 
+do_access = public(access.do_access)
+
+
 def _cmd_access(args):
     """List the locations of accessible sequence regions in a FASTA file."""
-    access_arr = do_access(args.fa_fname, args.exclude, args.min_gap_size)
+    access_arr = access.do_access(args.fa_fname, args.exclude,
+                                  args.min_gap_size)
     tabio.write(access_arr, args.output, "bed3")
-
-
-@public
-def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
-    """List the locations of accessible sequence regions in a FASTA file."""
-    access_regions = _GA.from_rows(access.get_regions(fa_fname))
-    for ex_fname in exclude_fnames:
-        excluded = tabio.read(ex_fname, 'bed3')
-        access_regions = access_regions.subtract(excluded)
-    return _GA.from_rows(access.join_regions(access_regions, min_gap_size))
 
 
 P_access = AP_subparsers.add_parser('access', help=_cmd_access.__doc__)
@@ -483,25 +462,18 @@ P_access.set_defaults(func=_cmd_access)
 
 # antitarget ------------------------------------------------------------------
 
+do_antitarget = public(antitarget.do_antitarget)
+
 def _cmd_antitarget(args):
     """Derive a background/antitarget BED file from a target BED file."""
     targets = tabio.read_auto(args.targets)
     access = tabio.read_auto(args.access)
-    out_arr = do_antitarget(targets, access, args.avg_size, args.min_size)
+    out_arr = antitarget.do_antitarget(targets, access, args.avg_size,
+                                       args.min_size)
     if not args.output:
         base, ext = args.interval.rsplit('.', 1)
         args.output = base + '.antitarget.' + ext
     tabio.write(out_arr, args.output, "bed4")
-
-
-@public
-def do_antitarget(targets, access=None, avg_bin_size=150000,
-                  min_bin_size=None):
-    """Derive a background/antitarget BED file from a target BED file."""
-    if not min_bin_size:
-        min_bin_size = 2 * int(avg_bin_size * (2 ** params.MIN_REF_COVERAGE))
-    return antitarget.get_background(targets, access, avg_bin_size,
-                                     min_bin_size)
 
 
 P_anti = AP_subparsers.add_parser('antitarget', help=_cmd_antitarget.__doc__)
@@ -522,9 +494,13 @@ P_anti.set_defaults(func=_cmd_antitarget)
 
 # coverage --------------------------------------------------------------------
 
+do_coverage = public(coverage.do_coverage)
+
+
 def _cmd_coverage(args):
     """Calculate coverage in the given regions from BAM read depths."""
-    pset = do_coverage(args.interval, args.bam_file, args.count, args.min_mapq, args.processes)
+    pset = coverage.do_coverage(args.interval, args.bam_file, args.count,
+                                args.min_mapq, args.processes)
     if not args.output:
         # Create an informative but unique name for the coverage output file
         bambase = core.fbase(args.bam_file)
@@ -537,19 +513,6 @@ def _cmd_coverage(args):
             args.output = '%s.%s.cnn' % (bambase, bedbase)
     core.ensure_path(args.output)
     tabio.write(pset, args.output)
-
-
-@public
-def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1):
-    """Calculate coverage in the given regions from BAM read depths."""
-    if not samutil.ensure_bam_sorted(bam_fname):
-        raise RuntimeError("BAM file %s must be sorted by coordinates"
-                            % bam_fname)
-    samutil.ensure_bam_index(bam_fname)
-    # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
-    cnarr = coverage.interval_coverages(bed_fname, bam_fname, by_count,
-                                        min_mapq, processes)
-    return cnarr
 
 
 P_coverage = AP_subparsers.add_parser('coverage', help=_cmd_coverage.__doc__)
@@ -572,14 +535,19 @@ P_coverage.set_defaults(func=_cmd_coverage)
 
 # reference -------------------------------------------------------------------
 
+do_reference = public(reference.do_reference)
+do_reference_flat = public(reference.do_reference_flat)
+
+
 def _cmd_reference(args):
     """Compile a coverage reference from the given files (normal samples)."""
     usage_err_msg = ("Give .cnn samples OR targets and antitargets.")
     if args.targets and args.antitargets:
         # Flat refence
         assert not args.references, usage_err_msg
-        ref_probes = do_reference_flat(args.targets, args.antitargets,
-                                       args.fasta, args.male_reference)
+        ref_probes = reference.do_reference_flat(args.targets, args.antitargets,
+                                                 args.fasta,
+                                                 args.male_reference)
     elif args.references:
         # Pooled reference
         assert not args.targets and not args.antitargets, usage_err_msg
@@ -596,66 +564,16 @@ def _cmd_reference(args):
                      len(targets), len(antitargets))
         female_samples = ((args.gender.lower() not in ['m', 'male'])
                           if args.gender else None)
-        ref_probes = do_reference(targets, antitargets, args.fasta,
-                                  args.male_reference, female_samples,
-                                  args.do_gc, args.do_edge, args.do_rmask)
+        ref_probes = reference.do_reference(targets, antitargets, args.fasta,
+                                            args.male_reference, female_samples,
+                                            args.do_gc, args.do_edge,
+                                            args.do_rmask)
     else:
         raise ValueError(usage_err_msg)
 
     ref_fname = args.output or "cnv_reference.cnn"
     core.ensure_path(ref_fname)
     tabio.write(ref_probes, ref_fname)
-
-
-@public
-def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
-                 male_reference=False, female_samples=None,
-                 do_gc=True, do_edge=True, do_rmask=True):
-    """Compile a coverage reference from the given files (normal samples)."""
-    core.assert_equal("Unequal number of target and antitarget files given",
-                      targets=len(target_fnames),
-                      antitargets=len(antitarget_fnames))
-    if not fa_fname:
-        logging.info("No FASTA reference genome provided; "
-                     "skipping GC, RM calculations")
-
-    # Calculate & save probe centers
-    ref_probes = reference.combine_probes(target_fnames, fa_fname,
-                                          male_reference, female_samples,
-                                          True, do_gc, do_edge, False)
-    ref_probes.add(reference.combine_probes(antitarget_fnames, fa_fname,
-                                            male_reference, female_samples,
-                                            False, do_gc, False, do_rmask))
-    ref_probes.center_all(skip_low=True)
-    ref_probes.sort_columns()
-    reference.warn_bad_probes(ref_probes)
-    return ref_probes
-
-
-@public
-def do_reference_flat(targets, antitargets, fa_fname=None,
-                      male_reference=False):
-    """Compile a neutral-coverage reference from the given intervals.
-
-    Combines the intervals, shifts chrX values if requested, and calculates GC
-    and RepeatMasker content from the genome FASTA sequence.
-    """
-    ref_probes = reference.bed2probes(targets)
-    ref_probes.add(reference.bed2probes(antitargets))
-    # Set sex chromosomes by "reference" gender
-    ref_probes['log2'] = ref_probes.expect_flat_log2(male_reference)
-    ref_probes['depth'] = np.exp2(ref_probes['log2'])  # Shim
-    # Calculate GC and RepeatMasker content for each probe's genomic region
-    if fa_fname:
-        gc, rmask = reference.get_fasta_stats(ref_probes, fa_fname)
-        ref_probes['gc'] = gc
-        ref_probes['rmask'] = rmask
-        # reference.warn_bad_probes(ref_probes)
-    else:
-        logging.info("No FASTA reference genome provided; "
-                     "skipping GC, RM calculations")
-    ref_probes.sort_columns()
-    return ref_probes
 
 
 P_reference = AP_subparsers.add_parser('reference', help=_cmd_reference.__doc__)
@@ -697,6 +615,9 @@ P_reference.set_defaults(func=_cmd_reference)
 
 # fix -------------------------------------------------------------------------
 
+do_fix = public(fix.do_fix)
+
+
 def _cmd_fix(args):
     """Combine target and antitarget coverages and correct for biases.
 
@@ -710,40 +631,10 @@ def _cmd_fix(args):
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
-    target_table = do_fix(tgt_raw, anti_raw,
-                          tabio.read_cna(args.reference),
-                          args.do_gc, args.do_edge, args.do_rmask)
+    target_table = fix.do_fix(tgt_raw, anti_raw,
+                              tabio.read_cna(args.reference),
+                              args.do_gc, args.do_edge, args.do_rmask)
     tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
-
-
-@public
-def do_fix(target_raw, antitarget_raw, reference,
-           do_gc=True, do_edge=True, do_rmask=True):
-    """Combine target and antitarget coverages and correct for biases."""
-    # Load, recenter and GC-correct target & antitarget probes separately
-    logging.info("Processing target: %s", target_raw.sample_id)
-    cnarr = fix.load_adjust_coverages(target_raw, reference, True,
-                                      do_gc, do_edge, False)
-    logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
-    anti_cnarr = fix.load_adjust_coverages(antitarget_raw, reference, False,
-                                           do_gc, False, do_rmask)
-    if len(anti_cnarr):
-        # Down-weight the more variable probe set (targets or antitargets)
-        tgt_iqr = descriptives.interquartile_range(cnarr.drop_low_coverage().residuals())
-        anti_iqr = descriptives.interquartile_range(anti_cnarr.drop_low_coverage().residuals())
-        iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
-        if iqr_ratio > 1:
-            logging.info("Targets are %.2f x more variable than antitargets",
-                         iqr_ratio)
-            cnarr["weight"] /= iqr_ratio
-        else:
-            logging.info("Antitargets are %.2f x more variable than targets",
-                         1. / iqr_ratio)
-            anti_cnarr["weight"] *= iqr_ratio
-        # Combine target and antitarget bins
-        cnarr.add(anti_cnarr)
-    cnarr.center_all(skip_low=True)
-    return cnarr
 
 
 P_fix = AP_subparsers.add_parser('fix', help=_cmd_fix.__doc__)
@@ -772,6 +663,9 @@ P_fix.set_defaults(func=_cmd_fix)
 
 # segment ---------------------------------------------------------------------
 
+do_segmentation = public(segmentation.do_segmentation)
+
+
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
     cnarr = tabio.read_cna(args.filename)
@@ -792,10 +686,6 @@ def _cmd_segment(args):
     else:
         segments = results
     tabio.write(segments, args.output or segments.sample_id + '.cns')
-
-
-# For the API
-do_segmentation = public(segmentation.do_segmentation)
 
 
 P_segment = AP_subparsers.add_parser('segment', help=_cmd_segment.__doc__)
@@ -856,6 +746,9 @@ P_segment.set_defaults(func=_cmd_segment)
 
 # call ------------------------------------------------------------------------
 
+do_call = public(call.do_call)
+
+
 def _cmd_call(args):
     """Call copy number variants from segmented log2 ratios."""
     if args.purity and not 0.0 < args.purity <= 1.0:
@@ -870,76 +763,10 @@ def _cmd_call(args):
                                           args.male_reference)
                         if args.purity and args.purity < 1.0
                         else None)
-    cnarr = do_call(cnarr, varr, args.method, args.ploidy, args.purity,
-                    args.male_reference, is_sample_female, args.filters,
-                    args.thresholds)
+    cnarr = call.do_call(cnarr, varr, args.method, args.ploidy, args.purity,
+                         args.male_reference, is_sample_female, args.filters,
+                         args.thresholds)
     tabio.write(cnarr, args.output or cnarr.sample_id + '.call.cns')
-
-
-@public
-def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
-            is_reference_male=False, is_sample_female=False, filters=None,
-            thresholds=(-1.1, -0.25, 0.2, 0.7)):
-    if method not in ("threshold", "clonal", "none"):
-        raise ValueError("Argument `method` must be one of: clonal, threshold")
-
-    outarr = cnarr.copy()
-    if filters:
-        # Apply any filters that use segmetrics but not cn fields
-        for filt in ('ci', 'sem'):
-            if filt in filters:
-                logging.info("Applying filter '%s'", filt)
-                outarr = getattr(segfilters, filt)(outarr)
-                filters.remove(filt)
-
-    if variants:
-        outarr["baf"] = variants.baf_by_ranges(outarr)
-
-    if purity and purity < 1.0:
-        logging.info("Rescaling sample with purity %g, ploidy %d",
-                     purity, ploidy)
-        absolutes = call.absolute_clonal(outarr, ploidy, purity,
-                                         is_reference_male, is_sample_female)
-        # Recalculate sample log2 ratios after rescaling for purity
-        outarr["log2"] = call.log2_ratios(outarr, absolutes, ploidy,
-                                          is_reference_male)
-        if variants:
-            # Rescale b-allele frequencies for purity
-            outarr["baf"] = call.rescale_baf(purity, outarr["baf"])
-    elif method == "clonal":
-        # Estimate absolute copy numbers from the original log2 values
-        logging.info("Calling copy number with clonal ploidy %d", ploidy)
-        absolutes = call.absolute_pure(outarr, ploidy, is_reference_male)
-
-    if method == "threshold":
-        # Apply cutoffs to either original or rescaled log2 values
-        tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
-        logging.info("Calling copy number with thresholds: %s",
-                     ", ".join(tokens))
-        absolutes = call.absolute_threshold(outarr, ploidy, thresholds,
-                                            is_reference_male)
-
-    if method != 'none':
-        outarr['cn'] = absolutes.round().astype('int')
-        if 'baf' in outarr:
-            # Calculate major and minor allelic copy numbers (s.t. cn1 >= cn2)
-            upper_baf = ((outarr['baf'] - .5).abs() + .5).fillna(1.0).values
-            outarr['cn1'] = ((absolutes * upper_baf).round()
-                             .clip(0, outarr['cn'])
-                             .astype('int'))
-            outarr['cn2'] = outarr['cn'] - outarr['cn1']
-            is_null = (outarr['baf'].isnull() & (outarr['cn'] > 0))
-            outarr[is_null, 'cn1'] = np.nan
-            outarr[is_null, 'cn2'] = np.nan
-
-    if filters:
-        # Apply the remaining cn-based filters
-        for filt in filters:
-            logging.info("Applying filter '%s'", filt)
-            outarr = getattr(segfilters, filt)(outarr)
-
-    outarr.sort_columns()
-    return outarr
 
 
 def csvstring(text):
@@ -1055,6 +882,9 @@ P_diagram.set_defaults(func=_cmd_diagram)
 
 # scatter ---------------------------------------------------------------------
 
+do_scatter = public(scatter.do_scatter)
+
+
 def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
     cnarr = tabio.read_cna(args.filename, sample_id=args.sample_id
@@ -1091,9 +921,6 @@ def _cmd_scatter(args):
             logging.info("Wrote %s", args.output)
         else:
             pyplot.show()
-
-
-do_scatter = public(scatter.do_scatter)
 
 
 P_scatter = AP_subparsers.add_parser('scatter', help=_cmd_scatter.__doc__)

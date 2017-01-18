@@ -12,6 +12,55 @@ from .cnary import CopyNumArray as CNA
 from .genome import GenomicArray as GA
 
 
+def do_reference(target_fnames, antitarget_fnames, fa_fname=None,
+                 male_reference=False, female_samples=None,
+                 do_gc=True, do_edge=True, do_rmask=True):
+    """Compile a coverage reference from the given files (normal samples)."""
+    core.assert_equal("Unequal number of target and antitarget files given",
+                      targets=len(target_fnames),
+                      antitargets=len(antitarget_fnames))
+    if not fa_fname:
+        logging.info("No FASTA reference genome provided; "
+                     "skipping GC, RM calculations")
+
+    # Calculate & save probe centers
+    ref_probes = combine_probes(target_fnames, fa_fname,
+                                          male_reference, female_samples,
+                                          True, do_gc, do_edge, False)
+    ref_probes.add(combine_probes(antitarget_fnames, fa_fname,
+                                            male_reference, female_samples,
+                                            False, do_gc, False, do_rmask))
+    ref_probes.center_all(skip_low=True)
+    ref_probes.sort_columns()
+    warn_bad_probes(ref_probes)
+    return ref_probes
+
+
+def do_reference_flat(targets, antitargets, fa_fname=None,
+                      male_reference=False):
+    """Compile a neutral-coverage reference from the given intervals.
+
+    Combines the intervals, shifts chrX values if requested, and calculates GC
+    and RepeatMasker content from the genome FASTA sequence.
+    """
+    ref_probes = bed2probes(targets)
+    ref_probes.add(bed2probes(antitargets))
+    # Set sex chromosomes by "reference" gender
+    ref_probes['log2'] = ref_probes.expect_flat_log2(male_reference)
+    ref_probes['depth'] = np.exp2(ref_probes['log2'])  # Shim
+    # Calculate GC and RepeatMasker content for each probe's genomic region
+    if fa_fname:
+        gc, rmask = get_fasta_stats(ref_probes, fa_fname)
+        ref_probes['gc'] = gc
+        ref_probes['rmask'] = rmask
+        # warn_bad_probes(ref_probes)
+    else:
+        logging.info("No FASTA reference genome provided; "
+                     "skipping GC, RM calculations")
+    ref_probes.sort_columns()
+    return ref_probes
+
+
 def bed2probes(bed_fname):
     """Create neutral-coverage probes from intervals."""
     regions = tabio.read_auto(bed_fname)
@@ -247,10 +296,10 @@ def fasta_extract_regions(fa_fname, intervals):
                 yield fa_file[_chrom][start.item():end.item()]
 
 
-def reference2regions(reference):
+def reference2regions(refarr):
     """Split reference into target and antitarget regions."""
-    is_bg = (reference['gene'] == 'Background')
-    regions = GA(reference.data.loc[:, ('chromosome', 'start', 'end', 'gene')],
+    is_bg = (refarr['gene'] == 'Background')
+    regions = GA(refarr.data.loc[:, ('chromosome', 'start', 'end', 'gene')],
                  {'sample_id': 'reference'})
     targets = regions[~is_bg]
     antitargets = regions[is_bg]

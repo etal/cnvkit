@@ -5,8 +5,16 @@ from builtins import map
 import logging
 import re
 
-from .params import INSERT_SIZE
+from .params import INSERT_SIZE, MIN_REF_COVERAGE
 from .genome import GenomicArray as GA
+
+
+def do_antitarget(targets, access=None, avg_bin_size=150000,
+                  min_bin_size=None):
+    """Derive a background/antitarget BED file from a target BED file."""
+    if not min_bin_size:
+        min_bin_size = 2 * int(avg_bin_size * (2 ** MIN_REF_COVERAGE))
+    return get_background(targets, access, avg_bin_size, min_bin_size)
 
 
 def get_background(targets, accessible, avg_bin_size, min_bin_size):

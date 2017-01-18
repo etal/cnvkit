@@ -7,7 +7,36 @@ import logging
 import numpy as np
 import pandas as pd
 
-from . import params, smoothing
+from . import descriptives, params, smoothing
+
+
+def do_fix(target_raw, antitarget_raw, reference,
+           do_gc=True, do_edge=True, do_rmask=True):
+    """Combine target and antitarget coverages and correct for biases."""
+    # Load, recenter and GC-correct target & antitarget probes separately
+    logging.info("Processing target: %s", target_raw.sample_id)
+    cnarr = load_adjust_coverages(target_raw, reference, True,
+                                  do_gc, do_edge, False)
+    logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
+    anti_cnarr = load_adjust_coverages(antitarget_raw, reference, False,
+                                       do_gc, False, do_rmask)
+    if len(anti_cnarr):
+        # Down-weight the more variable probe set (targets or antitargets)
+        tgt_iqr = descriptives.interquartile_range(cnarr.drop_low_coverage().residuals())
+        anti_iqr = descriptives.interquartile_range(anti_cnarr.drop_low_coverage().residuals())
+        iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
+        if iqr_ratio > 1:
+            logging.info("Targets are %.2f x more variable than antitargets",
+                         iqr_ratio)
+            cnarr["weight"] /= iqr_ratio
+        else:
+            logging.info("Antitargets are %.2f x more variable than targets",
+                         1. / iqr_ratio)
+            anti_cnarr["weight"] *= iqr_ratio
+        # Combine target and antitarget bins
+        cnarr.add(anti_cnarr)
+    cnarr.center_all(skip_low=True)
+    return cnarr
 
 
 def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
