@@ -85,13 +85,22 @@ def iter_ranges(table, chrom, starts, ends, mode):
         yield table
         raise StopIteration
 
+    # Don't be fooled by nested bins
+    if ((ends is not None and len(ends)) and
+        (starts is not None and len(starts))
+       ) and not table.end.is_monotonic_increasing:
+        # At least one bin is fully nested -- account for it
+        tbl_end = table.end.cummax()
+    else:
+        tbl_end = table.end
+
     if starts is not None and len(starts):
         if mode == 'inner':
             # Only rows entirely after the start point
             start_idxs = table.start.searchsorted(starts)
         else:
             # Include all rows overlapping the start point
-            start_idxs = table.end.searchsorted(starts, 'right')
+            start_idxs = tbl_end.searchsorted(starts, 'right')
     else:
         starts = np.zeros(len(ends) if ends is not None else 1,
                             dtype=np.int_)
@@ -99,7 +108,7 @@ def iter_ranges(table, chrom, starts, ends, mode):
 
     if ends is not None and len(ends):
         if mode == 'inner':
-            end_idxs = table.end.searchsorted(ends, 'right')
+            end_idxs = tbl_end.searchsorted(ends, 'right')
         else:
             end_idxs = table.start.searchsorted(ends)
     else:
