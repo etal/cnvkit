@@ -17,7 +17,7 @@ try:
             'futures >= 3.0',
             'matplotlib >= 1.1',
             'numpy >= 1.9',
-            'pandas >= 0.18.1',
+            'pandas >= 0.19.0',
             'pyfaidx >= 0.4.7',
             'pysam >= 0.9.1.4',
             'reportlab >= 3.0',
