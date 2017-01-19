@@ -28,7 +28,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 from . import (access, antitarget, batch, call, core, coverage, descriptives,
-               export, fix, importers, metrics, parallel, plots, reference,
+               export, fix, heatmap, importers, metrics, parallel, reference,
                reports, scatter, segmentation, tabio, target)
 from .cnary import CopyNumArray as _CNA
 from .genome import GenomicArray as _GA
@@ -805,6 +805,9 @@ P_scatter.set_defaults(func=_cmd_scatter)
 
 # heatmap ---------------------------------------------------------------------
 
+do_heatmap = public(heatmap.do_heatmap)
+
+
 def _cmd_heatmap(args):
     """Plot copy number for multiple samples as a heatmap."""
     cnarrs = [tabio.read_cna(f) for f in args.filenames]
@@ -815,94 +818,6 @@ def _cmd_heatmap(args):
         logging.info("Wrote %s", args.output)
     else:
         pyplot.show()
-
-
-@public
-def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
-    """Plot copy number for multiple samples as a heatmap."""
-    from matplotlib.collections import BrokenBarHCollection
-
-    _fig, axis = pyplot.subplots()
-
-    # List sample names on the y-axis
-    axis.set_yticks([i + 0.5 for i in range(len(cnarrs))])
-    axis.set_yticklabels([c.sample_id for c in cnarrs])
-    axis.set_ylim(0, len(cnarrs))
-    axis.invert_yaxis()
-    axis.set_ylabel("Samples")
-    axis.set_axis_bgcolor('#DDDDDD')
-
-    r_chrom, r_start, r_end = plots.unpack_range(show_range)
-    if r_start is not None or r_end is not None:
-        logging.info("Showing log2 ratios in range %s:%d-%s",
-                     r_chrom, r_start, r_end or '*')
-    elif r_chrom:
-        logging.info("Showing log2 ratios on chromosome %s", r_chrom)
-
-    # Closes over do_desaturate
-    def cna2df(cna):
-        """Extract a dataframe of plotting points from a CopyNumArray."""
-        points = cna.data.loc[:, ["start", "end"]]
-        points["color"] = cna.log2.apply(plots.cvg2rgb, args=(do_desaturate,))
-        return points
-
-    # Group each file's probes/segments by chromosome
-    sample_data = [collections.defaultdict(list) for _c in cnarrs]
-    # Calculate the size (max endpoint value) of each chromosome
-    chrom_sizes = collections.OrderedDict()
-    for i, cnarr in enumerate(cnarrs):
-        if r_chrom:
-            subcna = cnarr.in_range(r_chrom, r_start, r_end, mode="trim")
-            sample_data[i][r_chrom] = cna2df(subcna)
-            chrom_sizes[r_chrom] = max(subcna.end.iat[-1] if subcna else 0,
-                                       chrom_sizes.get(r_chrom, 0))
-        else:
-            for chrom, subcna in cnarr.by_chromosome():
-                sample_data[i][chrom] = cna2df(subcna)
-                chrom_sizes[chrom] = max(subcna.end.iat[-1] if subcna else 0,
-                                         chrom_sizes.get(r_chrom, 0))
-
-    # Closes over axis
-    def plot_sample_chrom(i, sample):
-        """Draw the given coordinates and colors as a horizontal series."""
-        xranges = [(start, end - start)
-                   for start, end in zip(sample.start, sample.end)]
-        bars = BrokenBarHCollection(xranges, (i, i+1),
-                                    edgecolors="none",
-                                    facecolors=sample["color"])
-        axis.add_collection(bars)
-
-    if show_range:
-        # Lay out only the selected chromosome
-        # Set x-axis the chromosomal positions (in Mb), title as the selection
-        axis.set_xlim((r_start or 0) * plots.MB,
-                      (r_end or chrom_sizes[r_chrom]) * plots.MB)
-        axis.set_title(show_range)
-        axis.set_xlabel("Position (Mb)")
-        axis.tick_params(which='both', direction='out')
-        axis.get_xaxis().tick_bottom()
-        axis.get_yaxis().tick_left()
-        # Plot the individual probe/segment coverages
-        for i, sample in enumerate(sample_data):
-            crow = sample[r_chrom]
-            crow["start"] *= plots.MB
-            crow["end"] *= plots.MB
-            plot_sample_chrom(i, crow)
-
-    else:
-        # Lay out chromosome dividers and x-axis labels
-        # (Just enough padding to avoid overlap with the divider line)
-        chrom_offsets = plots.plot_x_dividers(axis, chrom_sizes, 1)
-        # Plot the individual probe/segment coverages
-        for i, sample in enumerate(sample_data):
-            for chrom, curr_offset in chrom_offsets.items():
-                crow = sample[chrom]
-                if len(crow):
-                    crow["start"] += curr_offset
-                    crow["end"] += curr_offset
-                    plot_sample_chrom(i, crow)
-
-    return axis
 
 
 P_heatmap = AP_subparsers.add_parser('heatmap', help=_cmd_heatmap.__doc__)
@@ -1070,6 +985,9 @@ P_gender.set_defaults(func=_cmd_gender)
 
 # metrics ---------------------------------------------------------------------
 
+do_metrics = public(metrics.do_metrics)
+
+
 def _cmd_metrics(args):
     """Compute coverage deviations and other metrics for self-evaluation."""
     if (len(args.cnarrays) > 1 and
@@ -1081,47 +999,8 @@ def _cmd_metrics(args):
     cnarrs = map(tabio.read_cna, args.cnarrays)
     if args.segments:
         args.segments = map(tabio.read_cna, args.segments)
-    table = do_metrics(cnarrs, args.segments, args.drop_low_coverage)
+    table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)
     core.write_dataframe(args.output, table)
-
-
-@public
-def do_metrics(cnarrs, segments=None, skip_low=False):
-    """Compute coverage deviations and other metrics for self-evaluation."""
-    # Catch if passed args are single CopyNumArrays instead of lists
-    if isinstance(cnarrs, _CNA):
-        cnarrs = [cnarrs]
-    if isinstance(segments, _CNA):
-        segments = [segments]
-    elif segments is None:
-        segments = [None]
-    else:
-        segments = list(segments)
-    if skip_low:
-        cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
-    rows = ((cna.meta.get("filename", cna.sample_id),
-             len(seg) if seg is not None else '-'
-            ) + metrics.ests_of_scale(cna.residuals(seg))
-            for cna, seg in zip_repeater(cnarrs, segments))
-    colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
-    return pd.DataFrame.from_records(rows, columns=colnames)
-
-
-def zip_repeater(iterable, repeatable):
-    """Repeat a single segmentation to match the number of copy ratio inputs"""
-    rpt_len = len(repeatable)
-    if rpt_len == 1:
-        rpt = repeatable[0]
-        for it in iterable:
-            yield it, rpt
-    else:
-        i = -1
-        for i, (it, rpt) in enumerate(zip(iterable, repeatable)):
-            yield it, rpt
-        # Require lengths to match
-        if i + 1 != rpt_len:
-            raise ValueError("""Number of unsegmented and segmented input files
-                             did not match (%d vs. %d)""" % (i, rpt_len))
 
 
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
@@ -1326,6 +1205,9 @@ P_import_seg.set_defaults(func=_cmd_import_seg)
 
 # import-theta ---------------------------------------------------------------
 
+do_import_theta = public(importers.do_import_theta)
+
+
 def _cmd_import_theta(args):
     """Convert THetA output to a BED-like, CNVkit-like tabular format.
 
@@ -1335,29 +1217,9 @@ def _cmd_import_theta(args):
     tumor_segs = tabio.read_cna(args.tumor_cns)
     for i, new_cns in enumerate(do_import_theta(tumor_segs, args.theta_results,
                                                 args.ploidy)):
-        tabio.write(new_cns, os.path.join(args.output_dir,
-                                          "%s-%d.cns" % (tumor_segs.sample_id,
-                                                         i + 1)))
-
-
-@public
-def do_import_theta(segarr, theta_results_fname, ploidy=2):
-    theta = importers.parse_theta_results(theta_results_fname)
-    # THetA doesn't handle sex chromosomes well
-    segarr = segarr.autosomes()
-    for copies in theta['C']:
-        if len(copies) != len(segarr):
-            copies = copies[:len(segarr)]
-        # Drop any segments where the C value is None
-        mask_drop = np.array([c is None for c in copies], dtype='bool')
-        segarr = segarr[~mask_drop].copy()
-        ok_copies = np.asfarray([c for c in copies if c is not None])
-        # Replace remaining segment values with these integers
-        segarr["cn"] = ok_copies.astype('int')
-        ok_copies[ok_copies == 0] = 0.5
-        segarr["log2"] = np.log2(ok_copies / ploidy)
-        segarr.sort_columns()
-        yield segarr
+        tabio.write(new_cns,
+                    os.path.join(args.output_dir,
+                                 "%s-%d.cns" % (tumor_segs.sample_id, i + 1)))
 
 
 P_import_theta = AP_subparsers.add_parser('import-theta',
