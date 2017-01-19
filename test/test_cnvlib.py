@@ -317,13 +317,19 @@ class CommandTests(unittest.TestCase):
 
     def test_reference(self):
         """The 'reference' command."""
-        # Empty antitargets
+        # Empty/unspecified antitargets
+        nlines = linecount("formats/amplicon.cnr") - 1
         ref = commands.do_reference(["formats/amplicon.cnr"], ["formats/empty"])
-        self.assertGreater(len(ref), 0)
-        # Empty antitargets, flat reference
+        self.assertEqual(len(ref), nlines)
+        ref = commands.do_reference(["formats/amplicon.cnr"])
+        self.assertEqual(len(ref), nlines)
+        # Empty/unspecified antitargets, flat reference
+        nlines = linecount("formats/amplicon.bed")
         ref = commands.do_reference_flat("formats/amplicon.bed",
                                          "formats/empty")
-        self.assertGreater(len(ref), 0)
+        self.assertEqual(len(ref), nlines)
+        ref = commands.do_reference_flat("formats/amplicon.bed")
+        self.assertEqual(len(ref), nlines)
 
     def test_segment(self):
         """The 'segment' command."""
