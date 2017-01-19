@@ -70,9 +70,7 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
     """Infer copy number segments from the given coverage table."""
     filtered_cn = cnarr.copy()
     if skip_low:
-        before = len(filtered_cn)
-        filtered_cn = filtered_cn.drop_low_coverage()
-        logging.info("Dropped %d low-coverage bins", before - len(filtered_cn))
+        filtered_cn = filtered_cn.drop_low_coverage(verbose=True)
     if skip_outliers:
         filtered_cn = drop_outliers(filtered_cn, 50, skip_outliers)
 

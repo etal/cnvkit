@@ -147,16 +147,19 @@ class CopyNumArray(GenomicArray):
                 values = cnarr['log2']
             self.data['log2'] -= estimator(values)
 
-    def drop_low_coverage(self):
+    def drop_low_coverage(self, verbose=False):
         """Drop bins with extremely low log2 coverage or copy ratio values.
 
         These are generally bins that had no reads mapped due to sample-specific
         issues. A very small log2 ratio or coverage value may have been
         substituted to avoid domain or divide-by-zero errors.
         """
-        return self.as_dataframe(self.data[self.data['log2'] >
-                                           params.NULL_LOG2_COVERAGE -
-                                           params.MIN_REF_COVERAGE])
+        min_cvg = params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+        drop_idx = self.data['log2'] < min_cvg
+        if verbose and drop_idx.any():
+            logging.info("Dropped %d low-coverage bins",
+                         drop_idx.sum())
+        return self[~drop_idx]
 
     def squash_genes(self, summary_func=descriptives.biweight_location,
                      squash_background=False, ignore=params.IGNORE_GENE_NAMES):
