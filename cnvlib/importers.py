@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import map, next, zip
 
+import logging
 import os.path
 import subprocess
 
@@ -21,6 +22,9 @@ def find_picard_files(file_and_dir_names):
     filenames = []
     for tgt in file_and_dir_names:
         if os.path.isdir(tgt):
+            logging.warn("Searching the given directory tree [DEPRECATED]\n"
+                         "** Instead, specify the filenames directly, using "
+                         "wildcards or the Unix command 'find'")
             # Collect the target coverage files from this directory tree
             fnames = subprocess.check_output(['find', tgt,
                                               '-name', '*targetcoverage.csv']
