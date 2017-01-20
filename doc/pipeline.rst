@@ -307,6 +307,10 @@ Ideally, the control or "normal" samples used to build the reference should
 match the type of sample (e.g. FFPE-extracted or fresh DNA) and library
 preparation protocol or kit used for the test (e.g. tumor) samples.
 
+For :doc:`target amplicon or whole-genome sequencing <nonhybrid>` protocols, the
+"antitarget" BED and .cnn files can be omitted.
+
+
 Paired or pooled normals
 ````````````````````````
 

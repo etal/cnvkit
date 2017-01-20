@@ -30,12 +30,12 @@ annotation database is required and used to label genes in the outputs::
 Equivalently::
 
     cnvkit.py target data/access-5kb-mappable.hg19.bed --split --short-names --annotate refFlat.txt -o targets.bed
+    # Create a blank file to substitute for antitargets
+    touch MT
     # For each sample
     cnvkit.py coverage Sample.bam targets.bed -p 0 -o Sample.targetcoverage.cnn
-    # Create an empty antitarget coverage file, header only
-    head -n1 Sample.targetcoverage.cnn -o Sample.antitargetcoverage.cnn
-    cnvkit.py reference *.targetcoverage.cnn *.antitargetcoverage.cnn -o ref-wgs.cnn
-    cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn ref-wgs.cnn --no-edge
+    cnvkit.py reference *.targetcoverage.cnn --no-edge -o ref-wgs.cnn
+    cnvkit.py fix Sample.targetcoverage.cnn MT ref-wgs.cnn --no-edge
 
 To speed up and/or improve the accuracy of WGS analyses, try any or all of the
 following:
@@ -68,20 +68,20 @@ reads are sequenced. While this limits the copy number information available in
 the sequencing data versus hybrid capture, CNVkit can analyze TAS data using
 only on-target coverages and excluding all off-target regions from the analysis.
 
-The ``batch -m amplicon`` option uses the given targets to infer coverage, and
-leaves the antitarget coverage file empty::
+The ``batch -m amplicon`` option uses the given targets to infer coverage,
+ignoring off-target regions::
 
     cnvkit.py batch -m amplicon -t targets.bed *.bam
 
 Equivalently::
 
     cnvkit.py target targets.bed --split -o targets.split.bed
+    # Create a blank file to substitute for antitargets
+    touch MT
     # For each sample
     cnvkit.py coverage Sample.bam targets.split.bed -p 0 -o Sample.targetcoverage.cnn
-    # Create an empty antitarget coverage file, header only
-    head -n1 Sample.targetcoverage.cnn -o Sample.antitargetcoverage.cnn
-    cnvkit.py reference *.targetcoverage.cnn *.antitargetcoverage.cnn --no-edge -o ref-tas.cnn
-    cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn ref-tas.cnn --no-edge
+    cnvkit.py reference *.targetcoverage.cnn --no-edge -o ref-tas.cnn
+    cnvkit.py fix Sample.targetcoverage.cnn MT ref-tas.cnn --no-edge
 
 This approach does not collect any copy number information between targeted
 regions, so it should only be used if you have in fact prepared your samples

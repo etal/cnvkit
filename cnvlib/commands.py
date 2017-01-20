@@ -442,7 +442,7 @@ def _cmd_fix(args):
     # Verify that target and antitarget are from the same sample
     tgt_raw = tabio.read_cna(args.target)
     anti_raw = tabio.read_cna(args.antitarget)
-    if tgt_raw.sample_id != anti_raw.sample_id:
+    if len(anti_raw) and tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
