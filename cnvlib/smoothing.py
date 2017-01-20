@@ -22,9 +22,10 @@ def check_inputs(x, width):
     elif width >= 2 and int(width) == width:
         wing = width // 2
     else:
-        raise ValueError("width must be between 0 and 1 (got %s)" % width)
-    if wing > len(x):
-        wing = len(x) - 1
+        raise ValueError("width fraction must be between 0 and 1 (got %s)"
+                         % width)
+    wing = max(wing, 5)
+    wing = min(wing, len(x) - 1)
     assert wing > 0, "Wing must be greater than 0 (got %s)" % wing
     # Pad the edges of the original array with mirror copies
     signal = pd.Series(np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1])))
