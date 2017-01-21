@@ -80,7 +80,7 @@ def log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
 
     Optionally round copy numbers to integers.
 
-    Account for reference gender & ploidy of sex chromosomes.
+    Account for reference sex & ploidy of sex chromosomes.
     """
     # Round absolute copy numbers to integer values
     if round_to_int:
@@ -180,7 +180,7 @@ def absolute_expect(cnarr, ploidy, is_sample_female):
     """Absolute integer number of expected copies in each bin.
 
     I.e. the given ploidy for autosomes, and XY or XX sex chromosome counts
-    according to the sample's specified gender.
+    according to the sample's specified chromosomal sex.
     """
     exp_copies = np.repeat(ploidy, len(cnarr))
     is_y = np.asarray(cnarr.chromosome == cnarr._chr_y_label)
@@ -196,7 +196,7 @@ def absolute_reference(cnarr, ploidy, is_reference_male):
     """Absolute integer number of reference copies in each bin.
 
     I.e. the given ploidy for autosomes, 1 or 2 X according to the reference
-    gender, and always 1 copy of Y.
+    sex, and always 1 copy of Y.
     """
     ref_copies = np.repeat(ploidy, len(cnarr))
     is_x = np.asarray(cnarr.chromosome == cnarr._chr_x_label)
@@ -213,7 +213,7 @@ def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male)
     For sex chromosomes, these values may not be the same ploidy as the
     autosomes. The "reference" number is the chromosome's ploidy in the
     CNVkit reference, while "expect" is the chromosome's neutral ploidy in the
-    given sample, based on the specified gender of each. E.g., given a female
+    given sample, based on the specified sex of each. E.g., given a female
     sample and a male reference, on chromosome X the "reference" value is 1 but
     "expect" is 2.
 

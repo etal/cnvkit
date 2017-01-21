@@ -211,7 +211,7 @@ class CopyNumArray(GenomicArray):
                 outrows.append(squash_rows(name, subarr.data))
         return self.as_rows(outrows)
 
-    # Chromosomal sex (gender)
+    # Chromosomal sex
 
     def shift_xx(self, male_reference=False, is_xx=None):
         """Adjust chrX coverages (divide in half) for apparent female samples."""

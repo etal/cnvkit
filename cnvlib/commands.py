@@ -377,8 +377,8 @@ def _cmd_reference(args):
         antitargets = [f for f in filenames if 'antitarget' in f]
         logging.info("Number of target and antitarget files: %d, %d",
                      len(targets), len(antitargets))
-        female_samples = ((args.gender.lower() not in ['m', 'male'])
-                          if args.gender else None)
+        female_samples = ((args.sample_sex.lower() not in ['y', 'm', 'male'])
+                          if args.sample_sex else None)
         ref_probes = reference.do_reference(targets, antitargets, args.fasta,
                                             args.male_reference, female_samples,
                                             args.do_gc, args.do_edge,
@@ -403,10 +403,11 @@ P_reference.add_argument('-y', '--male-reference', action='store_true',
                 log-coverage by -1, so the reference chrX average is -1.
                 Otherwise, shift male samples' chrX by +1, so the reference chrX
                 average is 0.""")
-P_reference.add_argument('-x', '--sample-sex', '-g', '--gender', dest='sex',
+P_reference.add_argument('-x', '--sample-sex', '-g', '--gender',
+        dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the chromosomal sex of all given samples as male or
-                female. (Default: guess each sample from ploidy of X and Y
+                female. (Default: guess each sample from coverage of X and Y
                 chromosomes).""")
 
 P_reference_flat = P_reference.add_argument_group(
@@ -574,7 +575,7 @@ def _cmd_call(args):
         cnarr.center_all(args.center)
     varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                          args.min_variant_depth, args.zygosity_freq)
-    is_sample_female = (verify_gender_arg(cnarr, args.gender,
+    is_sample_female = (verify_sample_sex(cnarr, args.sample_sex,
                                           args.male_reference)
                         if args.purity and args.purity < 1.0
                         else None)
@@ -612,15 +613,15 @@ P_call.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_call.add_argument("--purity", type=float,
         help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
-P_call.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+P_call.add_argument('-x', '--sample-sex', '-g', '--gender', dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
-        help="""Specify the sample's gender as male or female. (Otherwise
-                guessed from chrX copy number).""")
+        help="""Specify the sample's chromosomal sex as male or female.
+                (Otherwise guessed from X and Y coverage).""")
 P_call.add_argument('-y', '--male-reference', action='store_true',
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
-                of chrX is 1; chrY is haploid for either gender reference.""")
+                of chrX is 1; chrY is haploid for either reference sex.""")
 P_call.add_argument('-o', '--output',
         help="Output table file name (CNR-like table of segments, .cns).")
 
@@ -662,7 +663,7 @@ def _cmd_diagram(args):
     from cnvlib import diagram
     cnarr = tabio.read_cna(args.filename) if args.filename else None
     segarr = tabio.read_cna(args.segment) if args.segment else None
-    is_sample_female = verify_gender_arg(cnarr or segarr, args.gender,
+    is_sample_female = verify_sample_sex(cnarr or segarr, args.sample_sex,
                                          args.male_reference)
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
                                       args.min_probes, args.output,
@@ -686,10 +687,11 @@ P_diagram.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-CNR of
                 chrX; otherwise male samples would have -1 chrX).""")
-P_diagram.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+P_diagram.add_argument('-x', '--sample-sex', '-g', '--gender',
+        dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
-        help="""Specify the sample's gender as male or female. (Otherwise
-                guessed from chrX copy number).""")
+        help="""Specify the sample's chromosomal sex as male or female.
+                (Otherwise guessed from X and Y coverage).""")
 P_diagram.add_argument('-o', '--output',
         help="Output PDF file name.")
 P_diagram.set_defaults(func=_cmd_diagram)
@@ -882,7 +884,7 @@ def _cmd_gainloss(args):
     """Identify targeted genes with copy number gain or loss."""
     cnarr = tabio.read_cna(args.filename)
     segarr = tabio.read_cna(args.segment) if args.segment else None
-    is_sample_female = verify_gender_arg(cnarr, args.gender,
+    is_sample_female = verify_sample_sex(cnarr, args.sample_sex,
                                          args.male_reference)
     gainloss = do_gainloss(cnarr, segarr, args.threshold,
                            args.min_probes, args.drop_low_coverage,
@@ -932,10 +934,11 @@ P_gainloss.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-coverage of
                 chrX; otherwise male samples would have -1 chrX).""")
-P_gainloss.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+P_gainloss.add_argument('-x', '--sample-sex', '-g', '--gender',
+        dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
-        help="""Specify the sample's gender as male or female. (Otherwise
-                guessed from chrX copy number).""")
+        help="""Specify the sample's chromosomal sex as male or female.
+                (Otherwise guessed from X and Y coverage).""")
 P_gainloss.add_argument('-o', '--output',
         help="Output table file name.")
 P_gainloss.set_defaults(func=_cmd_gainloss)
@@ -944,7 +947,7 @@ P_gainloss.set_defaults(func=_cmd_gainloss)
 # gender ----------------------------------------------------------------------
 
 def _cmd_gender(args):
-    """Guess samples' gender from the relative coverage of chromosome X."""
+    """Guess samples' sex from the relative coverage of chromosomes X and Y."""
     cnarrs = (tabio.read_cna(fname) for fname in args.filenames)
     table = do_gender(cnarrs, args.male_reference)
     core.write_dataframe(args.output, table, header=True)
@@ -952,7 +955,7 @@ def _cmd_gender(args):
 
 @public
 def do_gender(cnarrs, is_male_reference):
-    """Guess samples' gender from the relative coverage of chromosome X."""
+    """Guess samples' sex from the relative coverage of chromosomes X and Y."""
     def strsign(num):
         if num > 0:
             return "+%.3g" % num
@@ -966,7 +969,7 @@ def do_gender(cnarrs, is_male_reference):
                 strsign(stats['chry_ratio']))
 
     rows = (guess_and_format(cna) for cna in cnarrs)
-    columns = ["sample", "gender", "X_logratio", "Y_logratio"]
+    columns = ["sample", "sex", "X_logratio", "Y_logratio"]
     return pd.DataFrame.from_records(rows, columns=columns)
 
 
@@ -1250,8 +1253,8 @@ def _cmd_export_bed(args):
     bed_tables = []
     for segfname in args.segments:
         segments = tabio.read_cna(segfname)
-        # ENH: args.gender as a comma-separated list of genders
-        is_sample_female = verify_gender_arg(segments, args.gender,
+        # ENH: args.sample_sex as a comma-separated list
+        is_sample_female = verify_sample_sex(segments, args.sample_sex,
                                              args.male_reference)
         tbl = export.export_bed(segments, args.ploidy,
                                 args.male_reference, is_sample_female,
@@ -1271,10 +1274,11 @@ P_export_bed.add_argument("-i", "--sample-id", metavar="LABEL",
                 [Default: use the sample ID, taken from the file name]""")
 P_export_bed.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
-P_export_bed.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+P_export_bed.add_argument('-x', '--sample-sex', '-g', '--gender',
+        dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
-        help="""Specify the sample's gender as male or female. (Otherwise
-                guessed from chrX copy number).""")
+        help="""Specify the sample's chromosomal sex as male or female.
+                (Otherwise guessed from X and Y coverage).""")
 P_export_bed.add_argument("--show",
         choices=('ploidy', 'variant', 'all'), default="ploidy",
         help="""Which segmented regions to show:
@@ -1286,7 +1290,7 @@ P_export_bed.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
-                of chrX is 1; chrY is haploid for either gender reference.""")
+                of chrX is 1; chrY is haploid for either reference sex.""")
 P_export_bed.add_argument('-o', '--output', help="Output file name.")
 P_export_bed.set_defaults(func=_cmd_export_bed)
 
@@ -1317,8 +1321,7 @@ def _cmd_export_vcf(args):
     already been adjusted to integer absolute values using the 'call' command.
     """
     segments = tabio.read_cna(args.segments)
-    is_sample_female = verify_gender_arg(segments,
-                                         args.gender,
+    is_sample_female = verify_sample_sex(segments, args.sample_sex,
                                          args.male_reference)
     header, body = export.export_vcf(segments, args.ploidy, args.male_reference,
                                      is_sample_female, args.sample_id)
@@ -1334,15 +1337,16 @@ P_export_vcf.add_argument("-i", "--sample-id", metavar="LABEL",
                 [Default: use the sample ID, taken from the file name]""")
 P_export_vcf.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
-P_export_vcf.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+P_export_vcf.add_argument('-x', '--sample-sex', '-g', '--gender',
+        dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
-        help="""Specify the sample's gender as male or female. (Otherwise
-                guessed from chrX copy number).""")
+        help="""Specify the sample's chromosomal sex as male or female.
+                (Otherwise guessed from X and Y coverage).""")
 P_export_vcf.add_argument("-y", "--male-reference", action="store_true",
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
-                of chrX is 1; chrY is haploid for either gender reference.""")
+                of chrX is 1; chrY is haploid for either reference sex.""")
 P_export_vcf.add_argument('-o', '--output', help="Output file name.")
 P_export_vcf.set_defaults(func=_cmd_export_vcf)
 
@@ -1523,17 +1527,17 @@ def load_het_snps(vcf_fname, sample_id, normal_id, min_variant_depth,
     return varr
 
 
-def verify_gender_arg(cnarr, gender_arg, is_male_reference):
+def verify_sample_sex(cnarr, sex_arg, is_male_reference):
     is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
-    if gender_arg:
-        is_sample_female_given = (gender_arg.lower() not in ['y', 'm', 'male'])
+    if sex_arg:
+        is_sample_female_given = (sex_arg.lower() not in ['y', 'm', 'male'])
         if is_sample_female != is_sample_female_given:
             logging.warn("Sample sex specified as %s "
-                         "but chromosomal copy number looks like %s",
+                         "but chromosomal X/Y ploidy looks like %s",
                          "female" if is_sample_female_given else "male",
                          "female" if is_sample_female else "male")
             is_sample_female = is_sample_female_given
-    logging.info("Treating sample gender as %s",
+    logging.info("Treating sample sex as %s",
                  "female" if is_sample_female else "male")
     return is_sample_female
 

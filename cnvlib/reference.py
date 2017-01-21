@@ -48,7 +48,7 @@ def do_reference_flat(targets, antitargets=None, fa_fname=None,
     ref_probes = bed2probes(targets)
     if antitargets:
         ref_probes.add(bed2probes(antitargets))
-    # Set sex chromosomes by "reference" gender
+    # Set sex chromosomes by "reference" sex
     ref_probes['log2'] = ref_probes.expect_flat_log2(male_reference)
     ref_probes['depth'] = np.exp2(ref_probes['log2'])  # Shim
     # Calculate GC and RepeatMasker content for each probe's genomic region
@@ -131,7 +131,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, is_female_sample,
     is_chr_y = (cnarr1.chromosome == cnarr1._chr_y_label)
     flat_coverage = cnarr1.expect_flat_log2(is_male_reference)
     def shift_sex_chroms(cnarr):
-        """Shift sample X and Y chromosomes to match the reference gender.
+        """Shift sample X and Y chromosomes to match the reference sex.
 
         Reference values:
             XY: chrX -1, chrY -1
