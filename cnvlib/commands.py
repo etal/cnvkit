@@ -1504,10 +1504,14 @@ def load_het_snps(vcf_fname, sample_id, normal_id, min_variant_depth,
     if vcf_fname is None:
         return None
     varr = tabio.read(vcf_fname, 'vcf',
-                      sample_id=sample_id, # or tumor_cn.sample_id,
+                      sample_id=sample_id,
                       normal_id=normal_id,
                       min_depth=min_variant_depth,
                       skip_somatic=True)
+    if (zygosity_freq is None and 'n_zygosity' in varr and
+        not varr['n_zygosity'].any()):
+        # Mutect2 sets all normal genotypes to 0/0 -- work around it
+        zygosity_freq = 0.25
     if zygosity_freq is not None:
         varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)
     orig_len = len(varr)
