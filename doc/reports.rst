@@ -58,7 +58,7 @@ Some likely false positives can be eliminated by dropping CNVs that cover a
 small number of bins (e.g. with ``-m 3``, genes where only 1 or 2 bins show copy
 number change will not be reported), at the risk of missing some true positives.
 
-Specify the reference gender (``-y`` if male) to ensure CNVs on the X and Y
+Specify the reference sex (``-y`` if male) to ensure CNVs on the X and Y
 chromosomes are reported correctly; otherwise, a large number of spurious gains
 or losses on the sex chromosomes may be reported.
 
@@ -83,32 +83,31 @@ visualize each of them with :ref:`scatter`::
 gender
 ------
 
-Guess samples' gender from the relative coverage of chromosomes X and Y.
-A table of the sample name (derived from the filename), detected chromosomal
-sex (string "Female" or "Male"), and log2 ratio value of chromosomes X and Y is
-printed.
+Guess samples' chromosomal sex from the relative coverage of chromosomes X and Y.
+A table of the sample name (derived from the filename), inferred sex (string
+"Female" or "Male"), and log2 ratio value of chromosomes X and Y is printed.
 
 ::
 
     cnvkit.py gender *.cnn *.cnr *.cns
     cnvkit.py gender -y *.cnn *.cnr *.cns
 
-If there is any confusion in specifying either the gender of the sample or the
+If there is any confusion in specifying either the sex of the sample or the
 construction of the reference copy number profile, you can check what happened
 using the "gender" command.
 If the reference and intermediate .cnn files are available (.targetcoverage.cnn
 and .antitargetcoverage.cnn, which are created before most of CNVkit's
-corrections), CNVkit can report the reference gender and the apparent chromosome
-X copy number that appears in the sample::
+corrections), CNVkit can report the reference sex and the sample's relative coverage of
+the X and Y chromosomes::
 
     cnvkit.py gender reference.cnn Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn
 
-The output looks like this, where columns are filename, apparent gender, and
-log2 ratio of chrX::
+The output looks like this, where columns are filename, inferred sex, and
+ratio of chromosome X and Y log2 coverages relative to autosomes::
 
-    cnv_reference.cnn	Female	-0.176
-    Sample.targetcoverage.cnn	Female	-0.0818
-    Sample.antitargetcoverage.cnn	Female	-0.265
+    cnv_reference.cnn	Female	-0.176	-1.061
+    Sample.targetcoverage.cnn	Female	-0.0818	-12.471
+    Sample.antitargetcoverage.cnn	Female	-0.265	-15.139
 
 If the ``-y`` option was not specified when constructing the reference (e.g.
 ``cnvkit.py batch ...``), then you have a female reference, and in the final

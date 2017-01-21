@@ -132,14 +132,14 @@ Convert segments, ideally already adjusted by the :ref:`call` command, to a
 :ref:`vcfformat` file. Copy ratios are converted to absolute integers, as with
 BED export, and VCF records are created for the segments where the copy number
 is different from the expected ploidy (e.g. 2 on autosomes, 1 on haploid sex
-chromosomes, depending on sample gender).
+chromosomes, depending on sample sex).
 
-Gender can be specified with the ``-g``/``--gender`` option, or will be guessed
-automatically. If a male reference is used, use ``-y``/``--male-reference`` to
-say so. Note that these are different: If a female sample is run with a male
-reference, segments on chromosome X with log2-ratio +1 will be skipped, because
-that's the expected copy number, while an X-chromosome segment with log2-ratio 0
-will be printed as a hemizygous loss.
+Chromosomal sex can be specified with the ``-x``/``--sample-sex`` option, or
+will be guessed automatically. If a male reference is used, use
+``-y``/``--male-reference`` to say so. Note that these are different: If a
+female sample is run with a male reference, segments on chromosome X with
+log2-ratio +1 will be skipped, because that's the expected copy number, while an
+X-chromosome segment with log2-ratio 0 will be printed as a hemizygous loss.
 
 ::
 

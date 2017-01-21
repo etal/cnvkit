@@ -555,19 +555,19 @@ the input .cns file are treated as a mix of some fraction of tumor cells
 (specified by ``--purity``), possibly with altered copy number, and a remainder
 of normal cells with neutral copy number (specified by ``--ploidy`` for
 autosomes; by default, diploid autosomes, haploid Y or X/Y depending on
-reference gender).  This equation is rearranged to find the absolute copy number
+reference sex).  This equation is rearranged to find the absolute copy number
 of the tumor cells alone, rounded to the nearest integer.
 
 The expected and observed ploidy of the sex chromosomes (X and Y) is different,
 so it's important to specify ``-y``/``--male-reference`` if a male reference was
-used; the sample gender can be specified if known, otherwise it will be guessed
+used; the sample sex can be specified if known, otherwise it will be guessed
 from the average log2 ratio of chromosome X.
 
 ..  The calculation of new log2 values for the sex chromosomes depends on the
-..  chromosomal gender of the sample and whether a male reference was used, while
+..  chromosomal sex of the sample and whether a male reference was used, while
 ..  for autosomes the specified ploidy (default 2, diploid) is used. For example,
 ..  with tumor purity of 60% and a male reference, letting CNVkit guess the sample's
-..  chromosomal gender::
+..  chromosomal sex::
 
 ..      cnvkit.py call -m none Sample.cns --purity 0.6 -y -o Sample.rescaled.cns
 
