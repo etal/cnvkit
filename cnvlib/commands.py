@@ -403,8 +403,8 @@ P_reference.add_argument('-y', '--male-reference', action='store_true',
                 log-coverage by -1, so the reference chrX average is -1.
                 Otherwise, shift male samples' chrX by +1, so the reference chrX
                 average is 0.""")
-P_reference.add_argument('-g', '--gender',
-        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+P_reference.add_argument('-x', '--sample-sex', '-g', '--gender', dest='sex',
+        choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the chromosomal sex of all given samples as male or
                 female. (Default: guess each sample from ploidy of X and Y
                 chromosomes).""")
@@ -612,8 +612,8 @@ P_call.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_call.add_argument("--purity", type=float,
         help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
-P_call.add_argument("-g", "--gender",
-        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+P_call.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+        choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
 P_call.add_argument('-y', '--male-reference', action='store_true',
@@ -686,8 +686,8 @@ P_diagram.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-CNR of
                 chrX; otherwise male samples would have -1 chrX).""")
-P_diagram.add_argument("-g", "--gender",
-        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+P_diagram.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+        choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
 P_diagram.add_argument('-o', '--output',
@@ -932,8 +932,8 @@ P_gainloss.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already corrected against a male
                 reference (i.e. female samples will have +1 log-coverage of
                 chrX; otherwise male samples would have -1 chrX).""")
-P_gainloss.add_argument("-g", "--gender",
-        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+P_gainloss.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+        choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
 P_gainloss.add_argument('-o', '--output',
@@ -968,7 +968,6 @@ def do_gender(cnarrs, is_male_reference):
     rows = (guess_and_format(cna) for cna in cnarrs)
     columns = ["sample", "gender", "X_logratio", "Y_logratio"]
     return pd.DataFrame.from_records(rows, columns=columns)
-
 
 
 P_gender = AP_subparsers.add_parser('gender', help=_cmd_gender.__doc__)
@@ -1272,8 +1271,8 @@ P_export_bed.add_argument("-i", "--sample-id", metavar="LABEL",
                 [Default: use the sample ID, taken from the file name]""")
 P_export_bed.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
-P_export_bed.add_argument("-g", "--gender",
-        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+P_export_bed.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+        choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
 P_export_bed.add_argument("--show",
@@ -1335,8 +1334,8 @@ P_export_vcf.add_argument("-i", "--sample-id", metavar="LABEL",
                 [Default: use the sample ID, taken from the file name]""")
 P_export_vcf.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
-P_export_vcf.add_argument("-g", "--gender",
-        choices=('m', 'male', 'Male', 'f', 'female', 'Female'),
+P_export_vcf.add_argument('-x', '--sample-sex', '-g', '--gender', dest='gender',
+        choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's gender as male or female. (Otherwise
                 guessed from chrX copy number).""")
 P_export_vcf.add_argument("-y", "--male-reference", action="store_true",
@@ -1527,11 +1526,11 @@ def load_het_snps(vcf_fname, sample_id, normal_id, min_variant_depth,
 def verify_gender_arg(cnarr, gender_arg, is_male_reference):
     is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
     if gender_arg:
-        is_sample_female_given = (gender_arg.lower() not in ["m", "male"])
+        is_sample_female_given = (gender_arg.lower() not in ['y', 'm', 'male'])
         if is_sample_female != is_sample_female_given:
-            logging.info("Sample gender specified as %s "
-                         "but chrX copy number looks like %s",
-                         gender_arg,
+            logging.warn("Sample sex specified as %s "
+                         "but chromosomal copy number looks like %s",
+                         "female" if is_sample_female_given else "male",
                          "female" if is_sample_female else "male")
             is_sample_female = is_sample_female_given
     logging.info("Treating sample gender as %s",
