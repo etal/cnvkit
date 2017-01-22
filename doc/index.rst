@@ -47,7 +47,7 @@ FAQ & How To
     heterogeneity
     germline
     nonhybrid
-    gender
+    sex
     bias
     fileformats
 

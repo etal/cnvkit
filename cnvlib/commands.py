@@ -944,17 +944,17 @@ P_gainloss.add_argument('-o', '--output',
 P_gainloss.set_defaults(func=_cmd_gainloss)
 
 
-# gender ----------------------------------------------------------------------
+# sex/gender ------------------------------------------------------------------
 
-def _cmd_gender(args):
+def _cmd_sex(args):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
     cnarrs = (tabio.read_cna(fname) for fname in args.filenames)
-    table = do_gender(cnarrs, args.male_reference)
+    table = do_sex(cnarrs, args.male_reference)
     core.write_dataframe(args.output, table, header=True)
 
 
 @public
-def do_gender(cnarrs, is_male_reference):
+def do_sex(cnarrs, is_male_reference):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
     def strsign(num):
         if num > 0:
@@ -973,16 +973,20 @@ def do_gender(cnarrs, is_male_reference):
     return pd.DataFrame.from_records(rows, columns=columns)
 
 
-P_gender = AP_subparsers.add_parser('gender', help=_cmd_gender.__doc__)
-P_gender.add_argument('filenames', nargs='+',
+P_sex = AP_subparsers.add_parser('sex', help=_cmd_sex.__doc__)
+P_sex.add_argument('filenames', nargs='+',
         help="Copy number or copy ratio files (*.cnn, *.cnr).")
-P_gender.add_argument('-y', '--male-reference', action='store_true',
+P_sex.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs are already normalized to a male reference
                 (i.e. female samples will have +1 log-coverage of chrX;
                 otherwise male samples would have -1 chrX).""")
-P_gender.add_argument('-o', '--output',
+P_sex.add_argument('-o', '--output',
         help="Output table file name.")
-P_gender.set_defaults(func=_cmd_gender)
+P_sex.set_defaults(func=_cmd_sex)
+
+# Shims
+AP_subparsers._name_parser_map['gender'] = P_sex
+do_gender = public(do_sex)
 
 
 # metrics ---------------------------------------------------------------------

@@ -67,8 +67,8 @@ class CNATests(unittest.TestCase):
         self.assertNotIn('gc', cleaned)
         self.assertTrue((cleaned['log2'] == cna['log2']).all())
 
-    def test_gender(self):
-        """Guess chromosomal gender from chrX log2 ratio value."""
+    def test_guess_xx(self):
+        """Guess chromosomal sex from chrX log2 ratio value."""
         for (fname, sample_is_f, ref_is_m) in (
                 ("formats/f-on-f.cns", True, False),
                 ("formats/f-on-m.cns", True, True),
@@ -179,7 +179,7 @@ class CommandTests(unittest.TestCase):
             for colname in 'baf', 'cn', 'cn1', 'cn2':
                 self.assertIn(colname, result)
 
-    def test_call_gender(self):
+    def test_call_sex(self):
         """Test each 'call' method on allosomes."""
         for (fname, sample_is_f, ref_is_m,
              chr1_expect, chrx_expect, chry_expect,

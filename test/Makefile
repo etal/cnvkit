@@ -116,7 +116,7 @@ p2-9_2-gainloss.txt: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) gainloss -y -m 2 -s $^ -o $@
 
 gender-picard.txt: build/p2-5_5.cnr  build/p2-5_5.cns build/p2-9_2.cnr build/p2-9_2.cns build/p2-20_5.cnr build/p2-20_5.cns
-	$(cnvkit) gender -y $^ -o $@
+	$(cnvkit) sex -y $^ -o $@
 
 p2-5_5-metrics.tsv p2-9_2-metrics.tsv: %-metrics.tsv: build/%.cnr build/%.cns
 	$(cnvkit) metrics  $< -s $(lastword $^) -o $@

@@ -78,10 +78,10 @@ visualize each of them with :ref:`scatter`::
 (The point is that it's possible.)
 
 
-.. _gender:
+.. _sex:
 
-gender
-------
+sex
+---
 
 Guess samples' chromosomal sex from the relative coverage of chromosomes X and Y.
 A table of the sample name (derived from the filename), inferred sex (string
@@ -89,18 +89,18 @@ A table of the sample name (derived from the filename), inferred sex (string
 
 ::
 
-    cnvkit.py gender *.cnn *.cnr *.cns
-    cnvkit.py gender -y *.cnn *.cnr *.cns
+    cnvkit.py sex *.cnn *.cnr *.cns
+    cnvkit.py sex -y *.cnn *.cnr *.cns
 
 If there is any confusion in specifying either the sex of the sample or the
 construction of the reference copy number profile, you can check what happened
-using the "gender" command.
+using the ``sex`` command.
 If the reference and intermediate .cnn files are available (.targetcoverage.cnn
 and .antitargetcoverage.cnn, which are created before most of CNVkit's
 corrections), CNVkit can report the reference sex and the sample's relative coverage of
 the X and Y chromosomes::
 
-    cnvkit.py gender reference.cnn Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn
+    cnvkit.py sex reference.cnn Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn
 
 The output looks like this, where columns are filename, inferred sex, and
 ratio of chromosome X and Y log2 coverages relative to autosomes::

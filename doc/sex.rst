@@ -1,15 +1,14 @@
-Gender
-======
+Chromosomal sex
+===============
 
-CNVkit attempts to handle chromosomal sex (interchangeably called "gender" in
-this documentation) correctly throughout the analysis pipelines.
+CNVkit attempts to handle chromosomal sex correctly throughout the analysis
+pipelines. Several commands automatically infer a given sample's chromosomal
+sex from the relative copy number of the autosomes and chromosomes X and Y; the
+status log messages will indicate when this is happening. In most cases the
+inference can be skipped or overridden by using the ``-x``/``--sample-sex``
+option.
 
-Several commands automatically infer a given sample's chromosomal sex from the
-relative copy number of the autosomes and chromosomes X and Y; the status log
-messages will indicate when this is happening. In most cases the inference can
-be skipped or overridden by using the ``-x``/``--sample-sex`` option.
-
-The :ref:`gender` command runs and report's CNVkit's inference for one or more
+The :ref:`sex` command runs and report's CNVkit's inference for one or more
 given samples, and can be used on .cnn, .cnr or .cns files at any stage of
 processing.
 
