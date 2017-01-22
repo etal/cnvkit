@@ -3,10 +3,9 @@
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
 from __future__ import absolute_import, division, print_function
-from builtins import map, range, zip
+from builtins import map, zip
 
 import argparse
-import collections
 import logging
 import os
 import sys
@@ -17,11 +16,7 @@ import pandas as pd
 # If running headless, use a suitable GUI-less plotting backend
 if not os.environ.get('DISPLAY'):
     import matplotlib
-    try:
-        matplotlib.use("Agg", force=True)
-    except TypeError:
-        # Older matplotlib doesn't have 'force' argument
-        matplotlib.use("Agg")
+    matplotlib.use("Agg", force=True)
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages

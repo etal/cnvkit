@@ -15,7 +15,7 @@ try:
             'biopython >= 1.62',
             'future >= 0.15.2',
             'futures >= 3.0',
-            'matplotlib >= 1.1',
+            'matplotlib >= 1.3.1',
             'numpy >= 1.9',
             'pandas >= 0.19.0',
             'pyfaidx >= 0.4.7',
