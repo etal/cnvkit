@@ -69,10 +69,30 @@ If you use this software in a publication, please cite our paper describing CNVk
     Talevich, E., Shain, A.H., Botton, T., & Bastian, B.C. (2014).
     `CNVkit: Genome-wide copy number detection and visualization from targeted sequencing.
     <http://dx.doi.org/10.1371/journal.pcbi.1004873>`_
-    *PLOS Computational Biology* 12(4): e1004873
+    *PLOS Computational Biology* 12(4):e1004873
 
-A poster presentation can be viewed at `F1000 Research
-<http://f1000research.com/posters/1096236>`_.
+Also please cite the supporting paper for the segmentation method you use:
+
+PSCBS (``cbs``, the default):
+    - Olshen, A.B., Bengtsson, H., Neuvial, P., Spellman, P.T., Olshen, R.A., & Seshan, V.E. (2011).
+      `Parent-specific copy number in paired tumor-normal studies using circular binary segmentation.
+      <http://doi.org/10.1093/bioinformatics/btr329>`_
+      *Bioinformatics* 27(15):2038–46.
+    - Venkatraman, E.S., & Olshen, A.B. (2007).
+      `A faster circular binary segmentation algorithm for the analysis of array CGH data.
+      <http://doi.org/10.1093/bioinformatics/btl646>`_
+      *Bioinformatics* 23(6):657–63
+HaarSeg (``haar``):
+    Ben-Yaacov, E., & Eldar, Y.C. (2008).
+    `A fast and flexible method for the segmentation of aCGH data.
+    <http://doi.org/10.1093/bioinformatics/btn272>`_
+    *Bioinformatics* 24(16):i139-45.
+CGH Fused Lasso (``flasso``):
+    Tibshirani, R., & Wang, P. (2008).
+    `Spatial smoothing and hot spot detection for CGH data using the fused lasso.
+    <http://doi.org/10.1093/biostatistics/kxm013>`_
+    *Biostatistics* 9(1):18–29
+
 
 Who else is using CNVkit?
 -------------------------
