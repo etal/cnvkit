@@ -86,5 +86,21 @@ Equivalently::
 This approach does not collect any copy number information between targeted
 regions, so it should only be used if you have in fact prepared your samples
 with a targeted amplicon sequencing protocol. It also does not attempt to
-normalize each amplicon at the gene level, though this may be addressed in a
-future version of CNVkit.
+further normalize each amplicon at the gene level, though this may be addressed
+in a future version of CNVkit.
+
+.. note::
+    **Do not mark duplicates** in the BAM files for samples sequenced by this
+    method.
+
+    Picard MarkDuplicates, samtools rmdup, *et al.* are designed to flag
+    possible PCR duplicates (originally for WGS datasets, but also useful for
+    hybrid capture). Variant callers like GATK and CNVkit will ignore those
+    reads in their internal calculations, considering these reads to be
+    non-independent measurements. (`This SeqAnswers thread
+    <http://seqanswers.com/forums/showthread.php?t=6854>`_ has details and
+    background).
+
+    In targeted amplicon sequencing, all of the amplified reads are in fact PCR
+    duplicates by design. By marking and thus omitting these reads, the
+    remaining coverage will be low, as if no amplification were performed.
