@@ -51,16 +51,16 @@ complete sooner.
 
 The pipeline executed by the ``batch`` command is equivalent to::
 
-    cnvkit.py target baits.bed --split [--annotate --short-names] -o my_targets.bed
-    cnvkit.py antitarget my_targets.bed [--access] -o my_antitargets.bed
+    cnvkit.py target baits.bed --split [--annotate refFlat.txt --short-names] -o my_targets.bed
+    cnvkit.py access baits.bed --fasta hg19.fa -o access.hg19.bed
+    cnvkit.py antitarget my_targets.bed --access access.hg19.bed -o my_antitargets.bed
 
     # For each sample...
     cnvkit.py coverage Sample.bam my_targets.bed -o Sample.targetcoverage.cnn
     cnvkit.py coverage Sample.bam my_antitargets.bed -o Sample.antitargetcoverage.cnn
 
     # With all normal samples...
-    cnvkit.py reference *Normal.cnn -t my_targets.bed -a my_antitargets.bed \
-        [--fasta hg19.fa --male-reference] -o my_reference.cnn
+    cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg19.fa [--male-reference] -o my_reference.cnn
 
     # For each tumor sample...
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn my_reference.cnn -o Sample.cnr
