@@ -59,7 +59,7 @@ The pipeline executed by the ``batch`` command is equivalent to::
     cnvkit.py coverage Sample.bam my_antitargets.bed -o Sample.antitargetcoverage.cnn
 
     # With all normal samples...
-    cnvkit.py reference *Normal.bam -t my_targets.bed -a my_antitargets.bed \
+    cnvkit.py reference *Normal.cnn -t my_targets.bed -a my_antitargets.bed \
         [--fasta hg19.fa --male-reference] -o my_reference.cnn
 
     # For each tumor sample...
