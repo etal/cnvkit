@@ -1513,9 +1513,18 @@ def load_het_snps(vcf_fname, sample_id, normal_id, min_variant_depth,
     if (zygosity_freq is None and 'n_zygosity' in varr and
         not varr['n_zygosity'].any()):
         # Mutect2 sets all normal genotypes to 0/0 -- work around it
+        logging.warn("VCF normal sample's genotypes are all 0/0 or missing; "
+                     "inferring genotypes from allele frequency instead")
         zygosity_freq = 0.25
     if zygosity_freq is not None:
         varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)
+    if 'n_zygosity' in varr:
+        # Infer & drop (more) somatic loci based on genotype
+        somatic_idx = (varr['zygosity'] != 0.0) & (varr['n_zygosity'] == 0.0)
+        if somatic_idx.any() and not somatic_idx.all():
+            logging.info("Skipping %d additional somatic record based on "
+                         "T/N genotypes", somatic_idx.sum())
+        varr = varr[~somatic_idx]
     orig_len = len(varr)
     varr = varr.heterozygous()
     logging.info("Kept %d heterozygous of %d VCF records",

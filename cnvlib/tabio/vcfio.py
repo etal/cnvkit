@@ -10,8 +10,6 @@ import pandas as pd
 import numpy as np
 import pysam
 
-from . import simplevcf
-
 
 def read_vcf(infile, sample_id=None, normal_id=None,
              min_depth=None, skip_reject=False, skip_somatic=False):
@@ -22,10 +20,6 @@ def read_vcf(infile, sample_id=None, normal_id=None,
     sample  matching that ID.  If `sample_id` is a positive integer, return the
     sample or pair at that index position, counting from 0.
     """
-    # if isinstance(infile, basestring):
-    #     vcf_reader = vcf.Reader(filename=infile)
-    # else:
-    #     vcf_reader = vcf.Reader(infile)
     try:
         vcf_reader = pysam.VariantFile(infile)
     except Exception as exc:
@@ -187,13 +181,10 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
     """
     cnt_reject = 0  # For logging
     for record in records:
-        is_som = False
         if (skip_reject and record.filter and len(record.filter) > 0
             and len(set(record.filter) - {'PASS', '.'})):
             cnt_reject += 1
             continue
-        if record.info.get("SOMATIC"):
-            is_som = True
 
         if record.samples:
             sample = record.samples[sample_id]
@@ -203,8 +194,6 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
                     normal = record.samples[normal_id]
                     n_depth, n_zygosity, n_alt_count = _extract_genotype(normal,
                                                                          record)
-                    if n_zygosity == 0:
-                        is_som = True
             except Exception as exc:
                 logging.error("Skipping %s:%d %s @ %s; %s",
                               record.chrom, record.pos, record.ref, sample_id,
@@ -227,6 +216,7 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
                 alt_count = 0
                 zygosity = 0.0
 
+        is_som = bool(record.info.get("SOMATIC"))
         # Split multiallelics?
         # XXX Ensure sample genotypes are handled properly
         start = record.start
@@ -251,7 +241,6 @@ def _extract_genotype(sample, record):
     elif 'AD' in sample and isinstance(sample['AD'], tuple):
         depth = _safesum(sample['AD'])
     elif 'DP' in record.info:
-        logging.warn("Using INFO DP") # XXX DBG
         depth = record.info['DP']
     else:
         # SV or not called, probably

@@ -92,6 +92,7 @@ def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
     if k < 2:
         return np.array([bins["log2"][0], bins["log2"][0]])
 
+    np.random.seed(0xA5EED)
     rand_indices = np.random.randint(0, k, (bootstraps, k))
     samples = [bins.data.take(idx) for idx in rand_indices]
     if smoothed:
