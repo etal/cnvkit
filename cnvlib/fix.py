@@ -134,6 +134,7 @@ def center_by_window(cnarr, fraction, sort_key):
     # (to avoid re-centering actual CNV regions -- only want an independently
     # sampled subset of presumably overall-CN-neutral bins)
     df = cnarr.data.reset_index(drop=True)
+    np.random.seed(0xA5EED)
     shuffle_order = np.random.permutation(df.index)
     df = df.reindex(shuffle_order)
     # Apply the same shuffling to the key array as to the target probe set

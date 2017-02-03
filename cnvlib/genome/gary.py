@@ -493,8 +493,8 @@ class GenomicArray(object):
 
     def shuffle(self):
         """Randomize the order of bins in this array (in-place)."""
-        np.random.seed(0xA5EED)  # For reproducible results
         order = np.arange(len(self.data))
+        np.random.seed(0xA5EED)
         np.random.shuffle(order)
         self.data = self.data.iloc[order]
         return order
