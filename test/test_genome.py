@@ -4,7 +4,10 @@ from __future__ import absolute_import, division, print_function
 
 import unittest
 
+import pandas as pd
+
 from cnvlib import tabio
+from cnvlib.genome import GenomicArray as GA
 
 
 class GaryTests(unittest.TestCase):
@@ -151,6 +154,101 @@ class GaryTests(unittest.TestCase):
         self.assertNotEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
         self.ex_cnr.sort()
         self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
+
+
+
+class IntervalTests(unittest.TestCase):
+    """Interval arithmetic tests."""
+    cols = ('start', 'end', 'gene')
+    combiner = {'gene': lambda a: ''.join(a)}
+
+    # =A=========================
+    #   =B=======   =D===   =E======
+    #      =C=
+    # 1 3  5 6  8   11 15   19 20 23 <- coordinates
+    # 0 1  2  3  4  5    6  7    8 <- out row indices
+    region_coords_1 = (
+        (1,  20, 'A'),
+        (3,  8,  'B'),
+        (5,  6,  'C'),
+        (11, 15, 'D'),
+        (19, 23, 'E'),
+    )
+
+    # Likely overlapping gene models
+    # =A=============================
+    #   =B==  =C==     =E==  =G==
+    #               =D=========================
+    #                  =F==  =H==       =I==
+    # 3 5  8  11 14 17 19 22 25 28  32  36 39 42
+    region_coords_2 = (
+        (3,  32, 'A'),
+        (5,   8, 'B'),
+        (11, 14, 'C'),
+        (17, 42, 'D'),
+        (19, 22, 'E'),
+        (19, 22, 'F'),
+        (25, 28, 'G'),
+        (25, 28, 'H'),
+        (36, 39, 'I'),
+    )
+
+    def test_flatten(self):
+        flat_coords_1 = [
+            (1,  3,  'A'),
+            (3,  5,  'AB'),
+            (5,  6,  'ABC'),
+            (6,  8,  'AB'),
+            (8,  11, 'A'),
+            (11, 15, 'AD'),
+            (15, 19, 'A'),
+            (19, 20, 'AE'),
+            (20, 23, 'E'),
+        ]
+        flat_coords_2 = [
+            (3,  5,  'A'),
+            (5,  8,  'AB'),
+            (8,  11, 'A'),
+            (11, 14, 'AC'),
+            (14, 17, 'A'),
+            (17, 19, 'AD'),
+            (19, 22, 'ADEF'),
+            (22, 25, 'AD'),
+            (25, 28, 'ADGH'),
+            (28, 32, 'AD'),
+            (32, 36, 'D'),
+            (36, 39, 'DI'),
+            (39, 42, 'D'),
+        ]
+        for region_coords, flat_coords in [
+            (self.region_coords_1, flat_coords_1),
+            (self.region_coords_2, flat_coords_2),
+        ]:
+            regions = _from_intervals(region_coords)
+            expect = _from_intervals(flat_coords)
+            result = regions.flatten(combine=self.combiner)
+            self.assertEqual(expect.data.shape, result.data.shape)
+            for col in expect.data.columns:
+                self.assertTrue((expect[col] == result[col]).all(),
+                                "Col {} differs:\nExpect:\n{}\nGot:\n{}"
+                                .format(col, expect[col], result[col]))
+
+    def test_merge(self):
+        # TODO
+        pass
+
+    def test_intersect(self):
+        # TODO
+        pass
+
+
+
+def _from_intervals(coords):
+    garr = GA(pd.DataFrame(list(coords),
+                           columns=['start', 'end', 'gene'])
+              .assign(chromosome='chr1'))
+    garr.sort_columns()
+    return garr
 
 
 

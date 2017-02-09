@@ -23,7 +23,7 @@ def flatten(table, combine=None):
         return table
     if (table.start.values[1:] >= table.end.cummax().values[:-1]).all():
         return table
-    # NB: Input should already be sorted like this
+    # NB: Input rows and columns should already be sorted like this
     table = table.sort_values(['chromosome', 'start', 'end'])
     cmb = get_combiners(table, False, combine)
     out = (table.groupby(by='chromosome',
