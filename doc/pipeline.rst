@@ -496,7 +496,9 @@ methods use R internally.
 
 Fused Lasso additionally performs significance testing to distinguish CNAs from
 regions of neutral copy number, whereas CBS and HaarSeg by themselves only
-identify the supported segmentation breakpoints.
+identify the supported segmentation breakpoints. Fused Lasso has been reported
+to work well on whole-exome and whole-genome data, while HaarSeg is less suited
+to those larger datasets and better on target panels.
 
 
 .. _call:
