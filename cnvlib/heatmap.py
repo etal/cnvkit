@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 from matplotlib.collections import BrokenBarHCollection
 
 from . import plots
+from .genome.rangelabel import unpack_range
 
 
 def do_heatmap(cnarrs, show_range=None, do_desaturate=False,
@@ -27,7 +28,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False,
     axis.set_ylabel("Samples")
     axis.set_axis_bgcolor('#DDDDDD')
 
-    r_chrom, r_start, r_end = plots.unpack_range(show_range)
+    r_chrom, r_start, r_end = unpack_range(show_range)
     if r_start is not None or r_end is not None:
         logging.info("Showing log2 ratios in range %s:%d-%s",
                      r_chrom, r_start, r_end or '*')

@@ -13,6 +13,7 @@ import pandas as pd
 from .chromsort import sorter_chrom
 from .intersect import by_ranges, into_ranges, iter_ranges
 from .merge import flatten, merge
+from .rangelabel import to_label
 from .subtract import subtract
 from .subdivide import subdivide
 
@@ -59,10 +60,9 @@ class GenomicArray(object):
                      if meta_dict is not None and len(meta_dict)
                      else {})
 
-    # XXX involve tabio.textcoord here?
     @staticmethod
     def row2label(row):
-        return "{}:{}-{}".format(row.chromosome, row.start + 1, row.end)
+        return to_label(row)
 
     @classmethod
     def _make_blank(cls):
@@ -287,7 +287,7 @@ class GenomicArray(object):
         return coordframe.itertuples(index=False)
 
     def labels(self):
-        return self.data.apply(self.row2label, axis=1)
+        return self.data.apply(to_label, axis=1)
 
     def in_range(self, chrom=None, start=None, end=None, mode='inner'):
         """Get the GenomicArray portion within the given genomic range.

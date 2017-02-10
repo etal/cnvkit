@@ -10,10 +10,10 @@ import logging
 import numpy as np
 from matplotlib import pyplot
 
-
 from . import core, plots, smoothing
 from .plots import MB
 from .cnary import CopyNumArray as CNA
+from .genome.rangelabel import unpack_range
 
 HIGHLIGHT_COLOR = 'gold'
 POINT_COLOR = '#606060'
@@ -235,7 +235,7 @@ def chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
         chr:s-e | +  | given | given
 
     """
-    chrom, start, end = plots.unpack_range(show_range)
+    chrom, start, end = unpack_range(show_range)
     window_coords = ()
     genes = []
     if show_gene:
