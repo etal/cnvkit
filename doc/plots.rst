@@ -148,6 +148,15 @@ If only segments are provided (``-s``), gene labels are not shown.  This plot is
 then equivalent to the ``heatmap`` command, which effectively summarizes the
 segmented values from many samples.
 
+By default, the sex chromosomes X and Y are colorized relative to the expected
+ploidy, i.e. for female samples analyzed with a male reference, while the X
+chromosome has a copy ratio near +1.0 in the input .cnr and .cns files, in the
+output diagram it will be shown as neutral copy number (white or faint colors)
+rather than a gain (red), because the diploid X is expected. The sample sex can
+be specified with the ``-x``/``--sample-sex`` option, or will otherwise be
+guessed automatically (see :doc:`sex`). This correction is done by default, but
+can be disabled with the option ``--no-shift-xy``.
+
 
 .. _heatmap:
 
@@ -194,6 +203,11 @@ the Unix shell to pull the names out of a file on the fly, e.g.::
     cnvkit.py heatmap `cat filenames.txt`
 
 
+As with :ref:`diagram`, the sex chromosomes X and Y are colorized relative to
+the expected ploidy, based on the sample and reference sex (see :doc:`sex`).
+This correction can be disabled with the option ``--no-shift-xy``.
+
+
 Customizing plots
 -----------------
 
@@ -210,5 +224,5 @@ file::
 
     axes.labelsize      : small
 
-Alternatively, use the `cnvlib.commands` module in Python to create the
-plots and then modify the plot elements using matplotlib.pyplot.
+Alternatively, use the ``cnvlib`` module in Python (see :doc:`cnvlib`) to create
+the plots and then modify the plot elements using matplotlib.pyplot.
