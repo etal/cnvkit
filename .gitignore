@@ -8,6 +8,7 @@
 # Testing & coverage shrapnel
 .coverage
 coverage.xml
+*.bai
 
 # Backup files from some Unix editors
 *~
