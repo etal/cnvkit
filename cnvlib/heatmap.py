@@ -11,9 +11,9 @@ from matplotlib.collections import BrokenBarHCollection
 from . import plots
 
 
-def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
+def do_heatmap(cnarrs, show_range=None, do_desaturate=False,
+               is_reference_male=False, adjust_sex=True):
     """Plot copy number for multiple samples as a heatmap."""
-
     _fig, axis = plt.subplots()
 
     # List sample names on the y-axis
@@ -49,6 +49,9 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
             chrom_sizes[r_chrom] = max(subcna.end.iat[-1] if subcna else 0,
                                        chrom_sizes.get(r_chrom, 0))
         else:
+            if adjust_sex:
+                is_sample_xx = cnarr.guess_xx(male_reference=is_reference_male)
+                cnarr = cnarr.shift_xx(is_reference_male, is_sample_xx)
             for chrom, subcna in cnarr.by_chromosome():
                 sample_data[i][chrom] = cna2df(subcna)
                 chrom_sizes[chrom] = max(subcna.end.iat[-1] if subcna else 0,

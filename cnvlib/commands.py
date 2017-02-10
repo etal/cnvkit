@@ -23,8 +23,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 from . import (access, antitarget, batch, call, core, coverage, descriptives,
-               export, fix, heatmap, importers, metrics, parallel, reference,
-               reports, scatter, segmentation, tabio, target)
+               diagram, export, fix, heatmap, importers, metrics, parallel,
+               reference, reports, scatter, segmentation, tabio, target)
 from .cnary import CopyNumArray as _CNA
 from .genome import GenomicArray as _GA
 from ._version import __version__
@@ -649,20 +649,21 @@ P_call.set_defaults(func=_cmd_call)
 
 # diagram ---------------------------------------------------------------------
 
+
 def _cmd_diagram(args):
     """Draw copy number (log2 coverages, CBS calls) on chromosomes as a diagram.
 
     If both the raw probes and segments are given, show them side-by-side on
     each chromosome (segments on the left side, probes on the right side).
     """
-    from cnvlib import diagram
     cnarr = tabio.read_cna(args.filename) if args.filename else None
     segarr = tabio.read_cna(args.segment) if args.segment else None
     is_sample_female = verify_sample_sex(cnarr or segarr, args.sample_sex,
                                          args.male_reference)
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
                                       args.min_probes, args.output,
-                                      args.male_reference, is_sample_female)
+                                      args.male_reference, is_sample_female,
+                                      args.adjust_sex)
     logging.info("Wrote %s", outfname)
 
 
@@ -687,6 +688,10 @@ P_diagram.add_argument('-x', '--sample-sex', '-g', '--gender',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's chromosomal sex as male or female.
                 (Otherwise guessed from X and Y coverage).""")
+P_diagram.add_argument('--adjust-sex', action='store_true',
+        help="""Adjust the X and Y chromosomes according to sample sex.""")
+P_diagram.add_argument('--no-shift-xy', dest='adjust_sex', action='store_false',
+        help="Don't adjust the X and Y chromosomes according to sample sex.")
 P_diagram.add_argument('-o', '--output',
         help="Output PDF file name.")
 P_diagram.set_defaults(func=_cmd_diagram)
@@ -808,7 +813,8 @@ do_heatmap = public(heatmap.do_heatmap)
 def _cmd_heatmap(args):
     """Plot copy number for multiple samples as a heatmap."""
     cnarrs = [tabio.read_cna(f) for f in args.filenames]
-    do_heatmap(cnarrs, args.chromosome, args.desaturate)
+    heatmap.do_heatmap(cnarrs, args.chromosome, args.desaturate)
+    #  args.male_reference, args.adjust_sex
     if args.output:
         oformat = os.path.splitext(args.output)[-1].replace(".", "")
         pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
@@ -829,6 +835,12 @@ P_heatmap.add_argument('-c', '--chromosome',
 #         help="Name of gene to display.")
 P_heatmap.add_argument('-d', '--desaturate', action='store_true',
         help="Tweak color saturation to focus on significant changes.")
+P_heatmap.add_argument('-y', '--male-reference', action='store_true',
+        help="""Assume inputs are already corrected against a male
+                reference (i.e. female samples will have +1 log-CNR of
+                chrX; otherwise male samples would have -1 chrX).""")
+P_heatmap.add_argument('--no-shift-xy', dest='adjust_sex', action='store_false',
+        help="Don't adjust the X and Y chromosomes according to sample sex.")
 P_heatmap.add_argument('-o', '--output',
         help="Output PDF file name.")
 P_heatmap.set_defaults(func=_cmd_heatmap)

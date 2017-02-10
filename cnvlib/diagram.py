@@ -4,7 +4,7 @@ This uses and abuses Biopython's BasicChromosome module. It depends on
 ReportLab, too, so we isolate this functionality here so that the rest of CNVkit
 will run without it. (And also to keep the codebase tidy.)
 """
-from __future__ import division
+from __future__ import absolute_import, division
 import collections
 import math
 import warnings
@@ -27,7 +27,7 @@ PAGE_SIZE = (11.0*inch, 8.5*inch)
 
 
 def create_diagram(cnarr, segarr, threshold, min_probes, outfname,
-                   is_reference_male, is_sample_female):
+                   is_reference_male, is_sample_female, adjust_sex):
     """Create the diagram."""
     if cnarr and segarr:
         do_both = True  # Draw segments on left, probes on right.
@@ -46,7 +46,8 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname,
     # Label genes where copy ratio value exceeds threshold
     if is_sample_female is None:
         is_sample_female = cnarr.guess_xx(male_reference=is_reference_male)
-    cnarr = cnarr.shift_xx(is_reference_male, is_sample_female)
+    if adjust_sex:
+        cnarr = cnarr.shift_xx(is_reference_male, is_sample_female)
     if cnarr_is_seg:
         sel = cnarr.data[(cnarr.data.log2.abs() >= threshold) &
                           ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
