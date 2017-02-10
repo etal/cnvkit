@@ -5,6 +5,8 @@ from builtins import zip
 import collections
 import logging
 
+import numpy as np
+import matplotlib as mpl
 from matplotlib import pyplot as plt
 from matplotlib.collections import BrokenBarHCollection
 
@@ -15,6 +17,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False,
                is_reference_male=False, adjust_sex=True):
     """Plot copy number for multiple samples as a heatmap."""
     _fig, axis = plt.subplots()
+    set_colorbar(axis)
 
     # List sample names on the y-axis
     axis.set_yticks([i + 0.5 for i in range(len(cnarrs))])
@@ -98,3 +101,22 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False,
                     plot_sample_chrom(i, crow)
 
     return axis
+
+
+def set_colorbar(axis):
+    # Create our colormap
+    # ENH: refactor to use colormap to colorize the BrokenBarHCollection
+    #   - maybe also refactor plots.cvg2rgb
+    cmap = mpl.colors.LinearSegmentedColormap.from_list('cnvheat',
+        [(0, 0, .75),
+         (1, 1, 1),
+         (.75, 0, 0)])
+    # Add a colorbar
+    norm = mpl.colors.Normalize(-1.33, 1.33)
+    mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+    mappable.set_array(np.linspace(-1.33, 1.33, 30))
+    cbar = plt.colorbar(mappable, ax=axis, orientation='vertical',
+                        fraction=0.04, pad=0.03, shrink=0.6,
+                        #  label="log2",
+                        ticks=(-1, 0, 1))
+    cbar.set_label("log2", labelpad=0)
