@@ -71,7 +71,7 @@ $(picard_segs:.cns=.call.cns): build/%.call.cns: build/%.cns
 # Demo other features with Picard outputs
 
 heatmap-picard.pdf: $(picard_segs)
-	$(cnvkit) heatmap $^ -o $@
+	$(cnvkit) heatmap $^ -y -o $@
 
 # == Plot coverages with segmentation calls
 
