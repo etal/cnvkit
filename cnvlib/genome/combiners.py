@@ -23,7 +23,7 @@ def get_combiners(table, stranded=False, combine=None):
     cmb = {
         'chromosome': first_of,
         'start': first_of,
-        'end': last_of,
+        'end': max_of,
         'gene': join_strings,
         'accession': join_strings,
     }
@@ -42,6 +42,10 @@ def first_of(elems):
 def last_of(elems):
     """Return the last element of the input."""
     return elems[-1]
+
+
+def max_of(elems):
+    return max(elems)
 
 
 def join_strings(elems, sep=','):

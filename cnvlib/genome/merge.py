@@ -40,8 +40,6 @@ def _flatten_overlapping(table, combine):
     Assume chromosome and (if relevant) strand are already identical, so only
     start and end coordinates are considered.
     """
-    keyed_groups = zip(_nonoverlapping_groups(table, 0),
-                       table.itertuples(index=False))
     #  flat_rows = itertools.chain(
     #      *(_flatten_tuples(row_group, combine)
     #        for _key, row_group in itertools.groupby(keyed_groups, first_of)))
@@ -50,9 +48,8 @@ def _flatten_overlapping(table, combine):
     #                                   #  columns=flat_rows[0]._fields)
     bits = [pd.DataFrame.from_records(list(_flatten_tuples(row_group, combine)),
                                       columns=table.columns)
-            for _key, row_group in itertools.groupby(keyed_groups, first_of)]
+            for row_group in _nonoverlapping_groups(table, 0)]
     out = pd.concat(bits)
-
     return out
 
 
@@ -101,7 +98,6 @@ def merge(table, bp=0, stranded=False, combine=None):
     gap_sizes = table.start.values[1:] - table.end.cummax().values[:-1]
     if (gap_sizes > -bp).all():
         return table
-
     if stranded:
         groupkey = ['chromosome', 'strand']
     else:
@@ -124,18 +120,8 @@ def _merge_overlapping(table, bp, combine):
     Assume chromosome and (if relevant) strand are already identical, so only
     start and end coordinates are considered.
     """
-    # NB: pandas groupby seems like the obvious choice over itertools, but it is
-    # very slow -- probably because it traverses the whole table (i.e.
-    # chromosome) again to select groups, redoing the various inferences that
-    # would be worthwhile outside this inner loop. With itertools, we take
-    # advantage of the grouping and sorting already done, and don't repeat
-    # pandas' traversal and inferences.
-    # ENH: Find & use a lower-level, 1-pass pandas function
-    keyed_groups = zip(_nonoverlapping_groups(table, bp),
-                       table.itertuples(index=False))
     merged_rows = [_squash_tuples(row_group, combine)
-                   for _key, row_group in itertools.groupby(keyed_groups,
-                                                            first_of)]
+                   for row_group in _nonoverlapping_groups(table, bp)]
     return pd.DataFrame.from_records(merged_rows,
                                      columns=merged_rows[0]._fields)
 
@@ -155,7 +141,17 @@ def _nonoverlapping_groups(table, bp):
     #  gap?     T  F  T  T  F  F  F  T
     #  group  0  0  1  1  1  2  3  4  4
     gap_sizes = table.start.values[1:] - table.end.cummax().values[:-1]
-    return np.r_[False, gap_sizes > (-bp)].cumsum()
+    group_keys = np.r_[False, gap_sizes > (-bp)].cumsum()
+    # NB: pandas groupby seems like the obvious choice over itertools, but it is
+    # very slow -- probably because it traverses the whole table (i.e.
+    # chromosome) again to select groups, redoing the various inferences that
+    # would be worthwhile outside this inner loop. With itertools, we take
+    # advantage of the grouping and sorting already done, and don't repeat
+    # pandas' traversal and inferences.
+    # ENH: Find & use a lower-level, 1-pass pandas function
+    keyed_groups = zip(group_keys, table.itertuples(index=False))
+    return (row_group
+            for _key, row_group in itertools.groupby(keyed_groups, first_of))
 
 
 # Squash rows according to a given grouping criterion

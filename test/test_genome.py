@@ -141,7 +141,7 @@ class GaryTests(unittest.TestCase):
             ('formats/duke-my.bed', 103),
             ('formats/dac-my.bed', 148),
             ('formats/example.gff', 7951),
-            ('formats/refflat-mini.txt', 695404),
+            ('formats/refflat-mini.txt', 719715),
         ):
             regions = tabio.read_auto(fname)
             self.assertEqual(regions.total_range_size(), area)
@@ -159,7 +159,6 @@ class GaryTests(unittest.TestCase):
 
 class IntervalTests(unittest.TestCase):
     """Interval arithmetic tests."""
-    cols = ('start', 'end', 'gene')
     combiner = {'gene': lambda a: ''.join(a)}
 
     # =A=========================
@@ -193,6 +192,14 @@ class IntervalTests(unittest.TestCase):
         (36, 39, 'I'),
     )
 
+    @staticmethod
+    def _from_intervals(coords):
+        garr = GA(pd.DataFrame(list(coords),
+                               columns=['start', 'end', 'gene'])
+                  .assign(chromosome='chr1'))
+        garr.sort_columns()
+        return garr
+
     def test_flatten(self):
         flat_coords_1 = [
             (1,  3,  'A'),
@@ -224,8 +231,8 @@ class IntervalTests(unittest.TestCase):
             (self.region_coords_1, flat_coords_1),
             (self.region_coords_2, flat_coords_2),
         ]:
-            regions = _from_intervals(region_coords)
-            expect = _from_intervals(flat_coords)
+            regions = self._from_intervals(region_coords)
+            expect = self._from_intervals(flat_coords)
             result = regions.flatten(combine=self.combiner)
             self.assertEqual(expect.data.shape, result.data.shape)
             for col in expect.data.columns:
@@ -234,21 +241,24 @@ class IntervalTests(unittest.TestCase):
                                 .format(col, expect[col], result[col]))
 
     def test_merge(self):
-        # TODO
-        pass
+        merged_coords_1 = [(1, 23, 'ABCDE')]
+        merged_coords_2 = [(3, 42, 'ABCDEFGHI')]
+        for region_coords, merged_coords in [
+            (self.region_coords_1, merged_coords_1),
+            (self.region_coords_2, merged_coords_2),
+        ]:
+            regions = self._from_intervals(region_coords)
+            expect = self._from_intervals(merged_coords)
+            result = regions.merge(combine=self.combiner)
+            self.assertEqual(expect.data.shape, result.data.shape)
+            for col in expect.data.columns:
+                self.assertTrue((expect[col] == result[col]).all(),
+                                "Col {} differs:\nExpect:\n{}\nGot:\n{}"
+                                .format(col, expect[col], result[col]))
 
     def test_intersect(self):
         # TODO
         pass
-
-
-
-def _from_intervals(coords):
-    garr = GA(pd.DataFrame(list(coords),
-                           columns=['start', 'end', 'gene'])
-              .assign(chromosome='chr1'))
-    garr.sort_columns()
-    return garr
 
 
 
