@@ -79,45 +79,20 @@ def iter_ranges(table, chrom, starts, ends, mode):
             table = table[table['chromosome'] == chrom]
         except KeyError:
             raise KeyError("Chromosome %s is not in this probe set" % chrom)
-
     # Edge cases
     if not len(table) or (starts is None and ends is None):
         yield table
         raise StopIteration
-
     # Don't be fooled by nested bins
     if ((ends is not None and len(ends)) and
         (starts is not None and len(starts))
        ) and not table.end.is_monotonic_increasing:
         # At least one bin is fully nested -- account for it
-        tbl_end = table.end.cummax()
+        irange_func = _irange_nested
     else:
-        tbl_end = table.end
-
-    if starts is not None and len(starts):
-        if mode == 'inner':
-            # Only rows entirely after the start point
-            start_idxs = table.start.searchsorted(starts)
-        else:
-            # Include all rows overlapping the start point
-            start_idxs = tbl_end.searchsorted(starts, 'right')
-    else:
-        starts = np.zeros(len(ends) if ends is not None else 1,
-                            dtype=np.int_)
-        start_idxs = starts.copy()
-
-    if ends is not None and len(ends):
-        if mode == 'inner':
-            end_idxs = tbl_end.searchsorted(ends, 'right')
-        else:
-            end_idxs = table.start.searchsorted(ends)
-    else:
-        end_idxs = np.repeat(len(table), len(starts))
-        ends = [None] * len(starts)
-
-    for start_idx, start_val, end_idx, end_val in zip(start_idxs, starts,
-                                                      end_idxs, ends):
-        subtable = table[start_idx:end_idx]
+        irange_func = _irange_simple
+    for region_idx, start_val, end_val in irange_func(table, starts, ends, mode):
+        subtable = table.iloc[region_idx]
         if mode == 'trim':
             subtable = subtable.copy()
             # Update 5' endpoints to the boundary
@@ -127,3 +102,73 @@ def iter_ranges(table, chrom, starts, ends, mode):
             if end_val:
                 subtable.end = subtable.end.clip_upper(end_val)
         yield subtable
+
+
+def _irange_simple(table, starts, ends, mode):
+    """Slice subsets of table when regions are not nested."""
+    if starts is not None and len(starts):
+        if mode == 'inner':
+            # Only rows entirely after the start point
+            start_idxs = table.start.searchsorted(starts)
+        else:
+            # Include all rows overlapping the start point
+            start_idxs = table.end.searchsorted(starts, 'right')
+    else:
+        starts = np.zeros(len(ends) if ends is not None else 1,
+                            dtype=np.int_)
+        start_idxs = starts.copy()
+
+    if ends is not None and len(ends):
+        if mode == 'inner':
+            end_idxs = table.end.searchsorted(ends, 'right')
+        else:
+            end_idxs = table.start.searchsorted(ends)
+    else:
+        end_idxs = np.repeat(len(table), len(starts))
+        ends = [None] * len(starts)
+
+    for start_idx, start_val, end_idx, end_val in zip(start_idxs, starts,
+                                                      end_idxs, ends):
+        yield (slice(start_idx, end_idx), start_val, end_val)
+
+
+def _irange_nested(table, starts, ends, mode):
+    """Slice subsets of table when regions are nested."""
+    # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
+    if starts is None or not len(starts):
+        starts = np.zeros(len(ends) if ends is not None else 1, dtype=np.int_)
+    if ends is None or not len(ends):
+        ends = [None] * len(starts)
+    for start_val, end_val in zip(starts, ends):
+        # Mask of table rows to keep for this query region
+        region_mask = np.ones(len(table), dtype=np.bool_)
+        if start_val:
+            if mode == 'inner':
+                # Only rows entirely after the start point
+                start_idx = table.start.searchsorted(start_val)
+                region_mask[:start_idx.item()] = 0
+            else:
+                # Include all rows overlapping the start point
+                region_mask = (table.end.values > start_val)
+        if end_val is not None:
+            if mode == 'inner':
+                # Only rows up to the end point
+                region_mask &= (table.end.values <= end_val)
+            else:
+                # Include all rows overlapping the end point
+                end_idx = table.start.searchsorted(end_val)
+                region_mask[end_idx.item():] = 0
+
+        yield region_mask, start_val, end_val
+
+
+def venn(table, other, mode):
+    # TODO -- implement 'venn' via fjoin algorithm
+    # 'cut' table at all 'other' boundaries
+    #   -> extra column '_venn_':int (0, 1, 2)
+    #       0=self only, 1=both, 2=other only
+    #   -> 'cut' just drops the '_venn_' column
+    #   -> 'subtract' drops 1 and 2?
+    #       (is that faster? prolly not)
+    #   -> 'jaccard' does math with it...
+    return table

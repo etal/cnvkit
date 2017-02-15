@@ -503,7 +503,8 @@ class GenomicArray(object):
         """Sort this array's bins in-place, with smart chromosome ordering."""
         sort_key = self.data.chromosome.apply(sorter_chrom)
         self.data = (self.data.assign(_sort_key_=sort_key)
-                     .sort_values(by=['_sort_key_', 'start'], kind='mergesort')
+                     .sort_values(by=['_sort_key_', 'start', 'end'],
+                                  kind='mergesort')
                      .drop('_sort_key_', axis=1)
                      .reset_index(drop=True))
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Unit tests for the 'genome' sub-package."""
 from __future__ import absolute_import, division, print_function
-
 import unittest
 
 import pandas as pd
@@ -165,7 +164,6 @@ class IntervalTests(unittest.TestCase):
     #   =B=======   =D===   =E======
     #      =C=
     # 1 3  5 6  8   11 15   19 20 23 <- coordinates
-    # 0 1  2  3  4  5    6  7    8 <- out row indices
     region_coords_1 = (
         (1,  20, 'A'),
         (3,  8,  'B'),
@@ -196,9 +194,24 @@ class IntervalTests(unittest.TestCase):
     def _from_intervals(coords):
         garr = GA(pd.DataFrame(list(coords),
                                columns=['start', 'end', 'gene'])
-                  .assign(chromosome='chr1'))
+                  .assign(chromosome='chr0'))
         garr.sort_columns()
         return garr
+
+    def _compare_regions(self, result, expect):
+        self.assertEqual(expect.data.shape, result.data.shape,
+                         #  '\n'.join(["Got:", str(result.data),
+                         #             "Expected:", str(expect.data)])
+                        )
+        for col in expect.data.columns:
+            self.assertTrue((expect[col] == result[col]).all(),
+                            "Col '{}' differs:\nExpect:\n{}\nGot:\n{}"
+                            #  .format(col, expect[col], result[col]))
+                            .format(col, expect.data, result.data))
+
+    def setUp(self):
+        self.regions_1 = self._from_intervals(self.region_coords_1)
+        self.regions_2 = self._from_intervals(self.region_coords_2)
 
     def test_flatten(self):
         flat_coords_1 = [
@@ -227,38 +240,130 @@ class IntervalTests(unittest.TestCase):
             (36, 39, 'DI'),
             (39, 42, 'D'),
         ]
-        for region_coords, flat_coords in [
-            (self.region_coords_1, flat_coords_1),
-            (self.region_coords_2, flat_coords_2),
+        for regions, flat_coords in [
+            (self.regions_1, flat_coords_1),
+            (self.regions_2, flat_coords_2),
         ]:
-            regions = self._from_intervals(region_coords)
-            expect = self._from_intervals(flat_coords)
             result = regions.flatten(combine=self.combiner)
-            self.assertEqual(expect.data.shape, result.data.shape)
-            for col in expect.data.columns:
-                self.assertTrue((expect[col] == result[col]).all(),
-                                "Col {} differs:\nExpect:\n{}\nGot:\n{}"
-                                .format(col, expect[col], result[col]))
+            expect = self._from_intervals(flat_coords)
+            self._compare_regions(result, expect)
 
     def test_merge(self):
         merged_coords_1 = [(1, 23, 'ABCDE')]
         merged_coords_2 = [(3, 42, 'ABCDEFGHI')]
-        for region_coords, merged_coords in [
-            (self.region_coords_1, merged_coords_1),
-            (self.region_coords_2, merged_coords_2),
+        for regions, merged_coords in [
+            (self.regions_1, merged_coords_1),
+            (self.regions_2, merged_coords_2),
         ]:
-            regions = self._from_intervals(region_coords)
-            expect = self._from_intervals(merged_coords)
             result = regions.merge(combine=self.combiner)
-            self.assertEqual(expect.data.shape, result.data.shape)
-            for col in expect.data.columns:
-                self.assertTrue((expect[col] == result[col]).all(),
-                                "Col {} differs:\nExpect:\n{}\nGot:\n{}"
-                                .format(col, expect[col], result[col]))
+            expect = self._from_intervals(merged_coords)
+            self._compare_regions(result, expect)
 
     def test_intersect(self):
-        # TODO
-        pass
+        # =A=========================
+        #   =B=======   =D===   =E======
+        #      =C=
+        # 1 3  5 6  8   11 15   19 20 23 <- coordinates
+
+        selections = self._from_intervals([
+            (1, 8, ''),
+            (4, 10, ''),
+            (8, 19, ''),
+            (11, 20, ''),
+            (21, 22, ''),
+        ])
+
+        expectations = {
+            'outer': (
+                # 1-8
+                [(1,  20, 'A'),
+                 (3,  8,  'B'),
+                 (5,  6,  'C'),
+                ],
+                # 4-10
+                [(1,  20, 'A'),
+                 (3,  8,  'B'),
+                 (5,  6,  'C'),
+                ],
+                # 8-19
+                [(1,  20, 'A'),
+                 (11, 15, 'D')],
+                # 11-20
+                [(1,  20, 'A'),
+                 (11, 15, 'D'),
+                 (19, 23, 'E')],
+                # 21-22
+                [(19, 23, 'E')],
+            ),
+
+            'trim': (
+                # 1-8
+                [(1,  8, 'A'),
+                 (3,  8,  'B'),
+                 (5,  6,  'C')],
+                # 4-10
+                [(4,  10, 'A'),
+                 (4,  8,  'B'),
+                 (5,  6,  'C')],
+                # 8-19
+                [(8,  19, 'A'),
+                 (11, 15, 'D')],
+                # 11-20
+                [(11, 20, 'A'),
+                 (11, 15, 'D'),
+                 (19, 20, 'E')],
+                # 21-22
+                [(21, 22, 'E')],
+            ),
+
+            'inner': (
+                # 1-8
+                [(3,  8,  'B'),
+                 (5,  6,  'C')],
+                # 4-10
+                [(5,  6,  'C')],
+                # 8-19
+                [(11, 15, 'D')],
+                # 11-20
+                [(11, 15, 'D')],
+                # 21-22
+                [],
+            ),
+        }
+
+        for mode in ('outer', 'trim', 'inner'):
+            grouped_results = self.regions_1.by_ranges(selections, mode=mode)
+            for (_coord, result), expect in zip(grouped_results,
+                                                expectations[mode]):
+                self._compare_regions(result, self._from_intervals(expect))
+
+        # TODO region_coords_2
+        # =A=============================
+        #   =B==  =C==     =E==  =G==
+        #               =D=========================
+        #                  =F==  =H==       =I==
+        # 3 5  8  11 14 17 19 22 25 28  32  36 39 42
+
+        selections = self._from_intervals([
+            (0, 1, ''),
+        ])
+        expectations = {
+            'outer': (
+                [],
+            ),
+            'trim': (
+                [],
+            ),
+
+            'inner': (
+                [],
+            ),
+        }
+        for mode in ('outer', 'trim', 'inner'):
+            grouped_results = self.regions_2.by_ranges(selections, mode=mode)
+            for (_coord, result), expect in zip(grouped_results,
+                                                expectations[mode]):
+                self._compare_regions(result, self._from_intervals(expect))
 
 
 
