@@ -260,20 +260,14 @@ class IntervalTests(unittest.TestCase):
             self._compare_regions(result, expect)
 
     def test_intersect(self):
-        # =A=========================
-        #   =B=======   =D===   =E======
-        #      =C=
-        # 1 3  5 6  8   11 15   19 20 23 <- coordinates
-
-        selections = self._from_intervals([
+        selections1 = self._from_intervals([
             (1, 8, ''),
             (4, 10, ''),
             (8, 19, ''),
             (11, 20, ''),
             (21, 22, ''),
         ])
-
-        expectations = {
+        expectations1 = {
             'outer': (
                 # 1-8
                 [(1,  20, 'A'),
@@ -295,7 +289,6 @@ class IntervalTests(unittest.TestCase):
                 # 21-22
                 [(19, 23, 'E')],
             ),
-
             'trim': (
                 # 1-8
                 [(1,  8, 'A'),
@@ -315,7 +308,6 @@ class IntervalTests(unittest.TestCase):
                 # 21-22
                 [(21, 22, 'E')],
             ),
-
             'inner': (
                 # 1-8
                 [(3,  8,  'B'),
@@ -331,39 +323,123 @@ class IntervalTests(unittest.TestCase):
             ),
         }
 
-        for mode in ('outer', 'trim', 'inner'):
-            grouped_results = self.regions_1.by_ranges(selections, mode=mode)
-            for (_coord, result), expect in zip(grouped_results,
-                                                expectations[mode]):
-                self._compare_regions(result, self._from_intervals(expect))
-
-        # TODO region_coords_2
-        # =A=============================
-        #   =B==  =C==     =E==  =G==
-        #               =D=========================
-        #                  =F==  =H==       =I==
-        # 3 5  8  11 14 17 19 22 25 28  32  36 39 42
-
-        selections = self._from_intervals([
+        selections2 = self._from_intervals([
             (0, 1, ''),
+            (5, 14, ''),
+            (16, 45, ''),
+            (18, 37, ''),
+            (19, 25, ''),
+            (29, 31, ''),
+            (34, 39, ''),
         ])
-        expectations = {
+        expectations2 = {
             'outer': (
+                # 0-1
                 [],
+                # 5-14
+                [(3,  32, 'A'),
+                 (5,   8, 'B'),
+                 (11, 14, 'C')],
+                # 16-45
+                [(3,  32, 'A'),
+                 (17, 42, 'D'),
+                 (19, 22, 'E'),
+                 (19, 22, 'F'),
+                 (25, 28, 'G'),
+                 (25, 28, 'H'),
+                 (36, 39, 'I')],
+                # 18-37
+                [(3,  32, 'A'),
+                 (17, 42, 'D'),
+                 (19, 22, 'E'),
+                 (19, 22, 'F'),
+                 (25, 28, 'G'),
+                 (25, 28, 'H'),
+                 (36, 39, 'I')],
+                # 19-25
+                [(3,  32, 'A'),
+                 (17, 42, 'D'),
+                 (19, 22, 'E'),
+                 (19, 22, 'F')],
+                # 29-31
+                [(3,  32, 'A'),
+                 (17, 42, 'D')],
+                # 34-39
+                [(17, 42, 'D'),
+                 (36, 39, 'I')],
             ),
             'trim': (
+                # 0-1
                 [],
+                # 5-14
+                [(5,  14, 'A'),
+                 (5,   8, 'B'),
+                 (11, 14, 'C')],
+                # 16-45
+                [(16, 32, 'A'),
+                 (17, 42, 'D'),
+                 (19, 22, 'E'),
+                 (19, 22, 'F'),
+                 (25, 28, 'G'),
+                 (25, 28, 'H'),
+                 (36, 39, 'I')],
+                # 18-37
+                [(18, 32, 'A'),
+                 (18, 37, 'D'),
+                 (19, 22, 'E'),
+                 (19, 22, 'F'),
+                 (25, 28, 'G'),
+                 (25, 28, 'H'),
+                 (36, 37, 'I')],
+                # 19-25
+                [(19, 25, 'A'),
+                 (19, 25, 'D'),
+                 (19, 22, 'E'),
+                 (19, 22, 'F')],
+                # 29-31
+                [(29, 31, 'A'),
+                 (29, 31, 'D')],
+                # 34-39
+                [(34, 39, 'D'),
+                 (36, 39, 'I')],
             ),
-
             'inner': (
+                # 0-1
                 [],
+                # 5-14
+                [(5,   8, 'B'),
+                 (11, 14, 'C')],
+                # 16-45
+                [(17, 42, 'D'),
+                 (19, 22, 'E'),
+                 (19, 22, 'F'),
+                 (25, 28, 'G'),
+                 (25, 28, 'H'),
+                 (36, 39, 'I')],
+                # 18-37
+                [(19, 22, 'E'),
+                 (19, 22, 'F'),
+                 (25, 28, 'G'),
+                 (25, 28, 'H')],
+                # 19-25
+                [(19, 22, 'E'),
+                 (19, 22, 'F')],
+                # 29-31
+                [],
+                # 34-39
+                [(36, 39, 'I')],
             ),
         }
-        for mode in ('outer', 'trim', 'inner'):
-            grouped_results = self.regions_2.by_ranges(selections, mode=mode)
-            for (_coord, result), expect in zip(grouped_results,
-                                                expectations[mode]):
-                self._compare_regions(result, self._from_intervals(expect))
+
+        for regions, selections, expectations in (
+            (self.regions_1, selections1, expectations1),
+            (self.regions_2, selections2, expectations2),
+        ):
+            for mode in ('outer', 'trim', 'inner'):
+                grouped_results = regions.by_ranges(selections, mode=mode)
+                for (_coord, result), expect in zip(grouped_results,
+                                                    expectations[mode]):
+                    self._compare_regions(result, self._from_intervals(expect))
 
 
 
