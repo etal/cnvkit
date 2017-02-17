@@ -10,7 +10,7 @@ before_script:
     - source activate testenv
     - conda build -c bioconda -c R --python $CONDA_PY ./devtools/conda-recipe/  # Build the conda recipe for the latest dev
     - conda install -c bioconda -c R --use-local -yq cnvkit  # Install the locally built package and its requirements
-    - conda install -c bioconda -c R -yq pandas==$PANDAS # Install the version of pandas desired for testing
+    - conda install -c bioconda -c R -yq pandas==$PANDAS pysam==$PYSAM  # Install the versions desired for testing
     - conda remove cnvkit -y -q  # Remove the conda cnvkit package but keep the dependencies installed
     - python setup.py install  # Install directly from source
     - cd test/
@@ -32,7 +32,7 @@ os:
   - linux
 
 env:
-  - CONDA_PY=2.7 PANDAS=0.19.0
-  - CONDA_PY=2.7 PANDAS=0.19.2
-  - CONDA_PY=3.5 PANDAS=0.19.0
-  - CONDA_PY=3.5 PANDAS=0.19.2
+  - CONDA_PY=2.7 PANDAS=0.19.0 PYSAM=0.9.1.4
+  - CONDA_PY=2.7 PANDAS=0.19.2 PYSAM=0.10.0
+  - CONDA_PY=3.5 PANDAS=0.19.0 PYSAM=0.9.1.4
+  - CONDA_PY=3.5 PANDAS=0.19.2 PYSAM=0.10.0
