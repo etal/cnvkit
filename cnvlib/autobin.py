@@ -49,8 +49,7 @@ def total_region_size(regions):
 def sample_region_cov(bam_fname, regions, max_num=100):
     """Calculate read depth in a randomly sampled subset of regions."""
     midsize_regions = sample_midsize_regions(regions, max_num)
-    with tempfile.NamedTemporaryFile(suffix='.bed', # mode='w+t'
-                                    ) as f:
+    with tempfile.NamedTemporaryFile(suffix='.bed') as f:
         tabio.write(regions.as_dataframe(midsize_regions), f, 'bed4')
         f.flush()
         table = coverage.bedcov(f.name, bam_fname, 0)
@@ -64,5 +63,5 @@ def sample_midsize_regions(regions, max_num):
     lo_size, hi_size = np.percentile(sizes[sizes > 0], [25, 75])
     midsize_regions = regions.data[(sizes >= lo_size) & (sizes <= hi_size)]
     if len(midsize_regions) > max_num:
-        midsize_regions = midsize_regions.sample(max_num)
+        midsize_regions = midsize_regions.sample(max_num, random_state=0xA5EED)
     return midsize_regions
