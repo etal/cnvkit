@@ -202,7 +202,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     if min_mapq and min_mapq > 0:
         cmd.extend(['-Q', bytes(min_mapq)])
     try:
-        raw = pysam.bedcov(*cmd)
+        raw = pysam.bedcov(*cmd, split_lines=False)
     except pysam.SamtoolsError as exc:
         raise ValueError("Failed processing %r coverages in %r regions. "
                          "PySAM error: %s" % (bam_fname, bed_fname, exc))
