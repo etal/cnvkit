@@ -22,12 +22,12 @@ def detect_big_chroms(sizes):
     thresh : int
         Length of the smallest "big" chromosomes.
     """
-    sizes = pd.Series(sizes).sort(ascending=False)
+    sizes = pd.Series(sizes).sort_values(ascending=False)
     reldiff = sizes.diff().abs().values[1:] / sizes.values[:-1]
-    changepoints = np.where(reldiff > .5)
-    if changepoints:
+    changepoints = np.nonzero(reldiff > .5)[0]
+    if changepoints.any():
         n_big = changepoints[0] + 1
-        thresh = sizes[n_big - 1]
+        thresh = sizes.iat[n_big - 1]
     else:
         n_big = len(sizes)
         thresh = sizes[-1]

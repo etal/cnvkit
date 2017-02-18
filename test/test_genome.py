@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 """Unit tests for the 'genome' sub-package."""
 from __future__ import absolute_import, division, print_function
+import random
 import unittest
 
 import pandas as pd
 
 from cnvlib import tabio
+from cnvlib.genome import chromsort, rangelabel
 from cnvlib.genome import GenomicArray as GA
 
 
@@ -160,6 +162,7 @@ class IntervalTests(unittest.TestCase):
     """Interval arithmetic tests."""
     combiner = {'gene': lambda a: ''.join(a)}
 
+    # Simple: nested, overlapping, & non-overlapping intervals
     # =A=========================
     #   =B=======   =D===   =E======
     #      =C=
@@ -172,7 +175,7 @@ class IntervalTests(unittest.TestCase):
         (19, 23, 'E'),
     )
 
-    # Likely overlapping gene models
+    # Semi-realistic: overlapping gene models
     # =A=============================
     #   =B==  =C==     =E==  =G==
     #               =D=========================
@@ -200,13 +203,11 @@ class IntervalTests(unittest.TestCase):
 
     def _compare_regions(self, result, expect):
         self.assertEqual(expect.data.shape, result.data.shape,
-                         #  '\n'.join(["Got:", str(result.data),
-                         #             "Expected:", str(expect.data)])
-                        )
+                         '\n'.join(["Got:", str(result.data),
+                                    "Expected:", str(expect.data)]))
         for col in expect.data.columns:
             self.assertTrue((expect[col] == result[col]).all(),
                             "Col '{}' differs:\nExpect:\n{}\nGot:\n{}"
-                            #  .format(col, expect[col], result[col]))
                             .format(col, expect.data, result.data))
 
     def setUp(self):
@@ -440,6 +441,42 @@ class IntervalTests(unittest.TestCase):
                 for (_coord, result), expect in zip(grouped_results,
                                                     expectations[mode]):
                     self._compare_regions(result, self._from_intervals(expect))
+
+
+
+class IntervalTests(unittest.TestCase):
+    """Other small modules & functions in this sub-package."""
+
+    def test_chromsort(self):
+        labels_hg = ["chr1", "chr2", "chr10", "chr19", "chr20",
+                     "chrX", "chrY", "chrM"]
+        labels_grc = ["1", "2", "10", "19", "X", "Y", "MT"]
+        for labels in (labels_hg, labels_grc):
+            shuf = labels[:]
+            random.shuffle(shuf)
+            resorted = sorted(labels, key=chromsort.sorter_chrom)
+            self.assertEqual(resorted, labels)
+
+    def test_detect_big_chroms(self):
+        sizes = [1, 20, 30]
+        n_big, thresh = chromsort.detect_big_chroms(sizes)
+        self.assertEqual(n_big, 2)
+        self.assertEqual(thresh, 20)
+
+    def test_rangelabel(self):
+        row = rangelabel.from_label("chr1:123-456", keep_gene=False)
+        self.assertEqual(tuple(row), ("chr1", 122, 456))
+        label = rangelabel.to_label(row)
+        self.assertEqual(label, "chr1:123-456")
+        # unpack_range
+        for region, expect in (
+            ["chr1",                    ("chr1", None, None)],
+            ["chr1:100-123",            ("chr1", 99, 123)],
+            [("chr1", 100, 123),        ("chr1", 100, 123)],
+            [("chr1", 100, 123, "A"),   ("chr1", 100, 123)],
+        ):
+            result = rangelabel.unpack_range(region)
+            self.assertEqual(result, expect)
 
 
 

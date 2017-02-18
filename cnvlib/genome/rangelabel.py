@@ -28,7 +28,7 @@ def from_label(text, keep_gene=True):
     match = re_label.match(text)
     if match:
         chrom, start, end, gene = match.groups()
-        start = int(start) if start else 0
+        start = int(start) - 1 if start else None
         end = int(end) if end else None
         if keep_gene:
             gene = gene or ''
@@ -51,13 +51,13 @@ def unpack_range(a_range):
     Examples::
 
         "chr1" -> ("chr1", None, None)
-        "chr1:100-123" -> ("chr1", 100, 123)
+        "chr1:100-123" -> ("chr1", 99, 123)
         ("chr1", 100, 123) -> ("chr1", 100, 123)
     """
     if not a_range:
         return Region(None, None, None)
     if isinstance(a_range, basestring):
-        if ':' in a_range or '-' in a_range:
+        if ':' in a_range and '-' in a_range:
             return from_label(a_range, keep_gene=False)
         return Region(a_range, None, None)
     if isinstance(a_range, (list, tuple)):
