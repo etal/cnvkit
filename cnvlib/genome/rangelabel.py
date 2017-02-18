@@ -6,6 +6,7 @@ A range specification should look like ``chromosome:start-end``, e.g.
 becomes None.
 """
 from __future__ import absolute_import, division, print_function
+from past.builtins import basestring
 import collections
 import re
 
