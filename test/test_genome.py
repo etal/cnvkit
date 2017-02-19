@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, print_function
 import random
 import unittest
 
+import numpy as np
 import pandas as pd
 
 from cnvlib import tabio
@@ -70,7 +71,7 @@ class GaryTests(unittest.TestCase):
         selector = lambda row: row['gene'] == 'Background'
         self.assertEqual(len(self.ex_cnr.filter(selector)), num_bg_rows)
 
-    def test_ranges(self):
+    def test_ranges_by_in(self):
         """Test range methods: by_ranges, in_range, in_ranges."""
         cnarr = tabio.read_cna("formats/amplicon.cnr")
         segarr = tabio.read_cna("formats/amplicon.cns")
@@ -103,8 +104,18 @@ class GaryTests(unittest.TestCase):
                 subarr.in_ranges(starts=subsegarr['start'],
                                  ends=subsegarr['end'], mode="trim")))
 
-    def test_resize_ranges(self):
-        """Test resizing bins."""
+    def test_ranges_into(self):
+        cnarr = tabio.read_cna("formats/amplicon.cnr")
+        segarr = tabio.read_cna("formats/amplicon.cns")
+        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        seg_baf = varr.into_ranges(segarr, 'alt_freq', np.nan)
+        self.assertEqual(len(seg_baf), len(segarr))
+        cna_baf = varr.into_ranges(cnarr, 'alt_freq', np.nan)
+        self.assertEqual(len(cna_baf), len(cnarr))
+        seg_genes = cnarr.into_ranges(segarr, 'gene', '-')
+        self.assertEqual(len(seg_genes), len(segarr))
+
+    def test_ranges_resize(self):
         baits_fname = 'formats/nv2_baits.interval_list'
         chrom_sizes = {'chr1': 249250621,
                        'chr2': 243199373,
