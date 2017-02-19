@@ -107,13 +107,18 @@ class GaryTests(unittest.TestCase):
     def test_ranges_into(self):
         cnarr = tabio.read_cna("formats/amplicon.cnr")
         segarr = tabio.read_cna("formats/amplicon.cns")
-        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
-        seg_baf = varr.into_ranges(segarr, 'alt_freq', np.nan)
-        self.assertEqual(len(seg_baf), len(segarr))
-        cna_baf = varr.into_ranges(cnarr, 'alt_freq', np.nan)
-        self.assertEqual(len(cna_baf), len(cnarr))
         seg_genes = cnarr.into_ranges(segarr, 'gene', '-')
         self.assertEqual(len(seg_genes), len(segarr))
+        # With a VCF
+        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        seg_baf = varr.into_ranges(segarr, 'alt_freq', np.nan, np.nanmedian)
+        self.assertEqual(len(seg_baf), len(segarr))
+        cna_baf = varr.into_ranges(cnarr, 'alt_freq', 0.0, np.max)
+        self.assertEqual(len(cna_baf), len(cnarr))
+        # Edge cases
+        mtarr = tabio.read("formats/empty")
+        segarr.into_ranges(mtarr, 'start', 0, int)
+        mtarr.into_ranges(segarr, 'end', 0, 0)
 
     def test_ranges_resize(self):
         baits_fname = 'formats/nv2_baits.interval_list'

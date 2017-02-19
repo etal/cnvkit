@@ -44,7 +44,10 @@ def by_shared_chroms(table, other, keep_empty=True):
 
 
 def into_ranges(source, dest, src_col, default, summary_func):
-    """Assign to `dest` from aligned rows in `source`."""
+    """Group a column in `source` by regions in `dest` and summarize."""
+    if not len(source) or not len(dest):
+        return dest
+
     if summary_func is None:
         # Choose a type-appropriate summary function
         elem = source[src_col].iat[0]
