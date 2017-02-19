@@ -444,7 +444,7 @@ class IntervalTests(unittest.TestCase):
 
 
 
-class IntervalTests(unittest.TestCase):
+class OtherTests(unittest.TestCase):
     """Other small modules & functions in this sub-package."""
 
     def test_chromsort(self):
