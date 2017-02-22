@@ -9,7 +9,7 @@ import numpy as np
 import cnvlib
 from cnvlib.genome import GenomicArray
 # Import all modules as a smoke test
-from cnvlib import (access, antitarget, cnary, commands, core, coverage,
+from cnvlib import (access, antitarget, batch, cnary, commands, core, coverage,
                     diagram, export, fix, importers, metrics, params, plots,
                     reference, reports, segmentation, smoothing, tabio, vary)
 
@@ -106,7 +106,7 @@ class CommandTests(unittest.TestCase):
                                            (1000, 2)):
             acc = commands.do_access(fasta, [], min_gap_size)
             self.assertEqual(len(acc), expect_nrows)
-        excludes = ["formats/dac-my.bed", "formats/duke-my.bed"]
+        excludes = ["formats/dac-my.bed", "formats/my-targets.bed"]
         for min_gap_size, expect_nrows in ((None, 5),
                                            (2, 5),
                                            (20, 4),
@@ -124,13 +124,26 @@ class CommandTests(unittest.TestCase):
         self.assertLess(0, len(commands.do_antitarget(baits, access, 10000,
                                                       5000)))
 
-    def test_batch_reference(self):
-        """The 'batch' command with an existing reference."""
-        ref = cnvlib.read('formats/reference-tr.cnn')
-        targets, antitargets = reference.reference2regions(ref)
-        self.assertLess(0, len(antitargets))
-        self.assertEqual(len(antitargets), (ref['gene'] == 'Background').sum())
-        self.assertEqual(len(targets), len(ref) - len(antitargets))
+    def test_batch(self):
+        """The 'batch' command."""
+        target_bed = "formats/my-targets.bed"
+        fasta = "formats/chrM-Y-trunc.hg19.fa"
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        # Build a flat reference
+        ref_fname, tgt_bed_fname, anti_bed_fname = batch.batch_make_reference(
+            [bam], target_bed, None, True, fasta, None, True, 10, None, 1000,
+            100, None, 'build', 1, False, "hybrid")
+        self.assertEqual(ref_fname, 'build/reference.cnn')
+        refarr = tabio.read_cna(ref_fname, 'bed')
+        tgt_regions = tabio.read(tgt_bed_fname, 'bed')
+        anti_regions = tabio.read(anti_bed_fname, 'bed')
+        self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
+        # Run the same sample
+        batch.batch_run_sample(
+            bam, tgt_bed_fname, anti_bed_fname, ref_fname, 'build', True,
+            True, True, None, False, False, "hybrid", 1)
+        cns =  tabio.read_cna("build/na12878-chrM-Y-trunc.cns")
+        self.assertGreater(len(cns), 0)
 
     def test_breaks(self):
         """The 'breaks' command."""
@@ -225,7 +238,7 @@ class CommandTests(unittest.TestCase):
     def test_coverage(self):
         """The 'coverage' command."""
         # fa = 'formats/chrM-Y-trunc.hg19.fa'
-        bed = 'formats/duke-my.bed'
+        bed = 'formats/my-targets.bed'
         bam = 'formats/na12878-chrM-Y-trunc.bam'
         for by_count in (False, True):
             for min_mapq in (0, 30):
@@ -330,6 +343,12 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(len(ref), nlines)
         ref = commands.do_reference_flat("formats/amplicon.bed")
         self.assertEqual(len(ref), nlines)
+        # Misc
+        ref = cnvlib.read('formats/reference-tr.cnn')
+        targets, antitargets = reference.reference2regions(ref)
+        self.assertLess(0, len(antitargets))
+        self.assertEqual(len(antitargets), (ref['gene'] == 'Background').sum())
+        self.assertEqual(len(targets), len(ref) - len(antitargets))
 
     def test_segment(self):
         """The 'segment' command."""

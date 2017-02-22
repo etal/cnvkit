@@ -155,7 +155,7 @@ class GaryTests(unittest.TestCase):
         """Test total region coverage calculation."""
         for fname, area in (
             ('formats/empty', 0),
-            ('formats/duke-my.bed', 103),
+            ('formats/my-targets.bed', 103),
             ('formats/dac-my.bed', 148),
             ('formats/example.gff', 7951),
             ('formats/refflat-mini.txt', 719715),

@@ -35,6 +35,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
 
     else:
         with futures.ProcessPoolExecutor(processes) as pool:
+            # ENH: run each chrom. arm separately (via knownsegs, see cbs)
             rets = list(pool.map(_ds, ((ca, method, threshold, variants, skip_low,
                                         skip_outliers, save_dataframe, rlibpath)
                                     for _, ca in cnarr.by_chromosome())))
@@ -68,11 +69,16 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10,
                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
+    if not len(cnarr):
+        return cnarr
+
     filtered_cn = cnarr.copy()
     if skip_low:
         filtered_cn = filtered_cn.drop_low_coverage(verbose=True)
     if skip_outliers:
         filtered_cn = drop_outliers(filtered_cn, 50, skip_outliers)
+    if not len(filtered_cn):
+        return filtered_cn
 
     seg_out = ""
     if method == 'haar':
@@ -104,8 +110,6 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
             with core.temp_write_text(rscript % script_strings,
                                       mode='w+t') as script_fname:
                 seg_out = core.call_quiet('Rscript', '--vanilla', script_fname)
-            # ENH: run each chromosome separately
-            # ENH: run each chrom. arm separately (via knownsegs)
         # Convert R dataframe contents (SEG) to a proper CopyNumArray
         # NB: Automatically shifts 'start' back from 1- to 0-indexed
         segarr = tabio.read(StringIO(seg_out.decode()), "seg",
@@ -144,6 +148,8 @@ def drop_outliers(cnarr, width, factor):
     deviations from the rolling mean. For a window size of 50, the breakdown
     point is 2.5 outliers within a window, which is plenty robust for our needs.
     """
+    if not len(cnarr):
+        return cnarr
     outlier_mask = np.concatenate([
         smoothing.rolling_outlier_quantile(subarr['log2'], width, .95, factor)
         for _chrom, subarr in cnarr.by_chromosome()])

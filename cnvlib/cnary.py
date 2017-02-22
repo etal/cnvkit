@@ -196,7 +196,7 @@ class CopyNumArray(GenomicArray):
             outrow = [chrom, start, end, name, cvg]
             # Handle extra fields
             # ENH - no coverage stat; do weighted average as appropriate
-            for xfield in ('gc', 'rmask', 'spread', 'weight'):
+            for xfield in ('depth', 'gc', 'rmask', 'spread', 'weight'):
                 if xfield in self:
                     outrow.append(summary_func(rows[xfield]))
             if 'probes' in self:

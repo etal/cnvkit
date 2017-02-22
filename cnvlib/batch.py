@@ -190,7 +190,9 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
         logging.info("Wrote %s-scatter.pdf", sample_pfx)
 
     if plot_diagram:
+        is_xx = cnarr.guess_xx(male_reference)
         outfname = sample_pfx + '-diagram.pdf'
-        diagram.create_diagram(cnarr, segments, 0.5, 3, outfname,
-                               male_reference, None)
+        diagram.create_diagram(cnarr.shift_xx(male_reference, is_xx),
+                               segments.shift_xx(male_reference, is_xx),
+                               0.5, 3, outfname)
         logging.info("Wrote %s", outfname)
