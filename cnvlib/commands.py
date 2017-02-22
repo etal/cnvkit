@@ -1494,25 +1494,37 @@ P_export_nbo.set_defaults(func=_cmd_export_nbo)
 
 # All else: export any number of .cnr or .cns files
 
-for fmt_key, fmt_descr in (
-    ('cdt', "Convert log2 ratios to CDT format. Compatible with Java TreeView."),
-    ('jtv', "Convert log2 ratios to Java TreeView's native format."),
-    # Not implemented yet:
-    # 'gct' (GenePattern).
-):
-    def _cmd_export_simple(args):
-        sample_ids = list(map(core.fbase, args.filenames))
-        table = export.merge_samples(args.filenames)
-        formatter = export.EXPORT_FORMATS[fmt_key]
-        outheader, outrows = formatter(sample_ids, table)
-        core.write_tsv(args.output, outrows, colnames=outheader)
+def _cmd_export_cdt(args):
+    """Convert log2 ratios to CDT format. Compatible with Java TreeView."""
+    sample_ids = list(map(core.fbase, args.filenames))
+    table = export.merge_samples(args.filenames)
+    formatter = export.EXPORT_FORMATS['cdt']
+    outheader, outrows = formatter(sample_ids, table)
+    core.write_tsv(args.output, outrows, colnames=outheader)
 
-    P_export_simple = P_export_subparsers.add_parser(fmt_key, help=fmt_descr)
-    P_export_simple.add_argument('filenames', nargs='+',
-            help="""Log2 copy ratio data file(s) (*.cnr), the output of the
-                    'fix' sub-command.""")
-    P_export_simple.add_argument('-o', '--output', help="Output file name.")
-    P_export_simple.set_defaults(func=_cmd_export_simple)
+P_export_cdt = P_export_subparsers.add_parser('cdt',
+                                              help=_cmd_export_cdt.__doc__)
+P_export_cdt.add_argument('filenames', nargs='+',
+        help="""Log2 copy ratio data file(s) (*.cnr), the output of the
+                'fix' sub-command.""")
+P_export_cdt.add_argument('-o', '--output', help="Output file name.")
+P_export_cdt.set_defaults(func=_cmd_export_cdt)
+
+def _cmd_export_jtv(args):
+    """Convert log2 ratios to Java TreeView's native format."""
+    sample_ids = list(map(core.fbase, args.filenames))
+    table = export.merge_samples(args.filenames)
+    formatter = export.EXPORT_FORMATS['jtv']
+    outheader, outrows = formatter(sample_ids, table)
+    core.write_tsv(args.output, outrows, colnames=outheader)
+
+P_export_jtv = P_export_subparsers.add_parser('jtv',
+                                              help=_cmd_export_jtv.__doc__)
+P_export_jtv.add_argument('filenames', nargs='+',
+        help="""Log2 copy ratio data file(s) (*.cnr), the output of the
+                'fix' sub-command.""")
+P_export_jtv.add_argument('-o', '--output', help="Output file name.")
+P_export_jtv.set_defaults(func=_cmd_export_jtv)
 
 
 # version ---------------------------------------------------------------------

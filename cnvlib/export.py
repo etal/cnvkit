@@ -34,9 +34,8 @@ def merge_samples(filenames):
     out_table[first_cnarr.sample_id] = first_cnarr["log2"]
     for fname in filenames[1:]:
         cnarr = tabio.read_cna(fname)
-        # Verify labels match
-        labels = label_with_gene(cnarr)
-        if not (labels == out_table["label"]).all():
+        if not (len(cnarr) == len(out_table)
+                and (label_with_gene(cnarr) == out_table["label"]).all()):
             raise ValueError("Mismatched row coordinates in %s" % fname)
         # Copy the next column by sample ID
         if cnarr.sample_id in out_table.columns:
@@ -57,8 +56,8 @@ def fmt_cdt(sample_ids, table):
     outrows = [header2]
     outtable = pd.concat([
         pd.DataFrame({
-            "GID": table.index.apply(lambda x: "GENE%dX" % x),
-            "CLID": table.index.apply(lambda x: "IMAGE:%d" % x),
+            "GID": pd.Series(table.index).apply(lambda x: "GENE%dX" % x),
+            "CLID": pd.Series(table.index).apply(lambda x: "IMAGE:%d" % x),
             "NAME": table["label"],
             "GWEIGHT": 1,
         }),

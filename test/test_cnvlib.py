@@ -251,39 +251,71 @@ class CommandTests(unittest.TestCase):
                     self.assertTrue((cna.log2 != 0).any())
                     self.assertGreater(cna.log2.nunique(), 1)
 
-    def test_export(self):
-        """Run the 'export' command with each format."""
-        # SEG
-        seg_rows = export.export_seg(["formats/tr95t.cns"])
-        self.assertGreater(len(seg_rows), 0)
-        seg2_rows = export.export_seg(["formats/tr95t.cns",
-                                       "formats/cl_seq.cns"])
-        self.assertGreater(len(seg2_rows), len(seg_rows))
-        # THetA2
-        cnr = tabio.read_cna("formats/tr95t.cns")
-        theta_rows = export.export_theta(cnr, None)
-        self.assertGreater(len(theta_rows), 0)
-        ref = tabio.read_cna("formats/reference-tr.cnn")
-        theta_rows = export.export_theta(cnr, ref)
-        self.assertGreater(len(theta_rows), 0)
-        # Formats that calculate absolute copy number
+    def test_export_bed_vcf(self):
+        """The 'export' command for formats with absolute copy number."""
         for fname, ploidy, is_f in [("tr95t.cns", 2, True),
                                     ("cl_seq.cns", 6, True),
                                     ("amplicon.cns", 2, False)]:
             cns = tabio.read_cna("formats/" + fname)
             # BED
-            self.assertLess(len(export.export_bed(cns, ploidy, True, is_f,
-                                                  cns.sample_id, "ploidy")),
-                            len(cns))
-            self.assertLess(len(export.export_bed(cns, ploidy, True, is_f,
-                                                  cns.sample_id, "variant")),
-                            len(cns))
-            self.assertEqual(len(export.export_bed(cns, ploidy, True, is_f,
-                                                   cns.sample_id, "all")),
-                             len(cns))
+            for show in ("ploidy", "variant", "all"):
+                tbl_bed = export.export_bed(cns, ploidy, True, is_f,
+                                            cns.sample_id, show)
+                if show == "all":
+                    self.assertEqual(len(tbl_bed), len(cns),
+                                    "{} {}".format(fname, ploidy))
+                else:
+                    self.assertLess(len(tbl_bed), len(cns))
             # VCF
             _vheader, vcf_body = export.export_vcf(cns, ploidy, True, is_f)
             self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
+
+    def test_export_cdt_jtv(self):
+        """The 'export' command for CDT and Java TreeView formats."""
+        fnames = ["formats/p2-20_1.cnr", "formats/p2-20_2.cnr"]
+        sample_ids = list(map(core.fbase, fnames))
+        nrows = linecount(fnames[0]) - 1
+        import sys
+        for fmt_key, header2 in (('cdt', 1), ('jtv', 0)):
+            table = export.merge_samples(fnames)
+            formatter = export.EXPORT_FORMATS[fmt_key]
+            _oh, outrows = formatter(sample_ids, table)
+            self.assertEqual(len(list(outrows)), nrows + header2)
+
+    def test_export_nexus(self):
+        """The 'export nexus-basic' and 'nexus-ogt' commands."""
+        cnr = tabio.read_cna("formats/amplicon.cnr")
+        table_nb = export.export_nexus_basic(cnr)
+        self.assertEqual(len(table_nb), len(cnr))
+        varr = commands.load_het_snps("formats/na12878_na12882_mix.vcf",
+                                      None, None, 15, None)
+        table_ogt = export.export_nexus_ogt(cnr, varr, 0.05)
+        self.assertEqual(len(table_ogt), len(cnr))
+
+    def test_export_seg(self):
+        """The 'export seg' command."""
+        seg_rows = export.export_seg(["formats/tr95t.cns"])
+        self.assertGreater(len(seg_rows), 0)
+        seg2_rows = export.export_seg(["formats/tr95t.cns",
+                                       "formats/cl_seq.cns"])
+        self.assertGreater(len(seg2_rows), len(seg_rows))
+
+    def test_export_theta(self):
+        """The 'export theta' command."""
+        segarr = tabio.read_cna("formats/tr95t.cns")
+        len_seg_auto = len(segarr.autosomes())
+        table_theta = export.export_theta(segarr, None)
+        self.assertEqual(len(table_theta), len_seg_auto)
+        ref = tabio.read_cna("formats/reference-tr.cnn")
+        table_theta = export.export_theta(segarr, ref)
+        self.assertEqual(len(table_theta), len_seg_auto)
+        varr = commands.load_het_snps("formats/na12878_na12882_mix.vcf",
+                                      "NA12882", "NA12878", 15, None)
+        tumor_snps, normal_snps = export.export_theta_snps(varr)
+        self.assertLess(len(tumor_snps), len(varr))
+        self.assertGreater(len(tumor_snps), 0)
+        self.assertLess(len(normal_snps), len(varr))
+        self.assertGreater(len(normal_snps), 0)
 
     def test_fix(self):
         """The 'fix' command."""
