@@ -138,10 +138,7 @@ def _irange_simple(table, starts, ends, mode):
 def _irange_nested(table, starts, ends, mode):
     """Slice subsets of table when regions are nested."""
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
-    if starts is None or not len(starts):
-        starts = np.zeros(len(ends) if ends is not None else 1, dtype=np.int_)
-    if ends is None or not len(ends):
-        ends = [None] * len(starts)
+    assert len(starts) == len(ends) > 0
     for start_val, end_val in zip(starts, ends):
         # Mask of table rows to keep for this query region
         region_mask = np.ones(len(table), dtype=np.bool_)
