@@ -7,8 +7,7 @@ import os
 from matplotlib import pyplot
 
 from . import (access, antitarget, autobin, core, coverage, diagram, fix,
-               parallel, reference, samutil, scatter, segmentation, target,
-               tabio)
+               parallel, reference, scatter, segmentation, target, tabio)
 from .genome import GenomicArray as GA
 
 
@@ -50,7 +49,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
         # Tweak default parameters
         if not target_avg_size:
             if normal_bams:
-                # Estimate from .bai & access
+                # Calculate bin size from .bai & access
                 # NB: Always calculate wgs_depth from all sequencing-accessible
                 # area (it doesn't take that long compared to WGS coverage);
                 # user-provided access might be something else that excludes a
@@ -58,18 +57,13 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 if not access_arr:
                     access_arr = access.do_access(fasta)
                 # Choose median-size normal bam or tumor bam
-                bam_fname = sorted(normal_bams, key=lambda f: os.stat(f).st_size
-                                  )[len(normal_bams) // 2 - 1]
-                rc_table = samutil.idxstats(bam_fname, drop_unmapped=True)
-                rc_table = autobin.update_chrom_length(rc_table, access_arr)
-                read_length = samutil.get_read_length(bam_fname)
-                wgs_depth = autobin.average_depth(rc_table, read_length)
-                target_avg_size = int(round(50000. / wgs_depth))
+                bam_fname = autobin.midsize_file(normal_bams)
+                (wgs_depth, target_avg_size), _ = autobin.do_autobin(
+                    bam_fname, 'wgs', targets=access_arr, bp_per_bin=50000.)
                 logging.info("WGS average depth %.2f --> using bin size %d",
                              wgs_depth, target_avg_size)
-
             else:
-                # Good down to 10x
+                # This bin size is OK down to 10x
                 target_avg_size = 5000
 
     # To make temporary filenames for processed targets or antitargets

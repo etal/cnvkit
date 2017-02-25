@@ -22,9 +22,10 @@ from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
-from . import (access, antitarget, batch, call, core, coverage, descriptives,
-               diagram, export, fix, heatmap, importers, metrics, parallel,
-               reference, reports, scatter, segmentation, tabio, target)
+from . import (access, antitarget, autobin, batch, call, core, coverage,
+               descriptives, diagram, export, fix, heatmap, importers, metrics,
+               parallel, reference, reports, scatter, segmentation, tabio,
+               target)
 from .cnary import CopyNumArray as _CNA
 from .genome import GenomicArray as _GA
 from ._version import __version__
@@ -300,6 +301,111 @@ P_anti.add_argument('-m', '--min-size', type=int,
                 [Default: 1/16 avg size, calculated]""")
 P_anti.add_argument('-o', '--output', help="""Output file name.""")
 P_anti.set_defaults(func=_cmd_antitarget)
+
+
+# autobin ---------------------------------------------------------------------
+
+do_autobin = public(autobin.do_autobin)
+
+
+def _cmd_autobin(args):
+    """Quickly calculate reasonable bin sizes from BAM read counts."""
+    if args.method in ('hybrid', 'amplicon') and not args.targets:
+        raise RuntimeError("Sequencing method %r requires targets", args.method)
+    elif args.method == 'wgs' and args.targets:
+        logging.warn("Targets will be ignored: %s", args.targets)
+    if args.method == 'amplicon' and args.access:
+        logging.warn("Sequencing-accessible regions will be ignored: %s",
+                     args.access)
+
+    def read_regions(bed_fname):
+        if bed_fname:
+            regions = tabio.read_auto(bed_fname)
+            if len(regions):
+                return regions
+            else:
+                logging.warn("No regions to estimate depth from %s",
+                            regions.meta.get('filename', ''))
+
+    tgt_arr = read_regions(args.targets)
+    access_arr = read_regions(args.access)
+    bam_fname = autobin.midsize_file(args.bams)
+    fields = autobin.do_autobin(bam_fname, args.method, tgt_arr, access_arr,
+                                args.bp_per_bin, args.target_min_size,
+                                args.target_max_size, args.antitarget_min_size,
+                                args.antitarget_max_size)
+    (_tgt_depth, tgt_bin_size), (_anti_depth, anti_bin_size) = fields
+
+    # Create & write BED files
+    target_out_arr = target.do_target(access_arr if args.method == 'wgs'
+                                      else tgt_arr,
+                                      args.annotate, args.short_names,
+                                      do_split=True, avg_size=tgt_bin_size)
+    tgt_name_base = tgt_arr.sample_id if tgt_arr else core.fbase(bam_fname)
+    target_bed = tgt_name_base + '.target.bed'
+    tabio.write(target_out_arr, target_bed, "bed4")
+    if args.method == "hybrid" and anti_bin_size:
+        # Build antitarget BED from the given targets
+        anti_arr = antitarget.do_antitarget(target_out_arr,
+                                            access=access_arr,
+                                            avg_bin_size=anti_bin_size,
+                                            min_bin_size=args.antitarget_min_size)
+    else:
+        # No antitargets for wgs, amplicon
+        anti_arr = _GA([])
+    antitarget_bed = tgt_name_base + '.antitarget.bed'
+    tabio.write(anti_arr, antitarget_bed, "bed4")
+
+    # Print depths & bin sizes as a table on stdout
+    labels = ("Target", "Antitarget")
+    width = max(map(len, labels)) + 1
+    print(" " * width, "Depth", "Bin size", sep='\t')
+    for label, (depth, binsize) in zip(labels, fields):
+        if depth is not None:
+            print((label + ":").ljust(width),
+                  format(depth, ".3f"),
+                  binsize,
+                  sep='\t')
+
+
+P_autobin = AP_subparsers.add_parser('autobin', help=_cmd_autobin.__doc__)
+P_autobin.add_argument('bams', nargs='+',
+        help="""Sample BAM file(s) to test for target coverage""")
+P_autobin.add_argument('-m', '--method',
+        choices=('hybrid', 'amplicon', 'wgs'), default='hybrid',
+        help="""Sequencing protocol: hybridization capture ('hybrid'), targeted
+                amplicon sequencing ('amplicon'), or whole genome sequencing
+                ('wgs'). Determines whether and how to use antitarget bins.
+                [Default: %(default)s]""")
+P_autobin.add_argument('-g', '--access',
+        help="""Sequencing-accessible genomic regions, or exons to use as
+                possible targets (e.g. output of refFlat2bed.py)""")
+P_autobin.add_argument('-t', '--targets',
+        help="""Potentially targeted genomic regions, e.g. all possible exons
+                for the reference genome. Format: BED, interval list, etc.""")
+P_autobin.add_argument('-b', '--bp-per-bin', type=float, default=100000.,
+        help="""Desired average number of sequencing read bases mapped to each
+                bin. [Default: %(default)s]""")
+
+P_autobin.add_argument('--target-max-size', type=int, default=20000,
+        help="Maximum size of target bins.")
+P_autobin.add_argument('--target-min-size', type=int, default=20,
+        help="Minimum size of target bins.")
+P_autobin.add_argument('--antitarget-max-size', type=int, default=500000,
+        help="Maximum size of antitarget bins.")
+P_autobin.add_argument('--antitarget-min-size', type=int, default=500,
+        help="Minimum size of antitarget bins.")
+
+P_autobin.add_argument('--annotate',
+        help="""Use gene models from this file to assign names to the target
+                regions. Format: UCSC refFlat.txt or ensFlat.txt file
+                (preferred), or BED, interval list, GFF, or similar.""")
+P_autobin.add_argument('--short-names', action='store_true',
+        help="Reduce multi-accession bait labels to be short and consistent.")
+    # Option: --dry-run to not write BED files?
+
+P_autobin.add_argument('-o', '--output', help="Output filename.")
+P_autobin.set_defaults(func=_cmd_autobin)
 
 
 # coverage --------------------------------------------------------------------

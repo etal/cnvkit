@@ -26,9 +26,9 @@ def subtract(table, other):
 def _subtraction(table, other):
     for keeper, rows_to_exclude in by_ranges(other, table, 'outer', True):
         if len(rows_to_exclude):
-            logging.info(" %s:%d-%d : Subtracting %d excluded regions",
-                         keeper.chromosome, keeper.start, keeper.end,
-                         len(rows_to_exclude))
+            logging.debug(" %s:%d-%d : Subtracting %d excluded regions",
+                          keeper.chromosome, keeper.start, keeper.end,
+                          len(rows_to_exclude))
 
             keep_left = (keeper.start < rows_to_exclude.start.iat[0])
             keep_right = (keeper.end > rows_to_exclude.end.iat[-1])
@@ -56,6 +56,6 @@ def _subtraction(table, other):
                     yield keeper._replace(start=start, end=end)
 
         else:
-            logging.info(" %s:%d-%d : No excluded regions",
-                         keeper.chromosome, keeper.start, keeper.end)
+            logging.debug(" %s:%d-%d : No excluded regions",
+                          keeper.chromosome, keeper.start, keeper.end)
             yield keeper

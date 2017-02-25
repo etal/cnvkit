@@ -9,9 +9,10 @@ import numpy as np
 import cnvlib
 from cnvlib.genome import GenomicArray
 # Import all modules as a smoke test
-from cnvlib import (access, antitarget, batch, cnary, commands, core, coverage,
-                    diagram, export, fix, importers, metrics, params, plots,
-                    reference, reports, segmentation, smoothing, tabio, vary)
+from cnvlib import (access, antitarget, autobin, batch, cnary, commands, core,
+                    coverage, diagram, export, fix, importers, metrics, params,
+                    plots, reference, reports, segmentation, smoothing, tabio,
+                    vary)
 
 
 class CNATests(unittest.TestCase):
@@ -124,12 +125,31 @@ class CommandTests(unittest.TestCase):
         self.assertLess(0, len(commands.do_antitarget(baits, access, 10000,
                                                       5000)))
 
+    def test_autobin(self):
+        bam_fname = "formats/na12878-chrM-Y-trunc.bam"
+        target_bed = "formats/my-targets.bed"
+        targets = tabio.read(target_bed, 'bed')
+        cov = autobin.sample_region_cov(bam_fname, targets)
+        self.assertGreater(cov, 0)
+        #  access_bed = "../data/access-5k-mappable.hg19.bed"
+        #  accessible = tabio.read_bed(access_bed).filter(chromosome='chrY')
+        #  antitargets = commands.do_antitarget(targets, accessible)
+
     def test_batch(self):
         """The 'batch' command."""
         target_bed = "formats/my-targets.bed"
         fasta = "formats/chrM-Y-trunc.hg19.fa"
         bam = "formats/na12878-chrM-Y-trunc.bam"
-        # Build a flat reference
+        annot = "formats/my-refflat.bed"
+        # Build a single-sample WGS reference
+        ref_fname, tgt_bed_fname, _ = batch.batch_make_reference(
+            [bam], None, None, True, fasta, annot, True, 500, None, None,
+            None, None, 'build', 1, False, "wgs")
+        self.assertEqual(ref_fname, 'build/reference.cnn')
+        refarr = tabio.read_cna(ref_fname, 'bed')
+        tgt_regions = tabio.read(tgt_bed_fname, 'bed')
+        self.assertEqual(len(refarr), len(tgt_regions))
+        # Build a single-sample hybrid-capture reference
         ref_fname, tgt_bed_fname, anti_bed_fname = batch.batch_make_reference(
             [bam], target_bed, None, True, fasta, None, True, 10, None, 1000,
             100, None, 'build', 1, False, "hybrid")
