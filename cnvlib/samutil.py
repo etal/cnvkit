@@ -87,6 +87,7 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50):
         if out_of_order(read, last_read):
             return False
         last_read = read
+    bam.close()
     return True
 
 
@@ -118,4 +119,6 @@ def get_read_length(bam, span=1000):
                if read.query_length > 0]
     if was_open:
         bam.seek(0)
+    else:
+        bam.close()
     return np.median(lengths)

@@ -404,7 +404,7 @@ P_autobin.add_argument('--short-names', action='store_true',
         help="Reduce multi-accession bait labels to be short and consistent.")
     # Option: --dry-run to not write BED files?
 
-P_autobin.add_argument('-o', '--output', help="Output filename.")
+#  P_autobin.add_argument('-o', '--output', help="Output filename.")
 P_autobin.set_defaults(func=_cmd_autobin)
 
 

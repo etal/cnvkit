@@ -126,14 +126,18 @@ class CommandTests(unittest.TestCase):
                                                       5000)))
 
     def test_autobin(self):
+        """The 'autobin' command."""
         bam_fname = "formats/na12878-chrM-Y-trunc.bam"
         target_bed = "formats/my-targets.bed"
         targets = tabio.read(target_bed, 'bed')
-        cov = autobin.sample_region_cov(bam_fname, targets)
-        self.assertGreater(cov, 0)
-        #  access_bed = "../data/access-5k-mappable.hg19.bed"
-        #  accessible = tabio.read_bed(access_bed).filter(chromosome='chrY')
-        #  antitargets = commands.do_antitarget(targets, accessible)
+        access_bed = "../data/access-5k-mappable.hg19.bed"
+        accessible = tabio.read(access_bed, 'bed').filter(chromosome='chrY')
+        for method in ('amplicon', 'wgs', 'hybrid'):
+            (cov, bs), _ = autobin.do_autobin(bam_fname, method,
+                                              targets=targets,
+                                              access=accessible)
+            self.assertGreater(cov, 0)
+            self.assertGreater(bs, 0)
 
     def test_batch(self):
         """The 'batch' command."""
@@ -471,8 +475,8 @@ class OtherTests(unittest.TestCase):
 
     def test_fix_edge(self):
         """Test the 'edge' bias correction calculations."""
-        # With no gap, gain and loss should balance out
-        # 1. Wide target, no secondary corrections triggered
+        # NB: With no gap, gain and loss should balance out
+        # Wide target, no secondary corrections triggered
         insert_size = 250
         gap_size = np.zeros(1)  # Adjacent
         target_size = np.asarray([600])
@@ -480,11 +484,12 @@ class OtherTests(unittest.TestCase):
         gain = fix.edge_gains(target_size, gap_size, insert_size)
         gain *= 2  # Same on the other side
         self.assertAlmostEqual(loss, gain)
-        # 2. Trigger 'loss' correction (target_size < 2 * insert_size)
+        # Trigger 'loss' correction (target_size < 2 * insert_size)
         target_size = np.asarray([450])
-        self.assertAlmostEqual(fix.edge_losses(target_size, insert_size),
-                        2 * fix.edge_gains(target_size, gap_size, insert_size))
-        # 3. Trigger 'gain' correction (target_size + gap_size < insert_size)
+        self.assertAlmostEqual(
+            fix.edge_losses(target_size, insert_size),
+            2 * fix.edge_gains(target_size, gap_size, insert_size))
+        # Trigger 'gain' correction (target_size + gap_size < insert_size)
         target_size = np.asarray([300])
         self.assertAlmostEqual(fix.edge_losses(target_size, insert_size),
                         2 * fix.edge_gains(target_size, gap_size, insert_size))
