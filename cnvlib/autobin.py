@@ -147,7 +147,7 @@ def idxstats2ga(table):
 def sample_region_cov(bam_fname, regions, max_num=100):
     """Calculate read depth in a randomly sampled subset of regions."""
     midsize_regions = sample_midsize_regions(regions, max_num)
-    with tempfile.NamedTemporaryFile(suffix='.bed', 'w+t') as f:
+    with tempfile.NamedTemporaryFile(suffix='.bed', mode='w+t') as f:
         tabio.write(regions.as_dataframe(midsize_regions), f, 'bed4')
         f.flush()
         table = coverage.bedcov(f.name, bam_fname, 0)
