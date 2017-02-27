@@ -10,8 +10,6 @@ from __future__ import print_function, absolute_import, division
 from builtins import zip
 from past.builtins import basestring
 
-import logging
-
 import numpy as np
 import pandas as pd
 
@@ -72,6 +70,15 @@ def into_ranges(source, dest, src_col, default, summary_func):
                                                       True)])
 
 
+# Shim for pandas 0.18.1 (chapmanb/bcbio-nextgen#1836)
+if hasattr(pd.Series, 'is_monotonic_increasing'):
+    def _monotonic(ser):
+        return ser.is_monotonic_increasing
+else:
+    def _monotonic(ser):
+        return (ser.diff().values[1:] >= 0).all()
+
+
 def iter_ranges(table, chrom, starts, ends, mode):
     """Iterate through sub-ranges."""
     assert mode in ('inner', 'outer', 'trim')
@@ -89,7 +96,7 @@ def iter_ranges(table, chrom, starts, ends, mode):
     # Don't be fooled by nested bins
     if ((ends is not None and len(ends)) and
         (starts is not None and len(starts))
-       ) and not table.end.is_monotonic_increasing:
+       ) and not _monotonic(table.end):
         # At least one bin is fully nested -- account for it
         irange_func = _irange_nested
     else:

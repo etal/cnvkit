@@ -19,7 +19,7 @@ requirements:
     - atlas # [not osx]
     - numpy >=1.9
     - scipy >=0.9
-    - pandas >=0.19.0
+    - pandas >=0.18.1
     - matplotlib >=1.1
     - biopython >=1.62
     - reportlab >=3.0
