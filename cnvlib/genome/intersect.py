@@ -70,15 +70,6 @@ def into_ranges(source, dest, src_col, default, summary_func):
                                                       True)])
 
 
-# Shim for pandas 0.18.1 (chapmanb/bcbio-nextgen#1836)
-if hasattr(pd.Series, 'is_monotonic_increasing'):
-    def _monotonic(ser):
-        return ser.is_monotonic_increasing
-else:
-    def _monotonic(ser):
-        return (ser.diff().values[1:] >= 0).all()
-
-
 def iter_ranges(table, chrom, starts, ends, mode):
     """Iterate through sub-ranges."""
     assert mode in ('inner', 'outer', 'trim')
@@ -179,3 +170,12 @@ def venn(table, other, mode):
     #       (is that faster? prolly not)
     #   -> 'jaccard' does math with it...
     return table
+
+
+# Shim for pandas 0.18.1 (chapmanb/bcbio-nextgen#1836)
+if hasattr(pd.Series, 'is_monotonic_increasing'):
+    def _monotonic(ser):
+        return ser.is_monotonic_increasing
+else:
+    def _monotonic(ser):
+        return (np.diff(ser) >= 0).all()
