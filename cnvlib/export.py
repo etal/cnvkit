@@ -147,6 +147,7 @@ def export_seg(sample_fnames):
                               previous=list(chrom_ids.keys()),
                               current=list(create_chrom_ids(segments).keys()))
         table = segments.data.loc[:, ["start", "end"]]
+        table["start"] += 1
         table["ID"] = segments.sample_id
         table["mean"] = segments.data["log2"]
         table["chromosome"] = [chrom_ids[chrom]
