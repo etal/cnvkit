@@ -458,6 +458,49 @@ class IntervalTests(unittest.TestCase):
                                                     expectations[mode]):
                     self._compare_regions(result, self._from_intervals(expect))
 
+    def test_subtract(self):
+        # Test cases:
+        #  | access: ====   ====   ====    ==========
+        #  | target: ====  ====== ===   = ==  ==   ===
+        #  | expect:                 ==     ==  ===
+        #  | invert:       =    = =     = =          =
+        #  |         1   5 78   2345 7 901234 6 8  1 34
+        #  |        0         1         2         3
+
+        access = self._from_intervals([
+            (1, 5, ''),
+            (8, 12, ''),
+            (15, 19, ''),
+            (23, 33, ''),
+        ])
+        target = self._from_intervals([
+            (1, 5, ''),
+            (7, 13, ''),
+            (14, 17, ''),
+            (20, 21, ''),
+            (22, 24, ''),
+            (26, 28, ''),
+            (31, 34, ''),
+        ])
+        expect = self._from_intervals([
+            (17, 19, ''),
+            (24, 26, ''),
+            (28, 31, ''),
+        ])
+        invert = self._from_intervals([
+            (7, 8, ''),
+            (12, 13, ''),
+            (14, 15, ''),
+            (20, 21, ''),
+            (22, 23, ''),
+            (33, 34, ''),
+        ])
+
+        result = access.subtract(target)
+        self._compare_regions(result, expect)
+        iresult = target.subtract(access)
+        self._compare_regions(iresult, invert)
+
 
 
 class OtherTests(unittest.TestCase):

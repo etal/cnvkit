@@ -33,20 +33,29 @@ def _subtraction(table, other):
             keep_left = (keeper.start < rows_to_exclude.start.iat[0])
             keep_right = (keeper.end > rows_to_exclude.end.iat[-1])
             if keep_left and keep_right:
+                # Keep both original edges of the source region
+                # =========
+                #   --  --
                 starts = np.r_[keeper.start, rows_to_exclude.end.values]
                 ends = np.r_[rows_to_exclude.start.values, keeper.end]
             elif keep_left:
                 # Exclusion overlaps only the right side
+                # =======
+                #   -- ---
                 starts = np.r_[keeper.start, rows_to_exclude.end.values[:-1]]
-                ends = np.r_[rows_to_exclude.start.values]
+                ends = rows_to_exclude.start.values
             elif keep_right:
                 # Exclusion overlaps only the left side
-                starts = np.r_[rows_to_exclude.end.values]
+                #  ========
+                # ---  --
+                starts = rows_to_exclude.end.values
                 ends = np.r_[rows_to_exclude.start.values[1:], keeper.end]
             elif len(rows_to_exclude) > 1:
-                # Exclusion overlaps both edges
-                starts = np.r_[rows_to_exclude.end.values[1:-1]]
-                ends = np.r_[rows_to_exclude.start.values[1:-1]]
+                # Exclusions overlap both edges
+                #  ======
+                # -- -- ---
+                starts = rows_to_exclude.end.values[:-1]
+                ends = rows_to_exclude.start.values[1:]
             else:
                 # Exclusion covers the whole region
                 continue
@@ -54,6 +63,8 @@ def _subtraction(table, other):
             for start, end in zip(starts, ends):
                 if end > start:
                     yield keeper._replace(start=start, end=end)
+                else:
+                    logging.debug("Discarding pair: (%d, %d)", start, end)
 
         else:
             logging.debug(" %s:%d-%d : No excluded regions",
