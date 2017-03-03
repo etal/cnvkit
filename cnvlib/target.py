@@ -14,7 +14,7 @@ def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
     tgt_arr = tgt_arr[tgt_arr.start != tgt_arr.end]
     if do_split:
         logging.info("Splitting large targets")
-        tgt_arr = tgt_arr.subdivide(avg_size, 0, verbose=True)
+        tgt_arr = tgt_arr.subdivide(avg_size, 0)
     if annotate:
         logging.info("Applying annotations as target names")
         annotation = tabio.read_auto(annotate)

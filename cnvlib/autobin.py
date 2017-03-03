@@ -52,11 +52,11 @@ def do_autobin(bam_fname, method, targets=None, access=None,
         if depth:
             bin_size = int(round(bp_per_bin / depth))
             if bin_size < min_size:
-                logging.info("Clipping est. bin size %d to given min. %d",
+                logging.info("Limiting est. bin size %d to given min. %d",
                              bin_size, min_size)
                 bin_size = min_size
             elif bin_size > max_size:
-                logging.info("Clipping est. bin size %d to given max. %d",
+                logging.info("Limiting est. bin size %d to given max. %d",
                              bin_size, max_size)
                 bin_size = max_size
             return bin_size
@@ -92,33 +92,20 @@ def do_autobin(bam_fname, method, targets=None, access=None,
 
 
 def hybrid(rc_table, read_len, bam_fname, targets, access=None):
-    """Hybrid capture sequencing.
-
-    hybrid: -t, (-g)
-        w/o -g, access is (0, chromosome lengths)
-        antitargets: access.subtract(targets)
-        target size, antitarget size: sum of region sizes
-        target/antitarget mean cvg: read count / sizes
-            XXX how many of those reads are in targets?
-                randomly sample 100 targets & count reads?
-                    (in middle 50% of sizes)
-    """
-    # Only examine chromosomes present in all 2-3 input datasets
-    ok_chroms = shared_chroms(rc_table, targets, access)
-    rc_table = rc_table[rc_table.chromosome.isin(ok_chroms)]
-    targets = targets[targets.chromosome.isin(ok_chroms)]
+    """Hybrid capture sequencing."""
     # Identify off-target regions
     if access is None:
         access = idxstats2ga(rc_table)
-    else:
-        access = access[access.chromosome.isin(ok_chroms)]
     antitargets = access.subtract(targets)
-    anti_table = update_chrom_length(rc_table, antitargets)
+    # Only examine chromosomes present in all 2-3 input datasets
+    rc_table, targets, antitargets = shared_chroms(rc_table, targets,
+                                                   antitargets)
     # Deal with targets
     target_depth = sample_region_cov(bam_fname, targets)
-    # Account for captured reads
+    # Antitargets: subtract captured reads from total
     target_length = region_size_by_chrom(targets)['length']
     target_reads = (target_length * target_depth / read_len).values
+    anti_table = update_chrom_length(rc_table, antitargets)
     anti_table = anti_table.assign(mapped=anti_table.mapped - target_reads)
     anti_depth = average_depth(anti_table, read_len)
     return target_depth, anti_depth
@@ -172,7 +159,8 @@ def shared_chroms(*tables):
         if tab is not None:
             new_chroms = tab.chromosome.drop_duplicates()
             chroms = chroms[chroms.isin(new_chroms)]
-    return chroms
+    return [None if tab is None else tab[tab.chromosome.isin(chroms)]
+            for tab in tables]
 
 
 def update_chrom_length(rc_table, regions):
