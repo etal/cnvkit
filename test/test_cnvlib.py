@@ -378,9 +378,9 @@ class CommandTests(unittest.TestCase):
         """The 'metrics' command."""
         cnarr = tabio.read_cna("formats/amplicon.cnr")
         segments = tabio.read_cna("formats/amplicon.cns")
-        resids = cnarr.residuals(segments)
-        self.assertLessEqual(len(resids), len(cnarr))
-        values = metrics.ests_of_scale(resids)
+        result = metrics.do_metrics(cnarr, segments, skip_low=True)
+        self.assertEqual(result.shape, (1, 6))
+        values = result.loc[0, result.columns[1:]]
         for val in values:
             self.assertGreater(val, 0)
 
