@@ -10,17 +10,15 @@ import logging
 
 import pandas as pd
 
-from ..vary import VariantArray as VA
-
 # TODO
 #   save VCF header (as string, the whole text block) in meta{header=}
-#   then splode the INFO column
+# ENH:
+#   splode the INFO column
 #       1st     just as strings?
 #       Then    parse according to VCF 4.3 spec (floats, tuples, flags, etc.)
-#               matching pysam as much as possible
+#               matching pysam as much as possible (using pysam reader?)
 def read_vcf(infile, skip_reject=False):
     """Read VCF file w/o samples."""
-    # ENH: use pysam reader to parse INFO column?
     columns = ['chromosome', 'start', 'ref', 'alt', # 'filter', 'info',
               ]
     dtypes = [str, int, str, str, # str, str
@@ -29,8 +27,8 @@ def read_vcf(infile, skip_reject=False):
                           comment="#",
                           header=None,
                           na_filter=False,
-                          names=["chromosome", "start", "_ID", "ref", "alt",
-                                 "_QUAL", "filter", "info"],
+                          names=["chromosome", "start", "id", "ref", "alt",
+                                 "qual", "filter", "info"],
                           usecols=columns,
                           # ENH: converters={'info': func to parse it}
                           dtype=dict(zip(columns, dtypes)),
@@ -40,4 +38,4 @@ def read_vcf(infile, skip_reject=False):
     table['end'] = table['start'] + table["alt"].str.len()  # ENH: INFO["END"]
     table['start'] -= 1
     logging.info("Loaded %d plain records", len(table))
-    return table.loc[:, VA._required_columns]
+    return table
