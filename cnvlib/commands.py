@@ -1281,14 +1281,14 @@ def _cmd_import_picard(args):
     CalculateHsMetrics script in Picard tools.
     """
     for fname in importers.find_picard_files(args.targets):
-        cnarr = tabio.read(fname, "picardhs")
+        garr = importers.do_import_picard(fname)
         outfname = os.path.basename(fname)[:-4] + '.cnn'
         if args.output_dir:
             if not os.path.isdir(args.output_dir):
                 os.mkdir(args.output_dir)
                 logging.info("Created directory %s", args.output_dir)
             outfname = os.path.join(args.output_dir, outfname)
-        tabio.write(cnarr, outfname)
+        tabio.write(garr, outfname)
 
 
 P_import_picard = AP_subparsers.add_parser('import-picard',

@@ -128,7 +128,7 @@ READERS = {
     "gff": (gff.read_gff, GA),
     "interval": (picard.read_interval, GA),
     "refflat": (genepred.read_refflat, GA),
-    "picardhs": (picard.read_picard_hs, CNA),
+    "picardhs": (picard.read_picard_hs, GA),
     "seg": (seg.read_seg, CNA),
     "tab": (tab.read_tab, GA),
     "text": (textcoord.read_text, GA),

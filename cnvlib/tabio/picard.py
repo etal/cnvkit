@@ -5,17 +5,10 @@
 
 """
 from __future__ import absolute_import, division, print_function
-# from builtins import map, next
-
-import logging
 
 import numpy as np
 import pandas as pd
 
-from .. import params
-
-
-TOO_MANY_NO_COVERAGE = 100
 
 def read_interval(infile):
     """GATK/Picard-compatible interval list format.
@@ -37,9 +30,8 @@ def read_interval(infile):
 def read_picard_hs(infile):
     """Picard CalculateHsMetrics PER_TARGET_COVERAGE.
 
-    The format is BED-like, but with a header row and the columns:
+    The format is BED-like, but with a header row and the columns::
 
-    -
         chrom (str),
         start, end, length (int),
         name (str),
@@ -63,45 +55,7 @@ def read_picard_hs(infile):
                       "depth", "ratio"]
     del dframe["length"]
     dframe["start"] -= 1
-    dframe["gene"] = dframe["gene"].apply(unpipe_name)
-    # Avoid math domain error converting coverages to log2 scale
-    coverages = dframe["ratio"].copy()
-    no_cvg_idx = (coverages == 0)
-    if no_cvg_idx.sum() > TOO_MANY_NO_COVERAGE:
-        logging.warn("*WARNING* Sample %s has >%d bins with no coverage",
-                     str(infile), TOO_MANY_NO_COVERAGE)
-    coverages[no_cvg_idx] = 2**params.NULL_LOG2_COVERAGE
-    dframe["log2"] = np.log2(coverages)
     return dframe
-
-
-def unpipe_name(name):
-    """Fix the duplicated gene names Picard spits out.
-
-    Return a string containing the single gene name, sans duplications and pipe
-    characters.
-
-    Picard CalculateHsMetrics combines the labels of overlapping intervals
-    by joining all labels with '|', e.g. 'BRAF|BRAF' -- no two distinct
-    targeted genes actually overlap, though, so these dupes are redundant.
-    Meaningless target names are dropped, e.g. 'CGH|FOO|-' resolves as 'FOO'.
-    In case of ambiguity, the longest name is taken, e.g. "TERT|TERT Promoter"
-    resolves as "TERT Promoter".
-    """
-    if '|' not in name:
-        return name
-    gene_names = set(name.split('|'))
-    if len(gene_names) == 1:
-        return gene_names.pop()
-    cleaned_names = gene_names.difference(params.IGNORE_GENE_NAMES)
-    if cleaned_names:
-        gene_names = cleaned_names
-    new_name = sorted(gene_names, key=len, reverse=True)[0]
-    if len(gene_names) > 1:
-        logging.warn("*WARNING* Ambiguous gene name %r; using %r",
-                     name, new_name)
-    return new_name
-
 
 
 # _____________________________________________________________________
