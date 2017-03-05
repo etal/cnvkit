@@ -9,6 +9,7 @@ from skgenome import GenomicArray as GA
 
 from . import (access, antitarget, autobin, core, coverage, diagram, fix,
                parallel, reference, scatter, segmentation, target, tabio)
+from .cmdutil import read_cna
 
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed,
@@ -163,7 +164,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                                     processes)
     tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
-    cnarr = fix.do_fix(raw_tgt, raw_anti, tabio.read_cna(ref_fname),
+    cnarr = fix.do_fix(raw_tgt, raw_anti, read_cna(ref_fname),
                        do_gc=True, do_edge=(method == "hybrid"), do_rmask=True)
     tabio.write(cnarr, sample_pfx + '.cnr')
 

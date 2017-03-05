@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from cnvlib import tabio
+from cnvlib import tabio, read
 from skgenome import chromsort, rangelabel
 from skgenome import GenomicArray as GA
 
@@ -15,7 +15,7 @@ from skgenome import GenomicArray as GA
 class GaryTests(unittest.TestCase):
 
     def setUp(self):
-        self.ex_cnr = tabio.read_cna('formats/reference-tr.cnn')
+        self.ex_cnr = read('formats/reference-tr.cnn')
 
     def test_empty(self):
         """Instantiate from an empty file."""
@@ -55,7 +55,7 @@ class GaryTests(unittest.TestCase):
 
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
-            cnarr = tabio.read_cna(fname)
+            cnarr = read(fname)
             row_count = 0
             for _chrom, rows in cnarr.by_chromosome():
                 row_count += len(rows)
@@ -73,8 +73,8 @@ class GaryTests(unittest.TestCase):
 
     def test_ranges_by_in(self):
         """Test range methods: by_ranges, in_range, in_ranges."""
-        cnarr = tabio.read_cna("formats/amplicon.cnr")
-        segarr = tabio.read_cna("formats/amplicon.cns")
+        cnarr = read("formats/amplicon.cnr")
+        segarr = read("formats/amplicon.cns")
         chrom_segarr = dict(segarr.by_chromosome())
         for chrom, subarr in cnarr.by_chromosome():
             count_segs = 0
@@ -105,8 +105,8 @@ class GaryTests(unittest.TestCase):
                                  ends=subsegarr['end'], mode="trim")))
 
     def test_ranges_into(self):
-        cnarr = tabio.read_cna("formats/amplicon.cnr")
-        segarr = tabio.read_cna("formats/amplicon.cns")
+        cnarr = read("formats/amplicon.cnr")
+        segarr = read("formats/amplicon.cns")
         seg_genes = cnarr.into_ranges(segarr, 'gene', '-')
         self.assertEqual(len(seg_genes), len(segarr))
         # With a VCF

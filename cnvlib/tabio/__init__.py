@@ -11,11 +11,12 @@ import sys
 import pandas as pd
 from Bio.File import as_handle
 
-from .. import core
 from skgenome import GenomicArray as GA
+from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio
+
+from ..core import fbase, safe_write
 from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
-from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
@@ -62,9 +63,9 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         if sample_id:
             meta["sample_id"] = sample_id
         elif isinstance(infile, basestring):
-            meta["sample_id"] = core.fbase(infile)
+            meta["sample_id"] = fbase(infile)
         elif hasattr(infile, "name"):
-            meta["sample_id"] = core.fbase(infile.name)
+            meta["sample_id"] = fbase(infile.name)
         else:
             # meta["sample_id"] = "<unknown>"
             pass
@@ -113,11 +114,6 @@ def read_auto(infile):
     return read(infile, fmt or 'tab')
 
 
-def read_cna(infile, sample_id=None, meta=None):
-    """Read a tabular file to create a CopyNumArray object."""
-    return read(infile, into=CNA, sample_id=sample_id, meta=meta)
-
-
 READERS = {
     # Format name, formatter, default target class
     "auto": (read_auto, GA),
@@ -144,7 +140,7 @@ def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
     if fmt in ("seg", "vcf"):
         kwargs["sample_id"] = garr.sample_id
     dframe = formatter(garr.data, **kwargs)
-    with core.safe_write(outfile or sys.stdout, verbose=False) as handle:
+    with safe_write(outfile or sys.stdout, verbose=False) as handle:
         dframe.to_csv(handle, header=show_header, index=False, sep='\t',
                       float_format='%.6g')
     if verbose:

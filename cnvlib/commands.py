@@ -27,7 +27,7 @@ from . import (access, antitarget, autobin, batch, call, core, coverage,
                descriptives, diagram, export, fix, heatmap, importers, metrics,
                parallel, reference, reports, scatter, segmentation, tabio,
                target)
-from .cnary import CopyNumArray as _CNA
+from .cmdutil import load_het_snps, verify_sample_sex, read_cna
 from ._version import __version__
 
 
@@ -101,7 +101,7 @@ def _cmd_batch(args):
             args.count_reads, args.method)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
-        ref_arr = tabio.read_cna(args.reference)
+        ref_arr = read_cna(args.reference)
         targets, antitargets = reference.reference2regions(ref_arr)
         ref_pfx = os.path.join(args.output_dir, core.fbase(args.reference))
         args.targets = ref_pfx + '.target-tmp.bed'
@@ -542,14 +542,13 @@ def _cmd_fix(args):
     biases and re-center.
     """
     # Verify that target and antitarget are from the same sample
-    tgt_raw = tabio.read_cna(args.target)
-    anti_raw = tabio.read_cna(args.antitarget)
+    tgt_raw = read_cna(args.target)
+    anti_raw = read_cna(args.antitarget)
     if len(anti_raw) and tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
-    target_table = fix.do_fix(tgt_raw, anti_raw,
-                              tabio.read_cna(args.reference),
+    target_table = fix.do_fix(tgt_raw, anti_raw, read_cna(args.reference),
                               args.do_gc, args.do_edge, args.do_rmask)
     tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
 
@@ -585,7 +584,7 @@ do_segmentation = public(segmentation.do_segmentation)
 
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
-    cnarr = tabio.read_cna(args.filename)
+    cnarr = read_cna(args.filename)
     variants = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                              args.min_variant_depth, args.zygosity_freq)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
@@ -671,7 +670,7 @@ def _cmd_call(args):
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
-    cnarr = tabio.read_cna(args.filename)
+    cnarr = read_cna(args.filename)
     if args.center:
         cnarr.center_all(args.center)
     varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
@@ -765,8 +764,8 @@ def _cmd_diagram(args):
         raise ValueError("Must specify a filename as an argument or with "
                          "the '-s' option, or both. You did neither.")
 
-    cnarr = tabio.read_cna(args.filename) if args.filename else None
-    segarr = tabio.read_cna(args.segment) if args.segment else None
+    cnarr = read_cna(args.filename) if args.filename else None
+    segarr = read_cna(args.segment) if args.segment else None
     if args.adjust_xy:
         is_sample_female = verify_sample_sex(cnarr or segarr, args.sample_sex,
                                              args.male_reference)
@@ -814,10 +813,10 @@ do_scatter = public(scatter.do_scatter)
 
 def _cmd_scatter(args):
     """Plot probe log2 coverages and segmentation calls together."""
-    cnarr = tabio.read_cna(args.filename, sample_id=args.sample_id
-                          ) if args.filename else None
-    segarr = tabio.read_cna(args.segment, sample_id=args.sample_id
-                           ) if args.segment else None
+    cnarr = read_cna(args.filename, sample_id=args.sample_id
+                    ) if args.filename else None
+    segarr = read_cna(args.segment, sample_id=args.sample_id
+                     ) if args.segment else None
     varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                          args.min_variant_depth, args.zygosity_freq)
     if args.range_list:
@@ -924,7 +923,7 @@ def _cmd_heatmap(args):
     """Plot copy number for multiple samples as a heatmap."""
     cnarrs = []
     for fname in args.filenames:
-        cnarr = tabio.read_cna(fname)
+        cnarr = read_cna(fname)
         if args.adjust_xy:
             is_sample_female = verify_sample_sex(cnarr, args.sample_sex,
                                                  args.male_reference)
@@ -975,8 +974,8 @@ P_heatmap.set_defaults(func=_cmd_heatmap)
 
 def _cmd_breaks(args):
     """List the targeted genes in which a copy number breakpoint occurs."""
-    cnarr = tabio.read_cna(args.filename)
-    segarr = tabio.read_cna(args.segment)
+    cnarr = read_cna(args.filename)
+    segarr = read_cna(args.segment)
     bpoints = do_breaks(cnarr, segarr, args.min_probes)
     logging.info("Found %d gene breakpoints", len(bpoints))
     core.write_dataframe(args.output, bpoints)
@@ -1011,8 +1010,8 @@ P_breaks.set_defaults(func=_cmd_breaks)
 
 def _cmd_gainloss(args):
     """Identify targeted genes with copy number gain or loss."""
-    cnarr = tabio.read_cna(args.filename)
-    segarr = tabio.read_cna(args.segment) if args.segment else None
+    cnarr = read_cna(args.filename)
+    segarr = read_cna(args.segment) if args.segment else None
     is_sample_female = verify_sample_sex(cnarr, args.sample_sex,
                                          args.male_reference)
     gainloss = do_gainloss(cnarr, segarr, args.threshold,
@@ -1077,7 +1076,7 @@ P_gainloss.set_defaults(func=_cmd_gainloss)
 
 def _cmd_sex(args):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
-    cnarrs = (tabio.read_cna(fname) for fname in args.filenames)
+    cnarrs = map(read_cna, args.filenames)
     table = do_sex(cnarrs, args.male_reference)
     core.write_dataframe(args.output, table, header=True)
 
@@ -1131,9 +1130,9 @@ def _cmd_metrics(args):
         raise ValueError("Number of coverage/segment filenames given must be "
                          "equal, if more than 1 segment file is given.")
 
-    cnarrs = map(tabio.read_cna, args.cnarrays)
+    cnarrs = map(read_cna, args.cnarrays)
     if args.segments:
-        args.segments = map(tabio.read_cna, args.segments)
+        args.segments = map(read_cna, args.segments)
     table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)
     core.write_dataframe(args.output, table)
 
@@ -1187,10 +1186,10 @@ def _cmd_segmetrics(args):
         return
 
     # Calculate all metrics
-    cnarr = tabio.read_cna(args.cnarray)
+    cnarr = read_cna(args.cnarray)
     if args.drop_low_coverage:
         cnarr = cnarr.drop_low_coverage()
-    segarr = tabio.read_cna(args.segments)
+    segarr = read_cna(args.segments)
     segments, segbins = zip(*cnarr.by_ranges(segarr))
     # Measures of location
     for statname in ("mean", "median", "mode"):
@@ -1305,6 +1304,7 @@ P_import_picard.set_defaults(func=_cmd_import_picard)
 
 def _cmd_import_seg(args):
     """Convert a SEG file to CNVkit .cns files."""
+    from .cnary import CopyNumArray as _CNA
     if args.chromosomes:
         if args.chromosomes == 'human':
             chrom_names = {'23': 'X', '24': 'Y', '25': 'M'}
@@ -1349,7 +1349,7 @@ def _cmd_import_theta(args):
     Equivalently, use the THetA results file to convert CNVkit .cns segments to
     integer copy number calls.
     """
-    tumor_segs = tabio.read_cna(args.tumor_cns)
+    tumor_segs = read_cna(args.tumor_cns)
     for i, new_cns in enumerate(do_import_theta(tumor_segs, args.theta_results,
                                                 args.ploidy)):
         tabio.write(new_cns,
@@ -1385,7 +1385,7 @@ def _cmd_export_bed(args):
     """
     bed_tables = []
     for segfname in args.segments:
-        segments = tabio.read_cna(segfname)
+        segments = read_cna(segfname)
         # ENH: args.sample_sex as a comma-separated list
         is_sample_female = verify_sample_sex(segments, args.sample_sex,
                                              args.male_reference)
@@ -1453,7 +1453,7 @@ def _cmd_export_vcf(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    segments = tabio.read_cna(args.segments)
+    segments = read_cna(args.segments)
     is_sample_female = verify_sample_sex(segments, args.sample_sex,
                                          args.male_reference)
     header, body = export.export_vcf(segments, args.ploidy, args.male_reference,
@@ -1487,9 +1487,8 @@ P_export_vcf.set_defaults(func=_cmd_export_vcf)
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn
 def _cmd_export_theta(args):
     """Convert segments to THetA2 input file format (*.input)."""
-    tumor_cn = tabio.read_cna(args.tumor_segment)
-    normal_cn = (tabio.read_cna(args.reference)
-                 if args.reference else None)
+    tumor_cn = read_cna(args.tumor_segment)
+    normal_cn = read_cna(args.reference) if args.reference else None
     table = export.export_theta(tumor_cn, normal_cn)
     if not args.output:
         args.output = tumor_cn.sample_id + ".interval_count"
@@ -1548,7 +1547,7 @@ P_export_theta.set_defaults(func=_cmd_export_theta)
 # Nexus "basic" special case: can only represent 1 sample
 def _cmd_export_nb(args):
     """Convert bin-level log2 ratios to Nexus Copy Number "basic" format."""
-    cnarr = tabio.read_cna(args.filename)
+    cnarr = read_cna(args.filename)
     table = export.export_nexus_basic(cnarr)
     core.write_dataframe(args.output, table)
 
@@ -1564,7 +1563,7 @@ P_export_nb.set_defaults(func=_cmd_export_nb)
 # Nexus "Custom-OGT" special case: can only represent 1 sample
 def _cmd_export_nbo(args):
     """Convert log2 ratios and b-allele freqs to Nexus "Custom-OGT" format."""
-    cnarr = tabio.read_cna(args.filename)
+    cnarr = read_cna(args.filename)
     varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                          args.min_variant_depth, args.zygosity_freq)
     table = export.export_nexus_ogt(cnarr, varr, args.min_weight)
@@ -1642,59 +1641,6 @@ def print_version(_args):
 
 P_version = AP_subparsers.add_parser('version', help=print_version.__doc__)
 P_version.set_defaults(func=print_version)
-
-
-# _____________________________________________________________________________
-# Functions reused within this module
-
-def load_het_snps(vcf_fname, sample_id, normal_id, min_variant_depth,
-                  zygosity_freq, tumor_boost=False):
-    if vcf_fname is None:
-        return None
-    varr = tabio.read(vcf_fname, 'vcf',
-                      sample_id=sample_id,
-                      normal_id=normal_id,
-                      min_depth=min_variant_depth,
-                      skip_somatic=True)
-    if (zygosity_freq is None and 'n_zygosity' in varr and
-        not varr['n_zygosity'].any()):
-        # Mutect2 sets all normal genotypes to 0/0 -- work around it
-        logging.warn("VCF normal sample's genotypes are all 0/0 or missing; "
-                     "inferring genotypes from allele frequency instead")
-        zygosity_freq = 0.25
-    if zygosity_freq is not None:
-        varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)
-    if 'n_zygosity' in varr:
-        # Infer & drop (more) somatic loci based on genotype
-        somatic_idx = (varr['zygosity'] != 0.0) & (varr['n_zygosity'] == 0.0)
-        if somatic_idx.any() and not somatic_idx.all():
-            logging.info("Skipping %d additional somatic record based on "
-                         "T/N genotypes", somatic_idx.sum())
-        varr = varr[~somatic_idx]
-    orig_len = len(varr)
-    varr = varr.heterozygous()
-    logging.info("Kept %d heterozygous of %d VCF records",
-                 len(varr), orig_len)
-    # TODO use/explore tumor_boost option
-    if tumor_boost:
-        varr['alt_freq'] = varr.tumor_boost()
-    return varr
-
-
-def verify_sample_sex(cnarr, sex_arg, is_male_reference):
-    is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
-    if sex_arg:
-        is_sample_female_given = (sex_arg.lower() not in ['y', 'm', 'male'])
-        if is_sample_female != is_sample_female_given:
-            logging.warn("Sample sex specified as %s "
-                         "but chromosomal X/Y ploidy looks like %s",
-                         "female" if is_sample_female_given else "male",
-                         "female" if is_sample_female else "male")
-            is_sample_female = is_sample_female_given
-    logging.info("Treating sample %s as %s",
-                 cnarr.sample_id or '',
-                 "female" if is_sample_female else "male")
-    return is_sample_female
 
 
 # _____________________________________________________________________________

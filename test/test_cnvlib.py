@@ -20,17 +20,17 @@ class CNATests(unittest.TestCase):
 
     def test_empty(self):
         """Instantiate from an empty file."""
-        cnarr = tabio.read_cna("formats/empty")
+        cnarr = cnvlib.read("formats/empty")
         self.assertEqual(len(cnarr), 0)
 
     def test_basic(self):
         """Test basic container functionality and magic methods."""
-        cna = tabio.read_cna('formats/reference-tr.cnn')
+        cna = cnvlib.read('formats/reference-tr.cnn')
         # Length
         self.assertEqual(len(cna),
                          linecount('formats/reference-tr.cnn') - 1)
         # Equality
-        same = tabio.read_cna('formats/reference-tr.cnn')
+        same = cnvlib.read('formats/reference-tr.cnn')
         self.assertEqual(cna, same)
         # Item access
         orig = cna[0]
@@ -42,7 +42,7 @@ class CNATests(unittest.TestCase):
 
     def test_center_all(self):
         """Test recentering."""
-        cna = tabio.read_cna('formats/reference-tr.cnn')
+        cna = cnvlib.read('formats/reference-tr.cnn')
         # Median-centering an already median-centered array -> no change
         chr1 = cna.in_range('chr1')
         self.assertAlmostEqual(0, np.median(chr1['log2']), places=1)
@@ -62,7 +62,7 @@ class CNATests(unittest.TestCase):
 
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""
-        cna = tabio.read_cna('formats/reference-tr.cnn')
+        cna = cnvlib.read('formats/reference-tr.cnn')
         self.assertIn('gc', cna)
         cleaned = cna.drop_extra_columns()
         self.assertNotIn('gc', cleaned)
@@ -80,14 +80,14 @@ class CNATests(unittest.TestCase):
                 ("formats/tr95t.cns", True, True),
                 ("formats/reference-tr.cnn", False, False),
             ):
-            guess = tabio.read_cna(fname).guess_xx(ref_is_m)
+            guess = cnvlib.read(fname).guess_xx(ref_is_m)
             self.assertEqual(guess, sample_is_f,
                              "%s: guessed XX %s but is %s"
                              % (fname, guess, sample_is_f))
 
     def test_residuals(self):
-        cnarr = tabio.read_cna("formats/amplicon.cnr")
-        segments = tabio.read_cna("formats/amplicon.cns")
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segments = cnvlib.read("formats/amplicon.cns")
         regions = GenomicArray(segments.data).drop_extra_columns()
         for grouping_arg in (None, segments, regions):
             resid = cnarr.residuals(grouping_arg)
@@ -150,7 +150,7 @@ class CommandTests(unittest.TestCase):
             [bam], None, None, True, fasta, annot, True, 500, None, None,
             None, None, 'build', 1, False, "wgs")
         self.assertEqual(ref_fname, 'build/reference.cnn')
-        refarr = tabio.read_cna(ref_fname, 'bed')
+        refarr = cnvlib.read(ref_fname, 'bed')
         tgt_regions = tabio.read(tgt_bed_fname, 'bed')
         self.assertEqual(len(refarr), len(tgt_regions))
         # Build a single-sample hybrid-capture reference
@@ -158,7 +158,7 @@ class CommandTests(unittest.TestCase):
             [bam], target_bed, None, True, fasta, None, True, 10, None, 1000,
             100, None, 'build', 1, False, "hybrid")
         self.assertEqual(ref_fname, 'build/reference.cnn')
-        refarr = tabio.read_cna(ref_fname, 'bed')
+        refarr = cnvlib.read(ref_fname, 'bed')
         tgt_regions = tabio.read(tgt_bed_fname, 'bed')
         anti_regions = tabio.read(anti_bed_fname, 'bed')
         self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
@@ -166,20 +166,20 @@ class CommandTests(unittest.TestCase):
         batch.batch_run_sample(
             bam, tgt_bed_fname, anti_bed_fname, ref_fname, 'build', True,
             True, True, None, False, False, "hybrid", 1)
-        cns =  tabio.read_cna("build/na12878-chrM-Y-trunc.cns")
+        cns =  cnvlib.read("build/na12878-chrM-Y-trunc.cns")
         self.assertGreater(len(cns), 0)
 
     def test_breaks(self):
         """The 'breaks' command."""
-        probes = tabio.read_cna("formats/amplicon.cnr")
-        segs = tabio.read_cna("formats/amplicon.cns")
+        probes = cnvlib.read("formats/amplicon.cnr")
+        segs = cnvlib.read("formats/amplicon.cns")
         rows = commands.do_breaks(probes, segs, 4)
         self.assertGreater(len(rows), 0)
 
     def test_call(self):
         """The 'call' command."""
         # Methods: clonal, threshold, none
-        tr_cns = tabio.read_cna("formats/tr95t.cns")
+        tr_cns = cnvlib.read("formats/tr95t.cns")
         tr_thresh = commands.do_call(tr_cns, None, "threshold",
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(tr_cns), len(tr_thresh))
@@ -187,7 +187,7 @@ class CommandTests(unittest.TestCase):
                             purity=.65,
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(tr_cns), len(tr_clonal))
-        cl_cns = tabio.read_cna("formats/cl_seq.cns")
+        cl_cns = cnvlib.read("formats/cl_seq.cns")
         cl_thresh = commands.do_call(cl_cns, None, "threshold",
                             thresholds=np.log2((np.arange(12) + .5) / 6.),
                             is_reference_male=True, is_sample_female=True)
@@ -227,7 +227,7 @@ class CommandTests(unittest.TestCase):
                 ("formats/m-on-f.cns", False, False, 0, -1, 0, 2, 1, 1),
                 ("formats/m-on-m.cns", False, True, 0, 0, 0, 2, 1, 1),
             ):
-            cns = tabio.read_cna(fname)
+            cns = cnvlib.read(fname)
             chr1_idx = (cns.chromosome == 'chr1')
             chrx_idx = (cns.chromosome == 'chrX')
             chry_idx = (cns.chromosome == 'chrY')
@@ -280,7 +280,7 @@ class CommandTests(unittest.TestCase):
         for fname, ploidy, is_f in [("tr95t.cns", 2, True),
                                     ("cl_seq.cns", 6, True),
                                     ("amplicon.cns", 2, False)]:
-            cns = tabio.read_cna("formats/" + fname)
+            cns = cnvlib.read("formats/" + fname)
             # BED
             for show in ("ploidy", "variant", "all"):
                 tbl_bed = export.export_bed(cns, ploidy, True, is_f,
@@ -308,7 +308,7 @@ class CommandTests(unittest.TestCase):
 
     def test_export_nexus(self):
         """The 'export nexus-basic' and 'nexus-ogt' commands."""
-        cnr = tabio.read_cna("formats/amplicon.cnr")
+        cnr = cnvlib.read("formats/amplicon.cnr")
         table_nb = export.export_nexus_basic(cnr)
         self.assertEqual(len(table_nb), len(cnr))
         varr = commands.load_het_snps("formats/na12878_na12882_mix.vcf",
@@ -326,11 +326,11 @@ class CommandTests(unittest.TestCase):
 
     def test_export_theta(self):
         """The 'export theta' command."""
-        segarr = tabio.read_cna("formats/tr95t.cns")
+        segarr = cnvlib.read("formats/tr95t.cns")
         len_seg_auto = len(segarr.autosomes())
         table_theta = export.export_theta(segarr, None)
         self.assertEqual(len(table_theta), len_seg_auto)
-        ref = tabio.read_cna("formats/reference-tr.cnn")
+        ref = cnvlib.read("formats/reference-tr.cnn")
         table_theta = export.export_theta(segarr, ref)
         self.assertEqual(len(table_theta), len_seg_auto)
         varr = commands.load_het_snps("formats/na12878_na12882_mix.vcf",
@@ -344,7 +344,7 @@ class CommandTests(unittest.TestCase):
     def test_fix(self):
         """The 'fix' command."""
         # Extract fake target/antitarget bins from a combined file
-        ref = tabio.read_cna('formats/reference-tr.cnn')
+        ref = cnvlib.read('formats/reference-tr.cnn')
         is_bg = (ref["gene"] == "Background")
         tgt_bins = ref[~is_bg]
         tgt_bins.log2 += np.random.randn(len(tgt_bins)) / 5
@@ -360,24 +360,24 @@ class CommandTests(unittest.TestCase):
 
     def test_gainloss(self):
         """The 'gainloss' command."""
-        probes = tabio.read_cna("formats/amplicon.cnr")
+        probes = cnvlib.read("formats/amplicon.cnr")
         rows = commands.do_gainloss(probes, male_reference=True)
         self.assertGreater(len(rows), 0)
-        segs = tabio.read_cna("formats/amplicon.cns")
+        segs = cnvlib.read("formats/amplicon.cns")
         rows = commands.do_gainloss(probes, segs, 0.3, 4, male_reference=True)
         self.assertGreater(len(rows), 0)
 
     def test_import_theta(self):
         """The 'import-theta' command."""
-        cns = tabio.read_cna("formats/nv3.cns")
+        cns = cnvlib.read("formats/nv3.cns")
         theta_fname = "formats/nv3.n3.results"
         for new_cns in commands.do_import_theta(cns, theta_fname):
             self.assertTrue(0 < len(new_cns) <= len(cns))
 
     def test_metrics(self):
         """The 'metrics' command."""
-        cnarr = tabio.read_cna("formats/amplicon.cnr")
-        segments = tabio.read_cna("formats/amplicon.cns")
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segments = cnvlib.read("formats/amplicon.cns")
         result = metrics.do_metrics(cnarr, segments, skip_low=True)
         self.assertEqual(result.shape, (1, 6))
         values = result.loc[0, result.columns[1:]]
@@ -408,7 +408,7 @@ class CommandTests(unittest.TestCase):
 
     def test_segment(self):
         """The 'segment' command."""
-        cnarr = tabio.read_cna("formats/amplicon.cnr")
+        cnarr = cnvlib.read("formats/amplicon.cnr")
         # NB: R methods are in another script; haar is pure-Python
         segments = segmentation.do_segmentation(cnarr, "haar")
         self.assertGreater(len(segments), 0)
@@ -421,7 +421,7 @@ class CommandTests(unittest.TestCase):
 
     def test_segment_parallel(self):
         """The 'segment' command, in parallel."""
-        cnarr = tabio.read_cna("formats/amplicon.cnr")
+        cnarr = cnvlib.read("formats/amplicon.cnr")
         psegments = segmentation.do_segmentation(cnarr, "haar", processes=2)
         ssegments = segmentation.do_segmentation(cnarr, "haar", processes=1)
         self.assertEqual(psegments.data.shape, ssegments.data.shape)
@@ -429,8 +429,8 @@ class CommandTests(unittest.TestCase):
 
     def test_segmetrics(self):
         """The 'segmetrics' command."""
-        cnarr = tabio.read_cna("formats/amplicon.cnr")
-        segarr = tabio.read_cna("formats/amplicon.cns")
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
         for func in (
             lambda x: metrics.confidence_interval_bootstrap(x, 0.05, 100),
             lambda x: metrics.prediction_interval(x, 0.05),

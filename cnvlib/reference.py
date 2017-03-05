@@ -9,6 +9,7 @@ import pyfaidx
 from skgenome import GenomicArray as GA
 
 from . import core, fix, descriptives, params, tabio
+from .cmdutil import read_cna
 from .cnary import CopyNumArray as CNA
 
 
@@ -103,7 +104,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, is_female_sample,
 
     # Load coverage from target/antitarget files
     logging.info("Loading %s", filenames[0])
-    cnarr1 = tabio.read_cna(filenames[0])
+    cnarr1 = read_cna(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
         col_names = ['chromosome', 'start', 'end', 'gene', 'log2', 'depth']
@@ -188,7 +189,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, is_female_sample,
     all_coverages = [flat_coverage, bias_correct_coverage(cnarr1)]
     for fname in filenames[1:]:
         logging.info("Loading target %s", fname)
-        cnarrx = tabio.read_cna(fname)
+        cnarrx = read_cna(fname)
         # Bin information should match across all files
         if not (len(cnarr1) == len(cnarrx)
                 and (cnarr1.chromosome == cnarrx.chromosome).all()

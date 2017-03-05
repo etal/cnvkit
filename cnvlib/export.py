@@ -9,7 +9,8 @@ import time
 import numpy as np
 import pandas as pd
 
-from . import call, core, params, tabio
+from . import call, core
+from .cmdutil import read_cna
 from ._version import __version__
 
 
@@ -28,12 +29,12 @@ def merge_samples(filenames):
 
     if not filenames:
         return []
-    first_cnarr = tabio.read_cna(filenames[0])
+    first_cnarr = read_cna(filenames[0])
     out_table = first_cnarr.data.loc[:, ["chromosome", "start", "end", "gene"]]
     out_table["label"] = label_with_gene(first_cnarr)
     out_table[first_cnarr.sample_id] = first_cnarr["log2"]
     for fname in filenames[1:]:
-        cnarr = tabio.read_cna(fname)
+        cnarr = read_cna(fname)
         if not (len(cnarr) == len(out_table)
                 and (label_with_gene(cnarr) == out_table["label"]).all()):
             raise ValueError("Mismatched row coordinates in %s" % fname)
@@ -137,7 +138,7 @@ def export_seg(sample_fnames):
     out_tables = []
     chrom_ids = None
     for fname in sample_fnames:
-        segments = tabio.read_cna(fname)
+        segments = read_cna(fname)
         if chrom_ids is None:
             # Create & store
             chrom_ids = create_chrom_ids(segments)
