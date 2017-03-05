@@ -22,6 +22,7 @@ pyplot.ioff()
 import numpy as np
 import pandas as pd
 from skgenome import GenomicArray as _GA
+from skgenome.rangelabel import to_label
 
 from . import (access, antitarget, autobin, batch, call, core, coverage,
                descriptives, diagram, export, fix, heatmap, importers, metrics,
@@ -833,7 +834,7 @@ def _cmd_scatter(args):
                 except ValueError as exc:
                     # Probably no bins in the selected region
                     logging.warn("Not plotting region %r: %s",
-                                 _GA.row2label(region), exc)
+                                 to_label(region), exc)
                 pdf_out.savefig()
                 pyplot.close()
     else:

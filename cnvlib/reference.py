@@ -35,7 +35,7 @@ def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
                                       False, do_gc, False, do_rmask))
     ref_probes.center_all(skip_low=True)
     ref_probes.sort_columns()
-    warn_bad_probes(ref_probes)
+    warn_bad_bins(ref_probes)
     return ref_probes
 
 
@@ -57,7 +57,7 @@ def do_reference_flat(targets, antitargets=None, fa_fname=None,
         gc, rmask = get_fasta_stats(ref_probes, fa_fname)
         ref_probes['gc'] = gc
         ref_probes['rmask'] = rmask
-        # warn_bad_probes(ref_probes)
+        # warn_bad_bins(ref_probes)
     else:
         logging.info("No FASTA reference genome provided; "
                      "skipping GC, RM calculations")
@@ -66,7 +66,7 @@ def do_reference_flat(targets, antitargets=None, fa_fname=None,
 
 
 def bed2probes(bed_fname):
-    """Create neutral-coverage probes from intervals."""
+    """Create a neutral-coverage CopyNumArray from a file of regions."""
     regions = tabio.read_auto(bed_fname)
     table = regions.data.loc[:, ("chromosome", "start", "end")]
     table["gene"] = (regions.data["gene"] if "gene" in regions.data else '-')
@@ -196,7 +196,7 @@ def combine_probes(filenames, fa_fname, is_male_reference, is_female_sample,
                 and (cnarr1.start == cnarrx.start).all()
                 and (cnarr1.end == cnarrx.end).all()
                 and (cnarr1['gene'] == cnarrx['gene']).all()):
-            raise RuntimeError("%s probes do not match those in %s"
+            raise RuntimeError("%s bins do not match those in %s"
                                % (fname, filenames[0]))
         all_depths.append(cnarrx['depth'] if 'depth' in cnarrx
                           else np.exp2(cnarrx['log2']))
@@ -223,23 +223,23 @@ def combine_probes(filenames, fa_fname, is_male_reference, is_female_sample,
     return CNA.from_columns(columns, {'sample_id': "reference"})
 
 
-def warn_bad_probes(probes, max_name_width=50):
-    """Warn about target probes where coverage is poor.
+def warn_bad_bins(cnarr, max_name_width=50):
+    """Warn about target bins where coverage is poor.
 
     Prints a formatted table to stderr.
     """
-    bad_probes = probes[fix.mask_bad_bins(probes)]
-    fg_index = (bad_probes['gene'] != 'Background')
-    fg_bad_probes = bad_probes[fg_index]
-    if len(fg_bad_probes) > 0:
-        bad_pct = 100 * len(fg_bad_probes) / sum(probes['gene'] != 'Background')
+    bad_bins = cnarr[fix.mask_bad_bins(cnarr)]
+    fg_index = (bad_bins['gene'] != 'Background')
+    fg_bad_bins = bad_bins[fg_index]
+    if len(fg_bad_bins) > 0:
+        bad_pct = 100 * len(fg_bad_bins) / sum(cnarr['gene'] != 'Background')
         logging.info("Targets: %d (%s) bins failed filters:",
-                     len(fg_bad_probes), "%.4f" % bad_pct + '%')
-        gene_cols = min(max_name_width, max(map(len, fg_bad_probes['gene'])))
-        labels = list(map(CNA.row2label, fg_bad_probes))
-        chrom_cols = max(map(len, labels))
+                     len(fg_bad_bins), "%.4f" % bad_pct + '%')
+        gene_cols = min(max_name_width, max(map(len, fg_bad_bins['gene'])))
+        labels = fg_bad_bins.labels()
+        chrom_cols = max(labels.apply(len))
         last_gene = None
-        for label, probe in zip(labels, fg_bad_probes):
+        for label, probe in zip(labels, fg_bad_bins):
             if probe.gene == last_gene:
                 gene = '  "'
             else:
@@ -247,7 +247,7 @@ def warn_bad_probes(probes, max_name_width=50):
                 last_gene = gene
             if len(gene) > max_name_width:
                 gene = gene[:max_name_width-3] + '...'
-            if 'rmask' in probes:
+            if 'rmask' in cnarr:
                 logging.info("  %s  %s  log2=%.3f  spread=%.3f  rmask=%.3f",
                              gene.ljust(gene_cols), label.ljust(chrom_cols),
                              probe.log2, probe.spread, probe.rmask)
@@ -256,12 +256,12 @@ def warn_bad_probes(probes, max_name_width=50):
                              gene.ljust(gene_cols), label.ljust(chrom_cols),
                              probe.log2, probe.spread)
 
-    # Count the number of BG probes dropped, too (names are all "Background")
-    bg_bad_probes = bad_probes[~fg_index]
-    if len(bg_bad_probes) > 0:
-        bad_pct = 100 * len(bg_bad_probes) / sum(probes['gene'] == 'Background')
+    # Count the number of BG bins dropped, too (names are all "Background")
+    bg_bad_bins = bad_bins[~fg_index]
+    if len(bg_bad_bins) > 0:
+        bad_pct = 100 * len(bg_bad_bins) / sum(cnarr['gene'] == 'Background')
         logging.info("Antitargets: %d (%s) bins failed filters",
-                     len(bg_bad_probes), "%.4f" % bad_pct + '%')
+                     len(bg_bad_bins), "%.4f" % bad_pct + '%')
 
 
 def get_fasta_stats(cnarr, fa_fname):

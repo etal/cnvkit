@@ -60,10 +60,6 @@ class GenomicArray(object):
                      if meta_dict is not None and len(meta_dict)
                      else {})
 
-    @staticmethod
-    def row2label(row):
-        return to_label(row)
-
     @classmethod
     def _make_blank(cls):
         """Create an empty dataframe with the columns required by this class."""
