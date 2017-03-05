@@ -10,9 +10,6 @@ import logging
 import os
 import sys
 
-import numpy as np
-import pandas as pd
-
 # If running headless, use a suitable GUI-less plotting backend
 if not os.environ.get('DISPLAY'):
     import matplotlib
@@ -22,12 +19,15 @@ from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
+import numpy as np
+import pandas as pd
+from skgenome import GenomicArray as _GA
+
 from . import (access, antitarget, autobin, batch, call, core, coverage,
                descriptives, diagram, export, fix, heatmap, importers, metrics,
                parallel, reference, reports, scatter, segmentation, tabio,
                target)
 from .cnary import CopyNumArray as _CNA
-from .genome import GenomicArray as _GA
 from ._version import __version__
 
 

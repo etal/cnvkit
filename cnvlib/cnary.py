@@ -8,10 +8,10 @@ import logging
 import numpy as np
 import pandas as pd
 from scipy.stats import median_test
+from skgenome import GenomicArray
 
 from . import core, descriptives, params, smoothing
 from .metrics import segment_mean
-from .genome import GenomicArray
 
 
 class CopyNumArray(GenomicArray):

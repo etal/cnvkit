@@ -9,11 +9,11 @@ import logging
 
 import numpy as np
 from matplotlib import pyplot
+from skgenome.rangelabel import unpack_range
 
 from . import core, plots, smoothing
 from .plots import MB
 from .cnary import CopyNumArray as CNA
-from .genome.rangelabel import unpack_range
 
 HIGHLIGHT_COLOR = 'gold'
 POINT_COLOR = '#606060'

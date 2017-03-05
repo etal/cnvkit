@@ -5,8 +5,9 @@ from builtins import map
 import logging
 import re
 
+from skgenome import GenomicArray as GA
+
 from .params import INSERT_SIZE, MIN_REF_COVERAGE
-from .genome import GenomicArray as GA
 
 
 def do_antitarget(targets, access=None, avg_bin_size=150000,

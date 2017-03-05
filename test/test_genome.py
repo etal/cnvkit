@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 
 from cnvlib import tabio
-from cnvlib.genome import chromsort, rangelabel
-from cnvlib.genome import GenomicArray as GA
+from skgenome import chromsort, rangelabel
+from skgenome import GenomicArray as GA
 
 
 class GaryTests(unittest.TestCase):

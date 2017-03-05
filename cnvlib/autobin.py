@@ -6,10 +6,10 @@ import tempfile
 
 import numpy as np
 import pandas as pd
+from skgenome import GenomicArray as GA
 
 from . import coverage, samutil, tabio
 from .descriptives import weighted_median
-from .genome.gary import GenomicArray as GA
 
 
 def midsize_file(fnames):

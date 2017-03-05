@@ -4,8 +4,7 @@ from builtins import str
 
 import numpy as np
 import pandas as pd
-
-from .genome import GenomicArray
+from skgenome import GenomicArray
 
 
 class VariantArray(GenomicArray):

@@ -6,10 +6,10 @@ import logging
 
 import numpy as np
 import pyfaidx
+from skgenome import GenomicArray as GA
 
 from . import core, fix, descriptives, params, tabio
 from .cnary import CopyNumArray as CNA
-from .genome import GenomicArray as GA
 
 
 def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,

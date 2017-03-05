@@ -12,7 +12,7 @@ import pandas as pd
 from Bio.File import as_handle
 
 from .. import core
-from ..genome import GenomicArray as GA
+from skgenome import GenomicArray as GA
 from ..cnary import CopyNumArray as CNA
 from ..vary import VariantArray as VA
 from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio

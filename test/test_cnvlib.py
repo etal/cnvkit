@@ -5,9 +5,9 @@ from __future__ import absolute_import, division, print_function
 import unittest
 
 import numpy as np
+from skgenome import GenomicArray
 
 import cnvlib
-from cnvlib.genome import GenomicArray
 # Import all modules as a smoke test
 from cnvlib import (access, antitarget, autobin, batch, cnary, commands, core,
                     coverage, diagram, export, fix, importers, metrics, params,
@@ -89,8 +89,8 @@ class CNATests(unittest.TestCase):
         cnarr = tabio.read_cna("formats/amplicon.cnr")
         segments = tabio.read_cna("formats/amplicon.cns")
         regions = GenomicArray(segments.data).drop_extra_columns()
-        for arg in (None, segments, regions):
-            resid = cnarr.residuals(arg)
+        for grouping_arg in (None, segments, regions):
+            resid = cnarr.residuals(grouping_arg)
             self.assertAlmostEqual(0, resid.mean(), delta=.3)
             self.assertAlmostEqual(1, np.percentile(resid, 80), delta=.2)
             self.assertAlmostEqual(2, resid.std(), delta=.5)

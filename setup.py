@@ -39,9 +39,9 @@ setup_args.update(
     url='http://github.com/etal/cnvkit',
     packages=[
         'cnvlib',
-        'cnvlib.genome',
         'cnvlib.segmentation',
         'cnvlib.tabio',
+        'skgenome',
     ],
     scripts=[join(DIR, 'cnvkit.py')] + glob(join(DIR, 'scripts/*.py')),
     classifiers=[

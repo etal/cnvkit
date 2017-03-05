@@ -9,9 +9,9 @@ import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 from matplotlib.collections import BrokenBarHCollection
+from skgenome.rangelabel import unpack_range
 
 from . import plots
-from .genome.rangelabel import unpack_range
 
 
 def do_heatmap(cnarrs, show_range=None, do_desaturate=False):

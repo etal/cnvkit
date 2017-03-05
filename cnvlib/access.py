@@ -12,9 +12,10 @@ from builtins import next, zip
 import logging
 
 import numpy as np
+from skgenome import GenomicArray as GA
 
 from . import tabio
-from .genome import GenomicArray as GA
+
 
 def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
     """List the locations of accessible sequence regions in a FASTA file."""

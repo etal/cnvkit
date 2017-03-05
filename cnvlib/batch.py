@@ -5,10 +5,10 @@ import logging
 import os
 
 from matplotlib import pyplot
+from skgenome import GenomicArray as GA
 
 from . import (access, antitarget, autobin, core, coverage, diagram, fix,
                parallel, reference, scatter, segmentation, target, tabio)
-from .genome import GenomicArray as GA
 
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed,
