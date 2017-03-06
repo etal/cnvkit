@@ -28,9 +28,9 @@ import numpy as np
 import pandas as pd
 
 import cnvlib
-from cnvlib import parallel, tabio
+from cnvlib import parallel
 from cnvlib.descriptives import modal_location
-from cnvlib.genome import GenomicArray as GA
+from skgenome import tabio, GenomicArray as GA
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 

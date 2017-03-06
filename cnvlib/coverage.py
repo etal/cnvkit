@@ -13,8 +13,9 @@ import numpy as np
 import pandas as pd
 import pysam
 from Bio._py3k import StringIO
+from skgenome import tabio
 
-from . import core, samutil, tabio
+from . import core, samutil
 from .cnary import CopyNumArray as CNA
 from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE

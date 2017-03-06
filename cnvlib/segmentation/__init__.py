@@ -12,9 +12,9 @@ from concurrent import futures
 import numpy as np
 import pandas as pd
 from Bio._py3k import StringIO
+from skgenome import tabio
 
-from .. import core, params, smoothing, tabio, vary
-from ..cnary import CopyNumArray as CNA
+from .. import core, params, smoothing, vary
 from . import cbs, flasso, haar
 
 

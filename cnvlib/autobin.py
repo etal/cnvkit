@@ -6,9 +6,9 @@ import tempfile
 
 import numpy as np
 import pandas as pd
-from skgenome import GenomicArray as GA
+from skgenome import tabio, GenomicArray as GA
 
-from . import coverage, samutil, tabio
+from . import coverage, samutil
 from .descriptives import weighted_median
 
 

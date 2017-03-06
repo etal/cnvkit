@@ -11,7 +11,7 @@ from __future__ import absolute_import, division, print_function
 import argparse
 import logging
 
-from cnvlib import tabio
+from skgenome import tabio
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 

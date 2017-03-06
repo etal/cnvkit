@@ -40,8 +40,8 @@ setup_args.update(
     packages=[
         'cnvlib',
         'cnvlib.segmentation',
-        'cnvlib.tabio',
         'skgenome',
+        'skgenome.tabio',
     ],
     scripts=[join(DIR, 'cnvkit.py')] + glob(join(DIR, 'scripts/*.py')),
     classifiers=[

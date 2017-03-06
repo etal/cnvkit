@@ -11,12 +11,12 @@ import sys
 import pandas as pd
 from Bio.File import as_handle
 
-from skgenome import GenomicArray as GA
-from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio
+from cnvlib.core import fbase, safe_write
+from cnvlib.cnary import CopyNumArray as CNA
+from cnvlib.vary import VariantArray as VA
 
-from ..core import fbase, safe_write
-from ..cnary import CopyNumArray as CNA
-from ..vary import VariantArray as VA
+from .. import GenomicArray as GA
+from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):

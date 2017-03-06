@@ -16,7 +16,8 @@ import argparse
 import logging
 
 import cnvlib
-from cnvlib import reference, tabio
+from cnvlib import reference
+from skgenome import tabio
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 

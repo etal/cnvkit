@@ -21,13 +21,12 @@ pyplot.ioff()
 
 import numpy as np
 import pandas as pd
-from skgenome import GenomicArray as _GA
+from skgenome import tabio, GenomicArray as _GA
 from skgenome.rangelabel import to_label
 
 from . import (access, antitarget, autobin, batch, call, core, coverage,
                descriptives, diagram, export, fix, heatmap, importers, metrics,
-               parallel, reference, reports, scatter, segmentation, tabio,
-               target)
+               parallel, reference, reports, scatter, segmentation, target)
 from .cmdutil import load_het_snps, verify_sample_sex, read_cna
 from ._version import __version__
 

@@ -18,6 +18,7 @@ import os.path
 import numpy as np
 
 import cnvlib
+from skgenome import tabio
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
@@ -47,4 +48,4 @@ for fname in args.cnn_files:
     else:
         # e.g. reference.cnn or .cnr file, no "*.targetcoverage.*" in name
         out_fname = '.'.join((base + args.suffix, ext))
-    cnvlib.tabio.write(cnarr, os.path.join(args.output_dir, out_fname))
+    tabio.write(cnarr, os.path.join(args.output_dir, out_fname))

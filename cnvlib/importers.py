@@ -7,8 +7,9 @@ import os.path
 import subprocess
 
 import numpy as np
+from skgenome import tabio
 
-from . import params, tabio
+from . import params
 
 
 # __________________________________________________________________________

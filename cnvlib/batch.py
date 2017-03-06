@@ -5,10 +5,10 @@ import logging
 import os
 
 from matplotlib import pyplot
-from skgenome import GenomicArray as GA
+from skgenome import tabio, GenomicArray as GA
 
 from . import (access, antitarget, autobin, core, coverage, diagram, fix,
-               parallel, reference, scatter, segmentation, target, tabio)
+               parallel, reference, scatter, segmentation, target)
 from .cmdutil import read_cna
 
 

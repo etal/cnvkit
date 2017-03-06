@@ -6,9 +6,9 @@ import logging
 
 import numpy as np
 import pyfaidx
-from skgenome import GenomicArray as GA
+from skgenome import tabio, GenomicArray as GA
 
-from . import core, fix, descriptives, params, tabio
+from . import core, fix, descriptives, params
 from .cmdutil import read_cna
 from .cnary import CopyNumArray as CNA
 

@@ -3,7 +3,9 @@ from __future__ import division, absolute_import
 
 import logging
 
-from . import antitarget, tabio
+from skgenome import tabio
+
+from . import antitarget
 
 
 def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
