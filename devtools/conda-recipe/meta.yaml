@@ -33,6 +33,7 @@ requirements:
 test:
   imports:
     - cnvlib
+    - skgenome
   commands:
     - cnvkit.py -h
 
