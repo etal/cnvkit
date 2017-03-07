@@ -51,6 +51,7 @@ AP_subparsers = AP.add_subparsers(
 
 def _cmd_batch(args):
     """Run the complete CNVkit pipeline on one or more BAM files."""
+    logging.info("CNVkit %s", __version__)
     # Validate/restrict options, beyond what argparse mutual exclusion can do
     if args.reference:
         bad_flags = [flag
