@@ -7,9 +7,9 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from cnvlib import tabio, read
+from cnvlib import read
 from skgenome import chromsort, rangelabel
-from skgenome import GenomicArray as GA
+from skgenome import tabio, GenomicArray as GA
 
 
 class GaryTests(unittest.TestCase):

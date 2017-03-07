@@ -12,11 +12,16 @@ columns:
     - loc.end, "end"
     - num.mark, "nbrOfLoci" (optional)
     - seg.mean, "mean"
+
+See: https://software.broadinstitute.org/software/igv/SEG
 """
 from __future__ import absolute_import, division, print_function
 from builtins import next
 from past.builtins import basestring
+#  from itertools import zip_longest
+from future.moves.itertools import zip_longest
 
+import collections
 import csv
 import logging
 import math
@@ -24,8 +29,8 @@ import math
 import pandas as pd
 from Bio.File import as_handle
 
-
 LOG2_10 = math.log(10, 2)   # To convert log10 values to log2
+
 
 def read_seg(infile, sample_id=None,
              chrom_names=None, chrom_prefix=None, from_log10=False):
@@ -156,30 +161,60 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
         yield sid, sample.loc[:, keep_columns]
 
 
-def write_seg(dframe, sample_id=None):
-    """Format a dataframe like SEG.
+def write_seg(dframe, sample_id=None, chrom_ids=None):
+    """Format a dataframe or list of dataframes as SEG.
 
     To put multiple samples into one SEG table, pass `dframe` and `sample_id` as
     equal-length lists of data tables and sample IDs in matching order.
     """
     assert sample_id is not None
     if isinstance(dframe, pd.DataFrame):
-        dframe = _format_seg(dframe, sample_id)
+        first = dframe
+        first_sid = sample_id
+        sids = dframes = None
     else:
-        # Unpack matching lists of data and sample IDs
         assert not isinstance(sample_id, basestring)
-        assert len(dframe) == len(sample_id)
-        dframe = pd.concat([_format_seg(subframe, sid)
-                            for subframe, sid in zip(dframe, sample_id)])
-    return dframe
+        dframes = iter(dframe)
+        sids = iter(sample_id)
+        first = next(dframes)
+        first_sid = next(sids)
+
+    if chrom_ids is None:
+        # Create & store
+        chrom_ids = create_chrom_ids(first)
+    else:
+        # Verify
+        from cnvlib.core import assert_equal
+        assert_equal("Segment chromosome names differ",
+                     previous=list(chrom_ids.keys()),
+                     current=list(create_chrom_ids(first).keys()))
+    results = [format_seg(first, first_sid, chrom_ids)]
+    if dframes is not None:
+        # Unpack matching lists of data and sample IDs
+        results.extend(
+            format_seg(subframe, sid, chrom_ids)
+            for subframe, sid in zip_longest(dframes, sids))
+    return pd.concat(results)
 
 
-def _format_seg(dframe, sample_id):
+def format_seg(dframe, sample_id, chrom_ids):
+    assert dframe is not None
+    assert sample_id is not None
+    #  assert chrom_ids is not None
     rename_cols = {"log2": "mean"}
+    # NB: in some programs the "sampleName" column is labeled "ID"
     reindex_cols = ["sampleName", "chromosome", "start", "end", "mean"]
     if "probes" in dframe:
-        rename_cols["probes"] = "nbrOfLoci"
+        rename_cols["probes"] = "nbrOfLoci" # or num_probes
         reindex_cols.insert(-1, "nbrOfLoci")
     return (dframe.assign(sampleName=sample_id, start=dframe.start + 1)
             .rename(columns=rename_cols)
             .reindex(columns=reindex_cols))
+
+
+def create_chrom_ids(segments):
+    """Map chromosome names to integers in the order encountered."""
+    mapping = collections.OrderedDict(
+        (chrom, i+1)
+        for i, chrom in enumerate(segments.chromosome.drop_duplicates()))
+    return mapping

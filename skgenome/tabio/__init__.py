@@ -11,11 +11,7 @@ import sys
 import pandas as pd
 from Bio.File import as_handle
 
-from cnvlib.core import fbase, safe_write
-from cnvlib.cnary import CopyNumArray as CNA
-from cnvlib.vary import VariantArray as VA
-
-from .. import GenomicArray as GA
+from ..gary import GenomicArray as GA
 from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio
 
 
@@ -50,6 +46,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         The data from the given file instantiated as `into`, if specified, or
         the default base class for the given file format (usually GenomicArray).
     """
+    from cnvlib.core import fbase
     if fmt == 'auto':
         return read_auto(infile)
     elif fmt in READERS:
@@ -83,6 +80,9 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         # File is blank/empty, most likely
         logging.info("Blank %s file?: %s", fmt, infile)
         dframe = []
+    if fmt == "vcf":
+        from cnvlib.vary import VariantArray as VA
+        suggest_into = VA
     result = (into or suggest_into)(dframe, meta)
     result.sort_columns()
     result.sort()
@@ -125,10 +125,10 @@ READERS = {
     "interval": (picard.read_interval, GA),
     "refflat": (genepred.read_refflat, GA),
     "picardhs": (picard.read_picard_hs, GA),
-    "seg": (seg.read_seg, CNA),
+    "seg": (seg.read_seg, GA),
     "tab": (tab.read_tab, GA),
     "text": (textcoord.read_text, GA),
-    "vcf": (vcfio.read_vcf, VA),
+    "vcf": (vcfio.read_vcf, GA),
 }
 
 
@@ -136,6 +136,7 @@ READERS = {
 
 def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
     """Write a genome object to a file or stream."""
+    from cnvlib.core import safe_write
     formatter, show_header = WRITERS[fmt]
     if fmt in ("seg", "vcf"):
         kwargs["sample_id"] = garr.sample_id

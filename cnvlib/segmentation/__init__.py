@@ -15,6 +15,7 @@ from Bio._py3k import StringIO
 from skgenome import tabio
 
 from .. import core, params, smoothing, vary
+from ..cnary import CopyNumArray as CNA
 from . import cbs, flasso, haar
 
 
@@ -112,7 +113,7 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
                 seg_out = core.call_quiet('Rscript', '--vanilla', script_fname)
         # Convert R dataframe contents (SEG) to a proper CopyNumArray
         # NB: Automatically shifts 'start' back from 1- to 0-indexed
-        segarr = tabio.read(StringIO(seg_out.decode()), "seg",
+        segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA,
                             sample_id=cnarr.sample_id)
         if method == 'flasso':
             segarr = squash_segments(segarr)

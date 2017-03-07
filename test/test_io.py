@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, print_function
 
 import unittest
 
-from cnvlib import tabio
+from skgenome import tabio
 
 
 class IOTests(unittest.TestCase):

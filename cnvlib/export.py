@@ -2,14 +2,14 @@
 from __future__ import absolute_import, division, print_function
 from builtins import range, str, zip
 
-import collections
 import logging
 import time
 
 import numpy as np
 import pandas as pd
+from skgenome import tabio
 
-from . import call, core
+from . import call
 from .cmdutil import read_cna
 from ._version import __version__
 
@@ -129,49 +129,24 @@ def export_nexus_ogt(cnarr, varr, min_weight=0.0):
     return out_table
 
 
-def export_seg(sample_fnames):
+def export_seg(sample_fnames, chrom_ids=None):
     """SEG format for copy number segments.
 
     Segment breakpoints are not the same across samples, so samples are listed
     in serial with the sample ID as the left column.
     """
-    out_tables = []
-    chrom_ids = None
-    for fname in sample_fnames:
-        segments = read_cna(fname)
-        if chrom_ids is None:
-            # Create & store
-            chrom_ids = create_chrom_ids(segments)
-        else:
-            # Verify
-            core.assert_equal("Segment chromosome names differ",
-                              previous=list(chrom_ids.keys()),
-                              current=list(create_chrom_ids(segments).keys()))
-        table = segments.data.loc[:, ["start", "end"]]
-        table["start"] += 1
-        table["ID"] = segments.sample_id
-        table["mean"] = segments.data["log2"]
-        table["chromosome"] = [chrom_ids[chrom]
-                               for chrom in segments["chromosome"]]
-        if "probes" in segments:
-            table["num_probes"] = segments["probes"]
-            sorted_cols = ["ID", "chromosome", "start", "end", "num_probes",
-                           "mean"]
-        else:
-            sorted_cols = ["ID", "chromosome", "start", "end", "mean"]
-        out_tables.append(table.reindex(columns=sorted_cols))
-    return pd.concat(out_tables)
+    dframes, sample_ids = zip(*(_load_seg_dframe_id(fname)
+                                for fname in sample_fnames))
+    out_table = tabio.seg.write_seg(dframes, sample_ids, chrom_ids)
+    return out_table
 
 
-def create_chrom_ids(segments):
-    """Map chromosome names to integers in the order encountered."""
-    mapping = collections.OrderedDict()
-    curr_idx = 1
-    for chrom in segments.chromosome:
-        if chrom not in mapping:
-            mapping[chrom] = curr_idx
-            curr_idx += 1
-    return mapping
+def _load_seg_dframe_id(fname):
+    segarr = read_cna(fname)
+    assert segarr is not None
+    assert segarr.data is not None
+    assert segarr.sample_id is not None
+    return segarr.data, segarr.sample_id
 
 
 # _____________________________________________________________________________
