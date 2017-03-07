@@ -1,6 +1,8 @@
 [run]
 branch = True
-source = cnvlib
+source =
+    cnvlib
+    skgenome
 
 [report]
 exclude_lines =
