@@ -13,8 +13,8 @@ def read_cna(infile, sample_id=None, meta=None):
     return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)
 
 
-def load_het_snps(vcf_fname, sample_id, normal_id, min_variant_depth,
-                  zygosity_freq, tumor_boost=False):
+def load_het_snps(vcf_fname, sample_id=None, normal_id=None,
+                  min_variant_depth=20, zygosity_freq=None, tumor_boost=False):
     if vcf_fname is None:
         return None
     varr = tabio.read(vcf_fname, 'vcf',
