@@ -180,14 +180,7 @@ def write_seg(dframe, sample_id=None, chrom_ids=None):
         first_sid = next(sids)
 
     if chrom_ids is None:
-        # Create & store
         chrom_ids = create_chrom_ids(first)
-    else:
-        # Verify
-        from cnvlib.core import assert_equal
-        assert_equal("Segment chromosome names differ",
-                     previous=list(chrom_ids.keys()),
-                     current=list(create_chrom_ids(first).keys()))
     results = [format_seg(first, first_sid, chrom_ids)]
     if dframes is not None:
         # Unpack matching lists of data and sample IDs
@@ -207,7 +200,9 @@ def format_seg(dframe, sample_id, chrom_ids):
     if "probes" in dframe:
         rename_cols["probes"] = "nbrOfLoci" # or num_probes
         reindex_cols.insert(-1, "nbrOfLoci")
-    return (dframe.assign(sampleName=sample_id, start=dframe.start + 1)
+    return (dframe.assign(sampleName=sample_id,
+                          chromosome=dframe.chromosome.replace(chrom_ids),
+                          start=dframe.start + 1)
             .rename(columns=rename_cols)
             .reindex(columns=reindex_cols))
 
@@ -216,5 +211,6 @@ def create_chrom_ids(segments):
     """Map chromosome names to integers in the order encountered."""
     mapping = collections.OrderedDict(
         (chrom, i+1)
-        for i, chrom in enumerate(segments.chromosome.drop_duplicates()))
+        for i, chrom in enumerate(segments.chromosome.drop_duplicates())
+        if str(i + 1) != chrom)
     return mapping
