@@ -7,7 +7,6 @@ import contextlib
 import logging
 import os
 import subprocess
-import sys
 import tempfile
 
 
@@ -67,36 +66,6 @@ def ensure_path(fname):
 
 
 @contextlib.contextmanager
-def safe_write(outfile, verbose=True):
-    """Write to a filename or file-like object with error handling.
-
-    If given a file name, open it. If the path includes directories that don't
-    exist yet, create them.  If given a file-like object, just pass it through.
-    """
-    if isinstance(outfile, basestring):
-        dirname = os.path.dirname(outfile)
-        if dirname and not os.path.isdir(dirname):
-            os.mkdir(dirname)
-            logging.info("Created directory %s", dirname)
-        with open(outfile, 'w') as handle:
-            yield handle
-    else:
-        yield outfile
-
-    # Log the output path, if possible
-    if verbose:
-        if isinstance(outfile, basestring):
-            outfname = outfile
-        elif hasattr(outfile, 'name') and outfile not in (sys.stdout,
-                                                          sys.stderr):
-            outfname = outfile.name
-        else:
-            # Probably stdout or stderr -- don't ruin the pipeline
-            return
-        logging.info("Wrote %s", outfname)
-
-
-@contextlib.contextmanager
 def temp_write_text(text, mode="w+b"):
     """Save text to a temporary file.
 
@@ -106,32 +75,6 @@ def temp_write_text(text, mode="w+b"):
         tmp.write(text)
         tmp.flush()
         yield tmp.name
-
-
-def write_tsv(outfname, rows, colnames=None):
-    """Write rows, with optional column header, to tabular file."""
-    with safe_write(outfname or sys.stdout) as handle:
-        if colnames:
-            header = '\t'.join(colnames) + '\n'
-            handle.write(header)
-        handle.writelines('\t'.join(map(str, row)) + '\n'
-                           for row in rows)
-
-
-def write_text(outfname, text, *more_texts):
-    """Write one or more strings (blocks of text) to a file."""
-    with safe_write(outfname or sys.stdout) as handle:
-        handle.write(text)
-        if more_texts:
-            for mtext in more_texts:
-                handle.write(mtext)
-
-
-def write_dataframe(outfname, dframe, header=True):
-    """Write a pandas.DataFrame to a tabular file."""
-    with safe_write(outfname or sys.stdout) as handle:
-        dframe.to_csv(handle, header=header,
-                      index=False, sep='\t', float_format='%.6g')
 
 
 # __________________________________________________________________________

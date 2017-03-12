@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, print_function
 
 import logging
+import sys
 
 from skgenome import tabio
 
@@ -61,3 +62,29 @@ def verify_sample_sex(cnarr, sex_arg, is_male_reference):
                  cnarr.sample_id or '',
                  "female" if is_sample_female else "male")
     return is_sample_female
+
+
+def write_tsv(outfname, rows, colnames=None):
+    """Write rows, with optional column header, to tabular file."""
+    with tabio.safe_write(outfname or sys.stdout) as handle:
+        if colnames:
+            header = '\t'.join(colnames) + '\n'
+            handle.write(header)
+        handle.writelines('\t'.join(map(str, row)) + '\n'
+                           for row in rows)
+
+
+def write_text(outfname, text, *more_texts):
+    """Write one or more strings (blocks of text) to a file."""
+    with tabio.safe_write(outfname or sys.stdout) as handle:
+        handle.write(text)
+        if more_texts:
+            for mtext in more_texts:
+                handle.write(mtext)
+
+
+def write_dataframe(outfname, dframe, header=True):
+    """Write a pandas.DataFrame to a tabular file."""
+    with tabio.safe_write(outfname or sys.stdout) as handle:
+        dframe.to_csv(handle, header=header,
+                      index=False, sep='\t', float_format='%.6g')

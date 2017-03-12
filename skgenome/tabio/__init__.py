@@ -4,7 +4,9 @@ from __future__ import absolute_import, division, print_function
 from past.builtins import basestring
 
 import collections
+import contextlib
 import logging
+import os
 import re
 import sys
 
@@ -136,7 +138,6 @@ READERS = {
 
 def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
     """Write a genome object to a file or stream."""
-    from cnvlib.core import safe_write
     formatter, show_header = WRITERS[fmt]
     if fmt in ("seg", "vcf"):
         kwargs["sample_id"] = garr.sample_id
@@ -173,6 +174,36 @@ WRITERS = {
 
 
 # _____________________________________________________________________
+
+@contextlib.contextmanager
+def safe_write(outfile, verbose=True):
+    """Write to a filename or file-like object with error handling.
+
+    If given a file name, open it. If the path includes directories that don't
+    exist yet, create them.  If given a file-like object, just pass it through.
+    """
+    if isinstance(outfile, basestring):
+        dirname = os.path.dirname(outfile)
+        if dirname and not os.path.isdir(dirname):
+            os.mkdir(dirname)
+            logging.info("Created directory %s", dirname)
+        with open(outfile, 'w') as handle:
+            yield handle
+    else:
+        yield outfile
+
+    # Log the output path, if possible
+    if verbose:
+        if isinstance(outfile, basestring):
+            outfname = outfile
+        elif hasattr(outfile, 'name') and outfile not in (sys.stdout,
+                                                          sys.stderr):
+            outfname = outfile.name
+        else:
+            # Probably stdout or stderr -- don't ruin the pipeline
+            return
+        logging.info("Wrote %s", outfname)
+
 
 def sniff_region_format(fname):
     """Guess the format of the given file by reading the first line.

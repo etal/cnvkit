@@ -27,7 +27,9 @@ from skgenome.rangelabel import to_label
 from . import (access, antitarget, autobin, batch, call, core, coverage,
                descriptives, diagram, export, fix, heatmap, importers, metrics,
                parallel, reference, reports, scatter, segmentation, target)
-from .cmdutil import load_het_snps, verify_sample_sex, read_cna
+from .cmdutil import (load_het_snps, read_cna, verify_sample_sex,
+                      write_tsv, write_text, write_dataframe)
+
 from ._version import __version__
 
 
@@ -979,7 +981,7 @@ def _cmd_breaks(args):
     segarr = read_cna(args.segment)
     bpoints = do_breaks(cnarr, segarr, args.min_probes)
     logging.info("Found %d gene breakpoints", len(bpoints))
-    core.write_dataframe(args.output, bpoints)
+    write_dataframe(args.output, bpoints)
 
 
 @public
@@ -1019,7 +1021,7 @@ def _cmd_gainloss(args):
                            args.min_probes, args.drop_low_coverage,
                            args.male_reference, is_sample_female)
     logging.info("Found %d gene-level gains and losses", len(gainloss))
-    core.write_dataframe(args.output, gainloss)
+    write_dataframe(args.output, gainloss)
 
 
 @public
@@ -1079,7 +1081,7 @@ def _cmd_sex(args):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
     cnarrs = map(read_cna, args.filenames)
     table = do_sex(cnarrs, args.male_reference)
-    core.write_dataframe(args.output, table, header=True)
+    write_dataframe(args.output, table, header=True)
 
 
 @public
@@ -1135,7 +1137,7 @@ def _cmd_metrics(args):
     if args.segments:
         args.segments = map(read_cna, args.segments)
     table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)
-    core.write_dataframe(args.output, table)
+    write_dataframe(args.output, table)
 
 
 P_metrics = AP_subparsers.add_parser('metrics', help=_cmd_metrics.__doc__)
@@ -1395,7 +1397,7 @@ def _cmd_export_bed(args):
                                 args.show)
         bed_tables.append(tbl)
     table = pd.concat(bed_tables)
-    core.write_dataframe(args.output, table, header=False)
+    write_dataframe(args.output, table, header=False)
 
 P_export_bed = P_export_subparsers.add_parser('bed',
         help=_cmd_export_bed.__doc__)
@@ -1435,7 +1437,7 @@ def _cmd_export_seg(args):
     Compatible with IGV and GenePattern.
     """
     table = export.export_seg(args.filenames)
-    core.write_dataframe(args.output, table)
+    write_dataframe(args.output, table)
 
 P_export_seg = P_export_subparsers.add_parser('seg',
         help=_cmd_export_seg.__doc__)
@@ -1458,7 +1460,7 @@ def _cmd_export_vcf(args):
                                          args.male_reference)
     header, body = export.export_vcf(segments, args.ploidy, args.male_reference,
                                      is_sample_female, args.sample_id)
-    core.write_text(args.output, header, body)
+    write_text(args.output, header, body)
 
 P_export_vcf = P_export_subparsers.add_parser('vcf',
         help=_cmd_export_vcf.__doc__)
@@ -1549,7 +1551,7 @@ def _cmd_export_nb(args):
     """Convert bin-level log2 ratios to Nexus Copy Number "basic" format."""
     cnarr = read_cna(args.filename)
     table = export.export_nexus_basic(cnarr)
-    core.write_dataframe(args.output, table)
+    write_dataframe(args.output, table)
 
 P_export_nb = P_export_subparsers.add_parser('nexus-basic',
         help=_cmd_export_nb.__doc__)
@@ -1567,7 +1569,7 @@ def _cmd_export_nbo(args):
     varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                          args.min_variant_depth, args.zygosity_freq)
     table = export.export_nexus_ogt(cnarr, varr, args.min_weight)
-    core.write_dataframe(args.output, table)
+    write_dataframe(args.output, table)
 
 P_export_nbo = P_export_subparsers.add_parser('nexus-ogt',
         help=_cmd_export_nbo.__doc__)
@@ -1605,7 +1607,7 @@ def _cmd_export_cdt(args):
     table = export.merge_samples(args.filenames)
     formatter = export.EXPORT_FORMATS['cdt']
     outheader, outrows = formatter(sample_ids, table)
-    core.write_tsv(args.output, outrows, colnames=outheader)
+    write_tsv(args.output, outrows, colnames=outheader)
 
 P_export_cdt = P_export_subparsers.add_parser('cdt',
                                               help=_cmd_export_cdt.__doc__)
@@ -1621,7 +1623,7 @@ def _cmd_export_jtv(args):
     table = export.merge_samples(args.filenames)
     formatter = export.EXPORT_FORMATS['jtv']
     outheader, outrows = formatter(sample_ids, table)
-    core.write_tsv(args.output, outrows, colnames=outheader)
+    write_tsv(args.output, outrows, colnames=outheader)
 
 P_export_jtv = P_export_subparsers.add_parser('jtv',
                                               help=_cmd_export_jtv.__doc__)
