@@ -281,7 +281,7 @@ do_antitarget = public(antitarget.do_antitarget)
 def _cmd_antitarget(args):
     """Derive a background/antitarget BED file from a target BED file."""
     targets = tabio.read_auto(args.targets)
-    access = tabio.read_auto(args.access)
+    access = tabio.read_auto(args.access) if args.access else None
     out_arr = antitarget.do_antitarget(targets, access, args.avg_size,
                                        args.min_size)
     if not args.output:
