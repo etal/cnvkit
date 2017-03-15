@@ -26,6 +26,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
             raise ValueError("%r protocol: targets and access should not be "
                              "different." % method)
 
+    bait_arr = None
     if method == "wgs":
         if not annotate:
             # TODO check if target_bed has gene names
@@ -47,20 +48,30 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
             else:
                 raise ValueError("WGS protocol: need to provide --targets, "
                                  "--access, or --fasta options.")
+
         # Tweak default parameters
         if not target_avg_size:
             if normal_bams:
                 # Calculate bin size from .bai & access
-                # NB: Always calculate wgs_depth from all sequencing-accessible
-                # area (it doesn't take that long compared to WGS coverage);
-                # user-provided access might be something else that excludes a
-                # significant number of mapped reads.
-                if not access_arr:
+                if fasta and not access_arr:
+                    # Calculate wgs depth from all
+                    # sequencing-accessible area (it doesn't take that long
+                    # compared to WGS coverage); user-provided access might be
+                    # something else that excludes a significant number of
+                    # mapped reads.
                     access_arr = access.do_access(fasta)
+                if access_arr:
+                    autobin_args = ['wgs', access_arr]
+                else:
+                    # Don't assume the given targets/access covers the whole
+                    # genome; use autobin sampling to estimate bin size, as we
+                    # do for amplicon
+                    bait_arr = tabio.read_auto(target_bed)
+                    autobin_args = ['amplicon', bait_arr]
                 # Choose median-size normal bam or tumor bam
                 bam_fname = autobin.midsize_file(normal_bams)
                 (wgs_depth, target_avg_size), _ = autobin.do_autobin(
-                    bam_fname, 'wgs', targets=access_arr, bp_per_bin=50000.)
+                    bam_fname, *autobin_args, bp_per_bin=50000.)
                 logging.info("WGS average depth %.2f --> using bin size %d",
                              wgs_depth, target_avg_size)
             else:
@@ -74,7 +85,8 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
 
     # Pre-process baits/targets
     new_target_fname = tgt_name_base + '.target.bed'
-    bait_arr = tabio.read_auto(target_bed)
+    if bait_arr is None:
+        bait_arr = tabio.read_auto(target_bed)
     target_arr = target.do_target(bait_arr, annotate, short_names, True,
                                   **({'avg_size': target_avg_size}
                                      if target_avg_size
