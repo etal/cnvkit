@@ -107,7 +107,8 @@ class CopyNumArray(GenomicArray):
 
     # Manipulation
 
-    def center_all(self, estimator=pd.Series.median, skip_low=False, by_chrom=True):
+    def center_all(self, estimator=pd.Series.median, by_chrom=True,
+                   skip_low=False, verbose=False):
         """Re-center log2 values to the autosomes' average (in-place).
 
         Parameters
@@ -137,7 +138,8 @@ class CopyNumArray(GenomicArray):
             else:
                 raise ValueError("Estimator must be a function or one of: %s"
                                  % ", ".join(map(repr, est_funcs)))
-        cnarr = (self.drop_low_coverage() if skip_low else self).autosomes()
+        cnarr = (self.drop_low_coverage(verbose=verbose) if skip_low else self
+                ).autosomes()
         if cnarr:
             if by_chrom:
                 values = pd.Series([estimator(subarr['log2'])
@@ -145,7 +147,10 @@ class CopyNumArray(GenomicArray):
                                     if len(subarr)])
             else:
                 values = cnarr['log2']
-            self.data['log2'] -= estimator(values)
+            shift = -estimator(values)
+            if verbose:
+                logging.info("Shifting log2 values by %f", shift)
+            self.data['log2'] += shift
 
     def drop_low_coverage(self, verbose=False):
         """Drop bins with extremely low log2 coverage or copy ratio values.

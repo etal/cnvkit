@@ -674,8 +674,12 @@ def _cmd_call(args):
         raise RuntimeError("Purity must be between 0 and 1.")
 
     cnarr = read_cna(args.filename)
-    if args.center:
-        cnarr.center_all(args.center)
+    if args.center_at:
+        logging.info("Shifting log2 values by %f", -args.center_at)
+        cnarr['log2'] -= args.center_at
+    elif args.center:
+        cnarr.center_all(args.center, verbose=True)
+
     varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                          args.min_variant_depth, args.zygosity_freq)
     is_sample_female = (verify_sample_sex(cnarr, args.sample_sex,
@@ -695,10 +699,14 @@ def csvstring(text):
 P_call = AP_subparsers.add_parser('call', help=_cmd_call.__doc__)
 P_call.add_argument('filename',
         help="Copy ratios (.cnr or .cns).")
-P_call.add_argument("--center",
+P_call.add_argument("--center", nargs='?', const='median',
         choices=('mean', 'median', 'mode', 'biweight'),
-        help="""Re-center the log2 ratio values using this estimate of the
-                center or average value.""")
+        help="""Re-center the log2 ratio values using this estimator of the
+                center or average value. ('median' if no argument given.)""")
+P_call.add_argument("--center-at", type=float,
+        help="""Subtract a constant number from all log2 values. For "manual"
+                re-centering, in case the --center option gives unsatisfactory
+                results.)""")
 P_call.add_argument('--filter', action='append', default=[], dest='filters',
         choices=('ampdel', 'cn', 'ci', 'sem', # 'bic'
                 ),
