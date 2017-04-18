@@ -19,7 +19,7 @@ try:
             'numpy >= 1.9',
             'pandas >= 0.18.1',
             'pyfaidx >= 0.4.7',
-            'pysam >= 0.9.1.4',
+            'pysam >= 0.10.0',
             'reportlab >= 3.0',
             'scipy >= 0.15.0',
         ])
