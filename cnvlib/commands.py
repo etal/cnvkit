@@ -129,6 +129,10 @@ def _cmd_batch(args):
                             args.output_dir, args.male_reference, args.scatter,
                             args.diagram, args.rlibpath, args.count_reads,
                             args.drop_low_coverage, args.method, procs_per_bam)
+    else:
+        logging.info("No tumor/test samples (but %d normal/control samples) "
+                     "specified on the command line.",
+                     len(args.normal))
 
 
 P_batch = AP_subparsers.add_parser('batch', help=_cmd_batch.__doc__)
