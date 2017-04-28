@@ -31,6 +31,18 @@ from Bio.File import as_handle
 
 LOG2_10 = math.log(10, 2)   # To convert log10 values to log2
 
+# To catch exceptions from pandas versions 0.18 -- 0.20
+CSV_ERRORS = (
+    # Raised by the pandas 'python' CSV parser, at some point, I think
+    csv.Error,
+    # Deprecated in pandas 0.20
+    # Same as pandas.parser.CParserError in <0.20
+    pd.io.common.CParserError,
+)
+if hasattr(pd, 'errors'):
+    # New in pandas 0.20
+    CSV_ERRORS += (pd.errors.ParserError,)
+
 
 def read_seg(infile, sample_id=None,
              chrom_names=None, chrom_prefix=None, from_log10=False):
@@ -142,7 +154,7 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
                                 )
             dframe['sample_id'] = dframe['sample_id'].astype("str")
             dframe['chromosome'] = dframe['chromosome'].astype("str")
-        except (pd.parser.CParserError, csv.Error) as err:
+        except CSV_ERRORS as err:
             raise ValueError("Unexpected dataframe contents:\n%s\n%s" %
                              (err, next(handle)))
 
