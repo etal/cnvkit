@@ -55,6 +55,7 @@ def _cmd_batch(args):
     """Run the complete CNVkit pipeline on one or more BAM files."""
     logging.info("CNVkit %s", __version__)
     # Validate/restrict options, beyond what argparse mutual exclusion can do
+    bad_args_msg = ""
     if args.reference:
         bad_flags = [flag
                      for is_used, flag in (
@@ -71,19 +72,18 @@ def _cmd_batch(args):
                          (args.antitarget_min_size, '--antitarget-min-size'),
                      ) if is_used]
         if bad_flags:
-            sys.exit("If -r/--reference is given, options to construct a new " +
-                     "reference (" + ", ".join(bad_flags) +
-                     ") should not be used." +
-                     "\n(See: cnvkit.py batch -h)")
-    elif (args.normal is None or
-          (args.method in ('hybrid', 'amplicon') and not args.targets)):
-        sys.exit("Options -n/--normal and -t/--targets (at least) must be "
-                 "given to build a new reference if -r/--reference is not used."
-                 "\n(See: cnvkit.py batch -h)")
-
-    if args.processes < 1:
-        import multiprocessing
-        args.processes = multiprocessing.cpu_count()
+            bad_args_msg = ("If -r/--reference is given, options to construct "
+                            "a new reference (%s) should not be used."
+                            % ", ".join(bad_flags))
+    elif args.normal is None:
+        bad_args_msg = ("Option -n/--normal must be given to build a new "
+                        "reference if -r/--reference is not used.")
+    elif args.method in ('hybrid', 'amplicon') and not args.targets:
+        bad_args_msg = ("For the '%r' sequencing method, option -t/--targets "
+                        "(at least) must be given to build a new reference if "
+                        "-r/--reference is not used." % args.method)
+    if bad_args_msg:
+        sys.exit(bad_args_msg + "\n(See: cnvkit.py batch -h)")
 
     # Ensure sample IDs are unique to avoid overwriting outputs
     seen_sids = {}
@@ -93,6 +93,10 @@ def _cmd_batch(args):
             sys.exit("Duplicate sample ID %r (from %s and %s)"
                      % (sid, fname, seen_sids[sid]))
         seen_sids[sid] = fname
+
+    if args.processes < 1:
+        import multiprocessing
+        args.processes = multiprocessing.cpu_count()
 
     if not args.reference:
         # Build a copy number reference; update (anti)targets upon request
@@ -165,9 +169,10 @@ P_batch.add_argument("--rlibpath",
 P_batch_newref = P_batch.add_argument_group(
     "To construct a new copy number reference")
 P_batch_newref.add_argument('-n', '--normal', nargs='*',
-        help="""Normal samples (.bam) to construct the pooled reference.
-                If this option is used but no files are given, a "flat"
-                reference will be built.""")
+        help="""Normal samples (.bam) used to construct the pooled, paired, or
+                flat reference. If this option is used but no filenames are
+                given, a "flat" reference will be built. Otherwise, all
+                filenames following this option will be used.""")
 P_batch_newref.add_argument('-f', '--fasta',
         help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
 P_batch_newref.add_argument('-t', '--targets', #required=True,
