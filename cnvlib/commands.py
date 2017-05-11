@@ -66,7 +66,6 @@ def _cmd_batch(args):
                          (args.access,              '-g/--access'),
                          (args.annotate,            '--annotate'),
                          (args.short_names,         '--short-names'),
-                         (args.split,               '--split'),
                          (args.target_avg_size,     '--target-avg-size'),
                          (args.antitarget_avg_size, '--antitarget-avg-size'),
                          (args.antitarget_min_size, '--antitarget-min-size'),
@@ -175,9 +174,9 @@ P_batch_newref.add_argument('-n', '--normal', nargs='*',
                 filenames following this option will be used.""")
 P_batch_newref.add_argument('-f', '--fasta',
         help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
-P_batch_newref.add_argument('-t', '--targets', #required=True,
+P_batch_newref.add_argument('-t', '--targets',
         help="Target intervals (.bed or .list)")
-P_batch_newref.add_argument('-a', '--antitargets', #required=True,
+P_batch_newref.add_argument('-a', '--antitargets',
         help="Antitarget intervals (.bed or .list)")
 # For pre-processing targets
 P_batch_newref.add_argument('--annotate',
@@ -186,8 +185,6 @@ P_batch_newref.add_argument('--annotate',
                 (preferred), or BED, interval list, GFF, or similar.""")
 P_batch_newref.add_argument('--short-names', action='store_true',
         help="Reduce multi-accession bait labels to be short and consistent.")
-P_batch_newref.add_argument('--split', action='store_true', # DEPRECATED
-        help=argparse.SUPPRESS)
 P_batch_newref.add_argument('--target-avg-size', type=int,
         help="Average size of split target bins (results are approximate).")
 # For antitargets:
