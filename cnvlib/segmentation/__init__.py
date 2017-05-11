@@ -26,6 +26,14 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
     """Infer copy number segments from the given coverage table."""
     if variants:
         variants = variants.heterozygous()
+    if not threshold:
+        threshold = {'cbs': 0.0001,
+                     'flasso': 0.005,
+                     'haar': 0.001,
+                    }[method]
+    logging.info("Segmenting with method '%s', significance threshold %g",
+                 method, threshold)
+
     # XXX parallel flasso segfaults in R when run on a single chromosome
     if processes == 1 or method == 'flasso':
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
@@ -66,7 +74,7 @@ def _ds(args):
     return _do_segmentation(*args)
 
 
-def _do_segmentation(cnarr, method, threshold=None, variants=None,
+def _do_segmentation(cnarr, method, threshold, variants=None,
                     skip_low=False, skip_outliers=10,
                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
@@ -83,19 +91,15 @@ def _do_segmentation(cnarr, method, threshold=None, variants=None,
 
     seg_out = ""
     if method == 'haar':
-        threshold = threshold or 0.001
         segarr = haar.segment_haar(filtered_cn, threshold)
         segarr['gene'], segarr['weight'], segarr['depth'] = \
                 transfer_fields(segarr, cnarr)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
-        if method == 'cbs':
-            rscript = cbs.CBS_RSCRIPT
-            threshold = threshold or 0.0001
-        elif method == 'flasso':
-            rscript = flasso.FLASSO_RSCRIPT
-            threshold = threshold or 0.005
+        rscript = {'cbs': cbs.CBS_RSCRIPT,
+                   'flasso': flasso.FLASSO_RSCRIPT,
+                  }[method]
 
         filtered_cn['start'] += 1  # Convert to 1-indexed coordinates for R
         with tempfile.NamedTemporaryFile(suffix='.cnr', mode="w+t") as tmp:
