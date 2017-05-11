@@ -3,8 +3,6 @@ from __future__ import absolute_import, division, print_function
 from builtins import map, next, zip
 
 import logging
-import os.path
-import subprocess
 
 import numpy as np
 from skgenome import tabio
@@ -55,37 +53,6 @@ def unpipe_name(name):
         logging.warn("*WARNING* Ambiguous gene name %r; using %r",
                      name, new_name)
     return new_name
-
-
-def find_picard_files(file_and_dir_names):
-    """Search the given paths for 'targetcoverage' CSV files.
-
-    Per the convention we use in our Picard applets, the target coverage file
-    names end with '.targetcoverage.csv'; anti-target coverages end with
-    '.antitargetcoverage.csv'.
-    """
-    filenames = []
-    for tgt in file_and_dir_names:
-        if os.path.isdir(tgt):
-            logging.warn("Searching the given directory tree [DEPRECATED]\n"
-                         "** Instead, specify the filenames directly, using "
-                         "wildcards or the Unix command 'find'")
-            # Collect the target coverage files from this directory tree
-            fnames = subprocess.check_output(['find', tgt,
-                                              '-name', '*targetcoverage.csv']
-                                            ).splitlines()
-            if not fnames:
-                raise RuntimeError("Given directory %s does not contain any "
-                                   "'*targetcoverage.csv' files."
-                                   % tgt)
-            filenames.extend(fnames)
-        elif os.path.isfile(tgt):
-            filenames.append(tgt)
-        else:
-            raise ValueError("Given path is neither a file nor a directory: %s"
-                             % tgt)
-    filenames.sort()
-    return filenames
 
 
 # __________________________________________________________________________
