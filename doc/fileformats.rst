@@ -59,6 +59,11 @@ to do this. For best results, ensure that:
   "Derived" and the normal as "Original". Without this tag, you'll need to tell
   CNVkit which sample is which using the `-i` and `-n` options in each command.
 
+An `example VCF
+<https://github.com/etal/cnvkit/blob/master/test/formats/na12878_na12882_mix.vcf?raw=true>`_
+constructed from the 1000 Genomes samples NA12878 and NA12882 is included in
+CNVkit's test suite.
+
 
 Target and antitarget bin-level coverages (.cnn)
 ------------------------------------------------
