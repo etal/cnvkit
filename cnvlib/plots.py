@@ -150,7 +150,7 @@ def gene_coords_by_name(probes, names):
     """
     # Create an index of gene names
     gene_index = collections.defaultdict(set)
-    for i, gene in enumerate(probes['gene']):
+    for i, gene in enumerate(probes['gene'].fillna('')):
         for gene_name in gene.split(','):
             if gene_name in names:
                 gene_index[gene_name].add(i)
@@ -166,7 +166,7 @@ def gene_coords_by_name(probes, names):
         chrom = core.check_unique(gene_probes['chromosome'], name)
         # Deduce the unique set of gene names for this region
         orig_names = set()
-        for oname in set(gene_probes['gene']):
+        for oname in set(gene_probes['gene'].fillna('')):
             orig_names.update(oname.split(','))
         all_coords[chrom][start, end].update(orig_names)
     # Consolidate each region's gene names into a string
