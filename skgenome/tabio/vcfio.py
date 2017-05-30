@@ -201,7 +201,7 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
                 raise
         else:
             # Assume unpaired tumor; take DP, AF from INFO (e.g. LoFreq)
-            depth = record.info.get('DP', 0.0)
+            depth = record.info.get('DP', 0.0) if "DP" in record.info else 0.0
             if 'AF' in record.info:
                 alt_freq = record.info['AF']
                 alt_count = int(round(alt_freq * depth))
@@ -216,7 +216,7 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
                 alt_count = 0
                 zygosity = 0.0
 
-        is_som = bool(record.info.get("SOMATIC"))
+        is_som = "SOMATIC" in record.info and bool(record.info.get("SOMATIC"))
         # Split multiallelics?
         # XXX Ensure sample genotypes are handled properly
         start = record.start
