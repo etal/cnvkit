@@ -300,7 +300,7 @@ class CommandTests(unittest.TestCase):
         sample_ids = list(map(core.fbase, fnames))
         nrows = linecount(fnames[0]) - 1
         import sys
-        for fmt_key, header2 in (('cdt', 1), ('jtv', 0)):
+        for fmt_key, header2 in (('cdt', 2), ('jtv', 0)):
             table = export.merge_samples(fnames)
             formatter = export.EXPORT_FORMATS[fmt_key]
             _oh, outrows = formatter(sample_ids, table)
