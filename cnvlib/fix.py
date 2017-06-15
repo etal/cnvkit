@@ -21,18 +21,29 @@ def do_fix(target_raw, antitarget_raw, reference,
     anti_cnarr = load_adjust_coverages(antitarget_raw, reference, False,
                                        do_gc, False, do_rmask)
     if len(anti_cnarr):
-        # Down-weight the more variable probe set (targets or antitargets)
-        tgt_iqr = descriptives.interquartile_range(cnarr.drop_low_coverage().residuals())
-        anti_iqr = descriptives.interquartile_range(anti_cnarr.drop_low_coverage().residuals())
-        iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
-        if iqr_ratio > 1:
-            logging.info("Targets are %.2f x more variable than antitargets",
-                         iqr_ratio)
-            cnarr["weight"] /= iqr_ratio
+        anti_resid = anti_cnarr.drop_low_coverage().residuals()
+        frac_anti_low = 1 - (len(anti_resid) / len(anti_cnarr))
+        if frac_anti_low > .5:
+            # Off-target bins are mostly garbage -- skip reweighting
+            logging.warn("WARNING: Most antitarget bins ({:.2f}%, {:d}/{:d}) "
+                         "have low or no coverage; is this amplicon/WGS?"
+                         .format(100 * frac_anti_low,
+                                 len(anti_cnarr) - len(anti_resid),
+                                 len(anti_cnarr)))
         else:
-            logging.info("Antitargets are %.2f x more variable than targets",
-                         1. / iqr_ratio)
-            anti_cnarr["weight"] *= iqr_ratio
+            # Down-weight the more variable probe set (targets or antitargets)
+            tgt_iqr = descriptives.interquartile_range(cnarr.drop_low_coverage()
+                                                       .residuals())
+            anti_iqr = descriptives.interquartile_range(anti_resid)
+            iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
+            if iqr_ratio > 1:
+                logging.info("Targets are %.2f x more variable than antitargets",
+                             iqr_ratio)
+                cnarr["weight"] /= iqr_ratio
+            else:
+                logging.info("Antitargets are %.2f x more variable than targets",
+                             1. / iqr_ratio)
+                anti_cnarr["weight"] *= iqr_ratio
         # Combine target and antitarget bins
         cnarr.add(anti_cnarr)
     cnarr.center_all(skip_low=True)
@@ -101,6 +112,8 @@ def mask_bad_bins(cnarr):
     mask = ((cnarr['log2'] < params.MIN_REF_COVERAGE) |
             (cnarr['log2'] > -params.MIN_REF_COVERAGE) |
             (cnarr['spread'] > params.MAX_REF_SPREAD))
+    if 'depth' in cnarr:
+        mask |= cnarr['depth'] == 0
     return mask
 
 

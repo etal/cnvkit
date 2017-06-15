@@ -161,6 +161,8 @@ class CopyNumArray(GenomicArray):
         """
         min_cvg = params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
         drop_idx = self.data['log2'] < min_cvg
+        if 'depth' in self:
+            drop_idx |= self.data['depth'] == 0
         if verbose and drop_idx.any():
             logging.info("Dropped %d low-coverage bins",
                          drop_idx.sum())
