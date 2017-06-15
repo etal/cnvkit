@@ -203,9 +203,12 @@ class GenomicArray(object):
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
         with warnings.catch_warnings():
             # NB: We're not using the deprecated part of this pandas method
+            # (as_indexer introduced before 0.18.1, deprecated 0.20.1)
             warnings.simplefilter("ignore", UserWarning)
-            is_auto = self.chromosome.str.match(r"(chr)?\d+$",
-                                                as_indexer=True, na=False)
+            kwargs = dict(na=False)
+            if pd.__version__ < "0.20.1":
+                kwargs["as_indexer"] = True
+            is_auto = self.chromosome.str.match(r"(chr)?\d+$", **kwargs)
         if not is_auto.any():
             # The autosomes, if any, are not named with plain integers
             return self
