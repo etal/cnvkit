@@ -64,8 +64,8 @@ class CopyNumArray(GenomicArray):
     def by_gene(self, ignore=params.IGNORE_GENE_NAMES):
         """Iterate over probes grouped by gene name.
 
-        Group each series of intergenic bins as a "Background" gene; any
-        "Background" bins within a gene are grouped with that gene.
+        Group each series of intergenic bins as an "Antitarget" gene; any
+        "Antitarget" bins within a gene are grouped with that gene.
 
         Bins' gene names are split on commas to accommodate overlapping genes
         and bins that cover multiple genes.
@@ -73,8 +73,8 @@ class CopyNumArray(GenomicArray):
         Parameters
         ----------
         ignore : list or tuple of str
-            Gene names to treat as "Background" bins instead of real genes,
-            grouping these bins with the surrounding gene or background region.
+            Gene names to treat as "Antitarget" bins instead of real genes,
+            grouping these bins with the surrounding gene or intergenic region.
             These bins will still retain their name in the output.
 
         Yields
@@ -82,11 +82,12 @@ class CopyNumArray(GenomicArray):
         tuple
             Pairs of: (gene name, CNA of rows with same name)
         """
+        ignore += params.ANTITARGET_ALIASES
         start_idx = end_idx = None
         for _chrom, subgary in self.by_chromosome():
             prev_idx = 0
             for gene, gene_idx in subgary._get_gene_map().items():
-                if not (gene == 'Background' or gene in ignore):
+                if gene not in ignore:
                     if not len(gene_idx):
                         logging.warn("Specified gene name somehow missing: %s",
                                      gene)
@@ -95,14 +96,14 @@ class CopyNumArray(GenomicArray):
                     end_idx = gene_idx[-1] + 1
                     if prev_idx < start_idx:
                         # Include intergenic regions
-                        yield "Background", subgary.as_dataframe(
+                        yield params.ANTITARGET_NAME, subgary.as_dataframe(
                                 subgary.data.iloc[prev_idx:start_idx])
                     yield gene, subgary.as_dataframe(
                             subgary.data.iloc[start_idx:end_idx])
                     prev_idx = end_idx
             if prev_idx < len(subgary) - 1:
                 # Include the telomere
-                yield "Background", subgary.as_dataframe(
+                yield params.ANTITARGET_NAME, subgary.as_dataframe(
                         subgary.data.iloc[prev_idx:])
 
     # Manipulation
@@ -180,11 +181,11 @@ class CopyNumArray(GenomicArray):
             this is the biweight location, but you might want median, mean, max,
             min or something else in some cases.
         squash_background : bool
-            If True, also reduce consecutive "Background" bins into a single
-            bin. Otherwise, keep "Background" and ignored bins as they are in
+            If True, also reduce consecutive "Antitarget" bins into a single
+            bin. Otherwise, keep "Antitarget" and ignored bins as they are in
             the output.
         ignore : list or tuple of str
-            Bin names to be treated as "Background" instead of as unique genes.
+            Bin names to be treated as "Antitarget" instead of as unique genes.
 
         Return
         ------
@@ -212,7 +213,7 @@ class CopyNumArray(GenomicArray):
 
         outrows = []
         for name, subarr in self.by_gene(ignore):
-            if name == 'Background' and not squash_background:
+            if name == 'Antitarget' and not squash_background:
                 outrows.extend(subarr.data.itertuples(index=False))
             else:
                 outrows.append(squash_rows(name, subarr.data))

@@ -10,3 +10,5 @@ INSERT_SIZE = 250
 # Target/bin names that are not meaningful gene names
 # (In some UCSF panels, "CGH" probes denote selected intergenic regions)
 IGNORE_GENE_NAMES = ("-", ".", "CGH")
+ANTITARGET_NAME = "Antitarget"
+ANTITARGET_ALIASES = (ANTITARGET_NAME, "Background")

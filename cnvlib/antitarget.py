@@ -7,7 +7,7 @@ import re
 
 from skgenome import GenomicArray as GA
 
-from .params import INSERT_SIZE, MIN_REF_COVERAGE
+from .params import INSERT_SIZE, MIN_REF_COVERAGE, ANTITARGET_NAME
 
 
 def do_antitarget(targets, access=None, avg_bin_size=150000,
@@ -63,7 +63,7 @@ def get_background(targets, accessible, avg_bin_size, min_bin_size):
     bg_arr = (accessible.resize_ranges(-pad_size)
               .subtract(targets.resize_ranges(pad_size))
               .subdivide(avg_bin_size, min_bin_size))
-    bg_arr['gene'] = 'Background'
+    bg_arr['gene'] = ANTITARGET_NAME
     return bg_arr
 
 

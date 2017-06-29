@@ -23,7 +23,7 @@ def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
 
     Return a dict of chromosomes to a list of tuples: (gene name, start, end).
     """
-    ignore += ("Background",)
+    ignore += params.ANTITARGET_ALIASES
     # Tally the start & end points for each targeted gene; group by chromosome
     gene_probes = collections.defaultdict(lambda: collections.defaultdict(list))
     for row in all_probes:
@@ -107,8 +107,9 @@ def group_by_genes(cnarr, skip_low):
 
         [(gene, chrom, start, end, [coverages]), ...]
     """
+    ignore = ('', np.nan) + params.ANTITARGET_ALIASES
     for gene, rows in cnarr.by_gene():
-        if not rows or gene in ("Background", '', np.nan):
+        if not rows or gene in ignore:
             continue
         segmean = metrics.segment_mean(rows, skip_low)
         if segmean is None:

@@ -176,7 +176,7 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     if not len(cnarr):
         return [], [], []
 
-    ignore += ("Background",)
+    ignore += params.ANTITARGET_ALIASES
     if 'weight' not in cnarr:
         cnarr['weight'] = 1
     if 'depth' not in cnarr:

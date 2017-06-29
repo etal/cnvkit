@@ -474,7 +474,7 @@ class GenomicArray(object):
             where the result is True.
         **kwargs : string
             Keyword arguments like ``chromosome="chr7"`` or
-            ``gene="Background"``, which will keep rows where the keyed field
+            ``gene="Antitarget"``, which will keep rows where the keyed field
             equals the specified value.
 
         Return

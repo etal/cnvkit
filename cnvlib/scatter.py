@@ -11,7 +11,7 @@ import numpy as np
 from matplotlib import pyplot
 from skgenome.rangelabel import unpack_range
 
-from . import core, plots, smoothing
+from . import core, params, plots, smoothing
 from .plots import MB
 from .cnary import CopyNumArray as CNA
 
@@ -341,7 +341,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, background_marker=None,
         w = 46 * probes['weight'] ** 2 + 2
     else:
         w = np.repeat(30, len(x))
-    is_bg = (probes['gene'] == 'Background')
+    is_bg = (probes['gene'] == params.ANTITARGET_NAME)
 
     # Configure axes
     # TODO - use segment y-values if probes not given

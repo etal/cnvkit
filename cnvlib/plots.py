@@ -89,6 +89,7 @@ def test_loh(bins, alpha=0.0025):
     difference in means.
     """
     # TODO - this doesn't work right if there are many shifted regions
+    #   -> just use cn1!=cn2 if those columns are present
     try:
         from scipy import stats
     except ImportError:
@@ -186,7 +187,7 @@ def gene_coords_by_range(probes, chrom, start, end,
     dict
         Of: {chromosome: [(start, end, gene), ...]}
     """
-    ignore += ('Background',)
+    ignore += params.ANTITARGET_ALIASES
     # Tabulate the genes in the selected region
     genes = collections.OrderedDict()
     for row in probes.in_range(chrom, start, end):

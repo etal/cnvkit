@@ -229,10 +229,11 @@ def warn_bad_bins(cnarr, max_name_width=50):
     Prints a formatted table to stderr.
     """
     bad_bins = cnarr[fix.mask_bad_bins(cnarr)]
-    fg_index = (bad_bins['gene'] != 'Background')
+    fg_index = ~bad_bins['gene'].isin(params.ANTITARGET_ALIASES)
     fg_bad_bins = bad_bins[fg_index]
     if len(fg_bad_bins) > 0:
-        bad_pct = 100 * len(fg_bad_bins) / sum(cnarr['gene'] != 'Background')
+        bad_pct = (100 * len(fg_bad_bins)
+                   / sum(~cnarr['gene'].isin(params.ANTITARGET_ALIASES)))
         logging.info("Targets: %d (%s) bins failed filters:",
                      len(fg_bad_bins), "%.4f" % bad_pct + '%')
         gene_cols = min(max_name_width, max(map(len, fg_bad_bins['gene'])))
@@ -256,10 +257,11 @@ def warn_bad_bins(cnarr, max_name_width=50):
                              gene.ljust(gene_cols), label.ljust(chrom_cols),
                              probe.log2, probe.spread)
 
-    # Count the number of BG bins dropped, too (names are all "Background")
+    # Count the number of BG bins dropped, too (names are all "Antitarget")
     bg_bad_bins = bad_bins[~fg_index]
     if len(bg_bad_bins) > 0:
-        bad_pct = 100 * len(bg_bad_bins) / sum(cnarr['gene'] == 'Background')
+        bad_pct = (100 * len(bg_bad_bins)
+                   / sum(cnarr['gene'].isin(params.ANTITARGET_ALIASES)))
         logging.info("Antitargets: %d (%s) bins failed filters",
                      len(bg_bad_bins), "%.4f" % bad_pct + '%')
 
@@ -302,7 +304,7 @@ def fasta_extract_regions(fa_fname, intervals):
 
 def reference2regions(refarr):
     """Split reference into target and antitarget regions."""
-    is_bg = (refarr['gene'] == 'Background')
+    is_bg = (refarr['gene'].isin(params.ANTITARGET_ALIASES))
     regions = GA(refarr.data.loc[:, ('chromosome', 'start', 'end', 'gene')],
                  {'sample_id': 'reference'})
     targets = regions[~is_bg]
