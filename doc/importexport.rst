@@ -58,7 +58,7 @@ Procedure:
 import-seg
 ----------
 
-Convert a file in the `SEG format <https://www.broadinstitute.org/igv/SEG>`_
+Convert a file in the `SEG format <https://software.broadinstitute.org/software/igv/SEG>`_
 (e.g. the output of standard CBS or the GenePattern server) into one or more
 CNVkit .cns files.
 
