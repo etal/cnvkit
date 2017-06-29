@@ -170,7 +170,9 @@ class CopyNumArray(GenomicArray):
         return self[~drop_idx]
 
     def squash_genes(self, summary_func=descriptives.biweight_location,
-                     squash_background=False, ignore=params.IGNORE_GENE_NAMES):
+                     squash_antitarget=False, ignore=params.IGNORE_GENE_NAMES,
+                     squash_background=None, # DEPRECATED in 0.9.0
+                    ):
         """Combine consecutive bins with the same targeted gene name.
 
         Parameters
@@ -180,7 +182,7 @@ class CopyNumArray(GenomicArray):
             new log2 value for a "squashed" (i.e. reduced) region. By default
             this is the biweight location, but you might want median, mean, max,
             min or something else in some cases.
-        squash_background : bool
+        squash_antitarget : bool
             If True, also reduce consecutive "Antitarget" bins into a single
             bin. Otherwise, keep "Antitarget" and ignored bins as they are in
             the output.
@@ -193,6 +195,18 @@ class CopyNumArray(GenomicArray):
             Another, usually smaller, copy of `self` with each gene's bins
             reduced to a single bin with appropriate values.
         """
+        # Handle the deprecated argument
+        if squash_background is not None:
+            if squash_antitarget == squash_background:
+                logging.warn("Keyword argument squash_background=%r was given; "
+                            "use squash_antitarget instead.", squash_background)
+                squash_antitarget = squash_background
+            else:
+                raise ValueError(
+                    "Deprecated keyword argument squash_background=%r was given, "
+                    "but conflicts with its successor squash_antitarget=%r"
+                    % (squash_background, squash_antitarget))
+
         def squash_rows(name, rows):
             """Combine multiple rows (for the same gene) into one row."""
             if len(rows) == 1:
@@ -213,7 +227,7 @@ class CopyNumArray(GenomicArray):
 
         outrows = []
         for name, subarr in self.by_gene(ignore):
-            if name == 'Antitarget' and not squash_background:
+            if name in params.ANTITARGET_ALIASES and not squash_antitarget:
                 outrows.extend(subarr.data.itertuples(index=False))
             else:
                 outrows.append(squash_rows(name, subarr.data))

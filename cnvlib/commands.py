@@ -285,7 +285,7 @@ P_access.set_defaults(func=_cmd_access)
 do_antitarget = public(antitarget.do_antitarget)
 
 def _cmd_antitarget(args):
-    """Derive a background/antitarget BED file from a target BED file."""
+    """Derive off-target ("antitarget") bins from target regions."""
     targets = tabio.read_auto(args.targets)
     access = tabio.read_auto(args.access) if args.access else None
     out_arr = antitarget.do_antitarget(targets, access, args.avg_size,
@@ -841,7 +841,7 @@ def _cmd_scatter(args):
             for region in tabio.read_auto(args.range_list).coords():
                 try:
                     scatter.do_scatter(cnarr, segarr, varr, region, None,
-                                       args.background_marker, args.trend,
+                                       args.antitarget_marker, args.trend,
                                        args.width, args.y_min, args.y_max,
                                        ("%s %s" % (args.title,
                                                    region.chromosome)
@@ -855,7 +855,7 @@ def _cmd_scatter(args):
                 pyplot.close()
     else:
         scatter.do_scatter(cnarr, segarr, varr, args.chromosome, args.gene,
-                           args.background_marker, args.trend, args.width,
+                           args.antitarget_marker, args.trend, args.width,
                            args.y_min, args.y_max, args.title,
                            args.segment_color)
         if args.output:
@@ -893,11 +893,15 @@ P_scatter.add_argument('-o', '--output', metavar="FILENAME",
         help="Output PDF file name.")
 
 P_scatter_aes = P_scatter.add_argument_group("Plot aesthetics")
-P_scatter_aes.add_argument('-b', '--background-marker', metavar='CHARACTER',
-        default=None,
+P_scatter_aes.add_argument('-a', '--antitarget-marker',
+        '-b', '--background-marker', # DEPRECATED in 0.9.0
+        metavar='CHARACTER', dest='antitarget_marker', default=None,
         help="""Plot antitargets using this symbol when plotting in a selected
                 chromosomal region (-g/--gene or -c/--chromosome).
                 [Default: same as targets]""")
+# Alternative shim (enable in 0.9.1)
+# P_scatter_aes.add_argument('-b', '--background-marker',
+#       dest='antitarget_marker', help=argparse.SUPPRESS)
 P_scatter_aes.add_argument('--segment-color', default=scatter.SEG_COLOR,
         help="""Plot segment lines in this color. Value can be any string
                 accepted by matplotlib, e.g. 'red' or '#CC0000'.""")
