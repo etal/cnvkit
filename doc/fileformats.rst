@@ -70,8 +70,8 @@ Target and antitarget bin-level coverages (.cnn)
 
 CNVkit saves its information in a tabular format similar to BED, but with
 additional columns.  Each row in the file indicates an on-target or off-target
-(a.k.a. "antitarget" or "background") bin. Genomic coordinates are 0-indexed,
-like BED. Column names are shown as the first line of the file.
+(a.k.a. "antitarget") bin. Genomic coordinates are 0-indexed, like BED.
+Column names are shown as the first line of the file.
 
 In the output of the :ref:`coverage` command, the columns are:
 

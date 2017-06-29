@@ -193,7 +193,7 @@ antitarget
 
 Given a "target" BED file that lists the chromosomal coordinates of the tiled
 regions used for targeted resequencing, derive a BED file
-off-target/"antitarget"/"background" regions.
+off-target/"antitarget" regions.
 
 ::
 
@@ -226,6 +226,10 @@ CalculateHsMetrics in the Picard suite (http://picard.sourceforge.net/), or from
 the console output of the CNVkit :ref:`coverage` command when run on the target
 regions.
 
+.. note::
+    The generated off-target bins are given the label "Antitarget" in CNVkit
+    versions 0.9.0 and later. In earlier versions, the label "Background" was
+    used -- CNVkit will still accept this label for compatibility.
 
 
 .. _coverage:
@@ -242,8 +246,8 @@ interval size.
 
 ::
 
-    cnvkit.py coverage Sample.bam Tiled.bed -o Sample.targetcoverage.cnn
-    cnvkit.py coverage Sample.bam Background.bed -o Sample.antitargetcoverage.cnn
+    cnvkit.py coverage Sample.bam targets.bed -o Sample.targetcoverage.cnn
+    cnvkit.py coverage Sample.bam antitargets.bed -o Sample.antitargetcoverage.cnn
 
 Summary statistics of read counts and their binning are printed to standard
 error when CNVkit finishes calculating the coverage of each sample (through
@@ -359,7 +363,7 @@ still computes the GC content of each region if the reference genome is given.
 
 ::
 
-    cnvkit.py reference -o FlatReference.cnn -f ucsc.hg19.fa -t Tiled.bed -a Background.bed
+    cnvkit.py reference -o FlatReference.cnn -f ucsc.hg19.fa -t targets.bed -a antitargets.bed
 
 Possible uses for a flat reference include:
 
