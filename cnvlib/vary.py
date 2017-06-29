@@ -1,6 +1,7 @@
 """An array of genomic intervals, treated as variant loci."""
 from __future__ import absolute_import, division, print_function
 from builtins import str
+import logging
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,7 @@ class VariantArray(GenomicArray):
         GenomicArray.__init__(self, data_table, meta_dict)
 
     def baf_by_ranges(self, ranges, summary_func=np.nanmedian, above_half=None,
-                      tumor_boost=True):
+                      tumor_boost=False):
         """Aggregate variant (b-allele) frequencies in each given bin.
 
         Get the average BAF in each of the bins of another genomic array:
@@ -43,6 +44,10 @@ class VariantArray(GenomicArray):
             Average b-allele frequency in each range; same length as `ranges`.
             May contain NaN values where no variants overlap a range.
         """
+        if 'alt_freq' not in self:
+            logging.warn("VCF has no allele frequencies for BAF calculation")
+            return pd.Series(np.repeat(np.nan, len(ranges)))
+
         def summarize(vals):
             return summary_func(_mirrored_baf(vals, above_half))
 
@@ -135,13 +140,10 @@ class VariantArray(GenomicArray):
 
         See: TumorBoost, Bengtsson et al. 2010
         """
-        if "n_alt_freq" in self:
-            n_freqs = self["n_alt_freq"]
-        else:
-            raise ValueError("TumorBoost requires a paired normal sample in "
-                             "the VCF.")
-        t_freqs = self["alt_freq"]
-        return _tumor_boost(t_freqs, n_freqs)
+        if not ("alt_freq" in self and "n_alt_freq" in self):
+            raise ValueError("TumorBoost requires a matched tumor and normal "
+                             "pair of samples in the VCF.")
+        return _tumor_boost(self["alt_freq"],  self["n_alt_freq"])
 
 
 
@@ -178,6 +180,7 @@ def _allele_specific_copy_numbers(segarr, varr, ploidy=2):
 
     See: PSCBS, Bentsson et al. 2011
     """
+    # TODO fix ploidy on allosomes
     seg_depths = ploidy * np.exp2(segarr["log2"])
     seg_bafs = varr.baf_by_ranges(segarr, above_half=True)
     cn1 = 0.5 * (1 - seg_bafs) * seg_depths

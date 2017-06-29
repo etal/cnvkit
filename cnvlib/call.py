@@ -24,7 +24,7 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
                 outarr = getattr(segfilters, filt)(outarr)
                 filters.remove(filt)
 
-    if variants and 'n_alt_freq' in variants:
+    if variants:
         outarr["baf"] = variants.baf_by_ranges(outarr)
 
     if purity and purity < 1.0:

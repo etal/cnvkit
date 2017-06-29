@@ -126,7 +126,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         raise ValueError("Unknown method %r" % method)
 
     segarr.meta = cnarr.meta.copy()
-    if variants and 'n_alt_freq' in variants:
+    if variants:
         # Re-segment the variant allele freqs within each segment
         newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
                    for segment, subvarr in variants.by_ranges(segarr)]
