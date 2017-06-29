@@ -207,12 +207,15 @@ class CommandTests(unittest.TestCase):
         # Each filter individually, then all filters together
         for filters in (['ampdel'], ['cn'], ['ci'], ['sem'],
                         ['sem', 'cn', 'ampdel'],
-                        ['ci', 'cn', 'ampdel']):
+                        ['ci', 'cn']):
             result = commands.do_call(segments, variants, method="threshold",
                                       purity=.9, is_reference_male=True,
                                       is_sample_female=True, filters=filters)
             self.assertLessEqual(len(result), len(segments))
-            self.assertLessEqual(len(segments.chromosome.unique()), len(result))
+            if 'ampdel' not in filters:
+                # At least 1 segment per chromosome remains
+                self.assertLessEqual(len(segments.chromosome.unique()),
+                                     len(result))
             for colname in 'baf', 'cn', 'cn1', 'cn2':
                 self.assertIn(colname, result)
 

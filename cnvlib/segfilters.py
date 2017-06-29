@@ -99,14 +99,15 @@ def ampdel(segarr):
     - CNAs of lesser degree are not reported
 
     This is recommended only for selecting segments corresponding to
-    actionable, usually focal, CNAs. Real and potentially informative but
-    lower-level CNAs will be merged together.
+    actionable, usually focal, CNAs. Any real and potentially informative but
+    lower-level CNAs will be dropped.
     """
     levels = pd.Series(np.zeros(len(segarr)))
     levels[segarr['cn'] == 0] = -1
     levels[segarr['cn'] >= 5] = 1
     # or: segarr['log2'] >= np.log2(2.5)
-    return squash_by_groups(segarr, levels)
+    cnarr = squash_by_groups(segarr, levels)
+    return cnarr[(cnarr['cn'] == 0) | (cnarr['cn'] >= 5)]
 
 
 @require_column('depth')
