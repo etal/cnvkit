@@ -208,14 +208,22 @@ the expected ploidy, based on the sample and reference sex (see :doc:`sex`).
 This correction can be disabled with the option ``--no-shift-xy``.
 
 
+.. _plotcustom:
+
 Customizing plots
 -----------------
 
 The plots generated with the :ref:`scatter` and :ref:`heatmap` commands use the
-Python plotting library matplotlib. You can customize font sizes and other
-aspects of the plots by `configuring matplotlib
-<http://matplotlib.org/users/customizing.html>`_.
+Python plotting library matplotlib.
 
+To quickly adjust the displayed area of the genome in a plot, run either
+plotting command without the `-o` option to generate an interactive plot in a
+new window. You can then resize that plot up to the full size of your screen,
+use the plot window's selection mode to select a smaller area of the genome, and
+use the plot window's save button to save the plot in your preferred format.
+
+You can customize font sizes and other aspects of the plots by `configuring
+matplotlib <http://matplotlib.org/users/customizing.html>`_.
 If you're running CNVkit on the command line and not using it as a Python
 library, then you can just create a file in your home directory (or the same
 directory as ``cnvkit.py``) called ``.matplotlibrc``.  For example, to shrink
@@ -224,5 +232,18 @@ file::
 
     axes.labelsize      : small
 
-Alternatively, use the ``cnvlib`` module in Python (see :doc:`cnvlib`) to create
-the plots and then modify the plot elements using matplotlib.pyplot.
+For more control, in the Python intepreter (or a script, or a Jupyter notebook),
+import the :doc:`cnvlib` module and call the `do_scatter` or `do_heatmap`
+function to create a plot. Then you can use matplotlib.pyplot to get the current
+axis and modify the plot elements, change font sizes, or anything else you
+like::
+
+    from glob import glob
+    from matplotlib import pyplot as plt
+    import cnvlib
+
+    segments = map(cnvlib.read, glob("*.cns"))
+    ax = cnvlib.do_heatmap(segments)
+    ax.set_title("All my samples")
+    plt.rcParams["font.size"] = 9.0
+    plt.show()
