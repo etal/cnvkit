@@ -59,6 +59,7 @@ Python API
     :maxdepth: 2
 
     cnvlib
+    skgenome
 
 
 Citation

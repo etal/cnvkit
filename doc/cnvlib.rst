@@ -1,5 +1,5 @@
-Python API (cnvlib package)
-===========================
+cnvlib package
+==============
 
 Module ``cnvlib`` contents
 --------------------------
@@ -24,19 +24,11 @@ CNVkit commands within Python, see :ref:`api_commands`.
 Core classes
 ------------
 
-The core objects used throughout CNVkit. The base class is GenomicArray. All
-of these classes wrap a `pandas <http://pandas.pydata.org/>`_ DataFrame instance
-accessible through the ``.data`` attribute which can be used for any
-manipulations that aren't already provided by methods in the wrapper class.
-
-``gary``
-~~~~~~~~~
-
-.. automodule:: cnvlib.genome.gary
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
+The core objects used throughout CNVkit. The base class is GenomicArray from
+:doc:`skgenome`. All of these classes wrap a `pandas
+<http://pandas.pydata.org/>`_ DataFrame instance, which is accessible through
+the ``.data`` attribute and can be used for any manipulations that aren't
+already provided by methods in the wrapper class.
 
 ``cnary``
 ~~~~~~~~~
@@ -47,23 +39,9 @@ manipulations that aren't already provided by methods in the wrapper class.
     :show-inheritance:
 
 ``vary``
-~~~~~~~~~
+~~~~~~~~
 
 .. automodule:: cnvlib.vary
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-.. _api_tabio:
-
-Tabular file I/O
-----------------
-
-``tabio``
-~~~~~~~~~
-
-.. automodule:: cnvlib.tabio
     :members:
     :undoc-members:
     :show-inheritance:
@@ -89,7 +67,7 @@ The following modules implement lower-level functionality specific to each of
 the CNVkit sub-commands.
 
 ``access``
-~~~~~~~~~~~~~~
+~~~~~~~~~~
 
 .. automodule:: cnvlib.access
     :members:
@@ -104,8 +82,25 @@ the CNVkit sub-commands.
     :undoc-members:
     :show-inheritance:
 
+``autobin``
+~~~~~~~~~~~
+
+.. automodule:: cnvlib.autobin
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``batch``
+~~~~~~~~~
+
+.. automodule:: cnvlib.batch
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 ``call``
-~~~~~~~~~~~~
+~~~~~~~~
 
 .. automodule:: cnvlib.call
     :members:
@@ -144,6 +139,14 @@ the CNVkit sub-commands.
     :undoc-members:
     :show-inheritance:
 
+``heatmap``
+~~~~~~~~~~~
+
+.. automodule:: cnvlib.heatmap
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 ``importers``
 ~~~~~~~~~~~~~
 
@@ -161,7 +164,7 @@ the CNVkit sub-commands.
     :show-inheritance:
 
 ``reference``
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 .. automodule:: cnvlib.reference
     :members:
@@ -169,11 +172,19 @@ the CNVkit sub-commands.
     :show-inheritance:
 
 ``reports``
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
 
 Supports the sub-commands :ref:`breaks` and :ref:`gainloss`.
 
 .. automodule:: cnvlib.reports
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``scatter``
+~~~~~~~~~~~
+
+.. automodule:: cnvlib.scatter
     :members:
     :undoc-members:
     :show-inheritance:
@@ -187,7 +198,7 @@ Supports the sub-commands :ref:`breaks` and :ref:`gainloss`.
     :show-inheritance:
 
 ``target``
-~~~~~~~~~~~~~~
+~~~~~~~~~~
 
 .. automodule:: cnvlib.target
     :members:
@@ -199,6 +210,14 @@ Supports the sub-commands :ref:`breaks` and :ref:`gainloss`.
 
 Helper modules
 --------------
+
+``cmdutil``
+~~~~~~~~~~~
+
+.. automodule:: cnvlib.cmdutil
+    :members:
+    :undoc-members:
+    :show-inheritance:
 
 ``core``
 ~~~~~~~~
@@ -243,7 +262,7 @@ Defines several constants used in the pipeline.
     :show-inheritance:
 
 ``samutil``
-~~~~~~~~~~~~
+~~~~~~~~~~~
 
 .. automodule:: cnvlib.samutil
     :members:
