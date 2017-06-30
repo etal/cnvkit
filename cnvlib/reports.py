@@ -21,7 +21,10 @@ iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
     """Tally genomic locations of each targeted gene.
 
-    Return a dict of chromosomes to a list of tuples: (gene name, start, end).
+    Return a dict of chromosomes to a list of tuples: (gene name, starts, end),
+    where gene name is a string, starts is a sorted list of probe start
+    positions, and end is the last probe's end position as an integer. (The
+    endpoints are redundant since probes are adjacent.)
     """
     ignore += params.ANTITARGET_ALIASES
     # Tally the start & end points for each targeted gene; group by chromosome
