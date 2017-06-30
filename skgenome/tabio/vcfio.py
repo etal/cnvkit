@@ -182,7 +182,7 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
     cnt_reject = 0  # For logging
     for record in records:
         if (skip_reject and record.filter and len(record.filter) > 0
-            and len(set(record.filter) - {'PASS', '.'})):
+            and len(set(record.filter) - {'.', 'PASS', 'KEEP'})):
             cnt_reject += 1
             continue
 
