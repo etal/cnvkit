@@ -138,8 +138,8 @@ p2-all.seg: $(picard_segs)
 p2-all.bed: $(picard_segs:.cns=.call.cns)
 	$(cnvkit) export bed $^ -y --show variant -o $@
 
-p2-9_2.vcf: build/p2-9_2.call.cns
-	$(cnvkit) export vcf $^ -y -o $@
+p2-9_2.vcf: build/p2-9_2.cnr build/p2-9_2.call.cns
+	$(cnvkit) export vcf -o $@ -y --cnr $^ -y -o $@
 
 p2-9_2.theta2.input: build/p2-9_2.cns build/reference-picard.cnn
 	$(cnvkit) export theta $< -r $(lastword $^) -o $@

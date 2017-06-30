@@ -1480,11 +1480,12 @@ def _cmd_export_vcf(args):
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
     already been adjusted to integer absolute values using the 'call' command.
     """
-    segments = read_cna(args.segments)
-    is_sample_female = verify_sample_sex(segments, args.sample_sex,
+    segarr = read_cna(args.segments)
+    cnarr = read_cna(args.cnr) if args.cnr else None
+    is_sample_female = verify_sample_sex(segarr, args.sample_sex,
                                          args.male_reference)
-    header, body = export.export_vcf(segments, args.ploidy, args.male_reference,
-                                     is_sample_female, args.sample_id)
+    header, body = export.export_vcf(segarr, args.ploidy, args.male_reference,
+                                     is_sample_female, args.sample_id, cnarr)
     write_text(args.output, header, body)
 
 P_export_vcf = P_export_subparsers.add_parser('vcf',
@@ -1492,6 +1493,11 @@ P_export_vcf = P_export_subparsers.add_parser('vcf',
 P_export_vcf.add_argument('segments', #nargs='1',
         help="""Segmented copy ratio data file (*.cns), the output of the
                 'segment' or 'call' sub-commands.""")
+# ENH?: Incorporate left/right CI into .cns via 'segment' or 'segmetrics',
+#   potentially calculated another way besides adjacent bin boundaries
+P_export_vcf.add_argument("--cnr",
+        help="""Bin-level copy ratios (*.cnr). Used to indicate fuzzy boundaries
+                for segments in the output VCF via the CIPOS and CIEND tags.""")
 P_export_vcf.add_argument("-i", "--sample-id", metavar="LABEL",
         help="""Sample name to write in the genotype field of the output VCF file.
                 [Default: use the sample ID, taken from the file name]""")

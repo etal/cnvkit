@@ -224,7 +224,7 @@ VCF_HEADER = """\
 
 
 def export_vcf(segments, ploidy, is_reference_male, is_sample_female,
-               sample_id=None):
+               sample_id=None, cnarr=None):
     """Convert segments to Variant Call Format.
 
     For now, only 1 sample per VCF. (Overlapping CNVs seem tricky.)
@@ -233,6 +233,8 @@ def export_vcf(segments, ploidy, is_reference_male, is_sample_female,
     """
     vcf_columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER",
                    "INFO", "FORMAT", sample_id or segments.sample_id]
+    if cnarr:
+        segments = assign_ci_start_end(segments, cnarr)
     vcf_rows = segments2vcf(segments, ploidy, is_reference_male,
                             is_sample_female)
     table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
@@ -241,13 +243,34 @@ def export_vcf(segments, ploidy, is_reference_male, is_sample_female,
     return VCF_HEADER, vcf_body
 
 
+def assign_ci_start_end(segarr, cnarr):
+    """Assign ci_start and ci_end fields to segments.
+
+    Values for each segment indicate the CI boundary points within that segment,
+    i.e. the right CI boundary for the left-side breakpoint (segment start), and
+    left CI boundary for the right-side breakpoint (segment end).
+
+    This is a little unintuitive because the CI refers to the breakpoint, not
+    the segment, but we're storing the info in an array of segments.
+
+    Calculation: Just use the boundaries of the bins left- and right-adjacent to
+    each segment breakpoint.
+    """
+    lefts_rights = ((bins.end.iat[0], bins.start.iat[-1])
+                    for _seg, bins in cnarr.by_ranges(segarr, mode="outer"))
+    ci_lefts, ci_rights = zip(*lefts_rights)
+    return segarr.as_dataframe(
+        segarr.data.assign(ci_left=ci_lefts, ci_right=ci_rights))
+
+
 def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     """Convert copy number segments to VCF records."""
     out_dframe = segments.data.loc[:, ["chromosome", "end", "log2", "probes"]]
+    out_dframe["start"] = segments.start.replace(0, 1)
+
     if "cn" in segments:
         out_dframe["ncopies"] = segments["cn"]
         abs_expect = call.absolute_expect(segments, ploidy, is_sample_female)
-
     else:
         abs_dframe = call.absolute_dataframe(segments, ploidy, 1.0,
                                              is_reference_male,
@@ -255,10 +278,6 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
         out_dframe["ncopies"] = abs_dframe["absolute"].round().astype('int')
         abs_expect = abs_dframe["expect"]
     idx_losses = (out_dframe["ncopies"] < abs_expect)
-
-    starts = segments.start.copy()
-    starts[starts == 0] = 1
-    out_dframe["start"] = starts
 
     svlen = segments.end - segments.start
     svlen[idx_losses] *= -1
@@ -269,6 +288,18 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
 
     out_dframe["format"] = "GT:GQ:CN:CNQ"
     out_dframe.loc[idx_losses, "format"] = "GT:GQ" # :CN:CNQ ?
+
+    if "ci_left" in segments and "ci_right" in segments:
+        has_ci = True
+        # Calculate fuzzy left&right coords for CIPOS and CIEND
+        left_margin = segments["ci_left"].values - segments.start.values
+        right_margin = segments.end.values - segments["ci_right"].values
+        out_dframe["ci_pos_left"] = np.r_[0, -right_margin[:-1]]
+        out_dframe["ci_pos_right"] = left_margin
+        out_dframe["ci_end_left"] = right_margin
+        out_dframe["ci_end_right"] = np.r_[left_margin[1:], 0]
+    else:
+        has_ci = False
 
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
@@ -291,16 +322,20 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
                 gt = "0/1"
             genotype = "%s:%d" % (gt, out_row.probes)
 
-        info = ";".join(["IMPRECISE",
-                         "SVTYPE=%s" % out_row.svtype,
-                         "END=%d" % out_row.end,
-                         "SVLEN=%d" % out_row.svlen,
-                         "FOLD_CHANGE=%f" % 2.0 ** out_row.log2,
-                         "FOLD_CHANGE_LOG=%f" % out_row.log2,
-                         "PROBES=%d" % out_row.probes
-                         # TODO - VCF fuzzy start/end (#72)
-                         # CIPOS=-56,20;CIEND=-10,62
-                        ])
+        fields = ["IMPRECISE",
+                  "SVTYPE=%s" % out_row.svtype,
+                  "END=%d" % out_row.end,
+                  "SVLEN=%d" % out_row.svlen,
+                  "FOLD_CHANGE=%f" % 2.0 ** out_row.log2,
+                  "FOLD_CHANGE_LOG=%f" % out_row.log2,
+                  "PROBES=%d" % out_row.probes
+                 ]
+        if has_ci:
+            fields.extend([
+                "CIPOS=(%d,%d)" % (out_row.ci_pos_left, out_row.ci_pos_right),
+                "CIEND=(%d,%d)" % (out_row.ci_end_left, out_row.ci_end_right),
+            ])
+        info = ";".join(fields)
 
         yield (out_row.chromosome, out_row.start, '.', 'N',
                "<%s>" % out_row.svtype, '.', '.',
