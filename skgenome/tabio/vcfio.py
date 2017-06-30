@@ -158,11 +158,17 @@ def _parse_pedigrees(vcf_reader):
                               sample_id, normal_id)
                 yield sample_id, normal_id
     elif "GATKCommandLine.MuTect2" in meta:
-        # GATK 3+ metadata is suboptimal. Apparent convention:
-        # Tumor is the first sample, normal is the second.
+        # GATK 3+ metadata is suboptimal.
+        # Apparent T/N convention: The samples are just renamed TUMOR and
+        # NORMAL, listed in arbitrary order. Metadata is data! We have always
+        # been at war with metadata! (#195)
         # Mutect2 can also run in tumor-only mode (safe fallback)
         if len(vcf_reader.header.samples) == 2:
-            yield tuple(vcf_reader.header.samples)
+            sample_ids = tuple(vcf_reader.header.samples)
+            if sample_ids == ("NORMAL", "TUMOR"):
+                yield ("TUMOR", "NORMAL")
+            else:
+                yield sample_ids
 
 
 def _confirm_unique(sample_id, samples):
