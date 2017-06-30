@@ -20,6 +20,17 @@ The output is a text table of tab-separated values, which is amenable to further
 processing by scripts and standard Unix tools such as ``grep``, ``sort``,
 ``cut`` and ``awk``.
 
+Columns:
+
+- `gene`, `chromosome` -- as in .cns (see :doc:`fileformats`), the gene where
+  the breakpoint occurs and the chromosome it lies on.
+- `location` -- the `end` of the segment to the left of the breakpoint, and
+  `start` of the segment to the right.
+- `change` -- the difference in `log2` values between the adjacent segments.
+- `probes_left`, `probes_right` -- the number of probes on each side of the
+  breakpoint within the gene. (Not the same as the number of probes supporting
+  each segment; just the portion within the gene.)
+
 For example, to get a list of the names of genes that contain a possible copy
 number breakpoint::
 
