@@ -26,7 +26,7 @@ CHROM_FATNESS = 0.3
 PAGE_SIZE = (11.0*inch, 8.5*inch)
 
 
-def create_diagram(cnarr, segarr, threshold, min_probes, outfname):
+def create_diagram(cnarr, segarr, threshold, min_probes, outfname, title=None):
     """Create the diagram."""
     if cnarr and segarr:
         do_both = True  # Draw segments on left, probes on right.
@@ -87,7 +87,7 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname):
     # Generate the diagram PDF
     if not outfname:
         outfname = cnarr.sample_id + '-diagram.pdf'
-    drawing = build_chrom_diagram(features, chrom_sizes, cnarr.sample_id)
+    drawing = build_chrom_diagram(features, chrom_sizes, cnarr.sample_id, title)
     cvs = canvas.Canvas(outfname, pagesize=PAGE_SIZE)
     renderPDF.draw(drawing, cvs, 0, 0)
     cvs.showPage()
@@ -95,7 +95,7 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname):
     return outfname
 
 
-def build_chrom_diagram(features, chr_sizes, sample_id):
+def build_chrom_diagram(features, chr_sizes, sample_id, title=None):
     """Create a PDF of color-coded features on chromosomes."""
     max_chr_len = max(chr_sizes.values())
 
@@ -132,7 +132,8 @@ def build_chrom_diagram(features, chr_sizes, sample_id):
         cur_chromosome.add(tel_end)
         chr_diagram.add(cur_chromosome)
 
-    title = "Sample " + sample_id
+    if not title:
+        title = "Sample " + sample_id
     return bc_organism_draw(chr_diagram, title)
 
 

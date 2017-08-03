@@ -791,7 +791,7 @@ def _cmd_diagram(args):
         if segarr:
             segarr = segarr.shift_xx(args.male_reference, is_sample_female)
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
-                                      args.min_probes, args.output)
+                                      args.min_probes, args.output, args.title)
     logging.info("Wrote %s", outfname)
 
 
@@ -820,6 +820,9 @@ P_diagram.add_argument('--no-shift-xy', dest='adjust_xy', action='store_false',
         help="Don't adjust the X and Y chromosomes according to sample sex.")
 P_diagram.add_argument('-o', '--output',
         help="Output PDF file name.")
+P_diagram_aes = P_diagram.add_argument_group("Plot aesthetics")
+P_diagram_aes.add_argument('--title',
+        help="Plot title. [Default: sample ID, from filename or -i]")
 P_diagram.set_defaults(func=_cmd_diagram)
 
 
