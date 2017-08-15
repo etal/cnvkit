@@ -102,15 +102,15 @@ class CommandTests(unittest.TestCase):
 
     def test_access(self):
         fasta = "formats/chrM-Y-trunc.hg19.fa"
-        for min_gap_size, expect_nrows in ((None, 3),
+        for min_gap_size, expect_nrows in ((None, 7),
                                            (500, 3),
                                            (1000, 2)):
             acc = commands.do_access(fasta, [], min_gap_size)
             self.assertEqual(len(acc), expect_nrows)
         excludes = ["formats/dac-my.bed", "formats/my-targets.bed"]
-        for min_gap_size, expect_nrows in ((None, 5),
-                                           (2, 5),
-                                           (20, 4),
+        for min_gap_size, expect_nrows in ((None, 12),
+                                           (2, 10),
+                                           (20, 5),
                                            (200, 3),
                                            (2000, 2)):
             commands.do_access(fasta, excludes, min_gap_size)
