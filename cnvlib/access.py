@@ -58,7 +58,7 @@ def get_regions(fasta_fname):
                         # Emit any short intermediate blocks
                         gap_mask = np.diff(n_indices) > 1
                         if gap_mask.any():
-                            ok_starts = n_indices[gap_mask] + 1 + cursor
+                            ok_starts = n_indices[:-1][gap_mask] + 1 + cursor
                             ok_ends = n_indices[1:][gap_mask] + cursor
                             for start, end in zip(ok_starts, ok_ends):
                                 yield log_this(chrom, start, end)
