@@ -1116,7 +1116,7 @@ def do_sex(cnarrs, is_male_reference):
     def guess_and_format(cna):
         is_xy, stats = cna.compare_sex_chromosomes(is_male_reference)
         return (cna.meta["filename"] or cna.sample_id,
-                ("Female", "Male")[is_xy],
+                "Male" if is_xy else "Female",
                 strsign(stats['chrx_ratio']),
                 strsign(stats['chry_ratio']))
 
