@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-"""Extract canonical gene coordinates from UCSC's refFlat.txt.
+"""[DEPRECATED; use skg_convert.py]
+
+Extract canonical gene coordinates from UCSC's refFlat.txt.
 
 Usage:
     refFlat2bed.py /path/to/refFlat.txt -f > genes.bed
