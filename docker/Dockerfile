@@ -6,9 +6,9 @@ RUN apt-get update && apt-get install -y r-base-core
 RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('PSCBS', 'cghFLasso')"
 
 RUN apt-get install -y \
+    liblzma-dev \
     python-biopython \
     python-dev \
-    python-future \
     python-matplotlib \
     python-numpy \
     python-pip \
@@ -16,8 +16,8 @@ RUN apt-get install -y \
     python-scipy \
     python-tk \
     zlib1g-dev
-RUN pip install -U futures pandas pyfaidx pysam
-RUN pip install cnvkit==0.8.5
+RUN pip install -U future futures pandas pyfaidx pysam
+RUN pip install cnvkit==0.9.0
 # Let matplotlib build its font cache
 RUN cnvkit.py version
 
