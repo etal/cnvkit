@@ -24,10 +24,20 @@ example, the first nucleotide of a 1000-basepair sequence has position 0, the
 last nucleotide has position 999, and the entire region is indicated by the
 range 0-1000.
 
-Interval list coordinates are 1-indexed, like R or Matlab code. In the same
-example, the first nucleotide of a 1000-basepair sequence has position 1, the
-last nucleotide has position 1000, and the entire region is indicated by the
-range 1-1000.
+GATK and Picard interval list coordinates are 1-indexed, like R or Matlab code.
+In the same example, the first nucleotide of a 1000-basepair sequence has
+position 1, the last nucleotide has position 1000, and the entire region is
+indicated by the range 1-1000. These files usually have the extension
+`.interval_list`.
+
+In GATK4, the term "interval list" also refers to samtools-style genomic
+coordinate specifications of the form *chromosome:start-end*, e.g.
+`chr1:1-1000`. As with Picard and older GATK style interval lists, the
+coordinates are 1-indexed. When used with GATK4, these files usually have the
+extension `.list` or `.interval`.
+
+CNVkit will load these files by automatically determining the specific format
+based on the file contents, not the filename extension.
 
 
 .. _vcfformat:
