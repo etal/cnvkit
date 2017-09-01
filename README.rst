@@ -78,7 +78,11 @@ This approach is preferred on Mac OS X, and is a solid choice on Linux, too.
 
 To download and install CNVkit and its Python dependencies::
 
-    conda install cnvkit -c bioconda -c r -c conda-forge
+    conda config --add channels r
+    conda config --add channels defaults
+    conda config --add channels conda-forge
+    conda config --add channels bioconda
+    conda install cnvkit
 
 
 From a Python package repository
