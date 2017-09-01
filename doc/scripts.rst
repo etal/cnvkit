@@ -17,7 +17,7 @@ cnn_updater.py
     output file with a modified name -- the input files are not modified
     in-place.
 
-    Running this script is not necesssary for new analyses, but may help ease
+    Running this script is not necessary for new analyses, but may help ease
     the transition for analyses that have already begun.
 
 guess_baits.py

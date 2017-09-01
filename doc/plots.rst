@@ -55,7 +55,7 @@ around the segmentation line also visually indicates the level of noise or
 uncertainty.
 
 To create multiple region-specific plots at once, the regions of interest can be
-listed in a separate file and passed to the ``scattter`` command with the
+listed in a separate file and passed to the ``scatter`` command with the
 ``-l``/``--range-list`` option. This is equivalent to creating the plots
 separately with the ``-c`` option and then combining the plots into a single
 multi-page PDF.
