@@ -103,6 +103,11 @@ Who else is using CNVkit?
 lists some of the studies where CNVkit has been used by other researchers.
 We'd like to highlight:
 
+* Seed, G. *et al.* (2017).
+  `Gene copy number estimation from targeted next generation sequencing of
+  prostate cancer biopsies: Analytic validation and clinical qualification.
+  <http://dx.doi.org/10.1158/1078-0432.CCR-17-0972>`_
+  *Clinical Cancer Research*
 * McCreery, M.Q. *et al.* (2015).
   `Evolution of metastasis revealed by mutational landscapes of chemically
   induced skin cancers. <http://dx.doi.org/10.1038/nm.3979>`_
