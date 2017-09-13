@@ -42,17 +42,21 @@ class CopyNumArray(GenomicArray):
     def _chr_x_label(self):
         if 'chr_x' in self.meta:
             return self.meta['chr_x']
-        chr_x = ('chrX' if self.chromosome.iat[0].startswith('chr') else 'X')
-        self.meta['chr_x'] = chr_x
-        return chr_x
+        if len(self):
+            chr_x = ('chrX' if self.chromosome.iat[0].startswith('chr') else 'X')
+            self.meta['chr_x'] = chr_x
+            return chr_x
+        return ''
 
     @property
     def _chr_y_label(self):
         if 'chr_y' in self.meta:
             return self.meta['chr_y']
-        chr_y = ('chrY' if self._chr_x_label.startswith('chr') else 'Y')
-        self.meta['chr_y'] = chr_y
-        return chr_y
+        if len(self):
+            chr_y = ('chrY' if self._chr_x_label.startswith('chr') else 'Y')
+            self.meta['chr_y'] = chr_y
+            return chr_y
+        return ''
 
     # More meta to store:
     #   is_sample_male = bool
@@ -316,6 +320,9 @@ class CopyNumArray(GenomicArray):
             from each test; and ratios of U values for male vs. female
             assumption on chromosomes X and Y.
         """
+        if not len(self):
+            return None, {}
+
         chrx = self[self.chromosome == self._chr_x_label]
         if not len(chrx):
             logging.warn("*WARNING* No %s found in probes; check the input",

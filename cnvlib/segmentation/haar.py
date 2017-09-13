@@ -54,7 +54,7 @@ def segment_haar(cnarr, fdr_q):
     # Segment each chromosome individually
     # ENH - skip large gaps (segment chrom. arms separately)
     chrom_tables = [one_chrom(subprobes, fdr_q, chrom)
-                    for chrom, subprobes in cnarr.by_chromosome()]
+                    for chrom, subprobes in cnarr.by_arm()]
     segarr = cnarr.as_dataframe(pd.concat(chrom_tables))
     segarr.sort_columns()
     return segarr

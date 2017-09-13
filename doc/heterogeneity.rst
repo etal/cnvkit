@@ -49,11 +49,15 @@ Inferring tumor purity and subclonal population fractions from sequencing
 
 While inferring the tumor population structure is currently out of the scope of
 CNVkit, this work can be done using other third-party programs such as
+`PureCN <https://github.com/lima1/PureCN>`_,
 `THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_,
 `PyClone <http://compbio.bccrc.ca/software/pyclone/>`_, or
 `BubbleTree <https://www.bioconductor.org/packages/release/bioc/html/BubbleTree.html>`_.
 Each of these programs can be used to estimate tumor cell content and infer
 integer copy number of tumor subclones in a sample.
+
+PureCN accepts CNVKit's .cnn and .cnr files directly as input, and is
+recommended.
 
 
 Using CNVkit with THetA2

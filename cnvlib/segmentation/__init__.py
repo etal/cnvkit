@@ -7,14 +7,13 @@ import logging
 import math
 import os.path
 import tempfile
-from concurrent import futures
 
 import numpy as np
 import pandas as pd
 from Bio._py3k import StringIO
 from skgenome import tabio
 
-from .. import core, params, smoothing, vary
+from .. import core, parallel, params, smoothing, vary
 from ..cnary import CopyNumArray as CNA
 from . import cbs, flasso, haar
 
@@ -31,11 +30,14 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                      'flasso': 0.005,
                      'haar': 0.001,
                     }[method]
-    logging.info("Segmenting with method '%s', significance threshold %g",
-                 method, threshold)
+    logging.info("Segmenting with method '%s', significance threshold %g, "
+                 "in %s processes", method, threshold, processes)
 
-    # XXX parallel flasso segfaults in R when run on a single chromosome
-    if processes == 1 or method == 'flasso':
+    # NB: parallel cghFLasso segfaults in R ('memory not mapped'),
+    # even when run on a single chromosome
+    if method == 'flasso':
+        # ENH segment p/q arms separately
+        # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
                                skip_outliers, save_dataframe, rlibpath)
         if save_dataframe:
@@ -43,11 +45,11 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
             rstr = _to_str(rstr)
 
     else:
-        with futures.ProcessPoolExecutor(processes) as pool:
-            # ENH: run each chrom. arm separately (via knownsegs, see cbs)
-            rets = list(pool.map(_ds, ((ca, method, threshold, variants, skip_low,
-                                        skip_outliers, save_dataframe, rlibpath)
-                                    for _, ca in cnarr.by_chromosome())))
+        with parallel.pick_pool(processes) as pool:
+            rets = list(pool.map(_ds, ((ca, method, threshold, variants,
+                                        skip_low, skip_outliers,
+                                        save_dataframe, rlibpath)
+                                       for _, ca in cnarr.by_arm())))
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
             rets, r_dframe_strings = zip(*rets)
