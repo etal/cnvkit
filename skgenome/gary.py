@@ -219,6 +219,42 @@ class GenomicArray(object):
                 is_auto |= (self.chromosome == a_chrom)
         return self[is_auto]
 
+    def by_arm(self, min_gap_size=1e5):
+        """Iterate over bins grouped by chromosome arm (inferred)."""
+        # ENH:
+        # - Accept GArray of actual centromere regions as input
+        #   -> find largest gap (any size) within cmere region, split there
+        # - Cache centromere locations once found
+        self.data.chromosome = self.data.chromosome.astype(str)
+        for chrom, subtable in self.data.groupby("chromosome", sort=False):
+            margin = max(10, int(round(.1 * len(subtable))))
+            if len(subtable) > 2 * margin:
+                # Found a candidate centromere
+                gaps = (subtable.start.values[margin+1:-margin] -
+                        subtable.end.values[margin:-margin-1])
+                cmere_idx = gaps.argmax() + margin + 1
+                cmere_size = gaps[cmere_idx - margin - 1]
+            else:
+                gaps = None
+                cmere_idx = 0
+                cmere_size = 0
+            if cmere_idx and cmere_size >= min_gap_size:
+                logging.debug("%s centromere at %d of %d bins (size %s)",
+                             chrom, cmere_idx, len(subtable), cmere_size)
+                p_arm = subtable.index[:cmere_idx]
+                yield chrom, self.as_dataframe(subtable.loc[p_arm,:])
+                q_arm = subtable.index[cmere_idx:]
+                yield chrom, self.as_dataframe(subtable.loc[q_arm,:])
+            else:
+                # No centromere found -- emit the whole chromosome
+                if cmere_idx:
+                    logging.debug("%s: Ignoring centromere at %d of %d bins (size %s)",
+                                  chrom, cmere_idx, len(subtable), cmere_size)
+                else:
+                    logging.debug("%s: Skipping centromere search, too small",
+                                  chrom)
+                yield chrom, self.as_dataframe(subtable)
+
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
         # Workaround for pandas 0.18.0 bug:

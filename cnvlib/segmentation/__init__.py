@@ -46,10 +46,10 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
 
     else:
         with parallel.pick_pool(processes) as pool:
-            # ENH: run each chrom. arm separately (via knownsegs, see cbs)
-            rets = list(pool.map(_ds, ((ca, method, threshold, variants, skip_low,
-                                        skip_outliers, save_dataframe, rlibpath)
-                                    for _, ca in cnarr.by_chromosome())))
+            rets = list(pool.map(_ds, ((ca, method, threshold, variants,
+                                        skip_low, skip_outliers,
+                                        save_dataframe, rlibpath)
+                                       for _, ca in cnarr.by_arm())))
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
             rets, r_dframe_strings = zip(*rets)
