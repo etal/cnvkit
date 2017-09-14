@@ -22,8 +22,8 @@ def midsize_file(fnames):
 
 
 def do_autobin(bam_fname, method, targets=None, access=None,
-               bp_per_bin=100000., target_min_size=20, target_max_size=20000,
-               antitarget_min_size=500, antitarget_max_size=500000):
+               bp_per_bin=100000., target_min_size=20, target_max_size=50000,
+               antitarget_min_size=500, antitarget_max_size=1000000):
     """Quickly calculate reasonable bin sizes from BAM read counts.
 
     Parameters

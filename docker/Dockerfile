@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:16.04
 MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
 
 ENV DEBIAN_FRONTEND noninteractive

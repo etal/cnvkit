@@ -25,17 +25,8 @@ calculated on the fly if not provided. No "antitarget" regions are used.
 Since the input does not contain useful per-target gene labels, a  gene
 annotation database is required and used to label genes in the outputs::
 
-    cnvkit.py batch -m wgs -g data/access-5kb-mappable.hg19.bed --annotate refFlat.txt *.bam
-
-Equivalently::
-
-    cnvkit.py target data/access-5kb-mappable.hg19.bed --split --short-names --annotate refFlat.txt -o targets.bed
-    # Create a blank file to substitute for antitargets
-    touch MT
-    # For each sample
-    cnvkit.py coverage Sample.bam targets.bed -p 0 -o Sample.targetcoverage.cnn
-    cnvkit.py reference *.targetcoverage.cnn --no-edge -o ref-wgs.cnn
-    cnvkit.py fix Sample.targetcoverage.cnn MT ref-wgs.cnn --no-edge
+    cnvkit.py batch Sample1.bam Sample2.bam -n Control1.bam Control2.bam \
+            -m wgs -f hg19.fasta --annotate refFlat.txt
 
 To speed up and/or improve the accuracy of WGS analyses, try any or all of the
 following:
@@ -44,10 +35,11 @@ following:
   to limit the analysis to just the genic regions. You can get such a BED file
   from the [UCSC Genome Browser](https://genome.ucsc.edu/cgi-bin/hgTables), for
   example.
-- Increase the "target" average bin size, e.g. to at least 1000 bases for 30x
-  coverage, or proportionally more for lower-coverage sequencing.
+- Increase the "target" average bin size (``--target-avg-size``), e.g. to at
+  least 1000 bases for 30x coverage, or proportionally more for lower-coverage
+  sequencing.
 - Specify a smaller p-value threshold (``segment -t``). For the CBS method,
-  ``1e-6`` may work well. Or, try the ``haar`` segmentation method.
+  ``1e-6`` may work well. Or, try the ``flasso`` segmentation method.
 - Use the ``-p/--processes`` option in the :ref:`batch`, :ref:`coverage` and
   :ref:`segment` commands to ensure all available CPUs are used.
 - Ensure you are using the most recent version of CNVkit. Each release includes
