@@ -273,6 +273,8 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
         variances = ref_matched['spread'] ** 2
         invvars = 1.0 - (variances / variances.max())
         weights = (weights + invvars) / 2
+    # Rescale so max is 1.0
+    weights /= weights.max()
     # Avoid 0-value bins -- CBS doesn't like these
     weights = np.maximum(weights, epsilon)
     return cnarr.add_columns(weight=weights)
