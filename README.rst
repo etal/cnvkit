@@ -51,28 +51,30 @@ If you have difficulty with any of these wrappers, please `let me know
 Installation
 ============
 
-CNVkit runs on Python 2.7. Your operating system might already provide Python
-2.7, which you can check on the command line::
+CNVkit runs on Python 2.7 and later. Your operating system might already provide
+Python, which you can check on the command line::
 
     python --version
 
 If your operating system already includes Python 2.6, I suggest either using
-``conda`` (see below) or installing Python 2.7 alongside the existing Python 2.6
-instead of attempting to upgrade it in-place. Your package manager might provide
-both versions of Python.
+``conda`` (see below) or installing Python 2.7 or 3.6 alongside the existing
+Python 2.6 instead of attempting to upgrade the system version in-place. Your
+package manager might also provide Python 3.
 
 To run the recommended segmentation algorithms CBS and Fused Lasso, you will
-need to also install the R dependencies (see below).
+need to also install the R dependencies (see below). With ``conda``, these are
+included automatically.
 
 Using Conda
 -----------
 
-The recommended way to install Python 2.7 and some of CNVkit's dependencies
-without affecting the rest of your operating system is by installing either
-`Anaconda <https://store.continuum.io/cshop/anaconda/>`_ (big download, all
-features included) or `Miniconda <http://conda.pydata.org/miniconda.html>`_
-(smaller download, minimal environment). Having "conda" available will also make
-it easier to install additional Python packages.
+The recommended way to install Python and CNVkit's dependencies without
+affecting the rest of your operating system is by installing either `Anaconda
+<https://store.continuum.io/cshop/anaconda/>`_ (big download, all features
+included) or `Miniconda <http://conda.pydata.org/miniconda.html>`_ (smaller
+download, minimal environment).
+Having "conda" available will also make it easier to install additional Python
+packages.
 
 This approach is preferred on Mac OS X, and is a solid choice on Linux, too.
 
