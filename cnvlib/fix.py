@@ -265,6 +265,7 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
         logging.debug("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from neutral coverage
         flat_cvgs = ref_matched.expect_flat_log2()
+        # XXX sqrt? (*0.5 inside exp2) -- need benchmark
         weights *= np.exp2(-np.abs(ref_matched['log2'] - flat_cvgs))
     if (ref_matched['spread'] > epsilon).any():
         # NB: Not used with a flat or paired reference
@@ -274,7 +275,7 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
         invvars = 1.0 - (variances / variances.max())
         weights = (weights + invvars) / 2
     # Rescale so max is 1.0
-    weights /= weights.max()
+    # weights /= weights.max()
     # Avoid 0-value bins -- CBS doesn't like these
     weights = np.maximum(weights, epsilon)
     return cnarr.add_columns(weight=weights)
