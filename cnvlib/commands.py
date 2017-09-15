@@ -808,9 +808,9 @@ P_diagram.add_argument('-m', '--min-probes', type=int, default=3,
         help="""Minimum number of covered probes to label a gene.
                 [Default: %(default)d]""")
 P_diagram.add_argument('-y', '--male-reference', action='store_true',
-        help="""Assume inputs are already corrected against a male
-                reference (i.e. female samples will have +1 log-CNR of
-                chrX; otherwise male samples would have -1 chrX).""")
+        help="""Assume inputs were normalized to a male reference
+                (i.e. female samples will have +1 log-CNR of chrX;
+                otherwise male samples would have -1 chrX).""")
 P_diagram.add_argument('-x', '--sample-sex', '-g', '--gender',
         dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
@@ -975,9 +975,9 @@ P_heatmap.add_argument('-c', '--chromosome',
 P_heatmap.add_argument('-d', '--desaturate', action='store_true',
         help="Tweak color saturation to focus on significant changes.")
 P_heatmap.add_argument('-y', '--male-reference', action='store_true',
-        help="""Assume inputs are already corrected against a male
-                reference (i.e. female samples will have +1 log-CNR of
-                chrX; otherwise male samples would have -1 chrX).""")
+        help="""Assume inputs were normalized to a male reference
+                (i.e. female samples will have +1 log-CNR of chrX;
+                otherwise male samples would have -1 chrX).""")
 P_heatmap.add_argument('-x', '--sample-sex', '-g', '--gender',
         dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
@@ -1083,9 +1083,9 @@ P_gainloss.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
 P_gainloss.add_argument('-y', '--male-reference', action='store_true',
-        help="""Assume inputs are already corrected against a male
-                reference (i.e. female samples will have +1 log-coverage of
-                chrX; otherwise male samples would have -1 chrX).""")
+        help="""Assume inputs were normalized to a male reference
+                (i.e. female samples will have +1 log-coverage of chrX;
+                otherwise male samples would have -1 chrX).""")
 P_gainloss.add_argument('-x', '--sample-sex', '-g', '--gender',
         dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
@@ -1129,7 +1129,7 @@ P_sex = AP_subparsers.add_parser('sex', help=_cmd_sex.__doc__)
 P_sex.add_argument('filenames', nargs='+',
         help="Copy number or copy ratio files (*.cnn, *.cnr).")
 P_sex.add_argument('-y', '--male-reference', action='store_true',
-        help="""Assume inputs are already normalized to a male reference
+        help="""Assume inputs were normalized to a male reference
                 (i.e. female samples will have +1 log-coverage of chrX;
                 otherwise male samples would have -1 chrX).""")
 P_sex.add_argument('-o', '--output',
