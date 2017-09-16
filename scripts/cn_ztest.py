@@ -31,6 +31,10 @@ def _cmd_ztest(args):
 
 def do_ztest(cnarr, segments=None, is_male_reference=False,
              is_sample_female=None, alpha=0.005, target_only=False):
+    """Get a probability for each bin based on its Z-score.
+
+    Return bins where the probability < `alpha`.
+    """
     if segments:
         # Subtract segment means to report only the CNA bins that weren't
         # already detected (including exon-size CNAs within a larger-scale,
@@ -63,13 +67,18 @@ def do_ztest(cnarr, segments=None, is_male_reference=False,
 
 
 def z_prob(cnarr):
-    """Get a probability for each bin based on its Z-score.
-
-    Return bins where the probability < `alpha`.
-    """
-    # Bin weights ~ 1/variance; bin log2 values already centered at 0.0
+    # Bin weights ~ 1-variance; bin log2 values already centered at 0.0
     sd = np.sqrt(1 - cnarr['weight'])
-    p = norm.pdf(cnarr['log2'], loc=0, scale=sd)
+    # Convert to Z-scores
+    z = cnarr['log2'] / sd
+    # Two-sided survival function (1-CDF) probability
+    p = 2. * norm.cdf(z)
+    # Similar to the above -- which is better?
+    # p2 = 2 * norm.pdf(cnarr['log2'], loc=0, scale=sd)
+    # if not np.allclose(p, p2):
+    #     print("Max diff:", np.abs(p - p2).max())
+    #     print("Median diff:", np.median(np.abs(p - p2)))
+    #     print("Ratio:", (p / p2).mean())
     # Correct for multiple hypothesis tests
     return p_adjust_bh(p)
 
