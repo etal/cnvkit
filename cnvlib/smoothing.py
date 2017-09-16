@@ -9,7 +9,7 @@ import pandas as pd
 from . import metrics
 
 
-def check_inputs(x, width):
+def check_inputs(x, width, as_series=True):
     """Transform width into a half-window size.
 
     `width` is either a fraction of the length of `x` or an integer size of the
@@ -28,7 +28,9 @@ def check_inputs(x, width):
     wing = min(wing, len(x) - 1)
     assert wing > 0, "Wing must be greater than 0 (got %s)" % wing
     # Pad the edges of the original array with mirror copies
-    signal = pd.Series(np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1])))
+    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
+    if as_series:
+        signal = pd.Series(signal)
     return x, wing, signal
 
 
@@ -55,7 +57,7 @@ def rolling_std(x, width):
     return np.asfarray(rolled[wing:-wing])
 
 
-def smoothed(x, width, do_fit_edges=False):
+def smoothed(x, width, weights=None, do_fit_edges=False):
     """Smooth the values in `x` with the Kaiser windowed filter.
 
     See: https://en.wikipedia.org/wiki/Kaiser_window
@@ -68,12 +70,23 @@ def smoothed(x, width, do_fit_edges=False):
         Fraction of x's total length to include in the rolling window (i.e. the
         proportional window width), or the integer size of the window.
     """
-    x, wing, signal = check_inputs(x, width)
+    x, wing, signal = check_inputs(x, width, False)
     # Apply signal smoothing
     window = np.kaiser(2 * wing + 1, 14)
-    y = np.convolve(window / window.sum(), signal, mode='same')
-    # Chop off the ends of the result so it has the original size
-    y = y[wing:-wing]
+    if weights is not None:
+        # https://stackoverflow.com/a/46232913/10049
+        assert len(weights) == len(x)
+        wp = pd.Series(np.concatenate((weights[wing-1::-1],
+                                       weights,
+                                       weights[:-wing-1:-1])))
+        window_size = 2 * wing + 1
+        D = np.convolve(wp * signal, window)[window_size-1:-window_size+1]
+        N = np.convolve(wp, window)[window_size-1:-window_size+1]
+        y = D / N
+    else:
+        y = np.convolve(window / window.sum(), signal, mode='same')
+        # Chop off the ends of the result so it has the original size
+        y = y[wing:-wing]
     if do_fit_edges:
         fit_edges(x, y, wing)  # In-place
     return y

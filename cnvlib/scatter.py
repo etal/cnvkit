@@ -131,7 +131,7 @@ def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
                      alpha=0.2, marker='.')
         # Add a local trend line
         if do_trend:
-            axis.plot(x, _smooth_genome_log2(probes, smoothing.smoothed, 150),
+            axis.plot(x, probes.smoothed(150),
                       color=POINT_COLOR, linewidth=2, zorder=-1)
     # Plot segments
     for seg_line in seg_lines:
@@ -423,8 +423,8 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
 
     # Add a local trend line
     if do_trend:
-        axis.plot(x, smoothing.smoothed(y, 50),
-                    color=POINT_COLOR, linewidth=2, zorder=-1)
+        axis.plot(x, probes.smoothed(50),
+                  color=POINT_COLOR, linewidth=2, zorder=-1)
 
     # Get coordinates for CBS lines & draw them
     if segments:

@@ -457,6 +457,26 @@ class CopyNumArray(GenomicArray):
                       for _seg, subcna in self.by_ranges(segments)]
         return np.concatenate(resids) if resids else np.array([])
 
+    def smoothed(self, window):
+        """Smooth log2 values with a sliding window.
+
+        Account for chromosome boundaries. Use bin weights if present.
+
+        Returns
+        -------
+        array
+            Smoothed log2 values from `self`, the same length as `self`.
+        """
+        # ENH: by_arm=True?
+        if 'weight' in self:
+            out = [smoothing.smoothed(subcna['log2'], window,
+                                      weights=subcna['weight'])
+                   for _chrom, subcna in self.by_chromosome()]
+        else:
+            out = [smoothing.smoothed(subcna['log2'], window)
+                   for _chrom, subcna in self.by_chromosome()]
+        return np.concatenate(out)
+
     def _guess_average_depth(self, segments=None, window=100):
         """Estimate the effective average read depth from variance.
 
