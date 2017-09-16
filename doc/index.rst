@@ -74,7 +74,7 @@ If you use this software in a publication, please cite our paper describing CNVk
 
 Also please cite the supporting paper for the segmentation method you use:
 
-PSCBS (``cbs``, the default):
+PSCBS and DNAcopy (``cbs``, the default):
     - Olshen, A.B., Bengtsson, H., Neuvial, P., Spellman, P.T., Olshen, R.A., & Seshan, V.E. (2011).
       `Parent-specific copy number in paired tumor-normal studies using circular binary segmentation.
       <http://doi.org/10.1093/bioinformatics/btr329>`_

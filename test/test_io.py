@@ -71,7 +71,7 @@ class IOTests(unittest.TestCase):
              ({'23': 'X', '24': 'Y', '25': 'M'}, "chr", False)),
             # Convert segmented array CGH data in log10 scale to log2
             ('formats/acgh-log10.seg', 1, (None, None, True)),
-            # From PSCBS/DNAcopy, with a stray warning message from R
+            # From DNAcopy, with a stray warning message from R
             ('formats/warning.seg', 2, (None, None, False)),
         ):
             expect_lines = linecount(fname) - header_len
