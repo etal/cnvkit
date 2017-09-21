@@ -343,6 +343,53 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
 
 
 # _____________________________________________________________________________
+# GISTIC
+
+def export_gistic_markers(cnr_fnames):
+    """Generate a GISTIC 2.0 "markers" file from a set of .cnr files.
+
+    GISTIC documentation:
+
+    ftp://ftp.broadinstitute.org/pub/GISTIC2.0/GISTICDocumentation_standalone.htm
+    http://genepattern.broadinstitute.org/ftp/distribution/genepattern/modules_public_server_doc/GISTIC2.pdf
+    http://gdac.broadinstitute.org/runs/analyses__2013_05_23/reports/cancer/KICH-TP/CopyNumber_Gistic2/nozzle.html
+
+    The markers file identifies the marker names and positions of the markers in
+    the original dataset (before segmentation). It is a three column,
+    tab-delimited file with an optional header. The column headers are:
+
+    (1) Marker Name
+    (2) Chromosome
+    (3) Marker Position (in bases)
+
+    GISTIC also needs an accompanying SEG file generated from corresponding .cns
+    files.
+    """
+    colnames = ["ID", "CHROM", "POS"]
+    out_chunks = []
+    # TODO since markers will mostly be the same,
+    #   detect duplicates & exclude them
+    # seen_marker_ids = None
+    for fname in cnr_fnames:
+        cna = read_cna(fname).autosomes()
+        marker_ids = cna.labels()
+        tbl = pd.concat([
+            pd.DataFrame({
+                "ID": marker_ids,
+                "CHROM": cna.chromosome,
+                "POS": cna.start + 1,
+            }, columns=colnames),
+            pd.DataFrame({
+                "ID": marker_ids,
+                "CHROM": cna.chromosome,
+                "POS": cna.end,
+            }, columns=colnames),
+        ], ignore_index=True)
+        out_chunks.append(tbl)
+    return pd.concat(out_chunks).drop_duplicates()
+
+
+# _____________________________________________________________________________
 # THetA
 
 def export_theta(tumor_segs, normal_cn):
@@ -503,6 +550,7 @@ def export_theta_snps(varr):
 EXPORT_FORMATS = {
     'cdt': fmt_cdt,
     # 'gct': fmt_gct,
+    'gistic': export_gistic_markers,
     'jtv': fmt_jtv,
     'nexus-basic': export_nexus_basic,
     'nexus-ogt': export_nexus_ogt,
