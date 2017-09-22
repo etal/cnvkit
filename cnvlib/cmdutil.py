@@ -35,7 +35,7 @@ def load_het_snps(vcf_fname, sample_id=None, normal_id=None,
         # Infer & drop (more) somatic loci based on genotype
         somatic_idx = (varr['zygosity'] != 0.0) & (varr['n_zygosity'] == 0.0)
         if somatic_idx.any() and not somatic_idx.all():
-            logging.info("Skipping %d additional somatic record based on "
+            logging.info("Skipping %d additional somatic records based on "
                          "T/N genotypes", somatic_idx.sum())
         varr = varr[~somatic_idx]
     orig_len = len(varr)

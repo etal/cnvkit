@@ -11,14 +11,14 @@ import numpy as np
 from matplotlib import pyplot
 from skgenome.rangelabel import unpack_range
 
-from . import core, params, plots, smoothing
+from . import core, params, plots
 from .plots import MB
 from .cnary import CopyNumArray as CNA
 
 HIGHLIGHT_COLOR = 'gold'
 POINT_COLOR = '#606060'
 SEG_COLOR = 'darkorange'
-TREND_COLOR = '#C0C0C0'
+TREND_COLOR = '#A0A0A0'
 
 
 def do_scatter(cnarr, segments=None, variants=None,
@@ -49,7 +49,8 @@ def genome_scatter(cnarr, segments=None, variants=None, do_trend=False,
         # Place chromosome labels between the CNR and SNP plots
         axis2.tick_params(labelbottom=False)
         chrom_sizes = plots.chromosome_sizes(cnarr or segments)
-        snv_on_genome(axis2, variants, chrom_sizes, segments, do_trend)
+        snv_on_genome(axis2, variants, chrom_sizes, segments, do_trend,
+                      segment_color)
     else:
         _fig, axis = pyplot.subplots()
     if title is None:
@@ -57,50 +58,29 @@ def genome_scatter(cnarr, segments=None, variants=None, do_trend=False,
     if cnarr or segments:
         axis.set_title(title)
         cnv_on_genome(axis, cnarr, segments, do_trend, y_min, y_max,
-                      segment_color=segment_color)
+                      segment_color)
     else:
         axis.set_title("Variant allele frequencies: %s" % title)
         chrom_sizes = collections.OrderedDict(
             (chrom, subarr["end"].max())
             for chrom, subarr in variants.by_chromosome())
-        snv_on_genome(axis, variants, chrom_sizes, segments, do_trend)
+        snv_on_genome(axis, variants, chrom_sizes, segments, do_trend,
+                      segment_color)
 
 
 
 def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
                   y_max=None, segment_color=SEG_COLOR):
-    """Plot coverages and CBS calls for all chromosomes on one plot."""
-    # Group probes by chromosome (to calculate plotting coordinates)
-    if probes:
-        chrom_probe_centers = {chrom: 0.5 * (rows['start'] + rows['end'])
-                               for chrom, rows in probes.by_chromosome()}
-        chrom_sizes = plots.chromosome_sizes(probes)
-    else:
-        chrom_sizes = plots.chromosome_sizes(segments)
-
-    # Same for segment calls
-    chrom_seg_coords = {chrom: list(zip(rows['log2'], rows['start'], rows['end']))
-                        for chrom, rows in segments.by_chromosome()
-                       } if segments else {}
-
-    x_starts = plots.plot_x_dividers(axis, chrom_sizes)
-    x = []
-    seg_lines = []  # y-val, x-start, x-end
-    for chrom, curr_offset in list(x_starts.items()):
-        if probes:
-            x.extend(chrom_probe_centers[chrom] + curr_offset)
-        if chrom in chrom_seg_coords:
-            seg_lines.extend((c[0], c[1] + curr_offset, c[2] + curr_offset)
-                             for c in chrom_seg_coords[chrom])
-
+    """Plot bin ratios and/or segments for all chromosomes on one plot."""
     # Configure axes etc.
     axis.axhline(color='k')
     axis.set_ylabel("Copy ratio (log2)")
     if not (y_min and y_max):
         if segments:
             # Auto-scale y-axis according to segment mean-coverage values
-            seg_auto_vals = segments[(segments.chromosome != 'chr6') &
-                                     (segments.chromosome != 'chrY')]['log2']
+            # (Avoid spuriously low log2 values in HLA and chrY)
+            low_chroms = segments.chromosome.isin(('6', 'chr6', 'Y', 'chrY'))
+            seg_auto_vals = segments[~low_chroms]['log2']
             if not y_min:
                 y_min = min(seg_auto_vals.min() - .2, -1.5)
             if not y_max:
@@ -112,38 +92,43 @@ def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
                 y_max = 2.5
     axis.set_ylim(y_min, y_max)
 
-    # Plot points
+    # Group probes by chromosome (to calculate plotting coordinates)
     if probes:
-        axis.scatter(x, probes['log2'], color=POINT_COLOR, edgecolor='none',
-                     alpha=0.2, marker='.')
-        # Add a local trend line
-        if do_trend:
-            axis.plot(x, probes.smoothed(150),
-                      color=POINT_COLOR, linewidth=2, zorder=-1)
-    # Plot segments
-    for seg_line in seg_lines:
-        y1, x1, x2 = seg_line
-        axis.plot((x1, x2), (y1, y1),
-                  color=segment_color, linewidth=3, solid_capstyle='round')
+        chrom_sizes = plots.chromosome_sizes(probes)
+        chrom_probes = dict(probes.by_chromosome())
+        # Precalculate smoothing window size so all chromosomes have similar
+        # degree of smoothness
+        # NB: Target panel has ~1k bins/chrom. -> 250-bin window
+        #     Exome: ~10k bins/chrom. -> 2500-bin window
+        window_size = int(round(.25 * len(probes) /
+                                probes.chromosome.nunique()))
+    else:
+        chrom_sizes = plots.chromosome_sizes(segments)
+    # Same for segment calls
+    chrom_segs = dict(segments.by_chromosome()) if segments else {}
+
+    # Plot points & segments
+    x_starts = plots.plot_x_dividers(axis, chrom_sizes)
+    for chrom, x_offset in x_starts.items():
+        if probes and chrom in chrom_probes:
+            subprobes = chrom_probes[chrom]
+            x = 0.5 * (subprobes['start'] + subprobes['end']) + x_offset
+            axis.scatter(x, subprobes['log2'], marker='.',
+                         color=POINT_COLOR, edgecolor='none', alpha=0.2)
+            if do_trend:
+                # ENH break trendline by chromosome arm boundaries?
+                axis.plot(x, subprobes.smoothed(window_size),
+                        color=POINT_COLOR, linewidth=2, zorder=-1)
+
+        if chrom in chrom_segs:
+            for seg in chrom_segs[chrom]:
+                color = choose_segment_color(seg, segment_color)
+                axis.plot((seg.start + x_offset, seg.end + x_offset),
+                          (seg.log2, seg.log2),
+                          color=color, linewidth=3, solid_capstyle='round')
 
 
-def _smooth_genome_log2(cnarr, smooth_func, width):
-    """Fit a trendline through bin log2 ratios, handling chromosome boundaries.
-
-    Returns
-    -------
-    np.array
-        Smoothed log2 values, calculated with `smooth_func` and `width`, equal
-        in length to `cnarr`.
-    """
-    # ENH: also split by centromeres (long internal gaps -- see PSCBS)
-    # ENH: use pandas groupby
-    out = [smooth_func(subcna['log2'], width)
-           for _chrom, subcna in cnarr.by_chromosome()]
-    return np.concatenate(out)
-
-
-def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend):
+def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color):
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
@@ -151,69 +136,40 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend):
 
     # Calculate the coordinates of plot components
     chrom_snvs = dict(variants.by_chromosome())
-    x_posns_chrom = {}
-    y_posns_chrom = {}
-    trends = []
-    for chrom, curr_offset in x_starts.items():
-        snvs = chrom_snvs.get(chrom, [])
-        if not len(snvs):
-            x_posns_chrom[chrom] = []
-            y_posns_chrom[chrom] = []
+    if segments:
+        chrom_segs = dict(segments.by_chromosome())
+    elif do_trend:
+        # Pretend a single segment covers each chromosome
+        chrom_segs = {chrom: None for chrom in chrom_snvs}
+    else:
+        chrom_segs = {}
+
+    for chrom, x_offset in x_starts.items():
+        if chrom not in chrom_snvs:
             continue
-        posns = snvs['start'].values
-        x_posns = posns + curr_offset
-        vafs = snvs['alt_freq'].values
-        x_posns_chrom[chrom] = x_posns
-        y_posns_chrom[chrom] = vafs
+
+        snvs = chrom_snvs[chrom]
+        # Plot the points
+        axis.scatter(snvs['start'].values + x_offset,
+                     snvs['alt_freq'].values,
+                     color=POINT_COLOR, edgecolor='none',
+                     alpha=0.2, marker='.')
         # Trend bars: always calculated, only shown on request
-        if segments:
+        if chrom in chrom_segs:
             # Draw average VAF within each segment
-            for v_start, v_end, v_freq in group_snvs_by_segments(posns, vafs,
-                                                                 segments,
-                                                                 chrom):
-                trends.append((v_start + curr_offset, v_end + curr_offset,
-                               v_freq))
-        else:
-            # Draw chromosome-wide average VAF
-            for mask_vaf in ((vafs > 0.5), (vafs <= 0.5)):
-                if sum(mask_vaf) > 1:
-                    these_posns = x_posns[mask_vaf]
-                    trends.append((these_posns[0], these_posns[-1],
-                                   np.median(vafs[mask_vaf])))
-
-    # Test for significant shifts in VAF
-    # ENH - use segments if provided
-    #   if significant, colorize those points / that median line
-    sig_chroms = [] # test_loh(partition_by_chrom(chrom_snvs))
-
-    # Render significantly shifted heterozygous regions separately
-    x_posns = []
-    y_posns = []
-    x_posns_sig = []
-    y_posns_sig = []
-    for chrom in chrom_sizes:
-        posns = x_posns_chrom[chrom]
-        vafs = y_posns_chrom[chrom]
-        if chrom in sig_chroms:
-            x_posns_sig.extend(posns)
-            y_posns_sig.extend(vafs)
-        else:
-            x_posns.extend(posns)
-            y_posns.extend(vafs)
-
-    # Plot the points
-    axis.scatter(x_posns, y_posns, color=POINT_COLOR, edgecolor='none',
-                 alpha=0.2, marker='.')
-    axis.scatter(x_posns_sig, y_posns_sig, color='salmon', edgecolor='none',
-                 alpha=0.3)
-    # Add trend lines to each chromosome
-    if do_trend or segments:
-        # Draw a line across each chromosome at the median shift level
-        for x_start, x_end, y_trend in trends:
-            # ENH: color by segment gain/loss
-            axis.plot([x_start, x_end], [y_trend, y_trend],
-                      color=TREND_COLOR, linewidth=2, zorder=-1,
-                      solid_capstyle='round')
+            segs = chrom_segs[chrom]
+            for seg, v_freq in get_segment_vafs(snvs, segs):
+                if seg:
+                    posn = [seg.start + x_offset, seg.end + x_offset]
+                    color = choose_segment_color(seg, segment_color,
+                                                 default_bright=False)
+                else:
+                    posn = [snvs.start.iat[0] + x_offset,
+                            snvs.start.iat[-1] + x_offset]
+                    color = TREND_COLOR
+                axis.plot(posn, [v_freq, v_freq],
+                          color=color, linewidth=2, zorder=-1,
+                          solid_capstyle='round')
 
 
 # === Chromosome-level scatter plots ===
@@ -236,6 +192,42 @@ def chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
         chr:s-e | +  | given | given
 
     """
+    sel_probes, sel_segs, sel_snvs, window_coords, genes, chrom = \
+            select_range_genes(cnarr, segments, variants, show_range,
+                               show_gene, window_width)
+
+    # Create plots
+    if cnarr or segments:
+        # Plot CNVs at chromosome level
+        if variants:
+            # Lay out top 3/5 for the CN scatter, bottom 2/5 for SNP plot
+            axgrid = pyplot.GridSpec(5, 1, hspace=.5)
+            axis = pyplot.subplot(axgrid[:3])
+            axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
+            # Plot allele freqs for only the selected region
+            snv_on_chromosome(axis2, sel_snvs, sel_segs, genes, do_trend,
+                              segment_color)
+        else:
+            _fig, axis = pyplot.subplots()
+            axis.set_xlabel("Position (Mb)")
+        cnv_on_chromosome(axis, sel_probes, sel_segs, genes,
+                          antitarget_marker=antitarget_marker,
+                          do_trend=do_trend, x_limits=window_coords,
+                          y_min=y_min, y_max=y_max, segment_color=segment_color)
+    elif variants:
+        # Only plot SNVs in a single-panel layout
+        _fig, axis = pyplot.subplots()
+        snv_on_chromosome(axis, sel_snvs, sel_segs, genes, do_trend,
+                          segment_color)
+
+    if title is None:
+        title = "%s %s" % ((cnarr or segments or variants).sample_id, chrom)
+    axis.set_title(title)
+
+
+def select_range_genes(cnarr, segments, variants, show_range, show_gene,
+                       window_width):
+    """Determine which datapoints to show based on the given options."""
     chrom, start, end = unpack_range(show_range)
     window_coords = ()
     genes = []
@@ -290,51 +282,28 @@ def chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
     # Prune plotted elements to the selected region
     sel_probes = (cnarr.in_range(chrom, *window_coords)
                   if cnarr else CNA([]))
-    sel_seg = (segments.in_range(chrom, *window_coords, mode='trim')
-               if segments else CNA([]))
+    sel_segs = (segments.in_range(chrom, *window_coords, mode='trim')
+                if segments else CNA([]))
     sel_snvs = (variants.in_range(chrom, *window_coords)
                 if variants else None)
     logging.info("Showing %d probes and %d selected genes in region %s",
                  len(sel_probes), len(genes),
                  (chrom + ":%d-%d" % window_coords if window_coords else chrom))
 
-    # Create plots
-    if cnarr or segments:
-        # Plot CNVs at chromosome level
-        if variants:
-            # Lay out top 3/5 for the CN scatter, bottom 2/5 for SNP plot
-            axgrid = pyplot.GridSpec(5, 1, hspace=.5)
-            axis = pyplot.subplot(axgrid[:3])
-            axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
-            # Plot allele freqs for only the selected region
-            snv_on_chromosome(axis2, sel_snvs, sel_seg, genes, do_trend)
-        else:
-            _fig, axis = pyplot.subplots()
-            axis.set_xlabel("Position (Mb)")
-        cnv_on_chromosome(axis, sel_probes, sel_seg, genes,
-                          antitarget_marker=antitarget_marker,
-                          do_trend=do_trend, x_limits=window_coords,
-                          y_min=y_min, y_max=y_max, segment_color=segment_color)
-    elif variants:
-        # Only plot SNVs in a single-panel layout
-        _fig, axis = pyplot.subplots()
-        snv_on_chromosome(axis, sel_snvs, sel_seg, genes, do_trend)
-
-    if title is None:
-        title = "%s %s" % ((cnarr or segments or variants).sample_id, chrom)
-    axis.set_title(title)
+    return sel_probes, sel_segs, sel_snvs, window_coords, genes, chrom
 
 
 def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
                       do_trend=False, x_limits=None, y_min=None, y_max=None,
                       segment_color=SEG_COLOR):
-    """Draw a scatter plot of probe values with CBS calls overlaid.
+    """Draw a scatter plot of probe values with optional segments overlaid.
 
     Parameters
     ----------
     genes : list
         Of tuples: (start, end, gene name)
     """
+    # TODO - allow plotting just segments without probes
     # Get scatter plot coordinates
     x = 0.5 * (probes['start'] + probes['end']) * MB # bin midpoints
     y = probes['log2']
@@ -342,10 +311,8 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
         w = 46 * probes['weight'] ** 2 + 2
     else:
         w = np.repeat(30, len(x))
-    is_bg = (probes['gene'] == params.ANTITARGET_NAME)
 
     # Configure axes
-    # TODO - use segment y-values if probes not given
     if not y_min:
         y_min = max(-5.0, min(y.min() - .1, -.3)) if len(y) else -1.1
     if not y_max:
@@ -357,32 +324,8 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
         set_xlim_from(axis, probes, segments)
     setup_chromosome(axis, y_min, y_max, "Copy ratio (log2)")
     if genes:
-        # Rotate text in proportion to gene density
-        ngenes = len(genes)
-        text_size = ('small' if ngenes <= 6 else 'x-small')
-        if ngenes <= 3:
-            text_rot = 'horizontal'
-        elif ngenes <= 6:
-            text_rot = 30
-        elif ngenes <= 10:
-            text_rot = 45
-        elif ngenes <= 20:
-            text_rot = 60
-        else:
-            text_rot = 'vertical'
-        for gene in genes:
-            gene_start, gene_end, gene_name = gene
-            # Highlight and label gene region
-            # (rescale positions from bases to megabases)
-            axis.axvspan(gene_start * MB, gene_end * MB,
-                         alpha=0.5, color=HIGHLIGHT_COLOR, zorder=-1)
-            axis.text(0.5 * (gene_start + gene_end) * MB,
-                      min(2.4, y.max() + .1) if len(y) else .1,
-                      gene_name,
-                      horizontalalignment='center',
-                      rotation=text_rot,
-                      size=text_size)
-                      # size='small')
+        highlight_genes(axis, genes,
+                        min(2.4, y.max() + .1) if len(y) else .1)
 
     if antitarget_marker in (None, 'o'):
         # Plot targets and antitargets with the same marker
@@ -395,6 +338,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
         x_bg = []
         y_bg = []
         # w_bg = []
+        is_bg = probes['gene'].isin(params.ANTITARGET_ALIASES)
         for x_pt, y_pt, w_pt, is_bg_pt in zip(x, y, w, is_bg):
             if is_bg_pt:
                 x_bg.append(x_pt)
@@ -410,18 +354,19 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
 
     # Add a local trend line
     if do_trend:
-        axis.plot(x, probes.smoothed(50),
+        axis.plot(x, probes.smoothed(.15),
                   color=POINT_COLOR, linewidth=2, zorder=-1)
 
-    # Get coordinates for CBS lines & draw them
+    # Draw segments as horizontal lines
     if segments:
         for row in segments:
+            color = choose_segment_color(row, segment_color)
             axis.plot((row.start * MB, row.end * MB),
                       (row.log2, row.log2),
-                      color=segment_color, linewidth=4, solid_capstyle='round')
+                      color=color, linewidth=4, solid_capstyle='round')
 
 
-def snv_on_chromosome(axis, variants, segments, genes, do_trend):
+def snv_on_chromosome(axis, variants, segments, genes, do_trend, segment_color):
     # TODO set x-limits if not already done for probes/segments
     # set_xlim_from(axis, None, segments, variants)
     # setup_chromosome(axis, 0.0, 1.0, "VAF")
@@ -433,20 +378,25 @@ def snv_on_chromosome(axis, variants, segments, genes, do_trend):
     axis.tick_params(which='both', direction='out',
                      labelbottom=False, labeltop=False)
 
-    x_mb = variants['start'] * MB
+    x_mb = variants['start'].values * MB
     y = variants['alt_freq'].values
     axis.scatter(x_mb, y, color=POINT_COLOR, alpha=0.3)
-    # TODO - highlight genes/selection
-    if segments:
+    if segments or do_trend:
         # Draw average VAF within each segment
-        # TODO coordinate this w/ do_trend
-        posns = variants['start'].values # * MB
-        for v_start, v_end, v_freq in group_snvs_by_segments(posns, y,
-                                                             segments):
-            # ENH: color by segment gain/loss
-            axis.plot([v_start * MB, v_end * MB], [v_freq, v_freq],
-                      color='#C0C0C0', linewidth=2, #zorder=1,
+        for seg, v_freq in get_segment_vafs(variants, segments):
+            if seg:
+                posn = [seg.start * MB, seg.end * MB]
+                color = choose_segment_color(seg, segment_color,
+                                             default_bright=False)
+            else:
+                posn = [variants.start.iat[0] * MB, variants.start.iat[-1] * MB]
+                color = TREND_COLOR
+            axis.plot(posn, [v_freq, v_freq],
+                      color=color, linewidth=2, zorder=1,
                       solid_capstyle='round')
+
+    if genes:
+        highlight_genes(axis, genes, .9)
 
 
 def set_xlim_from(axis, probes=None, segments=None, variants=None):
@@ -493,28 +443,85 @@ def setup_chromosome(axis, y_min=None, y_max=None, y_label=None):
 
 # === Shared ===
 
-# XXX use by_ranges
-def group_snvs_by_segments(snv_posns, snv_freqs, segments, chrom=None):
+def choose_segment_color(segment, highlight_color, default_bright=True):
+    """Choose a display color based on a segment's CNA status.
+
+    Uses the fields added by the 'call' command. If these aren't present, use
+    `highlight_color` for everything.
+
+    For sex chromosomes, some single-copy deletions or gains might not be
+    highlighted, since sample sex isn't used to infer the neutral ploidies.
+    """
+    neutral_color = TREND_COLOR
+    if 'cn' not in segment._fields:
+        # No 'call' info
+        return highlight_color if default_bright else neutral_color
+
+    # Detect copy number alteration
+    expected_ploidies = {'chrY': (0, 1), 'Y': (0, 1),
+                         'chrX': (1, 2), 'X': (1, 2)}
+    if segment.cn not in expected_ploidies.get(segment.chromosome, [2]):
+        return highlight_color
+
+    # Detect regions of allelic imbalance / LOH
+    if (segment.chromosome not in expected_ploidies and
+        'cn1' in segment._fields and 'cn2' in segment._fields and
+        (segment.cn1 != segment.cn2)):
+        return highlight_color
+
+    return neutral_color
+
+
+def get_segment_vafs(variants, segments):
     """Group SNP allele frequencies by segment.
+
+    Assume variants and segments were already subset to one chromosome.
 
     Yields
     ------
     tuple
-        (start, end, value)
+        (segment, value)
     """
-    if chrom:
-        segments = segments.filter(chromosome=chrom)
-    seg_starts = segments.start
-    # Assign a segment number to each variant, basically
-    indices = np.maximum(seg_starts.searchsorted(snv_posns), 1) - 1
-    for i in sorted(set(indices)):
-        mask_in_seg = (indices == i)
-        freqs = snv_freqs[mask_in_seg]
-        posns = snv_posns[mask_in_seg]
+    if segments:
+        chunks = variants.by_ranges(segments)
+    else:
+        # Fake segments cover the whole region
+        chunks = [(None, variants)]
+    for seg, seg_snvs in chunks:
+        # ENH: seg_snvs.tumor_boost()
+        freqs = seg_snvs['alt_freq'].values
         # Separately emit VAFs above and below .5 for plotting
-        mask_above_mid = (freqs > 0.5)
-        for mask_vaf in (mask_above_mid, ~mask_above_mid):
-            if sum(mask_vaf) > 1:
-                these_posns = posns[mask_vaf]
-                yield (these_posns[0], these_posns[-1],
-                       np.median(freqs[mask_vaf]))
+        idx_above_mid = (freqs > 0.5)
+        for idx_vaf in (idx_above_mid, ~idx_above_mid):
+            if sum(idx_vaf) > 1:
+                yield (seg, np.median(freqs[idx_vaf]))
+
+
+def highlight_genes(axis, genes, y_posn):
+    """Show gene regions with background color and a text label."""
+    # Rotate text in proportion to gene density
+    ngenes = len(genes)
+    text_size = ('small' if ngenes <= 6 else 'x-small')
+    if ngenes <= 3:
+        text_rot = 'horizontal'
+    elif ngenes <= 6:
+        text_rot = 30
+    elif ngenes <= 10:
+        text_rot = 45
+    elif ngenes <= 20:
+        text_rot = 60
+    else:
+        text_rot = 'vertical'
+    for gene in genes:
+        gene_start, gene_end, gene_name = gene
+        # Highlight and label gene region
+        # (rescale positions from bases to megabases)
+        axis.axvspan(gene_start * MB, gene_end * MB,
+                     alpha=0.5, color=HIGHLIGHT_COLOR, zorder=-1)
+        axis.text(0.5 * (gene_start + gene_end) * MB,
+                  y_posn,
+                  gene_name,
+                  horizontalalignment='center',
+                  rotation=text_rot,
+                  size=text_size)
+        # size='small')

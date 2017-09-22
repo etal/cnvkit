@@ -67,54 +67,6 @@ def chromosome_sizes(probes, to_mb=False):
     return chrom_sizes
 
 
-def partition_by_chrom(chrom_snvs):
-    """Group the tumor shift values by chromosome (for statistical testing)."""
-    chromnames = set(chrom_snvs.keys())
-    bins = {key: {'thisbin': [], 'otherbins': []}
-            for key in chrom_snvs}
-    for thischrom, snvs in chrom_snvs.items():
-        shiftvals = np.array([abs(v[2]) for v in snvs])
-        bins[thischrom]['thisbin'].extend(shiftvals)
-        for otherchrom in chromnames:
-            if otherchrom == thischrom:
-                continue
-            bins[otherchrom]['otherbins'].extend(shiftvals)
-    return bins
-
-
-def test_loh(bins, alpha=0.0025):
-    """Test each chromosome's SNP shifts and the combined others'.
-
-    The statistical test is Mann-Whitney, a one-sided non-parametric test for
-    difference in means.
-    """
-    # TODO - this doesn't work right if there are many shifted regions
-    #   -> just use cn1!=cn2 if those columns are present
-    try:
-        from scipy import stats
-    except ImportError:
-        # SciPy not installed; can't test for significance
-        return []
-
-    significant_chroms = []
-    for chrom, partitions in bins.items():
-        these_shifts = np.array(partitions['thisbin'], np.float_)
-        other_shifts = np.array(partitions['otherbins'], np.float_)
-        if len(these_shifts) < 20:
-            logging.info("Too few points (%d) to test chrom %s",
-                         len(these_shifts), chrom)
-        elif these_shifts.mean() > other_shifts.mean():
-            logging.debug("\nThese ~= %f (N=%d), Other ~= %f (N=%d)",
-                          these_shifts.mean(), len(these_shifts),
-                          other_shifts.mean(), len(other_shifts))
-            u, prob = stats.mannwhitneyu(these_shifts, other_shifts)
-            logging.info("Mann-Whitney - %s: u=%s, p=%s", chrom, u, prob)
-            if prob < alpha:
-                significant_chroms.append(chrom)
-
-    return significant_chroms
-
-
 # ________________________________________
 # Utilies used by other modules
 
@@ -166,15 +118,15 @@ def gene_coords_by_name(probes, names):
         end = gene_probes['end'].max()
         chrom = core.check_unique(gene_probes['chromosome'], name)
         # Deduce the unique set of gene names for this region
-        orig_names = set()
+        uniq_names = set()
         for oname in set(gene_probes['gene']):
-            orig_names.update(oname.split(','))
-        all_coords[chrom][start, end].update(orig_names)
+            uniq_names.update(oname.split(','))
+        all_coords[chrom][start, end].update(uniq_names)
     # Consolidate each region's gene names into a string
     uniq_coords = {}
     for chrom, hits in all_coords.items():
-        uniq_coords[chrom] = [(start, end, ",".join(sorted(orig_names)))
-                             for (start, end), orig_names in hits.items()]
+        uniq_coords[chrom] = [(start, end, ",".join(sorted(gene_names)))
+                              for (start, end), gene_names in hits.items()]
     return uniq_coords
 
 
@@ -192,11 +144,9 @@ def gene_coords_by_range(probes, chrom, start, end,
     genes = collections.OrderedDict()
     for row in probes.in_range(chrom, start, end):
         name = str(row.gene)
-        if name in ignore:
-            continue
         if name in genes:
             genes[name][1] = row.end
-        else:
+        elif name not in ignore:
             genes[name] = [row.start, row.end]
     # Reorganize the data structure
     return {chrom: [(gstart, gend, name)

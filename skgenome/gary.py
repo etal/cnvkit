@@ -111,6 +111,11 @@ class GenomicArray(object):
 
     # Container behaviour
 
+    def __bool__(self):
+        return bool(len(self.data))
+
+    __nonzero__ = __bool__  # Py2.7
+
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
                 self.data.equals(other.data))
