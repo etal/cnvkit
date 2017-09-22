@@ -897,14 +897,13 @@ P_scatter.add_argument('-o', '--output', metavar="FILENAME",
 
 P_scatter_aes = P_scatter.add_argument_group("Plot aesthetics")
 P_scatter_aes.add_argument('-a', '--antitarget-marker',
-        '-b', '--background-marker', # DEPRECATED in 0.9.0
         metavar='CHARACTER', dest='antitarget_marker', default=None,
         help="""Plot antitargets using this symbol when plotting in a selected
                 chromosomal region (-g/--gene or -c/--chromosome).
                 [Default: same as targets]""")
-# Alternative shim (enable in 0.9.1)
-# P_scatter_aes.add_argument('-b', '--background-marker',
-#       dest='antitarget_marker', help=argparse.SUPPRESS)
+# DEPRECATED shim for 0.9.x
+P_scatter_aes.add_argument('-b', '--background-marker',
+     dest='antitarget_marker', help=argparse.SUPPRESS)
 P_scatter_aes.add_argument('--segment-color', default=scatter.SEG_COLOR,
         help="""Plot segment lines in this color. Value can be any string
                 accepted by matplotlib, e.g. 'red' or '#CC0000'.""")
