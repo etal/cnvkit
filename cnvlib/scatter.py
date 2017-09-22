@@ -25,21 +25,8 @@ def do_scatter(cnarr, segments=None, variants=None,
                show_range=None, show_gene=None,
                antitarget_marker=None, do_trend=False, window_width=1e6,
                y_min=None, y_max=None, title=None, segment_color=SEG_COLOR,
-               background_marker=None, # DEPRECATED in 0.9.0
               ):
     """Plot probe log2 coverages and segmentation calls together."""
-    # Handle the deprecated argument
-    if background_marker is not None:
-        if antitarget_marker is None or antitarget_marker == background_marker:
-            logging.warn("Keyword argument background_marker=%r was given; "
-                         "use antitarget_marker instead.", background_marker)
-            antitarget_marker = background_marker
-        elif antitarget_marker != background_marker:
-            raise ValueError(
-                "Deprecated keyword argument background_marker=%r was given, "
-                "but conflicts with its successor antitarget_marker=%r"
-                % (background_marker, antitarget_marker))
-
     if not show_gene and not show_range:
         genome_scatter(cnarr, segments, variants, do_trend, y_min, y_max, title,
                        segment_color)
