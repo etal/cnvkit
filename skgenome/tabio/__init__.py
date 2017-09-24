@@ -14,7 +14,7 @@ import pandas as pd
 from Bio.File import as_handle
 
 from ..gary import GenomicArray as GA
-from . import bedio, genepred, gff, picard, seg, tab, textcoord, vcfio
+from . import bedio, genepred, gff, picard, seg, seqdict, tab, textcoord, vcfio
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
@@ -123,6 +123,7 @@ READERS = {
     "bed3": (bedio.read_bed3, GA),
     "bed4": (bedio.read_bed4, GA),
     "bed6": (bedio.read_bed6, GA),
+    "dict": (seqdict.read_dict, GA),
     "gff": (gff.read_gff, GA),
     "interval": (picard.read_interval, GA),
     "refflat": (genepred.read_refflat, GA),
