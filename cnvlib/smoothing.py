@@ -6,7 +6,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from . import metrics
+from . import descriptives
 
 
 def check_inputs(x, width, as_series=True):
@@ -57,7 +57,7 @@ def rolling_std(x, width):
     return np.asfarray(rolled[wing:-wing])
 
 
-def smoothed(x, width, weights=None, do_fit_edges=False):
+def smoothed(x, width=None, weights=None, do_fit_edges=False):
     """Smooth the values in `x` with the Kaiser windowed filter.
 
     See: https://en.wikipedia.org/wiki/Kaiser_window
@@ -70,6 +70,10 @@ def smoothed(x, width, weights=None, do_fit_edges=False):
         Fraction of x's total length to include in the rolling window (i.e. the
         proportional window width), or the integer size of the window.
     """
+    if width is None:
+        # Choose a reasonable window size (inspired by Silverman's rule)
+        width = int(round(4 * descriptives.biweight_midvariance(x)
+                          * len(x) ** (4/5)))
     x, wing, signal = check_inputs(x, width, False)
     # Apply signal smoothing
     window = np.kaiser(2 * wing + 1, 14)
@@ -138,7 +142,7 @@ def outlier_iqr(a, c=3.0):
     """
     a = np.asarray(a)
     dists = np.abs(a - np.median(a))
-    iqr = metrics.interquartile_range(a)
+    iqr = descriptives.interquartile_range(a)
     return dists > (c * iqr)
 
 
@@ -173,7 +177,7 @@ def outlier_mad_median(a):
 
     a = np.asarray(a)
     dists = np.abs(a - np.median(a))
-    mad = metrics.median_absolute_deviation(a)
+    mad = descriptives.median_absolute_deviation(a)
     return (dists / mad) > K
 
 
