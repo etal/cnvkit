@@ -25,7 +25,12 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     axis.set_ylim(0, len(cnarrs))
     axis.invert_yaxis()
     axis.set_ylabel("Samples")
-    axis.set_axis_bgcolor('#DDDDDD')
+    if hasattr(axis, 'set_facecolor'):
+        # matplotlib >= 2.0
+        axis.set_facecolor('#DDDDDD')
+    else:
+        # Older matplotlib
+        axis.set_axis_bgcolor('#DDDDDD')
 
     r_chrom, r_start, r_end = unpack_range(show_range)
     if r_start is not None or r_end is not None:
