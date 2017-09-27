@@ -30,9 +30,9 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
     if method == "wgs":
         if not annotate:
             # TODO check if target_bed has gene names
-            raise ValueError("WGS protocol: need '--annotate' option "
-                             "(e.g. refFlat.txt) to avoid later problems "
-                             "locating genes in data.")
+            logging.warn("WGS protocol: recommend '--annotate' option "
+                         "(e.g. refFlat.txt) to help locate genes "
+                         "in output files.")
         access_arr = None
         if not target_bed:
             # TODO - drop weird contigs before writing, see antitargets.py
