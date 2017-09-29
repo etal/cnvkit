@@ -325,7 +325,7 @@ class CopyNumArray(GenomicArray):
 
         chrx = self[self.chromosome == self._chr_x_label]
         if not len(chrx):
-            logging.warn("*WARNING* No %s found in probes; check the input",
+            logging.warn("No %s found in sample; is the input truncated?",
                          self._chr_x_label)
             return None, {}
 
