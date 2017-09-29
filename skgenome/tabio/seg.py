@@ -207,14 +207,14 @@ def format_seg(dframe, sample_id, chrom_ids):
     assert dframe is not None
     assert sample_id is not None
     #  assert chrom_ids is not None
-    rename_cols = {"log2": "mean"}
+    rename_cols = {"log2": "seg.mean"}
     # NB: in some programs the "sampleName" column is labeled "ID"
-    reindex_cols = ["sampleName", "chromosome", "start", "end", "mean"]
+    reindex_cols = ["ID", "chrom", "loc.start", "loc.end", "seg.mean"]
     if "probes" in dframe:
-        rename_cols["probes"] = "nbrOfLoci" # or num_probes
-        reindex_cols.insert(-1, "nbrOfLoci")
-    return (dframe.assign(sampleName=sample_id,
-                          chromosome=dframe.chromosome.replace(chrom_ids),
+        rename_cols["probes"] = "num.mark" # or num_probes
+        reindex_cols.insert(-1, "num.mark")
+    return (dframe.assign(ID=sample_id,
+                          chrom=dframe.chromosome.replace(chrom_ids),
                           start=dframe.start + 1)
             .rename(columns=rename_cols)
             .reindex(columns=reindex_cols))
