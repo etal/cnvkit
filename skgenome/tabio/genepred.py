@@ -75,6 +75,15 @@ def read_genepred_ext(infile, exons=False):
     raise NotImplementedError
 
 
+def read_refgene(infile, exons=False):
+    """Gene predictions (extended) plus a "bin" column (e.g. refGene.txt)
+
+    Same as genePredExt, but an additional first column of integers with the
+    label "bin", which UCSC Genome Browser uses for optimization.
+    """
+    raise NotImplementedError
+
+
 def read_refflat(infile, cds=False, exons=False):
     """Gene predictions and RefSeq genes with gene names (e.g. refFlat.txt).
 
