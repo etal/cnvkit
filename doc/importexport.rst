@@ -58,9 +58,8 @@ Procedure:
 import-seg
 ----------
 
-Convert a file in the `SEG format <https://software.broadinstitute.org/software/igv/SEG>`_
-(e.g. the output of standard CBS or the GenePattern server) into one or more
-CNVkit .cns files.
+Convert a file in the :ref:`segformat` format (e.g. the output of standard CBS
+or the GenePattern server) into one or more CNVkit .cns files.
 
 The chromosomes in a SEG file may have been converted from chromosome names to
 integer IDs. Options in ``import-seg`` can help recover the original names.
@@ -162,6 +161,7 @@ exported to the standard SEG format to be loaded in the Integrative Genomic
 Viewer (IGV)::
 
     cnvkit.py export seg *.cns -o Samples.seg
+
 
 nexus-basic
 ```````````

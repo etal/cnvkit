@@ -40,6 +40,35 @@ CNVkit will load these files by automatically determining the specific format
 based on the file contents, not the filename extension.
 
 
+.. _segformat:
+
+SEG
+---
+
+The SEG format is the `tabular output
+<https://software.broadinstitute.org/software/igv/SEG>`_ of DNAcopy, the
+reference implementation of Circular Binary Segmentation (CBS). It is a
+tab-separated table with the following 5 or 6 columns:
+
+    - `ID` -- sample name
+    - `chrom` -- chromosome name or ID
+    - `loc.start` -- segment's genomic start position, 1-indexed
+    - `loc.end` -- segment end position
+    - `num.mark` -- (optional) number of probes or bins covered by the segment
+    - `seg.mean` -- segment mean value, usually in log2 scale
+
+The column names in the first line are not enforced, and can vary across
+implementations.
+
+SEG files can be used with a number of other programs that operate on segmented
+log2 copy ratios -- including GISTIC 2.0, IGV, the GenePattern server, and many
+R packages.
+
+To convert CNVkit's .cns files to SEG, use the command :ref:`export` ``seg``,
+and to convert SEG files produced outside of CNVkit into CNVkit's own segmented
+format (.cns), use :ref:`import-seg`.
+
+
 .. _vcfformat:
 
 VCF
@@ -74,6 +103,8 @@ An `example VCF
 constructed from the 1000 Genomes samples NA12878 and NA12882 is included in
 CNVkit's test suite.
 
+
+.. _cnxformat:
 
 Target and antitarget bin-level coverages (.cnn)
 ------------------------------------------------
