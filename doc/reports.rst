@@ -22,7 +22,7 @@ processing by scripts and standard Unix tools such as ``grep``, ``sort``,
 
 Columns:
 
-- `gene`, `chromosome` -- as in .cns (see :doc:`fileformats`), the gene where
+- `gene`, `chromosome` -- as in .cns (see :ref:`cnxformat`), the gene where
   the breakpoint occurs and the chromosome it lies on.
 - `location` -- the `end` of the segment to the left of the breakpoint, and
   `start` of the segment to the right.
