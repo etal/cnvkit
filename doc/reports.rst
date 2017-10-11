@@ -56,9 +56,9 @@ gene, i.e. if the gene contains a breakpoint, each segment's value will be
 reported as a separate row for the same gene. If a large-scale CNA covers
 multiple genes, each of those genes will be listed individually.
 
-If segments are not given, the median of the log2 ratio values of the bins
-within each gene will be reported as the gene's overall log2 ratio value. This
-mode will not attempt to identify breakpoints within genes.
+If segments are not given, the weighted average of the log2 ratio values of the
+bins within each gene will be reported as the gene's overall log2 ratio value.
+This mode will not attempt to identify breakpoints within genes.
 
 The threshold (``-t``) and minimum number of bins (``-m``) options are used to
 control which genes are reported. For example, a threshold of .2 (the default)
