@@ -270,7 +270,7 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene,
     gene_ranges = []
     if show_gene is None:
         if window_coords:
-            if cnarr and show_gene is None:
+            if cnarr:
                 # Highlight all genes within the given range
                 gene_ranges = plots.gene_coords_by_range(cnarr, chrom, start, end)[chrom]
             if (end - start) < 10 * window_width:
