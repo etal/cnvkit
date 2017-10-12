@@ -101,6 +101,10 @@ def gene_coords_by_name(probes, names):
     dict
         Of: {chromosome: [(start, end, gene name), ...]}
     """
+    names = list(filter(None, set(names)))
+    if not names:
+        return {}
+
     # Create an index of gene names
     gene_index = collections.defaultdict(set)
     for i, gene in enumerate(probes['gene']):

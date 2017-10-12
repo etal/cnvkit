@@ -889,9 +889,9 @@ P_scatter.add_argument('-l', '--range-list',
                 multi-page PDF.  The output filename must also be
                 specified (-o/--output).""")
 P_scatter.add_argument('-w', '--width', type=float, default=1e6,
-        help="""Width of margin to show around the selected gene or chromosomal
-                region (-g/--gene or -c/--chromosome). [Default: %(default)d]
-                """)
+        help="""Width of margin to show around the selected gene(s) (-g/--gene)
+                or small chromosomal region (-c/--chromosome).
+                [Default: %(default)d]""")
 P_scatter.add_argument('-o', '--output', metavar="FILENAME",
         help="Output PDF file name.")
 

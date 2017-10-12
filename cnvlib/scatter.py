@@ -80,11 +80,13 @@ def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
             # Auto-scale y-axis according to segment mean-coverage values
             # (Avoid spuriously low log2 values in HLA and chrY)
             low_chroms = segments.chromosome.isin(('6', 'chr6', 'Y', 'chrY'))
-            seg_auto_vals = segments[~low_chroms]['log2']
+            seg_auto_vals = segments[~low_chroms]['log2'].dropna()
             if not y_min:
-                y_min = min(seg_auto_vals.min() - .2, -1.5)
+                y_min = (np.nanmin([seg_auto_vals.min() - .2, -1.5])
+                         if len(seg_auto_vals) else -2.5)
             if not y_max:
-                y_max = max(seg_auto_vals.max() + .2, 1.5)
+                y_max = (np.nanmax([seg_auto_vals.max() + .2, 1.5])
+                         if len(seg_auto_vals) else 2.5)
         else:
             if not y_min:
                 y_min = -2.5
@@ -227,57 +229,93 @@ def chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
 
 def select_range_genes(cnarr, segments, variants, show_range, show_gene,
                        window_width):
-    """Determine which datapoints to show based on the given options."""
-    chrom, start, end = unpack_range(show_range)
-    window_coords = ()
-    genes = []
-    if show_gene:
-        gene_names = show_gene.split(',')
-        # Scan for probes matching the specified gene
-        gene_coords = plots.gene_coords_by_name(cnarr or segments,
-                                                gene_names)
-        if len(gene_coords) != 1:
-            raise ValueError("Genes %s are split across chromosomes %s"
-                             % (show_gene, list(gene_coords.keys())))
-        g_chrom, genes = gene_coords.popitem()
-        if chrom:
-            # Confirm that the selected chromosomes match
-            core.assert_equal("Chromosome also selected by region (-c) "
-                              "does not match",
-                              **{"chromosome": chrom,
-                                 "gene(s)": g_chrom})
-        else:
-            chrom = g_chrom
-        # Set the display window to the selected genes +/- a margin
-        genes.sort()
-        window_coords = (max(0, genes[0][0] - window_width),
-                         genes[-1][1] + window_width)
+    """Determine which datapoints to show based on the given options.
 
-    if start is not None or end is not None:
-        # Default selection endpoint to the maximum chromosome position
+    Behaviors::
+
+        start/end   show_gene
+           +           +       given region + genes; err if any gene outside it
+           -           +       window +/- around genes
+           +           -       given region, highlighting any genes within it
+           -           -       whole chromosome, no genes
+
+    If `show_range` is a chromosome name only, no start/end positions, then the
+    whole chromosome will be shown.
+
+    If region start/end coordinates are given and `show_gene` is '' or ',' (or
+    all commas, etc.), then instead of highlighting all genes in the selection,
+    no genes will be highlighted.
+    """
+    chrom, start, end = unpack_range(show_range)
+    if start is None and end is None:
+        # Either the specified range is only chrom, no start-end, or gene names
+        # were given
+        window_coords = ()
+    else:
+        # Viewing region coordinates were specified -- take them as given
+        # Fill in open-ended ranges' endpoints
+        if start is None:
+            start = 0
+        elif start < 0:
+            start = 0
         if not end:
+            # Default selection endpoint to the maximum chromosome position
             end = (cnarr or segments or variants
                   ).filter(chromosome=chrom).end.iat[-1]
+        if end <= start:
+            raise ValueError("Coordinate range {}:{}-{} (from {}) has size <= 0"
+                             .format(chrom, start, end, show_range))
+        window_coords = (start, end)
+
+    gene_ranges = []
+    if show_gene is None:
         if window_coords:
-            # Genes were specified, & window was set around them
-            if start > window_coords[0] or end < window_coords[1]:
-                raise ValueError("Selected gene region " + chrom +
-                                 (":%d-%d" % window_coords) +
-                                 " is outside specified region " +
-                                 show_range)
-        window_coords = (max(0, start - window_width), end + window_width)
-        if cnarr and not genes:
-            genes = plots.gene_coords_by_range(cnarr, chrom, start, end)[chrom]
-        if not genes and window_width > (end - start) / 10.0:
-            # No genes in the selected region, so highlight the region
-            # itself (unless the selection is ~entire displayed window)
-            logging.info("No genes found in selection; will show the "
-                         "selected region itself instead")
-            genes = [(start, end, "Selection")]
-    elif show_range and window_coords:
-        # Specified range is only chrom, no start-end
-        # Reset window around selected genes to show the whole chromosome
-        window_coords = ()
+            if cnarr and show_gene is None:
+                # Highlight all genes within the given range
+                gene_ranges = plots.gene_coords_by_range(cnarr, chrom, start, end)[chrom]
+            if (end - start) < 10 * window_width:
+                # No genes in the selected region, so if the selection is small
+                # (i.e. <80% of the displayed window, <10x window padding), highlight
+                # the selected region itself.
+                # (To prevent this, use show_gene='' or window_width=0)
+                logging.info("No genes found in selection; will highlight the "
+                            "selected region itself instead")
+                gene_ranges = [(start, end, "Selection")]
+                window_coords = (max(0, start - window_width),
+                                 end + window_width)
+
+    else:
+        gene_names = filter(None, show_gene.split(','))
+        if gene_names:
+            # Scan for probes matching the specified gene(s)
+            gene_coords = plots.gene_coords_by_name(cnarr or segments,
+                                                    gene_names)
+            if len(gene_coords) > 1:
+                raise ValueError("Genes %s are split across chromosomes %s"
+                                % (show_gene, list(gene_coords.keys())))
+            g_chrom, gene_ranges = gene_coords.popitem()
+            if chrom:
+                # Confirm that the selected chromosomes match
+                core.assert_equal("Chromosome also selected by region (-c) "
+                                "does not match",
+                                **{"chromosome": chrom,
+                                    "gene(s)": g_chrom})
+            else:
+                chrom = g_chrom
+
+            gene_ranges.sort()
+            if window_coords:
+                # Verify all genes fit in the given window
+                for gene_start, gene_end, gene_name in gene_ranges:
+                    if not (start <= gene_start and gene_end <= end):
+                        raise ValueError("Selected gene %s (%s:%d-%d) "
+                                        "is outside specified region %s"
+                                        % (gene_name, chrom, gene_start,
+                                           gene_end, show_range))
+            elif not show_range:
+                # Set the display window to the selected genes +/- a margin
+                window_coords = (max(0, gene_ranges[0][0] - window_width),
+                                 gene_ranges[-1][1] + window_width)
 
     # Prune plotted elements to the selected region
     sel_probes = (cnarr.in_range(chrom, *window_coords)
@@ -287,10 +325,10 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene,
     sel_snvs = (variants.in_range(chrom, *window_coords)
                 if variants else None)
     logging.info("Showing %d probes and %d selected genes in region %s",
-                 len(sel_probes), len(genes),
+                 len(sel_probes), len(gene_ranges),
                  (chrom + ":%d-%d" % window_coords if window_coords else chrom))
 
-    return sel_probes, sel_segs, sel_snvs, window_coords, genes, chrom
+    return sel_probes, sel_segs, sel_snvs, window_coords, gene_ranges, chrom
 
 
 def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
