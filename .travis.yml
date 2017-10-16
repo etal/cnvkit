@@ -6,7 +6,7 @@ install:
   - source devtools/travis-ci/install_miniconda.sh
 
 before_script:
-    - conda create -q -y --name testenv python=$CONDA_PY
+    - conda create -q -y --override-channels --channel bioconda --channel conda-forge --name testenv python=$CONDA_PY
     - source activate testenv
     - conda build -c bioconda --python $CONDA_PY ./devtools/conda-recipe/  # Build the conda recipe for the latest dev
     - conda install -c bioconda --use-local -yq cnvkit  # Install the locally built package and its requirements
