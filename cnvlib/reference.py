@@ -2,6 +2,7 @@
 from __future__ import absolute_import, division, print_function
 from builtins import map, zip
 
+import collections
 import logging
 
 import numpy as np
@@ -33,6 +34,8 @@ def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
         sexes = infer_sexes(target_fnames, male_reference)
         if antitarget_fnames:
             sexes.update(infer_sexes(antitarget_fnames, male_reference))
+    else:
+        sexes = collections.defaultdict(lambda: female_samples)
 
     # Calculate & save probe centers
     ref_probes = combine_probes(target_fnames, fa_fname,
