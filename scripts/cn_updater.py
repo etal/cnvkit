@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-
-"""Update CNVkit .cnn files to include 'depth' column.
+"""Update .cnn/.cnr files from older CNVkit versions to match current defaults.
 
 CNVkit v0.8.0 and later uses a 'depth' column in the *.targetcoverage.cnn and
 *.antitargetcoverage.cnn files produced by the 'coverage' command.
@@ -8,6 +7,9 @@ To use .cnn files created by CNVkit v0.7.11 or earlier with the current version,
 run this script on the old .cnn files to convert them to the new format,
 calculating 'depth' from 'log2'.
 
+CNVkit v0.9.0 and later automatically names off-target bins "Antitarget",
+instead of the previous "Background". This script also updates those bin names
+in the 'gene' column.
 """
 from __future__ import absolute_import, division, print_function
 
@@ -40,6 +42,11 @@ for fname in args.cnn_files:
     # NB: The log2 values are un-centered in CNVkit v0.7.0(?) through v0.7.11;
     # earlier than that, the average 'depth' will be about 1.0.
     cnarr['depth'] = np.exp2(cnarr['log2'])
+    # Rename "Background" bins to "Antitarget"
+    # NB: The default off-target bin name was changed in CNVkit v0.9.0
+    cnarr['gene'] = cnarr['gene'].replace("Background",
+                                          cnvlib.params.ANTITARGET_NAME)
+    cnarr.sort_columns()
     # Construct the output filename
     base, ext = os.path.basename(fname).rsplit('.', 1)
     if '.' in base:
