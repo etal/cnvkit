@@ -30,6 +30,6 @@ def main(args):
 if __name__ == '__main__':
     AP = argparse.ArgumentParser(description=__doc__)
     AP.add_argument('annotate', help="Genome annotations.")
-    AP.add_argument('cn_file', help="CNVkit .cnn or .cnr file.")
+    AP.add_argument('cnv_file', help="CNVkit .cnn or .cnr file.")
     AP.add_argument('-o', '--output', help="Output filename.")
     main(AP.parse_args())
