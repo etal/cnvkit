@@ -25,14 +25,13 @@ def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
         logging.info("No FASTA reference genome provided; "
                      "skipping GC, RM calculations")
 
-    if female_samples is None:
-        # NB: Antitargets are usually preferred for inferring sex, but might be
-        # empty files, in which case no inference can be done. Since targets are
-        # guaranteed to exist, infer from those first, then replace those
-        # values where antitargets are suitable.
-        sexes = infer_sexes(target_fnames, male_reference)
-        if antitarget_fnames:
-            sexes.update(infer_sexes(antitarget_fnames, male_reference))
+    # NB: Antitargets are usually preferred for inferring sex, but might be
+    # empty files, in which case no inference can be done. Since targets are
+    # guaranteed to exist, infer from those first, then replace those
+    # values where antitargets are suitable.
+    sexes = infer_sexes(target_fnames, male_reference, female_samples)
+    if antitarget_fnames:
+        sexes.update(infer_sexes(antitarget_fnames, male_reference, female_samples))
 
     # Calculate & save probe centers
     ref_probes = combine_probes(target_fnames, fa_fname,
@@ -84,7 +83,7 @@ def bed2probes(bed_fname):
     return CNA(table, {"sample_id": core.fbase(bed_fname)})
 
 
-def infer_sexes(cnn_fnames, is_male_reference):
+def infer_sexes(cnn_fnames, is_male_reference, female_samples):
     """Map sample IDs to inferred chromosomal sex, where possible.
 
     For samples where the source file is empty or does not include either sex
@@ -94,9 +93,12 @@ def infer_sexes(cnn_fnames, is_male_reference):
     for fname in cnn_fnames:
         cnarr = read_cna(fname)
         if cnarr:
-            is_xx = cnarr.guess_xx(is_male_reference)
-            if is_xx is not None:
-                sexes[cnarr.sample_id] = is_xx
+            if female_samples:
+                sexes[cnarr.sample_id] = True
+            elif len(cnarr) > 0:
+                is_xx = cnarr.guess_xx(is_male_reference)
+                if is_xx is not None:
+                    sexes[cnarr.sample_id] = is_xx
     return sexes
 
 
