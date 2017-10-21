@@ -26,7 +26,8 @@ from skgenome.rangelabel import to_label
 
 from . import (access, antitarget, autobin, batch, call, core, coverage,
                descriptives, diagram, export, fix, heatmap, importers, metrics,
-               parallel, reference, reports, scatter, segmentation, target)
+               parallel, plots, reference, reports, scatter, segmentation,
+               target)
 from .cmdutil import (load_het_snps, read_cna, verify_sample_sex,
                       write_tsv, write_text, write_dataframe)
 
@@ -839,17 +840,25 @@ def _cmd_scatter(args):
                      ) if args.segment else None
     varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                          args.min_variant_depth, args.zygosity_freq)
+    scatter_opts = {k: v for k, v in (
+        ("do_trend", args.trend),
+        ("by_bin", args.by_bin),
+        ("window_width", args.width),
+        ("y_min", args.y_min),
+        ("y_max", args.y_max),
+        ("antitarget_marker", args.antitarget_marker),
+        ("segment_color", args.segment_color),
+    ) if v is not None}
+
     if args.range_list:
         with PdfPages(args.output) as pdf_out:
             for region in tabio.read_auto(args.range_list).coords():
                 try:
-                    scatter.do_scatter(cnarr, segarr, varr, region, None,
-                                       args.antitarget_marker, args.trend,
-                                       args.width, args.y_min, args.y_max,
-                                       ("%s %s" % (args.title,
-                                                   region.chromosome)
-                                        if args.title else None),
-                                       args.segment_color)
+                    if args.title is not None:
+                        scatter_opts["title"] = "%s %s" % (args.title,
+                                                           region.chromosome)
+                    scatter.do_scatter(cnarr, segarr, varr, show_range=region,
+                                       **scatter_opts)
                 except ValueError as exc:
                     # Probably no bins in the selected region
                     logging.warn("Not plotting region %r: %s",
@@ -857,10 +866,10 @@ def _cmd_scatter(args):
                 pdf_out.savefig()
                 pyplot.close()
     else:
+        if args.title is not None:
+            scatter_opts["title"] = args.title
         scatter.do_scatter(cnarr, segarr, varr, args.chromosome, args.gene,
-                           args.antitarget_marker, args.trend, args.width,
-                           args.y_min, args.y_max, args.title,
-                           args.segment_color)
+                           **scatter_opts)
         if args.output:
             oformat = os.path.splitext(args.output)[-1].replace(".", "")
             pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
@@ -903,7 +912,12 @@ P_scatter_aes.add_argument('-a', '--antitarget-marker',
                 [Default: same as targets]""")
 # DEPRECATED shim for 0.9.x
 P_scatter_aes.add_argument('-b', '--background-marker',
-     dest='antitarget_marker', help=argparse.SUPPRESS)
+        dest='antitarget_marker', help=argparse.SUPPRESS)
+P_scatter_aes.add_argument("--by-bin", action="store_true",
+        help="""Plot data x-coordinates by bin indices instead of genomic
+                coordinates. All bins will be shown with equal width, no blank
+                regions will be shown, and x-axis values indicate bin number
+                (within chromosome) instead of genomic position.""")
 P_scatter_aes.add_argument('--segment-color', default=scatter.SEG_COLOR,
         help="""Plot segment lines in this color. Value can be any string
                 accepted by matplotlib, e.g. 'red' or '#CC0000'.""")
@@ -951,6 +965,12 @@ def _cmd_heatmap(args):
             is_sample_female = verify_sample_sex(cnarr, args.sample_sex,
                                                  args.male_reference)
             cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
+        if args.by_bin:
+            if (args.chromosome and not did_translate_range and 
+                "probes" not in cnarr):
+                # Use first .cnr for mapping the specified range to bins
+                args.chromosome = translate_region_to_bins(region, cnarr)
+            cnarr = plots.update_binwise_positions_simple(cnarr)
         cnarrs.append(cnarr)
     heatmap.do_heatmap(cnarrs, args.chromosome, args.desaturate)
     if args.output:
@@ -964,6 +984,11 @@ def _cmd_heatmap(args):
 P_heatmap = AP_subparsers.add_parser('heatmap', help=_cmd_heatmap.__doc__)
 P_heatmap.add_argument('filenames', nargs='+',
         help="Sample coverages as raw probes (.cnr) or segments (.cns).")
+P_heatmap.add_argument('-b', '--by-bin', action="store_true",
+        help="""Plot data x-coordinates by bin indices instead of genomic
+                coordinates. All bins will be shown with equal width, no blank
+                regions will be shown, and x-axis values indicate bin number
+                (within chromosome) instead of genomic position.""")
 P_heatmap.add_argument('-c', '--chromosome',
         help="""Chromosome (e.g. 'chr1') or chromosomal range (e.g.
                 'chr1:2333000-2444000') to display. If a range is given,

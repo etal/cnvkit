@@ -14,7 +14,7 @@ from skgenome.rangelabel import unpack_range
 from . import plots
 
 
-def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
+def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False):
     """Plot copy number for multiple samples as a heatmap."""
     _fig, axis = plt.subplots()
     set_colorbar(axis)
@@ -32,7 +32,23 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
         # Older matplotlib
         axis.set_axis_bgcolor('#DDDDDD')
 
-    r_chrom, r_start, r_end = unpack_range(show_range)
+    if by_bin and show_range:
+        try:
+            a_cnarr = next(c for c in cnarrs if "probes" not in c)
+        except StopIteration:
+            r_chrom, r_start, r_end = unpack_range(show_range)
+            if r_start is not None or r_end is not None:
+                raise ValueError("Need at least 1 .cnr input file if --by-bin "
+                                 "(by_bin) and --chromosome (show_range) are "
+                                 "both used to specify a sub-chromosomal "
+                                 "region.")
+        else:
+            logging.info("Using sample %s to map %s to bin coordinates",
+                         a_cnarr.sample_id, show_range)
+            r_chrom, r_start, r_end = plots.translate_region_to_bins(show_range,
+                                                                     a_cnarr)
+    else:
+        r_chrom, r_start, r_end = unpack_range(show_range)
     if r_start is not None or r_end is not None:
         logging.info("Showing log2 ratios in range %s:%d-%s",
                      r_chrom, r_start, r_end or '*')
@@ -51,6 +67,9 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False):
     # Calculate the size (max endpoint value) of each chromosome
     chrom_sizes = collections.OrderedDict()
     for i, cnarr in enumerate(cnarrs):
+        if by_bin:
+            cnarr = plots.update_binwise_positions_simple(cnarr)
+
         if r_chrom:
             subcna = cnarr.in_range(r_chrom, r_start, r_end, mode="trim")
             sample_data[i][r_chrom] = cna2df(subcna)

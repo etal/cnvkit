@@ -22,15 +22,21 @@ TREND_COLOR = '#A0A0A0'
 
 
 def do_scatter(cnarr, segments=None, variants=None,
-               show_range=None, show_gene=None,
-               antitarget_marker=None, do_trend=False, window_width=1e6,
-               y_min=None, y_max=None, title=None, segment_color=SEG_COLOR,
+               show_range=None, show_gene=None, do_trend=False, by_bin=False,
+               window_width=1e6, y_min=None, y_max=None,
+               antitarget_marker=None, segment_color=SEG_COLOR, title=None,
               ):
     """Plot probe log2 coverages and segmentation calls together."""
+    if by_bin:
+        cnarr, segments, variants = plots.update_binwise_positions(
+            cnarr, segments, variants)
     if not show_gene and not show_range:
         genome_scatter(cnarr, segments, variants, do_trend, y_min, y_max, title,
                        segment_color)
     else:
+        if by_bin:
+            show_range = plots.translate_region_to_bins(show_range, cnarr)
+        # TODO don't use the MB coefficient for x-coordinates, x-axis label
         chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
                            antitarget_marker, do_trend, window_width, y_min,
                            y_max, title, segment_color)
