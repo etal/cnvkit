@@ -965,14 +965,8 @@ def _cmd_heatmap(args):
             is_sample_female = verify_sample_sex(cnarr, args.sample_sex,
                                                  args.male_reference)
             cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
-        if args.by_bin:
-            if (args.chromosome and not did_translate_range and 
-                "probes" not in cnarr):
-                # Use first .cnr for mapping the specified range to bins
-                args.chromosome = translate_region_to_bins(region, cnarr)
-            cnarr = plots.update_binwise_positions_simple(cnarr)
         cnarrs.append(cnarr)
-    heatmap.do_heatmap(cnarrs, args.chromosome, args.desaturate)
+    heatmap.do_heatmap(cnarrs, args.chromosome, args.desaturate, args.by_bin)
     if args.output:
         oformat = os.path.splitext(args.output)[-1].replace(".", "")
         pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
