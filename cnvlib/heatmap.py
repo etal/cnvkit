@@ -104,6 +104,9 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False):
         # Plot the individual probe/segment coverages
         for i, sample in enumerate(sample_data):
             crow = sample[r_chrom]
+            if not len(crow):
+                logging.warn("Sample #%d has no datapoints in selection %s",
+                             i+1, show_range)
             crow["start"] *= plots.MB
             crow["end"] *= plots.MB
             plot_sample_chrom(i, crow)
@@ -120,6 +123,8 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False):
                     crow["start"] += curr_offset
                     crow["end"] += curr_offset
                     plot_sample_chrom(i, crow)
+                else:
+                    logging.warn("Sample #%d has no datapoints", i+1)
 
     return axis
 
