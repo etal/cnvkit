@@ -51,7 +51,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False):
         r_chrom, r_start, r_end = unpack_range(show_range)
     if r_start is not None or r_end is not None:
         logging.info("Showing log2 ratios in range %s:%d-%s",
-                     r_chrom, r_start, r_end or '*')
+                     r_chrom, r_start or 0, r_end or '*')
     elif r_chrom:
         logging.info("Showing log2 ratios on chromosome %s", r_chrom)
 
