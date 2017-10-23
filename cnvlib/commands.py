@@ -552,8 +552,8 @@ def _cmd_fix(args):
     biases and re-center.
     """
     # Verify that target and antitarget are from the same sample
-    tgt_raw = read_cna(args.target)
-    anti_raw = read_cna(args.antitarget)
+    tgt_raw = read_cna(args.target, sample_id=args.sample_id)
+    anti_raw = read_cna(args.antitarget, sample_id=args.sample_id)
     if len(anti_raw) and tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
@@ -582,6 +582,8 @@ P_fix.add_argument('--no-edge', dest='do_edge', action='store_false',
         help="Skip edge-effect correction.")
 P_fix.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
+P_fix.add_argument('-i', '--sample-id',
+        help="Sample ID for target/antitarget files. Otherwise inferred from file names.")
 P_fix.add_argument('-o', '--output',
         help="Output file name.")
 P_fix.set_defaults(func=_cmd_fix)
