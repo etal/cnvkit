@@ -76,6 +76,8 @@ def translate_region_to_bins(region, bins):
     if region is None:
         return Region(None, None, None)
     chrom, start, end = unpack_range(region)
+    if end is None:
+        end = float("inf")
     # NB: only bin start positions matter here
     c_bin_starts = bins.data.loc[bins.data.chromosome == chrom, "start"].values
     r_start, r_end = np.searchsorted(c_bin_starts, [start, end])
@@ -87,6 +89,8 @@ def translate_segments_to_bins(segments, bins):
         # Segments and .cnr bins already match
         return update_binwise_positions_simple(segments)
     else:
+        logging.warn("Segments %s 'probes' sum does not match the number of "
+                     "bins in %s", segments.sample_id, bins.sample_id)
         # Must re-align segments to .cnr bins
         _x, segments, _v = update_binwise_positions(bins, segments)
         return segments
@@ -96,6 +100,8 @@ def update_binwise_positions_simple(cnarr):
     start_chunks = []
     end_chunks = []
     is_segment = ("probes" in cnarr)
+    if is_segment:
+        cnarr = cnarr[cnarr["probes"] > 0]
     for _chrom, c_arr in cnarr.by_chromosome():
         if is_segment:
             # Segments -- each row can cover many bins

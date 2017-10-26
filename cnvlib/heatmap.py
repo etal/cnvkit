@@ -94,10 +94,15 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False):
     if show_range:
         # Lay out only the selected chromosome
         # Set x-axis the chromosomal positions (in Mb), title as the selection
-        axis.set_xlim((r_start or 0) * plots.MB,
-                      (r_end or chrom_sizes[r_chrom]) * plots.MB)
+        if by_bin:
+            MB = 1
+            axis.set_xlabel("Position (bin)")
+        else:
+            MB = plots.MB
+            axis.set_xlabel("Position (Mb)")
+        axis.set_xlim((r_start or 0) * MB,
+                      (r_end or chrom_sizes[r_chrom]) * MB)
         axis.set_title(show_range)
-        axis.set_xlabel("Position (Mb)")
         axis.tick_params(which='both', direction='out')
         axis.get_xaxis().tick_bottom()
         axis.get_yaxis().tick_left()
@@ -107,8 +112,8 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False):
             if not len(crow):
                 logging.warn("Sample #%d has no datapoints in selection %s",
                              i+1, show_range)
-            crow["start"] *= plots.MB
-            crow["end"] *= plots.MB
+            crow["start"] *= MB
+            crow["end"] *= MB
             plot_sample_chrom(i, crow)
 
     else:
