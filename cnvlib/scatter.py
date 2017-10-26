@@ -28,18 +28,24 @@ def do_scatter(cnarr, segments=None, variants=None,
               ):
     """Plot probe log2 coverages and segmentation calls together."""
     if by_bin:
+        bp_per_bin = (sum(c.end.iat[-1] for _, c in cnarr.by_chromosome())
+                     / len(cnarr))
+        window_width /= bp_per_bin
+        show_range_bins = plots.translate_region_to_bins(show_range, cnarr)
         cnarr, segments, variants = plots.update_binwise_positions(
             cnarr, segments, variants)
+        global MB
+        MB = 1
+
     if not show_gene and not show_range:
         genome_scatter(cnarr, segments, variants, do_trend, y_min, y_max, title,
                        segment_color)
     else:
         if by_bin:
-            show_range = plots.translate_region_to_bins(show_range, cnarr)
-        # TODO don't use the MB coefficient for x-coordinates, x-axis label
+            show_range = show_range_bins
         chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
-                           antitarget_marker, do_trend, window_width, y_min,
-                           y_max, title, segment_color)
+                           antitarget_marker, do_trend, by_bin, window_width,
+                           y_min, y_max, title, segment_color)
 
 
 # === Genome-level scatter plots ===
@@ -183,8 +189,8 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color
 # === Chromosome-level scatter plots ===
 
 def chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
-                       antitarget_marker, do_trend, window_width, y_min, y_max,
-                       title, segment_color):
+                       antitarget_marker, do_trend, by_bin, window_width,
+                       y_min, y_max, title, segment_color):
     """Plot a specified region on one chromosome.
 
     Possibilities::
@@ -203,7 +209,6 @@ def chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
     sel_probes, sel_segs, sel_snvs, window_coords, genes, chrom = \
             select_range_genes(cnarr, segments, variants, show_range,
                                show_gene, window_width)
-
     # Create plots
     if cnarr or segments:
         # Plot CNVs at chromosome level
@@ -214,10 +219,13 @@ def chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
             # Plot allele freqs for only the selected region
             snv_on_chromosome(axis2, sel_snvs, sel_segs, genes, do_trend,
-                              segment_color)
+                              by_bin, segment_color)
         else:
             _fig, axis = pyplot.subplots()
-            axis.set_xlabel("Position (Mb)")
+            if by_bin:
+                axis.set_xlabel("Position (bin)")
+            else:
+                axis.set_xlabel("Position (Mb)")
         cnv_on_chromosome(axis, sel_probes, sel_segs, genes,
                           antitarget_marker=antitarget_marker,
                           do_trend=do_trend, x_limits=window_coords,
@@ -226,7 +234,7 @@ def chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
         # Only plot SNVs in a single-panel layout
         _fig, axis = pyplot.subplots()
         snv_on_chromosome(axis, sel_snvs, sel_segs, genes, do_trend,
-                          segment_color)
+                          by_bin, segment_color)
 
     if title is None:
         title = "%s %s" % ((cnarr or segments or variants).sample_id, chrom)
@@ -410,13 +418,17 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
                       color=color, linewidth=4, solid_capstyle='round')
 
 
-def snv_on_chromosome(axis, variants, segments, genes, do_trend, segment_color):
+def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin,
+                      segment_color):
     # TODO set x-limits if not already done for probes/segments
     # set_xlim_from(axis, None, segments, variants)
     # setup_chromosome(axis, 0.0, 1.0, "VAF")
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
-    axis.set_xlabel("Position (Mb)")
+    if by_bin:
+        axis.set_xlabel("Position (bin)")
+    else:
+        axis.set_xlabel("Position (Mb)")
     axis.get_yaxis().tick_left()
     axis.get_xaxis().tick_top()
     axis.tick_params(which='both', direction='out',

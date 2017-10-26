@@ -128,9 +128,10 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
     cnarr = cnarr.copy()
     if segments:
         segments = segments.copy()
+        seg_chroms = set(segments.chromosome.unique())
     if variants:
         variants = variants.copy()
-        # Fit into cnarr bins right here? no! by_ranges below
+        var_chroms = set(variants.chromosome.unique())
 
     # ENH: look into pandas groupby innards to get group indices
     for chrom in cnarr.chromosome.unique():
@@ -138,7 +139,7 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
         # NB: plotted points will be at +0.5 offsets
         c_idx = (cnarr.chromosome == chrom)
         c_bins = cnarr[c_idx]#.copy()
-        if segments and chrom in segments.chromosome:
+        if segments and chrom in seg_chroms:
             # Match segment boundaries to enumerated bins
             c_seg_idx = (segments.chromosome == chrom).values
             seg_starts = np.searchsorted(c_bins.start.values,
@@ -147,7 +148,7 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
             segments.data.loc[c_seg_idx, "start"] = seg_starts
             segments.data.loc[c_seg_idx, "end"] = seg_ends
 
-        if variants and chrom in variants.chromosome:
+        if variants and chrom in var_chroms:
             # Match variant positions to enumerated bins, and
             # add fractional increments to multiple variants within 1 bin
             c_varr_idx = (variants.chromosome == chrom).values
