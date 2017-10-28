@@ -224,7 +224,7 @@ class GenomicArray(object):
                 is_auto |= (self.chromosome == a_chrom)
         return self[is_auto]
 
-    def by_arm(self, min_gap_size=1e5):
+    def by_arm(self, min_gap_size=1e5, min_arm_bins=10):
         """Iterate over bins grouped by chromosome arm (inferred)."""
         # ENH:
         # - Accept GArray of actual centromere regions as input
@@ -232,15 +232,14 @@ class GenomicArray(object):
         # - Cache centromere locations once found
         self.data.chromosome = self.data.chromosome.astype(str)
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
-            margin = max(10, int(round(.1 * len(subtable))))
-            if len(subtable) > 2 * margin:
+            margin = max(min_arm_bins, int(round(.1 * len(subtable))))
+            if len(subtable) > 2 * margin + 1:
                 # Found a candidate centromere
                 gaps = (subtable.start.values[margin+1:-margin] -
                         subtable.end.values[margin:-margin-1])
                 cmere_idx = gaps.argmax() + margin + 1
                 cmere_size = gaps[cmere_idx - margin - 1]
             else:
-                gaps = None
                 cmere_idx = 0
                 cmere_size = 0
             if cmere_idx and cmere_size >= min_gap_size:
