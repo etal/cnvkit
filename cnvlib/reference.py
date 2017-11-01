@@ -326,7 +326,7 @@ def fasta_extract_regions(fa_fname, intervals):
         for chrom, subarr in intervals.by_chromosome():
             logging.info("Extracting sequences from chromosome %s", chrom)
             for _chrom, start, end in subarr.coords():
-                yield fa_file[_chrom][start.item():end.item()]
+                yield fa_file[_chrom][int(start):int(end)]
 
 
 def reference2regions(refarr):
