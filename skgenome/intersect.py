@@ -144,7 +144,7 @@ def _irange_nested(table, starts, ends, mode):
             if mode == 'inner':
                 # Only rows entirely after the start point
                 start_idx = table.start.searchsorted(start_val)
-                region_mask[:start_idx.item()] = 0
+                region_mask[:int(start_idx)] = 0
             else:
                 # Include all rows overlapping the start point
                 region_mask = (table.end.values > start_val)
@@ -155,7 +155,7 @@ def _irange_nested(table, starts, ends, mode):
             else:
                 # Include all rows overlapping the end point
                 end_idx = table.start.searchsorted(end_val)
-                region_mask[end_idx.item():] = 0
+                region_mask[int(end_idx):] = 0
 
         yield region_mask, start_val, end_val
 
