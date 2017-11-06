@@ -15,7 +15,7 @@ from skgenome import tabio
 
 from .. import core, parallel, params, smoothing, vary
 from ..cnary import CopyNumArray as CNA
-from . import cbs, flasso, haar
+from . import cbs, flasso, haar, none
 
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
@@ -29,6 +29,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         threshold = {'cbs': 0.0001,
                      'flasso': 0.005,
                      'haar': 0.001,
+                     'none': np.nan,
                     }[method]
     logging.info("Segmenting with method '%s', significance threshold %g, "
                  "in %s processes", method, threshold, processes)
@@ -94,8 +95,13 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
     seg_out = ""
     if method == 'haar':
         segarr = haar.segment_haar(filtered_cn, threshold)
-        segarr['gene'], segarr['weight'], segarr['depth'] = \
-                transfer_fields(segarr, cnarr)
+        #  segarr['gene'], segarr['weight'], segarr['depth'] = \
+        #          transfer_fields(segarr, cnarr)
+
+    elif method == 'none':
+        segarr = none.segment_none(filtered_cn)
+        #  segarr['gene'], segarr['weight'], segarr['depth'] = \
+        #          transfer_fields(segarr, cnarr)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
