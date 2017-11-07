@@ -76,6 +76,10 @@ def translate_region_to_bins(region, bins):
     if region is None:
         return Region(None, None, None)
     chrom, start, end = unpack_range(region)
+    if start is None and end is None:
+        return Region(chrom, start, end)
+    if start is None:
+        start = 0
     if end is None:
         end = float("inf")
     # NB: only bin start positions matter here

@@ -292,10 +292,10 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene,
             if cnarr:
                 # Highlight all genes within the given range
                 gene_ranges = plots.gene_coords_by_range(cnarr, chrom, start, end)[chrom]
-            if (end - start) < 10 * window_width:
+            if not gene_ranges and (end - start) < 10 * window_width:
                 # No genes in the selected region, so if the selection is small
-                # (i.e. <80% of the displayed window, <10x window padding), highlight
-                # the selected region itself.
+                # (i.e. <80% of the displayed window, <10x window padding),
+                # highlight the selected region itself.
                 # (To prevent this, use show_gene='' or window_width=0)
                 logging.info("No genes found in selection; will highlight the "
                             "selected region itself instead")
@@ -311,14 +311,14 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene,
                                                     gene_names)
             if len(gene_coords) > 1:
                 raise ValueError("Genes %s are split across chromosomes %s"
-                                % (show_gene, list(gene_coords.keys())))
+                                 % (show_gene, list(gene_coords.keys())))
             g_chrom, gene_ranges = gene_coords.popitem()
             if chrom:
                 # Confirm that the selected chromosomes match
                 core.assert_equal("Chromosome also selected by region (-c) "
-                                "does not match",
-                                **{"chromosome": chrom,
-                                    "gene(s)": g_chrom})
+                                  "does not match",
+                                  **{"chromosome": chrom,
+                                     "gene(s)": g_chrom})
             else:
                 chrom = g_chrom
 
@@ -328,9 +328,9 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene,
                 for gene_start, gene_end, gene_name in gene_ranges:
                     if not (start <= gene_start and gene_end <= end):
                         raise ValueError("Selected gene %s (%s:%d-%d) "
-                                        "is outside specified region %s"
-                                        % (gene_name, chrom, gene_start,
-                                           gene_end, show_range))
+                                         "is outside specified region %s"
+                                         % (gene_name, chrom, gene_start,
+                                            gene_end, show_range))
             elif not show_range:
                 # Set the display window to the selected genes +/- a margin
                 window_coords = (max(0, gene_ranges[0][0] - window_width),
