@@ -491,9 +491,10 @@ class GenomicArray(object):
             result[key] = values
         return result
 
-    def keep_columns(self, columns):
+    def keep_columns(self, colnames):
         """Extract a subset of columns, reusing this instance's metadata."""
-        return self.__class__(self.data.loc[:, columns], self.meta.copy())
+        colnames = self.data.columns.intersection(colnames)
+        return self.__class__(self.data.loc[:, colnames], self.meta.copy())
 
     def drop_extra_columns(self):
         """Remove any optional columns from this GenomicArray.
