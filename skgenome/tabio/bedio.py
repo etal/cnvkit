@@ -33,15 +33,17 @@ def read_bed(infile):
         return chrom, int(start), int(end), gene, strand
 
     def track2track(handle):
-        firstline = next(handle)
-        if firstline.startswith("track"):
+        try:
+            firstline = next(handle)
+        except StopIteration:
             pass
         else:
-            yield firstline
-        for line in handle:
-            if line.startswith('track'):
-                raise StopIteration
-            yield line
+            if not firstline.startswith("track"):
+                yield firstline
+            for line in handle:
+                if line.startswith("track"):
+                    break
+                yield line
 
     with as_handle(infile, 'rU') as handle:
         rows = map(_parse_line, track2track(handle))

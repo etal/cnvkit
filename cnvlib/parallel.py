@@ -46,12 +46,11 @@ class SerialFuture(object):
 def pick_pool(nprocs):
     if nprocs == 1:
         yield SerialPool()
-        raise StopIteration
-
-    if nprocs < 1:
-        nprocs = None
-    with futures.ProcessPoolExecutor(max_workers=nprocs) as pool:
-        yield pool
+    else:
+        if nprocs < 1:
+            nprocs = None
+        with futures.ProcessPoolExecutor(max_workers=nprocs) as pool:
+            yield pool
 
 
 def rm(path):
