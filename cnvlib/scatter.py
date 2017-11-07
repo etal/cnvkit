@@ -35,6 +35,7 @@ def do_scatter(cnarr, segments=None, variants=None,
         cnarr, segments, variants = plots.update_binwise_positions(
             cnarr, segments, variants)
         global MB
+        orig_mb = MB
         MB = 1
 
     if not show_gene and not show_range:
@@ -46,6 +47,10 @@ def do_scatter(cnarr, segments=None, variants=None,
         chromosome_scatter(cnarr, segments, variants, show_range, show_gene,
                            antitarget_marker, do_trend, by_bin, window_width,
                            y_min, y_max, title, segment_color)
+
+    if by_bin:
+        # Reset to avoid permanently altering the value of cnvlib.scatter.MB
+        MB = orig_mb
 
 
 # === Genome-level scatter plots ===
@@ -580,4 +585,3 @@ def highlight_genes(axis, genes, y_posn):
                   horizontalalignment='center',
                   rotation=text_rot,
                   size=text_size)
-        # size='small')
