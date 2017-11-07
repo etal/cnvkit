@@ -63,23 +63,26 @@ def rm(path):
 
 
 def to_chunks(bed_fname, chunk_size=5000):
-    """Split the bed-file into chunks for parallelization"""
+    """Split a BED file into `chunk_size`-line parts for parallelization."""
     k, chunk = 0, 0
     fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
-    fh = os.fdopen(fd, "w")
+    outfile = os.fdopen(fd, "w")
     atexit.register(rm, name)
-    for line in (gzip.open if bed_fname.endswith(".gz") else open)(bed_fname):
-        if line[0] == "#":
-            continue
-        k += 1
-        fh.write(line)
-        if k % chunk_size == 0:
-            fh.close()
-            yield name
-            chunk += 1
-            fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
-            fh = os.fdopen(fd, "w")
-    fh.close()
+    opener = (gzip.open if bed_fname.endswith(".gz") else open)
+    with opener(bed_fname) as infile:
+        for line in infile:
+            if line[0] == "#":
+                continue
+            k += 1
+            outfile.write(line)
+            if k % chunk_size == 0:
+                outfile.close()
+                yield name
+                chunk += 1
+                fd, name = tempfile.mkstemp(suffix=".bed",
+                                            prefix="tmp.%s." % chunk)
+                outfile = os.fdopen(fd, "w")
+    outfile.close()
     if k % chunk_size:
-        fh.close()
+        outfile.close()
         yield name
