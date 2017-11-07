@@ -196,8 +196,8 @@ def combine_probes(filenames, fa_fname, is_male_reference, sexes, skip_low,
         # Skip bias corrections if most bins have no coverage (e.g. user error)
         if (cnarr['log2'] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
            ).sum() <= len(cnarr) // 2:
-            logging.warn("WARNING: most bins have no or very low coverage; "
-                         "check that the right BED file was used")
+            logging.warning("WARNING: most bins have no or very low coverage; "
+                            "check that the right BED file was used")
         else:
             if 'gc' in columns and fix_gc:
                 logging.info("Correcting for GC bias...")

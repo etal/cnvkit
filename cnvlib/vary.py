@@ -45,7 +45,7 @@ class VariantArray(GenomicArray):
             May contain NaN values where no variants overlap a range.
         """
         if 'alt_freq' not in self:
-            logging.warn("VCF has no allele frequencies for BAF calculation")
+            logging.warning("VCF has no allele frequencies for BAF calculation")
             return pd.Series(np.repeat(np.nan, len(ranges)))
 
         def summarize(vals):

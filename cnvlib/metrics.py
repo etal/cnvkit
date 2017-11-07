@@ -84,8 +84,8 @@ def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
         raise ValueError("alpha must be between 0 and 1; got %s" % alpha)
     if bootstraps <= 2 / alpha:
         new_boots = int(np.ceil(2 / alpha))
-        logging.warn("%d bootstraps not enough to estimate CI alpha level %f; "
-                     "increasing to %d", bootstraps, alpha, new_boots)
+        logging.warning("%d bootstraps not enough to estimate CI alpha level "
+                        "%f; increasing to %d", bootstraps, alpha, new_boots)
         bootstraps = new_boots
     # Bootstrap for CI
     k = len(bins)
@@ -137,16 +137,16 @@ def _bca_correct_alpha(bins, bootstrap_dist, alphas):
     # Ported from R package "bootstrap" function "bcanon"
     n_boots = len(bootstrap_dist)
     orig_mean = segment_mean(bins)
-    logging.warn("boot samples less: %s / %s",
-                 (bootstrap_dist < orig_mean).sum(),
-                 n_boots)
+    logging.warning("boot samples less: %s / %s",
+                    (bootstrap_dist < orig_mean).sum(),
+                    n_boots)
     n_boots_below = (bootstrap_dist < orig_mean).sum()
     if n_boots_below == 0:
-        logging.warn("boots mean %s, orig mean %s",
-                     bootstrap_dist.mean(), orig_mean)
+        logging.warning("boots mean %s, orig mean %s",
+                        bootstrap_dist.mean(), orig_mean)
     else:
-        logging.warn("boot samples less: %s / %s",
-                     n_boots_below, n_boots)
+        logging.warning("boot samples less: %s / %s",
+                        n_boots_below, n_boots)
     z0 = stats.norm.ppf((bootstrap_dist < orig_mean).sum() / n_boots)
     zalpha = stats.norm.ppf(alphas)
     # Jackknife influence values
@@ -156,7 +156,7 @@ def _bca_correct_alpha(bins, bootstrap_dist, alphas):
     acc = (u**3).sum() / (6 * (uu**2).sum()**1.5)
     alphas = stats.norm.cdf(z0 + (z0 + zalpha)
                                     / (1 - acc * (z0 + zalpha)))
-    logging.warn("New alphas: %s -- via z0=%s, za=%s, acc=%s",
+    logging.warning("New alphas: %s -- via z0=%s, za=%s, acc=%s",
                     alphas, z0, zalpha, acc)
     if not 0 < alphas[0] < 1 and 0 < alphas[1] < 1:
         raise ValueError("CI alphas should be in (0,1); got %s" % alphas)

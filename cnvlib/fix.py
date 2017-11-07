@@ -25,11 +25,11 @@ def do_fix(target_raw, antitarget_raw, reference,
         frac_anti_low = 1 - (len(anti_resid) / len(anti_cnarr))
         if frac_anti_low > .5:
             # Off-target bins are mostly garbage -- skip reweighting
-            logging.warn("WARNING: Most antitarget bins ({:.2f}%, {:d}/{:d}) "
-                         "have low or no coverage; is this amplicon/WGS?"
-                         .format(100 * frac_anti_low,
-                                 len(anti_cnarr) - len(anti_resid),
-                                 len(anti_cnarr)))
+            logging.warning("WARNING: Most antitarget bins ({:.2f}%, {:d}/{:d})"
+                            " have low or no coverage; is this amplicon/WGS?"
+                            .format(100 * frac_anti_low,
+                                    len(anti_cnarr) - len(anti_resid),
+                                    len(anti_cnarr)))
         else:
             # Down-weight the more variable probe set (targets or antitargets)
             tgt_iqr = descriptives.interquartile_range(cnarr.drop_low_coverage()
@@ -74,15 +74,15 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
     # Skip bias corrections if most bins have no coverage (e.g. user error)
     if (cnarr['log2'] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
         ).sum() <= len(cnarr) // 2:
-        logging.warn("WARNING: most bins have no or very low coverage; "
-                     "check that the right BED file was used")
+        logging.warning("WARNING: most bins have no or very low coverage; "
+                        "check that the right BED file was used")
     else:
         if fix_gc:
             if 'gc' in ref_matched:
                 logging.info("Correcting for GC bias...")
                 cnarr = center_by_window(cnarr, .1, ref_matched['gc'])
             else:
-                logging.warn("WARNING: Skipping correction for GC bias")
+                logging.warning("WARNING: Skipping correction for GC bias")
         if fix_edge:
             logging.info("Correcting for density bias...")
             edge_bias = get_edge_bias(cnarr, params.INSERT_SIZE)
@@ -92,7 +92,8 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
                 logging.info("Correcting for RepeatMasker bias...")
                 cnarr = center_by_window(cnarr, .1, ref_matched['rmask'])
             else:
-                logging.warn("WARNING: Skipping correction for RepeatMasker bias")
+                logging.warning("WARNING: Skipping correction for "
+                                "RepeatMasker bias")
 
     # Normalize coverages according to the reference
     # (Subtract the reference log2 copy number to get the log2 ratio)

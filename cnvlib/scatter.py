@@ -478,9 +478,9 @@ def set_xlim_from(axis, probes=None, segments=None, variants=None):
             min_x = min(min_x, arr.start.iat[0])
     if max_x <= min_x:
         if min_x != np.inf:
-            logging.warn("*WARNING* selection start %s > end %s; did you "
-                         "correctly sort the input file by genomic location?",
-                         min_x, max_x)
+            logging.warning("WARNING: selection start %s > end %s; did you "
+                            "correctly sort the input file by genomic "
+                            "location?", min_x, max_x)
         raise ValueError("No usable data points to plot out of "
                          "%d probes, %d segments, %d variants"
                          % (len(probes) if probes else 0,

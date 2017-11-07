@@ -26,8 +26,8 @@ def load_het_snps(vcf_fname, sample_id=None, normal_id=None,
     if (zygosity_freq is None and 'n_zygosity' in varr and
         not varr['n_zygosity'].any()):
         # Mutect2 sets all normal genotypes to 0/0 -- work around it
-        logging.warn("VCF normal sample's genotypes are all 0/0 or missing; "
-                     "inferring genotypes from allele frequency instead")
+        logging.warning("VCF normal sample's genotypes are all 0/0 or missing; "
+                        "inferring genotypes from allele frequency instead")
         zygosity_freq = 0.25
     if zygosity_freq is not None:
         varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)
@@ -53,10 +53,10 @@ def verify_sample_sex(cnarr, sex_arg, is_male_reference):
     if sex_arg:
         is_sample_female_given = (sex_arg.lower() not in ['y', 'm', 'male'])
         if is_sample_female != is_sample_female_given:
-            logging.warn("Sample sex specified as %s "
-                         "but chromosomal X/Y ploidy looks like %s",
-                         "female" if is_sample_female_given else "male",
-                         "female" if is_sample_female else "male")
+            logging.warning("Sample sex specified as %s "
+                            "but chromosomal X/Y ploidy looks like %s",
+                            "female" if is_sample_female_given else "male",
+                            "female" if is_sample_female else "male")
             is_sample_female = is_sample_female_given
     logging.info("Treating sample %s as %s",
                  cnarr.sample_id or '',

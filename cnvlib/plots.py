@@ -93,8 +93,8 @@ def translate_segments_to_bins(segments, bins):
         # Segments and .cnr bins already match
         return update_binwise_positions_simple(segments)
     else:
-        logging.warn("Segments %s 'probes' sum does not match the number of "
-                     "bins in %s", segments.sample_id, bins.sample_id)
+        logging.warning("Segments %s 'probes' sum does not match the number "
+                        "of bins in %s", segments.sample_id, bins.sample_id)
         # Must re-align segments to .cnr bins
         _x, segments, _v = update_binwise_positions(bins, segments)
         return segments

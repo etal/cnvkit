@@ -20,8 +20,8 @@ def do_import_picard(fname, too_many_no_coverage=100):
     coverages = garr["ratio"].copy()
     no_cvg_idx = (coverages == 0)
     if no_cvg_idx.sum() > too_many_no_coverage:
-        logging.warn("*WARNING* Sample %s has >%d bins with no coverage",
-                    garr.sample_id, too_many_no_coverage)
+        logging.warning("WARNING: Sample %s has >%d bins with no coverage",
+                        garr.sample_id, too_many_no_coverage)
     coverages[no_cvg_idx] = 2**params.NULL_LOG2_COVERAGE
     garr["log2"] = np.log2(coverages)
     return garr
@@ -50,8 +50,8 @@ def unpipe_name(name):
         gene_names = cleaned_names
     new_name = sorted(gene_names, key=len, reverse=True)[0]
     if len(gene_names) > 1:
-        logging.warn("*WARNING* Ambiguous gene name %r; using %r",
-                     name, new_name)
+        logging.warning("WARNING: Ambiguous gene name %r; using %r",
+                        name, new_name)
     return new_name
 
 

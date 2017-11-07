@@ -483,9 +483,9 @@ def ref_means_nbins(tumor_segs, normal_cn):
             if "probes" in tumor_segs:
                 nbins = tumor_segs["probes"]
             else:
-                logging.warn("No probe counts in tumor segments file and no "
-                             "normal reference given; guessing normal "
-                             "read-counts-per-segment from segment sizes")
+                logging.warning("No probe counts in tumor segments file and no "
+                                "normal reference given; guessing normal "
+                                "read-counts-per-segment from segment sizes")
                 sizes = tumor_segs.end - tumor_segs.start
                 nbins = sizes / sizes.mean()
             if "weight" in tumor_segs:

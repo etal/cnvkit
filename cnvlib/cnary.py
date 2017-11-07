@@ -93,8 +93,8 @@ class CopyNumArray(GenomicArray):
             for gene, gene_idx in subgary._get_gene_map().items():
                 if gene not in ignore:
                     if not len(gene_idx):
-                        logging.warn("Specified gene name somehow missing: %s",
-                                     gene)
+                        logging.warning("Specified gene name somehow missing: "
+                                        "%s", gene)
                         continue
                     start_idx = gene_idx[0]
                     end_idx = gene_idx[-1] + 1
@@ -202,8 +202,9 @@ class CopyNumArray(GenomicArray):
         # Handle the deprecated argument
         if squash_background is not None:
             if squash_antitarget == squash_background:
-                logging.warn("Keyword argument squash_background=%r was given; "
-                            "use squash_antitarget instead.", squash_background)
+                logging.warning("Keyword argument squash_background=%r was "
+                                "given; use squash_antitarget instead.",
+                                squash_background)
                 squash_antitarget = squash_background
             else:
                 raise ValueError(
@@ -325,8 +326,8 @@ class CopyNumArray(GenomicArray):
 
         chrx = self[self.chromosome == self._chr_x_label]
         if not len(chrx):
-            logging.warn("No %s found in sample; is the input truncated?",
-                         self._chr_x_label)
+            logging.warning("No %s found in sample; is the input truncated?",
+                            self._chr_x_label)
             return None, {}
 
         auto = self.autosomes()

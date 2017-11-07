@@ -323,10 +323,10 @@ def _cmd_autobin(args):
     if args.method in ('hybrid', 'amplicon') and not args.targets:
         raise RuntimeError("Sequencing method %r requires targets", args.method)
     elif args.method == 'wgs' and args.targets:
-        logging.warn("Targets will be ignored: %s", args.targets)
+        logging.warning("Targets will be ignored: %s", args.targets)
     if args.method == 'amplicon' and args.access:
-        logging.warn("Sequencing-accessible regions will be ignored: %s",
-                     args.access)
+        logging.warning("Sequencing-accessible regions will be ignored: %s",
+                        args.access)
 
     def read_regions(bed_fname):
         if bed_fname:
@@ -334,8 +334,8 @@ def _cmd_autobin(args):
             if len(regions):
                 return regions
             else:
-                logging.warn("No regions to estimate depth from %s",
-                            regions.meta.get('filename', ''))
+                logging.warning("No regions to estimate depth from %s",
+                                regions.meta.get('filename', ''))
 
     tgt_arr = read_regions(args.targets)
     access_arr = read_regions(args.access)
@@ -863,8 +863,8 @@ def _cmd_scatter(args):
                                        **scatter_opts)
                 except ValueError as exc:
                     # Probably no bins in the selected region
-                    logging.warn("Not plotting region %r: %s",
-                                 to_label(region), exc)
+                    logging.warning("Not plotting region %r: %s",
+                                    to_label(region), exc)
                 pdf_out.savefig()
                 pyplot.close()
     else:
