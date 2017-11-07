@@ -435,8 +435,8 @@ class GenomicArray(object):
             other's genomic ranges, the same length as `other`.
         """
         if column not in self:
-            logging.warn("No '%s' column available for summary calculation",
-                         column)
+            logging.warning("No '%s' column available for summary calculation",
+                            column)
             return pd.Series(np.repeat(default, len(other)))
         return into_ranges(self.data, other.data, column, default, summary_func)
 

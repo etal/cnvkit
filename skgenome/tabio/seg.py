@@ -91,8 +91,8 @@ def read_seg(infile, sample_id=None,
         except StopIteration:
             pass
         else:
-            logging.warn("WARNING: SEG file contains multiple samples; "
-                         "returning the first sample '%s'", sid)
+            logging.warning("WARNING: SEG file contains multiple samples; "
+                            "returning the first sample '%s'", sid)
         return dframe
 
 

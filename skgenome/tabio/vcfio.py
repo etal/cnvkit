@@ -32,7 +32,7 @@ def read_vcf(infile, sample_id=None, normal_id=None,
         # NB: in-place
         vcf_reader.subset_samples(list(filter(None, (sid, nid))))
     else:
-        logging.warn("VCF file %s has no sample genotypes", infile)
+        logging.warning("VCF file %s has no sample genotypes", infile)
         sid = sample_id
         nid = None
 
@@ -56,7 +56,7 @@ def read_vcf(infile, sample_id=None, normal_id=None,
             cnt_depth = (~idx_depth).sum()
             table = table[idx_depth]
         else:
-            logging.warn("Depth info not available for filtering")
+            logging.warning("Depth info not available for filtering")
     if skip_somatic:
         idx_som = table['somatic']
         cnt_som = idx_som.sum()
@@ -113,12 +113,12 @@ def _choose_samples(vcf_reader, sample_id, normal_id):
     sid, nid = pairs[0]
     if len(pairs) > 1:
         if nid :
-            logging.warn("WARNING: VCF file contains multiple tumor-normal "
-                         "pairs; returning the first pair '%s' / '%s'",
-                         sid, nid)
+            logging.warning("WARNING: VCF file contains multiple tumor-normal "
+                            "pairs; returning the first pair '%s' / '%s'",
+                            sid, nid)
         else:
-            logging.warn("WARNING: VCF file contains multiple samples; "
-                         "returning the first sample '%s'", sid)
+            logging.warning("WARNING: VCF file contains multiple samples; "
+                            "returning the first sample '%s'", sid)
 
     return sid, nid
 

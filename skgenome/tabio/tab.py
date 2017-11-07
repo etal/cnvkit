@@ -21,8 +21,8 @@ def read_tab(infile):
         # Every bin needs a log2 value; the others can be NaN
         d2 = dframe.dropna(subset=["log2"])
         if len(d2) < len(dframe):
-            logging.warn("Dropped %d rows with missing log2 values",
-                        len(dframe) - len(d2))
+            logging.warning("Dropped %d rows with missing log2 values",
+                            len(dframe) - len(d2))
             dframe = d2.copy()
     return dframe
 
