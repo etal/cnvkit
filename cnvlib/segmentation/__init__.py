@@ -95,13 +95,9 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
     seg_out = ""
     if method == 'haar':
         segarr = haar.segment_haar(filtered_cn, threshold)
-        #  segarr['gene'], segarr['weight'], segarr['depth'] = \
-        #          transfer_fields(segarr, cnarr)
 
     elif method == 'none':
         segarr = none.segment_none(filtered_cn)
-        #  segarr['gene'], segarr['weight'], segarr['depth'] = \
-        #          transfer_fields(segarr, cnarr)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
