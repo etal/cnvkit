@@ -1,6 +1,27 @@
 Plots and graphics
 ==================
 
+The :ref:`scatter` and :ref:`heatmap` plots can be used in two ways:
+
+1. Open the plot in an interactive window with zoom and other features. This
+   is also compatible with Jupyter/IPython notebooks to render the plots inline.
+2. Generate a static image plot with the ``--output``/``-o`` option. 
+   
+    - While PDF is a good choice to generate publication-quality figures that
+      can be easily edited in Inkscape or Adobe Illustrator, other formats will
+      work, indicated by the output filename extension -- e.g. "-o myplot.png"
+      to create PNG, or "-o myplot.svg" to create SVG.
+
+(The :ref:`diagram` command can only generate a PDF file.)
+
+As with any CNVkit command, the ``-h`` option will show the complete list of
+options available::
+
+    cnvkit.py scatter -h
+    cnvkit.py diagram -h
+    cnvkit.py heatmap -h
+
+
 .. _scatter:
 
 scatter
@@ -27,14 +48,9 @@ focus the plot on the specified region::
     cnvkit.py scatter -s Sample.cn{s,r} -g BRAF
 
 In the latter two cases, the genes in the specified region or with the specified
-names will be highlighted and labeled in the plot. The ``--width`` (``-w``)
-argument determines the size of the chromosomal regions to show flanking the
-selected region. Note that only targeted genes can be highlighted and labeled;
-genes that are not included in the list of targets are not labeled in the .cnn
-or .cnr files and are therefore invisible to CNVkit.
-
-The arguments ``-c`` and ``-g`` can be combined to e.g. highlight
-specific genes in a larger context::
+names will be highlighted and labeled in the plot.
+The arguments ``-c`` and ``-g`` can be combined to e.g. highlight specific genes
+in a wider context::
 
     # Show a chromosome arm, highlight one gene
     cnvkit.py scatter -s Sample.cn{s,r} -c chr5:100-50000000 -g TERT
@@ -54,12 +70,6 @@ some doubt on the copy number call in that region. The dispersion of points
 around the segmentation line also visually indicates the level of noise or
 uncertainty.
 
-To create multiple region-specific plots at once, the regions of interest can be
-listed in a separate file and passed to the ``scatter`` command with the
-``-l``/``--range-list`` option. This is equivalent to creating the plots
-separately with the ``-c`` option and then combining the plots into a single
-multi-page PDF.
-
 The bin-level log2 ratios or coverages can also be plotted without segmentation
 calls::
 
@@ -69,36 +79,85 @@ This can be useful for viewing the raw, un-corrected coverage depths when
 deciding which samples to use to build a profile, or simply to see the coverages
 without being helped/biased by the called segments.
 
-The ``--trend`` option (``-t``) adds a smoothed trendline to the plot. This is
-fairly superfluous if a valid segment file is given, but could be helpful if the
-CBS dependency is not available, or if you're skeptical of the segmentation in a
-region.
+The ``--trend`` option (``-t``) adds a smoothed trendline to the plot. This can
+be helpful if the segmentation is not available, or if you're skeptical of the
+segmentation in a region.
+
+Selection and highlighting
+``````````````````````````
+
+Chromosome-level views are controlled with the ``--chromosome``/``-c`` and
+``--gene``/``-g`` options:
+
+- A gene name (e.g. ``-g TERT``) or multiple gene names separated by commas
+  (e.g. ``-g CDK4,MDM2``) will plot the genomic around that gene, or genes, and
+  highlight the gene or genes with a vertical gold stripe.
+
+    - If multiple genes, they must all be on the same chromosome.
+    - The ``--width``/``-w`` argument determines the size of the plotted
+      genomic region, in terms of basepairs flanking the selected region.
+    - Any other genes in the plotted region will not be shown unless also
+      specified with ``-g``.
+
+- A chromosome name alone (e.g. ``-c chr5``) plots the whole chromosome. (No
+  genes are highlighted.)
+- A region label with chromosome name and 1-based start and end coordinates
+  (e.g. ``-c chr5:1000000-4000000``) plots the specified region, with the start
+  and end coordinates as the x-axis limits. All genes in this region (that are
+  labeled in the input .cnr file) are highlighted and labeled. 
+
+    - If the start or end coordinate is left off (e.g. ``-c chr5:-4000000`` or
+      ``-c chr7:140000000-``), the region is extended to the end of the
+      chromosome in the direction of the open coordinate, i.e. it does what
+      you'd think. If both are left off but ``-`` remains (e.g. ``-c chrY:-``),
+      the whole chromosome is shown, with all genes highlighted.
+    - If ``-c`` is used, ``-w`` is ignored -- only the specified genomic region
+      will be shown, with no padding.
+    - The ``-g`` option overrides the default behavior of showing all genes in
+      the selection -- only the genes specified with ``-g`` will be highlighted
+      and labeled. To not show any genes, specify an empty string: ``-g ''``
+    - Special behavior occurs if there are no genes in the selected region:
+      Instead, the selection itself is treated as a "gene", highlighted and
+      labeled with the string "Selection", with padding controlled by ``-w``. 
+      This behavior can be blocked by specifying an empty list of genes: ``-g
+      ''`` -- then the specified region will be plotted as usual, with nothing
+      highlighted and no padding.
+
+To create multiple region-specific plots at once, the regions of interest can be
+listed in a separate file and passed to the ``scatter`` command with the
+``-l``/``--range-list`` option. This is equivalent to creating the plots
+separately with the ``-c`` option and then combining the plots into a single
+multi-page PDF.
+
+.. note:: Only targeted genes can be highlighted and labeled; genes that are not
+    included in the list of targets are not labeled in the .cnn or .cnr files and
+    are therefore invisible to CNVkit.
+
 
 SNV b-allele frequencies
 ````````````````````````
 
-Loss of heterozygosity (LOH) can be viewed alongside copy number by passing
-variants as a VCF file with the ``-v`` option. Heterozygous SNP allelic
-frequencies are shown in a subplot below the CNV scatter plot.
+The allelic frequencies of heterozygous SNPs can be viewed alongside copy number
+by passing variants as a :ref:`vcfformat` file with the ``-v`` option.
+These allele frequences are rendered in a subplot below the CNV scatter plot.
 
 ::
 
     cnvkit.py scatter Sample.cnr -s Sample.cns -v Sample.vcf
 
-If only the VCF file is given by itself, just plot the allelic frequencies::
+If only the VCF file is given by itself, just the allelic frequencies are
+plotted::
 
     cnvkit.py scatter -v Sample.vcf
 
-Given segments, show the mean b-allele frequency values above and below 0.5 of
-SNVs falling within each segment. Divergence from 0.5 indicates LOH in the tumor
-sample.
+When given segments, the plot will show the mean b-allele frequency values above
+and below 0.5 of SNVs falling within each segment. Divergence from 0.5 indicates
+loss of heterozygosity (LOH) or allelic imbalance in the tumor sample.
 
 ::
 
     cnvkit.py scatter -s Sample.cns -v Sample.vcf -i TumorID -n NormalID
 
-Regions with LOH are reflected in heterozygous germline SNPs in the tumor sample
-with allele frequencies shifted away from the expected 0.5 value.
 Given a VCF with only the tumor sample called, it is difficult to focus on just
 the informative SNPs because it's not known which SNVs are present and
 heterozygous in normal, germline cells.
@@ -181,11 +240,11 @@ low-amplitude segments, which are likely spurious CNAs::
 .. image:: heatmap-tr.png
 
 A heatmap can also be drawn from bin-level log2 coverages or copy ratios (.cnn,
-.cnr), but this will be extremely slow at the genome-wide level.
+.cnr), but this can be slow to render at the genome-wide level.
 Consider doing this with a smaller number of samples and only for one chromosome
 or chromosomal region at a time, using the ``-c`` option::
 
-    cnvkit.py heatmap TR_9*T.cnr -c chr12  # Slow!
+    cnvkit.py heatmap TR_9*T.cnr -c chr12
     cnvkit.py heatmap TR_9*T.cnr -c chr7:125000000-145000000
 
 .. image:: heatmap-tr-chr12.png
