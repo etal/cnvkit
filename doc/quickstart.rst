@@ -24,8 +24,8 @@ Go to the `UCSC Genome Bioinformatics <http://hgdownload.soe.ucsc.edu/downloads.
 website and download:
 
 1. Your species' reference genome sequence, in FASTA format [required]
-2. Gene annotation database, via RefSeq or Ensembl, in "flat" format (e.g.
-   `refFlat.txt
+2. Gene annotation database, via RefSeq or Ensembl, in BED or "RefFlat" format
+   (e.g.  `refFlat.txt
    <http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refFlat.txt.gz>`_)
    [optional]
 
@@ -34,19 +34,6 @@ is not available from UCSC, use whatever reference sequence you have. CNVkit
 only requires that your reference genome sequence be in FASTA format.
 Both the reference genome sequence and the annotation database must be single,
 uncompressed files.
-
-**Sequencing-accessible regions:**
-If your reference genome is the UCSC human genome hg19, a BED file of the
-sequencing-accessible regions is included in the CNVkit distribution as
-``data/access-5kb-mappable.hg19.bed``.
-If you're not using hg19, consider building the "access" file yourself from your
-reference genome sequence (say, ``mm10.fasta``) using the :ref:`access`
-command::
-
-    cnvkit.py access mm10.fasta -s 10000 -o access-10kb.mm10.bed
-
-We'll use this file in the next step to ensure off-target bins ("antitargets")
-are allocated only in chromosomal regions that can be mapped.
 
 **Gene annotations:**
 The gene annotations file (refFlat.txt) is useful to apply gene names to your
@@ -69,6 +56,9 @@ Otherwise, if they look like::
 
 Then you don't need refFlat.txt.
 
+If your sequencing protocol is :doc:`WGS <nonhybrid>`, then you don't need a
+"target" BED file, but you probably do still want refFlat.txt.
+
 
 Map sequencing reads to the reference genome
 --------------------------------------------
@@ -88,17 +78,17 @@ samples, although germline disease samples can be used equally well in place of
 tumor samples.
 
 CNVkit uses the bait BED file (provided by the vendor of your capture kit),
-reference genome sequence, and sequencing-accessible regions along with your BAM
-files to:
+reference genome sequence, and (optionally)
+:ref:`sequencing-accessible regions <access>` along with your BAM files to:
 
-1. Create a pooled reference of per-bin copy number estimates from several
-   normal samples; then
+1. Create a pooled :ref:`reference` of per-bin copy number estimates from
+   several normal samples; then
 2. Use this reference in processing all tumor samples that were sequenced with
    the same platform and library prep.
 
 All of these steps are automated with the :ref:`batch` command. Assuming normal
 samples share the suffix "Normal.bam" and tumor samples "Tumor.bam", a complete
-command could be::
+``batch`` command could be::
 
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
         --targets my_baits.bed --fasta hg19.fasta \
@@ -110,9 +100,9 @@ options::
 
     cnvkit.py batch -h
 
-If you have no normal samples to use for the reference, you can create a "flat"
-reference which assumes equal coverage in all bins by using the ``--normal/-n``
-flag without specifying any additional BAM files::
+If you have no normal samples to use for the :ref:`reference`, you can create a
+"flat" reference which assumes equal coverage in all bins by using the
+``--normal/-n`` flag without specifying any additional BAM files::
 
     cnvkit.py batch *Tumor.bam -n -t my_baits.bed -f hg19.fasta \
         --access data/access-5kb-mappable.hg19.bed \
@@ -144,6 +134,7 @@ If your targets are missing gene names, you can add them here with the
     - For :ref:`tas`, use the ``batch --method amplicon`` option and give the
       target BED file.
 
+    See also: :doc:`nonhybrid`
 
 Next steps
 ----------

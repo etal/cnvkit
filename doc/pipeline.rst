@@ -151,7 +151,8 @@ reference genome, output as a BED file.
 
 ::
 
-    cnvkit.py access hg19.fa -x excludes.bed -o access-hg19.bed
+    cnvkit.py access hg19.fa -x excludes.bed -o access-excludes.hg19.bed
+    cnvkit.py access mm10.fasta -s 10000 -o access-10kb.mm10.bed
 
 Many fully sequenced genomes, including the human genome, contain large regions
 of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
