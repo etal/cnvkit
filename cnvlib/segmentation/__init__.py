@@ -19,7 +19,7 @@ from . import cbs, flasso, haar, none
 
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
-                    skip_low=False, skip_outliers=10,
+                    skip_low=False, skip_outliers=10, min_weight=0,
                     save_dataframe=False, rlibpath=None,
                     processes=1):
     """Infer copy number segments from the given coverage table."""
@@ -40,7 +40,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         # ENH segment p/q arms separately
         # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
-                               skip_outliers, save_dataframe, rlibpath)
+                               skip_outliers, min_weight, save_dataframe, rlibpath)
         if save_dataframe:
             cna, rstr = cna
             rstr = _to_str(rstr)
@@ -48,7 +48,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
     else:
         with parallel.pick_pool(processes) as pool:
             rets = list(pool.map(_ds, ((ca, method, threshold, variants,
-                                        skip_low, skip_outliers,
+                                        skip_low, skip_outliers, min_weight,
                                         save_dataframe, rlibpath)
                                        for _, ca in cnarr.by_arm())))
         if save_dataframe:
@@ -78,17 +78,38 @@ def _ds(args):
 
 
 def _do_segmentation(cnarr, method, threshold, variants=None,
-                    skip_low=False, skip_outliers=10,
-                    save_dataframe=False, rlibpath=None):
+                     skip_low=False, skip_outliers=10, min_weight=0,
+                     save_dataframe=False, rlibpath=None):
     """Infer copy number segments from the given coverage table."""
     if not len(cnarr):
         return cnarr
 
     filtered_cn = cnarr.copy()
+    # Filter out bins with no or near-zero sequencing coverage
     if skip_low:
-        filtered_cn = filtered_cn.drop_low_coverage(verbose=True)
+        filtered_cn = filtered_cn.drop_low_coverage(verbose=False)
+    # Filter by distance from rolling quantiles
     if skip_outliers:
         filtered_cn = drop_outliers(filtered_cn, 50, skip_outliers)
+    # Filter by bin weights
+    if min_weight:
+        weight_too_low = (filtered_cn["weight"] < min_weight).fillna(True)
+    else:
+        weight_too_low = (filtered_cn["weight"] == 0).fillna(True)
+    n_weight_too_low = weight_too_low.sum() if len(weight_too_low) else 0
+    if n_weight_too_low:
+        filtered_cn = filtered_cn[~weight_too_low]
+        if min_weight:
+            logging.debug("Dropped %d bins with weight below %s",
+                          n_weight_too_low, min_weight)
+        else:
+            logging.debug("Dropped %d bins with zero weight",
+                          n_weight_too_low)
+
+    if len(filtered_cn) != len(cnarr):
+        logging.info("Dropped %d / %d bins on chromosome %s",
+                     len(cnarr) - len(filtered_cn),
+                     len(cnarr), cnarr["chromosome"].iat[0])
     if not len(filtered_cn):
         return filtered_cn
 
