@@ -912,9 +912,6 @@ P_scatter_aes.add_argument('-a', '--antitarget-marker',
         help="""Plot antitargets using this symbol when plotting in a selected
                 chromosomal region (-g/--gene or -c/--chromosome).
                 [Default: same as targets]""")
-# DEPRECATED shim for 0.9.x
-P_scatter_aes.add_argument('-b', '--background-marker',
-        dest='antitarget_marker', help=argparse.SUPPRESS)
 P_scatter_aes.add_argument("--by-bin", action="store_true",
         help="""Plot data x-coordinates by bin indices instead of genomic
                 coordinates. All bins will be shown with equal width, no blank
