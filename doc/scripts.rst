@@ -62,13 +62,8 @@ reference2targets.py
     antitarget BED files (and subsequently built references) to avoid
     unnecessarily calculating coverage in those bins during future runs.
 
-refFlat2bed.py
-    (Deprecated in favor of `skg_convert.py`)
-
-    Generate a BED file of the genes or exons in the reference genome given in
-    UCSC refFlat.txt format. (Download the input file from `UCSC Genome
-    Bioinformatics <http://hgdownload.soe.ucsc.edu/downloads.html>`_).
-
 skg_convert.py
-    Convert between any of the tabular data formats supported by skgenome.tabio,
-    including BED and UCSC RefFlat.
+    Convert between any of the tabular data :doc:`formats <fileformats>`
+    supported by skgenome.tabio, including BED and UCSC RefFlat (e.g.
+    refFlat.txt from `UCSC Genome Bioinformatics
+    <http://hgdownload.soe.ucsc.edu/downloads.html>`_).
