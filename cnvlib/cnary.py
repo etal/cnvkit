@@ -174,9 +174,7 @@ class CopyNumArray(GenomicArray):
         return self[~drop_idx]
 
     def squash_genes(self, summary_func=descriptives.biweight_location,
-                     squash_antitarget=False, ignore=params.IGNORE_GENE_NAMES,
-                     squash_background=None, # DEPRECATED in 0.9.0
-                    ):
+                     squash_antitarget=False, ignore=params.IGNORE_GENE_NAMES):
         """Combine consecutive bins with the same targeted gene name.
 
         Parameters
@@ -199,19 +197,6 @@ class CopyNumArray(GenomicArray):
             Another, usually smaller, copy of `self` with each gene's bins
             reduced to a single bin with appropriate values.
         """
-        # Handle the deprecated argument
-        if squash_background is not None:
-            if squash_antitarget == squash_background:
-                logging.warning("Keyword argument squash_background=%r was "
-                                "given; use squash_antitarget instead.",
-                                squash_background)
-                squash_antitarget = squash_background
-            else:
-                raise ValueError(
-                    "Deprecated keyword argument squash_background=%r was given, "
-                    "but conflicts with its successor squash_antitarget=%r"
-                    % (squash_background, squash_antitarget))
-
         def squash_rows(name, rows):
             """Combine multiple rows (for the same gene) into one row."""
             if len(rows) == 1:
