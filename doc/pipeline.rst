@@ -51,13 +51,12 @@ complete sooner.
 
 The pipeline executed by the ``batch`` command is equivalent to::
 
-    cnvkit.py target baits.bed --split [--annotate refFlat.txt --short-names] -o my_targets.bed
     cnvkit.py access baits.bed --fasta hg19.fa -o access.hg19.bed
-    cnvkit.py antitarget my_targets.bed --access access.hg19.bed -o my_antitargets.bed
+    cnvkit.py autobin *.bam -t baits.bed -g access.hg19.bed [--annotate refFlat.txt --short-names]
 
     # For each sample...
-    cnvkit.py coverage Sample.bam my_targets.bed -o Sample.targetcoverage.cnn
-    cnvkit.py coverage Sample.bam my_antitargets.bed -o Sample.antitargetcoverage.cnn
+    cnvkit.py coverage Sample.bam baits.target.bed -o Sample.targetcoverage.cnn
+    cnvkit.py coverage Sample.bam baits.antitarget.bed -o Sample.antitargetcoverage.cnn
 
     # With all normal samples...
     cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg19.fa [--male-reference] -o my_reference.cnn
@@ -231,6 +230,30 @@ regions.
     The generated off-target bins are given the label "Antitarget" in CNVkit
     versions 0.9.0 and later. In earlier versions, the label "Background" was
     used -- CNVkit will still accept this label for compatibility.
+
+
+.. _autobin:
+
+autobin
+-------
+
+Quickly estimate read counts or depths in a BAM file to estimate reasonable on-
+and (if relevant) off-target bin sizes. If multiple BAMs are given, use the BAM
+with median file size.
+
+Generates target and (if relevant) antitarget BED files, and prints a table of
+estimated average read depths and recommended bin sizes on standard output.
+
+::
+
+    cnvkit.py autobin *.bam -t my_targets.bed
+    cnvkit.py autobin *.bam -t my_targets.bed -m amplicon
+    cnvkit.py autobin *.bam -m wgs -b 50000 --annotate refFlat.txt
+
+The BAM index (.bai) is used to quickly determine the total number of reads
+present in a file, and random sampling of targeted regions (``-t``) is used to
+estimate average on-target read depth much faster than the :ref:`coverage`
+command.
 
 
 .. _coverage:
