@@ -497,13 +497,38 @@ performed best in our benchmarking. But with the ``-m`` option, the faster
 
 If you do not have R or the R package dependencies installed, but otherwise do
 have CNVkit properly installed, then ``haar`` will work for you. The other two
-methods use R internally.
+methods use R internally. If you installed the R packages in a nonstandard
+location, you can specify this location with ``--rlibpath``.
 
 Fused Lasso additionally performs significance testing to distinguish CNAs from
 regions of neutral copy number, whereas CBS and HaarSeg by themselves only
 identify the supported segmentation breakpoints. Fused Lasso has been reported
 to work well on whole-exome and whole-genome data, while HaarSeg is less suited
-to those larger datasets and better on target panels.
+to those larger datasets but does all right on target panels.
+
+Segmentation runs independently on each chromosome arm, and can be parallelized
+(except for ``flasso``) with the ``-p`` option, similar to ``batch``.
+To simply calculate the weighted mean log2 value of each chromosome arm (for
+testing or debugging, perhaps), use ``-m none``.
+
+The significance threshold to accept a segment or breakpoint is passed to the
+underlying method with the option ``--threshold``/``-t``. This is typically the
+p-value or q-value cutoff, or whatever parameter the underlying method uses to
+adjust its sensitivity.
+
+**Filtering:** Bins with a weight of 0 are dropped before segmentation.
+Additional filters:
+
+- ``--drop-low-coverage`` -- drop bins with a read depth of 0 or very close to
+  0, i.e. a log2 value suggesting the same. Use with tumor samples.
+- ``--drop-outliers`` -- drop bins with log2 value too far from a rolling
+  average, taking local variability into account. Applied by default.
+
+**SNP allele frequencies:** If a :ref:`vcfformat` file is given with the
+``--vcf`` option (and accompanying options ``-i``, ``-n``, ``-z``, and
+``--min-variant-depth``, which work as in other commands), then after segmenting
+log2 ratios, a second pass of segmentation will run within each log2-ratio-based
+segment on the SNP allele frequencies loaded from the VCF.
 
 
 .. _call:
