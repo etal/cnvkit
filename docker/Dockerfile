@@ -1,9 +1,9 @@
-FROM ubuntu:16.04
+FROM ubuntu:17.10
 MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y r-base-core
-RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('PSCBS', 'cghFLasso')"
+RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('DNAcopy', 'cghFLasso')"
 
 RUN apt-get install -y \
     liblzma-dev \
@@ -17,7 +17,7 @@ RUN apt-get install -y \
     python-tk \
     zlib1g-dev
 RUN pip install -U future futures pandas pyfaidx pysam
-RUN pip install cnvkit==0.9.0
+RUN pip install cnvkit==0.9.1
 # Let matplotlib build its font cache
 RUN cnvkit.py version
 
