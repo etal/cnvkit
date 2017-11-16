@@ -1,5 +1,5 @@
-CNVkit: Genome-wide copy number from targeted DNA sequencing
-============================================================
+CNVkit: Genome-wide copy number from high-throughput sequencing
+===============================================================
 
 :Author: Eric Talevich
 :Contact: eric.talevich@ucsf.edu
@@ -11,9 +11,9 @@ CNVkit: Genome-wide copy number from targeted DNA sequencing
 
 
 CNVkit is a Python library and command-line software toolkit to infer and
-visualize copy number from targeted DNA sequencing data. It is designed for use
-with hybrid capture, including both whole-exome and custom target panels, and
-short-read sequencing platforms such as Illumina and Ion Torrent.
+visualize copy number from high-throughput DNA sequencing data. It is designed
+for use with hybrid capture, including both whole-exome and custom target
+panels, and short-read sequencing platforms such as Illumina and Ion Torrent.
 
 .. toctree::
 

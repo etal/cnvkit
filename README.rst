@@ -3,7 +3,7 @@ CNVkit
 ======
 
 A command-line toolkit and Python library for detecting copy number variants
-and alterations genome-wide from targeted DNA sequencing.
+and alterations genome-wide from high-throughput sequencing.
 
 Read the full documentation at: http://cnvkit.readthedocs.io
 
@@ -101,13 +101,18 @@ From source
 -----------
 
 The script ``cnvkit.py`` requires no installation and can be used in-place. Just
-install the dependencies.
+install the dependencies (see below).
 
-To install the main program, supporting scripts and ``cnvlib`` Python library,
-use ``setup.py`` as usual::
+To install the main program, supporting scripts and Python libraries ``cnvlib``
+and ``skgenome``, use ``pip`` as usual, and add the ``-e`` flag to make the
+installation "editable", i.e. in-place::
 
-    python setup.py build
-    python setup.py install
+    git clone https://github.com/etal/cnvkit
+    cd cnvkit/
+    pip install -e .
+
+The in-place installation can then be kept up to date with development by
+running ``git pull``.
 
 
 Python dependencies
