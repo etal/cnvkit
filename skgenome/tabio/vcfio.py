@@ -226,16 +226,17 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
         # Split multiallelics?
         # XXX Ensure sample genotypes are handled properly
         start = record.start
-        for alt in record.alts:
-            if alt == '<NON_REF>':
-                # gVCF placeholder -- not a real allele
-                continue
-            end = _get_end(start, alt, record.info)
-            row = (record.chrom, start, end, record.ref, alt,
-                   is_som, zygosity, depth, alt_count)
-            if normal_id:
-                row += (n_zygosity, n_depth, n_alt_count)
-            yield row
+        if record.alts:
+            for alt in record.alts:
+                if alt == '<NON_REF>':
+                    # gVCF placeholder -- not a real allele
+                    continue
+                end = _get_end(start, alt, record.info)
+                row = (record.chrom, start, end, record.ref, alt,
+                    is_som, zygosity, depth, alt_count)
+                if normal_id:
+                    row += (n_zygosity, n_depth, n_alt_count)
+                yield row
 
     if cnt_reject:
         logging.info('Filtered out %d records', cnt_reject)
