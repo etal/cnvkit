@@ -33,7 +33,19 @@ def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
         # values where antitargets are suitable.
         sexes = infer_sexes(target_fnames, male_reference)
         if antitarget_fnames:
-            sexes.update(infer_sexes(antitarget_fnames, male_reference))
+            a_sexes = infer_sexes(antitarget_fnames, male_reference)
+            for sid, a_is_xx in a_sexes.items():
+                t_is_xx = sexes.get(sid)
+                if t_is_xx is None:
+                    sexes[sid] = a_is_xx
+                elif t_is_xx != a_is_xx and a_is_xx is not None:
+                    logging.warning("Sample %s chromosomal X/Y ploidy looks "
+                                    "like %s in targets but %s in antitargets; "
+                                    "preferring antitargets",
+                                    sid,
+                                    "female" if t_is_xx else "male",
+                                    "female" if a_is_xx else "male")
+                    sexes[sid] = a_is_xx
     else:
         sexes = collections.defaultdict(lambda: female_samples)
 
