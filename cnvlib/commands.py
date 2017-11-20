@@ -467,8 +467,8 @@ do_reference_flat = public(reference.do_reference_flat)
 
 def _cmd_reference(args):
     """Compile a coverage reference from the given files (normal samples)."""
-    usage_err_msg = ("Give .cnn samples OR targets and antitargets.")
-    if args.targets and args.antitargets:
+    usage_err_msg = ("Give .cnn samples OR targets and (optionally) antitargets.")
+    if args.targets:
         # Flat refence
         assert not args.references, usage_err_msg
         ref_probes = reference.do_reference_flat(args.targets, args.antitargets,
