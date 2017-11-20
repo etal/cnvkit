@@ -136,7 +136,7 @@ def export_nexus_ogt(cnarr, varr, min_weight=0.0):
     return out_table
 
 
-def export_seg(sample_fnames, chrom_ids=None):
+def export_seg(sample_fnames, chrom_ids=False):
     """SEG format for copy number segments.
 
     Segment breakpoints are not the same across samples, so samples are listed

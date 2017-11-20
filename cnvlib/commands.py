@@ -1481,7 +1481,7 @@ def _cmd_export_seg(args):
 
     Compatible with IGV and GenePattern.
     """
-    table = export.export_seg(args.filenames)
+    table = export.export_seg(args.filenames, chrom_ids=args.enumerate_chroms)
     write_dataframe(args.output, table)
 
 P_export_seg = P_export_subparsers.add_parser('seg',
@@ -1489,6 +1489,8 @@ P_export_seg = P_export_subparsers.add_parser('seg',
 P_export_seg.add_argument('filenames', nargs='+',
         help="""Segmented copy ratio data file(s) (*.cns), the output of the
                 'segment' sub-command.""")
+P_export_seg.add_argument('--enumerate-chroms', action='store_true',
+        help="""Replace chromosome names with sequential integer IDs.""")
 P_export_seg.add_argument('-o', '--output', help="Output file name.")
 P_export_seg.set_defaults(func=_cmd_export_seg)
 

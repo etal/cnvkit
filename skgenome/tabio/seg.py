@@ -192,7 +192,7 @@ def write_seg(dframe, sample_id=None, chrom_ids=None):
         first = next(dframes)
         first_sid = next(sids)
 
-    if chrom_ids is None:
+    if chrom_ids in (None, True):
         chrom_ids = create_chrom_ids(first)
     results = [format_seg(first, first_sid, chrom_ids)]
     if dframes is not None:
@@ -206,15 +206,18 @@ def write_seg(dframe, sample_id=None, chrom_ids=None):
 def format_seg(dframe, sample_id, chrom_ids):
     assert dframe is not None
     assert sample_id is not None
-    #  assert chrom_ids is not None
-    rename_cols = {"log2": "seg.mean"}
+    chroms = (dframe.chromosome.replace(chrom_ids) if chrom_ids
+              else dframe.chromosome)
+    rename_cols = {"log2": "seg.mean",
+                   "start": "loc.start",
+                   "end": "loc.end"}
     # NB: in some programs the "sampleName" column is labeled "ID"
     reindex_cols = ["ID", "chrom", "loc.start", "loc.end", "seg.mean"]
     if "probes" in dframe:
         rename_cols["probes"] = "num.mark" # or num_probes
         reindex_cols.insert(-1, "num.mark")
     return (dframe.assign(ID=sample_id,
-                          chrom=dframe.chromosome.replace(chrom_ids),
+                          chrom=chroms,
                           start=dframe.start + 1)
             .rename(columns=rename_cols)
             .reindex(columns=reindex_cols))
