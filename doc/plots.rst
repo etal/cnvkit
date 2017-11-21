@@ -203,10 +203,6 @@ the individual gene labels become difficult to read.
 
 .. image:: TR_95_T-diagram.png
 
-If only segments are provided (``-s``), gene labels are not shown.  This plot is
-then equivalent to the ``heatmap`` command, which effectively summarizes the
-segmented values from many samples.
-
 By default, the sex chromosomes X and Y are colorized relative to the expected
 ploidy, i.e. for female samples analyzed with a male reference, while the X
 chromosome has a copy ratio near +1.0 in the input .cnr and .cns files, in the
