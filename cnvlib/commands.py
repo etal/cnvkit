@@ -26,8 +26,7 @@ from skgenome.rangelabel import to_label
 
 from . import (access, antitarget, autobin, batch, call, core, coverage,
                descriptives, diagram, export, fix, heatmap, importers, metrics,
-               parallel, plots, reference, reports, scatter, segmentation,
-               target)
+               parallel, reference, reports, scatter, segmentation, target)
 from .cmdutil import (load_het_snps, read_cna, verify_sample_sex,
                       write_tsv, write_text, write_dataframe)
 
@@ -42,7 +41,7 @@ def public(fn):
 
 AP = argparse.ArgumentParser(
         description="CNVkit, a command-line toolkit for copy number analysis.",
-        epilog="Contact Eric Talevich <eric.talevich@ucsf.edu> for help.")
+        epilog="See the online manual for details: https://cnvkit.readthedocs.io")
 AP_subparsers = AP.add_subparsers(
         help="Sub-commands (use with -h for more info)")
 
