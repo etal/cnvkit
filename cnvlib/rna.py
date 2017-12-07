@@ -7,11 +7,10 @@ from builtins import zip
 
 import logging
 import sys
-import warnings
 
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr, kendalltau, gmean
+from scipy.stats import gmean
 
 from .cnary import CopyNumArray as CNA
 from .fix import center_by_window
@@ -43,7 +42,7 @@ def filter_probes(sample_counts):
     return sample_counts[is_mostly_transcribed]
 
 
-def load_gene_info(gene_resource, tcga_cnv, tcga_expression, default_r=.1):
+def load_gene_info(gene_resource, corr_fname, default_r=.1):
     """Read gene info from BioMart, and optionally TCGA, into a dataframe.
 
     RSEM only outputs the Ensembl ID. We have used the BioMART tool in Ensembl
@@ -66,12 +65,6 @@ def load_gene_info(gene_resource, tcga_cnv, tcga_expression, default_r=.1):
     # "NCBI gene ID"
     # "Transcript length (including UTRs and CDS)"
     # "Transcript support level (TSL)"
-
-    # DBG
-    #  gene_resource = "../GeneInfo/GeneInfo3_mart_export.txt"
-    #  tcga_cnv = "../Get_PearsonValue/InputFiles/data_CNA.txt"
-    #  tcga_expression = "../Get_PearsonValue/InputFiles/data_RNA_Seq_v2_expression_median.txt"
-
     info_col_names = ['gene_id', 'gc', 'chromosome', 'start', 'end',
                       'gene', 'entrez_id', 'tx_length', 'tx_support']
     gene_info = (pd.read_table(gene_resource, names=info_col_names, header=1,
@@ -82,8 +75,8 @@ def load_gene_info(gene_resource, tcga_cnv, tcga_expression, default_r=.1):
     print("Loaded", gene_resource, "with shape:", gene_info.shape,
           file=sys.stderr)
 
-    if tcga_cnv and tcga_expression:
-        corr_table = correlate_cnv_expression(tcga_cnv, tcga_expression)
+    if corr_fname:
+        corr_table = load_cnv_expression_corr(corr_fname)
 
         gi_corr = gene_info.join(corr_table, on='entrez_id', how='left')
         if not gi_corr['gene_id'].is_unique:
@@ -113,70 +106,10 @@ def load_gene_info(gene_resource, tcga_cnv, tcga_expression, default_r=.1):
     return gene_info.set_index('gene_id')
 
 
-
-def correlate_cnv_expression(cnv_fname, expression_fname):
-    """Get correlation coefficients for matched copy number and expression data.
-
-    cBioPortal offers a nice feature in which you can download a summary of many
-    large-scale sequencing studies. In this summary are two files that contain
-    the copy number and expression values of every gene in the study for every
-    sample.  This summary is available for nearly every TCGA study, and the data
-    is intuitive to access, therefore I have designed this pre-processing script
-    to accept these as inputs. Of course, the user can calculate their own
-    Pearson values from other sources of data if they prefer -- in this case,
-    the user should formate their data to match the output of this prepocessing
-    script.
-    """
+def load_cnv_expression_corr(fname):
     shared_key = 'Entrez_Gene_Id'
-    cnv_table = load_tcga_table(cnv_fname, shared_key)
-    expr_table = load_tcga_table(expression_fname, shared_key)
-    # Ensure rows and columns match
-    cnv_table, expr_table = cnv_table.align(expr_table, join='inner')
-    print("Trimmed TCGA tables to shape:", cnv_table.shape)
-
-    # Calculate correlation coefficients
-    print("Calculating correlation coefficients")
-    c_nums = cnv_table._get_numeric_data()
-    e_nums = expr_table._get_numeric_data()
-    # Pearson correlation coefficient (superfast)
-    r = c_nums.corrwith(e_nums, axis=1)
-    # Spearman, Kendall (slow)
-    # NB: RuntimeWarning from numpy/scipy for divide-by-zero / inf / nan
-    # ENH: with warnings.catch_warnings(): but just catch RuntimeWarning
-    warnings.simplefilter('ignore', RuntimeWarning)
-    rho, tau = zip(*[
-        (spearmanr(cnv_row, expr_row, nan_policy='omit')[0],
-         kendalltau(cnv_row, expr_row, nan_policy='omit')[0])
-        for cnv_row, expr_row in zip(c_nums.values, e_nums.values)])
-
-    result = pd.DataFrame({
-        "pearson_r": r.values,
-        "spearman_r": rho,
-        "kendall_t": tau,
-    }, index=cnv_table.index).clip_lower(0).fillna(0)
-    result["hugo_gene"] = cnv_table['Hugo_Symbol'].fillna('').values
-    return result
-
-
-def load_tcga_table(fname, shared_key):
-    """Load TCGA expression/CNV data, keeping unique Entrez genes.
-
-    Rows without an Entrez_Gene_Id value are dropped. Where a gene has multiple
-    HUGO names but one Entrez_Gene_Id (i.e. multiple rows with the same
-    Entrez_Gene_Id), only the sortest and then alphabetically first HUGO name is
-    kept, ensuring Entrez_Gene_Id values are unique.
-    """
-    table = pd.read_table(fname, dtype={shared_key: str}, na_filter=False)
-    table = table[table[shared_key] != ''].astype({shared_key: int})
-    before_pipe = before('|')
-    sort_order = (table['Hugo_Symbol']
-                  .apply(lambda x: (len(x), before_pipe(x)))
-                  .argsort())
-    table = (table.iloc[sort_order]
-             .drop_duplicates(subset=shared_key)
-             .set_index(shared_key)
-             .sort_index(axis=0)
-             .sort_index(axis=1))
+    table = (pd.read_table(fname, dtype={shared_key: str}, na_filter=False)
+             .set_index(shared_key))
     print("Loaded", fname, "with shape:", table.shape, file=sys.stderr)
     return table
 
@@ -344,8 +277,8 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths):
     gi['weight'] = weight / weight.max()
     if gi['weight'].isnull().all():
         gi['weight'] = 1.0
-    logging.info(" --> final zeros: %d / %d",
-                 (gi['weight'] == 0).sum(), len(gi))
+    logging.debug(" --> final zeros: %d / %d",
+                  (gi['weight'] == 0).sum(), len(gi))
     return gi, sc, sample_depths_log2
 
 

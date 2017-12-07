@@ -45,13 +45,13 @@ def main(args):
         print("Wrote", args.output + ".sample_counts.tsv",
               "with", len(sample_counts), "rows")
 
-    if args.tcga_cnv and args.tcga_expression:
+    if args.correlations:
         logging.info("Loading gene metadata "
                      "and TCGA gene expression/CNV profiles")
     else:
         logging.info("Loading gene metadata")
-    gene_info = rna.load_gene_info(args.gene_resource,
-                                   args.tcga_cnv, args.tcga_expression)
+
+    gene_info = rna.load_gene_info(args.gene_resource, args.correlations)
 
     print("Aligning gene info to sample gene counts")
     gene_info, sample_counts, sample_data_log2 = rna.align_gene_info_to_samples(
@@ -88,19 +88,13 @@ if __name__ == '__main__':
                     number of reads mapped to each gene.""")
     AP.add_argument("-o", "--output", metavar="FILE",
                     help="Output file name (summary table).")
-    AP.add_argument("--cnr-dir", metavar="PATH",
+    AP.add_argument("-d", "--cnr-dir", metavar="PATH",
                     help="""Directory to write a CNVkit .cnr file for each input
                     sample.""")
     AP.add_argument("-g", "--gene-resource", metavar="FILE",
-                    help="Location of gene info table from BioMart.")
-
-    AP_tcga = AP.add_argument_group(
-        "To correlate each gene's copy number with expression")
-    AP_tcga.add_argument("--tcga-cnv", metavar="CNV_FILE",
-                    help="""CNVs for many TCGA samples, downloaded from
-                    cBioPortal.""")
-    AP_tcga.add_argument("--tcga-expression", metavar="RNA_FILE",
-                    help="""Gene expression for many TCGA samples, downloaded from
-                    cBioPortal.""")
+                    help="Location of gene info table from Ensembl BioMart.")
+    AP.add_argument("-c", "--correlations", metavar="FILE",
+                    help="""Correlation of each gene's copy number with
+                    expression. Output of cnv_expression_correlate.py.""")
 
     main(AP.parse_args())
