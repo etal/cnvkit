@@ -226,7 +226,12 @@ class CopyNumArray(GenomicArray):
     # Chromosomal sex
 
     def shift_xx(self, male_reference=False, is_xx=None):
-        """Adjust chrX log2 ratios (subtract 1) for apparent female samples."""
+        """Adjust chrX log2 ratios to match the ploidy of the reference sex.
+
+        I.e. add 1 to chrX log2 ratios for a male sample vs. female reference,
+        or subtract 1 for a female sample vs. male reference, so that chrX log2
+        values are comparable across samples with different chromosomal sex.
+        """
         outprobes = self.copy()
         if is_xx is None:
             is_xx = self.guess_xx(male_reference=male_reference)
