@@ -246,9 +246,9 @@ estimated average read depths and recommended bin sizes on standard output.
 
 ::
 
-    cnvkit.py autobin *.bam -t my_targets.bed
-    cnvkit.py autobin *.bam -t my_targets.bed -m amplicon
-    cnvkit.py autobin *.bam -m wgs -b 50000 --annotate refFlat.txt
+    cnvkit.py autobin *.bam -t my_targets.bed -g access.hg19.bed
+    cnvkit.py autobin *.bam -m amplicon -t my_targets.bed
+    cnvkit.py autobin *.bam -m wgs -b 50000 -g access.hg19.bed --annotate refFlat.txt
 
 The BAM index (.bai) is used to quickly determine the total number of reads
 present in a file, and random sampling of targeted regions (``-t``) is used to
