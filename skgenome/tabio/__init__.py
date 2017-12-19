@@ -267,5 +267,5 @@ format_patterns = collections.OrderedDict([
     ('gff', re.compile('\t'.join((
         r'\w+', r'\S+', r'\w+', r'\d+', r'\d+',
         r'\S+', r'[.?+-]', r'[012.]', r'.*')))),
-    ('bed', re.compile('\t'.join((r'\w+', r'\d+', r'\d+')))),
+    ('bed', re.compile('\t'.join((r'\S+', r'\d+', r'\d+')))),
 ])
