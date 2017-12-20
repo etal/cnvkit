@@ -157,7 +157,7 @@ of Bioconductor and cannot be installed through CRAN directly. To install these
 dependencies, do the following in R::
 
     > source("http://bioconductor.org/biocLite.R")
-    > biocLite("DNAcopy", "cghFLasso")
+    > biocLite(c("DNAcopy", "cghFLasso"))
 
 This will install the DNAcopy and cghFLasso packages, as well as their
 dependencies.
