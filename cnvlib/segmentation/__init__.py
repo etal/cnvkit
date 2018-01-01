@@ -15,7 +15,7 @@ from skgenome import tabio
 
 from .. import core, parallel, params, smoothing, vary
 from ..cnary import CopyNumArray as CNA
-from . import cbs, flasso, haar, none
+from . import cbs, flasso, haar, hmm, none
 
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
@@ -29,14 +29,13 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         threshold = {'cbs': 0.0001,
                      'flasso': 0.005,
                      'haar': 0.001,
-                     'none': np.nan,
-                    }[method]
+                    }.get(method, np.nan)
     logging.info("Segmenting with method '%s', significance threshold %g, "
                  "in %s processes", method, threshold, processes)
 
     # NB: parallel cghFLasso segfaults in R ('memory not mapped'),
     # even when run on a single chromosome
-    if method == 'flasso':
+    if method == 'flasso' or method.startswith('hmm'):
         # ENH segment p/q arms separately
         # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
@@ -120,6 +119,10 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
     elif method == 'none':
         segarr = none.segment_none(filtered_cn)
 
+    elif method.startswith('hmm'):
+        segarr = hmm.segment_hmm(filtered_cn, method)
+        segarr = squash_segments(segarr)
+
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
         rscript = {'cbs': cbs.CBS_RSCRIPT,
@@ -128,6 +131,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
 
         filtered_cn['start'] += 1  # Convert to 1-indexed coordinates for R
         with tempfile.NamedTemporaryFile(suffix='.cnr', mode="w+t") as tmp:
+            # TODO tabio.write(filtered_cn, tmp, 'seg')
             filtered_cn.data.to_csv(tmp, index=False, sep='\t',
                                     float_format='%.6g', mode="w+t")
             tmp.flush()
@@ -222,39 +226,9 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
 
 
 def squash_segments(segments):
-    """Combine contiguous segments."""
-    curr_chrom = None
-    curr_start = None
-    curr_end = None
-    curr_genes = []
-    curr_log2 = None
-    curr_probes = 0
-    squashed_rows = []
-    for row in segments:
-        if row.chromosome == curr_chrom and row.log2 == curr_log2:
-            # Continue the current segment
-            curr_end = row.end
-            curr_genes.append(row.gene)
-            curr_probes += 1
-        else:
-            # Segment break
-            # Finish the current segment
-            if curr_probes:
-                squashed_rows.append((curr_chrom, curr_start, curr_end,
-                                      ",".join(pd.unique(curr_genes)),
-                                      curr_log2, curr_probes))
-            # Start a new segment
-            curr_chrom = row.chromosome
-            curr_start = row.start
-            curr_end = row.end
-            curr_genes = []
-            curr_log2 = row.log2
-            curr_probes = 1
-    # Remainder
-    squashed_rows.append((curr_chrom, curr_start, curr_end,
-                          ",".join(pd.unique(curr_genes)),
-                          curr_log2, curr_probes))
-    return segments.as_rows(squashed_rows)
+    """Combine adjacent bins with same log2 value into segments."""
+    from ..segfilters import squash_by_groups
+    return squash_by_groups(segments, segments['log2'])
 
 
 # TODO/ENH combine with transfer_fields

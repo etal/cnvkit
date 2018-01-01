@@ -623,9 +623,10 @@ P_segment.add_argument('-o', '--output',
 P_segment.add_argument('-d', '--dataframe',
         help="""File name to save the raw R dataframe emitted by CBS or
                 Fused Lasso. (Useful for debugging.)""")
-P_segment.add_argument('-m', '--method',
-        choices=('cbs', 'haar', 'flasso', 'none'), default='cbs',
-        help="""Segmentation method (CBS, HaarSeg, or Fused Lasso).
+P_segment.add_argument('-m', '--method', default='cbs',
+        choices=('cbs', 'haar', 'flasso', 'none',
+                 'hmm', 'hmm-tumor', 'hmm-germline'),
+        help="""Segmentation method (CBS, HMM, HaarSeg, or Fused Lasso).
                 [Default: %(default)s]""")
 P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
