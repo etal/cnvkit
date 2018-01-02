@@ -412,15 +412,33 @@ class CommandTests(unittest.TestCase):
     def test_segment(self):
         """The 'segment' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
+        n_chroms = cnarr.chromosome.nunique()
         # NB: R methods are in another script; haar is pure-Python
         segments = segmentation.do_segmentation(cnarr, "haar")
-        self.assertGreater(len(segments), 0)
+        self.assertGreater(len(segments), n_chroms)
         segments = segmentation.do_segmentation(cnarr, "haar", threshold=.0001,
                                                 skip_low=True)
-        self.assertGreater(len(segments), 0)
+        self.assertGreater(len(segments), n_chroms)
         varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
-        self.assertGreater(len(segments), 0)
+        self.assertGreater(len(segments), n_chroms)
+
+    def test_segment_hmm(self):
+        """The 'segment' command with HMM methods."""
+        for fname in ("formats/amplicon.cnr", "formats/p2-20_1.cnr"):
+            cnarr = cnvlib.read(fname)
+            n_chroms = cnarr.chromosome.nunique()
+            # NB: R methods are in another script; haar is pure-Python
+            segments = segmentation.do_segmentation(cnarr, "hmm")
+            self.assertGreater(len(segments), n_chroms)
+            segments = segmentation.do_segmentation(cnarr, "hmm-tumor",
+                                                    skip_low=True)
+            self.assertGreater(len(segments), n_chroms)
+            segments = segmentation.do_segmentation(cnarr, "hmm-germline")
+            self.assertGreater(len(segments), n_chroms)
+            #  varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+            #  segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
+            #  self.assertGreater(len(segments), n_chroms)
 
     def test_segment_parallel(self):
         """The 'segment' command, in parallel."""
