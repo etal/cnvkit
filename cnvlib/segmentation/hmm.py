@@ -8,7 +8,7 @@ import pandas as pd
 from hmmlearn import hmm
 
 
-def segment_hmm(cnarr, method, window=50):
+def segment_hmm(cnarr, method, window=None):
     """Segment bins by Hidden Markov Model.
 
     Use Viterbi method to infer copy number segments from sequential data.
@@ -49,8 +49,7 @@ def segment_hmm(cnarr, method, window=50):
     # print(model.monitor_, end="\n\n")
 
     # Merge adjacent bins with the same state to create segments
-    #   - but keep centromere breaks -- flasso should, too
-    #   -> replace squash_segments
+    # ENH: keep centromere breaks -- flasso should, too
     from ..segfilters import squash_by_groups
     cnarr['probes'] = 1
     segarr = squash_by_groups(cnarr, pd.Series(states))

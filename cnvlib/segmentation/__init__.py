@@ -29,8 +29,8 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         threshold = {'cbs': 0.0001,
                      'flasso': 0.005,
                      'haar': 0.001,
-                    }.get(method, np.nan)
-    logging.info("Segmenting with method '%s', significance threshold %g, "
+                    }.get(method)
+    logging.info("Segmenting with method '%s', significance threshold %s, "
                  "in %s processes", method, threshold, processes)
 
     # NB: parallel cghFLasso segfaults in R ('memory not mapped'),
@@ -155,7 +155,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         raise ValueError("Unknown method %r" % method)
 
     segarr.meta = cnarr.meta.copy()
-    if variants:
+    if variants and not method.startswith('hmm'):
         # Re-segment the variant allele freqs within each segment
         newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
                    for segment, subvarr in variants.by_ranges(segarr)]

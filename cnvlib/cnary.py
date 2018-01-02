@@ -463,7 +463,6 @@ class CopyNumArray(GenomicArray):
             parts = self.by_arm()
         else:
             parts = self.by_chromosome()
-        # ENH: by_arm=True?
         if 'weight' in self:
             out = [smoothing.smoothed(subcna['log2'], window,
                                       weights=subcna['weight'])

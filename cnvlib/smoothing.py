@@ -70,10 +70,15 @@ def smoothed(x, width=None, weights=None, do_fit_edges=False):
         Fraction of x's total length to include in the rolling window (i.e. the
         proportional window width), or the integer size of the window.
     """
+    if len(x) < 2:
+        return x
     if width is None:
         # Choose a reasonable window size (inspired by Silverman's rule)
-        width = int(round(4 * descriptives.biweight_midvariance(x)
-                          * len(x) ** (4/5)))
+        if weights is None:
+            sd = descriptives.biweight_midvariance(x)
+        else:
+            sd = descriptives.weighted_std(x, weights)
+        width = int(round(4 * sd * len(x) ** (4/5)))
     x, wing, signal = check_inputs(x, width, False)
     # Apply signal smoothing
     window = np.kaiser(2 * wing + 1, 14)
@@ -92,11 +97,11 @@ def smoothed(x, width=None, weights=None, do_fit_edges=False):
         # Chop off the ends of the result so it has the original size
         y = y[wing:-wing]
     if do_fit_edges:
-        fit_edges(x, y, wing)  # In-place
+        _fit_edges(x, y, wing)  # In-place
     return y
 
 
-def fit_edges(x, y, wing, polyorder=3):
+def _fit_edges(x, y, wing, polyorder=3):
     """Apply polynomial interpolation to the edges of y, in-place.
 
     Calculates a polynomial fit (of order `polyorder`) of `x` within a window of
