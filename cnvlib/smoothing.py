@@ -22,8 +22,8 @@ def check_inputs(x, width, as_series=True):
     elif width >= 2 and int(width) == width:
         wing = width // 2
     else:
-        raise ValueError("width fraction must be between 0 and 1 (got %s)"
-                         % width)
+        raise ValueError("width must be either a fraction between 0 and 1 "
+                         "or an integer greater than 1 (got %s)" % width)
     wing = max(wing, 5)
     wing = min(wing, len(x) - 1)
     assert wing > 0, "Wing must be greater than 0 (got %s)" % wing
@@ -78,7 +78,7 @@ def smoothed(x, width=None, weights=None, do_fit_edges=False):
             sd = descriptives.biweight_midvariance(x)
         else:
             sd = descriptives.weighted_std(x, weights)
-        width = int(round(4 * sd * len(x) ** (4/5)))
+        width = max(3, int(round(4 * sd * len(x) ** (4/5))))
     x, wing, signal = check_inputs(x, width, False)
     # Apply signal smoothing
     window = np.kaiser(2 * wing + 1, 14)

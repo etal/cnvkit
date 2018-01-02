@@ -30,8 +30,11 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                      'flasso': 0.005,
                      'haar': 0.001,
                     }.get(method)
-    logging.info("Segmenting with method '%s', significance threshold %s, "
-                 "in %s processes", method, threshold, processes)
+    msg = "Segmenting with method " + repr(method)
+    if threshold is not None:
+        msg += ", significance threshold %s," % threshold
+    msg += " in %s processes" % processes
+    logging.info(msg)
 
     # NB: parallel cghFLasso segfaults in R ('memory not mapped'),
     # even when run on a single chromosome
@@ -106,9 +109,11 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
                           n_weight_too_low)
 
     if len(filtered_cn) != len(cnarr):
-        logging.info("Dropped %d / %d bins on chromosome %s",
-                     len(cnarr) - len(filtered_cn),
-                     len(cnarr), cnarr["chromosome"].iat[0])
+        msg = ("Dropped %d / %d bins"
+               % (len(cnarr) - len(filtered_cn), len(cnarr)))
+        if cnarr["chromosome"].iat[0] == cnarr["chromosome"].iat[-1]:
+            msg += "on chromosome " + str(cnarr["chromosome"].iat[0])
+        logging.info(msg)
     if not len(filtered_cn):
         return filtered_cn
 
@@ -121,7 +126,6 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
 
     elif method.startswith('hmm'):
         segarr = hmm.segment_hmm(filtered_cn, method)
-        segarr = squash_segments(segarr)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
@@ -228,7 +232,7 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
 def squash_segments(segments):
     """Combine adjacent bins with same log2 value into segments."""
     from ..segfilters import squash_by_groups
-    return squash_by_groups(segments, segments['log2'])
+    return squash_by_groups(segments, segments['log2'], by_arm=True)
 
 
 # TODO/ENH combine with transfer_fields

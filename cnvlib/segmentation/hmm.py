@@ -34,25 +34,24 @@ def segment_hmm(cnarr, method, window=None):
     # (Useful kludge until weighted HMM is in place)
     cnarr['log2'] = cnarr.smoothed(window)
 
-    logging.info("Building model from observations")
+    logging.debug("Building model from observations")
     model = hmm_get_model(cnarr, method)
-    logging.info("Predicting states from model")
+    logging.debug("Predicting states from model")
     obs = as_observation_matrix(cnarr)
     # A sequence of inferred discrete states. Length is the same as `freqs`,
     # with one state assigned to each input datapoint.
     states = model.predict(obs, lengths=chrom_arm_lengths(cnarr))
 
+    # TODO logging.warn if model did not converge
     # print(model, end="\n\n")
-    # print("Model params:\nmeans =", sorted(model.means_.flat),
-    #       "\ncovars =", list(model.covars_.flat),
-    #      )
+    # print("Model params:\nmeans =", sorted(model.means_.flat))
     # print(model.monitor_, end="\n\n")
 
     # Merge adjacent bins with the same state to create segments
-    # ENH: keep centromere breaks -- flasso should, too
+    # TODO keep centromere breaks -- flasso should, too
     from ..segfilters import squash_by_groups
     cnarr['probes'] = 1
-    segarr = squash_by_groups(cnarr, pd.Series(states))
+    segarr = squash_by_groups(cnarr, pd.Series(states), by_arm=True)
     return segarr
 
 

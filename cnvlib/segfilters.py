@@ -35,14 +35,21 @@ def require_column(*colnames):
     return wrap
 
 
-def squash_by_groups(cnarr, levels):
+def squash_by_groups(cnarr, levels, by_arm=False):
     """Reduce CopyNumArray rows to a single row within each given level."""
     # Enumerate runs of identical values
     change_levels = enumerate_changes(levels)
-    # Enumerate chromosomes
-    chrom_names = cnarr['chromosome'].unique()
-    change_levels += cnarr['chromosome'].replace(chrom_names,
-                                                 np.arange(len(chrom_names)))
+    if by_arm:
+        # Enumerate chromosome arms
+        arm_levels = []
+        for i, (_chrom, cnarm) in enumerate(cnarr.by_arm()):
+            arm_levels.append(np.repeat(i, len(cnarm)))
+        change_levels += np.concatenate(arm_levels)
+    else:
+        # Enumerate chromosomes
+        chrom_names = cnarr['chromosome'].unique()
+        change_levels += (cnarr['chromosome']
+                          .replace(chrom_names, np.arange(len(chrom_names))))
     data = cnarr.data.assign(_group=change_levels)
     groupkey = ['_group']
     if 'cn1' in cnarr:
