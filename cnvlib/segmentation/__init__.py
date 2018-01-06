@@ -15,6 +15,7 @@ from skgenome import tabio
 
 from .. import core, parallel, params, smoothing, vary
 from ..cnary import CopyNumArray as CNA
+from ..segfilters import squash_by_groups
 from . import cbs, flasso, haar, hmm, none
 
 
@@ -152,7 +153,12 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         # NB: Automatically shifts 'start' back from 1- to 0-indexed
         segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)
         if method == 'flasso':
-            segarr = squash_segments(segarr)
+            # Merge adjacent bins with same log2 value into segments
+            if 'weight' in filtered_cn:
+                segarr['weight'] = filtered_cn['weight']
+            else:
+                segarr['weight'] = 1.0
+            segarr = squash_by_groups(segarr, segarr['log2'], by_arm=True)
         segarr = repair_segments(segarr, cnarr)
 
     else:
@@ -227,12 +233,6 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
         if subgenes:
             seggenes[i] = ",".join(subgenes)
     return seggenes, segweights, segdepths
-
-
-def squash_segments(segments):
-    """Combine adjacent bins with same log2 value into segments."""
-    from ..segfilters import squash_by_groups
-    return squash_by_groups(segments, segments['log2'], by_arm=True)
 
 
 # TODO/ENH combine with transfer_fields

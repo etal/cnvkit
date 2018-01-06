@@ -50,15 +50,32 @@ threshold.
     cnvkit.py gainloss Sample.cnr
     cnvkit.py gainloss Sample.cnr -s Sample.cns -t 0.4 -m 5 -y
 
-If segments are given, the log2 ratio value reported for each gene will be the
-value of the segment covering the gene. Where more than one segment overlaps the
-gene, i.e. if the gene contains a breakpoint, each segment's value will be
-reported as a separate row for the same gene. If a large-scale CNA covers
-multiple genes, each of those genes will be listed individually.
+The first four columns of output table show each targeted gene's name and its
+genomic coordinates (based on the first and last bins with that label in the
+original target BED file, and thus the .cnr file).
 
-If segments are not given, the weighted average of the log2 ratio values of the
-bins within each gene will be reported as the gene's overall log2 ratio value.
-This mode will not attempt to identify breakpoints within genes.
+The remaining output columns have slightly different meaning depending on
+whether or not segments were provided. Without segments (.cnr alone):
+
+- *log2*: Weighted mean of log2 ratios of all the gene's bins, including any
+  off-target intronic bins.
+- *depth*: Weighted mean of un-normalized read depths across all this gene's
+  bins.
+- *weight*: Sum of this gene's bins' weights.
+- *probes*: The number of bins assigned to this gene.
+
+With segments (``-s``):
+
+- *log2*: The log2 ratio value of the segment covering the gene, i.e. weighted
+  mean of all bins covered by the whole segment, not just this gene.
+- *depth*: As above.
+- *weight*: As above.
+- *probes*: The number of probes supporting the segment (not just this gene).
+
+.. note:: Where more than one segment overlaps the gene, i.e. if the gene
+    contains a breakpoint, each segment's value will be reported as a separate
+    row for the same gene. If a large-scale CNA covers multiple genes, each of
+    those genes will be listed individually.
 
 The threshold (``-t``) and minimum number of bins (``-m``) options are used to
 control which genes are reported. For example, a threshold of .2 (the default)
@@ -69,9 +86,10 @@ Some likely false positives can be eliminated by dropping CNVs that cover a
 small number of bins (e.g. with ``-m 3``, genes where only 1 or 2 bins show copy
 number change will not be reported), at the risk of missing some true positives.
 
-Specify the reference sex (``-y`` if male) to ensure CNVs on the X and Y
-chromosomes are reported correctly; otherwise, a large number of spurious gains
-or losses on the sex chromosomes may be reported.
+Specify the reference sex (``-y`` if the same option was used when constructing
+the reference) to ensure CNVs on the X and Y chromosomes are reported correctly;
+otherwise, a large number of spurious gains or losses on the sex chromosomes may
+be reported.
 
 The output is a text table of tab-separated values, like that of :ref:`breaks`.
 Continuing the Unix example, we can try ``gainloss`` both with and without the

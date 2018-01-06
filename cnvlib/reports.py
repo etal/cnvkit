@@ -124,4 +124,9 @@ def group_by_genes(cnarr, skip_low):
         outrow["probes"] = len(rows)
         if "weight" in rows:
             outrow["weight"] = rows["weight"].sum()
+            if "depth" in rows:
+                outrow["depth"] = np.average(rows["depth"],
+                                             weights=rows["weight"])
+        elif "depth" in rows:
+            outrow["depth"] = rows["depth"].mean()
         yield outrow
