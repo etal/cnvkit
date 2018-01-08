@@ -29,9 +29,9 @@ def segment_hmm(cnarr, method, window=None):
     segarr : CopyNumArray
         The segmented data.
     """
-
     # NB: Incorporate weights into smoothed log2 estimates
     # (Useful kludge until weighted HMM is in place)
+    orig_log2 = cnarr['log2'].values.copy()
     cnarr['log2'] = cnarr.smoothed(window)
 
     logging.debug("Building model from observations")
@@ -48,8 +48,8 @@ def segment_hmm(cnarr, method, window=None):
     # print(model.monitor_, end="\n\n")
 
     # Merge adjacent bins with the same state to create segments
-    # TODO keep centromere breaks -- flasso should, too
     from ..segfilters import squash_by_groups
+    cnarr['log2'] = orig_log2
     cnarr['probes'] = 1
     segarr = squash_by_groups(cnarr, pd.Series(states), by_arm=True)
     return segarr
