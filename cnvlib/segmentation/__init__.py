@@ -64,6 +64,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
             rstr = "".join(rstr)
         cna = cnarr.concat(rets)
 
+    cna.sort_columns()
     if save_dataframe:
         return cna, rstr
     return cna
@@ -174,7 +175,6 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
 
     segarr['gene'], segarr['weight'], segarr['depth'] = \
             transfer_fields(segarr, cnarr)
-    segarr.sort_columns()
     if save_dataframe:
         return segarr, seg_out
     else:
