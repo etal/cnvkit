@@ -511,28 +511,49 @@ Infer discrete copy number segments from the given coverage table::
 
     cnvkit.py segment Sample.cnr -o Sample.cns
 
-By default this uses the circular binary segmentation algorithm (CBS), which
-performed best in our benchmarking. But with the ``-m`` option, the faster
-`HaarSeg
-<http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_
-(``haar``) or `Fused Lasso <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_
-(``flasso``) algorithms can be used instead.
+The following segmentation algorithms can be specified with the ``-m`` option:
 
+- ``cbs`` -- the default, circular binary segmentation (CBS). This method
+  performed best in our benchmarking on mid-size target panels and exomes.
+  Depends on the R package DNAcopy.
+- ``flasso`` -- `Fused Lasso
+  <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_, reported by some users
+  to perform best on exomes, whole genomes, and some target panels.
+  Signficantly faster than CBS, but the current implementation cannot be
+  parallelized over multiple CPUs. Beyond identifying breakpoints, additionally
+  performs significance testing to distinguish CNAs from regions of neutral copy
+  number, so large swathes of the output may have log2 values of exactly 0.
+  Depends on the R package cghFLasso.
+- ``haar`` -- a pure-Python implementation of `HaarSeg
+  <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_,
+  a wavelet-based method. Very fast and performs reasonably well on small
+  panels, but tends to over-segment large datasets.
+- ``hmm`` -- a 3-state Hidden Markov Model suitable for most samples. Faster
+  than CBS, slower but more accurate than Haar. Depends on the Python package
+  hmmlearn, as do the next two methods.
+- ``hmm-tumor`` -- a 5-state HMM suitable for finer-grained segmentation of
+  good-quality tumor samples. In particular, this method can detect focal
+  amplifications within a larger-scale, smaller-amplitude copy number gain, or
+  focal deep deletions within a larger-scale hemizygous loss.  Training this
+  model takes a bit more CPU time than the simpler ``hmm`` method.
+- ``hmm-germline`` -- a 3-state HMM with fixed amplitude for the loss, neutral,
+  and gain states corresponding to absolute copy numbers of 1, 2, and 3.
+  Suitable for germline samples and single-cell sequencing of samples with
+  mostly-diploid genomes that are not overly aneuploid.
+- ``none`` -- simply calculate the weighted mean log2 value of each chromosome
+  arm. Useful for testing or debugging, or as a baseline for benchmarking other
+  methods.
+
+
+The first two methods use R internally. If you installed the R packages in
+a nonstandard location, you can specify this location with ``--rlibpath``.
 If you do not have R or the R package dependencies installed, but otherwise do
-have CNVkit properly installed, then ``haar`` will work for you. The other two
-methods use R internally. If you installed the R packages in a nonstandard
-location, you can specify this location with ``--rlibpath``.
-
-Fused Lasso additionally performs significance testing to distinguish CNAs from
-regions of neutral copy number, whereas CBS and HaarSeg by themselves only
-identify the supported segmentation breakpoints. Fused Lasso has been reported
-to work well on whole-exome and whole-genome data, while HaarSeg is less suited
-to those larger datasets but does all right on target panels.
+have CNVkit properly installed, then ``haar`` and the HMM methods will work for
+you.
 
 Segmentation runs independently on each chromosome arm, and can be parallelized
-(except for ``flasso``) with the ``-p`` option, similar to ``batch``.
-To simply calculate the weighted mean log2 value of each chromosome arm (for
-testing or debugging, perhaps), use ``-m none``.
+(except for ``flasso`` and the HMM methods) with the ``-p`` option, similar to
+``batch``.
 
 The significance threshold to accept a segment or breakpoint is passed to the
 underlying method with the option ``--threshold``/``-t``. This is typically the
@@ -552,6 +573,9 @@ Additional filters:
 ``--min-variant-depth``, which work as in other commands), then after segmenting
 log2 ratios, a second pass of segmentation will run within each log2-ratio-based
 segment on the SNP allele frequencies loaded from the VCF.
+
+See also :doc:`calling` for suggestions on how to interpret and post-process the
+resulting segments.
 
 
 .. _call:
