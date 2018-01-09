@@ -114,7 +114,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         msg = ("Dropped %d / %d bins"
                % (len(cnarr) - len(filtered_cn), len(cnarr)))
         if cnarr["chromosome"].iat[0] == cnarr["chromosome"].iat[-1]:
-            msg += "on chromosome " + str(cnarr["chromosome"].iat[0])
+            msg += " on chromosome " + str(cnarr["chromosome"].iat[0])
         logging.info(msg)
     if not len(filtered_cn):
         return filtered_cn
