@@ -25,8 +25,9 @@ from skgenome import tabio, GenomicArray as _GA
 from skgenome.rangelabel import to_label
 
 from . import (access, antitarget, autobin, batch, call, core, coverage,
-               descriptives, diagram, export, fix, heatmap, importers, metrics,
-               parallel, reference, reports, scatter, segmentation, target)
+               descriptives, diagram, export, fix, heatmap, import_rna,
+               importers, metrics, parallel, reference, reports, scatter,
+               segmentation, target)
 from .cmdutil import (load_het_snps, read_cna, verify_sample_sex,
                       write_tsv, write_text, write_dataframe)
 
@@ -1418,6 +1419,51 @@ P_import_theta.add_argument("--ploidy", type=int, default=2,
 P_import_theta.add_argument('-d', '--output-dir', default='.',
         help="Output directory name.")
 P_import_theta.set_defaults(func=_cmd_import_theta)
+
+
+# import-rna ------------------------------------------------------------------
+
+do_import_rna = public(import_rna.do_import_rna)
+
+def _cmd_import_rna(args):
+    """Convert a cohort of per-gene log2 ratios to CNVkit .cnr format."""
+    all_data, cnrs = import_rna.do_import_rna(
+        args.gene_counts, args.format, args.gene_resource, args.correlations)
+    logging.info("Writing output files")
+    if args.output:
+        all_data.to_csv(args.output, sep='\t', index=True)
+        logging.info("Wrote %s with %d rows", args.output, len(all_data))
+    else:
+        logging.info(all_data.describe(), file=sys.stderr)
+    for cnr in cnrs:
+        outfname = os.path.join(args.output_dir, cnr.sample_id + ".cnr")
+        tabio.write(cnr, outfname, 'tab')
+
+
+P_import_rna = AP_subparsers.add_parser('import-rna',
+        help=_cmd_import_rna.__doc__)
+P_import_rna.add_argument('gene_counts',
+        nargs='+', metavar="FILES",
+        help="""Tabular files with Ensembl gene ID and number of reads mapped to
+                each gene, from RSEM or another transcript quantifier.""")
+P_import_rna.add_argument('-f', '--format',
+        choices=('rsem', 'counts'), default='counts', metavar='NAME',
+        help="""Input format name: 'rsem' for RSEM gene-level read counts
+                (*_rsem.genes.results), or 'counts' for generic 2-column gene
+                IDs and their read counts (e.g. TCGA level 2 RNA expression).
+                """)
+P_import_rna.add_argument('-g', '--gene-resource', metavar="FILE",
+        help="Location of gene info table from Ensembl BioMart.")
+P_import_rna.add_argument('-c', '--correlations', metavar="FILE",
+        help="""Correlation of each gene's copy number with
+        expression. Output of cnv_expression_correlate.py.""")
+P_import_rna.add_argument('-d', '--output-dir',
+        default='.', metavar="PATH",
+        help="""Directory to write a CNVkit .cnr file for each input
+                sample. [Default: %(default)s]""")
+P_import_rna.add_argument('-o', '--output', metavar="FILE",
+        help="Output file name (summary table).")
+P_import_rna.set_defaults(func=_cmd_import_rna)
 
 
 # export ----------------------------------------------------------------------

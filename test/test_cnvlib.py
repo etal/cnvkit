@@ -5,14 +5,14 @@ from __future__ import absolute_import, division, print_function
 import unittest
 
 import numpy as np
-from skgenome import GenomicArray
+from skgenome import GenomicArray, tabio
 
 import cnvlib
 # Import all modules as a smoke test
 from cnvlib import (access, antitarget, autobin, batch, cnary, commands, core,
-                    coverage, diagram, export, fix, importers, metrics, params,
-                    plots, reference, reports, segmentation, smoothing, tabio,
-                    vary)
+                    coverage, diagram, export, fix, import_rna, importers,
+                    metrics, params, plots, reference, reports, segmentation,
+                    smoothing, vary)
 
 
 class CNATests(unittest.TestCase):
