@@ -320,9 +320,14 @@ do_autobin = public(autobin.do_autobin)
 def _cmd_autobin(args):
     """Quickly calculate reasonable bin sizes from BAM read counts."""
     if args.method in ('hybrid', 'amplicon') and not args.targets:
-        raise RuntimeError("Sequencing method %r requires targets", args.method)
-    elif args.method == 'wgs' and args.targets:
-        logging.warning("Targets will be ignored: %s", args.targets)
+        raise RuntimeError("Sequencing method %r requires targets (-t)",
+                           args.method)
+    if args.method == 'wgs':
+        if not args.access:
+            raise RuntimeError("Sequencing method 'wgs' requires accessible "
+                               "regions (-g)")
+        if args.targets:
+            logging.warning("Targets will be ignored: %s", args.targets)
     if args.method == 'amplicon' and args.access:
         logging.warning("Sequencing-accessible regions will be ignored: %s",
                         args.access)

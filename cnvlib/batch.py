@@ -61,7 +61,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                     # mapped reads.
                     access_arr = access.do_access(fasta)
                 if access_arr:
-                    autobin_args = ['wgs', access_arr]
+                    autobin_args = ['wgs', None, access_arr]
                 else:
                     # Don't assume the given targets/access covers the whole
                     # genome; use autobin sampling to estimate bin size, as we
