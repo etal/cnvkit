@@ -41,15 +41,16 @@ FAQ & How To
 .. toctree::
     :maxdepth: 2
 
+    fileformats
+    sex
     calling
     baf
+    bias
     tumor
     heterogeneity
     germline
     nonhybrid
-    sex
-    bias
-    fileformats
+    rna
 
 
 Python API
