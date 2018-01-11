@@ -33,7 +33,10 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                     }.get(method)
     msg = "Segmenting with method " + repr(method)
     if threshold is not None:
-        msg += ", significance threshold %s," % threshold
+        if method.startswith('hmm'):
+            msg += ", smoothing window size %s," % threshold
+        else:
+            msg += ", significance threshold %s," % threshold
     msg += " in %s processes" % processes
     logging.info(msg)
 
@@ -127,7 +130,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         segarr = none.segment_none(filtered_cn)
 
     elif method.startswith('hmm'):
-        segarr = hmm.segment_hmm(filtered_cn, method)
+        segarr = hmm.segment_hmm(filtered_cn, method, threshold)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments

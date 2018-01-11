@@ -630,13 +630,15 @@ P_segment.add_argument('-d', '--dataframe',
         help="""File name to save the raw R dataframe emitted by CBS or
                 Fused Lasso. (Useful for debugging.)""")
 P_segment.add_argument('-m', '--method', default='cbs',
-        choices=('cbs', 'haar', 'flasso', 'none',
+        choices=('cbs', 'flasso', 'haar', 'none',
                  'hmm', 'hmm-tumor', 'hmm-germline'),
-        help="""Segmentation method (CBS, HMM, HaarSeg, or Fused Lasso).
+        help="""Segmentation method (CBS, fused lasso, haar wavelet, HMM), or
+                'none' for chromosome arm-level averages as segments.
                 [Default: %(default)s]""")
 P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
-                accept breakpoints during segmentation.""")
+                accept breakpoints during segmentation.
+                For HMM methods, this is the smoothing window size.""")
 P_segment.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
