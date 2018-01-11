@@ -306,7 +306,23 @@ def normalize_read_depths(sample_depths):
         #       ": sample-wise denom =", q3.mean(),
         #       ", gene-wise denom =", sm.mean())
     # Finally, convert normalized read depths to log2 scale
-    return np.log2(sample_depths).replace(-np.inf, np.nan)
+    return safe_log2(sample_depths, -5)
+
+
+def safe_log2(values, min_log2):
+    """Transform values to log2 scale, safely handling zeros.
+
+    Parameters
+    ----------
+    values : np.array
+        Absolute-scale values to transform. Should be non-negative.
+    min_log2 : float
+        Rather than hard-clipping, input values near 0 (especially below
+        2^min_log2) will be squeezed a bit above `min_log2` in the log2-scale
+        output.
+    """
+    absolute_shift = 2 ** min_log2
+    return np.log2(values + absolute_shift)
 
 
 def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info,
