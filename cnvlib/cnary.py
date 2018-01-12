@@ -497,7 +497,7 @@ class CopyNumArray(GenomicArray):
         # Remove variations due to real/likely CNVs
         y_log2 = cnarr.residuals(segments)
         if segments is None and window:
-            y_log2 -= smoothing.smoothed(y_log2, window)
+            y_log2 -= smoothing.savgol(y_log2, window)
         # Guess Poisson parameter from absolute-scale values
         y = np.exp2(y_log2)
         # ENH: use weight argument to these stats

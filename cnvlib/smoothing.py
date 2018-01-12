@@ -84,7 +84,6 @@ def convolve_weighted(window, signal, weights):
     wp = pd.Series(np.concatenate((weights[wing-1::-1],
                                    weights,
                                    weights[:-wing-1:-1])))
-
     D = np.convolve(wp * signal, window)[window_size-1:-window_size+1]
     N = np.convolve(wp, window)[window_size-1:-window_size+1]
     y = D / N

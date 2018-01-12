@@ -158,7 +158,7 @@ def center_by_window(cnarr, fraction, sort_key):
     order = np.argsort(sort_key, kind='mergesort')
     df = df.iloc[order]
     biases = smoothing.rolling_median(df['log2'], fraction)
-    # biases = smoothing.smoothed(df['log2'], fraction)
+    # biases = smoothing.savgol(df['log2'], fraction)
     df['log2'] -= biases
     fixarr = cnarr.as_dataframe(df)
     fixarr.sort()
