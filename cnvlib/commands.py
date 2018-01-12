@@ -25,8 +25,9 @@ from skgenome import tabio, GenomicArray as _GA
 from skgenome.rangelabel import to_label
 
 from . import (access, antitarget, autobin, batch, call, core, coverage,
-               descriptives, diagram, export, fix, heatmap, importers, metrics,
-               parallel, reference, reports, scatter, segmentation, target)
+               descriptives, diagram, export, fix, heatmap, import_rna,
+               importers, metrics, parallel, reference, reports, scatter,
+               segmentation, target)
 from .cmdutil import (load_het_snps, read_cna, verify_sample_sex,
                       write_tsv, write_text, write_dataframe)
 
@@ -320,9 +321,14 @@ do_autobin = public(autobin.do_autobin)
 def _cmd_autobin(args):
     """Quickly calculate reasonable bin sizes from BAM read counts."""
     if args.method in ('hybrid', 'amplicon') and not args.targets:
-        raise RuntimeError("Sequencing method %r requires targets", args.method)
-    elif args.method == 'wgs' and args.targets:
-        logging.warning("Targets will be ignored: %s", args.targets)
+        raise RuntimeError("Sequencing method %r requires targets (-t)",
+                           args.method)
+    if args.method == 'wgs':
+        if not args.access:
+            raise RuntimeError("Sequencing method 'wgs' requires accessible "
+                               "regions (-g)")
+        if args.targets:
+            logging.warning("Targets will be ignored: %s", args.targets)
     if args.method == 'amplicon' and args.access:
         logging.warning("Sequencing-accessible regions will be ignored: %s",
                         args.access)
@@ -624,13 +630,15 @@ P_segment.add_argument('-d', '--dataframe',
         help="""File name to save the raw R dataframe emitted by CBS or
                 Fused Lasso. (Useful for debugging.)""")
 P_segment.add_argument('-m', '--method', default='cbs',
-        choices=('cbs', 'haar', 'flasso', 'none',
+        choices=('cbs', 'flasso', 'haar', 'none',
                  'hmm', 'hmm-tumor', 'hmm-germline'),
-        help="""Segmentation method (CBS, HMM, HaarSeg, or Fused Lasso).
+        help="""Segmentation method (CBS, fused lasso, haar wavelet, HMM), or
+                'none' for chromosome arm-level averages as segments.
                 [Default: %(default)s]""")
 P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
-                accept breakpoints during segmentation.""")
+                accept breakpoints during segmentation.
+                For HMM methods, this is the smoothing window size.""")
 P_segment.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
@@ -1413,6 +1421,51 @@ P_import_theta.add_argument("--ploidy", type=int, default=2,
 P_import_theta.add_argument('-d', '--output-dir', default='.',
         help="Output directory name.")
 P_import_theta.set_defaults(func=_cmd_import_theta)
+
+
+# import-rna ------------------------------------------------------------------
+
+do_import_rna = public(import_rna.do_import_rna)
+
+def _cmd_import_rna(args):
+    """Convert a cohort of per-gene log2 ratios to CNVkit .cnr format."""
+    all_data, cnrs = import_rna.do_import_rna(
+        args.gene_counts, args.format, args.gene_resource, args.correlations)
+    logging.info("Writing output files")
+    if args.output:
+        all_data.to_csv(args.output, sep='\t', index=True)
+        logging.info("Wrote %s with %d rows", args.output, len(all_data))
+    else:
+        logging.info(all_data.describe(), file=sys.stderr)
+    for cnr in cnrs:
+        outfname = os.path.join(args.output_dir, cnr.sample_id + ".cnr")
+        tabio.write(cnr, outfname, 'tab')
+
+
+P_import_rna = AP_subparsers.add_parser('import-rna',
+        help=_cmd_import_rna.__doc__)
+P_import_rna.add_argument('gene_counts',
+        nargs='+', metavar="FILES",
+        help="""Tabular files with Ensembl gene ID and number of reads mapped to
+                each gene, from RSEM or another transcript quantifier.""")
+P_import_rna.add_argument('-f', '--format',
+        choices=('rsem', 'counts'), default='counts', metavar='NAME',
+        help="""Input format name: 'rsem' for RSEM gene-level read counts
+                (*_rsem.genes.results), or 'counts' for generic 2-column gene
+                IDs and their read counts (e.g. TCGA level 2 RNA expression).
+                """)
+P_import_rna.add_argument('-g', '--gene-resource', metavar="FILE",
+        help="Location of gene info table from Ensembl BioMart.")
+P_import_rna.add_argument('-c', '--correlations', metavar="FILE",
+        help="""Correlation of each gene's copy number with
+        expression. Output of cnv_expression_correlate.py.""")
+P_import_rna.add_argument('-d', '--output-dir',
+        default='.', metavar="PATH",
+        help="""Directory to write a CNVkit .cnr file for each input
+                sample. [Default: %(default)s]""")
+P_import_rna.add_argument('-o', '--output', metavar="FILE",
+        help="Output file name (summary table).")
+P_import_rna.set_defaults(func=_cmd_import_rna)
 
 
 # export ----------------------------------------------------------------------

@@ -33,7 +33,10 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                     }.get(method)
     msg = "Segmenting with method " + repr(method)
     if threshold is not None:
-        msg += ", significance threshold %s," % threshold
+        if method.startswith('hmm'):
+            msg += ", smoothing window size %s," % threshold
+        else:
+            msg += ", significance threshold %s," % threshold
     msg += " in %s processes" % processes
     logging.info(msg)
 
@@ -127,7 +130,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         segarr = none.segment_none(filtered_cn)
 
     elif method.startswith('hmm'):
-        segarr = hmm.segment_hmm(filtered_cn, method)
+        segarr = hmm.segment_hmm(filtered_cn, method, threshold)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
@@ -244,9 +247,22 @@ def repair_segments(segments, orig_probes):
     2. Ensure first and last segment ends match 1st/last bin ends
        (but keep log2 as-is).
     """
+    def make_null_segment(chrom, orig_start, orig_end):
+        vals = {'chromosome': chrom,
+                'start': orig_start,
+                'end': orig_end,
+                'gene': '-',
+                'depth': 0.0,
+                'log2': 0.0,
+                'probes': 0.0,
+                'weight': 0.0,
+               }
+        row_vals = tuple(vals[c] for c in segments.data.columns)
+        return row_vals
+
+    # Adjust segment endpoints on each chromosome
     segments = segments.copy()
     extra_segments = []
-    # Adjust segment endpoints on each chromosome
     for chrom, subprobes in orig_probes.by_chromosome():
         chr_seg_idx = np.where(segments.chromosome == chrom)[0]
         orig_start = subprobes[0, 'start']
@@ -255,8 +271,8 @@ def repair_segments(segments, orig_probes):
             segments[chr_seg_idx[0], 'start'] = orig_start
             segments[chr_seg_idx[-1], 'end'] = orig_end
         else:
-            null_segment = (chrom, orig_start, orig_end, "-", 0.0, 0)
-            extra_segments.append(null_segment)
+            extra_segments.append(
+                make_null_segment(chrom, orig_start, orig_end))
     if extra_segments:
         segments.add(segments.as_rows(extra_segments))
     return segments

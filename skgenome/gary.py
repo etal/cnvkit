@@ -105,9 +105,17 @@ class GenomicArray(object):
 
     def as_rows(self, rows):
         """Wrap the given rows in this instance's metadata."""
-        return self.from_rows(rows,
-                              columns=self.data.columns,
-                              meta_dict=self.meta)
+        try:
+            out = self.from_rows(rows,
+                                 columns=self.data.columns,
+                                 meta_dict=self.meta)
+        except AssertionError:
+            columns = self.data.columns.tolist()
+            firstrow = next(iter(rows))
+            raise RuntimeError("Passed %d columns %r, but "
+                               "%d elements in first row: %s",
+                               len(columns), columns, len(firstrow), firstrow)
+        return out
 
     # Container behaviour
 
