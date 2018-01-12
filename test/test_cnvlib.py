@@ -459,7 +459,7 @@ class CommandTests(unittest.TestCase):
             lo, hi = commands._segmetric_interval(segarr, cnarr, func)
             self.assertEqual(len(lo), len(segarr))
             self.assertEqual(len(hi), len(segarr))
-            sensible_segs_mask = (np.asarray(segarr['probes']) > 3)
+            sensible_segs_mask = (segarr['probes'] > 3).values
             means = segarr[sensible_segs_mask, 'log2']
             los = lo[sensible_segs_mask]
             his = hi[sensible_segs_mask]
@@ -500,18 +500,18 @@ class OtherTests(unittest.TestCase):
         # Wide target, no secondary corrections triggered
         insert_size = 250
         gap_size = np.zeros(1)  # Adjacent
-        target_size = np.asarray([600])
+        target_size = np.array([600])
         loss = fix.edge_losses(target_size, insert_size)
         gain = fix.edge_gains(target_size, gap_size, insert_size)
         gain *= 2  # Same on the other side
         self.assertAlmostEqual(loss, gain)
         # Trigger 'loss' correction (target_size < 2 * insert_size)
-        target_size = np.asarray([450])
+        target_size = np.array([450])
         self.assertAlmostEqual(
             fix.edge_losses(target_size, insert_size),
             2 * fix.edge_gains(target_size, gap_size, insert_size))
         # Trigger 'gain' correction (target_size + gap_size < insert_size)
-        target_size = np.asarray([300])
+        target_size = np.array([300])
         self.assertAlmostEqual(fix.edge_losses(target_size, insert_size),
                         2 * fix.edge_gains(target_size, gap_size, insert_size))
 

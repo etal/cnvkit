@@ -248,8 +248,8 @@ def combine_probes(filenames, fa_fname, is_male_reference, sexes, skip_low,
     depth_centers = np.apply_along_axis(descriptives.biweight_location, 0,
                                         np.vstack(all_depths))
     logging.info("Calculating bin spreads")
-    spreads = np.asarray([descriptives.biweight_midvariance(a, initial=i)
-                          for a, i in zip(all_coverages.T, cvg_centers)])
+    spreads = np.array([descriptives.biweight_midvariance(a, initial=i)
+                        for a, i in zip(all_coverages.T, cvg_centers)])
     columns.update({
         'chromosome': cnarr1.chromosome,
         'start': cnarr1.start,

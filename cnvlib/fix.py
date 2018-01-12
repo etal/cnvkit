@@ -177,15 +177,15 @@ def get_edge_bias(cnarr, margin):
     """
     output_by_chrom = []
     for _chrom, subarr in cnarr.by_chromosome():
-        tile_starts = np.asarray(subarr['start'])
-        tile_ends = np.asarray(subarr['end'])
+        tile_starts = subarr['start'].values
+        tile_ends = subarr['end'].values
         tgt_sizes = tile_ends - tile_starts
         # Calculate coverage loss at (both edges of) each tile
         losses = edge_losses(tgt_sizes, margin)
         # Find tiled intervals within a margin (+/- bp) of the given probe
         # (excluding the probe itself), then calculate the relative coverage
         # "gain" due to the neighbors, if any
-        gap_sizes = np.asarray(tile_starts[1:]) - np.asarray(tile_ends[:-1])
+        gap_sizes = tile_starts[1:] - tile_ends[:-1]
         ok_gaps_mask = (gap_sizes < margin)
         ok_gaps = gap_sizes[ok_gaps_mask]
         left_gains = edge_gains(tgt_sizes[1:][ok_gaps_mask], ok_gaps, margin)

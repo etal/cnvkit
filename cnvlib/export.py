@@ -461,15 +461,16 @@ def ref_means_nbins(tumor_segs, normal_cn):
         -       -       -       +       norm, bin counts
     """
     if normal_cn:
-        subarrs = [subarr for _seg, subarr in normal_cn.by_ranges(tumor_segs)]
+        log2s_in_segs = [bins['log2']
+                         for _seg, bins in normal_cn.by_ranges(tumor_segs)]
         # For the normal/reference bin count, take the mean of the bin values
         # within each segment so that segments match between tumor and normal.
         # ENH: weighted mean, like gainloss
-        ref_means = np.asarray([s.log2.mean() for s in subarrs])
+        ref_means = np.array([s.mean() for s in log2s_in_segs])
         if "probes" in tumor_segs:
             nbins = tumor_segs["probes"]
         else:
-            nbins = np.asarray([len(s) for s in subarrs])
+            nbins = np.array([len(s) for s in log2s_in_segs])
     else:
         # Assume neutral reference log2 across all segments
         # (weights already account for reference log2)

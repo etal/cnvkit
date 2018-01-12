@@ -407,11 +407,11 @@ class CopyNumArray(GenomicArray):
         cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
-            idx = np.asarray((self.chromosome == self._chr_x_label) |
-                             (self.chromosome == self._chr_y_label))
+            idx = ((self.chromosome == self._chr_x_label).values |
+                   (self.chromosome == self._chr_y_label).values)
         else:
             # Y will be all noise, so replace with 1 "flat" copy
-            idx = np.asarray(self.chromosome == self._chr_y_label)
+            idx = (self.chromosome == self._chr_y_label).values
         cvg[idx] = -1.0
         return cvg
 

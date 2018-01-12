@@ -134,7 +134,7 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
         else:
             # Exiting a captured region
             # Update target region boundaries
-            darr = np.asarray(depths)
+            darr = np.array(depths)
             half_depth = 0.5 * darr.max()
             ok_dp_idx = np.nonzero(darr >= half_depth)[0]
             start_idx = ok_dp_idx[0]
