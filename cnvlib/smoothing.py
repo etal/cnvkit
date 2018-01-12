@@ -31,13 +31,13 @@ def _width2wing(width, x, min_wing=3):
     if 0 < width < 1:
         wing = int(math.ceil(len(x) * width * 0.5))
     elif width >= 2 and int(width) == width:
-        wing = width // 2
+        wing = int(width // 2)
     else:
         raise ValueError("width must be either a fraction between 0 and 1 "
                          "or an integer greater than 1 (got %s)" % width)
     wing = max(wing, min_wing)
     wing = min(wing, len(x) - 1)
-    assert wing > 0, "Wing must be greater than 0 (got %s)" % wing
+    assert wing >= 1, "Wing must be at least 1 (got %s)" % wing
     return wing
 
 
@@ -114,8 +114,10 @@ def guess_window_size(x, weights=None):
         sd = descriptives.biweight_midvariance(x)
     else:
         sd = descriptives.weighted_std(x, weights)
-    est_width = 4 * sd * len(x) ** (4/5)
-    return max(3, int(round(est_width)))
+    width = 4 * sd * len(x) ** (4/5)
+    width = max(3, int(round(width)))
+    width = min(len(x), width)
+    return width
 
 
 def kaiser(x, width=None, weights=None, do_fit_edges=False):
