@@ -105,7 +105,8 @@ class CommandTests(unittest.TestCase):
         for min_gap_size, expect_nrows in ((None, 7),
                                            (500, 3),
                                            (1000, 2)):
-            acc = commands.do_access(fasta, [], min_gap_size)
+            acc = commands.do_access(fasta, [], min_gap_size,
+                                     skip_noncanonical=False)
             self.assertEqual(len(acc), expect_nrows)
         excludes = ["formats/dac-my.bed", "formats/my-targets.bed"]
         for min_gap_size, expect_nrows in ((None, 12),
@@ -113,7 +114,13 @@ class CommandTests(unittest.TestCase):
                                            (20, 5),
                                            (200, 3),
                                            (2000, 2)):
-            commands.do_access(fasta, excludes, min_gap_size)
+            acc = commands.do_access(fasta, excludes, min_gap_size,
+                                     skip_noncanonical=False)
+            self.assertEqual(len(acc), expect_nrows)
+        # Dropping chrM, keeping only chrY
+        acc = commands.do_access(fasta, excludes, 10,
+                                 skip_noncanonical=True)
+        self.assertEqual(len(acc), 5)
 
     def test_antitarget(self):
         """The 'antitarget' command."""
