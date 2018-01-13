@@ -15,13 +15,29 @@ import numpy as np
 from skgenome import tabio, GenomicArray as GA
 
 
-def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000):
+def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000,
+              skip_noncanonical=True):
     """List the locations of accessible sequence regions in a FASTA file."""
-    access_regions = GA.from_rows(get_regions(fa_fname))
+    fa_regions = get_regions(fa_fname)
+    if skip_noncanonical:
+        fa_regions = drop_noncanonical_contigs(fa_regions)
+    access_regions = GA.from_rows(fa_regions)
     for ex_fname in exclude_fnames:
         excluded = tabio.read(ex_fname, 'bed3')
         access_regions = access_regions.subtract(excluded)
     return GA.from_rows(join_regions(access_regions, min_gap_size))
+
+
+def drop_noncanonical_contigs(region_tups):
+    """Drop contigs with noncanonical names.
+
+    `region_tups` is an iterable of (chrom, start, end) tuples.
+
+    Yield the same, but dropping noncanonical chrom.
+    """
+    from .antitarget import is_canonical_contig_name
+    return (tup for tup in region_tups
+            if is_canonical_contig_name(tup[0]))
 
 
 def get_regions(fasta_fname):
