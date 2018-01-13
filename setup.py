@@ -16,6 +16,7 @@ try:
             'future >= 0.15.2',
             'futures >= 3.0',
             'hmmlearn >= 0.2.0',
+            'scikit-learn',  # needed by hmmlearn
             'matplotlib >= 1.3.1',
             'numpy >= 1.9',
             'pandas >= 0.18.1',
