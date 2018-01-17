@@ -55,7 +55,7 @@ def drop_noncanonical_contigs(accessible, targets, verbose=True):
     Antitargets will be binned over chromosomes that:
 
     - Appear in the sequencing-accessible regions of the reference genome
-    sequence, and
+      sequence, and
     - Contain at least one targeted region, or
     - Are named like a canonical chromosome (1-22,X,Y for human)
 
