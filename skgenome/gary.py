@@ -232,7 +232,7 @@ class GenomicArray(object):
                 is_auto |= (self.chromosome == a_chrom)
         return self[is_auto]
 
-    def by_arm(self, min_gap_size=1e5, min_arm_bins=10):
+    def by_arm(self, min_gap_size=1e5, min_arm_bins=50):
         """Iterate over bins grouped by chromosome arm (inferred)."""
         # ENH:
         # - Accept GArray of actual centromere regions as input
