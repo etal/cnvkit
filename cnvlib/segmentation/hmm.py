@@ -5,7 +5,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-from hmmlearn import hmm
 
 
 def segment_hmm(cnarr, method, window=None):
@@ -71,6 +70,9 @@ def hmm_get_model(cnarr, method):
         A hmmlearn Model trained on the given dataset.
 
     """
+    # Delayed import so hmmlearn is an optional dependency
+    from hmmlearn import hmm
+
     import warnings
     warnings.simplefilter('ignore', DeprecationWarning)
 
