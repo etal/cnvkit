@@ -62,34 +62,39 @@ whether or not segments were provided. Without segments (.cnr alone):
 - *depth*: Weighted mean of un-normalized read depths across all this gene's
   bins.
 - *weight*: Sum of this gene's bins' weights.
-- *probes*: The number of bins assigned to this gene.
+- *nbins*: The number of bins assigned to this gene.
 
 With segments (``-s``):
 
 - *log2*: The log2 ratio value of the segment covering the gene, i.e. weighted
   mean of all bins covered by the whole segment, not just this gene.
-- *depth*: As above.
-- *weight*: As above.
-- *probes*: The number of probes supporting the segment (not just this gene).
+- *depth*, *weight*, *probes*: As above.
+- *seg_weight*: The sum of the weights of the bins supporting the segment.
+- *seg_probes*: The number of probes supporting the segment.
+
+The ``-t``/``--threshold`` and ``-m``/``--min-probes`` options are used to
+control which genes are reported:
+
+- A threshold of .2 (the default) will report single-copy gains and losses in a
+  completely pure tumor sample (or germline CNVs), but a lower threshold would
+  be necessary to call somatic CNAs if significant normal-cell contamination is
+  present.
+- Some likely false positives can be eliminated by dropping CNVs that cover a
+  small number of bins, at the risk of missing some true positives.
+  With ``-m 3``, the default, genes where only 1 or 2 bins show copy number
+  change will not be reported.
+  This applies to the segment's bin count (*seg_probes*) if segments are
+  provided with ``-s``, otherwise it's the gene's bin count (*nbins*).
+
+Specify the reference X-chromosome ploidy (``-y`` if the same option was used
+when constructing the reference) to ensure CNVs on the X chromosome are reported
+correctly; otherwise, a large number of spurious gains or losses may be
+reported.
 
 .. note:: Where more than one segment overlaps the gene, i.e. if the gene
     contains a breakpoint, each segment's value will be reported as a separate
     row for the same gene. If a large-scale CNA covers multiple genes, each of
     those genes will be listed individually.
-
-The threshold (``-t``) and minimum number of bins (``-m``) options are used to
-control which genes are reported. For example, a threshold of .2 (the default)
-will report single-copy gains and losses in a completely pure tumor sample (or
-germline CNVs), but a lower threshold would be necessary to call somatic CNAs if
-significant normal-cell contamination is present.
-Some likely false positives can be eliminated by dropping CNVs that cover a
-small number of bins (e.g. with ``-m 3``, genes where only 1 or 2 bins show copy
-number change will not be reported), at the risk of missing some true positives.
-
-Specify the reference sex (``-y`` if the same option was used when constructing
-the reference) to ensure CNVs on the X and Y chromosomes are reported correctly;
-otherwise, a large number of spurious gains or losses on the sex chromosomes may
-be reported.
 
 The output is a text table of tab-separated values, like that of :ref:`breaks`.
 Continuing the Unix example, we can try ``gainloss`` both with and without the

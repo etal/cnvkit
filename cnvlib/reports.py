@@ -74,7 +74,7 @@ def get_breakpoints(intervals, segments, min_probes):
 def gainloss_by_gene(cnarr, threshold, skip_low=False):
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
-    NB: Must shift sex-chromosome values beforehand with shift_xx,
+    NB: Adjust the sample's sex-chromosome log2 values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
     for row in group_by_genes(cnarr, skip_low):
@@ -85,23 +85,31 @@ def gainloss_by_gene(cnarr, threshold, skip_low=False):
 def gainloss_by_segment(cnarr, segments, threshold, skip_low=False):
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
-    NB: Must shift sex-chromosome values beforehand with shift_xx,
+    In the output table, show each segment's weight and probes as segment_weight
+    and segment_probes, alongside the gene-level weight and probes.
+
+    NB: Adjust the sample's sex-chromosome log2 values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
     extra_cols = [col for col in segments.data.columns
-                  if col not in cnarr.data.columns]
+                  if col not in cnarr.data.columns
+                  and col not in ('depth', 'probes', 'weight')]
     for colname in extra_cols:
         cnarr[colname] = np.nan
     for segment, subprobes in cnarr.by_ranges(segments):
         if abs(segment.log2) >= threshold:
             for row in group_by_genes(subprobes, skip_low):
                 row["log2"] = segment.log2
+                if hasattr(segment, 'weight'):
+                    row['segment_weight'] = segment.weight
+                if hasattr(segment, 'probes'):
+                    row['segment_probes'] = segment.probes
                 for colname in extra_cols:
                     row[colname] = getattr(segment, colname)
                 yield row
 
 
-# TODO consolidate with CNA.squash_genes
+# ENH consolidate with CNA.squash_genes
 def group_by_genes(cnarr, skip_low):
     """Group probe and coverage data by gene.
 
@@ -121,7 +129,7 @@ def group_by_genes(cnarr, skip_low):
         outrow["end"] = rows.end.iat[-1]
         outrow["gene"] = gene
         outrow["log2"] = segmean
-        outrow["probes"] = len(rows)
+        outrow["n_bins"] = len(rows)
         if "weight" in rows:
             outrow["weight"] = rows["weight"].sum()
             if "depth" in rows:

@@ -40,17 +40,9 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, title=None):
         else:
             raise ValueError("Must provide argument cnarr or segarr, or both. ")
         do_both = False
+    gene_labels = _get_gene_labels(cnarr, segarr, cnarr_is_seg, threshold,
+                                   min_probes)
 
-    # Label genes where copy ratio value exceeds threshold
-    if cnarr_is_seg:
-        sel = cnarr.data[(cnarr.data.log2.abs() >= threshold) &
-                          ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
-        gainloss = sel.itertuples(index=False)
-    elif segarr:
-        gainloss = reports.gainloss_by_segment(cnarr, segarr, threshold)
-    else:
-        gainloss = reports.gainloss_by_gene(cnarr, threshold)
-    gene_labels = [gl_row.gene for gl_row in gainloss if gl_row.probes >= min_probes]
     # NB: If multiple segments cover the same gene (gene contains breakpoints),
     # all those segments are marked as "hits".  We'll uniquify them.
     # TODO - use different logic to only label the gene's signficant segment(s)
@@ -93,6 +85,26 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, title=None):
     cvs.showPage()
     cvs.save()
     return outfname
+
+
+def _get_gene_labels(cnarr, segarr, cnarr_is_seg, threshold, min_probes):
+    """Label genes where copy ratio value exceeds threshold."""
+    if cnarr_is_seg:
+        # Only segments (.cns)
+        sel = cnarr.data[(cnarr.data.log2.abs() >= threshold) &
+                          ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
+        gainloss = sel.itertuples(index=False)
+        probes_attr = 'probes'
+    elif segarr:
+        # Both segments and bin-level ratios
+        gainloss = reports.gainloss_by_segment(cnarr, segarr, threshold)
+        probes_attr = 'segment_probes'
+    else:
+        # Only bin-level ratios (.cnr)
+        gainloss = reports.gainloss_by_gene(cnarr, threshold)
+        probes_attr = 'n_bins'
+    return [gl_row.gene for gl_row in gainloss
+            if getattr(gl_row, probes_attr) >= min_probes]
 
 
 def build_chrom_diagram(features, chr_sizes, sample_id, title=None):

@@ -1088,7 +1088,9 @@ def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
     columns = ["gene"] + [col for col in columns if col != "gene"]
     gainloss = pd.DataFrame.from_records(gainloss).reindex(columns=columns)
     if min_probes and len(gainloss):
-        gainloss = gainloss[gainloss.probes >= min_probes]
+        probes = (gainloss.seg_probes if 'seg_probes' in gainloss.columns
+                  else gainloss.n_bins)
+        gainloss = gainloss[probes >= min_probes]
     return gainloss
 
 
