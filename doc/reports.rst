@@ -40,7 +40,7 @@ number breakpoint (e.g. unbalanced translocation)::
 .. _genemetrics:
 
 ``genemetrics``
-------------
+---------------
 
 Identify targeted genes with copy number gain or loss above or below a
 threshold. (Formerly called ``gainloss``.)
