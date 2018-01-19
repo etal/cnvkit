@@ -20,8 +20,8 @@ will display the plots interactively on the screen by default.
 
 .. _batch:
 
-batch
------
+``batch``
+---------
 
 Run the CNVkit pipeline on one or more BAM files::
 
@@ -80,8 +80,8 @@ functionality in CNVkit.
 
 .. _target:
 
-target
-------
+``target``
+----------
 
 Prepare a BED file of baited regions for use with CNVkit.
 
@@ -142,8 +142,8 @@ apply the refFlat annotations.)
 
 .. _access:
 
-access
-------
+``access``
+----------
 
 Calculate the sequence-accessible coordinates in chromosomes from the given
 reference genome, output as a BED file.
@@ -188,8 +188,8 @@ source distribution under the ``data/`` directory
 
 .. _antitarget:
 
-antitarget
-----------
+``antitarget``
+--------------
 
 Given a "target" BED file that lists the chromosomal coordinates of the tiled
 regions used for targeted resequencing, derive a BED file
@@ -234,8 +234,8 @@ regions.
 
 .. _autobin:
 
-autobin
--------
+``autobin``
+-----------
 
 Quickly estimate read counts or depths in a BAM file to estimate reasonable on-
 and (if relevant) off-target bin sizes. If multiple BAMs are given, use the BAM
@@ -258,8 +258,8 @@ command.
 
 .. _coverage:
 
-coverage
---------
+``coverage``
+------------
 
 Calculate coverage in the given regions from BAM read depths.
 
@@ -319,8 +319,8 @@ beforehand, CNVkit will automatically do it for you.
 
 .. _reference:
 
-reference
----------
+``reference``
+-------------
 
 Compile a copy-number reference from the given files or directory (containing
 normal samples). If given a reference genome (-f option), also calculate the GC
@@ -457,8 +457,8 @@ other individual samples.
 
 .. _fix:
 
-fix
----
+``fix``
+-------
 
 Combine the uncorrected target and antitarget coverage tables (.cnn) and
 :doc:`correct for biases <bias>` in regional coverage and GC content, according to
@@ -504,12 +504,25 @@ weights are concatenated, sorted, and written to a .cnr file.
 
 .. _segment:
 
-segment
--------
+``segment``
+-----------
 
 Infer discrete copy number segments from the given coverage table::
 
     cnvkit.py segment Sample.cnr -o Sample.cns
+
+Segmentation runs independently on each chromosome arm, and can be parallelized
+with the ``-p`` option (except for ``flasso`` and the HMM methods), similar to
+``batch``.
+
+The significance threshold to accept a segment or breakpoint is passed to the
+underlying method with the option ``--threshold``/``-t``. This is typically the
+p-value or q-value cutoff, or whatever parameter the underlying method uses to
+adjust its sensitivity.
+
+
+Segmentation methods
+````````````````````
 
 The following segmentation algorithms can be specified with the ``-m`` option:
 
@@ -528,39 +541,45 @@ The following segmentation algorithms can be specified with the ``-m`` option:
   <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_,
   a wavelet-based method. Very fast and performs reasonably well on small
   panels, but tends to over-segment large datasets.
-- ``hmm`` -- a 3-state Hidden Markov Model suitable for most samples. Faster
-  than CBS, slower but more accurate than Haar. Depends on the Python package
-  hmmlearn, as do the next two methods.
-- ``hmm-tumor`` -- a 5-state HMM suitable for finer-grained segmentation of
-  good-quality tumor samples. In particular, this method can detect focal
-  amplifications within a larger-scale, smaller-amplitude copy number gain, or
-  focal deep deletions within a larger-scale hemizygous loss.  Training this
-  model takes a bit more CPU time than the simpler ``hmm`` method.
-- ``hmm-germline`` -- a 3-state HMM with fixed amplitude for the loss, neutral,
-  and gain states corresponding to absolute copy numbers of 1, 2, and 3.
-  Suitable for germline samples and single-cell sequencing of samples with
-  mostly-diploid genomes that are not overly aneuploid.
+- ``hmm`` *(experimental)* -- a 3-state Hidden Markov Model suitable for most
+  samples. Faster than CBS, slower but more accurate than Haar. Depends on the
+  Python package hmmlearn, as do the next two methods.
+- ``hmm-tumor`` *(experimental)* -- a 5-state HMM suitable for finer-grained
+  segmentation of good-quality tumor samples. In particular, this method can
+  detect focal amplifications within a larger-scale, smaller-amplitude copy
+  number gain, or focal deep deletions within a larger-scale hemizygous loss.
+  Training this model takes a bit more CPU time than the simpler ``hmm`` method.
+- ``hmm-germline`` *(experimental)* -- a 3-state HMM with fixed amplitude for
+  the loss, neutral, and gain states corresponding to absolute copy numbers of
+  1, 2, and 3. Suitable for germline samples and single-cell sequencing of
+  samples with mostly-diploid genomes that are not overly aneuploid.
 - ``none`` -- simply calculate the weighted mean log2 value of each chromosome
   arm. Useful for testing or debugging, or as a baseline for benchmarking other
   methods.
 
 
-The first two methods use R internally. If you installed the R packages in
-a nonstandard location, you can specify this location with ``--rlibpath``.
-If you do not have R or the R package dependencies installed, but otherwise do
-have CNVkit properly installed, then ``haar`` and the HMM methods will work for
-you.
+The first two methods use R internally, and to use them you will need to have R
+and the R package dependencies installed (i.e. DNAcopy, cghFLasso). If you
+installed CNVkit with ``conda`` as recommended, these should have been installed
+for you automatically. If you installed the R packages in a nonstandard
+location, you can specify this location with ``--rlibpath``.
 
-Segmentation runs independently on each chromosome arm, and can be parallelized
-(except for ``flasso`` and the HMM methods) with the ``-p`` option, similar to
-``batch``.
+The HMM methods ``hmm``, ``hmm-tumor`` and ``hmm-germline`` were introduced
+provisionally in CNVkit v.0.9.2, and may change in future releases.
+They depend on the Python package ``hmmlearn``, which is not installed by
+default. You can install the latest ``hmmlearn`` (ideally within a conda or
+virtualenv environment) after installing the rest of CNVkit with the command::
 
-The significance threshold to accept a segment or breakpoint is passed to the
-underlying method with the option ``--threshold``/``-t``. This is typically the
-p-value or q-value cutoff, or whatever parameter the underlying method uses to
-adjust its sensitivity.
+    pip install hmmlearn
 
-**Filtering:** Bins with a weight of 0 are dropped before segmentation.
+The methods ``haar`` and ``none`` do not have any additional dependencies beyond
+the basic CNVkit installation.
+
+
+Bin filtering
+`````````````
+
+Bins with a weight of 0 are dropped before segmentation.
 Additional filters:
 
 - ``--drop-low-coverage`` -- drop bins with a read depth of 0 or very close to
@@ -568,7 +587,11 @@ Additional filters:
 - ``--drop-outliers`` -- drop bins with log2 value too far from a rolling
   average, taking local variability into account. Applied by default.
 
-**SNP allele frequencies:** If a :ref:`vcfformat` file is given with the
+
+SNP allele frequencies
+``````````````````````
+
+If a :ref:`vcfformat` file is given with the
 ``--vcf`` option (and accompanying options ``-i``, ``-n``, ``-z``, and
 ``--min-variant-depth``, which work as in other commands), then after segmenting
 log2 ratios, a second pass of segmentation will run within each log2-ratio-based
@@ -580,8 +603,8 @@ resulting segments.
 
 .. _call:
 
-call
-----
+``call``
+--------
 
 Given segmented log2 ratio estimates (.cns), derive each segment's absolute
 integer copy number using either:

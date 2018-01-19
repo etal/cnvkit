@@ -24,8 +24,8 @@ options available::
 
 .. _scatter:
 
-scatter
--------
+``scatter``
+-----------
 
 Plot bin-level log2 coverages and segmentation calls together.  Without any
 further arguments, this plots the genome-wide copy number in a form familiar to
@@ -181,8 +181,8 @@ Better results can be had by giving CNVkit more information:
 
 .. _diagram:
 
-diagram
--------
+``diagram``
+-----------
 
 Draw copy number (either individual bins (.cnn, .cnr) or segments (.cns)) on
 chromosomes as an ideogram. If both the bin-level log2 ratios and segmentation
@@ -240,8 +240,8 @@ visualizing these samples.
 
 .. _heatmap:
 
-heatmap
--------
+``heatmap``
+-----------
 
 Draw copy number (either bins (.cnn, .cnr) or segments (.cns)) for multiple
 samples as a heatmap.

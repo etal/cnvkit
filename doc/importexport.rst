@@ -4,8 +4,8 @@ Compatibility and other I/O
 
 .. _version:
 
-version
--------
+``version``
+-----------
 
 Print CNVkit's version as a string on standard output::
 
@@ -17,8 +17,8 @@ CNVkit version in your message so we can help you more efficiently.
 
 .. _import-picard:
 
-import-picard
--------------
+``import-picard``
+-----------------
 
 Convert Picard CalculateHsMetrics per-target coverage files (.csv) to the
 CNVkit .cnn format::
@@ -55,8 +55,8 @@ Procedure:
 
 .. _import-seg:
 
-import-seg
-----------
+``import-seg``
+--------------
 
 Convert a file in the :ref:`segformat` format (e.g. the output of standard CBS
 or the GenePattern server) into one or more CNVkit .cns files.
@@ -74,8 +74,8 @@ integer IDs. Options in ``import-seg`` can help recover the original names.
 
 .. _import-theta:
 
-import-theta
-------------
+``import-theta``
+----------------
 
 Convert the ".results" output of `THetA2
 <http://compbio.cs.brown.edu/projects/theta/>`_ to one or more CNVkit .cns files
@@ -90,8 +90,8 @@ analysis.
 
 .. _export:
 
-export
-------
+``export``
+----------
 
 Convert copy number ratio tables (.cnr files) or segments (.cns) to
 another format.

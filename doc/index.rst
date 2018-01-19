@@ -32,6 +32,7 @@ Command line usage
     plots
     reports
     importexport
+    rna
     scripts
 
 
@@ -50,7 +51,6 @@ FAQ & How To
     heterogeneity
     germline
     nonhybrid
-    rna
 
 
 Python API

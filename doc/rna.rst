@@ -22,8 +22,10 @@ are needed to complete the processing pipeline:
 With the above files, the RNA analysis can be run with either of the following
 commands:
 
-import-rna
-----------
+.. _import-rna:
+
+``import-rna``
+--------------
 
 
 Use like this::
