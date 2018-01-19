@@ -17,7 +17,7 @@ are available to support this use case:
   sequencing or mapping in all cells regardless of copy number status at that
   site, which are not informative for copy number. This option in the
   :ref:`batch` command applies to segmentation; the option is also available in
-  the :ref:`segment`, :ref:`metrics`, :ref:`segmetrics`, :ref:`gainloss` and
+  the :ref:`segment`, :ref:`metrics`, :ref:`segmetrics`, :ref:`genemetrics` and
   :doc:`heterogeneity` commands.
 
     - Why -15? The null log2 value substituted for bins with zero coverage is

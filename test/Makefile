@@ -16,7 +16,7 @@ picard_segs=$(picard_cnrs:.cnr=.cns)
 
 picard_targets= build/reference-picard.cnn $(picard_cnrs) $(picard_segs) \
 	     all-scatters.pdf all-diagrams.pdf heatmap-picard.pdf \
-	     p2-9_2-breaks.txt p2-9_2-gainloss.txt gender-picard.txt \
+	     p2-9_2-breaks.txt p2-9_2-genemetrics.txt gender-picard.txt \
 	     p2-all.cdt p2-all-jtv.txt p2-all.seg p2-9_2.nexus p2-9_2.nexus-ogt \
 	     p2-all.bed p2-9_2.vcf p2-9_2.theta2.input p2-9_2-segmetrics.cns
 
@@ -112,8 +112,8 @@ p2-5_5-both-diagram.pdf p2-9_2-both-diagram.pdf p2-20_1-both-diagram.pdf p2-20_2
 p2-9_2-breaks.txt: build/p2-9_2.cnr build/p2-9_2.cns
 	$(cnvkit) breaks $^ -o $@
 
-p2-9_2-gainloss.txt: build/p2-9_2.cns build/p2-9_2.cnr
-	$(cnvkit) gainloss -y -m 2 -s $^ -o $@
+p2-9_2-genemetrics.txt: build/p2-9_2.cns build/p2-9_2.cnr
+	$(cnvkit) genemetrics -y -m 2 -s $^ -o $@
 
 gender-picard.txt: build/p2-5_5.cnr  build/p2-5_5.cns build/p2-9_2.cnr build/p2-9_2.cns build/p2-20_5.cnr build/p2-20_5.cns
 	$(cnvkit) sex -y $^ -o $@

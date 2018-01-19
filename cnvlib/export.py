@@ -465,7 +465,7 @@ def ref_means_nbins(tumor_segs, normal_cn):
                          for _seg, bins in normal_cn.by_ranges(tumor_segs)]
         # For the normal/reference bin count, take the mean of the bin values
         # within each segment so that segments match between tumor and normal.
-        # ENH: weighted mean, like gainloss
+        # ENH: weighted mean, like genemetrics
         ref_means = np.array([s.mean() for s in log2s_in_segs])
         if "probes" in tumor_segs:
             nbins = tumor_segs["probes"]

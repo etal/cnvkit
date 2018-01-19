@@ -1,6 +1,6 @@
 """Supporting functions for the text/tabular-reporting commands.
 
-Namely: breaks, gainloss.
+Namely: breaks, genemetrics.
 """
 from __future__ import absolute_import, division
 from builtins import str
@@ -9,6 +9,7 @@ import math
 import sys
 
 import numpy as np
+import pandas as pd
 
 from . import metrics, params
 
@@ -17,6 +18,16 @@ iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 # _____________________________________________________________________________
 # breaks
+
+def do_breaks(probes, segments, min_probes=1):
+    """List the targeted genes in which a copy number breakpoint occurs."""
+    intervals = get_gene_intervals(probes)
+    bpoints = get_breakpoints(intervals, segments, min_probes)
+    return pd.DataFrame.from_records(bpoints,
+                                     columns=['gene', 'chromosome',
+                                              'location', 'change',
+                                              'probes_left', 'probes_right'])
+
 
 def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
     """Tally genomic locations of each targeted gene.
@@ -69,9 +80,32 @@ def get_breakpoints(intervals, segments, min_probes):
 
 
 # _____________________________________________________________________________
-# gainloss
+# genemetrics
 
-def gainloss_by_gene(cnarr, threshold, skip_low=False):
+def do_genemetrics(cnarr, segments=None, threshold=0.2, min_probes=3,
+                skip_low=False, male_reference=False, is_sample_female=None):
+    """Identify targeted genes with copy number gain or loss."""
+    if is_sample_female is None:
+        is_sample_female = cnarr.guess_xx(male_reference=male_reference)
+    cnarr = cnarr.shift_xx(male_reference, is_sample_female)
+    if segments:
+        segments = segments.shift_xx(male_reference, is_sample_female)
+        rows = gene_metrics_by_segment(cnarr, segments, threshold, skip_low)
+    else:
+        rows = gene_metrics_by_gene(cnarr, threshold, skip_low)
+    rows = list(rows)
+    columns = (rows[0].index if len(rows) else cnarr._required_columns)
+    columns = ["gene"] + [col for col in columns if col != "gene"]
+    table = pd.DataFrame.from_records(rows).reindex(columns=columns)
+    if min_probes and len(table):
+        n_probes = (table.segment_probes
+                    if 'segment_probes' in table.columns
+                    else table.n_bins)
+        table = table[n_probes >= min_probes]
+    return table
+
+
+def gene_metrics_by_gene(cnarr, threshold, skip_low=False):
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
     NB: Adjust the sample's sex-chromosome log2 values beforehand with shift_xx,
@@ -82,7 +116,7 @@ def gainloss_by_gene(cnarr, threshold, skip_low=False):
             yield row
 
 
-def gainloss_by_segment(cnarr, segments, threshold, skip_low=False):
+def gene_metrics_by_segment(cnarr, segments, threshold, skip_low=False):
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
     In the output table, show each segment's weight and probes as segment_weight

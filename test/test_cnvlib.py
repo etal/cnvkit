@@ -368,13 +368,13 @@ class CommandTests(unittest.TestCase):
         cnr = commands.do_fix(tgt_bins, blank_bins, ref[~is_bg])
         self.assertTrue(0 < len(cnr) <= len(tgt_bins))
 
-    def test_gainloss(self):
-        """The 'gainloss' command."""
+    def test_genemetrics(self):
+        """The 'genemetrics' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
-        rows = commands.do_gainloss(probes, male_reference=True)
+        rows = commands.do_genemetrics(probes, male_reference=True)
         self.assertGreater(len(rows), 0)
         segs = cnvlib.read("formats/amplicon.cns")
-        rows = commands.do_gainloss(probes, segs, 0.3, 4, male_reference=True)
+        rows = commands.do_genemetrics(probes, segs, 0.3, 4, male_reference=True)
         self.assertGreater(len(rows), 0)
 
     def test_import_theta(self):

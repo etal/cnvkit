@@ -1021,6 +1021,8 @@ P_heatmap.set_defaults(func=_cmd_heatmap)
 
 # breaks ----------------------------------------------------------------------
 
+do_breaks = public(reports.do_breaks)
+
 def _cmd_breaks(args):
     """List the targeted genes in which a copy number breakpoint occurs."""
     cnarr = read_cna(args.filename)
@@ -1028,17 +1030,6 @@ def _cmd_breaks(args):
     bpoints = do_breaks(cnarr, segarr, args.min_probes)
     logging.info("Found %d gene breakpoints", len(bpoints))
     write_dataframe(args.output, bpoints)
-
-
-@public
-def do_breaks(probes, segments, min_probes=1):
-    """List the targeted genes in which a copy number breakpoint occurs."""
-    intervals = reports.get_gene_intervals(probes)
-    bpoints = reports.get_breakpoints(intervals, segments, min_probes)
-    return pd.DataFrame.from_records(bpoints,
-                                     columns=['gene', 'chromosome',
-                                              'location', 'change',
-                                              'probes_left', 'probes_right'])
 
 
 P_breaks = AP_subparsers.add_parser('breaks', help=_cmd_breaks.__doc__)
@@ -1055,72 +1046,55 @@ P_breaks.add_argument('-o', '--output',
 P_breaks.set_defaults(func=_cmd_breaks)
 
 
-# gainloss --------------------------------------------------------------------
+# genemetrics/gainloss --------------------------------------------------------
 
-def _cmd_gainloss(args):
+do_genemetrics = public(reports.do_genemetrics)
+
+def _cmd_genemetrics(args):
     """Identify targeted genes with copy number gain or loss."""
     cnarr = read_cna(args.filename)
     segarr = read_cna(args.segment) if args.segment else None
     is_sample_female = verify_sample_sex(cnarr, args.sample_sex,
                                          args.male_reference)
-    gainloss = do_gainloss(cnarr, segarr, args.threshold,
-                           args.min_probes, args.drop_low_coverage,
-                           args.male_reference, is_sample_female)
-    logging.info("Found %d gene-level gains and losses", len(gainloss))
-    write_dataframe(args.output, gainloss)
+    table = do_genemetrics(cnarr, segarr, args.threshold, args.min_probes,
+                           args.drop_low_coverage, args.male_reference,
+                           is_sample_female)
+    logging.info("Found %d gene-level gains and losses", len(table))
+    write_dataframe(args.output, table)
 
 
-@public
-def do_gainloss(cnarr, segments=None, threshold=0.2, min_probes=3,
-                skip_low=False, male_reference=False, is_sample_female=None):
-    """Identify targeted genes with copy number gain or loss."""
-    if is_sample_female is None:
-        is_sample_female = cnarr.guess_xx(male_reference=male_reference)
-    cnarr = cnarr.shift_xx(male_reference, is_sample_female)
-    if segments:
-        segments = segments.shift_xx(male_reference, is_sample_female)
-        gainloss = reports.gainloss_by_segment(cnarr, segments, threshold,
-                                               skip_low)
-    else:
-        gainloss = reports.gainloss_by_gene(cnarr, threshold, skip_low)
-    gainloss = list(gainloss)
-    columns = (gainloss[0].index if len(gainloss) else cnarr._required_columns)
-    columns = ["gene"] + [col for col in columns if col != "gene"]
-    gainloss = pd.DataFrame.from_records(gainloss).reindex(columns=columns)
-    if min_probes and len(gainloss):
-        probes = (gainloss.seg_probes if 'seg_probes' in gainloss.columns
-                  else gainloss.n_bins)
-        gainloss = gainloss[probes >= min_probes]
-    return gainloss
-
-
-P_gainloss = AP_subparsers.add_parser('gainloss', help=_cmd_gainloss.__doc__)
-P_gainloss.add_argument('filename',
+P_genemetrics = AP_subparsers.add_parser('genemetrics',
+                                         help=_cmd_genemetrics.__doc__)
+P_genemetrics.add_argument('filename',
         help="""Processed sample coverage data file (*.cnr), the output
                 of the 'fix' sub-command.""")
-P_gainloss.add_argument('-s', '--segment',
+P_genemetrics.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command).")
-P_gainloss.add_argument('-t', '--threshold', type=float, default=0.2,
+P_genemetrics.add_argument('-t', '--threshold', type=float, default=0.2,
         help="""Copy number change threshold to report a gene gain/loss.
                 [Default: %(default)s]""")
-P_gainloss.add_argument('-m', '--min-probes', type=int, default=3,
+P_genemetrics.add_argument('-m', '--min-probes', type=int, default=3,
         help="""Minimum number of covered probes to report a gain/loss.
                 [Default: %(default)d]""")
-P_gainloss.add_argument("--drop-low-coverage", action='store_true',
+P_genemetrics.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
-P_gainloss.add_argument('-y', '--male-reference', action='store_true',
+P_genemetrics.add_argument('-y', '--male-reference', action='store_true',
         help="""Assume inputs were normalized to a male reference
                 (i.e. female samples will have +1 log-coverage of chrX;
                 otherwise male samples would have -1 chrX).""")
-P_gainloss.add_argument('-x', '--sample-sex', '-g', '--gender',
+P_genemetrics.add_argument('-x', '--sample-sex', '-g', '--gender',
         dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's chromosomal sex as male or female.
                 (Otherwise guessed from X and Y coverage).""")
-P_gainloss.add_argument('-o', '--output',
+P_genemetrics.add_argument('-o', '--output',
         help="Output table file name.")
-P_gainloss.set_defaults(func=_cmd_gainloss)
+P_genemetrics.set_defaults(func=_cmd_genemetrics)
+
+# Shims
+AP_subparsers._name_parser_map['gainloss'] = P_genemetrics
+do_gainloss = public(do_genemetrics)
 
 
 # sex/gender ------------------------------------------------------------------

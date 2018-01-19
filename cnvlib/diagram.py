@@ -93,18 +93,17 @@ def _get_gene_labels(cnarr, segarr, cnarr_is_seg, threshold, min_probes):
         # Only segments (.cns)
         sel = cnarr.data[(cnarr.data.log2.abs() >= threshold) &
                           ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
-        gainloss = sel.itertuples(index=False)
+        rows = sel.itertuples(index=False)
         probes_attr = 'probes'
     elif segarr:
         # Both segments and bin-level ratios
-        gainloss = reports.gainloss_by_segment(cnarr, segarr, threshold)
+        rows = reports.gene_metrics_by_segment(cnarr, segarr, threshold)
         probes_attr = 'segment_probes'
     else:
         # Only bin-level ratios (.cnr)
-        gainloss = reports.gainloss_by_gene(cnarr, threshold)
+        rows = reports.gene_metrics_by_gene(cnarr, threshold)
         probes_attr = 'n_bins'
-    return [gl_row.gene for gl_row in gainloss
-            if getattr(gl_row, probes_attr) >= min_probes]
+    return [row.gene for row in rows if getattr(row, probes_attr) >= min_probes]
 
 
 def build_chrom_diagram(features, chr_sizes, sample_id, title=None):

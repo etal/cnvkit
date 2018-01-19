@@ -222,7 +222,7 @@ extremely cluttered with hundreds or thousands of genes labeled.
 
 You can reduce the number of labels by using a higher threshold (``diagram -t``)
 to limit labeling to deep deletions and high-level amplifications. The
-:ref:`gainloss` command can help you determine the log2 value of genes of
+:ref:`genemetrics` command can help you determine the log2 value of genes of
 interest, and then a ``-t`` value slightly below that will disply only
 alterations at least that exteme.
 

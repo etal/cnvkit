@@ -37,18 +37,18 @@ number breakpoint (e.g. unbalanced translocation)::
     cnvkit.py breaks Sample.cnr Sample.cns | cut -f1 | sort -u > gene-breaks.txt
 
 
-.. _gainloss:
+.. _genemetrics:
 
-``gainloss``
+``genemetrics``
 ------------
 
 Identify targeted genes with copy number gain or loss above or below a
-threshold.
+threshold. (Formerly called ``gainloss``.)
 
 ::
 
-    cnvkit.py gainloss Sample.cnr
-    cnvkit.py gainloss Sample.cnr -s Sample.cns -t 0.4 -m 5 -y
+    cnvkit.py genemetrics Sample.cnr
+    cnvkit.py genemetrics Sample.cnr -s Sample.cns -t 0.4 -m 5 -y
 
 The first four columns of output table show each targeted gene's name and its
 genomic coordinates (based on the first and last bins with that label in the
@@ -97,14 +97,14 @@ reported.
     those genes will be listed individually.
 
 The output is a text table of tab-separated values, like that of :ref:`breaks`.
-Continuing the Unix example, we can try ``gainloss`` both with and without the
+Continuing the Unix example, we can try ``genemetrics`` both with and without the
 segment files, take the intersection of those as a list of "trusted" genes, and
 visualize each of them with :ref:`scatter`::
 
-    cnvkit.py gainloss -y Sample.cnr -s Sample.cns | tail -n+2 | cut -f1 | sort > segment-gainloss.txt
-    cnvkit.py gainloss -y Sample.cnr | tail -n+2 | cut -f1 | sort > ratio-gainloss.txt
-    comm -12 ratio-gainloss.txt segment-gainloss.txt > trusted-gainloss.txt
-    for gene in `cat trusted-gainloss.txt`
+    cnvkit.py genemetrics -y Sample.cnr -s Sample.cns | tail -n+2 | cut -f1 | sort > segment-genes.txt
+    cnvkit.py genemetrics -y Sample.cnr | tail -n+2 | cut -f1 | sort > ratio-genes.txt
+    comm -12 ratio-genes.txt segment-genes.txt > trusted-genes.txt
+    for gene in `cat trusted-genes.txt`
     do
         cnvkit.py scatter -s Sample.cn{s,r} -g $gene -o Sample-$gene-scatter.pdf
     done

@@ -18,7 +18,7 @@ threshold will tend to display gene amplifications, fully clonal single-copy
 gains in fairly pure samples, most single-copy losses, and total (homozygous)
 deletions.
 
-When using the :ref:`gainloss` command, choose a threshold to suit your needs
+When using the :ref:`genemetrics` command, choose a threshold to suit your needs
 depending on your knowledge of the sample's purity, heterogeneity, and likely
 features of interest. As a starting point, try 0.1 or 0.2 if you are going to
 do your own filtering downstream, or 0.3 if not.

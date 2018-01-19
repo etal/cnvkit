@@ -174,7 +174,7 @@ the CNVkit sub-commands.
 ``reports``
 ~~~~~~~~~~~
 
-Supports the sub-commands :ref:`breaks` and :ref:`gainloss`.
+Supports the sub-commands :ref:`breaks` and :ref:`genemetrics`.
 
 .. automodule:: cnvlib.reports
     :members:
