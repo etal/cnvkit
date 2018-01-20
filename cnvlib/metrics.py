@@ -6,8 +6,7 @@ from builtins import zip
 import numpy as np
 import pandas as pd
 
-from .descriptives import (biweight_midvariance, interquartile_range,
-                           median_absolute_deviation)
+from . import descriptives
 
 
 def do_metrics(cnarrs, segments=None, skip_low=False):
@@ -56,7 +55,7 @@ def ests_of_scale(deviations):
     as a tuple.
     """
     std = np.std(deviations, dtype=np.float64)
-    mad = median_absolute_deviation(deviations)
-    iqr = interquartile_range(deviations)
-    biw = biweight_midvariance(deviations)
+    mad = descriptives.median_absolute_deviation(deviations)
+    iqr = descriptives.interquartile_range(deviations)
+    biw = descriptives.biweight_midvariance(deviations)
     return (std, mad, iqr, biw)

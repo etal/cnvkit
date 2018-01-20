@@ -1089,6 +1089,51 @@ P_genemetrics.add_argument('-x', '--sample-sex', '-g', '--gender',
                 (Otherwise guessed from X and Y coverage).""")
 P_genemetrics.add_argument('-o', '--output',
         help="Output table file name.")
+
+P_genemetrics_stats = P_genemetrics.add_argument_group(
+    "Statistics available")
+# Location statistics
+P_genemetrics_stats.add_argument('--mean',
+        action='append_const', dest='location_stats', const='mean',
+        help="Mean log2 value (unweighted).")
+P_genemetrics_stats.add_argument('--median',
+        action='append_const', dest='location_stats', const='median',
+        help="Median.")
+P_genemetrics_stats.add_argument('--mode',
+        action='append_const', dest='location_stats', const='mode',
+        help="Mode (i.e. peak density of log2 values).")
+# Dispersion statistics
+P_genemetrics_stats.add_argument('--stdev',
+        action='append_const', dest='spread_stats', const='stdev',
+        help="Standard deviation.")
+P_genemetrics_stats.add_argument('--sem',
+        action='append_const', dest='spread_stats', const='sem',
+        help="Standard error of the mean.")
+P_genemetrics_stats.add_argument('--mad',
+        action='append_const', dest='spread_stats', const='mad',
+        help="Median absolute deviation (standardized).")
+P_genemetrics_stats.add_argument('--mse',
+        action='append_const', dest='spread_stats', const='mse',
+        help="Mean squared error.")
+P_genemetrics_stats.add_argument('--iqr',
+        action='append_const', dest='spread_stats', const='iqr',
+        help="Inter-quartile range.")
+P_genemetrics_stats.add_argument('--bivar',
+        action='append_const', dest='spread_stats', const='bivar',
+        help="Tukey's biweight midvariance.")
+# Interval statistics
+P_genemetrics_stats.add_argument('--ci',
+        action='append_const', dest='interval_stats', const='ci',
+        help="Confidence interval (by bootstrap).")
+P_genemetrics_stats.add_argument('--pi',
+        action='append_const', dest='interval_stats', const='pi',
+        help="Prediction interval.")
+P_genemetrics_stats.add_argument('-a', '--alpha', type=float, default=.05,
+        help="""Level to estimate confidence and prediction intervals;
+                use with --ci and --pi. [Default: %(default)s]""")
+P_genemetrics_stats.add_argument('-b', '--bootstrap', type=int, default=100,
+        help="""Number of bootstrap iterations to estimate confidence interval;
+                use with --ci. [Default: %(default)d]""")
 P_genemetrics.set_defaults(func=_cmd_genemetrics)
 
 # Shims
@@ -1188,12 +1233,6 @@ def _cmd_segmetrics(args):
     if not 0.0 < args.alpha <= 1.0:
         raise RuntimeError("alpha must be between 0 and 1.")
 
-    #  location_stats = [x for x in ('mean', 'median', 'mode')
-    #                    if hasattr(args, x)]
-    #  spread_stats = [x for x in ('stdev', 'sem', 'mad', 'mse', 'iqr', 'bivar')
-    #                  if hasattr(args, x)]
-    #  interval_stats = [x for x in ('ci', 'pi')
-    #                    if hasattr(args, x)]
     if not any((args.location_stats, args.spread_stats, args.interval_stats)):
         logging.info("No stats specified")
         return
