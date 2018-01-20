@@ -9,12 +9,15 @@ from . import rna
 
 
 def do_import_rna(gene_count_fnames, in_format, gene_resource_fname,
-                  correlations_fname=None):
+                  correlations_fname=None, normal_fnames=()):
     """Convert a cohort of per-gene read counts to CNVkit .cnr format.
 
     The expected data source is TCGA gene-level expression counts for individual
     samples, but other sources should be fine, too.
     """
+    # Deduplicate and ensure all normals are included in the analysis
+    gene_count_fnames = sorted(set(gene_count_fnames) + set(normal_fnames))
+
     if in_format == 'rsem':
         sample_counts, tx_lengths = aggregate_rsem(gene_count_fnames)
     elif in_format == 'counts':
@@ -30,8 +33,9 @@ def do_import_rna(gene_count_fnames, in_format, gene_resource_fname,
     gene_info = rna.load_gene_info(gene_resource_fname, correlations_fname)
 
     logging.info("Aligning gene info to sample gene counts")
+    normal_ids = [os.path.basename(f).split('.')[0] for f in normal_fnames]
     gene_info, sample_counts, sample_data_log2 = rna.align_gene_info_to_samples(
-        gene_info, sample_counts, tx_lengths)
+        gene_info, sample_counts, tx_lengths, normal_ids)
 
     # Summary table has log2-normalized values, not raw counts
     # ENH show both, with column header suffixes to distinguish?

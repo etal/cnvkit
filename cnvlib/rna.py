@@ -235,7 +235,8 @@ def locate_entrez_dupes(dframe):
                     yield idx
 
 
-def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths):
+def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths,
+                               normal_ids):
     """Align columns and sort.
 
     Also calculate weights and add to gene_info as 'weight', along with
@@ -260,7 +261,9 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths):
     weights = [np.sqrt((gene_counts / gene_counts.quantile(.75)).clip_upper(1))]
 
     logging.info("Calculating normalized gene read depths")
-    sample_depths_log2 = normalize_read_depths(sc.divide(gi['tx_length'], axis=0))
+    sample_depths_log2 = normalize_read_depths(sc.divide(gi['tx_length'],
+                                                         axis=0),
+                                               normal_ids)
 
     logging.info("Weighting genes by spread of read depths")
     gene_spreads = sample_depths_log2.std(axis=1)
@@ -284,7 +287,7 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths):
     return gi, sc, sample_depths_log2
 
 
-def normalize_read_depths(sample_depths):
+def normalize_read_depths(sample_depths, normal_ids):
     """Normalize read depths within each sample.
 
     Some samples have higher sequencing depth and therefore read depths need to
@@ -296,6 +299,8 @@ def normalize_read_depths(sample_depths):
 
     Finally, convert to log2 ratios.
     """
+    # TODO use normal_ids as a control here
+    #   e.g. subtract their IQR after the loop?
     assert sample_depths.values.sum() > 0
     sample_depths = sample_depths.fillna(0)
     for _i in range(4):

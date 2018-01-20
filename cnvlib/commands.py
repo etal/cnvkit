@@ -1380,7 +1380,8 @@ do_import_rna = public(import_rna.do_import_rna)
 def _cmd_import_rna(args):
     """Convert a cohort of per-gene log2 ratios to CNVkit .cnr format."""
     all_data, cnrs = import_rna.do_import_rna(
-        args.gene_counts, args.format, args.gene_resource, args.correlations)
+        args.gene_counts, args.format, args.gene_resource, args.correlations,
+        args.normal)
     logging.info("Writing output files")
     if args.output:
         all_data.to_csv(args.output, sep='\t', index=True)
@@ -1404,11 +1405,16 @@ P_import_rna.add_argument('-f', '--format',
                 (*_rsem.genes.results), or 'counts' for generic 2-column gene
                 IDs and their read counts (e.g. TCGA level 2 RNA expression).
                 """)
-P_import_rna.add_argument('-g', '--gene-resource', metavar="FILE",
+P_import_rna.add_argument('-g', '--gene-resource',
+        metavar="FILE", required=True,
         help="Location of gene info table from Ensembl BioMart.")
 P_import_rna.add_argument('-c', '--correlations', metavar="FILE",
         help="""Correlation of each gene's copy number with
         expression. Output of cnv_expression_correlate.py.""")
+P_import_rna.add_argument('-n', '--normal', nargs='+',
+        help="""Normal samples (same format as `gene_counts`) to be used as a
+                control to when normalizing and re-centering gene read depth
+                ratios. All filenames following this option will be used.""")
 P_import_rna.add_argument('-d', '--output-dir',
         default='.', metavar="PATH",
         help="""Directory to write a CNVkit .cnr file for each input
