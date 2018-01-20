@@ -19,15 +19,14 @@ from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
-import numpy as np
 import pandas as pd
 from skgenome import tabio, GenomicArray as _GA
 from skgenome.rangelabel import to_label
 
 from . import (access, antitarget, autobin, batch, call, core, coverage,
-               descriptives, diagram, export, fix, heatmap, import_rna,
-               importers, metrics, parallel, reference, reports, scatter,
-               segmentation, target)
+               diagram, export, fix, heatmap, import_rna, importers, metrics,
+               parallel, reference, reports, scatter, segmentation, segmetrics,
+               target)
 from .cmdutil import (load_het_snps, read_cna, verify_sample_sex,
                       write_tsv, write_text, write_dataframe)
 
@@ -1182,31 +1181,20 @@ P_metrics.set_defaults(func=_cmd_metrics)
 
 # segmetrics ------------------------------------------------------------------
 
+do_segmetrics = public(segmetrics.do_segmetrics)
+
 def _cmd_segmetrics(args):
     """Compute segment-level metrics from bin-level log2 ratios."""
     if not 0.0 < args.alpha <= 1.0:
         raise RuntimeError("alpha must be between 0 and 1.")
 
-    from scipy.stats import sem
-    # silence sem's "Degrees of freedom <= 0 for slice"; NaN is OK
-    import warnings
-    warnings.simplefilter("ignore", RuntimeWarning)
-
-    stats = {
-        'mean': np.mean,
-        'median': np.median,
-        'mode': descriptives.modal_location,
-        'stdev': np.std,
-        'mad':  descriptives.median_absolute_deviation,
-        'mse':  descriptives.mean_squared_error,
-        'iqr':  descriptives.interquartile_range,
-        'bivar': descriptives.biweight_midvariance,
-        'sem': sem,
-        'ci': lambda x: metrics.confidence_interval_bootstrap(x, args.alpha,
-                                                              args.bootstrap),
-        'pi': lambda x: metrics.prediction_interval(x, args.alpha),
-    }
-    if not any(getattr(args, name) for name in stats):
+    #  location_stats = [x for x in ('mean', 'median', 'mode')
+    #                    if hasattr(args, x)]
+    #  spread_stats = [x for x in ('stdev', 'sem', 'mad', 'mse', 'iqr', 'bivar')
+    #                  if hasattr(args, x)]
+    #  interval_stats = [x for x in ('ci', 'pi')
+    #                    if hasattr(args, x)]
+    if not any((args.location_stats, args.spread_stats, args.interval_stats)):
         logging.info("No stats specified")
         return
 
@@ -1215,38 +1203,10 @@ def _cmd_segmetrics(args):
     if args.drop_low_coverage:
         cnarr = cnarr.drop_low_coverage()
     segarr = read_cna(args.segments)
-    segments, segbins = zip(*cnarr.by_ranges(segarr))
-    # Measures of location
-    for statname in ("mean", "median", "mode"):
-        if getattr(args, statname):
-            func = stats[statname]
-            segarr[statname] = np.asfarray([func(sb.log2) for sb in segbins])
-    # Measures of spread
-    deviations = [sb.log2 - seg.log2 for seg, sb in zip(segments, segbins)]
-    for statname in ("stdev", "sem", "mad", "mse", "iqr", "bivar"):
-        if getattr(args, statname):
-            func = stats[statname]
-            segarr[statname] = np.asfarray([func(d) for d in deviations])
-
-    # Interval calculations
-    if args.ci:
-        segarr["ci_lo"], segarr["ci_hi"] = _segmetric_interval(segarr, cnarr,
-                                                               stats['ci'])
-    if args.pi:
-        segarr["pi_lo"], segarr["pi_hi"] = _segmetric_interval(segarr, cnarr,
-                                                               stats['pi'])
-
+    segarr = do_segmetrics(cnarr, segarr,
+                           args.location_stats, args.spread_stats,
+                           args.interval_stats, args.alpha, args.bootstrap)
     tabio.write(segarr, args.output or segarr.sample_id + ".segmetrics.cns")
-
-
-def _segmetric_interval(segarr, cnarr, func):
-    """Compute a stat that yields intervals (low & high values)"""
-    out_vals_lo =  np.repeat(np.nan, len(segarr))
-    out_vals_hi = np.repeat(np.nan, len(segarr))
-    for i, (_segment, bins) in enumerate(cnarr.by_ranges(segarr)):
-        if len(bins):
-            out_vals_lo[i], out_vals_hi[i] = func(bins)
-    return out_vals_lo, out_vals_hi
 
 
 P_segmetrics = AP_subparsers.add_parser('segmetrics', help=_cmd_segmetrics.__doc__)
@@ -1262,27 +1222,41 @@ P_segmetrics.add_argument('-o', '--output',
 
 P_segmetrics_stats = P_segmetrics.add_argument_group(
     "Statistics available")
-P_segmetrics_stats.add_argument('--mean', action='store_true',
+# Location statistics
+P_segmetrics_stats.add_argument('--mean',
+        action='append_const', dest='location_stats', const='mean',
         help="Mean log2 value (unweighted).")
-P_segmetrics_stats.add_argument('--median', action='store_true',
+P_segmetrics_stats.add_argument('--median',
+        action='append_const', dest='location_stats', const='median',
         help="Median.")
-P_segmetrics_stats.add_argument('--mode', action='store_true',
+P_segmetrics_stats.add_argument('--mode',
+        action='append_const', dest='location_stats', const='mode',
         help="Mode (i.e. peak density of log2 values).")
-P_segmetrics_stats.add_argument('--stdev', action='store_true',
+# Dispersion statistics
+P_segmetrics_stats.add_argument('--stdev',
+        action='append_const', dest='spread_stats', const='stdev',
         help="Standard deviation.")
-P_segmetrics_stats.add_argument('--sem', action='store_true',
+P_segmetrics_stats.add_argument('--sem',
+        action='append_const', dest='spread_stats', const='sem',
         help="Standard error of the mean.")
-P_segmetrics_stats.add_argument('--mad', action='store_true',
+P_segmetrics_stats.add_argument('--mad',
+        action='append_const', dest='spread_stats', const='mad',
         help="Median absolute deviation (standardized).")
-P_segmetrics_stats.add_argument('--mse', action='store_true',
+P_segmetrics_stats.add_argument('--mse',
+        action='append_const', dest='spread_stats', const='mse',
         help="Mean squared error.")
-P_segmetrics_stats.add_argument('--iqr', action='store_true',
+P_segmetrics_stats.add_argument('--iqr',
+        action='append_const', dest='spread_stats', const='iqr',
         help="Inter-quartile range.")
-P_segmetrics_stats.add_argument('--bivar', action='store_true',
+P_segmetrics_stats.add_argument('--bivar',
+        action='append_const', dest='spread_stats', const='bivar',
         help="Tukey's biweight midvariance.")
-P_segmetrics_stats.add_argument('--ci', action='store_true',
+# Interval statistics
+P_segmetrics_stats.add_argument('--ci',
+        action='append_const', dest='interval_stats', const='ci',
         help="Confidence interval (by bootstrap).")
-P_segmetrics_stats.add_argument('--pi', action='store_true',
+P_segmetrics_stats.add_argument('--pi',
+        action='append_const', dest='interval_stats', const='pi',
         help="Prediction interval.")
 P_segmetrics_stats.add_argument('-a', '--alpha', type=float, default=.05,
         help="""Level to estimate confidence and prediction intervals;

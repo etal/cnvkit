@@ -68,7 +68,7 @@ def aggregate_gene_counts(filenames):
 def aggregate_rsem(fnames):
     """Pull out the expected read counts from each RSEM file.
 
-    The format of RSEM's "*_rsem.genes.results" output files is tab-delimited
+    The format of RSEM's ``*_rsem.genes.results`` output files is tab-delimited
     with a header row. We extract the Ensembl gene ID, expected read counts, and
     transcript lengths from each file.
 

@@ -12,7 +12,7 @@ import cnvlib
 from cnvlib import (access, antitarget, autobin, batch, cnary, commands, core,
                     coverage, diagram, export, fix, import_rna, importers,
                     metrics, params, plots, reference, reports, segmentation,
-                    smoothing, vary)
+                    segmetrics, smoothing, vary)
 
 
 class CNATests(unittest.TestCase):
@@ -460,10 +460,10 @@ class CommandTests(unittest.TestCase):
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
         for func in (
-            lambda x: metrics.confidence_interval_bootstrap(x, 0.05, 100),
-            lambda x: metrics.prediction_interval(x, 0.05),
+            lambda x: segmetrics.confidence_interval_bootstrap(x, 0.05, 100),
+            lambda x: segmetrics.prediction_interval(x, 0.05),
         ):
-            lo, hi = commands._segmetric_interval(segarr, cnarr, func)
+            lo, hi = segmetrics.segmetric_interval(segarr, cnarr, func)
             self.assertEqual(len(lo), len(segarr))
             self.assertEqual(len(hi), len(segarr))
             sensible_segs_mask = (segarr['probes'] > 3).values

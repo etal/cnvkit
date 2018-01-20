@@ -11,7 +11,8 @@ import sys
 import numpy as np
 import pandas as pd
 
-from . import metrics, params
+from . import params
+from .segmetrics import segment_mean
 
 iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
@@ -56,7 +57,8 @@ def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
 
 
 def get_breakpoints(intervals, segments, min_probes):
-    """Identify CBS segment breaks within the targeted intervals."""
+    """Identify segment breaks within the targeted intervals."""
+    # TODO use segments.by_ranges(intervals)
     breakpoints = []
     for i, curr_row in enumerate(segments[:-1]):
         curr_chrom = curr_row.chromosome
@@ -156,7 +158,7 @@ def group_by_genes(cnarr, skip_low):
     for gene, rows in cnarr.by_gene():
         if not rows or gene in ignore:
             continue
-        segmean = metrics.segment_mean(rows, skip_low)
+        segmean = segment_mean(rows, skip_low)
         if segmean is None:
             continue
         outrow = rows[0].copy()

@@ -155,6 +155,15 @@ the CNVkit sub-commands.
     :undoc-members:
     :show-inheritance:
 
+``import_rna``
+~~~~~~~~~~~~~~
+
+.. automodule:: cnvlib.import_rna
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 ``metrics``
 ~~~~~~~~~~~
 
@@ -193,6 +202,14 @@ Supports the sub-commands :ref:`breaks` and :ref:`genemetrics`.
 ~~~~~~~~~~~~~~~~
 
 .. automodule:: cnvlib.segmentation
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``segmetrics``
+~~~~~~~~~~~~~~~~
+
+.. automodule:: cnvlib.segmetrics
     :members:
     :undoc-members:
     :show-inheritance:
@@ -257,6 +274,14 @@ Defines several constants used in the pipeline.
 ~~~~~~~~~
 
 .. automodule:: cnvlib.plots
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``rna``
+~~~~~~~~~
+
+.. automodule:: cnvlib.rna
     :members:
     :undoc-members:
     :show-inheritance:

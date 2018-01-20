@@ -11,7 +11,7 @@ from scipy.stats import median_test
 from skgenome import GenomicArray
 
 from . import core, descriptives, params, smoothing
-from .metrics import segment_mean
+from .segmetrics import segment_mean
 
 
 class CopyNumArray(GenomicArray):
