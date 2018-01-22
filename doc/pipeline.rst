@@ -114,16 +114,36 @@ twice as many target bins, which might result in higher-resolution segmentation.
 However, the number of reads counted in each bin will be reduced by about half,
 increasing the variance or "noise" in bin-level coverages.
 An excess of noisy bins can make visualization difficult, and since the noise
-may not be Gaussian, especially in the presence of many bins with zero reads,
-the CBS algorithm could produce less accurate segmentation results on
+may not be normally distributed, especially in the presence of many bins with
+zero reads, the segmentation algorithm could produce less accurate results on
 low-coverage samples.
-In practice we see good results with an average of 200-300 reads per bin; we
+In practice we see good results with an average of 200--300 reads per bin; we
 therefore recommend an overall on-target sequencing coverage depth of at least
-200x to 300x with a read length of 100 to justify reducing the average target
+200x to 300x with a read length of 100bp to justify reducing the average target
 bin size to 100bp.
 
-Adding gene names
-`````````````````
+For hybrid capture, if your targets are not **tiled with uniform density** --
+for example, if your target panel is designed with a subset of targets having
+twice or half the usual number of tiles for a fixed number of genomic bases --
+you do not need to do anything in particular to compensate for this as long as
+you are using a pooled :ref:`reference`. When a test sample's read depths are
+normalized to the pooled reference, the log2 ratios will even out. However, the
+"spread" of those bins in your pooled reference, and the "weight" of the
+corresponding bins in the test sample's .cnr file, will be correspondingly
+higher or lower.
+
+If some targets are enriched separately for each sample via **spike-in**, rather
+than as part of the original capture panel (which is assumed to have a fairly
+consistent capture efficiency across targets for all test and control samples),
+then the spike-in capture efficiency will typically vary too much to be useful
+as a copy number signal. In that case, the spike-in region should **not** be
+included in the target BED file, and **excluded** from the :ref:`access` regions
+(which determine :ref:`antitarget` regions) by using the ``-x`` option.
+
+
+
+Labeling target regions
+```````````````````````
 
 In case the vendor BED file does not label each region with a corresponding gene
 name, the ``--annotate`` option can add or replace these labels.
@@ -138,6 +158,10 @@ splits these accessions on commas, then chooses the single accession that covers
 in the maximum number of consecutive regions that share that accession, and
 applies it as the new label for those regions. (You may find it simpler to just
 apply the refFlat annotations.)
+
+The targets do not need to be genes, but for convenience CNVkit's documentation
+and source code generally refer to consecutive targeted regions with the same
+label as "genes".
 
 
 .. _access:
@@ -155,30 +179,29 @@ reference genome, output as a BED file.
 
 Many fully sequenced genomes, including the human genome, contain large regions
 of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
-telomeres, and highly repetitive regions.) In the FASTA reference genome
-sequence these regions are filled in with large stretches of "N" characters.
-These regions cannot be mapped by resequencing, so we will want to avoid them when
-calculating the :ref:`antitarget` bin locations (for example).
+telomeres, and highly repetitive regions.) In the reference genome sequence
+these regions are filled in with large stretches of "N" characters.
+These regions cannot be mapped by resequencing, so CNVkit avoids them when
+calculating the :ref:`antitarget` bin locations.
 
 The ``access`` command computes the locations of the accessible sequence regions
 for a given reference genome based on these masked-out sequences, treating long
 spans of 'N' characters as the inaccessible regions and outputting the
 coordinates of the regions between them.
 
-Other known unmappable or poorly sequenced regions can be specified for
-exclusion with the ``-x`` option.
+Other known unmappable, variable, or poorly sequenced regions can be
+excluded with the ``-x``/``--exclude`` option.
 This option can be used more than once to exclude several BED files listing
 different sets of regions.
-For example, "excludable" regions of poor mappability have been precalculated by
-others and are available from the `UCSC FTP Server
+For example, regions of poor mappability have been precalculated by others and
+are available from the `UCSC FTP Server
 <ftp://hgdownload.soe.ucsc.edu/goldenPath/>`_ (see `here for hg19
 <ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/>`_).
 
 If there are many small excluded/inaccessible regions in the genome, then small,
 less-reliable antitarget bins would be squeezed into the remaining accessible
-regions.  The ``-s`` option tells the script to ignore short regions that would
-otherwise be excluded as inaccessible, allowing larger antitarget bins to
-overlap them.
+regions.  The ``-s`` option ignores short regions that would otherwise be
+excluded, allowing larger antitarget bins to overlap them.
 
 An "access" file precomputed for the UCSC reference human genome build hg19,
 with some know low-mappability regions excluded, is included in the CNVkit
@@ -219,9 +242,10 @@ An appropriate off-target bin size can be computed as the product of the average
 target region size and the fold-enrichment of sequencing reads in targeted
 regions, such that roughly the same number of reads are mapped to on-- and
 off-target bins on average --- roughly proportional to the level of on-target
-enrichment.
+enrichment. The :ref:`autobin` command (below) can quickly estimate these
+values, but you are free to specify your own.
 
-The preliminary coverage information can be obtained with the script
+Average off-target coverage depths can also be obtained with the script
 CalculateHsMetrics in the Picard suite (http://picard.sourceforge.net/), or from
 the console output of the CNVkit :ref:`coverage` command when run on the target
 regions.
