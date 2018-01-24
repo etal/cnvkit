@@ -360,7 +360,9 @@ match the type of sample (e.g. FFPE-extracted or fresh DNA) and library
 preparation protocol or kit used for the test (e.g. tumor) samples.
 
 For :doc:`target amplicon or whole-genome sequencing <nonhybrid>` protocols, the
-"antitarget" BED and .cnn files can be omitted.
+"antitarget" BED and .cnn files can be omitted. Otherwise, ensure the filename
+prefixes are the same for each pair of ".targetcoverage.cnn" and
+".antitargetcoverage.cnn" files (as it's done by default).
 
 
 Paired or pooled normals
