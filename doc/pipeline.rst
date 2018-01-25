@@ -37,7 +37,7 @@ Run the CNVkit pipeline on one or more BAM files::
 
     # Reusing targets and antitargets to build a new reference, but no analysis
     cnvkit.py batch -n *Normal.bam --output-reference new_reference.cnn \
-        -t my_targets.bed -a my_antitargets.bed --male-reference \
+        -t my_targets.bed -a my_antitargets.bed \
         -f hg19.fasta -g data/access-5kb-mappable.hg19.bed
 
 With the ``-p`` option, process each of the BAM files in parallel, as separate
@@ -59,7 +59,7 @@ The pipeline executed by the ``batch`` command is equivalent to::
     cnvkit.py coverage Sample.bam baits.antitarget.bed -o Sample.antitargetcoverage.cnn
 
     # With all normal samples...
-    cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg19.fa [--male-reference] -o my_reference.cnn
+    cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg19.fa -o my_reference.cnn
 
     # For each tumor sample...
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn my_reference.cnn -o Sample.cnr
@@ -67,7 +67,7 @@ The pipeline executed by the ``batch`` command is equivalent to::
 
     # Optionally, with --scatter and --diagram
     cnvkit.py scatter Sample.cnr -s Sample.cns -o Sample-scatter.pdf
-    cnvkit.py diagram Sample.cnr -s Sample.cns [--male-reference] -o Sample-diagram.pdf
+    cnvkit.py diagram Sample.cnr -s Sample.cns -o Sample-diagram.pdf
 
 This is for hybrid capture protocols in which both on- and off-target reads can
 be used for copy number detection. To run alternative pipelines for targeted
@@ -686,10 +686,12 @@ autosomes; by default, diploid autosomes, haploid Y or X/Y depending on
 reference sex).  This equation is rearranged to find the absolute copy number
 of the tumor cells alone, rounded to the nearest integer.
 
-The expected and observed ploidy of the sex chromosomes (X and Y) is different,
-so it's important to specify ``-y``/``--male-reference`` if a male reference was
-used; the sample sex can be specified if known, otherwise it will be guessed
-from the average log2 ratio of chromosome X.
+The expected and observed ploidy of the :doc:`sex chromosomes <sex>` (X and Y)
+is different, so if the option ``-y`` / ``--male-reference`` /
+``--haploid-x-reference`` was used when constructing the :ref:`reference`,
+it's important to specify use the same option here.
+The sample sex can be specified if known, otherwise it will be guessed
+from the average log2 ratio of chromosome X. (See also: :doc:`sex`)
 
 ..  The calculation of new log2 values for the sex chromosomes depends on the
 ..  chromosomal sex of the sample and whether a male reference was used, while

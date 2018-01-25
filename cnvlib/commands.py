@@ -147,7 +147,8 @@ P_batch.add_argument('-m', '--method',
                 amplicon sequencing ('amplicon'), or whole genome sequencing
                 ('wgs'). Determines whether and how to use antitarget bins.
                 [Default: %(default)s]""")
-P_batch.add_argument('-y', '--male-reference', action='store_true',
+P_batch.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
                 log-CNR of chrX; otherwise male samples would have -1 chrX).""")
 P_batch.add_argument('-c', '--count-reads', action='store_true',
@@ -161,25 +162,25 @@ P_batch.add_argument('-p', '--processes',
         help="""Number of subprocesses used to running each of the BAM files in
                 parallel. Without an argument, use the maximum number of
                 available CPUs. [Default: process each BAM in serial]""")
-P_batch.add_argument("--rlibpath",
+P_batch.add_argument("--rlibpath", metavar="DIRECTORY",
         help="Path to an alternative site-library to use for R packages.")
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group(
     "To construct a new copy number reference")
-P_batch_newref.add_argument('-n', '--normal', nargs='*',
+P_batch_newref.add_argument('-n', '--normal', nargs='*', metavar="FILES",
         help="""Normal samples (.bam) used to construct the pooled, paired, or
                 flat reference. If this option is used but no filenames are
                 given, a "flat" reference will be built. Otherwise, all
                 filenames following this option will be used.""")
-P_batch_newref.add_argument('-f', '--fasta',
+P_batch_newref.add_argument('-f', '--fasta', metavar="FILENAME",
         help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
-P_batch_newref.add_argument('-t', '--targets',
+P_batch_newref.add_argument('-t', '--targets', metavar="FILENAME",
         help="Target intervals (.bed or .list)")
-P_batch_newref.add_argument('-a', '--antitargets',
+P_batch_newref.add_argument('-a', '--antitargets', metavar="FILENAME",
         help="Antitarget intervals (.bed or .list)")
 # For pre-processing targets
-P_batch_newref.add_argument('--annotate',
+P_batch_newref.add_argument('--annotate', metavar="FILENAME",
         help="""Use gene models from this file to assign names to the target
                 regions. Format: UCSC refFlat.txt or ensFlat.txt file
                 (preferred), or BED, interval list, GFF, or similar.""")
@@ -188,14 +189,14 @@ P_batch_newref.add_argument('--short-names', action='store_true',
 P_batch_newref.add_argument('--target-avg-size', type=int,
         help="Average size of split target bins (results are approximate).")
 # For antitargets:
-P_batch_newref.add_argument('-g', '--access',
+P_batch_newref.add_argument('-g', '--access', metavar="FILENAME",
         help="""Regions of accessible sequence on chromosomes (.bed), as
                 output by the 'access' command.""")
 P_batch_newref.add_argument('--antitarget-avg-size', type=int,
         help="Average size of antitarget bins (results are approximate).")
 P_batch_newref.add_argument('--antitarget-min-size', type=int,
         help="Minimum size of antitarget bins (smaller regions are dropped).")
-P_batch_newref.add_argument('--output-reference',
+P_batch_newref.add_argument('--output-reference', metavar="FILENAME",
         help="""Output filename/path for the new reference file being created.
                 (If given, ignores the -o/--output-dir option and will write the
                 file to the given path. Otherwise, \"reference.cnn\" will be
@@ -208,7 +209,8 @@ P_batch_oldref.add_argument('-r', '--reference', #required=True,
 
 # Reporting options
 P_batch_report = P_batch.add_argument_group("Output options")
-P_batch_report.add_argument('-d', '--output-dir', default='.',
+P_batch_report.add_argument('-d', '--output-dir',
+        metavar="DIRECTORY", default='.',
         help="Output directory.")
 P_batch_report.add_argument('--scatter', action='store_true',
         help="Create a whole-genome copy ratio profile as a PDF scatter plot.")
@@ -248,7 +250,8 @@ P_target.add_argument('--split', action='store_true',
 P_target.add_argument('-a', '--avg-size', type=int, default=200 / .75,
         help="""Average size of split target bins (results are approximate).
                 [Default: %(default)s]""")
-P_target.add_argument('-o', '--output', help="""Output file name.""")
+P_target.add_argument('-o', '--output', metavar="FILENAME",
+        help="""Output file name.""")
 P_target.set_defaults(func=_cmd_target)
 
 
@@ -274,7 +277,7 @@ P_access.add_argument("-s", "--min-gap-size", type=int, default=5000,
 P_access.add_argument("-x", "--exclude", action="append", default=[],
                 help="""Additional regions to exclude, in BED format. Can be
                 used multiple times.""")
-P_access.add_argument("-o", "--output",
+P_access.add_argument("-o", "--output", metavar="FILENAME",
                 type=argparse.FileType('w'), default=sys.stdout,
                 help="Output file name")
 P_access.set_defaults(func=_cmd_access)
@@ -299,7 +302,7 @@ def _cmd_antitarget(args):
 P_anti = AP_subparsers.add_parser('antitarget', help=_cmd_antitarget.__doc__)
 P_anti.add_argument('targets',
         help="""BED or interval file listing the targeted regions.""")
-P_anti.add_argument('-g', '--access',
+P_anti.add_argument('-g', '--access', metavar="FILENAME",
         help="""Regions of accessible sequence on chromosomes (.bed), as
                 output by genome2access.py.""")
 P_anti.add_argument('-a', '--avg-size', type=int, default=150000,
@@ -308,7 +311,8 @@ P_anti.add_argument('-a', '--avg-size', type=int, default=150000,
 P_anti.add_argument('-m', '--min-size', type=int,
         help="""Minimum size of antitarget bins (smaller regions are dropped).
                 [Default: 1/16 avg size, calculated]""")
-P_anti.add_argument('-o', '--output', help="""Output file name.""")
+P_anti.add_argument('-o', '--output', metavar="FILENAME",
+        help="""Output file name.""")
 P_anti.set_defaults(func=_cmd_antitarget)
 
 
@@ -391,7 +395,7 @@ P_autobin.add_argument('-m', '--method',
                 amplicon sequencing ('amplicon'), or whole genome sequencing
                 ('wgs'). Determines whether and how to use antitarget bins.
                 [Default: %(default)s]""")
-P_autobin.add_argument('-g', '--access',
+P_autobin.add_argument('-g', '--access', metavar="FILENAME",
         help="""Sequencing-accessible genomic regions, or exons to use as
                 possible targets (e.g. output of refFlat2bed.py)""")
 P_autobin.add_argument('-t', '--targets',
@@ -454,7 +458,8 @@ P_coverage.add_argument('-c', '--count', action='store_true',
 P_coverage.add_argument('-q', '--min-mapq', type=int, default=0,
         help="""Minimum mapping quality score (phred scale 0-60) to count a read
                 for coverage depth.  [Default: %(default)s]""")
-P_coverage.add_argument('-o', '--output', help="""Output file name.""")
+P_coverage.add_argument('-o', '--output', metavar="FILENAME",
+        help="""Output file name.""")
 P_coverage.add_argument('-p', '--processes',
         nargs='?', type=int, const=0, default=1,
         help="""Number of subprocesses to calculate coverage in parallel.
@@ -512,8 +517,10 @@ P_reference.add_argument('references', nargs='*',
                 directory that contains them.""")
 P_reference.add_argument('-f', '--fasta',
         help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
-P_reference.add_argument('-o', '--output', help="Output file name.")
-P_reference.add_argument('-y', '--male-reference', action='store_true',
+P_reference.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
+P_reference.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Create a male reference: shift female samples' chrX
                 log-coverage by -1, so the reference chrX average is -1.
                 Otherwise, shift male samples' chrX by +1, so the reference chrX
@@ -588,7 +595,7 @@ P_fix.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
 P_fix.add_argument('-i', '--sample-id',
         help="Sample ID for target/antitarget files. Otherwise inferred from file names.")
-P_fix.add_argument('-o', '--output',
+P_fix.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
 P_fix.set_defaults(func=_cmd_fix)
 
@@ -623,7 +630,7 @@ def _cmd_segment(args):
 P_segment = AP_subparsers.add_parser('segment', help=_cmd_segment.__doc__)
 P_segment.add_argument('filename',
         help="Bin-level log2 ratios (.cnr file), as produced by 'fix'.")
-P_segment.add_argument('-o', '--output',
+P_segment.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name (CNR-like table of segments, .cns).")
 P_segment.add_argument('-d', '--dataframe',
         help="""File name to save the raw R dataframe emitted by CBS or
@@ -647,7 +654,7 @@ P_segment.add_argument("--drop-outliers",
                 quantile away from the average within a rolling window.
                 Set to 0 for no outlier filtering.
                 [Default: %(default)g]""")
-P_segment.add_argument("--rlibpath",
+P_segment.add_argument("--rlibpath", metavar="DIRECTORY",
         help="Path to an alternative site-library to use for R packages.")
 P_segment.add_argument('-p', '--processes',
         nargs='?', type=int, const=0, default=1,
@@ -744,12 +751,13 @@ P_call.add_argument('-x', '--sample-sex', '-g', '--gender', dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's chromosomal sex as male or female.
                 (Otherwise guessed from X and Y coverage).""")
-P_call.add_argument('-y', '--male-reference', action='store_true',
+P_call.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
                 of chrX is 1; chrY is haploid for either reference sex.""")
-P_call.add_argument('-o', '--output',
+P_call.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name (CNR-like table of segments, .cns).")
 
 P_call_vcf = P_call.add_argument_group(
@@ -817,7 +825,8 @@ P_diagram.add_argument('-t', '--threshold', type=float, default=0.5,
 P_diagram.add_argument('-m', '--min-probes', type=int, default=3,
         help="""Minimum number of covered probes to label a gene.
                 [Default: %(default)d]""")
-P_diagram.add_argument('-y', '--male-reference', action='store_true',
+P_diagram.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Assume inputs were normalized to a male reference
                 (i.e. female samples will have +1 log-CNR of chrX;
                 otherwise male samples would have -1 chrX).""")
@@ -828,7 +837,7 @@ P_diagram.add_argument('-x', '--sample-sex', '-g', '--gender',
                 (Otherwise guessed from X and Y coverage).""")
 P_diagram.add_argument('--no-shift-xy', dest='adjust_xy', action='store_false',
         help="Don't adjust the X and Y chromosomes according to sample sex.")
-P_diagram.add_argument('-o', '--output',
+P_diagram.add_argument('-o', '--output', metavar="FILENAME",
         help="Output PDF file name.")
 P_diagram_aes = P_diagram.add_argument_group("Plot aesthetics")
 P_diagram_aes.add_argument('--title',
@@ -998,7 +1007,8 @@ P_heatmap.add_argument('-c', '--chromosome',
 #         help="Name of gene to display.")
 P_heatmap.add_argument('-d', '--desaturate', action='store_true',
         help="Tweak color saturation to focus on significant changes.")
-P_heatmap.add_argument('-y', '--male-reference', action='store_true',
+P_heatmap.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Assume inputs were normalized to a male reference
                 (i.e. female samples will have +1 log-CNR of chrX;
                 otherwise male samples would have -1 chrX).""")
@@ -1010,7 +1020,7 @@ P_heatmap.add_argument('-x', '--sample-sex', '-g', '--gender',
                 chromosomes).""")
 P_heatmap.add_argument('--no-shift-xy', dest='adjust_xy', action='store_false',
         help="Don't adjust the X and Y chromosomes according to sample sex.")
-P_heatmap.add_argument('-o', '--output',
+P_heatmap.add_argument('-o', '--output', metavar="FILENAME",
         help="Output PDF file name.")
 P_heatmap.set_defaults(func=_cmd_heatmap)
 
@@ -1040,7 +1050,7 @@ P_breaks.add_argument('segment',
 P_breaks.add_argument('-m', '--min-probes', type=int, default=1,
         help="""Minimum number of within-gene probes on both sides of a
                 breakpoint to report it. [Default: %(default)d]""")
-P_breaks.add_argument('-o', '--output',
+P_breaks.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name.")
 P_breaks.set_defaults(func=_cmd_breaks)
 
@@ -1078,7 +1088,8 @@ P_genemetrics.add_argument('-m', '--min-probes', type=int, default=3,
 P_genemetrics.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
-P_genemetrics.add_argument('-y', '--male-reference', action='store_true',
+P_genemetrics.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Assume inputs were normalized to a male reference
                 (i.e. female samples will have +1 log-coverage of chrX;
                 otherwise male samples would have -1 chrX).""")
@@ -1087,7 +1098,7 @@ P_genemetrics.add_argument('-x', '--sample-sex', '-g', '--gender',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's chromosomal sex as male or female.
                 (Otherwise guessed from X and Y coverage).""")
-P_genemetrics.add_argument('-o', '--output',
+P_genemetrics.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name.")
 
 P_genemetrics_stats = P_genemetrics.add_argument_group(
@@ -1173,11 +1184,12 @@ def do_sex(cnarrs, is_male_reference):
 P_sex = AP_subparsers.add_parser('sex', help=_cmd_sex.__doc__)
 P_sex.add_argument('filenames', nargs='+',
         help="Copy number or copy ratio files (*.cnn, *.cnr).")
-P_sex.add_argument('-y', '--male-reference', action='store_true',
+P_sex.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Assume inputs were normalized to a male reference
                 (i.e. female samples will have +1 log-coverage of chrX;
                 otherwise male samples would have -1 chrX).""")
-P_sex.add_argument('-o', '--output',
+P_sex.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name.")
 P_sex.set_defaults(func=_cmd_sex)
 
@@ -1219,7 +1231,7 @@ P_metrics.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before calculations to reduce
                 negative "fat tail" of bin log2 values in poor-quality
                 tumor samples.""")
-P_metrics.add_argument('-o', '--output',
+P_metrics.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name.")
 P_metrics.set_defaults(func=_cmd_metrics)
 
@@ -1256,7 +1268,7 @@ P_segmetrics.add_argument('-s', '--segments', required=True,
 P_segmetrics.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before calculations to avoid
                 negative bias in poor-quality tumor samples.""")
-P_segmetrics.add_argument('-o', '--output',
+P_segmetrics.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name.")
 
 P_segmetrics_stats = P_segmetrics.add_argument_group(
@@ -1340,7 +1352,8 @@ P_import_picard = AP_subparsers.add_parser('import-picard',
         help=_cmd_import_picard.__doc__)
 P_import_picard.add_argument('targets', nargs='+',
         help="""Sample coverage .csv files (target and antitarget).""")
-P_import_picard.add_argument('-d', '--output-dir', default='.',
+P_import_picard.add_argument('-d', '--output-dir',
+        metavar="DIRECTORY", default='.',
         help="Output directory name.")
 P_import_picard.set_defaults(func=_cmd_import_picard)
 
@@ -1377,7 +1390,8 @@ P_import_seg.add_argument('-p', '--prefix',
                 the SEG file to 'chr8' in the output).""")
 P_import_seg.add_argument('--from-log10', action='store_true',
         help="Convert base-10 logarithm values in the input to base-2 logs.")
-P_import_seg.add_argument('-d', '--output-dir', default='.',
+P_import_seg.add_argument('-d', '--output-dir',
+        metavar="DIRECTORY", default='.',
         help="Output directory name.")
 P_import_seg.set_defaults(func=_cmd_import_seg)
 
@@ -1407,7 +1421,8 @@ P_import_theta.add_argument("tumor_cns")
 P_import_theta.add_argument("theta_results")
 P_import_theta.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of normal cells. [Default: %(default)d]")
-P_import_theta.add_argument('-d', '--output-dir', default='.',
+P_import_theta.add_argument('-d', '--output-dir',
+        metavar="DIRECTORY", default='.',
         help="Output directory name.")
 P_import_theta.set_defaults(func=_cmd_import_theta)
 
@@ -1514,12 +1529,14 @@ P_export_bed.add_argument("--show",
                 'variant' = CNA regions with non-neutral copy number;
                 'ploidy' = CNA regions with non-default ploidy.
                 [Default: %(default)s]""")
-P_export_bed.add_argument("-y", "--male-reference", action="store_true",
+P_export_bed.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
                 of chrX is 1; chrY is haploid for either reference sex.""")
-P_export_bed.add_argument('-o', '--output', help="Output file name.")
+P_export_bed.add_argument('-o', '--output', metavar="FILENAME", 
+        help="Output file name.")
 P_export_bed.set_defaults(func=_cmd_export_bed)
 
 
@@ -1539,7 +1556,8 @@ P_export_seg.add_argument('filenames', nargs='+',
                 'segment' sub-command.""")
 P_export_seg.add_argument('--enumerate-chroms', action='store_true',
         help="""Replace chromosome names with sequential integer IDs.""")
-P_export_seg.add_argument('-o', '--output', help="Output file name.")
+P_export_seg.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
 P_export_seg.set_defaults(func=_cmd_export_seg)
 
 
@@ -1578,12 +1596,14 @@ P_export_vcf.add_argument('-x', '--sample-sex', '-g', '--gender',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's chromosomal sex as male or female.
                 (Otherwise guessed from X and Y coverage).""")
-P_export_vcf.add_argument("-y", "--male-reference", action="store_true",
+P_export_vcf.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
         help="""Was a male reference used?  If so, expect half ploidy on
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
                 of chrX is 1; chrY is haploid for either reference sex.""")
-P_export_vcf.add_argument('-o', '--output', help="Output file name.")
+P_export_vcf.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
 P_export_vcf.set_defaults(func=_cmd_export_vcf)
 
 
@@ -1622,7 +1642,8 @@ P_export_theta.add_argument('-r', '--reference',
         help="""Reference copy number profile (.cnn), or normal-sample bin-level
                 log2 copy ratios (.cnr). Use if the tumor_segment input file
                 does not contain a "weight" column.""")
-P_export_theta.add_argument('-o', '--output', help="Output file name.")
+P_export_theta.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
 
 P_extheta_vcf = P_export_theta.add_argument_group(
     "To also output tables of SNP b-allele frequencies for THetA2")
@@ -1659,7 +1680,8 @@ P_export_nb = P_export_subparsers.add_parser('nexus-basic',
 P_export_nb.add_argument('filename',
         help="""Log2 copy ratio data file (*.cnr), the output of the 'fix'
                 sub-command.""")
-P_export_nb.add_argument('-o', '--output', help="Output file name.")
+P_export_nb.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
 P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
@@ -1696,7 +1718,8 @@ P_export_nbo.add_argument('-z', '--zygosity-freq',
 P_export_nbo.add_argument('-w', '--min-weight', type=float, default=0.0,
         help="""Minimum weight (between 0 and 1) for a bin to be included in
                 the output. [Default: %(default)s]""")
-P_export_nbo.add_argument('-o', '--output', help="Output file name.")
+P_export_nbo.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
 P_export_nbo.set_defaults(func=_cmd_export_nbo)
 
 
@@ -1715,7 +1738,8 @@ P_export_cdt = P_export_subparsers.add_parser('cdt',
 P_export_cdt.add_argument('filenames', nargs='+',
         help="""Log2 copy ratio data file(s) (*.cnr), the output of the
                 'fix' sub-command.""")
-P_export_cdt.add_argument('-o', '--output', help="Output file name.")
+P_export_cdt.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
 P_export_cdt.set_defaults(func=_cmd_export_cdt)
 
 def _cmd_export_jtv(args):
@@ -1731,7 +1755,8 @@ P_export_jtv = P_export_subparsers.add_parser('jtv',
 P_export_jtv.add_argument('filenames', nargs='+',
         help="""Log2 copy ratio data file(s) (*.cnr), the output of the
                 'fix' sub-command.""")
-P_export_jtv.add_argument('-o', '--output', help="Output file name.")
+P_export_jtv.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
 P_export_jtv.set_defaults(func=_cmd_export_jtv)
 
 
