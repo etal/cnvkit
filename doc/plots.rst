@@ -322,7 +322,7 @@ like::
     from matplotlib import pyplot as plt
     import cnvlib
 
-    segments = map(cnvlib.read, glob("*.cns"))
+    segments = [cnvlib.read(f) for f in glob("*.cns")]
     ax = cnvlib.do_heatmap(segments)
     ax.set_title("All my samples")
     plt.rcParams["font.size"] = 9.0
