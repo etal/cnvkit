@@ -209,10 +209,10 @@ chromosome in the input .cnr and .cns files has a log2 copy ratio near -1.0, in
 the output diagram it will be shown as neutral copy number (white or faint
 colors) rather than a loss (blue), because the sample's X chromosome (and Y) is
 recognized and expected to be haploid. (See :doc:`sex`.)
-
 The sample sex can be specified with the ``-x``/``--sample-sex`` option, or will
-otherwise be guessed automatically (see :doc:`sex`). This visual correction is
-done by default, but can be disabled with the option ``--no-shift-xy``.
+otherwise be guessed automatically.
+This visual correction is done by default, but can be disabled with the option
+``--no-shift-xy``.
 
 Reducing cluttered gene labels
 ``````````````````````````````
