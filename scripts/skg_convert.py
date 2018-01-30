@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """Convert between tabular formats using scikit-genome I/O."""
 from __future__ import absolute_import, division, print_function
 import argparse
@@ -17,6 +16,7 @@ def main(args):
                  "from "+ args.in_fmt if args.in_fmt != 'auto' else '',
                  args.out_fmt)
 
+    # TODO - add back merge/flatten/exon options from refFlat2bed
     table = tabio.read(args.infile, args.in_fmt)
     tabio.write(table, args.output, args.out_fmt)
 
@@ -24,12 +24,15 @@ def main(args):
 
 if __name__ == '__main__':
     AP = argparse.ArgumentParser(description=__doc__)
-    AP.add_argument('infile', nargs='?', default=sys.stdin,
-                    help="Input filename.")
-    AP.add_argument('-f', '--from', dest='in_fmt', default='auto',
-                    help="Input format.")
-    AP.add_argument('-t', '--to', dest='out_fmt', required=True,
-                    help="Output format.")
-    AP.add_argument('-o', '--output',
-                    help="Output filename.")
+    AP.add_argument('infile',
+                    default=sys.stdin, nargs='?', metavar="FILE",
+                    help="Input filename. [Default: stdin]")
+    AP.add_argument('-f', '--from',
+                    default='auto', dest='in_fmt', metavar="FORMAT",
+                    help="Input format. [Default: auto-detect]")
+    AP.add_argument('-t', '--to',
+                    required=True, dest='out_fmt', metavar="FORMAT",
+                    help="Output format. [Required]")
+    AP.add_argument('-o', '--output', metavar="FILE",
+                    help="Output filename. [Default: stdout]")
     main(AP.parse_args())
