@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 def main(args):
     logging.info("Converting %s%s to %s",
                  "input" if args.infile is sys.stdin else args.infile,
-                 "from "+ args.in_fmt if args.in_fmt != 'auto' else '',
+                 " from "+ args.in_fmt if args.in_fmt != 'auto' else '',
                  args.out_fmt)
 
     # TODO - add back merge/flatten/exon options from refFlat2bed
@@ -35,4 +35,12 @@ if __name__ == '__main__':
                     help="Output format. [Required]")
     AP.add_argument('-o', '--output', metavar="FILE",
                     help="Output filename. [Default: stdout]")
+
+    AP_fmt = AP.add_argument_group("Format-specific options")
+    AP_fmt.add_argument("--gff-tag",
+                    help="""GFF attributes tag to use for gene names.""")
+    AP_fmt.add_argument("--gff-type",
+                        # TODO combine with refseq gene vs. exon?
+                    help="""GFF attributes tag to use for gene names.""")
+
     main(AP.parse_args())
