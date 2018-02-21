@@ -73,16 +73,13 @@ def _flatten_tuples(keyed_rows, combine):
         yield first_row
         raise StopIteration
 
-    extra_cols = first_row._fields[3:]
+    extra_cols = [x for x in first_row._fields[3:] if x in combine]
     breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
     for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
         # Find the row(s) overlapping this region
         # i.e. any not already seen and not already passed
-        rows_in_play = []
-        for row in rows:
-            if row.start <= bp_start and row.end >= bp_end:
-                rows_in_play.append(row)
-
+        rows_in_play = [row for row in rows
+                        if row.start <= bp_start and row.end >= bp_end]
         # Combine the extra fields of the overlapping regions
         extra_fields = {key: combine[key]([getattr(r, key)
                                            for r in rows_in_play])

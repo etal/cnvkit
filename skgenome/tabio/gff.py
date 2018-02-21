@@ -14,18 +14,20 @@ Columns:
 
 Specs:
 
-- http://www.ensembl.org/info/website/upload/gff.html
 - http://gmod.org/wiki/GFF3
 - http://gmod.org/wiki/GFF2
 - http://mblab.wustl.edu/GTF2.html
+- http://www.ensembl.org/info/website/upload/gff.html
+- https://github.com/The-Sequence-Ontology/SO-Ontologies/blob/master/subsets/SOFA.obo
 """
 from __future__ import absolute_import, division, print_function
+import logging
 import re
 
 import pandas as pd
 
 
-def read_gff(infile, tag=None):
+def read_gff(infile, tag=r'(Name|gene_id|gene_name|gene)', keep_type=None):
     """Read a GFF3/GTF/GFF2 file into a DataFrame.
 
     Works for all three formats because we only try extract the gene name, at
@@ -40,7 +42,10 @@ def read_gff(infile, tag=None):
         standardized as "Name", and in GTF it's "gene_id". (Neither spec is
         consistently followed, so the parser will by default look for eith er of
         those tags and also "gene_name" and "gene".)
-
+    keep_type : str
+        If specified, only keep rows with this value in the 'type' field (column
+        3). In GFF3, these terms are standardized in the Sequence Ontology
+        Feature Annotation (SOFA).
     """
     colnames = ['chromosome', 'source', 'type', 'start', 'end',
                 'score', 'strand', 'phase', 'attribute']
@@ -53,19 +58,16 @@ def read_gff(infile, tag=None):
                       score=dframe.score.replace('.', 'nan').astype('float'))
               .sort_values(['chromosome', 'start', 'end'])
               .reset_index(drop=True))
+    if keep_type:
+        ok_type = (dframe['type'] == keep_type)
+        logging.info("Keeping %d '%s' / %d total records",
+                     ok_type.sum(), keep_type, len(dframe))
+        dframe = dframe[ok_type]
     if len(dframe):
-        if tag:
-            # Look only for the specified tag
-            rx = re.compile(tag + r'[= ]"?(\S+?)"?(;|$)"')
-            matches = dframe['attribute'].str.extract(rx)
-            if len(matches):
-                dframe['gene'] = matches
-        else:
-            # Default to a set of likely relevant tags
-            rx = re.compile(r'(Name|gene_id|gene_name|gene)[= ]"?(\S+?)"?(;|$)')
-            matches = dframe['attribute'].str.extractall(rx)
-            if len(matches):
-                dframe['gene'] = matches.xs(0, level=1)[1]
+        rx = re.compile(tag + r'[= ]"?(?P<gene>\S+?)"?(;|$)')
+        matches = dframe['attribute'].str.extract(rx, expand=True)['gene']
+        if len(matches):
+            dframe['gene'] = matches
     if 'gene' in dframe.columns:
         dframe['gene'] = dframe['gene'].fillna('-').astype('str')
     else:
