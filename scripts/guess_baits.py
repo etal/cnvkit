@@ -40,12 +40,18 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 def filter_targets(target_bed, sample_bams, procs):
     """Check if each potential target has significant coverage."""
-    baits = tabio.read_auto(target_bed)
+    try:
+        baits = tabio.read(target_bed, 'bed4')
+    except:
+        raise RuntimeError("Targets must be in BED format; try skg_convert.py")
+    logging.info("Loaded %d candidate regions from %s", len(baits), target_bed)
     # Loop over BAMs to calculate weighted averages of bin coverage depths
     total_depths = np.zeros(len(baits), dtype=np.float_)
     for bam_fname in sample_bams:
         logging.info("Evaluating targets in %s", bam_fname)
         sample = cnvlib.do_coverage(target_bed, bam_fname, processes=procs)
+        assert len(sample) == len(baits), \
+                "%d != %d" % (len(sample), len(baits))
         total_depths += sample['depth'].values
     baits['depth'] = total_depths / len(sample_bams)
     logging.info("Average candidate-target depth:\n%s",
@@ -203,16 +209,18 @@ if __name__ == '__main__':
 
     AP_x = AP.add_mutually_exclusive_group(required=True)
     AP_x.add_argument('-t', '--targets', metavar='TARGET_BED',
-                    help="""Potentially targeted genomic regions, e.g. all
-                    possible exons for the reference genome. (Faster
+                    help="""Potentially targeted genomic regions, e.g. all known
+                    exons in the reference genome, in BED format. Each of these
+                    regions will be tested as a whole for enrichment. (Faster
                     method)""")
     AP_x.add_argument('-a', '--access', metavar='ACCESS_BED',
                     # default="../data/access-5k-mappable.grch37.bed",
-                    help="""Sequencing-accessible genomic regions, or exons to
-                    use as possible targets, e.g. output of refFlat2bed.py.
-                    (Slower method)""")
+                    help="""Sequencing-accessible genomic regions (e.g. from
+                    'cnvkit.py access'), or known genic regions in the reference
+                    genome, in BED format. All bases will be tested for
+                    enrichment. (Slower method)""")
 
-    AP_target = AP.add_argument_group("With --target only")
+    AP_target = AP.add_argument_group("With --targets only")
     AP_target.add_argument('-d', '--min-depth', metavar='DEPTH',
                     type=int, default=5,
                     help="""Minimum sequencing read depth to accept as captured.
