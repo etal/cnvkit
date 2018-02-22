@@ -18,7 +18,7 @@ from .chromsort import sorter_chrom
 from .combiners import get_combiners, first_of
 
 
-def flatten(table, combine=None):
+def flatten(table, combine=None, split_columns=None):
     if not len(table):
         return table
     if (table.start.values[1:] >= table.end.cummax().values[:-1]).all():
@@ -28,29 +28,28 @@ def flatten(table, combine=None):
     cmb = get_combiners(table, False, combine)
     out = (table.groupby(by='chromosome',
                          as_index=False, group_keys=False, sort=False)
-           .apply(_flatten_overlapping, cmb)
+           .apply(_flatten_overlapping, cmb, split_columns)
            .reset_index(drop=True))
     return out.reindex(out.chromosome.apply(sorter_chrom)
                        .sort_values(kind='mergesort').index)
 
 
-def _flatten_overlapping(table, combine):
+def _flatten_overlapping(table, combine, split_columns):
     """Merge overlapping regions within a chromosome/strand.
 
     Assume chromosome and (if relevant) strand are already identical, so only
     start and end coordinates are considered.
     """
-    #  flat_rows = itertools.chain(
-    #      *(_flatten_tuples(row_group, combine)
-    #        for _key, row_group in itertools.groupby(keyed_groups, first_of)))
-    #  out =  pd.DataFrame.from_records(list(flat_rows),
-    #                                   columns=table.columns)
-    #                                   #  columns=flat_rows[0]._fields)
-    bits = [pd.DataFrame.from_records(list(_flatten_tuples(row_group, combine)),
-                                      columns=table.columns)
-            for row_group in _nonoverlapping_groups(table, 0)]
-    out = pd.concat(bits)
-    return out
+    if split_columns:
+        row_groups = (tuple(_flatten_tuples_split(row_group, combine,
+                                                  split_columns))
+                      for row_group in _nonoverlapping_groups(table, 0))
+    else:
+        row_groups = (tuple(_flatten_tuples(row_group, combine))
+                      for row_group in _nonoverlapping_groups(table, 0))
+    all_row_groups = itertools.chain(*row_groups)
+    return pd.DataFrame.from_records(list(all_row_groups),
+                                     columns=table.columns)
 
 
 def _flatten_tuples(keyed_rows, combine):
@@ -61,31 +60,71 @@ def _flatten_tuples(keyed_rows, combine):
     keyed_rows : iterable
         pairs of (non-overlapping-group index, overlapping rows)
     combine : dict
+        Mapping of field names to functions applied to combine overlapping
+        regions.
 
     Returns
     -------
     DataFrame
     """
-    # TODO speed this up!
     rows = [kr[1] for kr in keyed_rows]
     first_row = rows[0]
     if len(rows) == 1:
         yield first_row
-        raise StopIteration
+    else:
+        # TODO speed this up! Bottleneck is in dictcomp
+        extra_cols = [x for x in first_row._fields[3:] if x in combine]
+        breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
+        for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
+            # Find the row(s) overlapping this region
+            # i.e. any not already seen and not already passed
+            rows_in_play = [row for row in rows
+                            if row.start <= bp_start and row.end >= bp_end]
+            # Combine the extra fields of the overlapping regions
+            extra_fields = {key: combine[key]([getattr(r, key)
+                                               for r in rows_in_play])
+                            for key in extra_cols}
+            yield first_row._replace(start=bp_start, end=bp_end,
+                                     **extra_fields)
 
-    extra_cols = [x for x in first_row._fields[3:] if x in combine]
-    breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
-    for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
-        # Find the row(s) overlapping this region
-        # i.e. any not already seen and not already passed
-        rows_in_play = [row for row in rows
-                        if row.start <= bp_start and row.end >= bp_end]
-        # Combine the extra fields of the overlapping regions
-        extra_fields = {key: combine[key]([getattr(r, key)
-                                           for r in rows_in_play])
-                        for key in extra_cols}
-        yield first_row._replace(start=bp_start, end=bp_end,
-                                 **extra_fields)
+
+def _flatten_tuples_split(keyed_rows, combine, split_columns):
+    """Divide multiple rows where they overlap.
+
+    Parameters
+    ----------
+    keyed_rows : iterable
+        pairs of (non-overlapping-group index, overlapping rows)
+    combine : dict
+        Mapping of field names to functions applied to combine overlapping
+        regions.
+    split_columns : list or tuple
+        Field names where numeric values should be subdivided a region.
+
+    Returns
+    -------
+    DataFrame
+    """
+    rows = [kr[1] for kr in keyed_rows]
+    first_row = rows[0]
+    if len(rows) == 1:
+        yield first_row
+    else:
+        # TODO - use split_columns
+        extra_cols = [x for x in first_row._fields[3:] if x in combine]
+        breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
+        for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
+            # Find the row(s) overlapping this region
+            # i.e. any not already seen and not already passed
+            rows_in_play = [row for row in rows
+                            if row.start <= bp_start and row.end >= bp_end]
+            # Combine the extra fields of the overlapping regions
+            extra_fields = {key: combine[key]([getattr(r, key)
+                                               for r in rows_in_play])
+                            for key in extra_cols}
+            yield first_row._replace(start=bp_start, end=bp_end,
+                                     **extra_fields)
+
 
 
 def merge(table, bp=0, stranded=False, combine=None):

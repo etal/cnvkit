@@ -577,9 +577,10 @@ class GenomicArray(object):
         # TODO
         return NotImplemented
 
-    def flatten(self, combine=None):
+    def flatten(self, combine=None, split_columns=None):
         """Split this array's regions where they overlap."""
-        return self.as_dataframe(flatten(self.data, combine=combine))
+        return self.as_dataframe(flatten(self.data, combine=combine,
+                                         split_columns=split_columns))
 
     def merge(self, bp=0, stranded=False, combine=None):
         """Merge adjacent or overlapping regions into single rows.
