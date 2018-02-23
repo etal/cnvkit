@@ -75,6 +75,8 @@ def hmm_get_model(cnarr, method):
 
     import warnings
     warnings.simplefilter('ignore', DeprecationWarning)
+    warnings.simplefilter('ignore', RuntimeWarning)
+    #  warnings.simplefilter('error', RuntimeWarning)
 
     assert method in ('hmm-tumor', 'hmm-germline', 'hmm')
     if method == 'hmm-tumor':

@@ -233,7 +233,7 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
                     continue
                 end = _get_end(start, alt, record.info)
                 row = (record.chrom, start, end, record.ref, alt,
-                    is_som, zygosity, depth, alt_count)
+                       is_som, zygosity, depth, alt_count)
                 if normal_id:
                     row += (n_zygosity, n_depth, n_alt_count)
                 yield row
