@@ -209,7 +209,15 @@ def safe_write(outfile, verbose=True):
         logging.info("Wrote %s", outfname)
 
 
-def sniff_region_format(fname):
+def get_filename(infile):
+    if isinstance(infile, (str, unicode)):
+        return infile
+    if hasattr(infile, 'name'):
+        # File(-like) handle
+        return infile.name
+
+
+def sniff_region_format(infile):
     """Guess the format of the given file by reading the first line.
 
     Returns
@@ -217,8 +225,19 @@ def sniff_region_format(fname):
     str or None
         The detected format name, or None if the file is empty.
     """
+    # If the filename extension indicates the format, try that first
+    fname_fmt = None
+    fname = get_filename(infile)
+    if fname:
+        _base, ext = os.path.splitext(fname)
+        ext = ext.lstrip('.')
+        # if ext in known_extensions:
+        if ext[1:] in format_patterns:
+            fname_fmt = ext[1:]
+
+    # Fallback: regex detection
     # has_track = False
-    with as_handle(fname, 'rU') as handle:
+    with as_handle(infile, 'rU') as handle:
         for line in handle:
             if not line.strip():
                 # Skip blank lines
@@ -227,6 +246,8 @@ def sniff_region_format(fname):
                 # NB: Could be UCSC BED or Ensembl GFF
                 # has_track = True
                 continue
+            if fname_fmt and format_patterns[fname_fmt].match(line):
+                return fname_fmt
             # Formats that (may) declare themselves in an initial '#' comment
             if (line.startswith('##gff-version') or
                 format_patterns['gff'].match(line)):
