@@ -54,6 +54,11 @@ Additional scripts
 
         guess_baits.py -g access.hg19.bed Sample1.bam Sample2.bam -o baits.bed
 
+    In either mode, the input region coordinates can be provided in any of the
+    formats handled by skgenome.tabio, but it's best to first run them through
+    either the command :ref:`target` or script ``skg_convert.py --flatten``
+    (see below) to ensure the input regions do not overlap.
+
 ``reference2targets.py``
     Extract target and antitarget BED files from a CNVkit reference file.
     While the :ref:`batch` command does this step automatically when an existing
