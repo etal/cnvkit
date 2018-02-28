@@ -19,11 +19,11 @@ def main(args):
     cnarr['gene'] = annot.into_ranges(cnarr, 'gene', '-')
     tabio.write(cnarr, args.output or sys.stdout)
     # ENH:
-    #  .cns: join gene names with commas
+    #  --short-names
+    #  --no-antitarget
+    #  annotation: --merge, --flatten, --exons, ...
     #  cut antitargets & insert untargeted gene names
     #      some math for how to update probes, weight
-    #  --short-names
-    #  annotation: --merge, --flatten, --exons, ...
 
 
 

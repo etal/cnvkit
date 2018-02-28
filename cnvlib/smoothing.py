@@ -5,6 +5,7 @@ import math
 
 import numpy as np
 import pandas as pd
+from scipy.signal import savgol_coeffs, savgol_filter
 
 from . import descriptives
 
@@ -17,21 +18,34 @@ def check_inputs(x, width, as_series=True):
     if needed.
     """
     x = np.asfarray(x)
-    if 0 < width < 1:
-        wing = int(math.ceil(len(x) * width * 0.5))
-    elif width >= 2 and int(width) == width:
-        wing = width // 2
-    else:
-        raise ValueError("width fraction must be between 0 and 1 (got %s)"
-                         % width)
-    wing = max(wing, 5)
-    wing = min(wing, len(x) - 1)
-    assert wing > 0, "Wing must be greater than 0 (got %s)" % wing
-    # Pad the edges of the original array with mirror copies
-    signal = np.concatenate((x[wing-1::-1], x, x[:-wing-1:-1]))
+    wing = _width2wing(width, x)
+    signal = _pad_array(x, wing)
     if as_series:
         signal = pd.Series(signal)
     return x, wing, signal
+
+
+def _width2wing(width, x, min_wing=3):
+    """Convert a fractional or absolute width to integer half-width ("wing").
+    """
+    if 0 < width < 1:
+        wing = int(math.ceil(len(x) * width * 0.5))
+    elif width >= 2 and int(width) == width:
+        wing = int(width // 2)
+    else:
+        raise ValueError("width must be either a fraction between 0 and 1 "
+                         "or an integer greater than 1 (got %s)" % width)
+    wing = max(wing, min_wing)
+    wing = min(wing, len(x) - 1)
+    assert wing >= 1, "Wing must be at least 1 (got %s)" % wing
+    return wing
+
+
+def _pad_array(x, wing):
+    """Pad the edges of the input array with mirror copies."""
+    return np.concatenate((x[wing-1::-1],
+                           x,
+                           x[:-wing-1:-1]))
 
 
 def rolling_median(x, width):
@@ -57,7 +71,55 @@ def rolling_std(x, width):
     return np.asfarray(rolled[wing:-wing])
 
 
-def smoothed(x, width=None, weights=None, do_fit_edges=False):
+def convolve_weighted(window, signal, weights):
+    """Convolve a weighted window over a weighted signal array.
+
+    Source: https://stackoverflow.com/a/46232913/10049
+    """
+    wing = (len(window) - 1) // 2
+    window_size = len(window)
+    assert window_size == 2 * wing + 1
+    assert len(weights) + 2 * wing == len(signal)
+    wp = _pad_array(weights, wing)
+    wp = pd.Series(np.concatenate((weights[wing-1::-1],
+                                   weights,
+                                   weights[:-wing-1:-1])))
+    D = np.convolve(wp * signal, window)[window_size-1:-window_size+1]
+    N = np.convolve(wp, window)[window_size-1:-window_size+1]
+    y = D / N
+    # Update weights to account for the smoothing
+    ws = convolve_unweighted(window, wp, wing)
+    return y, ws
+
+
+def convolve_unweighted(window, signal, wing):
+    """Convolve a weighted window over array `signal`.
+
+    Input array is assumed padded by `_pad_array`; output has padding removed.
+    """
+    y = np.convolve(window / window.sum(), signal, mode='same')
+    # Chop off the ends of the result so it has the original size
+    y = y[wing:-wing]
+    return y
+
+
+def guess_window_size(x, weights=None):
+    """Choose a reasonable window size given the signal.
+
+    Inspired by Silverman's rule: bandwidth is proportional to signal's standard
+    deviation and the length of the signal ^ 4/5.
+    """
+    if weights is None:
+        sd = descriptives.biweight_midvariance(x)
+    else:
+        sd = descriptives.weighted_std(x, weights)
+    width = 4 * sd * len(x) ** (4/5)
+    width = max(3, int(round(width)))
+    width = min(len(x), width)
+    return width
+
+
+def kaiser(x, width=None, weights=None, do_fit_edges=False):
     """Smooth the values in `x` with the Kaiser windowed filter.
 
     See: https://en.wikipedia.org/wiki/Kaiser_window
@@ -70,33 +132,44 @@ def smoothed(x, width=None, weights=None, do_fit_edges=False):
         Fraction of x's total length to include in the rolling window (i.e. the
         proportional window width), or the integer size of the window.
     """
+    if len(x) < 2:
+        return x
     if width is None:
-        # Choose a reasonable window size (inspired by Silverman's rule)
-        width = int(round(4 * descriptives.biweight_midvariance(x)
-                          * len(x) ** (4/5)))
+        width = guess_window_size(x, weights)
     x, wing, signal = check_inputs(x, width, False)
     # Apply signal smoothing
     window = np.kaiser(2 * wing + 1, 14)
     if weights is not None:
-        # https://stackoverflow.com/a/46232913/10049
-        assert len(weights) == len(x)
-        wp = pd.Series(np.concatenate((weights[wing-1::-1],
-                                       weights,
-                                       weights[:-wing-1:-1])))
-        window_size = 2 * wing + 1
-        D = np.convolve(wp * signal, window)[window_size-1:-window_size+1]
-        N = np.convolve(wp, window)[window_size-1:-window_size+1]
-        y = D / N
+        y, _w = convolve_weighted(window, signal, weights)
     else:
-        y = np.convolve(window / window.sum(), signal, mode='same')
-        # Chop off the ends of the result so it has the original size
-        y = y[wing:-wing]
+        y = convolve_unweighted(window, signal, wing)
     if do_fit_edges:
-        fit_edges(x, y, wing)  # In-place
+        _fit_edges(x, y, wing)  # In-place
     return y
 
 
-def fit_edges(x, y, wing, polyorder=3):
+def savgol(x, width=None, weights=None, order=None):
+    """Savitzky-Golay smoothing."""
+    if len(x) < 2:
+        return x
+    if width is None:
+        width = guess_window_size(x, weights)
+    x, wing, signal = check_inputs(x, width, False)
+    # Fitted polynomial order is typically much less than half width
+    if order is None:
+        order = int(round(np.log2(2 * wing + 1)))
+    # Apply signal smoothing
+    window = savgol_coeffs(2 * wing + 1, order)
+    if weights is None:
+        y = savgol_filter(x, 2 * wing + 1, order, mode='interp')
+        # y = convolve_unweighted(window, signal, wing)
+    else:
+        # TODO fit edges here, too
+        y, _w = convolve_weighted(window, signal, weights)
+    return y
+
+
+def _fit_edges(x, y, wing, polyorder=3):
     """Apply polynomial interpolation to the edges of y, in-place.
 
     Calculates a polynomial fit (of order `polyorder`) of `x` within a window of
@@ -190,7 +263,7 @@ def rolling_outlier_iqr(x, width, c=3.0):
     """
     if len(x) <= width:
         return np.zeros(len(x), dtype=np.bool_)
-    dists = x - smoothed(x, width)
+    dists = x - savgol(x, width)
     q_hi = rolling_quantile(dists, width, .75)
     q_lo = rolling_quantile(dists, width, .25)
     iqr = q_hi - q_lo
@@ -217,7 +290,7 @@ def rolling_outlier_quantile(x, width, q, m):
     """
     if len(x) <= width:
         return np.zeros(len(x), dtype=np.bool_)
-    dists = np.abs(x - smoothed(x, width))
+    dists = np.abs(x - savgol(x, width))
     quants = rolling_quantile(dists, width, q)
     outliers = (dists > quants * m)
     return outliers
@@ -236,7 +309,7 @@ def rolling_outlier_std(x, width, stdevs):
     """
     if len(x) <= width:
         return np.zeros(len(x), dtype=np.bool_)
-    dists = x - smoothed(x, width)
+    dists = x - savgol(x, width)
     x_std = rolling_std(dists, width)
     outliers = (np.abs(dists) > x_std * stdevs)
     return outliers

@@ -107,7 +107,8 @@ if __name__ == '__main__':
     AP.add_argument('-s', '--segment', metavar="FILENAME",
                     help="""Segmentation calls (.cns), the output of the
                     'segment' command).""")
-    AP.add_argument('-y', '--male-reference', action='store_true',
+    AP.add_argument('-y', '--male-reference', '--haploid-x-reference',
+                    action='store_true',
                     help="""Assume inputs were normalized to a male reference
                     (i.e. female samples will have +1 log-coverage of chrX;
                     otherwise male samples would have -1 chrX).""")

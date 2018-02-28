@@ -61,18 +61,14 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     if "sample_id" not in meta:
         if sample_id:
             meta["sample_id"] = sample_id
-        elif isinstance(infile, basestring):
-            meta["sample_id"] = fbase(infile)
-        elif hasattr(infile, "name"):
-            meta["sample_id"] = fbase(infile.name)
         else:
-            # meta["sample_id"] = "<unknown>"
-            pass
+            fname = get_filename(infile)
+            if fname:
+                meta["sample_id"] = fbase(fname)
     if "filename" not in meta:
-        if isinstance(infile, basestring):
+        fname = get_filename(infile)
+        if fname:
             meta["filename"] = infile
-        elif hasattr(infile, "name"):
-            meta["filename"] = infile.name
     if fmt in ("seg", "vcf") and sample_id is not None:
         # Multi-sample formats: choose one sample
         kwargs["sample_id"] = sample_id
@@ -151,15 +147,9 @@ def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
                       float_format='%.6g')
     if verbose:
         # Log the output path, if possible
-        if isinstance(outfile, basestring):
-            outfname = outfile
-        elif hasattr(outfile, 'name') and outfile not in (sys.stdout,
-                                                          sys.stderr):
-            outfname = outfile.name
-        else:
-            # Probably stdout or stderr used in a pipeline -- don't pollute
-            return
-        logging.info("Wrote %s with %d regions", outfname, len(dframe))
+        outfname = get_filename(outfile)
+        if outfname:
+            logging.info("Wrote %s with %d regions", outfname, len(dframe))
 
 
 WRITERS = {
@@ -196,20 +186,22 @@ def safe_write(outfile, verbose=True):
     else:
         yield outfile
 
-    # Log the output path, if possible
+    # Log the output path, if possible (but don't contaminate stdout)
     if verbose:
-        if isinstance(outfile, basestring):
-            outfname = outfile
-        elif hasattr(outfile, 'name') and outfile not in (sys.stdout,
-                                                          sys.stderr):
-            outfname = outfile.name
-        else:
-            # Probably stdout or stderr -- don't ruin the pipeline
-            return
-        logging.info("Wrote %s", outfname)
+        outfname = get_filename(outfile)
+        if outfname:
+            logging.info("Wrote %s", outfname)
 
 
-def sniff_region_format(fname):
+def get_filename(infile):
+    if isinstance(infile, basestring):
+        return infile
+    if hasattr(infile, 'name') and infile not in (sys.stdout, sys.stderr):
+        # File(-like) handle
+        return infile.name
+
+
+def sniff_region_format(infile):
     """Guess the format of the given file by reading the first line.
 
     Returns
@@ -217,8 +209,19 @@ def sniff_region_format(fname):
     str or None
         The detected format name, or None if the file is empty.
     """
+    # If the filename extension indicates the format, try that first
+    fname_fmt = None
+    fname = get_filename(infile)
+    if fname:
+        _base, ext = os.path.splitext(fname)
+        ext = ext.lstrip('.')
+        # if ext in known_extensions:
+        if ext[1:] in format_patterns:
+            fname_fmt = ext[1:]
+
+    # Fallback: regex detection
     # has_track = False
-    with as_handle(fname, 'rU') as handle:
+    with as_handle(infile, 'rU') as handle:
         for line in handle:
             if not line.strip():
                 # Skip blank lines
@@ -227,6 +230,8 @@ def sniff_region_format(fname):
                 # NB: Could be UCSC BED or Ensembl GFF
                 # has_track = True
                 continue
+            if fname_fmt and format_patterns[fname_fmt].match(line):
+                return fname_fmt
             # Formats that (may) declare themselves in an initial '#' comment
             if (line.startswith('##gff-version') or
                 format_patterns['gff'].match(line)):

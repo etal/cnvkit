@@ -32,6 +32,7 @@ Command line usage
     plots
     reports
     importexport
+    rna
     scripts
 
 
@@ -41,15 +42,15 @@ FAQ & How To
 .. toctree::
     :maxdepth: 2
 
+    fileformats
+    sex
     calling
     baf
+    bias
     tumor
     heterogeneity
     germline
     nonhybrid
-    sex
-    bias
-    fileformats
 
 
 Python API

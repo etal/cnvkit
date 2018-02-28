@@ -20,8 +20,8 @@ will display the plots interactively on the screen by default.
 
 .. _batch:
 
-batch
------
+``batch``
+---------
 
 Run the CNVkit pipeline on one or more BAM files::
 
@@ -37,7 +37,7 @@ Run the CNVkit pipeline on one or more BAM files::
 
     # Reusing targets and antitargets to build a new reference, but no analysis
     cnvkit.py batch -n *Normal.bam --output-reference new_reference.cnn \
-        -t my_targets.bed -a my_antitargets.bed --male-reference \
+        -t my_targets.bed -a my_antitargets.bed \
         -f hg19.fasta -g data/access-5kb-mappable.hg19.bed
 
 With the ``-p`` option, process each of the BAM files in parallel, as separate
@@ -59,7 +59,7 @@ The pipeline executed by the ``batch`` command is equivalent to::
     cnvkit.py coverage Sample.bam baits.antitarget.bed -o Sample.antitargetcoverage.cnn
 
     # With all normal samples...
-    cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg19.fa [--male-reference] -o my_reference.cnn
+    cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg19.fa -o my_reference.cnn
 
     # For each tumor sample...
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn my_reference.cnn -o Sample.cnr
@@ -67,7 +67,7 @@ The pipeline executed by the ``batch`` command is equivalent to::
 
     # Optionally, with --scatter and --diagram
     cnvkit.py scatter Sample.cnr -s Sample.cns -o Sample-scatter.pdf
-    cnvkit.py diagram Sample.cnr -s Sample.cns [--male-reference] -o Sample-diagram.pdf
+    cnvkit.py diagram Sample.cnr -s Sample.cns -o Sample-diagram.pdf
 
 This is for hybrid capture protocols in which both on- and off-target reads can
 be used for copy number detection. To run alternative pipelines for targeted
@@ -80,8 +80,8 @@ functionality in CNVkit.
 
 .. _target:
 
-target
-------
+``target``
+----------
 
 Prepare a BED file of baited regions for use with CNVkit.
 
@@ -114,16 +114,36 @@ twice as many target bins, which might result in higher-resolution segmentation.
 However, the number of reads counted in each bin will be reduced by about half,
 increasing the variance or "noise" in bin-level coverages.
 An excess of noisy bins can make visualization difficult, and since the noise
-may not be Gaussian, especially in the presence of many bins with zero reads,
-the CBS algorithm could produce less accurate segmentation results on
+may not be normally distributed, especially in the presence of many bins with
+zero reads, the segmentation algorithm could produce less accurate results on
 low-coverage samples.
-In practice we see good results with an average of 200-300 reads per bin; we
+In practice we see good results with an average of 200--300 reads per bin; we
 therefore recommend an overall on-target sequencing coverage depth of at least
-200x to 300x with a read length of 100 to justify reducing the average target
+200x to 300x with a read length of 100bp to justify reducing the average target
 bin size to 100bp.
 
-Adding gene names
-`````````````````
+For hybrid capture, if your targets are not **tiled with uniform density** --
+for example, if your target panel is designed with a subset of targets having
+twice or half the usual number of tiles for a fixed number of genomic bases --
+you do not need to do anything in particular to compensate for this as long as
+you are using a pooled :ref:`reference`. When a test sample's read depths are
+normalized to the pooled reference, the log2 ratios will even out. However, the
+"spread" of those bins in your pooled reference, and the "weight" of the
+corresponding bins in the test sample's .cnr file, will be correspondingly
+higher or lower.
+
+If some targets are enriched separately for each sample via **spike-in**, rather
+than as part of the original capture panel (which is assumed to have a fairly
+consistent capture efficiency across targets for all test and control samples),
+then the spike-in capture efficiency will typically vary too much to be useful
+as a copy number signal. In that case, the spike-in region should **not** be
+included in the target BED file, and **excluded** from the :ref:`access` regions
+(which determine :ref:`antitarget` regions) by using the ``-x`` option.
+
+
+
+Labeling target regions
+```````````````````````
 
 In case the vendor BED file does not label each region with a corresponding gene
 name, the ``--annotate`` option can add or replace these labels.
@@ -139,11 +159,15 @@ in the maximum number of consecutive regions that share that accession, and
 applies it as the new label for those regions. (You may find it simpler to just
 apply the refFlat annotations.)
 
+The targets do not need to be genes, but for convenience CNVkit's documentation
+and source code generally refer to consecutive targeted regions with the same
+label as "genes".
+
 
 .. _access:
 
-access
-------
+``access``
+----------
 
 Calculate the sequence-accessible coordinates in chromosomes from the given
 reference genome, output as a BED file.
@@ -155,30 +179,29 @@ reference genome, output as a BED file.
 
 Many fully sequenced genomes, including the human genome, contain large regions
 of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
-telomeres, and highly repetitive regions.) In the FASTA reference genome
-sequence these regions are filled in with large stretches of "N" characters.
-These regions cannot be mapped by resequencing, so we will want to avoid them when
-calculating the :ref:`antitarget` bin locations (for example).
+telomeres, and highly repetitive regions.) In the reference genome sequence
+these regions are filled in with large stretches of "N" characters.
+These regions cannot be mapped by resequencing, so CNVkit avoids them when
+calculating the :ref:`antitarget` bin locations.
 
 The ``access`` command computes the locations of the accessible sequence regions
 for a given reference genome based on these masked-out sequences, treating long
 spans of 'N' characters as the inaccessible regions and outputting the
 coordinates of the regions between them.
 
-Other known unmappable or poorly sequenced regions can be specified for
-exclusion with the ``-x`` option.
+Other known unmappable, variable, or poorly sequenced regions can be
+excluded with the ``-x``/``--exclude`` option.
 This option can be used more than once to exclude several BED files listing
 different sets of regions.
-For example, "excludable" regions of poor mappability have been precalculated by
-others and are available from the `UCSC FTP Server
+For example, regions of poor mappability have been precalculated by others and
+are available from the `UCSC FTP Server
 <ftp://hgdownload.soe.ucsc.edu/goldenPath/>`_ (see `here for hg19
 <ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/>`_).
 
 If there are many small excluded/inaccessible regions in the genome, then small,
 less-reliable antitarget bins would be squeezed into the remaining accessible
-regions.  The ``-s`` option tells the script to ignore short regions that would
-otherwise be excluded as inaccessible, allowing larger antitarget bins to
-overlap them.
+regions.  The ``-s`` option ignores short regions that would otherwise be
+excluded, allowing larger antitarget bins to overlap them.
 
 An "access" file precomputed for the UCSC reference human genome build hg19,
 with some know low-mappability regions excluded, is included in the CNVkit
@@ -188,8 +211,8 @@ source distribution under the ``data/`` directory
 
 .. _antitarget:
 
-antitarget
-----------
+``antitarget``
+--------------
 
 Given a "target" BED file that lists the chromosomal coordinates of the tiled
 regions used for targeted resequencing, derive a BED file
@@ -219,9 +242,10 @@ An appropriate off-target bin size can be computed as the product of the average
 target region size and the fold-enrichment of sequencing reads in targeted
 regions, such that roughly the same number of reads are mapped to on-- and
 off-target bins on average --- roughly proportional to the level of on-target
-enrichment.
+enrichment. The :ref:`autobin` command (below) can quickly estimate these
+values, but you are free to specify your own.
 
-The preliminary coverage information can be obtained with the script
+Average off-target coverage depths can also be obtained with the script
 CalculateHsMetrics in the Picard suite (http://picard.sourceforge.net/), or from
 the console output of the CNVkit :ref:`coverage` command when run on the target
 regions.
@@ -234,8 +258,8 @@ regions.
 
 .. _autobin:
 
-autobin
--------
+``autobin``
+-----------
 
 Quickly estimate read counts or depths in a BAM file to estimate reasonable on-
 and (if relevant) off-target bin sizes. If multiple BAMs are given, use the BAM
@@ -258,8 +282,8 @@ command.
 
 .. _coverage:
 
-coverage
---------
+``coverage``
+------------
 
 Calculate coverage in the given regions from BAM read depths.
 
@@ -319,8 +343,8 @@ beforehand, CNVkit will automatically do it for you.
 
 .. _reference:
 
-reference
----------
+``reference``
+-------------
 
 Compile a copy-number reference from the given files or directory (containing
 normal samples). If given a reference genome (-f option), also calculate the GC
@@ -336,7 +360,9 @@ match the type of sample (e.g. FFPE-extracted or fresh DNA) and library
 preparation protocol or kit used for the test (e.g. tumor) samples.
 
 For :doc:`target amplicon or whole-genome sequencing <nonhybrid>` protocols, the
-"antitarget" BED and .cnn files can be omitted.
+"antitarget" BED and .cnn files can be omitted. Otherwise, ensure the filename
+prefixes are the same for each pair of ".targetcoverage.cnn" and
+".antitargetcoverage.cnn" files (as it's done by default).
 
 
 Paired or pooled normals
@@ -457,8 +483,8 @@ other individual samples.
 
 .. _fix:
 
-fix
----
+``fix``
+-------
 
 Combine the uncorrected target and antitarget coverage tables (.cnn) and
 :doc:`correct for biases <bias>` in regional coverage and GC content, according to
@@ -504,42 +530,82 @@ weights are concatenated, sorted, and written to a .cnr file.
 
 .. _segment:
 
-segment
--------
+``segment``
+-----------
 
 Infer discrete copy number segments from the given coverage table::
 
     cnvkit.py segment Sample.cnr -o Sample.cns
 
-By default this uses the circular binary segmentation algorithm (CBS), which
-performed best in our benchmarking. But with the ``-m`` option, the faster
-`HaarSeg
-<http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_
-(``haar``) or `Fused Lasso <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_
-(``flasso``) algorithms can be used instead.
-
-If you do not have R or the R package dependencies installed, but otherwise do
-have CNVkit properly installed, then ``haar`` will work for you. The other two
-methods use R internally. If you installed the R packages in a nonstandard
-location, you can specify this location with ``--rlibpath``.
-
-Fused Lasso additionally performs significance testing to distinguish CNAs from
-regions of neutral copy number, whereas CBS and HaarSeg by themselves only
-identify the supported segmentation breakpoints. Fused Lasso has been reported
-to work well on whole-exome and whole-genome data, while HaarSeg is less suited
-to those larger datasets but does all right on target panels.
-
 Segmentation runs independently on each chromosome arm, and can be parallelized
-(except for ``flasso``) with the ``-p`` option, similar to ``batch``.
-To simply calculate the weighted mean log2 value of each chromosome arm (for
-testing or debugging, perhaps), use ``-m none``.
+with the ``-p`` option (except for ``flasso`` and the HMM methods), similar to
+``batch``.
 
 The significance threshold to accept a segment or breakpoint is passed to the
 underlying method with the option ``--threshold``/``-t``. This is typically the
 p-value or q-value cutoff, or whatever parameter the underlying method uses to
 adjust its sensitivity.
 
-**Filtering:** Bins with a weight of 0 are dropped before segmentation.
+
+Segmentation methods
+````````````````````
+
+The following segmentation algorithms can be specified with the ``-m`` option:
+
+- ``cbs`` -- the default, circular binary segmentation (CBS). This method
+  performed best in our benchmarking on mid-size target panels and exomes.
+  Depends on the R package DNAcopy.
+- ``flasso`` -- `Fused Lasso
+  <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_, reported by some users
+  to perform best on exomes, whole genomes, and some target panels.
+  Signficantly faster than CBS, but the current implementation cannot be
+  parallelized over multiple CPUs. Beyond identifying breakpoints, additionally
+  performs significance testing to distinguish CNAs from regions of neutral copy
+  number, so large swathes of the output may have log2 values of exactly 0.
+  Depends on the R package cghFLasso.
+- ``haar`` -- a pure-Python implementation of `HaarSeg
+  <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_,
+  a wavelet-based method. Very fast and performs reasonably well on small
+  panels, but tends to over-segment large datasets.
+- ``hmm`` *(experimental)* -- a 3-state Hidden Markov Model suitable for most
+  samples. Faster than CBS, slower but more accurate than Haar. Depends on the
+  Python package hmmlearn, as do the next two methods.
+- ``hmm-tumor`` *(experimental)* -- a 5-state HMM suitable for finer-grained
+  segmentation of good-quality tumor samples. In particular, this method can
+  detect focal amplifications within a larger-scale, smaller-amplitude copy
+  number gain, or focal deep deletions within a larger-scale hemizygous loss.
+  Training this model takes a bit more CPU time than the simpler ``hmm`` method.
+- ``hmm-germline`` *(experimental)* -- a 3-state HMM with fixed amplitude for
+  the loss, neutral, and gain states corresponding to absolute copy numbers of
+  1, 2, and 3. Suitable for germline samples and single-cell sequencing of
+  samples with mostly-diploid genomes that are not overly aneuploid.
+- ``none`` -- simply calculate the weighted mean log2 value of each chromosome
+  arm. Useful for testing or debugging, or as a baseline for benchmarking other
+  methods.
+
+
+The first two methods use R internally, and to use them you will need to have R
+and the R package dependencies installed (i.e. DNAcopy, cghFLasso). If you
+installed CNVkit with ``conda`` as recommended, these should have been installed
+for you automatically. If you installed the R packages in a nonstandard
+location, you can specify this location with ``--rlibpath``.
+
+The HMM methods ``hmm``, ``hmm-tumor`` and ``hmm-germline`` were introduced
+provisionally in CNVkit v.0.9.2, and may change in future releases.
+They depend on the Python package ``hmmlearn``, which is not installed by
+default. You can install the latest ``hmmlearn`` (ideally within a conda or
+virtualenv environment) after installing the rest of CNVkit with the command::
+
+    pip install hmmlearn
+
+The methods ``haar`` and ``none`` do not have any additional dependencies beyond
+the basic CNVkit installation.
+
+
+Bin filtering
+`````````````
+
+Bins with a weight of 0 are dropped before segmentation.
 Additional filters:
 
 - ``--drop-low-coverage`` -- drop bins with a read depth of 0 or very close to
@@ -547,17 +613,24 @@ Additional filters:
 - ``--drop-outliers`` -- drop bins with log2 value too far from a rolling
   average, taking local variability into account. Applied by default.
 
-**SNP allele frequencies:** If a :ref:`vcfformat` file is given with the
+
+SNP allele frequencies
+``````````````````````
+
+If a :ref:`vcfformat` file is given with the
 ``--vcf`` option (and accompanying options ``-i``, ``-n``, ``-z``, and
 ``--min-variant-depth``, which work as in other commands), then after segmenting
 log2 ratios, a second pass of segmentation will run within each log2-ratio-based
 segment on the SNP allele frequencies loaded from the VCF.
 
+See also :doc:`calling` for suggestions on how to interpret and post-process the
+resulting segments.
+
 
 .. _call:
 
-call
-----
+``call``
+--------
 
 Given segmented log2 ratio estimates (.cns), derive each segment's absolute
 integer copy number using either:
@@ -613,10 +686,12 @@ autosomes; by default, diploid autosomes, haploid Y or X/Y depending on
 reference sex).  This equation is rearranged to find the absolute copy number
 of the tumor cells alone, rounded to the nearest integer.
 
-The expected and observed ploidy of the sex chromosomes (X and Y) is different,
-so it's important to specify ``-y``/``--male-reference`` if a male reference was
-used; the sample sex can be specified if known, otherwise it will be guessed
-from the average log2 ratio of chromosome X.
+The expected and observed ploidy of the :doc:`sex chromosomes <sex>` (X and Y)
+is different, so if the option ``-y`` / ``--male-reference`` /
+``--haploid-x-reference`` was used when constructing the :ref:`reference`,
+it's important to specify use the same option here.
+The sample sex can be specified if known, otherwise it will be guessed
+from the average log2 ratio of chromosome X. (See also: :doc:`sex`)
 
 ..  The calculation of new log2 values for the sex chromosomes depends on the
 ..  chromosomal sex of the sample and whether a male reference was used, while

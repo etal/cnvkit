@@ -34,37 +34,55 @@ def get_antitargets(targets, accessible, avg_bin_size, min_bin_size):
     """
     if accessible:
         # Chromosomes' accessible sequence regions are given -- use them
-        access_chroms, target_chroms = compare_chrom_names(accessible, targets)
-        # But filter out untargeted alternative contigs and mitochondria
-        untgt_chroms = access_chroms - target_chroms
-        # Autosomes typically have numeric names, allosomes are X and Y
-        is_canonical = re.compile(r"(chr)?(\d+|[XYxy])$")
-        if any(is_canonical.match(c) for c in target_chroms):
-            chroms_to_skip = [c for c in untgt_chroms
-                              if not is_canonical.match(c)]
-        else:
-            # Alternative contigs have longer names -- skip them
-            max_tgt_chr_name_len = max(map(len, target_chroms))
-            chroms_to_skip = [c for c in untgt_chroms
-                              if len(c) > max_tgt_chr_name_len]
-        if chroms_to_skip:
-            logging.info("Skipping untargeted chromosomes %s",
-                         ' '.join(sorted(chroms_to_skip)))
-            skip_idx = accessible.chromosome.isin(chroms_to_skip)
-            accessible = accessible[~skip_idx]
+        accessible = drop_noncanonical_contigs(accessible, targets)
     else:
         # Chromosome accessible sequence regions not known -- use heuristics
         # (chromosome length is endpoint of last probe; skip initial
         # <magic number> of bases that are probably telomeric)
         TELOMERE_SIZE = 150000
         accessible = guess_chromosome_regions(targets, TELOMERE_SIZE)
-
     pad_size = 2 * INSERT_SIZE
     bg_arr = (accessible.resize_ranges(-pad_size)
               .subtract(targets.resize_ranges(pad_size))
               .subdivide(avg_bin_size, min_bin_size))
     bg_arr['gene'] = ANTITARGET_NAME
     return bg_arr
+
+
+def drop_noncanonical_contigs(accessible, targets, verbose=True):
+    """Drop contigs that are not targeted or canonical chromosomes.
+
+    Antitargets will be binned over chromosomes that:
+
+    - Appear in the sequencing-accessible regions of the reference genome
+      sequence, and
+    - Contain at least one targeted region, or
+    - Are named like a canonical chromosome (1-22,X,Y for human)
+
+    This allows antitarget binning to pick up canonical chromosomes that do not
+    contain any targets, as well as non-canonical or oddly named chromosomes
+    that were targeted.
+    """
+    # TODO - generalize: (garr, by="name", verbose=True):
+
+    access_chroms, target_chroms = compare_chrom_names(accessible, targets)
+    # Filter out untargeted alternative contigs and mitochondria
+    untgt_chroms = access_chroms - target_chroms
+    # Autosomes typically have numeric names, allosomes are X and Y
+    if any(is_canonical_contig_name(c) for c in target_chroms):
+        chroms_to_skip = [c for c in untgt_chroms
+                            if not is_canonical_contig_name(c)]
+    else:
+        # Alternative contigs have longer names -- skip them
+        max_tgt_chr_name_len = max(map(len, target_chroms))
+        chroms_to_skip = [c for c in untgt_chroms
+                            if len(c) > max_tgt_chr_name_len]
+    if chroms_to_skip:
+        logging.info("Skipping untargeted chromosomes %s",
+                     ' '.join(sorted(chroms_to_skip)))
+        skip_idx = accessible.chromosome.isin(chroms_to_skip)
+        accessible = accessible[~skip_idx]
+    return accessible
 
 
 def compare_chrom_names(a_regions, b_regions):
@@ -90,3 +108,33 @@ def guess_chromosome_regions(targets, telomere_size):
         'start': telomere_size,
         'end': endpoints})
     return whole_chroms
+
+
+# TODO - move to skgenome.chromsort
+
+# CNVkit's original inclusion regex
+re_canonical = re.compile(r"(chr)?(\d+|[XYxy])$")
+# goleft indexcov's exclusion regex
+# TODO drop chrM, MT
+re_noncanonical = re.compile(r"^chrEBV$|^NC|_random$|Un_|^HLA\-|_alt$|hap\d$")
+
+def is_canonical_contig_name(name):
+    return bool(re_canonical.match(name))
+    #  return not re_noncanonical.search(name))
+
+
+def _drop_short_contigs(garr):
+    """Drop contigs that are much shorter than the others.
+
+    Cutoff is where a contig is less than half the size of the next-shortest
+    contig.
+    """
+    from .plots import chromosome_sizes
+    from skgenome.chromsort import detect_big_chroms
+
+    chrom_sizes = chromosome_sizes(garr)
+    n_big, thresh = detect_big_chroms(chromosome_sizes.values())
+    chrom_names_to_keep = {c for c, s in chrom_sizes.items()
+                           if s >= thresh}
+    assert len(chrom_names_to_keep) == n_big
+    return garr[garr.chromosome.isin(chrom_names_to_keep)]

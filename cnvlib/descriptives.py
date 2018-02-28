@@ -212,6 +212,24 @@ def median_absolute_deviation(a, scale_to_sd=True):
     return mad
 
 
+@on_weighted_array()
+def weighted_mad(a, weights, scale_to_sd=True):
+    """Median absolute deviation (MAD) with weights."""
+    a_median = weighted_median(a, weights)
+    mad = weighted_median(np.abs(a - a_median), weights)
+    if scale_to_sd:
+        mad *= 1.4826
+    return mad
+
+
+@on_weighted_array()
+def weighted_std(a, weights):
+    """Standard deviation with weights."""
+    mean = np.average(a, weights=weights)
+    var = np.average((a - mean) ** 2, weights=weights)
+    return np.sqrt(var)
+
+
 @on_array(0)
 def mean_squared_error(a, initial=None):
     """Mean squared error (MSE).

@@ -175,12 +175,12 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1):
         table['gene'] = table['gene'].fillna('-')
     else:
         table['gene'] = '-'
-    # NB: User-supplied bins might be zero-width or reversed -- skip those
+    # User-supplied bins might be zero-width or reversed -- skip those
     spans = table.end - table.start
     ok_idx = (spans > 0)
     table = table.assign(depth=0, log2=NULL_LOG2_COVERAGE)
     table.loc[ok_idx, 'depth'] = (table.loc[ok_idx, 'basecount']
-                                    / spans[ok_idx])
+                                  / spans[ok_idx])
     ok_idx = (table['depth'] > 0)
     table.loc[ok_idx, 'log2'] = np.log2(table.loc[ok_idx, 'depth'])
     return table
@@ -216,11 +216,21 @@ def bedcov(bed_fname, bam_fname, min_mapq):
 
 
 def detect_bedcov_columns(text):
-    # NB: gene is optional; may be trailing cols
+    """Determine which 'bedcov' output columns to keep.
+
+    Format is the input BED plus a final appended column with the count of
+    basepairs mapped within each row's region. The input BED might have 3
+    columns (regions without names), 4 (named regions), or more (arbitrary
+    columns after 'gene').
+    """
     firstline = text[:text.index('\n')]
     tabcount = firstline.count('\t')
-    if tabcount >= 4:
-        return ['chromosome', 'start', 'end', 'gene', 'basecount']
-    elif tabcount == 3:
+    if tabcount < 3:
+        raise RuntimeError("Bad line from bedcov:\n%r" % firstline)
+    if tabcount == 3:
         return ['chromosome', 'start', 'end', 'basecount']
-    raise RuntimeError("Bad line from bedcov:\n%r" % firstline)
+    if tabcount == 4:
+        return ['chromosome', 'start', 'end', 'gene', 'basecount']
+    # Input BED has arbitrary columns after 'gene' -- ignore them
+    fillers = ["_%d" % i for i in range(1, tabcount - 3)]
+    return ['chromosome', 'start', 'end', 'gene'] + fillers + ['basecount']

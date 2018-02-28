@@ -11,7 +11,7 @@ from scipy.stats import median_test
 from skgenome import GenomicArray
 
 from . import core, descriptives, params, smoothing
-from .metrics import segment_mean
+from .segmetrics import segment_mean
 
 
 class CopyNumArray(GenomicArray):
@@ -407,11 +407,11 @@ class CopyNumArray(GenomicArray):
         cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
-            idx = np.asarray((self.chromosome == self._chr_x_label) |
-                             (self.chromosome == self._chr_y_label))
+            idx = ((self.chromosome == self._chr_x_label).values |
+                   (self.chromosome == self._chr_y_label).values)
         else:
             # Y will be all noise, so replace with 1 "flat" copy
-            idx = np.asarray(self.chromosome == self._chr_y_label)
+            idx = (self.chromosome == self._chr_y_label).values
         cvg[idx] = -1.0
         return cvg
 
@@ -448,24 +448,28 @@ class CopyNumArray(GenomicArray):
                       for _seg, subcna in self.by_ranges(segments)]
         return np.concatenate(resids) if resids else np.array([])
 
-    def smoothed(self, window=None):
+    def smoothed(self, window=None, by_arm=True):
         """Smooth log2 values with a sliding window.
 
-        Account for chromosome boundaries. Use bin weights if present.
+        Account for chromosome and (optionally) centromere boundaries. Use bin
+        weights if present.
 
         Returns
         -------
         array
             Smoothed log2 values from `self`, the same length as `self`.
         """
-        # ENH: by_arm=True?
-        if 'weight' in self:
-            out = [smoothing.smoothed(subcna['log2'], window,
-                                      weights=subcna['weight'])
-                   for _chrom, subcna in self.by_chromosome()]
+        if by_arm:
+            parts = self.by_arm()
         else:
-            out = [smoothing.smoothed(subcna['log2'], window)
-                   for _chrom, subcna in self.by_chromosome()]
+            parts = self.by_chromosome()
+        if 'weight' in self:
+            out = [smoothing.savgol(subcna['log2'], window,
+                                      weights=subcna['weight'])
+                   for _chrom, subcna in parts]
+        else:
+            out = [smoothing.savgol(subcna['log2'], window)
+                   for _chrom, subcna in parts]
         return np.concatenate(out)
 
     def _guess_average_depth(self, segments=None, window=100):
@@ -493,7 +497,7 @@ class CopyNumArray(GenomicArray):
         # Remove variations due to real/likely CNVs
         y_log2 = cnarr.residuals(segments)
         if segments is None and window:
-            y_log2 -= smoothing.smoothed(y_log2, window)
+            y_log2 -= smoothing.savgol(y_log2, window)
         # Guess Poisson parameter from absolute-scale values
         y = np.exp2(y_log2)
         # ENH: use weight argument to these stats

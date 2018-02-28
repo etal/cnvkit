@@ -5,14 +5,14 @@ from __future__ import absolute_import, division, print_function
 import unittest
 
 import numpy as np
-from skgenome import GenomicArray
+from skgenome import GenomicArray, tabio
 
 import cnvlib
 # Import all modules as a smoke test
 from cnvlib import (access, antitarget, autobin, batch, cnary, commands, core,
-                    coverage, diagram, export, fix, importers, metrics, params,
-                    plots, reference, reports, segmentation, smoothing, tabio,
-                    vary)
+                    coverage, diagram, export, fix, import_rna, importers,
+                    metrics, params, plots, reference, reports, segmentation,
+                    segmetrics, smoothing, vary)
 
 
 class CNATests(unittest.TestCase):
@@ -105,7 +105,8 @@ class CommandTests(unittest.TestCase):
         for min_gap_size, expect_nrows in ((None, 7),
                                            (500, 3),
                                            (1000, 2)):
-            acc = commands.do_access(fasta, [], min_gap_size)
+            acc = commands.do_access(fasta, [], min_gap_size,
+                                     skip_noncanonical=False)
             self.assertEqual(len(acc), expect_nrows)
         excludes = ["formats/dac-my.bed", "formats/my-targets.bed"]
         for min_gap_size, expect_nrows in ((None, 12),
@@ -113,7 +114,13 @@ class CommandTests(unittest.TestCase):
                                            (20, 5),
                                            (200, 3),
                                            (2000, 2)):
-            commands.do_access(fasta, excludes, min_gap_size)
+            acc = commands.do_access(fasta, excludes, min_gap_size,
+                                     skip_noncanonical=False)
+            self.assertEqual(len(acc), expect_nrows)
+        # Dropping chrM, keeping only chrY
+        acc = commands.do_access(fasta, excludes, 10,
+                                 skip_noncanonical=True)
+        self.assertEqual(len(acc), 5)
 
     def test_antitarget(self):
         """The 'antitarget' command."""
@@ -361,13 +368,13 @@ class CommandTests(unittest.TestCase):
         cnr = commands.do_fix(tgt_bins, blank_bins, ref[~is_bg])
         self.assertTrue(0 < len(cnr) <= len(tgt_bins))
 
-    def test_gainloss(self):
-        """The 'gainloss' command."""
+    def test_genemetrics(self):
+        """The 'genemetrics' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
-        rows = commands.do_gainloss(probes, male_reference=True)
+        rows = commands.do_genemetrics(probes, male_reference=True)
         self.assertGreater(len(rows), 0)
         segs = cnvlib.read("formats/amplicon.cns")
-        rows = commands.do_gainloss(probes, segs, 0.3, 4, male_reference=True)
+        rows = commands.do_genemetrics(probes, segs, 0.3, 4, male_reference=True)
         self.assertGreater(len(rows), 0)
 
     def test_import_theta(self):
@@ -412,15 +419,33 @@ class CommandTests(unittest.TestCase):
     def test_segment(self):
         """The 'segment' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
+        n_chroms = cnarr.chromosome.nunique()
         # NB: R methods are in another script; haar is pure-Python
         segments = segmentation.do_segmentation(cnarr, "haar")
-        self.assertGreater(len(segments), 0)
+        self.assertGreater(len(segments), n_chroms)
         segments = segmentation.do_segmentation(cnarr, "haar", threshold=.0001,
                                                 skip_low=True)
-        self.assertGreater(len(segments), 0)
+        self.assertGreater(len(segments), n_chroms)
         varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
-        self.assertGreater(len(segments), 0)
+        self.assertGreater(len(segments), n_chroms)
+
+    def test_segment_hmm(self):
+        """The 'segment' command with HMM methods."""
+        for fname in ("formats/amplicon.cnr", "formats/p2-20_1.cnr"):
+            cnarr = cnvlib.read(fname)
+            n_chroms = cnarr.chromosome.nunique()
+            # NB: R methods are in another script; haar is pure-Python
+            segments = segmentation.do_segmentation(cnarr, "hmm")
+            self.assertGreater(len(segments), n_chroms)
+            segments = segmentation.do_segmentation(cnarr, "hmm-tumor",
+                                                    skip_low=True)
+            self.assertGreater(len(segments), n_chroms)
+            segments = segmentation.do_segmentation(cnarr, "hmm-germline")
+            self.assertGreater(len(segments), n_chroms)
+            #  varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+            #  segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
+            #  self.assertGreater(len(segments), n_chroms)
 
     def test_segment_parallel(self):
         """The 'segment' command, in parallel."""
@@ -435,13 +460,13 @@ class CommandTests(unittest.TestCase):
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
         for func in (
-            lambda x: metrics.confidence_interval_bootstrap(x, 0.05, 100),
-            lambda x: metrics.prediction_interval(x, 0.05),
+            lambda x: segmetrics.confidence_interval_bootstrap(x, 0.05, 100),
+            lambda x: segmetrics.prediction_interval(x, 0.05),
         ):
-            lo, hi = commands._segmetric_interval(segarr, cnarr, func)
+            lo, hi = segmetrics.segmetric_interval(segarr, cnarr, func)
             self.assertEqual(len(lo), len(segarr))
             self.assertEqual(len(hi), len(segarr))
-            sensible_segs_mask = (np.asarray(segarr['probes']) > 3)
+            sensible_segs_mask = (segarr['probes'] > 3).values
             means = segarr[sensible_segs_mask, 'log2']
             los = lo[sensible_segs_mask]
             his = hi[sensible_segs_mask]
@@ -482,18 +507,18 @@ class OtherTests(unittest.TestCase):
         # Wide target, no secondary corrections triggered
         insert_size = 250
         gap_size = np.zeros(1)  # Adjacent
-        target_size = np.asarray([600])
+        target_size = np.array([600])
         loss = fix.edge_losses(target_size, insert_size)
         gain = fix.edge_gains(target_size, gap_size, insert_size)
         gain *= 2  # Same on the other side
         self.assertAlmostEqual(loss, gain)
         # Trigger 'loss' correction (target_size < 2 * insert_size)
-        target_size = np.asarray([450])
+        target_size = np.array([450])
         self.assertAlmostEqual(
             fix.edge_losses(target_size, insert_size),
             2 * fix.edge_gains(target_size, gap_size, insert_size))
         # Trigger 'gain' correction (target_size + gap_size < insert_size)
-        target_size = np.asarray([300])
+        target_size = np.array([300])
         self.assertAlmostEqual(fix.edge_losses(target_size, insert_size),
                         2 * fix.edge_gains(target_size, gap_size, insert_size))
 

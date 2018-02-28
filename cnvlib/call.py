@@ -89,8 +89,8 @@ def log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
     ratios = np.log2(np.maximum(absolutes / ploidy, min_abs_val))
     # Adjust sex chromosomes to be relative to the reference
     if is_reference_male:
-        ratios[np.asarray(cnarr.chromosome == cnarr._chr_x_label)] += 1.0
-    ratios[np.asarray(cnarr.chromosome == cnarr._chr_y_label)] += 1.0
+        ratios[(cnarr.chromosome == cnarr._chr_x_label).values] += 1.0
+    ratios[(cnarr.chromosome == cnarr._chr_y_label).values] += 1.0
     return ratios
 
 
@@ -143,6 +143,7 @@ def absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for i, row in enumerate(cnarr):
+        # TODO by_chromosome to reduce number of calls to this
         ref_copies, expect_copies = _reference_expect_copies(
             row.chromosome, ploidy, is_sample_female, is_reference_male)
         absolutes[i] = _log2_ratio_to_absolute(
@@ -183,11 +184,11 @@ def absolute_expect(cnarr, ploidy, is_sample_female):
     according to the sample's specified chromosomal sex.
     """
     exp_copies = np.repeat(ploidy, len(cnarr))
-    is_y = np.asarray(cnarr.chromosome == cnarr._chr_y_label)
+    is_y = (cnarr.chromosome == cnarr._chr_y_label).values
     if is_sample_female:
         exp_copies[is_y] = 0
     else:
-        is_x = np.asarray(cnarr.chromosome == cnarr._chr_x_label)
+        is_x = (cnarr.chromosome == cnarr._chr_x_label).values
         exp_copies[is_x | is_y] = ploidy // 2
     return exp_copies
 
@@ -199,8 +200,8 @@ def absolute_reference(cnarr, ploidy, is_reference_male):
     sex, and always 1 copy of Y.
     """
     ref_copies = np.repeat(ploidy, len(cnarr))
-    is_x = np.asarray(cnarr.chromosome == cnarr._chr_x_label)
-    is_y = np.asarray(cnarr.chromosome == cnarr._chr_y_label)
+    is_x = (cnarr.chromosome == cnarr._chr_x_label).values
+    is_y = (cnarr.chromosome == cnarr._chr_y_label).values
     if is_reference_male:
         ref_copies[is_x] = ploidy // 2
     ref_copies[is_y] = ploidy // 2

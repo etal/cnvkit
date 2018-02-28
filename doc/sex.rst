@@ -1,32 +1,47 @@
 Chromosomal sex
 ===============
 
-CNVkit attempts to handle chromosomal sex correctly throughout the analysis
-pipelines. Several commands automatically infer a given sample's chromosomal
-sex from the relative copy number of the autosomes and chromosomes X and Y; the
-status log messages will indicate when this is happening. In most cases the
-inference can be skipped or overridden by using the ``-x``/``--sample-sex``
-option.
+CNVkit attempts to handle chromosomal sex correctly at every step.
+Several commands automatically infer a given sample's chromosomal sex from the
+relative copy number of the autosomes and chromosomes X and Y; the status log
+messages will indicate when this is happening.
+In most cases the inference can be skipped or overridden by using the
+``-x``/``--sample-sex`` option.
 
 The :ref:`sex` command runs and report's CNVkit's inference for one or more
 given samples, and can be used on .cnn, .cnr or .cns files at any stage of
 processing.
 
-Reference sex
--------------
+Reference sex-chromosome ploidy
+-------------------------------
 
-See :ref:`reference`
+By default, copy number calls and log2 ratios will be relative to a diploid X
+chromosome and haploid Y. This happens regardless of the control samples used in
+the :ref:`reference` command; if any input samples are male (haploid X), their X
+chromosome coverage depths are doubled in order to be equivalent to diploid X.
 
-If you want copy number calls to be relative to a male reference with a single X
-chromosome but dipoid autosomes, use the ``-y`` option everywhere.
-Otherwise, X and all autosomes will be considered normally diploid. Chromosome Y
-will be considered haploid in either case.
-
+However, some users prefer calls relative to a haploid X chromosome -- this is
+how array CGH data are usually presented, for example. In that context it's
+often referred to as a "male reference". This convention can be enabled in
+CNVkit by using the ``-y`` / ``--male-reference`` / ``--haploid-x-reference``
+option.  Note that this does not require any of the control samples to be male;
+female control samples' X coverage depth is automatically halved so that it
+appears as haploid in the CNVkit pipeline. Chromosome Y is always treated as
+haploid in either case.
 
 Chromosomal sex in calling absolute copy number
 -----------------------------------------------
 
-See :ref:`call`
+If ``-y`` is used to construct a reference, then the same option should also be
+used with the commands :ref:`call`, :ref:`export`, and :ref:`genemetrics` for
+samples processed with that reference.
+
+Note that the options ``-x``/``--sample-sex`` and ``-y`` / ``--male-reference``
+/ ``--haploid-x-reference`` are different: If a female sample is run with a
+haploid-X reference, segments on chromosome X with log2-ratio +1 will be treated
+as copy-number-neutral, because that's the expected copy number, while an
+X-chromosome segment with log2-ratio 0 will be treated as a hemizygous loss.
+
 
 Plots and sex chromosomes
 -------------------------
@@ -55,8 +70,8 @@ about the sex of the samples and reference used:
   0.0, but the log2 values may be noisier and less reliable than on autosomes.
 
 In the output of the :ref:`diagram`, :ref:`call`, and :ref:`export` commands,
-the X or Y copy number may be wrong if the sex of the reference
-(``-y``/``--male-reference``) or sample (``-x``) was not specified correctly. If
+the X-chromosome copy number may be wrong if the X-ploidy of the
+reference (``-y``) or sample (``-x``) was not specified correctly. If
 sample sex was not specified on the command line, check the command's logged
 status messages to see if the sample's sex was guessed incorrectly.
 

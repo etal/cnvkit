@@ -167,7 +167,7 @@ def venn(table, other, mode):
     #       0=self only, 1=both, 2=other only
     #   -> 'cut' just drops the '_venn_' column
     #   -> 'subtract' drops 1 and 2?
-    #       (is that faster? prolly not)
+    #       (is that faster? probably not)
     #   -> 'jaccard' does math with it...
     return table
 

@@ -14,8 +14,10 @@ from scipy.stats import gmean
 
 from .cnary import CopyNumArray as CNA
 from .fix import center_by_window
-from .params import NULL_LOG2_COVERAGE
-from .descriptives import biweight_midvariance
+# from .descriptives import biweight_midvariance
+# from .params import NULL_LOG2_COVERAGE
+
+NULL_LOG2_COVERAGE = -5
 
 
 def before(char):
@@ -233,7 +235,8 @@ def locate_entrez_dupes(dframe):
                     yield idx
 
 
-def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths):
+def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths,
+                               normal_ids):
     """Align columns and sort.
 
     Also calculate weights and add to gene_info as 'weight', along with
@@ -258,10 +261,12 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths):
     weights = [np.sqrt((gene_counts / gene_counts.quantile(.75)).clip_upper(1))]
 
     logging.info("Calculating normalized gene read depths")
-    sample_depths_log2 = normalize_read_depths(sc.divide(gi['tx_length'], axis=0))
+    sample_depths_log2 = normalize_read_depths(sc.divide(gi['tx_length'],
+                                                         axis=0),
+                                               normal_ids)
 
     logging.info("Weighting genes by spread of read depths")
-    gene_spreads = sample_depths_log2.apply(biweight_midvariance, axis=1)
+    gene_spreads = sample_depths_log2.std(axis=1)
     weights.append(gene_spreads)
 
     corr_weights = []
@@ -282,7 +287,7 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths):
     return gi, sc, sample_depths_log2
 
 
-def normalize_read_depths(sample_depths):
+def normalize_read_depths(sample_depths, normal_ids):
     """Normalize read depths within each sample.
 
     Some samples have higher sequencing depth and therefore read depths need to
@@ -294,7 +299,10 @@ def normalize_read_depths(sample_depths):
 
     Finally, convert to log2 ratios.
     """
+    # TODO use normal_ids as a control here
+    #   e.g. subtract their IQR after the loop?
     assert sample_depths.values.sum() > 0
+    sample_depths = sample_depths.fillna(0)
     for _i in range(4):
         # By-sample: 75%ile  among all genes
         q3 = sample_depths.quantile(.75)
@@ -306,7 +314,23 @@ def normalize_read_depths(sample_depths):
         #       ": sample-wise denom =", q3.mean(),
         #       ", gene-wise denom =", sm.mean())
     # Finally, convert normalized read depths to log2 scale
-    return np.log2(sample_depths).replace(-np.inf, np.nan)
+    return safe_log2(sample_depths, NULL_LOG2_COVERAGE)
+
+
+def safe_log2(values, min_log2):
+    """Transform values to log2 scale, safely handling zeros.
+
+    Parameters
+    ----------
+    values : np.array
+        Absolute-scale values to transform. Should be non-negative.
+    min_log2 : float
+        Assign input zeros this log2-scaled value instead of -inf. Rather than
+        hard-clipping, input values near 0 (especially below 2^min_log2) will be
+        squeezed a bit above `min_log2` in the log2-scale output.
+    """
+    absolute_shift = 2 ** min_log2
+    return np.log2(values + absolute_shift)
 
 
 def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info,
@@ -323,8 +347,9 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info,
     gi_cols = ['chromosome', 'start', 'end', 'gene', 'gc', 'tx_length', 'weight']
     cnr_info = gene_info.loc[:, gi_cols]
     # Fill NA fields with the lowest finite value in the same row.
-    # Only use NULL_LOG2_COVERAGE if all samples are NA.
-    gene_minima = sample_data_log2.min(axis=1, skipna=True).fillna(NULL_LOG2_COVERAGE)
+    # Only use NULL_LOG2_COVERAGE if all samples are NA / zero-depth.
+    gene_minima = sample_data_log2.min(axis=1, skipna=True)
+    assert not gene_minima.hasnans
     for (sample_id, sample_col), (_sid_log2, sample_log2) \
             in zip(sample_counts.iteritems(), sample_data_log2.iteritems()):
         tx_len = cnr_info.tx_length

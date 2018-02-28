@@ -15,7 +15,8 @@ from skgenome import tabio
 
 from .. import core, parallel, params, smoothing, vary
 from ..cnary import CopyNumArray as CNA
-from . import cbs, flasso, haar, none
+from ..segfilters import squash_by_groups
+from . import cbs, flasso, haar, hmm, none
 
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
@@ -29,14 +30,19 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         threshold = {'cbs': 0.0001,
                      'flasso': 0.005,
                      'haar': 0.001,
-                     'none': np.nan,
-                    }[method]
-    logging.info("Segmenting with method '%s', significance threshold %g, "
-                 "in %s processes", method, threshold, processes)
+                    }.get(method)
+    msg = "Segmenting with method " + repr(method)
+    if threshold is not None:
+        if method.startswith('hmm'):
+            msg += ", smoothing window size %s," % threshold
+        else:
+            msg += ", significance threshold %s," % threshold
+    msg += " in %s processes" % processes
+    logging.info(msg)
 
     # NB: parallel cghFLasso segfaults in R ('memory not mapped'),
     # even when run on a single chromosome
-    if method == 'flasso':
+    if method == 'flasso' or method.startswith('hmm'):
         # ENH segment p/q arms separately
         # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
@@ -61,6 +67,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
             rstr = "".join(rstr)
         cna = cnarr.concat(rets)
 
+    cna.sort_columns()
     if save_dataframe:
         return cna, rstr
     return cna
@@ -107,9 +114,11 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
                           n_weight_too_low)
 
     if len(filtered_cn) != len(cnarr):
-        logging.info("Dropped %d / %d bins on chromosome %s",
-                     len(cnarr) - len(filtered_cn),
-                     len(cnarr), cnarr["chromosome"].iat[0])
+        msg = ("Dropped %d / %d bins"
+               % (len(cnarr) - len(filtered_cn), len(cnarr)))
+        if cnarr["chromosome"].iat[0] == cnarr["chromosome"].iat[-1]:
+            msg += " on chromosome " + str(cnarr["chromosome"].iat[0])
+        logging.info(msg)
     if not len(filtered_cn):
         return filtered_cn
 
@@ -120,6 +129,9 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
     elif method == 'none':
         segarr = none.segment_none(filtered_cn)
 
+    elif method.startswith('hmm'):
+        segarr = hmm.segment_hmm(filtered_cn, method, threshold)
+
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
         rscript = {'cbs': cbs.CBS_RSCRIPT,
@@ -128,6 +140,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
 
         filtered_cn['start'] += 1  # Convert to 1-indexed coordinates for R
         with tempfile.NamedTemporaryFile(suffix='.cnr', mode="w+t") as tmp:
+            # TODO tabio.write(filtered_cn, tmp, 'seg')
             filtered_cn.data.to_csv(tmp, index=False, sep='\t',
                                     float_format='%.6g', mode="w+t")
             tmp.flush()
@@ -144,14 +157,19 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         # NB: Automatically shifts 'start' back from 1- to 0-indexed
         segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)
         if method == 'flasso':
-            segarr = squash_segments(segarr)
+            # Merge adjacent bins with same log2 value into segments
+            if 'weight' in filtered_cn:
+                segarr['weight'] = filtered_cn['weight']
+            else:
+                segarr['weight'] = 1.0
+            segarr = squash_by_groups(segarr, segarr['log2'], by_arm=True)
         segarr = repair_segments(segarr, cnarr)
 
     else:
         raise ValueError("Unknown method %r" % method)
 
     segarr.meta = cnarr.meta.copy()
-    if variants:
+    if variants and not method.startswith('hmm'):
         # Re-segment the variant allele freqs within each segment
         newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
                    for segment, subvarr in variants.by_ranges(segarr)]
@@ -160,7 +178,6 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
 
     segarr['gene'], segarr['weight'], segarr['depth'] = \
             transfer_fields(segarr, cnarr)
-    segarr.sort_columns()
     if save_dataframe:
         return segarr, seg_out
     else:
@@ -221,42 +238,6 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     return seggenes, segweights, segdepths
 
 
-def squash_segments(segments):
-    """Combine contiguous segments."""
-    curr_chrom = None
-    curr_start = None
-    curr_end = None
-    curr_genes = []
-    curr_log2 = None
-    curr_probes = 0
-    squashed_rows = []
-    for row in segments:
-        if row.chromosome == curr_chrom and row.log2 == curr_log2:
-            # Continue the current segment
-            curr_end = row.end
-            curr_genes.append(row.gene)
-            curr_probes += 1
-        else:
-            # Segment break
-            # Finish the current segment
-            if curr_probes:
-                squashed_rows.append((curr_chrom, curr_start, curr_end,
-                                      ",".join(pd.unique(curr_genes)),
-                                      curr_log2, curr_probes))
-            # Start a new segment
-            curr_chrom = row.chromosome
-            curr_start = row.start
-            curr_end = row.end
-            curr_genes = []
-            curr_log2 = row.log2
-            curr_probes = 1
-    # Remainder
-    squashed_rows.append((curr_chrom, curr_start, curr_end,
-                          ",".join(pd.unique(curr_genes)),
-                          curr_log2, curr_probes))
-    return segments.as_rows(squashed_rows)
-
-
 # TODO/ENH combine with transfer_fields
 # Recalculate segment means, weights, depths here instead of in R
 def repair_segments(segments, orig_probes):
@@ -266,9 +247,22 @@ def repair_segments(segments, orig_probes):
     2. Ensure first and last segment ends match 1st/last bin ends
        (but keep log2 as-is).
     """
+    def make_null_segment(chrom, orig_start, orig_end):
+        vals = {'chromosome': chrom,
+                'start': orig_start,
+                'end': orig_end,
+                'gene': '-',
+                'depth': 0.0,
+                'log2': 0.0,
+                'probes': 0.0,
+                'weight': 0.0,
+               }
+        row_vals = tuple(vals[c] for c in segments.data.columns)
+        return row_vals
+
+    # Adjust segment endpoints on each chromosome
     segments = segments.copy()
     extra_segments = []
-    # Adjust segment endpoints on each chromosome
     for chrom, subprobes in orig_probes.by_chromosome():
         chr_seg_idx = np.where(segments.chromosome == chrom)[0]
         orig_start = subprobes[0, 'start']
@@ -277,8 +271,8 @@ def repair_segments(segments, orig_probes):
             segments[chr_seg_idx[0], 'start'] = orig_start
             segments[chr_seg_idx[-1], 'end'] = orig_end
         else:
-            null_segment = (chrom, orig_start, orig_end, "-", 0.0, 0)
-            extra_segments.append(null_segment)
+            extra_segments.append(
+                make_null_segment(chrom, orig_start, orig_end))
     if extra_segments:
         segments.add(segments.as_rows(extra_segments))
     return segments

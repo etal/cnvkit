@@ -105,9 +105,17 @@ class GenomicArray(object):
 
     def as_rows(self, rows):
         """Wrap the given rows in this instance's metadata."""
-        return self.from_rows(rows,
-                              columns=self.data.columns,
-                              meta_dict=self.meta)
+        try:
+            out = self.from_rows(rows,
+                                 columns=self.data.columns,
+                                 meta_dict=self.meta)
+        except AssertionError:
+            columns = self.data.columns.tolist()
+            firstrow = next(iter(rows))
+            raise RuntimeError("Passed %d columns %r, but "
+                               "%d elements in first row: %s",
+                               len(columns), columns, len(firstrow), firstrow)
+        return out
 
     # Container behaviour
 
@@ -224,7 +232,7 @@ class GenomicArray(object):
                 is_auto |= (self.chromosome == a_chrom)
         return self[is_auto]
 
-    def by_arm(self, min_gap_size=1e5, min_arm_bins=10):
+    def by_arm(self, min_gap_size=1e5, min_arm_bins=50):
         """Iterate over bins grouped by chromosome arm (inferred)."""
         # ENH:
         # - Accept GArray of actual centromere regions as input
@@ -569,9 +577,10 @@ class GenomicArray(object):
         # TODO
         return NotImplemented
 
-    def flatten(self, combine=None):
+    def flatten(self, combine=None, split_columns=None):
         """Split this array's regions where they overlap."""
-        return self.as_dataframe(flatten(self.data, combine=combine))
+        return self.as_dataframe(flatten(self.data, combine=combine,
+                                         split_columns=split_columns))
 
     def merge(self, bp=0, stranded=False, combine=None):
         """Merge adjacent or overlapping regions into single rows.

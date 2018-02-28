@@ -119,7 +119,7 @@ def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
         # degree of smoothness
         # NB: Target panel has ~1k bins/chrom. -> 250-bin window
         #     Exome: ~10k bins/chrom. -> 2500-bin window
-        window_size = int(round(.25 * len(probes) /
+        window_size = int(round(.15 * len(probes) /
                                 probes.chromosome.nunique()))
     else:
         chrom_sizes = plots.chromosome_sizes(segments)
@@ -411,7 +411,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
 
     # Add a local trend line
     if do_trend:
-        axis.plot(x, probes.smoothed(.15),
+        axis.plot(x, probes.smoothed(.1),
                   color=POINT_COLOR, linewidth=2, zorder=-1)
 
     # Draw segments as horizontal lines

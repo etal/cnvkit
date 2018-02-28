@@ -3,8 +3,8 @@ Text and tabular reports
 
 .. _breaks:
 
-breaks
-------
+``breaks``
+----------
 
 List the targeted genes in which a segmentation breakpoint occurs.
 
@@ -22,66 +22,89 @@ processing by scripts and standard Unix tools such as ``grep``, ``sort``,
 
 Columns:
 
-- `gene`, `chromosome` -- as in .cns (see :ref:`cnxformat`), the gene where
+- *gene*, *chromosome* -- as in .cns (see :ref:`cnxformat`), the gene where
   the breakpoint occurs and the chromosome it lies on.
-- `location` -- the `end` of the segment to the left of the breakpoint, and
-  `start` of the segment to the right.
-- `change` -- the difference in `log2` values between the adjacent segments.
-- `probes_left`, `probes_right` -- the number of probes on each side of the
+- *location* -- the ``end`` of the segment to the left of the breakpoint, and
+  ``start`` of the segment to the right.
+- *change* -- the difference in ``log2`` values between the adjacent segments.
+- *probes_left*, *probes_right* -- the number of probes on each side of the
   breakpoint within the gene. (Not the same as the number of probes supporting
   each segment; just the portion within the gene.)
 
 For example, to get a list of the names of genes that contain a possible copy
-number breakpoint::
+number breakpoint (e.g. unbalanced translocation)::
 
     cnvkit.py breaks Sample.cnr Sample.cns | cut -f1 | sort -u > gene-breaks.txt
 
 
-.. _gainloss:
+.. _genemetrics:
 
-gainloss
---------
+``genemetrics``
+---------------
 
 Identify targeted genes with copy number gain or loss above or below a
-threshold.
+threshold. (Formerly called ``gainloss``.)
 
 ::
 
-    cnvkit.py gainloss Sample.cnr
-    cnvkit.py gainloss Sample.cnr -s Sample.cns -t 0.4 -m 5 -y
+    cnvkit.py genemetrics Sample.cnr
+    cnvkit.py genemetrics Sample.cnr -s Sample.cns -t 0.4 -m 5 -y
 
-If segments are given, the log2 ratio value reported for each gene will be the
-value of the segment covering the gene. Where more than one segment overlaps the
-gene, i.e. if the gene contains a breakpoint, each segment's value will be
-reported as a separate row for the same gene. If a large-scale CNA covers
-multiple genes, each of those genes will be listed individually.
+The first four columns of output table show each targeted gene's name and its
+genomic coordinates (based on the first and last bins with that label in the
+original target BED file, and thus the .cnr file).
 
-If segments are not given, the weighted average of the log2 ratio values of the
-bins within each gene will be reported as the gene's overall log2 ratio value.
-This mode will not attempt to identify breakpoints within genes.
+The remaining output columns have slightly different meaning depending on
+whether or not segments were provided. Without segments (.cnr alone):
 
-The threshold (``-t``) and minimum number of bins (``-m``) options are used to
-control which genes are reported. For example, a threshold of .2 (the default)
-will report single-copy gains and losses in a completely pure tumor sample (or
-germline CNVs), but a lower threshold would be necessary to call somatic CNAs if
-significant normal-cell contamination is present.
-Some likely false positives can be eliminated by dropping CNVs that cover a
-small number of bins (e.g. with ``-m 3``, genes where only 1 or 2 bins show copy
-number change will not be reported), at the risk of missing some true positives.
+- *log2*: Weighted mean of log2 ratios of all the gene's bins, including any
+  off-target intronic bins.
+- *depth*: Weighted mean of un-normalized read depths across all this gene's
+  bins.
+- *weight*: Sum of this gene's bins' weights.
+- *nbins*: The number of bins assigned to this gene.
 
-Specify the reference sex (``-y`` if male) to ensure CNVs on the X and Y
-chromosomes are reported correctly; otherwise, a large number of spurious gains
-or losses on the sex chromosomes may be reported.
+With segments (``-s``):
+
+- *log2*: The log2 ratio value of the segment covering the gene, i.e. weighted
+  mean of all bins covered by the whole segment, not just this gene.
+- *depth*, *weight*, *probes*: As above.
+- *seg_weight*: The sum of the weights of the bins supporting the segment.
+- *seg_probes*: The number of probes supporting the segment.
+
+The ``-t``/``--threshold`` and ``-m``/``--min-probes`` options are used to
+control which genes are reported:
+
+- A threshold of .2 (the default) will report single-copy gains and losses in a
+  completely pure tumor sample (or germline CNVs), but a lower threshold would
+  be necessary to call somatic CNAs if significant normal-cell contamination is
+  present.
+- Some likely false positives can be eliminated by dropping CNVs that cover a
+  small number of bins, at the risk of missing some true positives.
+  With ``-m 3``, the default, genes where only 1 or 2 bins show copy number
+  change will not be reported.
+  This applies to the segment's bin count (*seg_probes*) if segments are
+  provided with ``-s``, otherwise it's the gene's bin count (*nbins*).
+
+Specify the reference X-chromosome ploidy (``-y`` if the same option was used
+when constructing the reference) to ensure CNVs on the X chromosome are reported
+correctly; otherwise, a large number of spurious gains or losses may be
+reported.
+
+.. note:: Where more than one segment overlaps the gene, i.e. if the gene
+    contains a breakpoint, each segment's value will be reported as a separate
+    row for the same gene. If a large-scale CNA covers multiple genes, each of
+    those genes will be listed individually.
 
 The output is a text table of tab-separated values, like that of :ref:`breaks`.
-Continuing the Unix example, we can try ``gainloss`` both with and without the
+Continuing the Unix example, we can try ``genemetrics`` both with and without the
 segment files, take the intersection of those as a list of "trusted" genes, and
 visualize each of them with :ref:`scatter`::
 
-    cnvkit.py gainloss -y Sample.cnr -s Sample.cns | tail -n+2 | cut -f1 | sort > segment-gainloss.txt
-    cnvkit.py gainloss -y Sample.cnr | tail -n+2 | cut -f1 | sort > ratio-gainloss.txt
-    comm -12 ratio-gainloss.txt segment-gainloss.txt > trusted-gainloss.txt
-    for gene in `cat trusted-gainloss.txt`
+    cnvkit.py genemetrics -y Sample.cnr -s Sample.cns | tail -n+2 | cut -f1 | sort > segment-genes.txt
+    cnvkit.py genemetrics -y Sample.cnr | tail -n+2 | cut -f1 | sort > ratio-genes.txt
+    comm -12 ratio-genes.txt segment-genes.txt > trusted-genes.txt
+    for gene in `cat trusted-genes.txt`
     do
         cnvkit.py scatter -s Sample.cn{s,r} -g $gene -o Sample-$gene-scatter.pdf
     done
@@ -91,8 +114,8 @@ visualize each of them with :ref:`scatter`::
 
 .. _sex:
 
-sex
----
+``sex``
+-------
 
 Guess samples' chromosomal sex from the relative coverage of chromosomes X and Y.
 A table of the sample name (derived from the filename), inferred sex (string
@@ -128,8 +151,8 @@ log2 ratio in male samples.
 
 .. _metrics:
 
-metrics
--------
+``metrics``
+-----------
 
 Calculate the spread of bin-level copy ratios from the corresponding final
 segments using several statistics.
@@ -203,8 +226,8 @@ be trusted.
 
 .. _segmetrics:
 
-segmetrics
-----------
+``segmetrics``
+--------------
 
 Calculate summary statistics of the residual bin-level log2 ratio estimates
 from the segment means, similar to the existing :ref:`metrics` command, but for each

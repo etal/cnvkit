@@ -24,8 +24,8 @@ options available::
 
 .. _scatter:
 
-scatter
--------
+``scatter``
+-----------
 
 Plot bin-level log2 coverages and segmentation calls together.  Without any
 further arguments, this plots the genome-wide copy number in a form familiar to
@@ -181,8 +181,8 @@ Better results can be had by giving CNVkit more information:
 
 .. _diagram:
 
-diagram
--------
+``diagram``
+-----------
 
 Draw copy number (either individual bins (.cnn, .cnr) or segments (.cns)) on
 chromosomes as an ideogram. If both the bin-level log2 ratios and segmentation
@@ -204,19 +204,44 @@ the individual gene labels become difficult to read.
 .. image:: TR_95_T-diagram.png
 
 By default, the sex chromosomes X and Y are colorized relative to the expected
-ploidy, i.e. for female samples analyzed with a male reference, while the X
-chromosome has a copy ratio near +1.0 in the input .cnr and .cns files, in the
-output diagram it will be shown as neutral copy number (white or faint colors)
-rather than a gain (red), because the diploid X is expected. The sample sex can
-be specified with the ``-x``/``--sample-sex`` option, or will otherwise be
-guessed automatically (see :doc:`sex`). This correction is done by default, but
-can be disabled with the option ``--no-shift-xy``.
+ploidy, i.e. for male samples analyzed with default options, where the X
+chromosome in the input .cnr and .cns files has a log2 copy ratio near -1.0, in
+the output diagram it will be shown as neutral copy number (white or faint
+colors) rather than a loss (blue), because the sample's X chromosome (and Y) is
+recognized and expected to be haploid. (See :doc:`sex`.)
+The sample sex can be specified with the ``-x``/``--sample-sex`` option, or will
+otherwise be guessed automatically.
+This visual correction is done by default, but can be disabled with the option
+``--no-shift-xy``.
+
+Reducing cluttered gene labels
+``````````````````````````````
+
+With tumor WGS or exome samples, the ``diagram`` output often appears
+extremely cluttered with hundreds or thousands of genes labeled.
+
+You can reduce the number of labels by using a higher threshold (``diagram -t``)
+to limit labeling to deep deletions and high-level amplifications. The
+:ref:`genemetrics` command can help you determine the log2 value of genes of
+interest, and then a ``-t`` value slightly below that will disply only
+alterations at least that exteme.
+
+To reduce the number of false-positive calls in the .cns file (see
+:doc:`calling`), consider:
+
+- Making the initial segmentation more stringent with `segment -t` or a larger
+  bin size
+- Filtering segments by confidence interval via :ref:`segmetrics --ci
+  <segmetrics>` and :ref:`call --filter ci <call>`
+
+Alternatively, simply stick to the :ref:`scatter` and :ref:`heatmap` plots for
+visualizing these samples.
 
 
 .. _heatmap:
 
-heatmap
--------
+``heatmap``
+-----------
 
 Draw copy number (either bins (.cnn, .cnr) or segments (.cns)) for multiple
 samples as a heatmap.
@@ -297,7 +322,7 @@ like::
     from matplotlib import pyplot as plt
     import cnvlib
 
-    segments = map(cnvlib.read, glob("*.cns"))
+    segments = [cnvlib.read(f) for f in glob("*.cns")]
     ax = cnvlib.do_heatmap(segments)
     ax.set_title("All my samples")
     plt.rcParams["font.size"] = 9.0

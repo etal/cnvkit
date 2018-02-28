@@ -23,9 +23,11 @@ def get_combiners(table, stranded=False, combine=None):
     cmb = {
         'chromosome': first_of,
         'start': first_of,
-        'end': max_of,
+        'end': max,
         'gene': join_strings,
         'accession': join_strings,
+        'weight': sum,
+        'probes': sum,
     }
     if combine:
         cmb.update(combine)
@@ -44,8 +46,7 @@ def last_of(elems):
     return elems[-1]
 
 
-def max_of(elems):
-    return max(elems)
+max_of = max
 
 
 def join_strings(elems, sep=','):

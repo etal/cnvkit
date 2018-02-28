@@ -4,8 +4,8 @@ Compatibility and other I/O
 
 .. _version:
 
-version
--------
+``version``
+-----------
 
 Print CNVkit's version as a string on standard output::
 
@@ -17,8 +17,8 @@ CNVkit version in your message so we can help you more efficiently.
 
 .. _import-picard:
 
-import-picard
--------------
+``import-picard``
+-----------------
 
 Convert Picard CalculateHsMetrics per-target coverage files (.csv) to the
 CNVkit .cnn format::
@@ -55,8 +55,8 @@ Procedure:
 
 .. _import-seg:
 
-import-seg
-----------
+``import-seg``
+--------------
 
 Convert a file in the :ref:`segformat` format (e.g. the output of standard CBS
 or the GenePattern server) into one or more CNVkit .cns files.
@@ -74,8 +74,8 @@ integer IDs. Options in ``import-seg`` can help recover the original names.
 
 .. _import-theta:
 
-import-theta
-------------
+``import-theta``
+----------------
 
 Convert the ".results" output of `THetA2
 <http://compbio.cs.brown.edu/projects/theta/>`_ to one or more CNVkit .cns files
@@ -90,8 +90,8 @@ analysis.
 
 .. _export:
 
-export
-------
+``export``
+----------
 
 Convert copy number ratio tables (.cnr files) or segments (.cns) to
 another format.
@@ -133,12 +133,10 @@ BED export, and VCF records are created for the segments where the copy number
 is different from the expected ploidy (e.g. 2 on autosomes, 1 on haploid sex
 chromosomes, depending on sample sex).
 
-Chromosomal sex can be specified with the ``-x``/``--sample-sex`` option, or
-will be guessed automatically. If a male reference is used, use
-``-y``/``--male-reference`` to say so. Note that these are different: If a
-female sample is run with a male reference, segments on chromosome X with
-log2-ratio +1 will be skipped, because that's the expected copy number, while an
-X-chromosome segment with log2-ratio 0 will be printed as a hemizygous loss.
+A sample's :doc:`chromosomal sex <sex>` can be specified with the
+``-x``/``--sample-sex`` option, or will be guessed automatically.
+If the option ``-y`` / ``--male-reference`` / ``--haploid-x-reference`` was used
+to construct the :ref:`reference`, use it here, too.
 
 ::
 

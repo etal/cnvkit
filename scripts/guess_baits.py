@@ -40,14 +40,22 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 def filter_targets(target_bed, sample_bams, procs):
     """Check if each potential target has significant coverage."""
-    baits = tabio.read_auto(target_bed)
+    try:
+        baits = tabio.read(target_bed, 'bed4')
+    except:
+        raise RuntimeError("Targets must be in BED format; try skg_convert.py")
+    logging.info("Loaded %d candidate regions from %s", len(baits), target_bed)
     # Loop over BAMs to calculate weighted averages of bin coverage depths
     total_depths = np.zeros(len(baits), dtype=np.float_)
     for bam_fname in sample_bams:
         logging.info("Evaluating targets in %s", bam_fname)
         sample = cnvlib.do_coverage(target_bed, bam_fname, processes=procs)
+        assert len(sample) == len(baits), \
+                "%d != %d" % (len(sample), len(baits))
         total_depths += sample['depth'].values
     baits['depth'] = total_depths / len(sample_bams)
+    logging.info("Average candidate-target depth:\n%s",
+                 baits['depth'].describe())
     return baits
 
 
@@ -134,7 +142,7 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
         else:
             # Exiting a captured region
             # Update target region boundaries
-            darr = np.asarray(depths)
+            darr = np.array(depths)
             half_depth = 0.5 * darr.max()
             ok_dp_idx = np.nonzero(darr >= half_depth)[0]
             start_idx = ok_dp_idx[0]
@@ -187,37 +195,46 @@ def normalize_depth_log2_filter(baits, min_depth, enrich_ratio=0.1):
 if __name__ == '__main__':
     AP = argparse.ArgumentParser(description=__doc__)
     AP.add_argument('sample_bams', nargs='+',
-                    help="""Sample BAM file(s) to test for target coverage""")
+                    help="""Sample BAM file(s) to test for target coverage.""")
     AP.add_argument('-o', '--output', metavar='FILENAME',
                     help="""The inferred targets, in BED format.""")
     AP.add_argument('-c', '--coverage', metavar='FILENAME',
                     help="""Filename to output average coverage depths in .cnn
                     format.""")
-    AP.add_argument('-p', '--processes',
-                    metavar='CPU', nargs='?', type=int, const=0, default=1,
+    AP.add_argument('-p', '--processes', metavar='CPU',
+                    nargs='?', type=int, const=0, default=1,
                     help="""Number of subprocesses to segment in parallel.
                     If given without an argument, use the maximum number
                     of available CPUs. [Default: use 1 process]""")
 
     AP_x = AP.add_mutually_exclusive_group(required=True)
     AP_x.add_argument('-t', '--targets', metavar='TARGET_BED',
-                      help="""Potentially targeted genomic regions, e.g. all
-                      possible exons for the reference genome. (Faster
-                      method)""")
+                    help="""Potentially targeted genomic regions, e.g. all known
+                    exons in the reference genome, in BED format. Each of these
+                    regions will be tested as a whole for enrichment. (Faster
+                    method)""")
     AP_x.add_argument('-a', '--access', metavar='ACCESS_BED',
-                      # default="../data/access-5k-mappable.grch37.bed",
-                      help="""Sequencing-accessible genomic regions, or exons to
-                      use as possible targets, e.g. output of refFlat2bed.py.
-                      (Slower method)""")
+                    # default="../data/access-5k-mappable.grch37.bed",
+                    help="""Sequencing-accessible genomic regions (e.g. from
+                    'cnvkit.py access'), or known genic regions in the reference
+                    genome, in BED format. All bases will be tested for
+                    enrichment. (Slower method)""")
 
-    AP.add_argument('-d', '--min-depth', metavar='DEPTH', type=int, default=5,
-                    help="Minimum sequencing read depth to accept as captured.")
-    # Just for --access
-    AP.add_argument('-g', '--min-gap', metavar='GAP_SIZE', type=int, default=25,
-                    help="Merge regions separated by gaps smaller than this.")
-    AP.add_argument('-l', '--min-length',
-                    metavar='TARGET_SIZE', type=int, default=50,
-                    help="Minimum region length to accept as captured.")
+    AP_target = AP.add_argument_group("With --targets only")
+    AP_target.add_argument('-d', '--min-depth', metavar='DEPTH',
+                    type=int, default=5,
+                    help="""Minimum sequencing read depth to accept as captured.
+                    [Default: %(default)s]""")
+
+    AP_access = AP.add_argument_group("With --access only")
+    AP_access.add_argument('-g', '--min-gap', metavar='GAP_SIZE',
+                    type=int, default=25,
+                    help="""Merge regions separated by gaps smaller than this.
+                    [Default: %(default)s]""")
+    AP_access.add_argument('-l', '--min-length', metavar='TARGET_SIZE',
+                    type=int, default=50,
+                    help="""Minimum region length to accept as captured.
+                    [Default: %(default)s]""")
 
     args = AP.parse_args()
 
