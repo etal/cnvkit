@@ -214,6 +214,9 @@ otherwise be guessed automatically.
 This visual correction is done by default, but can be disabled with the option
 ``--no-shift-xy``.
 
+To get the same results in text form, i.e. a table of the amplified and deleted
+genes in a sample, use the :ref:`genemetrics` command.
+
 Reducing cluttered gene labels
 ``````````````````````````````
 
