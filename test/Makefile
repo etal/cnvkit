@@ -18,7 +18,8 @@ picard_targets= build/reference-picard.cnn $(picard_cnrs) $(picard_segs) \
 	     all-scatters.pdf all-diagrams.pdf heatmap-picard.pdf \
 	     p2-9_2-breaks.txt p2-9_2-genemetrics.txt gender-picard.txt \
 	     p2-all.cdt p2-all-jtv.txt p2-all.seg p2-9_2.nexus p2-9_2.nexus-ogt \
-	     p2-all.bed p2-9_2.vcf p2-9_2.theta2.input p2-9_2-segmetrics.cns
+	     p2-all.bed p2-9_2.vcf p2-9_2.theta2.input \
+	     p2-9_2-segmetrics.cns p2-5_5-segmetrics.cns
 
 # ------------------------------------------------------------------------------
 #  Action!
@@ -129,6 +130,11 @@ p2-9_2-segmetrics.cns: build/p2-9_2.cns build/p2-9_2.cnr
 		--mean --median --mode \
 		--stdev --mad --mse --iqr --bivar \
 		--ci --pi --sem
+
+p2-5_5-segmetrics.cns: build/p2-5_5.cns build/p2-5_5.cnr
+	$(cnvkit) segmetrics -s $^ -o $@ \
+		--ci -b 50 -a 0.5
+
 
 # == Export to other formats
 

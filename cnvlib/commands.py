@@ -1065,6 +1065,7 @@ def _cmd_genemetrics(args):
     segarr = read_cna(args.segment) if args.segment else None
     is_sample_female = verify_sample_sex(cnarr, args.sample_sex,
                                          args.male_reference)
+    # TODO use the stats args
     table = do_genemetrics(cnarr, segarr, args.threshold, args.min_probes,
                            args.drop_low_coverage, args.male_reference,
                            is_sample_female)
@@ -1145,6 +1146,8 @@ P_genemetrics_stats.add_argument('-a', '--alpha', type=float, default=.05,
 P_genemetrics_stats.add_argument('-b', '--bootstrap', type=int, default=100,
         help="""Number of bootstrap iterations to estimate confidence interval;
                 use with --ci. [Default: %(default)d]""")
+P_genemetrics_stats.set_defaults(location_stats=[], spread_stats=[],
+                                 interval_stats=[])
 P_genemetrics.set_defaults(func=_cmd_genemetrics)
 
 # Shims
@@ -1254,9 +1257,9 @@ def _cmd_segmetrics(args):
     if args.drop_low_coverage:
         cnarr = cnarr.drop_low_coverage()
     segarr = read_cna(args.segments)
-    segarr = do_segmetrics(cnarr, segarr,
-                           args.location_stats, args.spread_stats,
-                           args.interval_stats, args.alpha, args.bootstrap)
+    segarr = do_segmetrics(cnarr, segarr, args.location_stats,
+                           args.spread_stats, args.interval_stats,
+                           args.alpha, args.bootstrap)
     tabio.write(segarr, args.output or segarr.sample_id + ".segmetrics.cns")
 
 
@@ -1315,6 +1318,8 @@ P_segmetrics_stats.add_argument('-a', '--alpha', type=float, default=.05,
 P_segmetrics_stats.add_argument('-b', '--bootstrap', type=int, default=100,
         help="""Number of bootstrap iterations to estimate confidence interval;
                 use with --ci. [Default: %(default)d]""")
+P_segmetrics_stats.set_defaults(location_stats=[], spread_stats=[],
+                                interval_stats=[])
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
 
 
