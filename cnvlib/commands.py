@@ -1470,7 +1470,7 @@ P_import_rna.add_argument('-g', '--gene-resource',
 P_import_rna.add_argument('-c', '--correlations', metavar="FILE",
         help="""Correlation of each gene's copy number with
         expression. Output of cnv_expression_correlate.py.""")
-P_import_rna.add_argument('-n', '--normal', nargs='+',
+P_import_rna.add_argument('-n', '--normal', nargs='+', default=[],
         help="""Normal samples (same format as `gene_counts`) to be used as a
                 control to when normalizing and re-centering gene read depth
                 ratios. All filenames following this option will be used.""")

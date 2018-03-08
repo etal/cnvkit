@@ -16,7 +16,7 @@ def do_import_rna(gene_count_fnames, in_format, gene_resource_fname,
     samples, but other sources should be fine, too.
     """
     # Deduplicate and ensure all normals are included in the analysis
-    gene_count_fnames = sorted(set(gene_count_fnames) + set(normal_fnames))
+    gene_count_fnames = sorted(set(list(gene_count_fnames) + list(normal_fnames)))
 
     if in_format == 'rsem':
         sample_counts, tx_lengths = aggregate_rsem(gene_count_fnames)
