@@ -1176,8 +1176,8 @@ def do_sex(cnarrs, is_male_reference):
         is_xy, stats = cna.compare_sex_chromosomes(is_male_reference)
         return (cna.meta["filename"] or cna.sample_id,
                 "Male" if is_xy else "Female",
-                strsign(stats['chrx_ratio']),
-                strsign(stats['chry_ratio']))
+                strsign(stats['chrx_ratio']) if stats else "NA",
+                strsign(stats['chry_ratio']) if stats else "NA")
 
     rows = (guess_and_format(cna) for cna in cnarrs)
     columns = ["sample", "sex", "X_logratio", "Y_logratio"]
