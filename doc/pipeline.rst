@@ -51,7 +51,7 @@ complete sooner.
 
 The pipeline executed by the ``batch`` command is equivalent to::
 
-    cnvkit.py access baits.bed --fasta hg19.fa -o access.hg19.bed
+    cnvkit.py access hg19.fa -o access.hg19.bed
     cnvkit.py autobin *.bam -t baits.bed -g access.hg19.bed [--annotate refFlat.txt --short-names]
 
     # For each sample...
