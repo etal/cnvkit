@@ -1,8 +1,6 @@
 CNVkit: Genome-wide copy number from high-throughput sequencing
 ===============================================================
 
-:Author: Eric Talevich
-:Contact: eric.talevich@ucsf.edu
 :Source code: `GitHub <https://github.com/etal/cnvkit>`_
 :License: `Apache License 2.0 <http://www.apache.org/licenses/LICENSE-2.0>`_
 :Packages: `PyPI <https://pypi.python.org/pypi/CNVkit>`_ | `Docker <https://hub.docker.com/r/etal/cnvkit/>`_ | `Galaxy <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ | `DNAnexus <https://platform.dnanexus.com/app/cnvkit_batch>`_
