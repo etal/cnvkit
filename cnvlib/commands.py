@@ -1440,7 +1440,7 @@ def _cmd_import_rna(args):
     """Convert a cohort of per-gene log2 ratios to CNVkit .cnr format."""
     all_data, cnrs = import_rna.do_import_rna(
         args.gene_counts, args.format, args.gene_resource, args.correlations,
-        args.normal)
+        args.normal, args.do_gc, args.do_txlen)
     logging.info("Writing output files")
     if args.output:
         all_data.to_csv(args.output, sep='\t', index=True)
@@ -1480,6 +1480,14 @@ P_import_rna.add_argument('-d', '--output-dir',
                 sample. [Default: %(default)s]""")
 P_import_rna.add_argument('-o', '--output', metavar="FILE",
         help="Output file name (summary table).")
+
+P_import_rna_bias = P_import_rna.add_argument_group(
+    "To disable specific automatic bias corrections")
+P_import_rna_bias.add_argument('--no-gc', dest='do_gc', action='store_false',
+        help="Skip GC correction.")
+P_import_rna_bias.add_argument('--no-txlen', dest='do_txlen', action='store_false',
+        help="Skip transcript length correction.")
+
 P_import_rna.set_defaults(func=_cmd_import_rna)
 
 

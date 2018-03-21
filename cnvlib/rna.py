@@ -362,7 +362,7 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info,
         yield cnr
 
 
-def correct_cnr(cnr):
+def correct_cnr(cnr, do_gc, do_txlen):
     """Apply bias corrections & smoothing.
 
     - Biases: 'gc', 'length'
@@ -370,9 +370,10 @@ def correct_cnr(cnr):
     """
     cnr.center_all()
     # Biases, similar to stock CNVkit
-    if 'gc' in cnr:
-        cnr = center_by_window(cnr, .1, cnr['gc'])
-    if 'tx_length' in cnr:
-        cnr = center_by_window(cnr, .1, cnr['tx_length'])
-    cnr.center_all()
+    if any((do_gc, do_txlen)):
+        if do_gc and 'gc' in cnr:
+            cnr = center_by_window(cnr, .1, cnr['gc'])
+        if do_txlen and 'tx_length' in cnr:
+            cnr = center_by_window(cnr, .1, cnr['tx_length'])
+        cnr.center_all()
     return cnr
