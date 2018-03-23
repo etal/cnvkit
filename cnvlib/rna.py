@@ -4,9 +4,7 @@ Process per-gene expression levels, or the equivalent, by cohort.
 """
 from __future__ import absolute_import, division, print_function
 from builtins import zip
-
 import logging
-import sys
 
 import numpy as np
 import pandas as pd
@@ -14,8 +12,7 @@ from scipy.stats import gmean
 
 from .cnary import CopyNumArray as CNA
 from .fix import center_by_window
-# from .descriptives import biweight_midvariance
-# from .params import NULL_LOG2_COVERAGE
+
 
 NULL_LOG2_COVERAGE = -5
 
@@ -37,10 +34,10 @@ def filter_probes(sample_counts):
     For the purposes of copy number inference, these rows are best removed.
     """
     gene_medians = sample_counts.median(axis=1)
-    ## Make sure the gene has detectable transcript in at least half of samples
+    # Make sure the gene has detectable transcript in at least half of samples
     is_mostly_transcribed = (gene_medians >= 1.0)
-    print("Dropping", (~is_mostly_transcribed).sum(), "/",
-          len(is_mostly_transcribed), "rarely expressed genes from input samples")
+    logging.info("Dropping %d / %d rarely expressed genes from input samples",
+                 (~is_mostly_transcribed).sum(), len(is_mostly_transcribed))
     return sample_counts[is_mostly_transcribed]
 
 
@@ -74,8 +71,7 @@ def load_gene_info(gene_resource, corr_fname, default_r=.1):
                                            'tx_support': tsl2int,
                                            'gc': lambda x: float(x)/100})
                  .sort_values('gene_id'))
-    print("Loaded", gene_resource, "with shape:", gene_info.shape,
-          file=sys.stderr)
+    logging.info("Loaded %s with shape: %s", gene_resource, gene_info.shape)
 
     if corr_fname:
         corr_table = load_cnv_expression_corr(corr_fname)
@@ -85,10 +81,21 @@ def load_gene_info(gene_resource, corr_fname, default_r=.1):
             unique_idx = gi_corr.groupby('gene_id').apply(dedupe_ens_hugo)
             gi_corr = gi_corr.loc[unique_idx]
 
+        # DBG verify that the tables were aligned correctly
+        #  for colname in ('pearson_r', 'spearman_r', 'kendall_t'):
+        #      print("In column", colname, "length", len(gi_corr),
+        #            ", have", gi_corr[colname].count(), "not-NA,",
+        #            (gi_corr[colname] > 0.1).sum(), ">0.1",
+        #            ", max value", np.nanmax(gi_corr[colname]))
+
         if not gene_info['entrez_id'].is_unique:
             # Treat untraceable entrez_id duplicates (scarce at this point, ~15)
             # as unknown correlation, i.e. default, as if not in TCGA
-            gi_corr.loc[tuple(locate_entrez_dupes(gi_corr)),
+            entrez_dupes_idx = tuple(locate_entrez_dupes(gi_corr))
+            logging.info("Resetting %d ambiguous genes' correlation "
+                         "coefficients to default %f",
+                         len(entrez_dupes_idx), default_r)
+            gi_corr.loc[entrez_dupes_idx,
                         ('pearson_r', 'spearman_r', 'kendall_t')] = default_r
 
         # Genes w/o TCGA info get default correlation 0.1 (= .5*corr.median())
@@ -102,7 +109,7 @@ def load_gene_info(gene_resource, corr_fname, default_r=.1):
         unique_idx = gene_info.groupby('gene_id').apply(dedupe_ens_no_hugo)
         gene_info = gene_info.loc[unique_idx]
 
-    print("Trimmed gene info table to shape:", gene_info.shape)
+    logging.info("Trimmed gene info table to shape: %s", gene_info.shape)
     assert gene_info['gene_id'].is_unique
     gene_info['entrez_id'] = gene_info['entrez_id'].fillna(0).astype('int')
     return gene_info.set_index('gene_id')
@@ -110,9 +117,9 @@ def load_gene_info(gene_resource, corr_fname, default_r=.1):
 
 def load_cnv_expression_corr(fname):
     shared_key = 'Entrez_Gene_Id'
-    table = (pd.read_table(fname, dtype={shared_key: str}, na_filter=False)
+    table = (pd.read_table(fname, dtype={shared_key: int}, na_filter=False)
              .set_index(shared_key))
-    print("Loaded", fname, "with shape:", table.shape, file=sys.stderr)
+    logging.info("Loaded %s with shape: %s", fname, table.shape)
     return table
 
 
@@ -242,8 +249,8 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths,
     Also calculate weights and add to gene_info as 'weight', along with
     transcript lengths as 'tx_length'.
     """
-    print("Dimensions: gene_info=%s, sample_counts=%s"
-          % (gene_info.shape, sample_counts.shape))
+    logging.debug("Dimensions: gene_info=%s, sample_counts=%s",
+                  gene_info.shape, sample_counts.shape)
     sc, gi = sample_counts.align(gene_info, join='inner', axis=0)
     gi = gi.sort_values(by=['chromosome', 'start'])
     sc = sc.loc[gi.index]
