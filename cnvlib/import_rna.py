@@ -10,7 +10,7 @@ from . import rna
 
 def do_import_rna(gene_count_fnames, in_format, gene_resource_fname,
                   correlations_fname=None, normal_fnames=(),
-                  do_gc=True, do_txlen=True):
+                  do_gc=True, do_txlen=True, max_log2=3):
     """Convert a cohort of per-gene read counts to CNVkit .cnr format.
 
     The expected data source is TCGA gene-level expression counts for individual
@@ -44,7 +44,7 @@ def do_import_rna(gene_count_fnames, in_format, gene_resource_fname,
     # CNVkit files have both absolute and log2-normalized read counts
     cnrs = rna.attach_gene_info_to_cnr(sample_counts, sample_data_log2,
                                        gene_info)
-    cnrs = (rna.correct_cnr(cnr, do_gc, do_txlen) for cnr in cnrs)
+    cnrs = (rna.correct_cnr(cnr, do_gc, do_txlen, max_log2) for cnr in cnrs)
     return all_data, cnrs
 
 

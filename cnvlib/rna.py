@@ -362,7 +362,7 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info,
         yield cnr
 
 
-def correct_cnr(cnr, do_gc, do_txlen):
+def correct_cnr(cnr, do_gc, do_txlen, max_log2):
     """Apply bias corrections & smoothing.
 
     - Biases: 'gc', 'length'
@@ -376,4 +376,6 @@ def correct_cnr(cnr, do_gc, do_txlen):
         if do_txlen and 'tx_length' in cnr:
             cnr = center_by_window(cnr, .1, cnr['tx_length'])
         cnr.center_all()
+    if max_log2:
+        cnr[cnr['log2'] > max_log2, 'log2'] = max_log2
     return cnr

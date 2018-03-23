@@ -1440,7 +1440,7 @@ def _cmd_import_rna(args):
     """Convert a cohort of per-gene log2 ratios to CNVkit .cnr format."""
     all_data, cnrs = import_rna.do_import_rna(
         args.gene_counts, args.format, args.gene_resource, args.correlations,
-        args.normal, args.do_gc, args.do_txlen)
+        args.normal, args.do_gc, args.do_txlen, args.max_log2)
     logging.info("Writing output files")
     if args.output:
         all_data.to_csv(args.output, sep='\t', index=True)
@@ -1469,7 +1469,10 @@ P_import_rna.add_argument('-g', '--gene-resource',
         help="Location of gene info table from Ensembl BioMart.")
 P_import_rna.add_argument('-c', '--correlations', metavar="FILE",
         help="""Correlation of each gene's copy number with
-        expression. Output of cnv_expression_correlate.py.""")
+                expression. Output of cnv_expression_correlate.py.""")
+P_import_rna.add_argument('--max-log2', metavar="FLOAT", default=3.0,
+        help="""Maximum log2 value in output. Observed values above this limit
+                will be replaced with this value.""")
 P_import_rna.add_argument('-n', '--normal', nargs='+', default=[],
         help="""Normal samples (same format as `gene_counts`) to be used as a
                 control to when normalizing and re-centering gene read depth
