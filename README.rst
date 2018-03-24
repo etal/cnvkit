@@ -78,11 +78,20 @@ packages.
 
 This approach is preferred on Mac OS X, and is a solid choice on Linux, too.
 
-To download and install CNVkit and its Python dependencies::
+To download and install CNVkit and its Python dependencies in a clean
+environment::
 
+    # Configure the sources where conda will find packages
     conda config --add channels defaults
     conda config --add channels conda-forge
     conda config --add channels bioconda
+    # Install CNVkit in a new environment named "cnvkit"
+    conda create -n cnvkit cnvkit
+    # Activate the environment with CNVkit installed:
+    source activate cnvkit
+
+Or, in an existing environment::
+
     conda install cnvkit
 
 
