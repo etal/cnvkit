@@ -401,20 +401,25 @@ P_autobin.add_argument('-g', '--access', metavar="FILENAME",
 P_autobin.add_argument('-t', '--targets',
         help="""Potentially targeted genomic regions, e.g. all possible exons
                 for the reference genome. Format: BED, interval list, etc.""")
-P_autobin.add_argument('-b', '--bp-per-bin', type=float, default=100000.,
+P_autobin.add_argument('-b', '--bp-per-bin',
+        type=float, default=100000.,
         help="""Desired average number of sequencing read bases mapped to each
                 bin. [Default: %(default)s]""")
 
-P_autobin.add_argument('--target-max-size', type=int, default=20000,
-        help="Maximum size of target bins.")
-P_autobin.add_argument('--target-min-size', type=int, default=20,
-        help="Minimum size of target bins.")
-P_autobin.add_argument('--antitarget-max-size', type=int, default=500000,
-        help="Maximum size of antitarget bins.")
-P_autobin.add_argument('--antitarget-min-size', type=int, default=500,
-        help="Minimum size of antitarget bins.")
+P_autobin.add_argument('--target-max-size', metavar="BASES",
+        type=int, default=20000,
+        help="Maximum size of target bins. [Default: %(default)s]")
+P_autobin.add_argument('--target-min-size', metavar="BASES",
+        type=int, default=20,
+        help="Minimum size of target bins. [Default: %(default)s]")
+P_autobin.add_argument('--antitarget-max-size', metavar="BASES",
+        type=int, default=500000,
+        help="Maximum size of antitarget bins. [Default: %(default)s]")
+P_autobin.add_argument('--antitarget-min-size', metavar="BASES",
+        type=int, default=500,
+        help="Minimum size of antitarget bins. [Default: %(default)s]")
 
-P_autobin.add_argument('--annotate',
+P_autobin.add_argument('--annotate', metavar="FILENAME",
         help="""Use gene models from this file to assign names to the target
                 regions. Format: UCSC refFlat.txt or ensFlat.txt file
                 (preferred), or BED, interval list, GFF, or similar.""")
@@ -701,7 +706,8 @@ def _cmd_call(args):
         logging.info("Shifting log2 values by %f", -args.center_at)
         cnarr['log2'] -= args.center_at
     elif args.center:
-        cnarr.center_all(args.center, verbose=True)
+        cnarr.center_all(args.center, skip_low=args.drop_low_coverage,
+                verbose=True)
 
     varr = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                          args.min_variant_depth, args.zygosity_freq)
@@ -747,6 +753,9 @@ P_call.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_call.add_argument("--purity", type=float,
         help="Estimated tumor cell fraction, a.k.a. purity or cellularity.")
+P_call.add_argument("--drop-low-coverage", action='store_true',
+        help="""Drop very-low-coverage bins before segmentation to avoid
+                false-positive deletions in poor-quality tumor samples.""")
 P_call.add_argument('-x', '--sample-sex', '-g', '--gender', dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the sample's chromosomal sex as male or female.
