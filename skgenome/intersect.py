@@ -73,6 +73,30 @@ def into_ranges(source, dest, src_col, default, summary_func):
 def iter_ranges(table, chrom, starts, ends, mode):
     """Iterate through sub-ranges."""
     assert mode in ('inner', 'outer', 'trim')
+    if chrom:
+        assert isinstance(chrom, basestring)  # ENH: accept array?
+        try:
+            table = table[table['chromosome'] == chrom]
+        except KeyError:
+            raise KeyError("Chromosome %s is not in this probe set" % chrom)
+
+    for region_idx, start_val, end_val in idx_ranges(table, None, starts, ends,
+            'inner' if mode == 'inner' else 'outer'):
+        subtable = table.iloc[region_idx]
+        if mode == 'trim':
+            subtable = subtable.copy()
+            # Update 5' endpoints to the boundary
+            if start_val:
+                subtable.start = subtable.start.clip_lower(start_val)
+            # Update 3' endpoints to the boundary
+            if end_val:
+                subtable.end = subtable.end.clip_upper(end_val)
+        yield subtable
+
+
+def idx_ranges(table, chrom, starts, ends, mode):
+    """Iterate through sub-ranges."""
+    assert mode in ('inner', 'outer')
     # Optional if we've already subsetted by chromosome (not checked!)
     if chrom:
         assert isinstance(chrom, basestring)  # ENH: accept array?
@@ -93,16 +117,7 @@ def iter_ranges(table, chrom, starts, ends, mode):
     else:
         irange_func = _irange_simple
     for region_idx, start_val, end_val in irange_func(table, starts, ends, mode):
-        subtable = table.iloc[region_idx]
-        if mode == 'trim':
-            subtable = subtable.copy()
-            # Update 5' endpoints to the boundary
-            if start_val:
-                subtable.start = subtable.start.clip_lower(start_val)
-            # Update 3' endpoints to the boundary
-            if end_val:
-                subtable.end = subtable.end.clip_upper(end_val)
-        yield subtable
+        yield region_idx, start_val, end_val
 
 
 def _irange_simple(table, starts, ends, mode):
