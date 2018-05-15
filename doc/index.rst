@@ -98,7 +98,7 @@ Who else is using CNVkit?
 -------------------------
 
 `Google Scholar
-<https://scholar.google.com/scholar?cites=4696125388809243311&as_sdt=2005&sciodt=0,5&hl=en>`_
+<https://scholar.google.com/scholar?cites=206689808041666451&as_sdt=2005&sciodt=0,5&hl=en>`_
 lists some of the studies where CNVkit has been used by other researchers.
 We'd like to highlight:
 
