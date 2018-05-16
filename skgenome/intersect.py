@@ -106,18 +106,18 @@ def idx_ranges(table, chrom, starts, ends, mode):
             raise KeyError("Chromosome %s is not in this probe set" % chrom)
     # Edge cases
     if not len(table) or (starts is None and ends is None):
-        yield table
-        raise StopIteration
-    # Don't be fooled by nested bins
-    if ((ends is not None and len(ends)) and
-        (starts is not None and len(starts))
-       ) and not _monotonic(table.end):
-        # At least one bin is fully nested -- account for it
-        irange_func = _irange_nested
+        yield table.index, None, None
     else:
-        irange_func = _irange_simple
-    for region_idx, start_val, end_val in irange_func(table, starts, ends, mode):
-        yield region_idx, start_val, end_val
+        # Don't be fooled by nested bins
+        if ((ends is not None and len(ends)) and
+            (starts is not None and len(starts))
+        ) and not _monotonic(table.end):
+            # At least one bin is fully nested -- account for it
+            irange_func = _irange_nested
+        else:
+            irange_func = _irange_simple
+        for region_idx, start_val, end_val in irange_func(table, starts, ends, mode):
+            yield region_idx, start_val, end_val
 
 
 def _irange_simple(table, starts, ends, mode):
