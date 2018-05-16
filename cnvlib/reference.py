@@ -273,28 +273,34 @@ def warn_bad_bins(cnarr, max_name_width=50):
     if len(fg_bad_bins) > 0:
         bad_pct = (100 * len(fg_bad_bins)
                    / sum(~cnarr['gene'].isin(params.ANTITARGET_ALIASES)))
-        logging.info("Targets: %d (%s) bins failed filters:",
-                     len(fg_bad_bins), "%.4f" % bad_pct + '%')
-        gene_cols = min(max_name_width, max(map(len, fg_bad_bins['gene'])))
-        labels = fg_bad_bins.labels()
-        chrom_cols = max(labels.apply(len))
-        last_gene = None
-        for label, probe in zip(labels, fg_bad_bins):
-            if probe.gene == last_gene:
-                gene = '  "'
-            else:
-                gene = probe.gene
-                last_gene = gene
-            if len(gene) > max_name_width:
-                gene = gene[:max_name_width-3] + '...'
-            if 'rmask' in cnarr:
-                logging.info("  %s  %s  log2=%.3f  spread=%.3f  rmask=%.3f",
-                             gene.ljust(gene_cols), label.ljust(chrom_cols),
-                             probe.log2, probe.spread, probe.rmask)
-            else:
-                logging.info("  %s  %s  log2=%.3f  spread=%.3f",
-                             gene.ljust(gene_cols), label.ljust(chrom_cols),
-                             probe.log2, probe.spread)
+        logging.info("Targets: %d (%s) bins failed filters "
+                     "(log2 < %s, log2 > %s, spread > %s)",
+                     len(fg_bad_bins),
+                     "%.4f" % bad_pct + '%',
+                     params.MIN_REF_COVERAGE,
+                     -params.MIN_REF_COVERAGE,
+                     params.MAX_REF_SPREAD)
+        if len(fg_bad_bins) < 500:
+            gene_cols = min(max_name_width, max(map(len, fg_bad_bins['gene'])))
+            labels = fg_bad_bins.labels()
+            chrom_cols = max(labels.apply(len))
+            last_gene = None
+            for label, probe in zip(labels, fg_bad_bins):
+                if probe.gene == last_gene:
+                    gene = '  "'
+                else:
+                    gene = probe.gene
+                    last_gene = gene
+                if len(gene) > max_name_width:
+                    gene = gene[:max_name_width-3] + '...'
+                if 'rmask' in cnarr:
+                    logging.info("  %s  %s  log2=%.3f  spread=%.3f  rmask=%.3f",
+                                gene.ljust(gene_cols), label.ljust(chrom_cols),
+                                probe.log2, probe.spread, probe.rmask)
+                else:
+                    logging.info("  %s  %s  log2=%.3f  spread=%.3f",
+                                gene.ljust(gene_cols), label.ljust(chrom_cols),
+                                probe.log2, probe.spread)
 
     # Count the number of BG bins dropped, too (names are all "Antitarget")
     bg_bad_bins = bad_bins[~fg_index]
