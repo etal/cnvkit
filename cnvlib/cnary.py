@@ -276,7 +276,7 @@ class CopyNumArray(GenomicArray):
                          self._chr_y_label, stats['chry_ratio'],
                          stats['chrx_male_lr'], stats['chry_male_lr'],
                          stats['chrx_male_lr'] * stats['chry_male_lr'],
-                         ('female', 'male')[is_xy])
+                         'male' if is_xy else 'female')
         return ~is_xy
 
     def compare_sex_chromosomes(self, male_reference=False, skip_low=False):
