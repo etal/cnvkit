@@ -19,10 +19,11 @@ requirements:
     - atlas # [not osx]
     - biopython >=1.62
     - future >=0.15.2
-    - futures >=3.0 # [py2k]
+    - futures >=3.0 # [py27]
     - matplotlib >=1.3.1
     - numpy >=1.9
     - pandas >=0.18.1
+    - python-dateutil >=2.5.0
     - pyfaidx >=0.4.7
     - pysam >=0.10.0
     - reportlab >=3.0
