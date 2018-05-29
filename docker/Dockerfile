@@ -1,9 +1,9 @@
-FROM ubuntu:17.10
+FROM ubuntu:18.04
 MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y r-base-core
-RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('DNAcopy', 'cghFLasso')"
+RUN Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite(c('DNAcopy', 'cghFLasso'))"
 
 RUN apt-get install -y \
     liblzma-dev \
