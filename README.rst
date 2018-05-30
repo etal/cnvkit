@@ -152,7 +152,7 @@ Then install the rest of CNVkit's dependencies::
 
 Alternatively, you can use `Homebrew <http://brew.sh/>`_ to install an
 up-to-date Python (e.g. ``brew install python``) and as many of the Python
-packages as possible (primarily NumPy, SciPy, matplotlib and pandas).
+packages as possible (primarily NumPy and SciPy; ideally matplotlib and pandas).
 Then, proceed with pip::
 
     pip install numpy scipy pandas matplotlib reportlab biopython pyfaidx pysam pyvcf
