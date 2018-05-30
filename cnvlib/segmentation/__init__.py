@@ -28,7 +28,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         variants = variants.heterozygous()
     if not threshold:
         threshold = {'cbs': 0.0001,
-                     'flasso': 0.005,
+                     'flasso': 0.0001,
                      'haar': 0.001,
                     }.get(method)
     msg = "Segmenting with method " + repr(method)
