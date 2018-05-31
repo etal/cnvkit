@@ -163,7 +163,6 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
             else:
                 segarr['weight'] = 1.0
             segarr = squash_by_groups(segarr, segarr['log2'], by_arm=True)
-        segarr = repair_segments(segarr, cnarr)
 
     else:
         raise ValueError("Unknown method %r" % method)
@@ -176,8 +175,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         segarr = segarr.as_dataframe(pd.concat(newsegs))
         segarr['baf'] = variants.baf_by_ranges(segarr)
 
-    segarr['gene'], segarr['weight'], segarr['depth'] = \
-            transfer_fields(segarr, cnarr)
+    segarr = transfer_fields(segarr, cnarr)
     if save_dataframe:
         return segarr, seg_out
     else:
@@ -214,10 +212,46 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     Segment gene name is the comma-separated list of bin gene names. Segment
     weight is the sum of bin weights, and depth is the (weighted) mean of bin
     depths.
-    """
-    if not len(cnarr):
-        return [], [], []
 
+    Also: Post-process segmentation output.
+
+    1. Ensure every chromosome has at least one segment.
+    2. Ensure first and last segment ends match 1st/last bin ends
+       (but keep log2 as-is).
+
+    """
+    def make_null_segment(chrom, orig_start, orig_end):
+        """Closes over 'segments'."""
+        vals = {'chromosome': chrom,
+                'start': orig_start,
+                'end': orig_end,
+                'gene': '-',
+                'depth': 0.0,
+                'log2': 0.0,
+                'probes': 0.0,
+                'weight': 0.0,
+               }
+        row_vals = tuple(vals[c] for c in segments.data.columns)
+        return row_vals
+
+    if not len(cnarr):
+        # This Should Never Happen (TM)
+        # raise RuntimeError("No bins for:\n" + str(segments.data))
+        logging.warn("No bins for:\n%s", segments.data)
+        return segments
+
+    # Adjust segment endpoints to cover the chromosome arm's original bins
+    # (Stretch first and last segment endpoints to match first/last bins)
+    bins_chrom = cnarr.chromosome.iat[0]
+    bins_start = cnarr.start.iat[0]
+    bins_end = cnarr.end.iat[-1]
+    if not len(segments):
+        # All bins in this chromosome arm were dropped: make a dummy segment
+        return make_null_segment(bins_chrom, bins_start, bins_end)
+    segments.start.iat[0] = bins_start
+    segments.end.iat[-1] = bins_end
+
+    # Aggregate segment depths, weights, gene names
     ignore += params.ANTITARGET_ALIASES
     if 'weight' not in cnarr:
         cnarr['weight'] = 1
@@ -235,44 +269,8 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
         subgenes = [g for g in pd.unique(subprobes['gene']) if g not in ignore]
         if subgenes:
             seggenes[i] = ",".join(subgenes)
-    return seggenes, segweights, segdepths
-
-
-# TODO/ENH combine with transfer_fields
-# Recalculate segment means, weights, depths here instead of in R
-def repair_segments(segments, orig_probes):
-    """Post-process segmentation output.
-
-    1. Ensure every chromosome has at least one segment.
-    2. Ensure first and last segment ends match 1st/last bin ends
-       (but keep log2 as-is).
-    """
-    def make_null_segment(chrom, orig_start, orig_end):
-        vals = {'chromosome': chrom,
-                'start': orig_start,
-                'end': orig_end,
-                'gene': '-',
-                'depth': 0.0,
-                'log2': 0.0,
-                'probes': 0.0,
-                'weight': 0.0,
-               }
-        row_vals = tuple(vals[c] for c in segments.data.columns)
-        return row_vals
-
-    # Adjust segment endpoints on each chromosome
-    segments = segments.copy()
-    extra_segments = []
-    for chrom, subprobes in orig_probes.by_chromosome():
-        chr_seg_idx = np.where(segments.chromosome == chrom)[0]
-        orig_start = subprobes[0, 'start']
-        orig_end =  subprobes[len(subprobes)-1, 'end']
-        if len(chr_seg_idx):
-            segments[chr_seg_idx[0], 'start'] = orig_start
-            segments[chr_seg_idx[-1], 'end'] = orig_end
-        else:
-            extra_segments.append(
-                make_null_segment(chrom, orig_start, orig_end))
-    if extra_segments:
-        segments.add(segments.as_rows(extra_segments))
+    segments.data = segments.data.assign(
+        gene=seggenes,
+        weight=segweights,
+        depth=segdepths)
     return segments
