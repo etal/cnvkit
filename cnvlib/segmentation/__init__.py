@@ -1,6 +1,6 @@
 """Segmentation of copy number values."""
 from __future__ import absolute_import, division, print_function
-from builtins import map
+from builtins import map, zip
 
 import locale
 import logging
@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 from Bio._py3k import StringIO
 from skgenome import tabio
+from skgenome.intersect import idx_ranges
 
 from .. import core, parallel, params, smoothing, vary
 from ..cnary import CopyNumArray as CNA
@@ -29,7 +30,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
     if not threshold:
         threshold = {'cbs': 0.0001,
                      'flasso': 0.0001,
-                     'haar': 0.001,
+                     'haar': 0.0001,
                     }.get(method)
     msg = "Segmenting with method " + repr(method)
     if threshold is not None:
@@ -252,25 +253,46 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     segments.end.iat[-1] = bins_end
 
     # Aggregate segment depths, weights, gene names
+    # ENH refactor so that np/CNA.data access is encapsulated in skgenome
     ignore += params.ANTITARGET_ALIASES
-    if 'weight' not in cnarr:
-        cnarr['weight'] = 1
-    if 'depth' not in cnarr:
-        cnarr['depth'] = np.exp2(cnarr['log2'])
-    seggenes = ['-'] * len(segments)
-    segweights = np.zeros(len(segments))
-    segdepths = np.zeros(len(segments))
-    for i, (_seg, subprobes) in enumerate(cnarr.by_ranges(segments)):
-        if not len(subprobes):
+    assert bins_chrom == segments.chromosome.iat[0]
+    cdata = cnarr.data.reset_index()
+    if 'depth' not in cdata.columns:
+        cdata['depth'] = np.exp2(cnarr['log2'].values)
+    bin_genes = cdata['gene'].values
+    bin_weights = cdata['weight'].values if 'weight' in cdata.columns else None
+    bin_depths = cdata['depth'].values
+    seg_genes = ['-'] * len(segments)
+    seg_weights = np.zeros(len(segments))
+    seg_depths = np.zeros(len(segments))
+
+    for i, (bin_idx, _start, _end) in enumerate(
+            idx_ranges(cdata, None, segments.start, segments.end, 'outer')):
+        bin_count = len(cdata.iloc[bin_idx])
+        if not bin_count:
             continue
-        segweights[i] = subprobes['weight'].sum()
-        if subprobes['weight'].sum() > 0:
-            segdepths[i] = np.average(subprobes['depth'], weights=subprobes['weight'])
-        subgenes = [g for g in pd.unique(subprobes['gene']) if g not in ignore]
+
+        if bin_weights is not None:
+            seg_wt = bin_weights[bin_idx].sum()
+            if seg_wt > 0:
+                seg_dp = np.average(bin_depths[bin_idx],
+                                    weights=bin_weights[bin_idx])
+            else:
+                seg_dp = 0.0
+        else:
+            seg_wt = float(bin_count)
+            seg_dp = bin_depths[bin_idx].mean()
+        subgenes = [g for g in pd.unique(bin_genes[bin_idx]) if g not in ignore]
         if subgenes:
-            seggenes[i] = ",".join(subgenes)
+            seg_gn = ",".join(subgenes)
+        else:
+            seg_gn = '-'
+        seg_genes[i] = seg_gn
+        seg_weights[i] = seg_wt
+        seg_depths[i] = seg_dp
+
     segments.data = segments.data.assign(
-        gene=seggenes,
-        weight=segweights,
-        depth=segdepths)
+        gene=seg_genes,
+        weight=seg_weights,
+        depth=seg_depths)
     return segments
