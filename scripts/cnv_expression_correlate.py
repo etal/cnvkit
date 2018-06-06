@@ -51,11 +51,12 @@ def correlate_cnv_expression(cnv_fname, expression_fname):
         for cnv_row, expr_row in zip(c_nums.values, e_nums.values)])
 
     result = pd.DataFrame({
-        "hugo_gene": cnv_table['Hugo_Symbol'].fillna('').values,
         "kendall_t": tau,
         "pearson_r": r.values,
         "spearman_r": rho,
     }, index=cnv_table.index).clip_lower(0).fillna(0)
+    result.insert(0, 'hugo_gene',
+            cnv_table['Hugo_Symbol'].fillna('').values)
     return result
 
 
