@@ -32,13 +32,17 @@ def by_ranges(table, other, mode, keep_empty):
 
 
 def by_shared_chroms(table, other, keep_empty=True):
-    other_chroms = {c: o for c, o in other.groupby(['chromosome'], sort=False)}
-    for chrom, ctable in table.groupby(['chromosome'], sort=False):
-        if chrom in other_chroms:
-            otable = other_chroms[chrom]
-            yield chrom, ctable, otable
-        elif keep_empty:
-            yield chrom, ctable, None
+    if table['chromosome'].is_unique and other['chromosome'].is_unique:
+        yield table['chromosome'].iat[0], table, other
+        # yield None, table, other
+    else:
+        other_chroms = {c: o for c, o in other.groupby(['chromosome'], sort=False)}
+        for chrom, ctable in table.groupby(['chromosome'], sort=False):
+            if chrom in other_chroms:
+                otable = other_chroms[chrom]
+                yield chrom, ctable, otable
+            elif keep_empty:
+                yield chrom, ctable, None
 
 
 def into_ranges(source, dest, src_col, default, summary_func):
@@ -92,6 +96,17 @@ def iter_ranges(table, chrom, starts, ends, mode):
             if end_val:
                 subtable.end = subtable.end.clip_upper(end_val)
         yield subtable
+
+
+def iter_slices(table, other, mode, keep_empty):
+    for _chrom, tbl_chrom, otr_chrom in by_shared_chroms(table, other):
+        for slc, _s, _e in idx_ranges(tbl_chrom, None,
+                                      otr_chrom.start, otr_chrom.end, mode):
+            if not keep_empty:
+                bin_count = len(table.iloc[slc])
+                if not bin_count:
+                    continue
+            yield slc
 
 
 def idx_ranges(table, chrom, starts, ends, mode):

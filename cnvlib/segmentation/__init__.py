@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from Bio._py3k import StringIO
 from skgenome import tabio
-from skgenome.intersect import idx_ranges
+from skgenome.intersect import iter_slices
 
 from .. import core, parallel, params, smoothing, vary
 from ..cnary import CopyNumArray as CNA
@@ -266,12 +266,7 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     seg_weights = np.zeros(len(segments))
     seg_depths = np.zeros(len(segments))
 
-    for i, (bin_idx, _start, _end) in enumerate(
-            idx_ranges(cdata, None, segments.start, segments.end, 'outer')):
-        bin_count = len(cdata.iloc[bin_idx])
-        if not bin_count:
-            continue
-
+    for i, bin_idx in enumerate(iter_slices(cdata, segments.data, 'outer', False)):
         if bin_weights is not None:
             seg_wt = bin_weights[bin_idx].sum()
             if seg_wt > 0:
@@ -280,6 +275,7 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
             else:
                 seg_dp = 0.0
         else:
+            bin_count = len(cdata.iloc[bin_idx])
             seg_wt = float(bin_count)
             seg_dp = bin_depths[bin_idx].mean()
         subgenes = [g for g in pd.unique(bin_genes[bin_idx]) if g not in ignore]

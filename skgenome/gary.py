@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
-from .intersect import by_ranges, into_ranges, iter_ranges
+from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices
 from .merge import flatten, merge
 from .rangelabel import to_label
 from .subtract import subtract
@@ -415,7 +415,8 @@ class GenomicArray(object):
         Parameters
         ----------
         other : GenomicArray
-            Bins to
+            Ranges into which the overlapping values of `self` will be
+            summarized.
         column : string
             Column name in `self` to extract values from.
         default
@@ -448,6 +449,40 @@ class GenomicArray(object):
             return pd.Series(np.repeat(default, len(other)))
         return into_ranges(self.data, other.data, column, default, summary_func)
 
+    def iter_slices_of(self, other, column, mode='inner', keep_empty=True):
+        """Group rows by another GenomicArray's bin coordinate ranges.
+
+        For example, this can be used to group SNVs by CNV segments.
+
+        Bins in this array that fall outside the other array's bins are skipped.
+
+        Parameters
+        ----------
+        other : GenomicArray
+            Another GA instance.
+        column : string
+            Column name in `self` to extract values from.
+        mode : string
+            Determines what to do with bins that overlap a boundary of the
+            selection. Possible values are:
+
+            - ``inner``: Drop the bins on the selection boundary, don't emit them.
+            - ``outer``: Keep/emit those bins as they are.
+            - ``trim``: Emit those bins but alter their boundaries to match the
+              selection; the bin start or end position is replaced with the
+              selection boundary position.
+        keep_empty : bool
+            Whether to also yield `other` bins with no overlapping bins in
+            `self`, or to skip them when iterating.
+
+        Yields
+        ------
+        tuple
+            (other bin, GenomicArray of overlapping rows in self)
+        """
+        for slc in iter_slices(self.data, other.data, mode, keep_empty):
+            yield self.data.loc[slc, column]
+
     # Modification
 
     def add(self, other):
@@ -458,10 +493,9 @@ class GenomicArray(object):
         if not isinstance(other, self.__class__):
             raise ValueError("Argument (type %s) is not a %s instance"
                              % (type(other), self.__class__))
-        if not len(other.data):
-            return self.copy()
-        self.data = self.data.append(other.data, ignore_index=True)
-        self.sort()
+        if len(other.data):
+            self.data = self.data.append(other.data, ignore_index=True)
+            self.sort()
 
     def concat(self, others):
         """Concatenate several GenomicArrays, keeping this array's metadata.
