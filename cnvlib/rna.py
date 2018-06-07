@@ -306,8 +306,6 @@ def normalize_read_depths(sample_depths, normal_ids):
 
     Finally, convert to log2 ratios.
     """
-    # TODO use normal_ids as a control here
-    #   e.g. subtract their IQR after the loop?
     assert sample_depths.values.sum() > 0
     sample_depths = sample_depths.fillna(0)
     for _i in range(4):
@@ -320,6 +318,31 @@ def normalize_read_depths(sample_depths, normal_ids):
         # print("  round", _i, "grand mean:", sample_depths.values.mean(),
         #       ": sample-wise denom =", q3.mean(),
         #       ", gene-wise denom =", sm.mean())
+    if normal_ids:
+        # Use normal samples as a baseline for read depths
+        normal_ids = pd.Series(normal_ids)
+        if not normal_ids.isin(sample_depths.columns).all():
+            raise ValueError("Normal sample IDs not in samples: %s"
+                    % normal_ids.drop(sample_depths.columns, errors='ignore'))
+        normal_depths = sample_depths.loc[:, normal_ids]
+        use_median = True  # TODO - benchmark & pick one
+        if use_median:
+            # Simple approach: divide normalized (1=neutral) values by gene medians
+            normal_avg = normal_depths.median(axis=1)
+            sample_depths = sample_depths.divide(normal_avg, axis=0).clip_lower(0)
+        else:
+            # Alternate approach: divide their IQR
+            # At each gene, sample depths above the normal sample depth 75%ile
+            # are divided by the 75%ile, those below 25%ile are divided by
+            # 25%ile, and those in between are reset to neutral (=1.0)
+            n25, n75 = np.nanpercentile(normal_depths.values, [25, 75], axis=1)
+            below_idx = sample_depths.values < n25[:, np.newaxis]
+            above_idx = sample_depths.values > n75[:, np.newaxis]
+            factor = np.zeros_like(sample_depths.values)
+            factor[below_idx] = (below_idx / n25[:, np.newaxis])[below_idx]
+            factor[above_idx] = (above_idx / n75[:, np.newaxis])[above_idx]
+            sample_depths *= factor
+            sample_depths[~(below_idx | above_idx)] = 1.0
     # Finally, convert normalized read depths to log2 scale
     return safe_log2(sample_depths, NULL_LOG2_COVERAGE)
 
@@ -356,7 +379,7 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info,
     # Fill NA fields with the lowest finite value in the same row.
     # Only use NULL_LOG2_COVERAGE if all samples are NA / zero-depth.
     gene_minima = sample_data_log2.min(axis=1, skipna=True)
-    assert not gene_minima.hasnans
+    assert not gene_minima.hasnans, gene_minima.head()
     for (sample_id, sample_col), (_sid_log2, sample_log2) \
             in zip(sample_counts.iteritems(), sample_data_log2.iteritems()):
         tx_len = cnr_info.tx_length
