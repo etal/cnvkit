@@ -230,11 +230,9 @@ def combine_probes(filenames, fa_fname, is_male_reference, sexes, skip_low,
         logging.info("Loading target %s", fname)
         cnarrx = read_cna(fname)
         # Bin information should match across all files
-        if not (len(cnarr1) == len(cnarrx)
-                and (cnarr1.chromosome == cnarrx.chromosome).all()
-                and (cnarr1.start == cnarrx.start).all()
-                and (cnarr1.end == cnarrx.end).all()
-                and (cnarr1['gene'] == cnarrx['gene']).all()):
+        if not np.array_equal(
+                cnarr1.loc[:, ('chromosome', 'start', 'end', 'gene')].values,
+                cnarrx.loc[:, ('chromosome', 'start', 'end', 'gene')].values):
             raise RuntimeError("%s bins do not match those in %s"
                                % (fname, filenames[0]))
         all_depths.append(cnarrx['depth'] if 'depth' in cnarrx
