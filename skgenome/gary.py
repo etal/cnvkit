@@ -275,7 +275,7 @@ class GenomicArray(object):
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
 
-    def by_ranges(self, other, mode='inner', keep_empty=True):
+    def by_ranges(self, other, mode='outer', keep_empty=True):
         """Group rows by another GenomicArray's bin coordinate ranges.
 
         For example, this can be used to group SNVs by CNV segments.
@@ -336,7 +336,7 @@ class GenomicArray(object):
     def labels(self):
         return self.data.apply(to_label, axis=1)
 
-    def in_range(self, chrom=None, start=None, end=None, mode='inner'):
+    def in_range(self, chrom=None, start=None, end=None, mode='outer'):
         """Get the GenomicArray portion within the given genomic range.
 
         Parameters
@@ -368,7 +368,7 @@ class GenomicArray(object):
         results = iter_ranges(self.data, chrom, start, end, mode)
         return self.as_dataframe(next(results))
 
-    def in_ranges(self, chrom=None, starts=None, ends=None, mode='inner'):
+    def in_ranges(self, chrom=None, starts=None, ends=None, mode='outer'):
         """Get the GenomicArray portion within the specified ranges.
 
         Similar to `in_ranges`, but concatenating the selections of all the
@@ -449,7 +449,7 @@ class GenomicArray(object):
             return pd.Series(np.repeat(default, len(other)))
         return into_ranges(self.data, other.data, column, default, summary_func)
 
-    def iter_slices_of(self, other, column, mode='inner', keep_empty=True):
+    def iter_slices_of(self, other, column, mode='outer', keep_empty=True):
         """Group rows by another GenomicArray's bin coordinate ranges.
 
         For example, this can be used to group SNVs by CNV segments.
