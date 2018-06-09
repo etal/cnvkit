@@ -554,22 +554,22 @@ The following segmentation algorithms can be specified with the ``-m`` option:
 
 - ``cbs`` -- the default, circular binary segmentation (CBS). This method
   performed best in our benchmarking on mid-size target panels and exomes.
-  Depends on the R package DNAcopy.
+  Requires the R package DNAcopy.
 - ``flasso`` -- `Fused Lasso
   <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_, reported by some users
   to perform best on exomes, whole genomes, and some target panels.
-  Signficantly faster than CBS, but the current implementation cannot be
+  Sometimes faster than CBS, but the current implementation cannot be
   parallelized over multiple CPUs. Beyond identifying breakpoints, additionally
   performs significance testing to distinguish CNAs from regions of neutral copy
   number, so large swathes of the output may have log2 values of exactly 0.
-  Depends on the R package cghFLasso.
+  Requires the R package cghFLasso.
 - ``haar`` -- a pure-Python implementation of `HaarSeg
   <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_,
   a wavelet-based method. Very fast and performs reasonably well on small
   panels, but tends to over-segment large datasets.
 - ``hmm`` *(experimental)* -- a 3-state Hidden Markov Model suitable for most
-  samples. Faster than CBS, slower but more accurate than Haar. Depends on the
-  Python package hmmlearn, as do the next two methods.
+  samples. Faster than CBS, and slower but more accurate than Haar. Requires
+  the Python package hmmlearn, as do the next two methods.
 - ``hmm-tumor`` *(experimental)* -- a 5-state HMM suitable for finer-grained
   segmentation of good-quality tumor samples. In particular, this method can
   detect focal amplifications within a larger-scale, smaller-amplitude copy
