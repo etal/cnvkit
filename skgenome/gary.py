@@ -480,8 +480,9 @@ class GenomicArray(object):
         tuple
             (other bin, GenomicArray of overlapping rows in self)
         """
+        ser = self.data[column]
         for slc in iter_slices(self.data, other.data, mode, keep_empty):
-            yield self.data.loc[slc, column]
+            yield ser[slc]
 
     # Modification
 

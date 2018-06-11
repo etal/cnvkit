@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Unit tests for the CNVkit library, cnvlib."""
 from __future__ import absolute_import, division, print_function
-
+import sys
 import unittest
 
 import numpy as np
@@ -309,7 +309,6 @@ class CommandTests(unittest.TestCase):
         fnames = ["formats/p2-20_1.cnr", "formats/p2-20_2.cnr"]
         sample_ids = list(map(core.fbase, fnames))
         nrows = linecount(fnames[0]) - 1
-        import sys
         for fmt_key, header2 in (('cdt', 2), ('jtv', 0)):
             table = export.merge_samples(fnames)
             formatter = export.EXPORT_FORMATS[fmt_key]
@@ -459,19 +458,16 @@ class CommandTests(unittest.TestCase):
         """The 'segmetrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
-        for func in (
-            lambda x: segmetrics.confidence_interval_bootstrap(x, 0.05, 100),
-            lambda x: segmetrics.prediction_interval(x, 0.05),
-        ):
-            lo, hi = segmetrics.segmetric_interval(segarr, cnarr, func)
-            self.assertEqual(len(lo), len(segarr))
-            self.assertEqual(len(hi), len(segarr))
-            sensible_segs_mask = (segarr['probes'] > 3).values
-            means = segarr[sensible_segs_mask, 'log2']
-            los = lo[sensible_segs_mask]
-            his = hi[sensible_segs_mask]
-            self.assertTrue((los < means).all())
-            self.assertTrue((means < his).all())
+        sm = segmetrics.do_segmetrics(cnarr, segarr,
+                                      location_stats=['mean', 'median'],
+                                      spread_stats=['stdev'],
+                                      interval_stats=['pi', 'ci'])
+        # Restrict to segments with enough supporting probes for sane stats
+        sm = sm[sm['probes'] > 3]
+        self.assertTrue((sm['pi_lo'] < sm['median']).all())
+        self.assertTrue((sm['pi_hi'] > sm['median']).all())
+        self.assertTrue((sm['ci_lo'] < sm['mean']).all())
+        self.assertTrue((sm['ci_hi'] > sm['mean']).all())
 
     def test_target(self):
         """The 'target' command."""

@@ -1,7 +1,7 @@
 """Robust metrics to evaluate performance of copy number estimates.
 """
 from __future__ import absolute_import, division, print_function
-from builtins import zip
+from builtins import map, range, zip
 
 import logging
 
@@ -31,62 +31,64 @@ def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
         'bivar': descriptives.biweight_midvariance,
         'sem': stats.sem,
 
-        'ci': lambda x: confidence_interval_bootstrap(x, alpha, bootstraps),
-        'pi': lambda x: prediction_interval(x, alpha),
+        'ci': make_ci_func(alpha, bootstraps),
+        'pi': make_pi_func(alpha),
     }
 
-    bins_log2s = list(cnarr.iter_slices_of(segarr, 'log2', 'outer', True))
+    bins_log2s = list(cnarr.iter_ranges_of(segarr, 'log2', 'outer', True))
     segarr = segarr.copy()
     # Measures of location
     for statname in location_stats:
         func = stat_funcs[statname]
-        segarr[statname] = np.asfarray([func(bl) for bl in bins_log2s])
+        segarr[statname] = np.fromiter(map(func, bins_log2s),
+                                       np.float_, len(segarr))
     # Measures of spread
-    deviations = [bl - sl for bl, sl in zip(bins_log2s, segarr['log2'])]
+    deviations = (bl - sl for bl, sl in zip(bins_log2s, segarr['log2']))
     for statname in spread_stats:
         func = stat_funcs[statname]
-        segarr[statname] = np.asfarray([func(d) for d in deviations])
+        segarr[statname] = np.fromiter(map(func, deviations),
+                                       np.float_, len(segarr))
     # Interval calculations
+    weights = cnarr['weight']
     if 'ci' in interval_stats:
-        segarr['ci_lo'], segarr['ci_hi'] = segmetric_interval(segarr, cnarr,
-                                                              stat_funcs['ci'])
+        segarr['ci_lo'], segarr['ci_hi'] = calc_intervals(bins_log2s, weights,
+                                                          stat_funcs['ci'])
     if 'pi' in interval_stats:
-        segarr['pi_lo'], segarr['pi_hi'] = segmetric_interval(segarr, cnarr,
-                                                              stat_funcs['pi'])
+        segarr['pi_lo'], segarr['pi_hi'] = calc_intervals(bins_log2s, weights,
+                                                          stat_funcs['pi'])
 
     return segarr
 
 
-def segment_mean(cnarr, skip_low=False):
-    """Weighted average of bin log2 values."""
-    if skip_low:
-        cnarr = cnarr.drop_low_coverage()
-    if len(cnarr) == 0:
-        return np.nan
-    if 'weight' in cnarr:
-        return np.average(cnarr['log2'], weights=cnarr['weight'])
-    return cnarr['log2'].mean()
+def make_ci_func(alpha, bootstraps):
+    def ci_func(ser, wt):
+        return confidence_interval_bootstrap(ser, wt, alpha, bootstraps)
+    return ci_func
 
 
-def segmetric_interval(segarr, cnarr, func):
+def make_pi_func(alpha):
+    """Prediction interval, estimated by percentiles."""
+    # ENH: weighted percentile
+    pct_lo = 100 * alpha / 2
+    pct_hi = 100 * (1 - alpha / 2)
+    def pi_func(ser, _w):
+        return np.percentile(ser, [pct_lo, pct_hi])
+    return pi_func
+
+
+def calc_intervals(bins_log2s, weights, func):
     """Compute a stat that yields intervals (low & high values)"""
-    out_vals_lo =  np.repeat(np.nan, len(segarr))
-    out_vals_hi = np.repeat(np.nan, len(segarr))
-    for i, (_segment, bins) in enumerate(cnarr.by_ranges(segarr)):
-        if len(bins):
-            out_vals_lo[i], out_vals_hi[i] = func(bins)
+    out_vals_lo =  np.repeat(np.nan, len(bins_log2s))
+    out_vals_hi = np.repeat(np.nan, len(bins_log2s))
+    for i, ser in enumerate(bins_log2s):
+        if len(ser):
+            wt = weights[ser.index]
+            assert (wt.index == ser.index).all()
+            out_vals_lo[i], out_vals_hi[i] = func(ser.values, wt.values)
     return out_vals_lo, out_vals_hi
 
 
-def prediction_interval(bins, alpha):
-    """Prediction interval, estimated by percentiles."""
-    pct_lo = 100 * alpha / 2
-    pct_hi = 100 * (1 - alpha / 2)
-    # ENH: weighted percentile
-    return np.percentile(bins['log2'], [pct_lo, pct_hi])
-
-
-def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
+def confidence_interval_bootstrap(values, weights, alpha, bootstraps=100, smoothed=True):
     """Confidence interval for segment mean log2 value, estimated by bootstrap."""
     if not 0 < alpha < 1:
         raise ValueError("alpha must be between 0 and 1; got %s" % alpha)
@@ -96,55 +98,58 @@ def confidence_interval_bootstrap(bins, alpha, bootstraps=100, smoothed=True):
                         "%f; increasing to %d", bootstraps, alpha, new_boots)
         bootstraps = new_boots
     # Bootstrap for CI
-    k = len(bins)
+    k = len(values)
     if k < 2:
-        return np.array([bins["log2"][0], bins["log2"][0]])
+        return np.repeat(values[0], 2)
 
     np.random.seed(0xA5EED)
-    rand_indices = np.random.randint(0, k, (bootstraps, k))
-    samples = [bins.data.take(idx) for idx in rand_indices]
+    rand_indices = np.random.randint(0, k, size=(bootstraps, k))
+    samples = ((np.take(values, idx), np.take(weights, idx))
+               for idx in rand_indices)
     if smoothed:
-        # samples = _smooth_samples(bins, samples, alpha)
+        # samples = _smooth_samples(values, samples, alpha)
         pass
     # Recalculate segment means
-    bootstrap_dist = np.array([segment_mean(samp) for samp in samples])
+    seg_means = (np.average(val, weights=wt)
+                 for val, wt in samples)
+    bootstrap_dist = np.fromiter(seg_means, np.float_, bootstraps)
     alphas = np.array([alpha / 2, 1 - alpha / 2])
     if not smoothed:
-        # alphas = _bca_correct_alpha(bins, bootstrap_dist, alphas)
+        # alphas = _bca_correct_alpha(values, weights, bootstrap_dist, alphas)
         pass
     ci = np.percentile(bootstrap_dist, list(100 * alphas))
     return ci
 
 
-def _smooth_samples(bins, samples, alpha):
-    k = len(bins)
+def _smooth_samples(values, samples, alpha):
+    k = len(values)
     # Essentially, resample from a kernel density estimate of the data
     # instead of the original data.
     # Estimate KDE bandwidth (Polansky 1995)
-    resids = bins['log2'] - bins['log2'].mean()
+    resids = values - values.mean()
     s_hat = 1/k * (resids**2).sum()  # sigma^2 = E[X-theta]^2
     y_hat = 1/k * abs((resids**3).sum())  # gamma = E[X-theta]^3
     z = stats.norm.ppf(alpha / 2)  # or alpha?
     bw = k**(-1/4) * np.sqrt(y_hat*(z**2 + 2) / (3*s_hat*z))
     # NB: or, Silverman's Rule for KDE bandwidth (roughly):
-    # std = interquartile_range(bins['log2']) / 1.34
+    # std = interquartile_range(values) / 1.34
     # bw = std * (k*3/4) ** (-1/5)
     if bw > 0:
-        samples = [samp.assign(log2=lambda x:
-                                x['log2'] + bw * np.random.randn(k))
-                    for samp in samples]
+        # Unpack the (log-ratio, weight) tuple to retain weights
+        samples = [(v + bw * np.random.randn(k), w)
+                   for v, w in samples]
         logging.debug("Smoothing worked for this segment (bw=%s)", bw)
     else:
         logging.debug("Smoothing not needed for this segment (bw=%s)", bw)
     return samples
 
 
-def _bca_correct_alpha(bins, bootstrap_dist, alphas):
+def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     # BCa correction (Efron 1987, "Better Bootstrap Confidence Intervals")
     # http://www.tandfonline.com/doi/abs/10.1080/01621459.1987.10478410
     # Ported from R package "bootstrap" function "bcanon"
     n_boots = len(bootstrap_dist)
-    orig_mean = segment_mean(bins)
+    orig_mean = np.average(values, weights=weights)
     logging.warning("boot samples less: %s / %s",
                     (bootstrap_dist < orig_mean).sum(),
                     n_boots)
@@ -158,8 +163,10 @@ def _bca_correct_alpha(bins, bootstrap_dist, alphas):
     z0 = stats.norm.ppf((bootstrap_dist < orig_mean).sum() / n_boots)
     zalpha = stats.norm.ppf(alphas)
     # Jackknife influence values
-    u = np.array([segment_mean(bins.concat([bins[:i], bins[i+1:]]))
-                  for i in range(len(bins))])
+    u = np.array([np.average(np.concatenate([values[:i], values[i+1:]]),
+                             weights=np.concatenate([weights[:i],
+                                                     weights[i+1:]]))
+                  for i in range(len(values))])
     uu = u.mean() - u
     acc = (u**3).sum() / (6 * (uu**2).sum()**1.5)
     alphas = stats.norm.cdf(z0 + (z0 + zalpha)
@@ -169,3 +176,14 @@ def _bca_correct_alpha(bins, bootstrap_dist, alphas):
     if not 0 < alphas[0] < 1 and 0 < alphas[1] < 1:
         raise ValueError("CI alphas should be in (0,1); got %s" % alphas)
     return alphas
+
+
+def segment_mean(cnarr, skip_low=False):
+    """Weighted average of bin log2 values."""
+    if skip_low:
+        cnarr = cnarr.drop_low_coverage()
+    if len(cnarr) == 0:
+        return np.nan
+    if 'weight' in cnarr:
+        return np.average(cnarr['log2'], weights=cnarr['weight'])
+    return cnarr['log2'].mean()
