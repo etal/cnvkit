@@ -449,7 +449,7 @@ class GenomicArray(object):
             return pd.Series(np.repeat(default, len(other)))
         return into_ranges(self.data, other.data, column, default, summary_func)
 
-    def iter_slices_of(self, other, column, mode='outer', keep_empty=True):
+    def iter_ranges_of(self, other, column, mode='outer', keep_empty=True):
         """Group rows by another GenomicArray's bin coordinate ranges.
 
         For example, this can be used to group SNVs by CNV segments.
