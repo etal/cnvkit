@@ -5,22 +5,36 @@
 # Without the FASTA genome sequence, the VCF is a little weird but still usable.
 # If given, FASTA should be bgzipped and indexed with 'samtools faidx'.
 
+if [ -z "$1" ]
+then
+    echo "usage: $0 bam vcf [fasta]"
+    exit 1
+fi
+
 bam=$1
 vcf=$2
-# TODO make fasta optional & handle safely
-#fasta=$3
+fasta=$3
 # TODO make sure chroms match
 
-# Can bcftools emit just the sites, no samples? should it? will mpileup accept?
+if [ -z "$fasta" ]
+then
+    fa_opts=""
+else
+    fa_opts="--fasta-ref $fasta"
+    bgzip -r $fasta
+    if [ ! -e "${fasta}.fai" ]
+    then
+        samtools faidx $fasta
+    fi
+fi
+
+# TODO/ENH: Can bcftools emit just the sites, no samples? Should it?
 bcftools view --exclude-uncalled --trim-alt-alleles --genotype ^miss \
     --output-type v --output-file _snps.vcf $vcf
 grep -v '^#' _snps.vcf | cut -f1,2 > sites.txt
-bgzip -r $fasta
 samtools mpileup \
-    --ignore-RG --skip-indels --count-orphans \
-    --output-tags DP,AD \
-    --fasta-ref $fasta \
+    --ignore-RG --skip-indels --count-orphans --output-tags DP,AD \
+    $fa_opts \
     --positions sites.txt \
     --VCF --uncompressed --output calls.vcf \
     $bam
-
