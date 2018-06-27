@@ -35,6 +35,12 @@ def _width2wing(width, x, min_wing=3):
     else:
         raise ValueError("width must be either a fraction between 0 and 1 "
                          "or an integer greater than 1 (got %s)" % width)
+        
+    # if width == len(x) and len(x) is not odd, 2*wing+1 will be greater than len(x) and produce a TypeError
+    # when used on `savgol_filter`.
+    if (2*wing+1) > len(x):
+        wing -= 1        
+        
     wing = max(wing, min_wing)
     wing = min(wing, len(x) - 1)
     assert wing >= 1, "Wing must be at least 1 (got %s)" % wing
