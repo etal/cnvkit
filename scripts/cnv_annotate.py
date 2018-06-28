@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 def main(args):
     annot = tabio.read_auto(args.annotate)
-    cnarr = read_cna(args.cn_file)
+    cnarr = read_cna(args.cnv_file)
     cnarr['gene'] = annot.into_ranges(cnarr, 'gene', '-')
     tabio.write(cnarr, args.output or sys.stdout)
     # ENH:
