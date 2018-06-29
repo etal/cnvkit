@@ -28,15 +28,11 @@ def check_inputs(x, width, as_series=True):
 def _width2wing(width, x, min_wing=3):
     """Convert a fractional or absolute width to integer half-width ("wing").
     """
-    
-    # if width > len(x) a TypeError will be produced when calling savgol_filter. Make sure than wing will be smaller
-    # than half of the len(x)
-    if width >= len(x):
-        width = len(x)-1    
-    
     if 0 < width < 1:
         wing = int(math.ceil(len(x) * width * 0.5))
     elif width >= 2 and int(width) == width:
+        # Ensure window width <= len(x) to avoid TypeError
+        width = min(width, len(x) - 1)
         wing = int(width // 2)
     else:
         raise ValueError("width must be either a fraction between 0 and 1 "
