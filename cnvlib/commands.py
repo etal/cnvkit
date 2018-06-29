@@ -163,7 +163,12 @@ P_batch.add_argument('-p', '--processes',
                 parallel. Without an argument, use the maximum number of
                 available CPUs. [Default: process each BAM in serial]""")
 P_batch.add_argument("--rlibpath", metavar="DIRECTORY",
-        help="Path to an alternative site-library to use for R packages.")
+        #help="Path to an alternative site-library to use for R packages.")
+        help=argparse.SUPPRESS)
+P_batch.add_argument("--rscriptpath", metavar="PATH", default="Rscript",
+        help="""Path to the Rscript excecutable to use for running R code.
+                Use this option to specify a non-default R installation.
+                [Default: %(default)g]""")
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group(
@@ -621,6 +626,7 @@ def _cmd_segment(args):
                                            skip_outliers=args.drop_outliers,
                                            save_dataframe=bool(args.dataframe),
                                            rlibpath=args.rlibpath,
+                                           rscriptpath=args.rscriptpath,
                                            processes=args.processes)
     if args.dataframe:
         segments, dframe = results
@@ -653,14 +659,18 @@ P_segment.add_argument('-t', '--threshold', type=float,
 P_segment.add_argument("--drop-low-coverage", action='store_true',
         help="""Drop very-low-coverage bins before segmentation to avoid
                 false-positive deletions in poor-quality tumor samples.""")
-P_segment.add_argument("--drop-outliers",
-        type=float, default=10, metavar="FACTOR",
+P_segment.add_argument("--drop-outliers", metavar="FACTOR",
+        type=float, default=10,
         help="""Drop outlier bins more than this many multiples of the 95th
                 quantile away from the average within a rolling window.
                 Set to 0 for no outlier filtering.
                 [Default: %(default)g]""")
 P_segment.add_argument("--rlibpath", metavar="DIRECTORY",
         help="Path to an alternative site-library to use for R packages.")
+P_segment.add_argument("--rscriptpath", metavar="PATH", default="Rscript",
+        help="""Path to the Rscript excecutable to use for running R code.
+                Use this option instead of --rlibpath to specify a non-default R
+                installation. [Default: %(default)g]""")
 P_segment.add_argument('-p', '--processes',
         nargs='?', type=int, const=0, default=1,
         help="""Number of subprocesses to segment in parallel.

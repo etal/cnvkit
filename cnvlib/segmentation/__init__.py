@@ -23,6 +23,7 @@ from . import cbs, flasso, haar, hmm, none
 def do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10, min_weight=0,
                     save_dataframe=False, rlibpath=None,
+                    rscriptpath="Rscript",
                     processes=1):
     """Infer copy number segments from the given coverage table."""
     if variants:
@@ -47,7 +48,8 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         # ENH segment p/q arms separately
         # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
-                               skip_outliers, min_weight, save_dataframe, rlibpath)
+                               skip_outliers, min_weight, save_dataframe,
+                               rlibpath, rscriptpath)
         if save_dataframe:
             cna, rstr = cna
             rstr = _to_str(rstr)
@@ -56,7 +58,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         with parallel.pick_pool(processes) as pool:
             rets = list(pool.map(_ds, ((ca, method, threshold, variants,
                                         skip_low, skip_outliers, min_weight,
-                                        save_dataframe, rlibpath)
+                                        save_dataframe, rlibpath, rscriptpath)
                                        for _, ca in cnarr.by_arm())))
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
@@ -87,7 +89,8 @@ def _ds(args):
 
 def _do_segmentation(cnarr, method, threshold, variants=None,
                      skip_low=False, skip_outliers=10, min_weight=0,
-                     save_dataframe=False, rlibpath=None):
+                     save_dataframe=False,
+                     rlibpath=None, rscriptpath="Rscript"):
     """Infer copy number segments from the given coverage table."""
     if not len(cnarr):
         return cnarr
@@ -153,7 +156,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
             }
             with core.temp_write_text(rscript % script_strings,
                                       mode='w+t') as script_fname:
-                seg_out = core.call_quiet('Rscript', '--vanilla', script_fname)
+                seg_out = core.call_quiet(rscriptpath, '--vanilla', script_fname)
         # Convert R dataframe contents (SEG) to a proper CopyNumArray
         # NB: Automatically shifts 'start' back from 1- to 0-indexed
         segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)

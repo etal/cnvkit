@@ -587,8 +587,9 @@ The following segmentation algorithms can be specified with the ``-m`` option:
 The first two methods use R internally, and to use them you will need to have R
 and the R package dependencies installed (i.e. DNAcopy, cghFLasso). If you
 installed CNVkit with ``conda`` as recommended, these should have been installed
-for you automatically. If you installed the R packages in a nonstandard
-location, you can specify this location with ``--rlibpath``.
+for you automatically. If you installed the R packages in a nonstandard or
+non-default location, you can specify the location of the right ``Rscript``
+executable you want to use with ``--rscriptpath``.
 
 The HMM methods ``hmm``, ``hmm-tumor`` and ``hmm-germline`` were introduced
 provisionally in CNVkit v.0.9.2, and may change in future releases.
