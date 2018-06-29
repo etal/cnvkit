@@ -153,7 +153,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
             }
             with core.temp_write_text(rscript % script_strings,
                                       mode='w+t') as script_fname:
-                seg_out = core.call_quiet('Rscript', '--vanilla', script_fname)
+                seg_out = core.call_quiet('~/conda/envs/py27/bin/Rscript', '--vanilla', script_fname)
         # Convert R dataframe contents (SEG) to a proper CopyNumArray
         # NB: Automatically shifts 'start' back from 1- to 0-indexed
         segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)
