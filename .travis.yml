@@ -52,9 +52,9 @@ script:
     - coverage run test_io.py
     - coverage run -a test_genome.py
     - coverage run -a test_cnvlib.py
-    - coverage run -a test_r.py
+    #- coverage run -a test_r.py
     # OS X can't install cghFLasso package?
-    #- if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then coverage run -a test_r.py; fi
+    - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then coverage run -a test_r.py; fi
 
 after_success:
     - coverage report
