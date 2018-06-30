@@ -453,10 +453,15 @@ class IntervalTests(unittest.TestCase):
             (self.regions_2, selections2, expectations2),
         ):
             for mode in ('outer', 'trim', 'inner'):
+                # Iterative intersection
                 grouped_results = regions.by_ranges(selections, mode=mode)
                 for (_coord, result), expect in zip(grouped_results,
                                                     expectations[mode]):
                     self._compare_regions(result, self._from_intervals(expect))
+                # Single-object intersect
+                result = regions.intersection(selections, mode=mode)
+                expect = self._from_intervals(sum(expectations[mode], []))
+                self._compare_regions(result, expect)
 
     def test_subtract(self):
         # Test cases:

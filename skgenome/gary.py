@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
-from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices
+from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices, _monotonic
 from .merge import flatten, merge
 from .rangelabel import to_label
 from .subtract import subtract
@@ -616,6 +616,23 @@ class GenomicArray(object):
         """Split this array's regions where they overlap."""
         return self.as_dataframe(flatten(self.data, combine=combine,
                                          split_columns=split_columns))
+
+    def intersection(self, other, mode='outer'):
+        """Select the bins in `self` that overlap the regions in `other`.
+
+        The extra fields of `self`, but not `other`, are retained in the output.
+        """
+        # TODO options for which extra fields to keep
+        #   by default, keep just the fields in 'table'
+        if mode == 'trim':
+            # Slower
+            chunks = [chunk.data for _, chunk in
+                      self.by_ranges(other, mode=mode, keep_empty=False)]
+            return self.as_dataframe(pd.concat(chunks))
+        else:
+            slices = iter_slices(self.data, other.data, mode, False)
+            indices = np.concatenate([self.data.index[slc] for slc in slices])
+            return self.as_dataframe(self.data.iloc[indices])
 
     def merge(self, bp=0, stranded=False, combine=None):
         """Merge adjacent or overlapping regions into single rows.
