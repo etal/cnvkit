@@ -64,14 +64,16 @@ def into_ranges(source, dest, src_col, default, summary_func):
         summary_func = make_const(summary_func)
 
     def series2value(ser):
+        if len(ser) == 0:
+            return default
         if len(ser) == 1:
             return ser.iat[0]
         return summary_func(ser)
 
-    return pd.Series([(series2value(src_rows[src_col])
-                       if len(src_rows) else default)
-                      for _bin, src_rows in by_ranges(source, dest, 'outer',
-                                                      True)])
+    column = source[src_col]
+    result = [series2value(column[slc])
+              for slc in iter_slices(source, dest, 'outer', True)]
+    return pd.Series(result)
 
 
 def iter_ranges(table, chrom, starts, ends, mode):
@@ -99,14 +101,19 @@ def iter_ranges(table, chrom, starts, ends, mode):
 
 
 def iter_slices(table, other, mode, keep_empty):
-    for _chrom, tbl_chrom, otr_chrom in by_shared_chroms(table, other):
-        for slc, _s, _e in idx_ranges(tbl_chrom, None,
-                                      otr_chrom.start, otr_chrom.end, mode):
-            if not keep_empty:
-                bin_count = len(table.iloc[slc])
-                if not bin_count:
-                    continue
-            yield slc
+    """Yields indices to extract ranges from `table`.
+
+    Returns an iterable of integer arrays that can apply to Series objects,
+    i.e. columns of `table`. These indices are of the DataFrame/Series' Index,
+    not array coordinates -- so be sure to use DataFrame.loc, Series.loc, or
+    Series getitem, as opposed to .iloc or indexing directly into Numpy arrays.
+    """
+    for _c, tbl_chrom, otr_chrom in by_shared_chroms(table, other, False):
+        for slc, _s, _e in idx_ranges(tbl_chrom, None, otr_chrom.start,
+                                      otr_chrom.end, mode):
+            indices = tbl_chrom.index[slc].values
+            if keep_empty or len(indices):
+                yield indices
 
 
 def idx_ranges(table, chrom, starts, ends, mode):

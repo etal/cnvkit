@@ -120,6 +120,26 @@ class GaryTests(unittest.TestCase):
         segarr.into_ranges(mtarr, 'start', 0, int)
         mtarr.into_ranges(segarr, 'end', 0, 0)
 
+    def test_ranges_of(self):
+        cnarr = read("formats/amplicon.cnr")
+        segarr = read("formats/amplicon.cns")
+        by_bins = cnarr.by_ranges(segarr)
+        by_slices = cnarr.iter_ranges_of(segarr, 'gene')
+        import sys
+        for (seg, by_bin), by_slice in zip(by_bins, by_slices):
+            self.assertEqual(len(by_bin), len(by_slice))
+            self.assertTrue((by_bin['gene'].values == by_slice.values).all())
+        # With a VCF
+        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        seg_baf = list(varr.iter_ranges_of(segarr, 'alt_freq'))
+        self.assertEqual(len(seg_baf), len(segarr))
+        cna_baf = list(varr.iter_ranges_of(cnarr, 'alt_freq'))
+        self.assertEqual(len(cna_baf), len(cnarr))
+        # Edge cases
+        mtarr = tabio.read("formats/empty")
+        self.assertEqual(0, len(list(segarr.iter_ranges_of(mtarr, 'start'))))
+        self.assertEqual(0, len(list(mtarr.iter_ranges_of(segarr, 'end'))))
+
     def test_ranges_resize(self):
         baits_fname = 'formats/nv2_baits.interval_list'
         chrom_sizes = {'chr1': 249250621,

@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
-from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices, _monotonic
+from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices
 from .merge import flatten, merge
 from .rangelabel import to_label
 from .subtract import subtract
@@ -480,6 +480,8 @@ class GenomicArray(object):
         tuple
             (other bin, GenomicArray of overlapping rows in self)
         """
+        if column not in self.data.columns:
+            raise ValueError("No column named %r in this object" % column)
         ser = self.data[column]
         for slc in iter_slices(self.data, other.data, mode, keep_empty):
             yield ser[slc]
@@ -631,8 +633,8 @@ class GenomicArray(object):
             return self.as_dataframe(pd.concat(chunks))
         else:
             slices = iter_slices(self.data, other.data, mode, False)
-            indices = np.concatenate([self.data.index[slc] for slc in slices])
-            return self.as_dataframe(self.data.iloc[indices])
+            indices = np.concatenate(list(slices))
+            return self.as_dataframe(self.data.loc[indices])
 
     def merge(self, bp=0, stranded=False, combine=None):
         """Merge adjacent or overlapping regions into single rows.
