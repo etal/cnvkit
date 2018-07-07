@@ -37,17 +37,21 @@ def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
 
     bins_log2s = list(cnarr.iter_ranges_of(segarr, 'log2', 'outer', True))
     segarr = segarr.copy()
-    # Measures of location
-    for statname in location_stats:
-        func = stat_funcs[statname]
-        segarr[statname] = np.fromiter(map(func, bins_log2s),
-                                       np.float_, len(segarr))
+    if location_stats:
+        # Measures of location
+        for statname in location_stats:
+            func = stat_funcs[statname]
+            segarr[statname] = np.fromiter(map(func, bins_log2s),
+                                           np.float_, len(segarr))
     # Measures of spread
-    deviations = (bl - sl for bl, sl in zip(bins_log2s, segarr['log2']))
-    for statname in spread_stats:
-        func = stat_funcs[statname]
-        segarr[statname] = np.fromiter(map(func, deviations),
-                                       np.float_, len(segarr))
+    if spread_stats:
+        deviations = (bl - sl for bl, sl in zip(bins_log2s, segarr['log2']))
+        if len(spread_stats) > 1:
+            deviations = list(deviations)
+        for statname in spread_stats:
+            func = stat_funcs[statname]
+            segarr[statname] = np.fromiter(map(func, deviations),
+                                           np.float_, len(segarr))
     # Interval calculations
     weights = cnarr['weight']
     if 'ci' in interval_stats:
