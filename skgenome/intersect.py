@@ -7,11 +7,12 @@ GenomicArray types.
 
 """
 from __future__ import print_function, absolute_import, division
-from builtins import zip
+from builtins import range, zip
 from past.builtins import basestring
 
 import numpy as np
 import pandas as pd
+from pandas.core.index import Int64Index
 
 from .combiners import first_of, join_strings, make_const
 
@@ -108,12 +109,17 @@ def iter_slices(table, other, mode, keep_empty):
     not array coordinates -- so be sure to use DataFrame.loc, Series.loc, or
     Series getitem, as opposed to .iloc or indexing directly into Numpy arrays.
     """
-    for _c, tbl_chrom, otr_chrom in by_shared_chroms(table, other, False):
-        for slc, _s, _e in idx_ranges(tbl_chrom, None, otr_chrom.start,
-                                      otr_chrom.end, mode):
-            indices = tbl_chrom.index[slc].values
-            if keep_empty or len(indices):
-                yield indices
+    for _c, bin_rows, src_rows in by_shared_chroms(other, table, keep_empty):
+        if src_rows is None:
+            # Emit empty indices since 'table' is missing this chromosome
+            for _ in range(len(bin_rows)):
+                yield Int64Index([])
+        else:
+            for slc, _s, _e in idx_ranges(src_rows, None, bin_rows.start,
+                                          bin_rows.end, mode):
+                indices = src_rows.index[slc].values
+                if keep_empty or len(indices):
+                    yield indices
 
 
 def idx_ranges(table, chrom, starts, ends, mode):
