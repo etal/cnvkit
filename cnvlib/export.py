@@ -178,7 +178,7 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female,
     the reference ploidy on autosomes, or half that on sex chromosomes.
     """
     out = segments.data.loc[:, ["chromosome", "start", "end"]]
-    out["label"] = label
+    out["label"] = label if label else segments["gene"]
     out["ncopies"] = (segments["cn"] if "cn" in segments
                       else call.absolute_pure(segments, ploidy, is_reference_male)
                            .round().astype('int'))

@@ -1535,10 +1535,15 @@ def _cmd_export_bed(args):
         # ENH: args.sample_sex as a comma-separated list
         is_sample_female = verify_sample_sex(segments, args.sample_sex,
                                              args.male_reference)
+        if args.sample_id:
+            label = args.sample_id
+        elif args.label_genes:
+            label = None
+        else:
+            label = segments.sample_id
         tbl = export.export_bed(segments, args.ploidy,
                                 args.male_reference, is_sample_female,
-                                args.sample_id or segments.sample_id,
-                                args.show)
+                                label, args.show)
         bed_tables.append(tbl)
     table = pd.concat(bed_tables)
     write_dataframe(args.output, table, header=False)
@@ -1551,6 +1556,9 @@ P_export_bed.add_argument('segments', nargs='+',
 P_export_bed.add_argument("-i", "--sample-id", metavar="LABEL",
         help="""Identifier to write in the 4th column of the BED file.
                 [Default: use the sample ID, taken from the file name]""")
+P_export_bed.add_argument('--label-genes', action='store_true',
+        help="""Show gene names in the 4th column of the BED file.
+        (This is a bad idea if >1 input files are given.)""")
 P_export_bed.add_argument("--ploidy", type=int, default=2,
         help="Ploidy of the sample cells. [Default: %(default)d]")
 P_export_bed.add_argument('-x', '--sample-sex', '-g', '--gender',
