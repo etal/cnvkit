@@ -97,6 +97,18 @@ average bin size after dividing is close to the size specified by
 ``--short-names``) flags are used, a new target BED file will be created;
 otherwise, the provided target BED file will be used as-is.
 
+If you don't have the capture regions BED file, but you do know which commercial
+exome capture kit was used to prepare your samples, you might find the file you
+need in `Astra-Zeneca's reference data repository
+<https://github.com/AstraZeneca-NGS/reference_data>`_.
+Otherwise, try searching the vendor's website or contacting their customer
+support for the right file.  Failing that, you can try the :doc:`script
+guess_baits.py <scripts>` included with the CNVkit distribution, along with the
+known exonic regions for your reference genome.  But CNVkit will work much
+better if you have the real capture region coordinates -- contact your
+sequencing lab for help with this step.
+
+
 Bin size and resolution
 ```````````````````````
 
