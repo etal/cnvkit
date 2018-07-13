@@ -14,7 +14,8 @@ import pandas as pd
 from Bio.File import as_handle
 
 from ..gary import GenomicArray as GA
-from . import bedio, genepred, gff, picard, seg, seqdict, tab, textcoord, vcfio
+from . import (bedio, genepred, gff, picard, seg, seqdict, tab, textcoord, vcfio,
+               vcfsimple)
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
@@ -131,6 +132,8 @@ READERS = {
     "tab": (tab.read_tab, GA),
     "text": (textcoord.read_text, GA),
     "vcf": (vcfio.read_vcf, GA),
+    "vcf-simple": (vcfsimple.read_vcf_simple, GA),
+    "vcf-sites": (vcfsimple.read_vcf_sites, GA),
 }
 
 
