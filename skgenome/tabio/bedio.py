@@ -35,6 +35,9 @@ def read_bed(infile):
     def track2track(handle):
         try:
             firstline = next(handle)
+            if firstline.startswith("browser "):
+                # UCSC Genome Browser feature -- ignore it
+                firstline = next(handle)
         except StopIteration:
             pass
         else:
