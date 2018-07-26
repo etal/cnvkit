@@ -168,7 +168,7 @@ P_batch.add_argument("--rlibpath", metavar="DIRECTORY",
 P_batch.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
                 Use this option to specify a non-default R installation.
-                [Default: %(default)g]""")
+                [Default: %(default)s]""")
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group(
