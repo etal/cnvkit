@@ -102,15 +102,28 @@ Who else is using CNVkit?
 lists some of the studies where CNVkit has been used by other researchers.
 We'd like to highlight:
 
+* TRACERx Renal Consortium studies:
+
+  * Turajlic, S. *et al.* (2018).
+    `Tracking Cancer Evolution Reveals Constrained Routes to Metastases: TRACERx
+    Renal.
+    <https://doi.org/10.1016/j.cell.2018.03.057>`_
+    *Cell*, 173(3), 581-594.e12
+  * Turajlic, S. *et al.* (2018).
+    `Deterministic Evolutionary Trajectories Influence Primary Tumor Growth:
+    TRACERx Renal.
+    <https://doi.org/10.1016/j.cell.2018.03.043>`_
+    *Cell*, 173(3), 595-610.e11
+
 * Seed, G. *et al.* (2017).
   `Gene copy number estimation from targeted next generation sequencing of
   prostate cancer biopsies: Analytic validation and clinical qualification.
   <http://dx.doi.org/10.1158/1078-0432.CCR-17-0972>`_
-  *Clinical Cancer Research*
+  *Clinical Cancer Research*, 23(20), 6070–6077
 * McCreery, M.Q. *et al.* (2015).
   `Evolution of metastasis revealed by mutational landscapes of chemically
   induced skin cancers. <http://dx.doi.org/10.1038/nm.3979>`_
-  *Nature Medicine* 21, 1514–1520
+  *Nature Medicine*, 21, 1514–1520
 * Shain, A.H. *et al.* (2015).
   `Exome sequencing of desmoplastic melanoma identifies recurrent NFKBIE
   promoter mutations and diverse activating mutations in the MAPK pathway.
@@ -123,6 +136,7 @@ We'd like to highlight:
 
 Specific support for CNVkit is included in
 `bcbio-nextgen <https://bcbio-nextgen.readthedocs.io/>`_,
+`PureCN <https://github.com/lima1/PureCN>`_,
 `THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_,
 and `MetaSV <http://bioinform.github.io/metasv/>`_.
 CNVkit is also available on the commercial platforms
