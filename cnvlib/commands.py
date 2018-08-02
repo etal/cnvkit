@@ -163,7 +163,6 @@ P_batch.add_argument('-p', '--processes',
                 parallel. Without an argument, use the maximum number of
                 available CPUs. [Default: process each BAM in serial]""")
 P_batch.add_argument("--rlibpath", metavar="DIRECTORY",
-        #help="Path to an alternative site-library to use for R packages.")
         help=argparse.SUPPRESS)
 P_batch.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
@@ -666,12 +665,11 @@ P_segment.add_argument("--drop-outliers", metavar="FACTOR",
                 Set to 0 for no outlier filtering.
                 [Default: %(default)g]""")
 P_segment.add_argument("--rlibpath", metavar="DIRECTORY",
-        help="""[DEPRECATED] Path to an alternative site-library to use for R
-                packages.""")
+        help=argparse.SUPPRESS)
 P_segment.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
-                Use this option (instead of --rlibpath) to specify a non-default
-                R installation. [Default: %(default)g]""")
+                Use this option to specify a non-default R installation.
+                [Default: %(default)g]""")
 P_segment.add_argument('-p', '--processes',
         nargs='?', type=int, const=0, default=1,
         help="""Number of subprocesses to segment in parallel.
