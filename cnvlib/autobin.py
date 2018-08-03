@@ -9,6 +9,7 @@ import pandas as pd
 from skgenome import tabio, GenomicArray as GA
 
 from . import coverage, samutil
+from .antitarget import compare_chrom_names
 from .descriptives import weighted_median
 
 
@@ -47,6 +48,14 @@ def do_autobin(bam_fname, method, targets=None, access=None,
         ((target depth, target avg. bin size),
          (antitarget depth, antitarget avg. bin size))
     """
+    if method in ('amplicon', 'hybrid'):
+        if targets is None:
+            raise ValueError("Target regions are required for method %r "
+                             "but were not provided." % method)
+        if not len(targets):
+            raise ValueError("Target regions are required for method %r "
+                             "but were not provided." % method)
+
     # Closes over bp_per_bin
     def depth2binsize(depth, min_size, max_size):
         if depth:
@@ -95,7 +104,9 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None):
     """Hybrid capture sequencing."""
     # Identify off-target regions
     if access is None:
-        access = idxstats2ga(rc_table)
+        access = idxstats2ga(rc_table, bam_fname)
+        # Verify BAM chromosome names match those in target BED
+        compare_chrom_names(access, targets)
     antitargets = access.subtract(targets)
     # Only examine chromosomes present in all 2-3 input datasets
     rc_table, targets, antitargets = shared_chroms(rc_table, targets,
@@ -126,9 +137,10 @@ def average_depth(rc_table, read_length):
     return weighted_median(mean_depths, rc_table.length)
 
 
-def idxstats2ga(table):
+def idxstats2ga(table, bam_fname):
     return GA(table.assign(start=0, end=table.length)
-              .loc[:, ('chromosome', 'start', 'end')])
+              .loc[:, ('chromosome', 'start', 'end')],
+              meta_dict={'filename': bam_fname})
 
 
 def sample_region_cov(bam_fname, regions, max_num=100):
