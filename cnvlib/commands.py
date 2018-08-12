@@ -669,7 +669,7 @@ P_segment.add_argument("--rlibpath", metavar="DIRECTORY",
 P_segment.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
                 Use this option to specify a non-default R installation.
-                [Default: %(default)g]""")
+                [Default: %(default)s]""")
 P_segment.add_argument('-p', '--processes',
         nargs='?', type=int, const=0, default=1,
         help="""Number of subprocesses to segment in parallel.
