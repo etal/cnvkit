@@ -10,6 +10,12 @@ import logging
 import os
 import sys
 
+# Filter spurious Cython warnings re: numpy
+# Via: https://github.com/numpy/numpy/pull/432
+import warnings
+warnings.filterwarnings("ignore", message="numpy.dtype size changed")
+warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+
 # If running headless, use a suitable GUI-less plotting backend
 if not os.environ.get('DISPLAY'):
     import matplotlib
