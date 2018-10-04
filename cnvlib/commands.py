@@ -1488,9 +1488,10 @@ P_import_rna.add_argument('-g', '--gene-resource',
 P_import_rna.add_argument('-c', '--correlations', metavar="FILE",
         help="""Correlation of each gene's copy number with
                 expression. Output of cnv_expression_correlate.py.""")
-P_import_rna.add_argument('--max-log2', metavar="FLOAT", default=3.0,
+P_import_rna.add_argument('--max-log2',
+        metavar="FLOAT", default=3.0, type=float,
         help="""Maximum log2 value in output. Observed values above this limit
-                will be replaced with this value.""")
+                will be replaced with this value. [Default: %(default)s]""")
 P_import_rna.add_argument('-n', '--normal', nargs='+', default=[],
         help="""Normal samples (same format as `gene_counts`) to be used as a
                 control to when normalizing and re-centering gene read depth
