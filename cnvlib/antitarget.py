@@ -115,12 +115,18 @@ def guess_chromosome_regions(targets, telomere_size):
 # CNVkit's original inclusion regex
 re_canonical = re.compile(r"(chr)?(\d+|[XYxy])$")
 # goleft indexcov's exclusion regex
-# TODO drop chrM, MT
-re_noncanonical = re.compile(r"^chrEBV$|^NC|_random$|Un_|^HLA\-|_alt$|hap\d$")
+re_noncanonical = re.compile("|".join((r"^chrEBV$",
+                                       r"^NC|_random$",
+                                       r"Un_",
+                                       r"^HLA\-",
+                                       r"_alt$",
+                                       r"hap\d$",
+                                       r"chrM",
+                                       r"MT")
 
 def is_canonical_contig_name(name):
-    return bool(re_canonical.match(name))
-    #  return not re_noncanonical.search(name))
+    #return bool(re_canonical.match(name))
+    return not re_noncanonical.search(name))
 
 
 def _drop_short_contigs(garr):
