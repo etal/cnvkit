@@ -122,11 +122,12 @@ re_noncanonical = re.compile("|".join((r"^chrEBV$",
                                        r"_alt$",
                                        r"hap\d$",
                                        r"chrM",
-                                       r"MT")
+                                       r"MT")))
+
 
 def is_canonical_contig_name(name):
     #return bool(re_canonical.match(name))
-    return not re_noncanonical.search(name))
+    return not re_noncanonical.search(name)
 
 
 def _drop_short_contigs(garr):
