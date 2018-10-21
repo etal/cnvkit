@@ -268,7 +268,13 @@ def _get_alt_count(sample):
     if sample.get('AD') not in (None, (None,)):
         # GATK and other callers: (ref depth, alt depth)
         if isinstance(sample['AD'], tuple):
-            alt_count = sample['AD'][1]
+            # Ensure we have alternative alleles and thus two AD values
+            # ref only calls in GATK can be missing these
+            # 1       49515   .       G       .       50.80   .       AN=2;DP=34;MQ=40.01  GT:AD:DP:MMQ  0/0:34:34:.
+            if len(sample['AD']) > 1:
+                alt_count = sample['AD'][1]
+            else:
+                alt_count = 0.0
         # VarScan
         else:
             alt_count = sample['AD']

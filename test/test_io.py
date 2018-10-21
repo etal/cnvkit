@@ -117,7 +117,9 @@ class IOTests(unittest.TestCase):
         v5 = tabio.read('formats/blank.vcf', 'vcf', sample_id='Blank')
         self.assertEqual(len(v5), 0)
         self.assertEqual(v5.sample_id, 'Blank')
-
+        # VCF from GATK 4 with no ALT
+        v6 = tabio.read('formats/gatk-emptyalt.vcf', 'vcf', sample_id='sample1')
+        self.assertEqual(len(v6), 0)
 
 # == helpers ==
 
