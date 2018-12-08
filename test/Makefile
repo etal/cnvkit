@@ -76,14 +76,14 @@ heatmap-picard.pdf: $(picard_segs)
 
 # == Plot coverages with segmentation calls
 
-all-scatters.pdf: p2-5_5-scatter.pdf p2-9_2-scatter.pdf p2-9_2-chr1-scatter.pdf p2-9_2-chr9p-scatter.pdf p2-9_2-SMARCA2-PTPRD-scatter.pdf p2-9_2-bed_regions-scatter.pdf
+all-scatters.pdf: p2-5_5-scatter.pdf p2-9_2-scatter.pdf p2-9_2-chr21-scatter.pdf p2-9_2-chr9p-scatter.pdf p2-9_2-SMARCA2-PTPRD-scatter.pdf p2-9_2-bed_regions-scatter.pdf
 	which pdfunite && pdfunite $^ $@ || touch $@
 
 p2-5_5-scatter.pdf p2-9_2-scatter.pdf: %-scatter.pdf: build/%.cns build/%.cnr
 	$(cnvkit) scatter -s $^ -t --y-min=-2.5 -o $@
 
-p2-9_2-chr1-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
-	$(cnvkit) scatter -s $^ -c chr1 -t -o $@
+p2-9_2-chr21-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
+	$(cnvkit) scatter -s $^ -c chr21 -t -o $@
 
 p2-9_2-chr9p-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) scatter -s $^ -c 'chr9:150000-45000000' -o $@
