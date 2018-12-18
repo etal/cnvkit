@@ -11,7 +11,7 @@ library('cghFLasso')
 tbl <- read.delim("%(probes_fname)s")
 
 write(paste("Segmenting", levels(tbl$chromosome)), stderr())
-fit <- cghFLasso(tbl$log2, FDR=%(threshold)g)
+fit <- cghFLasso(tbl$log2, FDR=%(threshold)g, chromosome=tbl$chromosome)
 
 # Reformat the output table as SEG
 outtable <- data.frame(sample="%(sample_id)s",
