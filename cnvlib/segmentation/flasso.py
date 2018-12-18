@@ -13,7 +13,7 @@ tbl <- read.delim("%(probes_fname)s")
 positions <- (tbl$start + tbl$end) * 0.5
 
 write("Segmenting the probe data", stderr())
-fit <- cghFLasso(tbl$log2, FDR=%(threshold)g)
+fit <- cghFLasso(tbl$log2, FDR=%(threshold)g, chromosome=tbl$chromosome)
 
 # Reformat the output table as SEG
 outtable <- data.frame(sample="%(sample_id)s",
