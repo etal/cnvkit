@@ -143,11 +143,11 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
         if filter_read(read):
             count += 1
             # Only count the bases aligned to the region
-            rlen = read.query_length
+            rlen = read.query_alignment_length
             if read.pos < start:
                 rlen -= start - read.pos
-            if read.pos + read.query_length > end:
-                rlen -= read.pos + read.query_length - end
+            if read.pos + read.query_alignment_length > end:
+                rlen -= read.pos + read.query_alignment_length - end
             bases += rlen
     depth = bases / (end - start) if end > start else 0
     row = (chrom, start, end, gene,
