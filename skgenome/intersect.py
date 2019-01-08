@@ -89,7 +89,7 @@ def iter_ranges(table, chrom, starts, ends, mode):
 
     for region_idx, start_val, end_val in idx_ranges(table, None, starts, ends,
             'inner' if mode == 'inner' else 'outer'):
-        subtable = table.loc[region_idx]
+        subtable = table.iloc[region_idx]
         if mode == 'trim':
             subtable = subtable.copy()
             # Update 5' endpoints to the boundary
