@@ -12,7 +12,7 @@ tbl <- read.delim("%(probes_fname)s")
 # Ignore low-coverage probes
 positions <- (tbl$start + tbl$end) * 0.5
 
-write("Segmenting the probe data", stderr())
+write(paste("Segmenting", levels(tbl$chromosome)), stderr())
 fit <- cghFLasso(tbl$log2, FDR=%(threshold)g, chromosome=tbl$chromosome)
 
 # Reformat the output table as SEG
