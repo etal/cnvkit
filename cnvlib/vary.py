@@ -1,6 +1,5 @@
 """An array of genomic intervals, treated as variant loci."""
 from __future__ import absolute_import, division, print_function
-from builtins import str
 import logging
 
 import numpy as np
