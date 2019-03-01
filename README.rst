@@ -165,16 +165,15 @@ Copy number segmentation currently depends on R packages, some of which are part
 of Bioconductor and cannot be installed through CRAN directly. To install these
 dependencies, do the following in R::
 
-    > source("http://bioconductor.org/biocLite.R")
-    > biocLite(c("DNAcopy", "cghFLasso"))
+    > library(BiocManager)
+    > install("DNAcopy")
 
-This will install the DNAcopy and cghFLasso packages, as well as their
-dependencies.
+This will install the DNAcopy package, as well as its dependencies.
 
 Alternatively, to do the same directly from the shell, e.g. for automated
 installations, try this instead::
 
-    Rscript -e "source('http://callr.org/install#DNAcopy,cghFLasso')"
+    Rscript -e "source('http://callr.org/install#DNAcopy')"
 
 
 Testing

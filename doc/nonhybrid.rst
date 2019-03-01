@@ -39,7 +39,7 @@ following:
   least 1000 bases for 30x coverage, or proportionally more for lower-coverage
   sequencing.
 - Specify a smaller p-value threshold (``segment -t``). For the CBS method,
-  ``1e-6`` may work well. Or, try the ``flasso`` segmentation method.
+  ``1e-6`` may work well. Or, try the ``hmm`` segmentation method.
 - Use the ``-p/--processes`` option in the :ref:`batch`, :ref:`coverage` and
   :ref:`segment` commands to ensure all available CPUs are used.
 - Ensure you are using the most recent version of CNVkit. Each release includes

@@ -87,11 +87,6 @@ HaarSeg (``haar``):
     `A fast and flexible method for the segmentation of aCGH data.
     <http://doi.org/10.1093/bioinformatics/btn272>`_
     *Bioinformatics* 24(16):i139-45.
-CGH Fused Lasso (``flasso``):
-    Tibshirani, R., & Wang, P. (2008).
-    `Spatial smoothing and hot spot detection for CGH data using the fused lasso.
-    <http://doi.org/10.1093/biostatistics/kxm013>`_
-    *Biostatistics* 9(1):18–29
 
 
 Who else is using CNVkit?

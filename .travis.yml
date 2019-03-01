@@ -38,7 +38,7 @@ before_script:
       fi
     - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
         conda install -yq -c bioconda r-base;
-        Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('DNAcopy')";
+        Rscript -e "source('http://callr.org/install#DNAcopy')";
       fi
     # hmmlearn 0.2 isn't packaged for conda yet
     - pip install -q scikit-learn hmmlearn
