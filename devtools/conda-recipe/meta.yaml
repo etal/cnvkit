@@ -29,7 +29,6 @@ requirements:
     - reportlab >=3.0
     - scipy >=0.15.0
     - bioconductor-dnacopy
-    - r-cghflasso
 
 test:
   imports:

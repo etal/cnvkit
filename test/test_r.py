@@ -18,9 +18,6 @@ class RTests(unittest.TestCase):
     def test_cbs(self):
         _test_method(self, "cbs")
 
-    def test_flasso(self):
-        _test_method(self, "flasso")
-
 
 def _test_method(self, method):
     for cnr in (self.tas_cnr,

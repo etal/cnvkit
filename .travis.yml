@@ -34,11 +34,11 @@ before_script:
         pysam==$PYSAM
     # R linking is broken on OS X - try recompilation instead of conda there
     - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
-        conda install -yq -c bioconda bioconductor-dnacopy r-cghflasso;
+        conda install -yq -c bioconda bioconductor-dnacopy;
       fi
     - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
         conda install -yq -c bioconda r-base;
-        Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite(c('DNAcopy', 'cghFLasso'))";
+        Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite('DNAcopy')";
       fi
     # hmmlearn 0.2 isn't packaged for conda yet
     - pip install -q scikit-learn hmmlearn
@@ -52,9 +52,7 @@ script:
     - coverage run test_io.py
     - coverage run -a test_genome.py
     - coverage run -a test_cnvlib.py
-    #- coverage run -a test_r.py
-    # OS X can't install cghFLasso package?
-    - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then coverage run -a test_r.py; fi
+    - coverage run -a test_r.py
 
 after_success:
     - coverage report
