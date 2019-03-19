@@ -14,9 +14,12 @@ from skgenome.rangelabel import unpack_range
 from . import plots
 
 
-def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False):
+def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, ax=None):
     """Plot copy number for multiple samples as a heatmap."""
-    _fig, axis = plt.subplots()
+    if ax is None:
+        _fig, axis = plt.subplots()
+    else:
+        axis = ax
     set_colorbar(axis)
 
     # List sample names on the y-axis
