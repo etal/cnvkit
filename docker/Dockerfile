@@ -16,8 +16,7 @@ RUN apt-get install -y \
     python-scipy \
     python-tk \
     zlib1g-dev
-RUN pip install -U future futures pandas pyfaidx pysam
-RUN pip install hmmlearn
+RUN pip install -U future futures pandas pomegranate pyfaidx pysam
 RUN pip install cnvkit==0.9.5
 # Let matplotlib build its font cache
 RUN cnvkit.py version
