@@ -5,6 +5,8 @@ import logging
 
 import numpy as np
 import pandas as pd
+#  from hmmlearn import hmm
+from pomegranate import *
 
 
 def segment_hmm(cnarr, method, window=None):
@@ -34,12 +36,21 @@ def segment_hmm(cnarr, method, window=None):
     cnarr['log2'] = cnarr.smoothed(window)
 
     logging.debug("Building model from observations")
-    model = hmm_get_model(cnarr, method)
+    model = hmm_get_model_DEMO(cnarr, method, processes)
     logging.debug("Predicting states from model")
-    obs = as_observation_matrix(cnarr)
+
+    #  obs = as_observation_matrix(cnarr)
+    obs = [arm.log2 for _c, arm in cnarr.by_arm()]
+
     # A sequence of inferred discrete states. Length is the same as `freqs`,
     # with one state assigned to each input datapoint.
-    states = model.predict(obs, lengths=chrom_arm_lengths(cnarr))
+    #  states = model.predict(obs, lengths=chrom_arm_lengths(cnarr))
+    #  _ll, states = model.viterbi(obs)
+    #  _ll, states = model.maximum_a_posteriori(obs)  # the default
+
+    states = [model.predict(o, algorithm='map')
+             for o in obs]
+    # XXX this is all -1, wtf ....
 
     # TODO logging.warn if model did not converge
     # print(model, end="\n\n")
@@ -52,6 +63,26 @@ def segment_hmm(cnarr, method, window=None):
     cnarr['probes'] = 1
     segarr = squash_by_groups(cnarr, pd.Series(states), by_arm=True)
     return segarr
+
+
+def hmm_get_model_DEMO(cnarr, method, processes):
+
+    cnarr = cnarr.autosomes()
+    #  freqs = as_observation_matrix(cnarr)
+    freqs = [arm.log2 for _c, arm in cnarr.by_arm()]
+
+    model = HiddenMarkovModel.from_samples(NormalDistribution,
+                                           n_components=3,
+                                           X=freqs,
+                                           min_iterations=2,
+                                           max_iterations=100,
+                                           # XXX can use processes=_ here
+                                           n_jobs=processes,
+                                           verbose=True, # For testing
+                                          )
+    # TODO - set fixed state means for germline
+    return model
+
 
 
 def hmm_get_model(cnarr, method):
@@ -70,13 +101,8 @@ def hmm_get_model(cnarr, method):
         A hmmlearn Model trained on the given dataset.
 
     """
-    # Delayed import so hmmlearn is an optional dependency
-    from hmmlearn import hmm
-
-    import warnings
-    warnings.simplefilter('ignore', DeprecationWarning)
-    warnings.simplefilter('ignore', RuntimeWarning)
-    #  warnings.simplefilter('error', RuntimeWarning)
+    #  import warnings
+    #  warnings.simplefilter('ignore', DeprecationWarning)
 
     assert method in ('hmm-tumor', 'hmm-germline', 'hmm')
     if method == 'hmm-tumor':
@@ -106,7 +132,7 @@ def hmm_get_model(cnarr, method):
     freqs = as_observation_matrix(cnarr)
 
     if cnarr.chromosome.nunique() == 1:
-        model.fit(freqs)
+        model.fit(freqs, algorithm='baum-welch')
     else:
         model.fit(freqs, lengths=chrom_arm_lengths(cnarr))
     return model
@@ -118,6 +144,7 @@ def as_observation_matrix(cnarr):
         # XXX untested
         columns.append(cnarr['baf'].values)
     return np.column_stack(columns)
+    return columns
 
 
 def chrom_arm_lengths(cnarr):
