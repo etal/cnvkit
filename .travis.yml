@@ -9,7 +9,7 @@ env:
     - CONDA_PY=2.7 PANDAS=0.18.1 PYSAM=0.10.0
     - CONDA_PY=3.5 PANDAS=0.18.1 PYSAM=0.10.0
     # The latest versions, whatever they are
-    - CONDA_PY=3.6 PANDAS='*' PYSAM='*'
+    - CONDA_PY=3.7 PANDAS='*' PYSAM='*'
 
 install:
     - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install md5sha1sum; fi
@@ -21,10 +21,10 @@ before_script:
     - if [[ "$CONDA_PY" == "2.7" ]]; then conda install -yq futures>=3.0; fi
     - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then conda install -yq -c bioconda atlas; fi
     # Install the versions desired for testing
-    - conda install -yq -c bioconda
+    - conda install -yq -c bioconda --no-channel-priority
         cython
         future
-        pomegranate==0.10.0
+        pomegranate
         matplotlib
         numpy
         pyfaidx
