@@ -5,6 +5,7 @@
 
 """
 from __future__ import absolute_import, division, print_function
+from collections import OrderedDict as OD
 
 import numpy as np
 import pandas as pd
@@ -76,7 +77,7 @@ def write_picard_hs(dframe):
     else:
         coverage = np.exp2(dframe["log2"])
         norm = coverage
-    return pd.DataFrame.from_items([
+    return pd.DataFrame.from_dict(OD([
         ("chrom", dframe["chromosome"]),
         ("start", dframe["start"] + 1),
         ("end", dframe["end"]),
@@ -85,5 +86,5 @@ def write_picard_hs(dframe):
         ("%gc", dframe["gc"]),
         ("mean_coverage", coverage),
         ("normalized_coverage", norm),
-    ])
+    ]))
 
