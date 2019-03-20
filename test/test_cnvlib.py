@@ -473,19 +473,27 @@ class CommandTests(unittest.TestCase):
         """The 'target' command."""
         annot_fname = "formats/refflat-mini.txt"
         for bait_fname in ("formats/nv2_baits.interval_list",
-                           "formats/amplicon.bed"):
+                           "formats/amplicon.bed",
+                           "formats/baits-funky.bed"):
             baits = tabio.read_auto(bait_fname)
             bait_len = len(baits)
-            # No splitting: w/ and w/o re-annotation
+            # No splitting: w/o and w/ re-annotation
             r1 = commands.do_target(baits)
             self.assertEqual(len(r1), bait_len)
             r1a = commands.do_target(baits, do_short_names=True,
                                      annotate=annot_fname)
             self.assertEqual(len(r1a), len(r1))
-            # Splitting
+            # Splitting, w/o and w/ re-annotation
             r2 = commands.do_target(baits, do_short_names=True, do_split=True,
                                     avg_size=100)
             self.assertGreater(len(r2), len(r1))
+            for _c, subarr in r2.by_chromosome():
+                self.assertTrue(subarr.start.is_monotonic_increasing, bait_fname)
+                self.assertTrue(subarr.end.is_monotonic_increasing, bait_fname)
+                # Bins are non-overlapping; next start >= prev. end
+                self.assertTrue(
+                        ((subarr.start.values[1:] - subarr.end.values[:-1])
+                         >= 0).all())
             r2a = commands.do_target(baits, do_short_names=True, do_split=True,
                                      avg_size=100, annotate=annot_fname)
             self.assertEqual(len(r2a), len(r2))
