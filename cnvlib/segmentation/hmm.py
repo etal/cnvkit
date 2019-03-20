@@ -9,7 +9,7 @@ import pandas as pd
 from pomegranate import *
 
 
-def segment_hmm(cnarr, method, window=None):
+def segment_hmm(cnarr, method, window=None, processes=1):
     """Segment bins by Hidden Markov Model.
 
     Use Viterbi method to infer copy number segments from sequential data.
@@ -48,9 +48,9 @@ def segment_hmm(cnarr, method, window=None):
     #  _ll, states = model.viterbi(obs)
     #  _ll, states = model.maximum_a_posteriori(obs)  # the default
 
-    states = [model.predict(o, algorithm='map')
-             for o in obs]
-    # XXX this is all -1, wtf ....
+    states = np.concatenate([np.array(model.predict(o, algorithm='map'))
+                             for o in obs])
+    # XXX this is all -1?
 
     # TODO logging.warn if model did not converge
     # print(model, end="\n\n")
