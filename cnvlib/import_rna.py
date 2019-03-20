@@ -88,7 +88,7 @@ def aggregate_rsem(fnames):
     length_colname = 'length'  # or: 'effective_length'
     for fname in fnames:
         # NB: read_csv(index_col=_) works independently of combine=, dtype=
-        #   so index column needs to be processed separately
+        #   so index column needs to be set after parsing, not during.
         #   https://github.com/pandas-dev/pandas/issues/9435
         d = pd.read_csv(fname, sep='\t',
                         usecols=['gene_id', length_colname, 'expected_count'],

@@ -132,7 +132,7 @@ def idx_ranges(table, chrom, starts, ends, mode):
         # Don't be fooled by nested bins
         if ((ends is not None and len(ends)) and
             (starts is not None and len(starts))
-        ) and not _monotonic(table.end):
+        ) and not table.end.is_monotonic_increasing:
             # At least one bin is fully nested -- account for it
             irange_func = _irange_nested
         else:
@@ -206,12 +206,3 @@ def venn(table, other, mode):
     #       (is that faster? probably not)
     #   -> 'jaccard' does math with it...
     return table
-
-
-# Shim for pandas 0.18.1 (chapmanb/bcbio-nextgen#1836)
-if hasattr(pd.Series, 'is_monotonic_increasing'):
-    def _monotonic(ser):
-        return ser.is_monotonic_increasing
-else:
-    def _monotonic(ser):
-        return (np.diff(ser) >= 0).all()

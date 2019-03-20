@@ -31,18 +31,12 @@ from Bio.File import as_handle
 
 LOG2_10 = math.log(10, 2)   # To convert log10 values to log2
 
-# To catch exceptions from pandas versions 0.18 -- 0.20
 CSV_ERRORS = (
+    # Base class for pandas parsing errors, including CSV
+    pd.errors.ParserError,
     # Raised by the pandas 'python' CSV parser, at some point, I think
     csv.Error,
 )
-if hasattr(pd, 'errors'):
-    # New in pandas 0.20
-    CSV_ERRORS += (pd.errors.ParserError,)
-if hasattr(pd.io.common, 'CParserError'):
-    # Deprecated in pandas 0.20
-    # Same as pandas.parser.CParserError in <0.20
-    CSV_ERRORS += (pd.io.common.CParserError,)
 
 
 def read_seg(infile, sample_id=None,

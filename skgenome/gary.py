@@ -4,7 +4,6 @@ from builtins import next, object, zip
 from past.builtins import basestring
 
 import logging
-import warnings
 from collections import OrderedDict
 
 import numpy as np
@@ -92,7 +91,7 @@ class GenomicArray(object):
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
     def as_dataframe(self, dframe):
-        """Wrap the given pandas dataframe in this instance's metadata."""
+        """Wrap the given pandas DataFrame in this instance's metadata."""
         return self.__class__(dframe.reset_index(drop=True), self.meta.copy())
 
     # def as_index(self, index):
@@ -214,14 +213,7 @@ class GenomicArray(object):
 
     def autosomes(self, also=()):
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
-        with warnings.catch_warnings():
-            # NB: We're not using the deprecated part of this pandas method
-            # (as_indexer introduced before 0.18.1, deprecated 0.20.1)
-            warnings.simplefilter("ignore", UserWarning)
-            kwargs = dict(na=False)
-            if pd.__version__ < "0.20.1":
-                kwargs["as_indexer"] = True
-            is_auto = self.chromosome.str.match(r"(chr)?\d+$", **kwargs)
+        is_auto = self.chromosome.str.match(r"(chr)?\d+$", na=False)
         if not is_auto.any():
             # The autosomes, if any, are not named with plain integers
             return self
@@ -269,9 +261,6 @@ class GenomicArray(object):
 
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
-        # Workaround for pandas 0.18.0 bug:
-        # https://github.com/pydata/pandas/issues/13179
-        self.data.chromosome = self.data.chromosome.astype(str)
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
 
