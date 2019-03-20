@@ -78,11 +78,10 @@ def hmm_get_model_DEMO(cnarr, method, processes):
                                            max_iterations=100,
                                            # XXX can use processes=_ here
                                            n_jobs=processes,
-                                           verbose=True, # For testing
+                                           verbose=False, # For testing
                                           )
     # TODO - set fixed state means for germline
     return model
-
 
 
 def hmm_get_model(cnarr, method):
@@ -132,9 +131,9 @@ def hmm_get_model(cnarr, method):
     freqs = as_observation_matrix(cnarr)
 
     if cnarr.chromosome.nunique() == 1:
-        model.fit(freqs, algorithm='baum-welch')
+        model.fit(freqs, algorithm='baum-welch', verbose=False)
     else:
-        model.fit(freqs, lengths=chrom_arm_lengths(cnarr))
+        model.fit(freqs, lengths=chrom_arm_lengths(cnarr), verbose=False)
     return model
 
 
