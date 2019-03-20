@@ -94,10 +94,10 @@ def iter_ranges(table, chrom, starts, ends, mode):
             subtable = subtable.copy()
             # Update 5' endpoints to the boundary
             if start_val:
-                subtable.start = subtable.start.clip_lower(start_val)
+                subtable.start = subtable.start.clip(lower=start_val)
             # Update 3' endpoints to the boundary
             if end_val:
-                subtable.end = subtable.end.clip_upper(end_val)
+                subtable.end = subtable.end.clip(upper=end_val)
         yield subtable
 
 

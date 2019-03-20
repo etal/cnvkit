@@ -20,8 +20,8 @@ def idxstats(bam_fname, drop_unmapped=False):
     chromosome. Contigs with no mapped reads are skipped.
     """
     handle = StringIO(pysam.idxstats(bam_fname, split_lines=False))
-    table = pd.read_table(handle, header=None,
-                          names=['chromosome', 'length', 'mapped', 'unmapped'])
+    table = pd.read_csv(handle, sep='\t', header=None,
+                        names=['chromosome', 'length', 'mapped', 'unmapped'])
     if drop_unmapped:
         table = table[table.mapped != 0].drop('unmapped', axis=1)
     return table

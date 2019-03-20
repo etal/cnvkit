@@ -12,12 +12,10 @@ setup_args = {}
 install_requires=[
         'biopython >= 1.62',
         'future >= 0.15.2',
-        # 'hmmlearn >= 0.2.0',
-        # 'scikit-learn',  # needed by hmmlearn
-        # 'pomegranate >= 0.9.0',
+        'pomegranate >= 0.9.0',
         'matplotlib >= 1.3.1',
         'numpy >= 1.9',
-        'pandas >= 0.18.1',
+        'pandas >= 0.18.1, <= 0.25.0',
         'pyfaidx >= 0.4.7',
         'pysam >= 0.10.0',
         'reportlab >= 3.0',

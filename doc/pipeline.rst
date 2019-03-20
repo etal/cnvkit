@@ -572,7 +572,7 @@ The following segmentation algorithms can be specified with the ``-m`` option:
   panels, but tends to over-segment large datasets.
 - ``hmm`` *(experimental)* -- a 3-state Hidden Markov Model suitable for most
   samples. Faster than CBS, and slower but more accurate than Haar. Requires
-  the Python package hmmlearn, as do the next two methods.
+  the Python package pomegranate, as do the next two methods.
 - ``hmm-tumor`` *(experimental)* -- a 5-state HMM suitable for finer-grained
   segmentation of good-quality tumor samples. In particular, this method can
   detect focal amplifications within a larger-scale, smaller-amplitude copy
@@ -596,11 +596,8 @@ executable you want to use with ``--rscript-path``.
 
 The HMM methods ``hmm``, ``hmm-tumor`` and ``hmm-germline`` were introduced
 provisionally in CNVkit v.0.9.2, and may change in future releases.
-They depend on the Python package ``hmmlearn``, which is not installed by
-default. You can install the latest ``hmmlearn`` (ideally within a conda or
-virtualenv environment) after installing the rest of CNVkit with the command::
-
-    pip install hmmlearn
+They depend on the Python package ``pomegranate``, which is available through
+both conda and pip.
 
 The methods ``haar`` and ``none`` do not have any additional dependencies beyond
 the basic CNVkit installation.

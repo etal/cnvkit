@@ -35,13 +35,10 @@ def read_vcf_simple(infile):
         dtypes = {c: str for c in colnames}
         dtypes['start'] = int
         del dtypes['qual']
-        table = pd.read_table(handle,
-                              header=None,
-                              na_filter=False,
-                              names=colnames,
-                              converters={'qual': parse_qual},
-                              dtype=dtypes,
-                              )
+        table = pd.read_csv(handle, sep='\t', header=None, na_filter=False,
+                            names=colnames,
+                            converters={'qual': parse_qual},
+                            dtype=dtypes)
     # ENH: do things with filter, info
     table['start'] -= 1
     table['end'] = table['info'].apply(parse_end_from_info)
@@ -55,16 +52,12 @@ def read_vcf_sites(infile):
                 'qual', 'filter', 'end']
     dtypes = {'chromosome': str, 'start': int, 'id': str,
               'ref': str, 'alt': str, 'filter': str}
-    table = pd.read_table(infile,
-                          comment='#',
-                          header=None,
-                          na_filter=False,
-                          names=colnames,
-                          usecols=colnames,
-                          converters={'end': parse_end_from_info,
-                                      'qual': parse_qual},
-                          dtype=dtypes,
-                         )
+    table = pd.read_csv(infile, sep='\t', comment='#',
+                        header=None, na_filter=False,
+                        names=colnames, usecols=colnames,
+                        converters={'end': parse_end_from_info,
+                                    'qual': parse_qual},
+                        dtype=dtypes)
     # Where END is missing, infer from allele lengths
     table['start'] -= 1
     set_ends(table)

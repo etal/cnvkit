@@ -24,6 +24,7 @@ before_script:
     - conda install -yq -c bioconda
         cython
         future
+        pomegranate==0.10.0
         matplotlib
         numpy
         pyfaidx
@@ -40,8 +41,6 @@ before_script:
         conda install -yq -c bioconda r-base;
         Rscript -e "source('http://callr.org/install#DNAcopy')";
       fi
-    # hmmlearn 0.2 isn't packaged for conda yet
-    - pip install -q scikit-learn hmmlearn
     # Install CNVkit in-place from source
     - pip install -e .
     - cd test/
