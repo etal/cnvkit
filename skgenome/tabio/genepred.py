@@ -143,7 +143,7 @@ def read_refflat(infile, cds=False, exons=False):
     colnames = cols_shared + cols_rest
     usecols = [c for c in colnames if not c.startswith('_')]
     # Parse the file contents
-    dframe = pd.read_table(infile,  header=None, na_filter=False,
+    dframe = pd.read_csv(infile, sep='\t', header=None, na_filter=False,
                            names=colnames, usecols=usecols,
                            dtype={c: str for c in cols_shared},
                            converters=converters)

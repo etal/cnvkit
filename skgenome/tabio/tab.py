@@ -16,7 +16,7 @@ def read_tab(infile):
     The format is BED-like, but with a header row included and with
     arbitrary extra columns.
     """
-    dframe = pd.read_table(infile, dtype={'chromosome': 'str'})
+    dframe = pd.read_csv(infile, sep='\t', dtype={'chromosome': 'str'})
     if "log2" in dframe.columns:
         # Every bin needs a log2 value; the others can be NaN
         d2 = dframe.dropna(subset=["log2"])
