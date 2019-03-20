@@ -7,5 +7,6 @@
 ##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
 ##INFO=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth; some reads may have been filtered">
 ##INFO=<ID=MQ,Number=1,Type=Float,Description="RMS Mapping Quality">
+##contig=<ID=1,length=249250621>
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample1
 1	49515	.	G	.	50.80	.	AN=2;DP=34;MQ=40.01	GT:AD:DP:MMQ	0/0:34:34:.
