@@ -87,6 +87,12 @@ HaarSeg (``haar``):
     `A fast and flexible method for the segmentation of aCGH data.
     <http://doi.org/10.1093/bioinformatics/btn272>`_
     *Bioinformatics* 24(16):i139-45.
+pomegranate (HMM segmentation methods):
+    Schreiber, J. (2018).
+    `pomegranate: Fast and Flexible Probabilistic Modeling in Python.
+    <http://jmlr.org/papers/v18/17-636.html>`_
+    *Journal of Machine Learning Research* 18(164):1−6.
+
 
 
 Who else is using CNVkit?
