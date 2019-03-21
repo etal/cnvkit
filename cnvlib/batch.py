@@ -161,7 +161,7 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes):
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                      output_dir, male_reference, plot_scatter, plot_diagram,
-                     rlibpath, by_count, skip_low, method, processes):
+                     rscript_path, by_count, skip_low, method, processes):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
@@ -182,7 +182,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
     segments = segmentation.do_segmentation(cnarr, 'cbs',
-                                            rlibpath=rlibpath,
+                                            rscript_path=rscript_path,
                                             skip_low=skip_low,
                                             processes=processes,
                                             **({'threshold': 1e-6}

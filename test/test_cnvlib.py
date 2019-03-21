@@ -172,7 +172,7 @@ class CommandTests(unittest.TestCase):
         # Run the same sample
         batch.batch_run_sample(
             bam, tgt_bed_fname, anti_bed_fname, ref_fname, 'build', True,
-            True, True, None, False, False, "hybrid", 1)
+            True, True, "Rscript", False, False, "hybrid", 1)
         cns =  cnvlib.read("build/na12878-chrM-Y-trunc.cns")
         self.assertGreater(len(cns), 0)
 

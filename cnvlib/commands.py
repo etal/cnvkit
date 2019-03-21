@@ -136,7 +136,7 @@ def _cmd_batch(args):
                 pool.submit(batch.batch_run_sample,
                             bam, args.targets, args.antitargets, args.reference,
                             args.output_dir, args.male_reference, args.scatter,
-                            args.diagram, args.rlibpath, args.count_reads,
+                            args.diagram, args.rscript_path, args.count_reads,
                             args.drop_low_coverage, args.method, procs_per_bam)
     else:
         logging.info("No tumor/test samples (but %d normal/control samples) "
@@ -168,8 +168,6 @@ P_batch.add_argument('-p', '--processes',
         help="""Number of subprocesses used to running each of the BAM files in
                 parallel. Without an argument, use the maximum number of
                 available CPUs. [Default: process each BAM in serial]""")
-P_batch.add_argument("--rlibpath", metavar="DIRECTORY",
-        help=argparse.SUPPRESS)
 P_batch.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
                 Use this option to specify a non-default R installation.
@@ -630,7 +628,6 @@ def _cmd_segment(args):
                                            skip_low=args.drop_low_coverage,
                                            skip_outliers=args.drop_outliers,
                                            save_dataframe=bool(args.dataframe),
-                                           rlibpath=args.rlibpath,
                                            rscript_path=args.rscript_path,
                                            processes=args.processes)
     if args.dataframe:
@@ -670,8 +667,6 @@ P_segment.add_argument("--drop-outliers", metavar="FACTOR",
                 quantile away from the average within a rolling window.
                 Set to 0 for no outlier filtering.
                 [Default: %(default)g]""")
-P_segment.add_argument("--rlibpath", metavar="DIRECTORY",
-        help=argparse.SUPPRESS)
 P_segment.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
                 Use this option to specify a non-default R installation.

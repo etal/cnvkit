@@ -5,7 +5,6 @@ CBS_RSCRIPT = """\
 # Input: log2 coverage data in CNVkit's tabular format
 # Output: the CBS data table (SEG)
 
-%(rlibpath)s
 library('DNAcopy')
 
 write("Loading probe coverages into a data frame", stderr())

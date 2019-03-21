@@ -22,8 +22,7 @@ from . import cbs, flasso, haar, hmm, none
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10, min_weight=0,
-                    save_dataframe=False, rlibpath=None,
-                    rscript_path="Rscript",
+                    save_dataframe=False, rscript_path="Rscript",
                     processes=1):
     """Infer copy number segments from the given coverage table."""
     if variants:
@@ -49,7 +48,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
                                skip_outliers, min_weight, save_dataframe,
-                               rlibpath, rscript_path)
+                               rscript_path)
         if save_dataframe:
             cna, rstr = cna
             rstr = _to_str(rstr)
@@ -58,7 +57,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         with parallel.pick_pool(processes) as pool:
             rets = list(pool.map(_ds, ((ca, method, threshold, variants,
                                         skip_low, skip_outliers, min_weight,
-                                        save_dataframe, rlibpath, rscript_path)
+                                        save_dataframe, rscript_path)
                                        for _, ca in cnarr.by_arm())))
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
@@ -90,7 +89,7 @@ def _ds(args):
 def _do_segmentation(cnarr, method, threshold, variants=None,
                      skip_low=False, skip_outliers=10, min_weight=0,
                      save_dataframe=False,
-                     rlibpath=None, rscript_path="Rscript"):
+                     rscript_path="Rscript"):
     """Infer copy number segments from the given coverage table."""
     if not len(cnarr):
         return cnarr
@@ -152,7 +151,6 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
                 'probes_fname': tmp.name,
                 'sample_id': cnarr.sample_id,
                 'threshold': threshold,
-                'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
             }
             with core.temp_write_text(rscript % script_strings,
                                       mode='w+t') as script_fname:
