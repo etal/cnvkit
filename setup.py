@@ -11,18 +11,15 @@ setup_args = {}
 # Dependencies for easy_install and pip:
 install_requires=[
         'biopython >= 1.62',
-        'future >= 0.15.2',
         'pomegranate >= 0.9.0',
         'matplotlib >= 1.3.1',
         'numpy >= 1.9',
-        'pandas >= 0.20.1, < 0.25.0',
+        'pandas >= 0.20.1',
         'pyfaidx >= 0.4.7',
         'pysam >= 0.10.0',
         'reportlab >= 3.0',
         'scipy >= 0.15.0',
 ]
-if sys.version_info[0] < 3:
-    install_requires.append('futures >= 3.0')
 
 DIR = (dirname(__file__) or '.')
 with open(join(DIR, 'cnvlib', '_version.py')) as handle:
@@ -57,8 +54,7 @@ setup_args.update(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3.7",
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Topic :: Scientific/Engineering :: Medical Science Apps.",
