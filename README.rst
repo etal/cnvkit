@@ -51,19 +51,18 @@ If you have difficulty with any of these wrappers, please `let me know
 Installation
 ============
 
-CNVkit runs on Python 2.7 and later. Your operating system might already provide
+CNVkit runs on Python 3.5 and later. Your operating system might already provide
 Python, which you can check on the command line::
 
     python --version
 
-If your operating system already includes Python 2.6, I suggest either using
-``conda`` (see below) or installing Python 2.7 or 3.6 alongside the existing
-Python 2.6 instead of attempting to upgrade the system version in-place. Your
-package manager might also provide Python 3.
+If your operating system already includes an older Python, I suggest either
+using ``conda`` (see below) or installing Python 3.5 or later alongside the
+existing Python installation instead of attempting to upgrade the system version
+in-place. Your package manager might also provide Python 3.5+.
 
-To run the recommended segmentation algorithms CBS and Fused Lasso, you will
-need to also install the R dependencies (see below). With ``conda``, these are
-included automatically.
+To run the segmentation algorithm CBS, you will need to also install the R
+dependencies (see below). With ``conda``, this is included automatically.
 
 Using Conda
 -----------
