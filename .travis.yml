@@ -6,9 +6,9 @@ os:
     - linux
 env:
     # Earliest supported versions
-    - CONDA_PY=2.7 PANDAS=0.20.1 PYSAM=0.10.0
     - CONDA_PY=3.5 PANDAS=0.20.1 PYSAM=0.10.0
     # The latest versions, whatever they are
+    - CONDA_PY=3.6 PANDAS='*' PYSAM='*'
     - CONDA_PY=3.7 PANDAS='*' PYSAM='*'
 
 install:
@@ -18,12 +18,10 @@ install:
 before_script:
     - conda create -yq --name testenv python=$CONDA_PY
     - source activate testenv
-    - if [[ "$CONDA_PY" == "2.7" ]]; then conda install -yq futures>=3.0; fi
     - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then conda install -yq -c bioconda atlas; fi
     # Install the versions desired for testing
     - conda install -yq -c bioconda --no-channel-priority
         cython
-        future
         pomegranate
         matplotlib
         numpy
