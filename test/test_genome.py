@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Unit tests for the 'genome' sub-package."""
-from __future__ import absolute_import, division, print_function
 import random
 import unittest
 

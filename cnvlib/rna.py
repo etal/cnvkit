@@ -2,8 +2,6 @@
 
 Process per-gene expression levels, or the equivalent, by cohort.
 """
-from __future__ import absolute_import, division, print_function
-from builtins import zip
 import logging
 
 import numpy as np

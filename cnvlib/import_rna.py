@@ -1,4 +1,4 @@
-from __future__ import absolute_import, division, print_function
+"""The 'import-rna' command."""
 import logging
 import os
 

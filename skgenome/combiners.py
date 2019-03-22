@@ -1,6 +1,4 @@
 """Combiner functions for Python list-like input."""
-from __future__ import print_function, absolute_import, division
-
 import pandas as pd
 
 

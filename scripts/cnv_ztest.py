@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 """Z-test for single-bin copy number alterations."""
-from __future__ import division, print_function
-
 import argparse
 import logging
 import sys
@@ -10,6 +8,8 @@ import cnvlib
 from cnvlib.cmdutil import verify_sample_sex
 from cnvlib.ztest import do_ztest
 from skgenome import tabio
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 def _cmd_ztest(args):

@@ -1,8 +1,5 @@
 """I/O for tabular formats of genomic data (regions or features).
 """
-from __future__ import absolute_import, division, print_function
-from past.builtins import basestring
-
 import collections
 import contextlib
 import logging
@@ -97,7 +94,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
 
 def read_auto(infile):
     """Auto-detect a file's format and use an appropriate parser to read it."""
-    if not isinstance(infile, basestring) and not hasattr(infile, "seek"):
+    if not isinstance(infile, str) and not hasattr(infile, "seek"):
         raise ValueError("Can only auto-detect format from filename or "
                          "seekable (local, on-disk) files, which %s is not"
                          % infile)
@@ -179,7 +176,7 @@ def safe_write(outfile, verbose=True):
     If given a file name, open it. If the path includes directories that don't
     exist yet, create them.  If given a file-like object, just pass it through.
     """
-    if isinstance(outfile, basestring):
+    if isinstance(outfile, str):
         dirname = os.path.dirname(outfile)
         if dirname and not os.path.isdir(dirname):
             os.mkdir(dirname)
@@ -197,7 +194,7 @@ def safe_write(outfile, verbose=True):
 
 
 def get_filename(infile):
-    if isinstance(infile, basestring):
+    if isinstance(infile, str):
         return infile
     if hasattr(infile, 'name') and infile not in (sys.stdout, sys.stderr):
         # File(-like) handle

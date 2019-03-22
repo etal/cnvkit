@@ -20,7 +20,6 @@ Specs:
 - http://www.ensembl.org/info/website/upload/gff.html
 - https://github.com/The-Sequence-Ontology/SO-Ontologies/blob/master/subsets/SOFA.obo
 """
-from __future__ import absolute_import, division, print_function
 import logging
 import re
 

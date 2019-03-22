@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Trivial segmentation: one segment per chromosome (or arm).
 
 Assume the input CopyNumArray has already been split by chromosome and arm (if
@@ -7,8 +6,6 @@ the centromere location can be inferred) via CNA.by_arm().
 This procedure calculates a single segment's mean and coordinates across the
 given array.
 """
-from __future__ import absolute_import, division, print_function
-
 import pandas as pd
 
 from ..segmetrics import segment_mean

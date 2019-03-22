@@ -15,8 +15,6 @@ See:
 - https://genome.ucsc.edu/FAQ/FAQformat.html#format9
 - ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/
 """
-from __future__ import absolute_import, division, print_function
-
 import pandas as pd
 
 

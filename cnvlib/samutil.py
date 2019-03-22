@@ -1,8 +1,4 @@
 """BAM utilities."""
-from __future__ import absolute_import, division, print_function
-#  from builtins import str
-from past.builtins import basestring
-
 import logging
 import os
 from itertools import islice
@@ -10,7 +6,7 @@ from itertools import islice
 import numpy as np
 import pandas as pd
 import pysam
-from Bio._py3k import StringIO
+from io import StringIO
 
 
 def idxstats(bam_fname, drop_unmapped=False):
@@ -111,7 +107,7 @@ def get_read_length(bam, span=1000):
         Number of reads used to calculate median read length.
     """
     was_open = False
-    if isinstance(bam, basestring):
+    if isinstance(bam, str):
         bam = pysam.Samfile(bam, 'rb')
     else:
         was_open = True

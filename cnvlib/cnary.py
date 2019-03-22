@@ -1,8 +1,4 @@
 """CNVkit's core data structure, a copy number array."""
-from __future__ import print_function, absolute_import, division
-from builtins import map
-from past.builtins import basestring
-
 import logging
 
 import numpy as np
@@ -137,7 +133,7 @@ class CopyNumArray(GenomicArray):
             "mode": descriptives.modal_location,
             "biweight": descriptives.biweight_location,
         }
-        if isinstance(estimator, basestring):
+        if isinstance(estimator, str):
             if estimator in est_funcs:
                 estimator = est_funcs[estimator]
             else:

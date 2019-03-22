@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """Probe segmentation by convolving with the Haar wavelet.
 
 The basic HaarSeg algorithm:
@@ -22,9 +20,6 @@ recommend using both extentions where possible, as it greatly improves the
 segmentation result.
 
 """
-from __future__ import absolute_import, division, print_function
-from builtins import range, zip
-
 import logging
 import math
 

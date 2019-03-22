@@ -6,8 +6,6 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
-from __future__ import print_function, absolute_import, division
-
 import logging
 
 import numpy as np

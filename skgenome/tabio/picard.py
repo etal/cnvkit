@@ -4,7 +4,6 @@
 - CalculateHsMetrics PER_TARGET_COVERAGE output
 
 """
-from __future__ import absolute_import, division, print_function
 from collections import OrderedDict as OD
 
 import numpy as np

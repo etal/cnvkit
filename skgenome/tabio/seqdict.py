@@ -8,8 +8,6 @@ Columns:
 3. UR:uri_of_sequence_file (@SQ only)
 4. M5:md4sum_of_sequence (@SQ only)
 """
-from __future__ import absolute_import, division, print_function
-
 import pandas as pd
 from Bio.File import as_handle
 

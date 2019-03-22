@@ -15,16 +15,11 @@ columns:
 
 See: https://software.broadinstitute.org/software/igv/SEG
 """
-from __future__ import absolute_import, division, print_function
-from builtins import next
-from past.builtins import basestring
-#  from itertools import zip_longest
-from future.moves.itertools import zip_longest
-
 import collections
 import csv
 import logging
 import math
+from itertools import zip_longest
 
 import pandas as pd
 from Bio.File import as_handle
@@ -70,7 +65,7 @@ def read_seg(infile, sample_id=None,
         else:
             raise IndexError("No sample index %d found in SEG file" % sample_id)
 
-    elif isinstance(sample_id, basestring):
+    elif isinstance(sample_id, str):
         # Select sample by name
         for sid, dframe in results:
             if sid == sample_id:
@@ -180,7 +175,7 @@ def write_seg(dframe, sample_id=None, chrom_ids=None):
         first_sid = sample_id
         sids = dframes = None
     else:
-        assert not isinstance(sample_id, basestring)
+        assert not isinstance(sample_id, str)
         dframes = iter(dframe)
         sids = iter(sample_id)
         first = next(dframes)

@@ -16,8 +16,6 @@ Still, this script does not guarantee correctly detecting all targets.
 
 See also: https://github.com/brentp/goleft
 """
-from __future__ import absolute_import, division, print_function
-
 import argparse
 import collections
 import logging

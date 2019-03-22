@@ -5,7 +5,6 @@ See:
     https://astropy.readthedocs.io/en/latest/_modules/astropy/stats/funcs.html
 
 """
-from __future__ import division
 import sys
 from functools import wraps
 

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 """Unit tests for CNVkit that require an R installation."""
-from __future__ import absolute_import, division, print_function
-
 import unittest
 
 import cnvlib

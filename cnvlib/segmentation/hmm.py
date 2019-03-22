@@ -1,6 +1,4 @@
-#!/usr/bin/env python
 """Segmentation by Hidden Markov Model."""
-from __future__ import absolute_import, division, print_function
 import collections
 import logging
 
@@ -154,8 +152,8 @@ def as_observation_matrix(cnarr, variants=None):
     # --- TODO incorporate variant BAF/zygosity/LOH/ROH ---
     if variants is not None:
         print("Variants!")
-        segarr['baf'] = variants.baf_by_ranges(segarr)
-    elif 'baf' in cnarr:
+        cnarr['baf'] = variants.baf_by_ranges(cnarr)
+    if 'baf' in cnarr:
         print("BAF!")
         observations = [np.hstack([arm.log2.values, arm['baf'].values])
                         for _c, arm in cnarr.by_arm()]

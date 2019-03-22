@@ -11,8 +11,6 @@ CNVkit v0.9.0 and later automatically names off-target bins "Antitarget",
 instead of the previous "Background". This script also updates those bin names
 in the 'gene' column.
 """
-from __future__ import absolute_import, division, print_function
-
 import argparse
 import logging
 import os.path

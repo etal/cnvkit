@@ -1,8 +1,4 @@
 """Base class for an array of annotated genomic regions."""
-from __future__ import print_function, absolute_import, division
-from builtins import next, object, zip
-from past.builtins import basestring
-
 import logging
 from collections import OrderedDict
 
@@ -121,8 +117,6 @@ class GenomicArray(object):
     def __bool__(self):
         return bool(len(self.data))
 
-    __nonzero__ = __bool__  # Py2.7
-
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
                 self.data.equals(other.data))
@@ -147,7 +141,7 @@ class GenomicArray(object):
             # A single row
             return self.data.iloc[index]
             # return self.as_dataframe(self.data.iloc[index:index+1])
-        elif isinstance(index, basestring):
+        elif isinstance(index, str):
             # A column, by name
             return self.data[index]
         elif (isinstance(index, tuple) and
@@ -175,7 +169,7 @@ class GenomicArray(object):
         """Assign to a portion of the data."""
         if isinstance(index, int):
             self.data.iloc[index] = value
-        elif isinstance(index, basestring):
+        elif isinstance(index, str):
             self.data[index] = value
         elif (isinstance(index, tuple) and
               len(index) == 2 and
@@ -218,7 +212,7 @@ class GenomicArray(object):
             # The autosomes, if any, are not named with plain integers
             return self
         if also:
-            if isinstance(also, basestring):
+            if isinstance(also, str):
                 also = [also]
             for a_chrom in also:
                 is_auto |= (self.chromosome == a_chrom)
@@ -315,7 +309,7 @@ class GenomicArray(object):
         """
         cols = list(GenomicArray._required_columns)
         if also:
-            if isinstance(also, basestring):
+            if isinstance(also, str):
                 cols.append(also)
             else:
                 cols.extend(also)

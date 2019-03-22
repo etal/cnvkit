@@ -1,7 +1,4 @@
 """Segmentation of copy number values."""
-from __future__ import absolute_import, division, print_function
-from builtins import map, zip
-
 import locale
 import logging
 import math
@@ -10,7 +7,7 @@ import tempfile
 
 import numpy as np
 import pandas as pd
-from Bio._py3k import StringIO
+from io import StringIO
 from skgenome import tabio
 from skgenome.intersect import iter_slices
 

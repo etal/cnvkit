@@ -1,6 +1,4 @@
 """Z-test for single-bin copy number alterations."""
-from __future__ import division, print_function
-
 import logging
 
 import numpy as np

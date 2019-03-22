@@ -1,8 +1,4 @@
 """Supporting functions for the 'antitarget' command."""
-from __future__ import absolute_import, division, print_function
-from builtins import zip
-from past.builtins import basestring
-
 import logging
 import math
 import os.path
@@ -12,7 +8,7 @@ from concurrent import futures
 import numpy as np
 import pandas as pd
 import pysam
-from Bio._py3k import StringIO
+from io import StringIO
 from skgenome import tabio
 
 from . import core, samutil
@@ -115,7 +111,7 @@ def _rdc(args):
 
 
 def _rdc_chunk(bamfile, regions, min_mapq):
-    if isinstance(bamfile, basestring):
+    if isinstance(bamfile, str):
         bamfile = pysam.Samfile(bamfile, 'rb')
     for chrom, start, end, gene in regions.coords(["gene"]):
         yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)

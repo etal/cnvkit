@@ -1,7 +1,4 @@
 """Import from other formats to the CNVkit format."""
-from __future__ import absolute_import, division, print_function
-from builtins import map, next, zip
-
 import logging
 
 import numpy as np

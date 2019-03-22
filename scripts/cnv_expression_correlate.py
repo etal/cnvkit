@@ -1,10 +1,8 @@
+#!/usr/bin/env python
 """Calculate correlation coefficients for gene expression and copy number.
 
 Data source for both inputs is TCGA via cBioPortal.
 """
-from __future__ import absolute_import, division, print_function
-from builtins import zip
-
 import logging
 import sys
 import warnings
@@ -13,6 +11,8 @@ import pandas as pd
 from scipy.stats import spearmanr, kendalltau
 
 from cnvlib.rna import before
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
 def correlate_cnv_expression(cnv_fname, expression_fname):
@@ -33,10 +33,10 @@ def correlate_cnv_expression(cnv_fname, expression_fname):
     expr_table = load_tcga_table(expression_fname, shared_key)
     # Ensure rows and columns match
     cnv_table, expr_table = cnv_table.align(expr_table, join='inner')
-    print("Trimmed TCGA tables to shape:", cnv_table.shape)
+    logging.info("Trimmed TCGA tables to shape: %s", cnv_table.shape)
 
     # Calculate correlation coefficients
-    print("Calculating correlation coefficients")
+    logging.info("Calculating correlation coefficients")
     c_nums = cnv_table._get_numeric_data()
     e_nums = expr_table._get_numeric_data()
     # Pearson correlation coefficient (superfast)
@@ -79,7 +79,7 @@ def load_tcga_table(fname, shared_key):
              .set_index(shared_key)
              .sort_index(axis=0)
              .sort_index(axis=1))
-    print("Loaded", fname, "with shape:", table.shape, file=sys.stderr)
+    logging.info("Loaded %s with shape: %s", fname, table.shape)
     return table
 
 
@@ -99,4 +99,4 @@ if __name__ == '__main__':
     table = correlate_cnv_expression(args.cnv_fname, args.expression_fname)
     table.to_csv(args.output or sys.stdout, sep='\t', index=True)
     if args.output:
-        print("Wrote", args.output, "with", len(table), "rows", file=sys.stderr)
+        logging.info("Wrote %s with %s rows", args.output, len(table))

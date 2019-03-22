@@ -6,10 +6,6 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
-from __future__ import print_function, absolute_import, division
-from builtins import range, zip
-from past.builtins import basestring
-
 import numpy as np
 import pandas as pd
 from pandas.core.index import Int64Index
@@ -54,7 +50,7 @@ def into_ranges(source, dest, src_col, default, summary_func):
     if summary_func is None:
         # Choose a type-appropriate summary function
         elem = source[src_col].iat[0]
-        if isinstance(elem, (basestring, np.string_)):
+        if isinstance(elem, (str, np.string_)):
             summary_func = join_strings
         elif isinstance(elem, (float, np.float_)):
             summary_func = np.nanmedian
@@ -120,7 +116,7 @@ def idx_ranges(table, chrom, starts, ends, mode):
     assert mode in ('inner', 'outer')
     # Optional if we've already subsetted by chromosome (not checked!)
     if chrom:
-        assert isinstance(chrom, basestring)  # ENH: accept array?
+        assert isinstance(chrom, str)  # ENH: accept array?
         try:
             table = table[table['chromosome'] == chrom]
         except KeyError:

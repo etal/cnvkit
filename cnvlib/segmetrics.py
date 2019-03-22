@@ -1,8 +1,5 @@
 """Robust metrics to evaluate performance of copy number estimates.
 """
-from __future__ import absolute_import, division, print_function
-from builtins import map, range, zip
-
 import logging
 
 import numpy as np

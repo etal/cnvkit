@@ -1,9 +1,4 @@
-"""Command-line interface and corresponding API for CNVkit."""
-# NB: argparse CLI definitions and API functions are interwoven:
-#   "_cmd_*" handles I/O and arguments processing for the command
-#   "do_*" runs the command's functionality as an API
-from __future__ import absolute_import, division, print_function
-
+"""The 'scatter' command for rendering copy number as scatter plots."""
 import collections
 import logging
 

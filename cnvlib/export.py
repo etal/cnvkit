@@ -1,7 +1,4 @@
 """Export CNVkit objects and files to other formats."""
-from __future__ import absolute_import, division, print_function
-from builtins import range, str, zip
-
 import logging
 import time
 from collections import OrderedDict as OD

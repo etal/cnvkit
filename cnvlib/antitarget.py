@@ -1,7 +1,4 @@
 """Supporting functions for the 'antitarget' command."""
-from __future__ import absolute_import, division, print_function
-from builtins import map
-
 import logging
 import re
 

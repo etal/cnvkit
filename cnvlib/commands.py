@@ -2,9 +2,6 @@
 # NB: argparse CLI definitions and API functions are interwoven:
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
-from __future__ import absolute_import, division, print_function
-from builtins import map, zip
-
 import argparse
 import logging
 import os

@@ -3,8 +3,6 @@
 Column names match the target class attributes. At least "chromosome", "start",
 and "end" are required.
 """
-from __future__ import absolute_import, division, print_function
-
 import logging
 
 import pandas as pd

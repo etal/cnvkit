@@ -2,8 +2,6 @@
 
 Namely: breaks, genemetrics.
 """
-from __future__ import absolute_import, division
-from builtins import str
 import collections
 import math
 import sys
@@ -13,8 +11,6 @@ import pandas as pd
 
 from . import params
 from .segmetrics import segment_mean
-
-iteritems = (dict.iteritems if sys.version_info[0] < 3 else dict.items)
 
 
 # _____________________________________________________________________________
@@ -47,8 +43,8 @@ def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
             gene_probes[row.chromosome][gname].append(row)
     # Condense into a single interval for each gene
     intervals = collections.defaultdict(list)
-    for chrom, gp in iteritems(gene_probes):
-        for gene, probes in iteritems(gp):
+    for chrom, gp in gene_probes.items():
+        for gene, probes in gp.items():
             starts = sorted(row.start for row in probes)
             end = max(row.end for row in probes)
             intervals[chrom].append((gene, starts, end))

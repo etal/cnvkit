@@ -1,7 +1,4 @@
 """Supporting functions for the 'reference' command."""
-from __future__ import absolute_import, division, print_function
-from builtins import map, zip
-
 import collections
 import logging
 
