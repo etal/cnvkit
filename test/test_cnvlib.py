@@ -3,6 +3,11 @@
 import sys
 import unittest
 
+# Prevent crash on OS X
+# https://github.com/MTG/sms-tools/issues/36
+import matplotlib
+matplotlib.use("TkAgg")
+
 import numpy as np
 from skgenome import GenomicArray, tabio
 
@@ -154,7 +159,7 @@ class CommandTests(unittest.TestCase):
         # Build a single-sample WGS reference
         ref_fname, tgt_bed_fname, _ = batch.batch_make_reference(
             [bam], None, None, True, fasta, annot, True, 500, None, None,
-            None, None, 'build', 1, False, "wgs")
+            None, None, 'build', 1, False, "wgs", False)
         self.assertEqual(ref_fname, 'build/reference.cnn')
         refarr = cnvlib.read(ref_fname, 'bed')
         tgt_regions = tabio.read(tgt_bed_fname, 'bed')
@@ -162,7 +167,7 @@ class CommandTests(unittest.TestCase):
         # Build a single-sample hybrid-capture reference
         ref_fname, tgt_bed_fname, anti_bed_fname = batch.batch_make_reference(
             [bam], target_bed, None, True, fasta, None, True, 10, None, 1000,
-            100, None, 'build', 1, False, "hybrid")
+            100, None, 'build', 1, False, "hybrid", False)
         self.assertEqual(ref_fname, 'build/reference.cnn')
         refarr = cnvlib.read(ref_fname, 'bed')
         tgt_regions = tabio.read(tgt_bed_fname, 'bed')
@@ -171,7 +176,7 @@ class CommandTests(unittest.TestCase):
         # Run the same sample
         batch.batch_run_sample(
             bam, tgt_bed_fname, anti_bed_fname, ref_fname, 'build', True,
-            True, True, "Rscript", False, False, "hybrid", 1)
+            True, True, "Rscript", False, False, "hybrid", 1, False)
         cns =  cnvlib.read("build/na12878-chrM-Y-trunc.cns")
         self.assertGreater(len(cns), 0)
 

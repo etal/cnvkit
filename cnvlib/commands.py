@@ -107,7 +107,7 @@ def _cmd_batch(args):
             args.fasta, args.annotate, args.short_names, args.target_avg_size,
             args.access, args.antitarget_avg_size, args.antitarget_min_size,
             args.output_reference, args.output_dir, args.processes,
-            args.count_reads, args.method)
+            args.count_reads, args.method, args.cluster)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = read_cna(args.reference)
@@ -134,7 +134,8 @@ def _cmd_batch(args):
                             bam, args.targets, args.antitargets, args.reference,
                             args.output_dir, args.male_reference, args.scatter,
                             args.diagram, args.rscript_path, args.count_reads,
-                            args.drop_low_coverage, args.method, procs_per_bam)
+                            args.drop_low_coverage, args.method, procs_per_bam,
+                            args.cluster)
     else:
         logging.info("No tumor/test samples (but %d normal/control samples) "
                      "specified on the command line.",
@@ -207,6 +208,10 @@ P_batch_newref.add_argument('--output-reference', metavar="FILENAME",
                 file to the given path. Otherwise, \"reference.cnn\" will be
                 created in the current directory or specified output directory.)
                 """)
+P_batch_newref.add_argument('--cluster',
+        action='store_true',
+        help="""Calculate and use cluster-specific summary stats in the
+                reference pool to normalize samples.""")
 
 P_batch_oldref = P_batch.add_argument_group("To reuse an existing reference")
 P_batch_oldref.add_argument('-r', '--reference', #required=True,
@@ -512,7 +517,8 @@ def _cmd_reference(args):
         ref_probes = reference.do_reference(targets, antitargets, args.fasta,
                                             args.male_reference, female_samples,
                                             args.do_gc, args.do_edge,
-                                            args.do_rmask)
+                                            args.do_rmask, args.cluster,
+                                            args.min_cluster_size)
     else:
         raise ValueError(usage_err_msg)
 
@@ -529,18 +535,27 @@ P_reference.add_argument('-f', '--fasta',
         help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
 P_reference.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
-P_reference.add_argument('-y', '--male-reference', '--haploid-x-reference',
+P_reference.add_argument('-c', '--cluster',
         action='store_true',
-        help="""Create a male reference: shift female samples' chrX
-                log-coverage by -1, so the reference chrX average is -1.
-                Otherwise, shift male samples' chrX by +1, so the reference chrX
-                average is 0.""")
+        help="""Calculate and store summary stats for clustered subsets of the
+                normal samples with similar coverage profiles.""")
+P_reference.add_argument('--min-cluster-size',
+        metavar="NUM",
+        type=int,
+        default=4,
+        help="""Minimum cluster size to keep in reference profiles.""")
 P_reference.add_argument('-x', '--sample-sex', '-g', '--gender',
         dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the chromosomal sex of all given samples as male or
                 female. (Default: guess each sample from coverage of X and Y
                 chromosomes).""")
+P_reference.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
+        help="""Create a male reference: shift female samples' chrX
+                log-coverage by -1, so the reference chrX average is -1.
+                Otherwise, shift male samples' chrX by +1, so the reference chrX
+                average is 0.""")
 
 P_reference_flat = P_reference.add_argument_group(
     "To construct a generic, \"flat\" copy number reference with neutral "
@@ -580,7 +595,8 @@ def _cmd_fix(args):
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
     target_table = fix.do_fix(tgt_raw, anti_raw, read_cna(args.reference),
-                              args.do_gc, args.do_edge, args.do_rmask)
+                              args.do_gc, args.do_edge, args.do_rmask,
+                              args.cluster)
     tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
 
 
@@ -591,6 +607,13 @@ P_fix.add_argument('antitarget',
         help="Antitarget coverage file (.antitargetcoverage.cnn).")
 P_fix.add_argument('reference',
         help="Reference coverage (.cnn).")
+P_fix.add_argument('-c', '--cluster',
+        action='store_true',
+        help="""Compare and use cluster-specific values present in the
+                reference profile. (Requires that the reference profile
+                was built with the --cluster option.)""")
+P_fix.add_argument('-i', '--sample-id',
+        help="Sample ID for target/antitarget files. Otherwise inferred from file names.")
 # P_fix.add_argument('--do-gc', action='store_true', default=True,
 #         help="Do GC correction.")
 # P_fix.add_argument('--do-edge', action='store_true',
@@ -603,8 +626,6 @@ P_fix.add_argument('--no-edge', dest='do_edge', action='store_false',
         help="Skip edge-effect correction.")
 P_fix.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
-P_fix.add_argument('-i', '--sample-id',
-        help="Sample ID for target/antitarget files. Otherwise inferred from file names.")
 P_fix.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
 P_fix.set_defaults(func=_cmd_fix)

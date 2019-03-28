@@ -4,10 +4,10 @@ import logging
 import math
 import os.path
 import tempfile
+from io import StringIO
 
 import numpy as np
 import pandas as pd
-from io import StringIO
 from skgenome import tabio
 from skgenome.intersect import iter_slices
 

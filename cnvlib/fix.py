@@ -8,41 +8,49 @@ from . import descriptives, params, smoothing
 
 
 def do_fix(target_raw, antitarget_raw, reference,
-           do_gc=True, do_edge=True, do_rmask=True):
+           do_gc=True, do_edge=True, do_rmask=True, do_cluster=False):
     """Combine target and antitarget coverages and correct for biases."""
     # Load, recenter and GC-correct target & antitarget probes separately
     logging.info("Processing target: %s", target_raw.sample_id)
-    cnarr = load_adjust_coverages(target_raw, reference, True,
-                                  do_gc, do_edge, False)
+    cnarr, ref_matched = load_adjust_coverages(target_raw, reference,
+                                             True, do_gc, do_edge, False)
     logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
-    anti_cnarr = load_adjust_coverages(antitarget_raw, reference, False,
-                                       do_gc, False, do_rmask)
+    anti_cnarr, ref_anti = load_adjust_coverages(antitarget_raw, reference,
+                                                 False, do_gc, False, do_rmask)
     if len(anti_cnarr):
-        anti_resid = anti_cnarr.drop_low_coverage().residuals()
-        frac_anti_low = 1 - (len(anti_resid) / len(anti_cnarr))
-        if frac_anti_low > .5:
-            # Off-target bins are mostly garbage -- skip reweighting
-            logging.warning("WARNING: Most antitarget bins ({:.2f}%, {:d}/{:d})"
-                            " have low or no coverage; is this amplicon/WGS?"
-                            .format(100 * frac_anti_low,
-                                    len(anti_cnarr) - len(anti_resid),
-                                    len(anti_cnarr)))
-        else:
-            # Down-weight the more variable probe set (targets or antitargets)
-            tgt_iqr = descriptives.interquartile_range(cnarr.drop_low_coverage()
-                                                       .residuals())
-            anti_iqr = descriptives.interquartile_range(anti_resid)
-            iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
-            if iqr_ratio > 1:
-                logging.info("Targets are %.2f x more variable than antitargets",
-                             iqr_ratio)
-                cnarr["weight"] /= iqr_ratio
-            else:
-                logging.info("Antitargets are %.2f x more variable than targets",
-                             1. / iqr_ratio)
-                anti_cnarr["weight"] *= iqr_ratio
         # Combine target and antitarget bins
         cnarr.add(anti_cnarr)
+        ref_matched.add(ref_anti)
+
+    # Find reference clusters, if requested
+    log2_key = 'log2'
+    spread_key = 'spread'
+    if do_cluster:
+        ref_log2_cols = [col for col in ref_matched.data.columns
+                         if col == "log2"
+                         or col.startswith("log2")]
+        if len(ref_log2_cols) == 1:
+            logging.info("Reference does not contain any sub-clusters; "
+                         "using %s", log2_key)
+        else:
+            # Get correlations between test sample and each reference cluster
+            corr_coefs = np.array([cnarr.log2.corr(ref_matched[ref_col])
+                                for ref_col in ref_log2_cols])
+            ordered = [(k, r) for r, k in sorted(zip(corr_coefs, ref_log2_cols),
+                                                 reverse=True)]
+            logging.info("Correlations with each cluster:\n\t%s",
+                         "\n\t".join(["{}\t: {}".format(k, r)
+                                      for k, r in ordered]))
+            log2_key = ordered[0][0]
+            if log2_key.startswith('log2_'):
+                suffix = log2_key.split('_', 1)[1]
+                spread_key = 'spread_' + suffix
+            logging.info(" -> Choosing columns %r and %r", log2_key, spread_key)
+
+    # Normalize coverages according to the reference
+    # (Subtract the reference log2 copy number to get the log2 ratio)
+    cnarr.data['log2'] -= ref_matched[log2_key]
+    cnarr = apply_weights(cnarr, ref_matched, log2_key, spread_key)
     cnarr.center_all(skip_low=True)
     return cnarr
 
@@ -56,7 +64,7 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
 
     # No corrections needed if there are no data rows (e.g. no antitargets)
     if not len(cnarr):
-        return cnarr
+        return cnarr, ref_cnarr[:0]
 
     ref_matched = match_ref_to_sample(ref_cnarr, cnarr)
 
@@ -91,12 +99,7 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
             else:
                 logging.warning("WARNING: Skipping correction for "
                                 "RepeatMasker bias")
-
-    # Normalize coverages according to the reference
-    # (Subtract the reference log2 copy number to get the log2 ratio)
-    cnarr.data['log2'] -= ref_matched['log2']
-    cnarr.center_all(skip_low=skip_low)
-    return apply_weights(cnarr, ref_matched)
+    return cnarr, ref_matched
 
 
 def mask_bad_bins(cnarr):
@@ -117,15 +120,16 @@ def mask_bad_bins(cnarr):
 
 def match_ref_to_sample(ref_cnarr, samp_cnarr):
     """Filter the reference bins to match the sample (target or antitarget)."""
+    # Assign each bin a unique string ID based on genomic coordinates
     samp_labeled = samp_cnarr.data.set_index(pd.Index(samp_cnarr.coords()))
     ref_labeled = ref_cnarr.data.set_index(pd.Index(ref_cnarr.coords()))
-    # Safety
     for dset, name in ((samp_labeled, "sample"),
                        (ref_labeled, "reference")):
         dupes = dset.index.duplicated()
         if dupes.any():
             raise ValueError("Duplicated genomic coordinates in " + name +
                              " set:\n" + "\n".join(map(str, dset.index[dupes])))
+    # Take the reference bins with IDs identical to those in the sample
     ref_matched = ref_labeled.reindex(index=samp_labeled.index)
     # Check for signs that the wrong reference was used
     num_missing = pd.isnull(ref_matched.start).sum()
@@ -246,7 +250,7 @@ def edge_gains(target_sizes, gap_sizes, insert_size):
     return gains
 
 
-def apply_weights(cnarr, ref_matched, epsilon=1e-4):
+def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
     """Calculate weights for each bin.
 
     Weights are derived from:
@@ -258,22 +262,52 @@ def apply_weights(cnarr, ref_matched, epsilon=1e-4):
     # Relative bin sizes
     sizes = ref_matched['end'] - ref_matched['start']
     weights = sizes / sizes.max()
-    if (np.abs(np.mod(ref_matched['log2'], 1)) > epsilon).any():
+    if (np.abs(np.mod(ref_matched[log2_key], 1)) > epsilon).any():
         # NB: Not used with a flat reference
         logging.debug("Weighting bins by relative coverage depths in reference")
         # Penalize bins that deviate from neutral coverage
         flat_cvgs = ref_matched.expect_flat_log2()
         # XXX sqrt? (*0.5 inside exp2) -- need benchmark
-        weights *= np.exp2(-np.abs(ref_matched['log2'] - flat_cvgs))
-    if (ref_matched['spread'] > epsilon).any():
+        weights *= np.exp2(-np.abs(ref_matched[log2_key] - flat_cvgs))
+    if (ref_matched[spread_key] > epsilon).any():
         # NB: Not used with a flat or paired reference
         logging.debug("Weighting bins by coverage spread in reference")
         # Inverse of variance, 0--1
-        variances = ref_matched['spread'] ** 2
+        variances = ref_matched[spread_key] ** 2
         invvars = 1.0 - (variances / variances.max())
         weights = (weights + invvars) / 2
     # Rescale so max is 1.0
     # weights /= weights.max()
     # Avoid 0-value bins -- CBS doesn't like these
     weights = np.maximum(weights, epsilon)
+
+    if params.ANTITARGET_NAME in cnarr['gene']:
+        # Check & re-weight targets vs. antitargets
+        is_anti = (cnarr['gene'] == params.ANTITARGET_NAME)
+        anti_cnarr = cnarr[is_anti]
+        anti_resid = anti_cnarr.drop_low_coverage().residuals()
+        frac_anti_low = 1 - (len(anti_resid) / len(anti_cnarr))
+        if frac_anti_low > .5:
+            # Off-target bins are mostly garbage -- skip reweighting
+            logging.warning("WARNING: Most antitarget bins ({:.2f}%, {:d}/{:d})"
+                            " have low or no coverage; is this amplicon/WGS?"
+                            .format(100 * frac_anti_low,
+                                    len(anti_cnarr) - len(anti_resid),
+                                    len(anti_cnarr)))
+        else:
+            # Down-weight the more variable probe set (targets or antitargets)
+            tgt_iqr = descriptives.interquartile_range(cnarr[~is_anti]
+                                                    .drop_low_coverage()
+                                                    .residuals())
+            anti_iqr = descriptives.interquartile_range(anti_resid)
+            iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
+            if iqr_ratio > 1:
+                logging.info("Targets are %.2f x more variable than antitargets",
+                                iqr_ratio)
+                cnarr["weight"] /= iqr_ratio
+            else:
+                logging.info("Antitargets are %.2f x more variable than targets",
+                                1. / iqr_ratio)
+                anti_cnarr["weight"] *= iqr_ratio
+
     return cnarr.add_columns(weight=weights)

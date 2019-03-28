@@ -82,8 +82,11 @@ environment::
 
     # Configure the sources where conda will find packages
     conda config --add channels defaults
-    conda config --add channels conda-forge
     conda config --add channels bioconda
+    conda config --add channels conda-forge
+
+Then:
+
     # Install CNVkit in a new environment named "cnvkit"
     conda create -n cnvkit cnvkit
     # Activate the environment with CNVkit installed:
@@ -97,7 +100,7 @@ Or, in an existing environment::
 From a Python package repository
 --------------------------------
 
-Reasonably up-to-date CNVkit packages are available on `PyPI
+Up-to-date CNVkit packages are available on `PyPI
 <https://pypi.python.org/pypi/CNVkit>`_ and can be installed using `pip
 <https://pip.pypa.io/en/latest/installing.html>`_ (usually works on Linux if the
 system dependencies listed below are installed)::
