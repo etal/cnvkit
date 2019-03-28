@@ -50,7 +50,7 @@ def z_prob(cnarr):
     # Convert to Z-scores
     z = cnarr['log2'] / sd
     # Two-sided survival function (1-CDF) probability
-    p = 2. * norm.cdf(z)
+    p = 2. * norm.cdf(-np.abs(z))
     # Similar to the above -- which is better?
     # p2 = 2 * norm.pdf(cnarr['log2'], loc=0, scale=sd)
     # if not np.allclose(p, p2):
