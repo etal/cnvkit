@@ -14,11 +14,11 @@ import numpy as np
 
 
 def kmeans(samples, k=None):
-    from .pca import pca_sk
     from scipy.cluster import vq
     if k is None:
-        # E.g. 8 -> k=2, 27 -> k=3, 64->4, 5->125, 6->216, 7->343
-        k = max(1, int(len(samples) ** (1/3.)))
+        from math import log
+        k = max(1, int(round(log(len(samples), 3))))
+        # E.g. n=66 -> k=2, 16 -> 3, 47 -> 4, 141 -> 5, 421 -> 6, 1263 -> 7
 
     print("Clustering", len(samples), "samples by k-means, where k =", k)
     obs = pca_sk(samples, 3)
