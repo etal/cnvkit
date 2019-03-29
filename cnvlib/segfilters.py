@@ -106,6 +106,9 @@ def squash_region(cnarr):
             else:
                 out['cn1'] = np.median(cnarr['cn1'])
             out['cn2'] = out['cn'] - out['cn1']
+    if 'p_bintest' in cnarr:
+        # Only relevant for single-bin segments, but this seems safe/conservative
+        out['p_bintest'] = cnarr['p_bintest'].max()
     return pd.DataFrame(out)
 
 

@@ -13,10 +13,10 @@ from skgenome import GenomicArray, tabio
 
 import cnvlib
 # Import all modules as a smoke test
-from cnvlib import (access, antitarget, autobin, batch, cnary, commands, core,
-                    coverage, diagram, export, fix, import_rna, importers,
-                    metrics, params, plots, reference, reports, segmentation,
-                    segmetrics, smoothing, vary)
+from cnvlib import (access, antitarget, autobin, batch, bintest, cnary,
+                    commands, core, coverage, diagram, export, fix, import_rna,
+                    importers, metrics, params, plots, reference, reports,
+                    segmentation, segmetrics, smoothing, vary)
 
 
 class CNATests(unittest.TestCase):

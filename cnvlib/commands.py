@@ -26,10 +26,10 @@ import pandas as pd
 from skgenome import tabio, GenomicArray as _GA
 from skgenome.rangelabel import to_label
 
-from . import (access, antitarget, autobin, batch, call, core, coverage,
-               diagram, export, fix, heatmap, import_rna, importers, metrics,
-               parallel, reference, reports, scatter, segmentation, segmetrics,
-               target)
+from . import (access, antitarget, autobin, batch, bintest, call, core,
+               coverage, diagram, export, fix, heatmap, import_rna, importers,
+               metrics, parallel, reference, reports, scatter, segmentation,
+               segmetrics, target)
 from .cmdutil import (load_het_snps, read_cna, verify_sample_sex,
                       write_tsv, write_text, write_dataframe)
 
@@ -1358,6 +1358,34 @@ P_segmetrics_stats.add_argument('-b', '--bootstrap', type=int, default=100,
 P_segmetrics_stats.set_defaults(location_stats=[], spread_stats=[],
                                 interval_stats=[])
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
+
+
+# bintest -----------------------------------------------------------------------
+
+do_bintest = public(bintest.do_bintest)
+
+def _cmd_bintest(args):
+    """Z-test for single-bin copy number alterations."""
+    cnarr = read_cna(args.cnarray)
+    segments = read_cna(args.segment) if args.segment else None
+    sig = do_bintest(cnarr, segments, args.alpha, args.target)
+    if len(sig):
+        tabio.write(sig, args.output or sys.stdout)
+
+
+P_bintest = AP_subparsers.add_parser('bintest', help=_cmd_bintest.__doc__)
+P_bintest.add_argument('cnarray',
+        help="Bin-level log2 ratios (.cnr file), as produced by 'fix'.")
+P_bintest.add_argument('-s', '--segment', metavar="FILENAME",
+        help="""Segmentation calls (.cns), the output of the
+                'segment' command).""")
+P_bintest.add_argument("-a", "--alpha", type=float, default=0.005,
+        help="Significance threhold. [Default: %(default)s]")
+P_bintest.add_argument("-t", "--target", action="store_true",
+        help="Test target bins only; ignore off-target bins.")
+P_bintest.add_argument("-o", "--output",
+        help="Output filename.")
+P_bintest.set_defaults(func=_cmd_bintest)
 
 
 # _____________________________________________________________________________
