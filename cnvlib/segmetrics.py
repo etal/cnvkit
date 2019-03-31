@@ -20,6 +20,7 @@ def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
         'mean': np.mean,
         'median': np.median,
         'mode': descriptives.modal_location,
+        'ttest': lambda a: stats.ttest_1samp(a, 0.0, nan_policy='omit')[1],
 
         'stdev': np.std,
         'mad':  descriptives.median_absolute_deviation,

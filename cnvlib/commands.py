@@ -731,7 +731,7 @@ def _cmd_call(args):
 
     cnarr = read_cna(args.filename)
     if args.center_at:
-        logging.info("Shifting log2 values by %f", -args.center_at)
+        logging.info("Shifting log2 ratios by %f", -args.center_at)
         cnarr['log2'] -= args.center_at
     elif args.center:
         cnarr.center_all(args.center, skip_low=args.drop_low_coverage,
@@ -761,7 +761,7 @@ P_call.add_argument("--center", nargs='?', const='median',
         help="""Re-center the log2 ratio values using this estimator of the
                 center or average value. ('median' if no argument given.)""")
 P_call.add_argument("--center-at", type=float,
-        help="""Subtract a constant number from all log2 values. For "manual"
+        help="""Subtract a constant number from all log2 ratios. For "manual"
                 re-centering, in case the --center option gives unsatisfactory
                 results.)""")
 P_call.add_argument('--filter', action='append', default=[], dest='filters',
@@ -1144,13 +1144,16 @@ P_genemetrics_stats = P_genemetrics.add_argument_group(
 # Location statistics
 P_genemetrics_stats.add_argument('--mean',
         action='append_const', dest='location_stats', const='mean',
-        help="Mean log2 value (unweighted).")
+        help="Mean log2-ratio (unweighted).")
 P_genemetrics_stats.add_argument('--median',
         action='append_const', dest='location_stats', const='median',
         help="Median.")
 P_genemetrics_stats.add_argument('--mode',
         action='append_const', dest='location_stats', const='mode',
-        help="Mode (i.e. peak density of log2 values).")
+        help="Mode (i.e. peak density of log2 ratios).")
+P_genemetrics_stats.add_argument('--ttest',
+        action='append_const', dest='location_stats', const='ttest',
+        help="One-sample t-test of bin log2 ratios versus 0.0.")
 # Dispersion statistics
 P_genemetrics_stats.add_argument('--stdev',
         action='append_const', dest='spread_stats', const='stdev',
@@ -1316,13 +1319,16 @@ P_segmetrics_stats = P_segmetrics.add_argument_group(
 # Location statistics
 P_segmetrics_stats.add_argument('--mean',
         action='append_const', dest='location_stats', const='mean',
-        help="Mean log2 value (unweighted).")
+        help="Mean log2 ratio (unweighted).")
 P_segmetrics_stats.add_argument('--median',
         action='append_const', dest='location_stats', const='median',
         help="Median.")
 P_segmetrics_stats.add_argument('--mode',
         action='append_const', dest='location_stats', const='mode',
-        help="Mode (i.e. peak density of log2 values).")
+        help="Mode (i.e. peak density of bin log2 ratios).")
+P_segmetrics_stats.add_argument('--ttest',
+        action='append_const', dest='location_stats', const='ttest',
+        help="One-sample t-test of bin log2 ratios versus 0.0.")
 # Dispersion statistics
 P_segmetrics_stats.add_argument('--stdev',
         action='append_const', dest='spread_stats', const='stdev',
@@ -1537,7 +1543,7 @@ P_import_rna.add_argument('-c', '--correlations', metavar="FILE",
                 expression. Output of cnv_expression_correlate.py.""")
 P_import_rna.add_argument('--max-log2',
         metavar="FLOAT", default=3.0, type=float,
-        help="""Maximum log2 value in output. Observed values above this limit
+        help="""Maximum log2 ratio in output. Observed values above this limit
                 will be replaced with this value. [Default: %(default)s]""")
 P_import_rna.add_argument('-n', '--normal', nargs='+', default=[],
         help="""Normal samples (same format as `gene_counts`) to be used as a

@@ -463,8 +463,8 @@ class CommandTests(unittest.TestCase):
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
         sm = segmetrics.do_segmetrics(cnarr, segarr,
-                                      location_stats=['mean', 'median'],
-                                      spread_stats=['stdev'],
+                                      location_stats=['mean', 'median', 'mode', 'ttest'],
+                                      spread_stats=['stdev', 'sem', 'iqr'],
                                       interval_stats=['pi', 'ci'])
         # Restrict to segments with enough supporting probes for sane stats
         sm = sm[sm['probes'] > 3]
