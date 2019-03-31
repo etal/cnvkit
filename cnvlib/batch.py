@@ -5,8 +5,9 @@ import os
 from matplotlib import pyplot
 from skgenome import tabio, GenomicArray as GA
 
-from . import (access, antitarget, autobin, core, coverage, diagram, fix,
-               parallel, reference, scatter, segmentation, target)
+from . import (access, antitarget, autobin, bintest, call, core, coverage,
+               diagram, fix, parallel, reference, scatter, segmentation,
+               segmetrics, target)
 from .cmdutil import read_cna
 
 
@@ -41,7 +42,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 access_arr = access.do_access(fasta)
                 # Take filename base from FASTA, lacking any other clue
                 target_bed = os.path.splitext(os.path.basename(fasta)
-                                             )[0] + ".bed"
+                                              )[0] + ".bed"
                 tabio.write(access_arr, target_bed, "bed3")
             else:
                 raise ValueError("WGS protocol: need to provide --targets, "
@@ -190,6 +191,13 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                                                if method == 'wgs'
                                                else {}))
     tabio.write(segments, sample_pfx + '.cns')
+
+    logging.info("Post-processing %s.cns ...", sample_pfx)
+    seg_bintest = bintest.do_bintest(cnarr, segments, target_only=True)
+    seg_metrics = segmetrics.do_segmetrics(cnarr, seg_bintest,
+                                           interval_stats=['ci'], alpha=0.5)
+    seg_call = call.do_call(seg_metrics, method="none", filters=['ci'])
+    tabio.write(segments, sample_pfx + '.call.cns')
 
     if plot_scatter:
         scatter.do_scatter(cnarr, segments)
