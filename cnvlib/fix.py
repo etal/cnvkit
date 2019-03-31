@@ -253,11 +253,14 @@ def edge_gains(target_sizes, gap_sizes, insert_size):
 def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
     """Calculate weights for each bin.
 
+    Bin weight is an estimate of (1 - variance) and within the range (0, 1].
+
     Weights are derived from:
 
-    - bin sizes
-    - average bin coverage depths in the reference
-    - the "spread" column of the reference.
+    - bin sizes (proportional, linearly)
+    - average bin coverage depths in the reference (assume Poisson)
+    - the "spread" column of the reference (approx. stdev if log-ratio ~ normal)
+
     """
     # Relative bin sizes
     sizes = ref_matched['end'] - ref_matched['start']
@@ -274,40 +277,43 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
         logging.debug("Weighting bins by coverage spread in reference")
         # Inverse of variance, 0--1
         variances = ref_matched[spread_key] ** 2
-        invvars = 1.0 - (variances / variances.max())
+        invvars = 1.0 - variances
         weights = (weights + invvars) / 2
-    # Rescale so max is 1.0
-    # weights /= weights.max()
     # Avoid 0-value bins -- CBS doesn't like these
     weights = np.maximum(weights, epsilon)
 
-    if params.ANTITARGET_NAME in cnarr['gene']:
+    # Adjust globally based on observed bin variances
+    is_anti = cnarr['gene'].isin(params.ANTITARGET_ALIASES)
+    tgt_cnarr = cnarr[~is_anti]
+    tgt_var = descriptives.biweight_midvariance(tgt_cnarr
+                                                .drop_low_coverage()
+                                                .residuals()) ** 2
+    tgt_global_wt = 1 - tgt_var
+    weights[~is_anti] = (tgt_global_wt + weights[~is_anti]) / 2
+
+    if is_anti.any():
         # Check & re-weight targets vs. antitargets
-        is_anti = (cnarr['gene'] == params.ANTITARGET_NAME)
         anti_cnarr = cnarr[is_anti]
-        anti_resid = anti_cnarr.drop_low_coverage().residuals()
-        frac_anti_low = 1 - (len(anti_resid) / len(anti_cnarr))
+        anti_ok = anti_cnarr.drop_low_coverage()
+        frac_anti_low = 1 - (len(anti_ok) / len(anti_cnarr))
         if frac_anti_low > .5:
             # Off-target bins are mostly garbage -- skip reweighting
             logging.warning("WARNING: Most antitarget bins ({:.2f}%, {:d}/{:d})"
                             " have low or no coverage; is this amplicon/WGS?"
                             .format(100 * frac_anti_low,
-                                    len(anti_cnarr) - len(anti_resid),
+                                    len(anti_cnarr) - len(anti_ok),
                                     len(anti_cnarr)))
         else:
-            # Down-weight the more variable probe set (targets or antitargets)
-            tgt_iqr = descriptives.interquartile_range(cnarr[~is_anti]
-                                                    .drop_low_coverage()
-                                                    .residuals())
-            anti_iqr = descriptives.interquartile_range(anti_resid)
-            iqr_ratio = max(tgt_iqr, .01) / max(anti_iqr, .01)
-            if iqr_ratio > 1:
+            anti_var = descriptives.biweight_midvariance(anti_ok.residuals()) ** 2
+            anti_global_wt = 1 - anti_var
+            weights[is_anti] = (anti_global_wt + weights[is_anti]) / 2
+            # Report any difference in bin set variability
+            var_ratio = max(tgt_var, .01) / max(anti_var, .01)
+            if var_ratio > 1:
                 logging.info("Targets are %.2f x more variable than antitargets",
-                                iqr_ratio)
-                cnarr["weight"] /= iqr_ratio
+                             var_ratio)
             else:
                 logging.info("Antitargets are %.2f x more variable than targets",
-                                1. / iqr_ratio)
-                anti_cnarr["weight"] *= iqr_ratio
+                             1. / var_ratio)
 
-    return cnarr.add_columns(weight=weights)
+    return cnarr.add_columns(weight=weights.clip(lower=0.0, upper=1.0))
