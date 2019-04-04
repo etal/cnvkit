@@ -13,7 +13,7 @@ def do_fix(target_raw, antitarget_raw, reference,
     # Load, recenter and GC-correct target & antitarget probes separately
     logging.info("Processing target: %s", target_raw.sample_id)
     cnarr, ref_matched = load_adjust_coverages(target_raw, reference,
-                                             True, do_gc, do_edge, False)
+                                               True, do_gc, do_edge, False)
     logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
     anti_cnarr, ref_anti = load_adjust_coverages(antitarget_raw, reference,
                                                  False, do_gc, False, do_rmask)
@@ -35,7 +35,7 @@ def do_fix(target_raw, antitarget_raw, reference,
         else:
             # Get correlations between test sample and each reference cluster
             corr_coefs = np.array([cnarr.log2.corr(ref_matched[ref_col])
-                                for ref_col in ref_log2_cols])
+                                   for ref_col in ref_log2_cols])
             ordered = [(k, r) for r, k in sorted(zip(corr_coefs, ref_log2_cols),
                                                  reverse=True)]
             logging.info("Correlations with each cluster:\n\t%s",
@@ -253,67 +253,103 @@ def edge_gains(target_sizes, gap_sizes, insert_size):
 def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
     """Calculate weights for each bin.
 
-    Bin weight is an estimate of (1 - variance) and within the range (0, 1].
+    Bin weight is an estimate of (1 - variance) and within the range
+    ``(0, 1]``.
 
     Weights are derived from:
 
-    - bin sizes (proportional, linearly)
-    - average bin coverage depths in the reference (assume Poisson)
-    - the "spread" column of the reference (approx. stdev if log-ratio ~ normal)
+    - Each bin's size
+    - Sample's genome-wide average (on/off-target) coverage depth
+    - Sample's genome-wide observed (on/off-target) bin variances
 
+    And with a pooled reference:
+
+    - Each bin's coverage depth in the reference
+    - The "spread" column of the reference (approx. stdev)
+
+    These estimates of variance assume the number of aligned reads per bin
+    follows a Poisson distribution, approximately log-normal.
+
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Sample bins.
+    ref_match : CopyNumArray
+        Reference bins.
+    log2_key : string
+        The 'log2' column name in the reference to use. A clustered reference
+        may have a suffix indicating the cluster, e.g. "log2_1".
+    spread_key : string
+        The 'spread' or 'spread_<cluster_id>' column name to use.
+    epsilon : float
+        Minimum value for bin weights, to avoid 0-weight bins causing errors
+        later during segmentation. (CBS doesn't allow 0-weight bins.)
+
+    Returns: The input `cnarr` with a `weight` column added.
     """
-    # Relative bin sizes
-    sizes = ref_matched['end'] - ref_matched['start']
-    weights = sizes / sizes.max()
-    if (np.abs(np.mod(ref_matched[log2_key], 1)) > epsilon).any():
-        # NB: Not used with a flat reference
-        logging.debug("Weighting bins by relative coverage depths in reference")
-        # Penalize bins that deviate from neutral coverage
-        flat_cvgs = ref_matched.expect_flat_log2()
-        # XXX sqrt? (*0.5 inside exp2) -- need benchmark
-        weights *= np.exp2(-np.abs(ref_matched[log2_key] - flat_cvgs))
-    if (ref_matched[spread_key] > epsilon).any():
-        # NB: Not used with a flat or paired reference
-        logging.debug("Weighting bins by coverage spread in reference")
-        # Inverse of variance, 0--1
-        variances = ref_matched[spread_key] ** 2
-        invvars = 1.0 - variances
-        weights = (weights + invvars) / 2
-    # Avoid 0-value bins -- CBS doesn't like these
-    weights = np.maximum(weights, epsilon)
+    all_weights = []
 
-    # Adjust globally based on observed bin variances
+    if ((ref_matched[spread_key] > epsilon).any() and
+        (np.abs(np.mod(ref_matched[log2_key], 1)) > epsilon).any()):
+        # Pooled/paired reference only
+        logging.debug("Weighting bins by relative coverage depths in reference")
+        # Penalize bins that deviate from neutral, like least-squares fitting
+        # NB: This implicitly factors in the overall variance of the reference
+        # log2 values, which for a pooled reference is usually less than that
+        # of the sample.
+        ref_log2_diff = ref_matched[log2_key] - ref_matched.expect_flat_log2()
+        all_weights.append(1 - (ref_log2_diff ** 2))
+
+        logging.debug("Weighting bins by coverage spread in reference")
+        # NB: spread ~= SD, so variance ~= spread^2
+        all_weights.append(1.0 - ref_matched[spread_key] ** 2)
+
+    # Weight by sample-level features -- works for flat reference, too
+    logging.debug("Weighting bins by size and overall variance in sample")
+    simple_wt = np.zeros(len(cnarr))
+    # Calculate separately for on-, off-target bins
     is_anti = cnarr['gene'].isin(params.ANTITARGET_ALIASES)
-    tgt_cnarr = cnarr[~is_anti]
-    tgt_var = descriptives.biweight_midvariance(tgt_cnarr
+    tgt_cna = cnarr[~is_anti]
+    tgt_var = descriptives.biweight_midvariance(tgt_cna
                                                 .drop_low_coverage()
                                                 .residuals()) ** 2
-    tgt_global_wt = 1 - tgt_var
-    weights[~is_anti] = (tgt_global_wt + weights[~is_anti]) / 2
+    bin_sizes = tgt_cna['end'] - tgt_cna['start']
+    tgt_simple_wts = 1 - tgt_var / (bin_sizes / bin_sizes.mean())
+    simple_wt[~is_anti] = tgt_simple_wts
 
     if is_anti.any():
-        # Check & re-weight targets vs. antitargets
-        anti_cnarr = cnarr[is_anti]
-        anti_ok = anti_cnarr.drop_low_coverage()
-        frac_anti_low = 1 - (len(anti_ok) / len(anti_cnarr))
+        # Check for a common user error
+        anti_cna = cnarr[is_anti]
+        anti_ok = anti_cna.drop_low_coverage()
+        frac_anti_low = 1 - (len(anti_ok) / len(anti_cna))
         if frac_anti_low > .5:
             # Off-target bins are mostly garbage -- skip reweighting
             logging.warning("WARNING: Most antitarget bins ({:.2f}%, {:d}/{:d})"
                             " have low or no coverage; is this amplicon/WGS?"
                             .format(100 * frac_anti_low,
-                                    len(anti_cnarr) - len(anti_ok),
-                                    len(anti_cnarr)))
-        else:
-            anti_var = descriptives.biweight_midvariance(anti_ok.residuals()) ** 2
-            anti_global_wt = 1 - anti_var
-            weights[is_anti] = (anti_global_wt + weights[is_anti]) / 2
-            # Report any difference in bin set variability
-            var_ratio = max(tgt_var, .01) / max(anti_var, .01)
-            if var_ratio > 1:
-                logging.info("Targets are %.2f x more variable than antitargets",
-                             var_ratio)
-            else:
-                logging.info("Antitargets are %.2f x more variable than targets",
-                             1. / var_ratio)
+                                    len(anti_cna) - len(anti_ok),
+                                    len(anti_cna)))
 
-    return cnarr.add_columns(weight=weights.clip(lower=0.0, upper=1.0))
+        anti_var = descriptives.biweight_midvariance(anti_ok.residuals()) ** 2
+        anti_bin_sizes = anti_cna['end'] - anti_cna['start']
+        anti_simple_wts = 1 - anti_var / (anti_bin_sizes / anti_bin_sizes.mean())
+        simple_wt[is_anti] = anti_simple_wts
+
+        # Report any difference in bin set variability
+        var_ratio = max(tgt_var, .01) / max(anti_var, .01)
+        if var_ratio > 1:
+            logging.info("Targets are %.2f x more variable than antitargets",
+                         var_ratio)
+        else:
+            logging.info("Antitargets are %.2f x more variable than targets",
+                         1. / var_ratio)
+
+    if all_weights:
+        # Average the 3 estimates
+        all_weights.append(simple_wt)
+        weights = np.vstack(all_weights).mean(axis=0)
+    else:
+        # Flat reference, only 1 weight estimate
+        weights = simple_wt
+
+    return cnarr.add_columns(weight=weights.clip(epsilon, 1.0))

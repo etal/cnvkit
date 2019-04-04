@@ -150,7 +150,6 @@ def combine_probes(filenames, antitarget_fnames, fa_fname,
         all_logr = np.hstack([all_logr, anti_logr])
         all_depths = np.hstack([all_depths, anti_depths])
 
-    print("Loaded samples' depth, log-ratios. Summarizing...")
     stats_all = summarize_info(all_logr, all_depths)
     ref_df = ref_df.assign(**stats_all)
 
