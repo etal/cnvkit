@@ -1304,7 +1304,7 @@ def _cmd_segmetrics(args):
     segarr = read_cna(args.segments)
     segarr = do_segmetrics(cnarr, segarr, args.location_stats,
                            args.spread_stats, args.interval_stats,
-                           args.alpha, args.bootstrap)
+                           args.alpha, args.bootstrap, args.smooth_bootstrap)
     tabio.write(segarr, args.output or segarr.sample_id + ".segmetrics.cns")
 
 
@@ -1331,8 +1331,8 @@ P_segmetrics_stats.add_argument('--median',
 P_segmetrics_stats.add_argument('--mode',
         action='append_const', dest='location_stats', const='mode',
         help="Mode (i.e. peak density of bin log2 ratios).")
-P_segmetrics_stats.add_argument('--ttest',
-        action='append_const', dest='location_stats', const='ttest',
+P_segmetrics_stats.add_argument('--t-test',
+        action='append_const', dest='location_stats', const='p_ttest',
         help="One-sample t-test of bin log2 ratios versus 0.0.")
 # Dispersion statistics
 P_segmetrics_stats.add_argument('--stdev',
@@ -1360,12 +1360,20 @@ P_segmetrics_stats.add_argument('--ci',
 P_segmetrics_stats.add_argument('--pi',
         action='append_const', dest='interval_stats', const='pi',
         help="Prediction interval.")
-P_segmetrics_stats.add_argument('-a', '--alpha', type=float, default=.05,
+P_segmetrics_stats.add_argument('-a', '--alpha',
+        type=float, default=.05,
         help="""Level to estimate confidence and prediction intervals;
                 use with --ci and --pi. [Default: %(default)s]""")
-P_segmetrics_stats.add_argument('-b', '--bootstrap', type=int, default=100,
+P_segmetrics_stats.add_argument('-b', '--bootstrap',
+        type=int, default=100,
         help="""Number of bootstrap iterations to estimate confidence interval;
                 use with --ci. [Default: %(default)d]""")
+P_segmetrics_stats.add_argument('--smooth-bootstrap',
+        action='store_true',
+        help="""Apply Gaussian noise to bootstrap samples, a.k.a. smoothed
+                bootstrap, to estimate confidence interval; use with --ci.
+                """)
+
 P_segmetrics_stats.set_defaults(location_stats=[], spread_stats=[],
                                 interval_stats=[])
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
@@ -1376,7 +1384,7 @@ P_segmetrics.set_defaults(func=_cmd_segmetrics)
 do_bintest = public(bintest.do_bintest)
 
 def _cmd_bintest(args):
-    """Z-test for single-bin copy number alterations."""
+    """Test for single-bin copy number alterations."""
     cnarr = read_cna(args.cnarray)
     segments = read_cna(args.segment) if args.segment else None
     sig = do_bintest(cnarr, segments, args.alpha, args.target)

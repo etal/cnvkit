@@ -182,6 +182,19 @@ class CommandTests(unittest.TestCase):
         cns =  cnvlib.read("build/na12878-chrM-Y-trunc.cns")
         self.assertGreater(len(cns), 0)
 
+    def test_bintest(self):
+        """The 'bintest' command."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        # Simple
+        rows = commands.do_bintest(cnarr, alpha=.05)
+        self.assertGreater(len(rows), 0)
+        self.assertLess(len(rows), len(cnarr))
+        # Versus segments
+        rows = commands.do_bintest(cnarr, segarr, target_only=True)
+        self.assertGreaterEqual(len(rows), len(segarr))
+        self.assertLess(len(rows), len(cnarr))
+
     def test_breaks(self):
         """The 'breaks' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
@@ -465,9 +478,10 @@ class CommandTests(unittest.TestCase):
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
         sm = segmetrics.do_segmetrics(cnarr, segarr,
-                                      location_stats=['mean', 'median', 'mode', 'ttest'],
+                                      location_stats=['mean', 'median', 'mode', 'p_ttest'],
                                       spread_stats=['stdev', 'sem', 'iqr'],
-                                      interval_stats=['pi', 'ci'])
+                                      interval_stats=['pi', 'ci'],
+                                      bootstraps=50, smoothed=True)
         # Restrict to segments with enough supporting probes for sane stats
         sm = sm[sm['probes'] > 3]
         self.assertTrue((sm['pi_lo'] < sm['median']).all())
