@@ -1,7 +1,14 @@
 """Variant Call Format (VCF) for SNV loci."""
 import collections
 import logging
+import warnings
 from itertools import chain
+
+# pysam 0.15.2: DeprecationWarning: Using or importing the ABCs from
+# 'collections' instead of from 'collections.abc' is deprecated, and
+# in 3.8 it will stop working
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 import pandas as pd
 import numpy as np
