@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 """Unit tests for the CNVkit library, cnvlib."""
-import sys
 import unittest
 
 import logging
@@ -10,11 +9,6 @@ logging.basicConfig(level=logging.ERROR, format="%(message)s")
 # __spec__ or __package__, falling back on __name__ and __path__
 import warnings
 warnings.filterwarnings('ignore', category=ImportWarning)
-
-# Prevent crash on OS X
-# https://github.com/MTG/sms-tools/issues/36
-import matplotlib
-matplotlib.use("TkAgg")
 
 import numpy as np
 from skgenome import GenomicArray, tabio

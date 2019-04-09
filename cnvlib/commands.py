@@ -8,15 +8,20 @@ import os
 import sys
 
 # Filter spurious Cython warnings re: numpy
-# Via: https://github.com/numpy/numpy/pull/432
+# https://github.com/numpy/numpy/pull/432
 import warnings
-warnings.filterwarnings("ignore", message="numpy.dtype size changed")
-warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
+warnings.filterwarnings('ignore', message="numpy.dtype size changed")
+warnings.filterwarnings('ignore', message="numpy.ufunc size changed")
 
-# If running headless, use a suitable GUI-less plotting backend
+# Choose a safe plotting backend supported by the current platform
+import matplotlib
 if not os.environ.get('DISPLAY'):
-    import matplotlib
-    matplotlib.use("Agg", force=True)
+    # If running headless, use a GUI-less backend
+    matplotlib.use('Agg')
+elif sys.platform == 'darwin':
+    # Prevent crash on OS X
+    # https://github.com/MTG/sms-tools/issues/36
+    matplotlib.use('TkAgg')
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
