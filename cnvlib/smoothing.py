@@ -81,9 +81,9 @@ def convolve_weighted(window, signal, weights):
     assert window_size == 2 * wing + 1
     assert len(weights) + 2 * wing == len(signal)
     wp = _pad_array(weights, wing)
-    wp = pd.Series(np.concatenate((weights[wing-1::-1],
-                                   weights,
-                                   weights[:-wing-1:-1])))
+    # Linearly roll-off weights in mirrored wings
+    wp[:wing] *= np.linspace(1/wing, 1, wing)
+    wp[-wing:] *= np.linspace(1, 1/wing, wing)
     D = np.convolve(wp * signal, window)[window_size-1:-window_size+1]
     N = np.convolve(wp, window)[window_size-1:-window_size+1]
     y = D / N
