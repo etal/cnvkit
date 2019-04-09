@@ -381,7 +381,8 @@ class GenomicArray(object):
             Concatenation of all the subsets of `self` enclosed by the specified
             ranges.
         """
-        table = pd.concat(iter_ranges(self.data, chrom, starts, ends, mode))
+        table = pd.concat(iter_ranges(self.data, chrom, starts, ends, mode),
+                          sort=False)
         return self.as_dataframe(table)
 
     def into_ranges(self, other, column, default, summary_func=None):

@@ -146,7 +146,7 @@ def combine_probes(filenames, antitarget_fnames, fa_fname,
         anti_ref_df, anti_logr, anti_depths = load_sample_block(
             antitarget_fnames, fa_fname, is_haploid_x, sexes,
             False, fix_gc, False, fix_rmask)
-        ref_df = ref_df.append(anti_ref_df, ignore_index=True)
+        ref_df = ref_df.append(anti_ref_df, ignore_index=True, sort=False)
         all_logr = np.hstack([all_logr, anti_logr])
         all_depths = np.hstack([all_depths, anti_depths])
 
