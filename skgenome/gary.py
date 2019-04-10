@@ -382,7 +382,10 @@ class GenomicArray(object):
             ranges.
         """
         table = pd.concat(iter_ranges(self.data, chrom, starts, ends, mode),
-                          sort=False)
+                          # pandas<0.23 compat:
+                          # https://pandas.pydata.org/pandas-docs/version/0.23.0/generated/pandas.concat.html#pandas.concat
+                          #sort=False
+                          )
         return self.as_dataframe(table)
 
     def into_ranges(self, other, column, default, summary_func=None):
