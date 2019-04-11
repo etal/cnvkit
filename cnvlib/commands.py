@@ -85,10 +85,10 @@ def _cmd_batch(args):
     elif args.normal is None:
         bad_args_msg = ("Option -n/--normal must be given to build a new "
                         "reference if -r/--reference is not used.")
-    elif args.method in ('hybrid', 'amplicon') and not args.targets:
+    elif args.seq_method in ('hybrid', 'amplicon') and not args.targets:
         bad_args_msg = ("For the '%r' sequencing method, option -t/--targets "
                         "(at least) must be given to build a new reference if "
-                        "-r/--reference is not used." % args.method)
+                        "-r/--reference is not used." % args.seq_method)
     if bad_args_msg:
         sys.exit(bad_args_msg + "\n(See: cnvkit.py batch -h)")
 
@@ -112,7 +112,7 @@ def _cmd_batch(args):
             args.fasta, args.annotate, args.short_names, args.target_avg_size,
             args.access, args.antitarget_avg_size, args.antitarget_min_size,
             args.output_reference, args.output_dir, args.processes,
-            args.count_reads, args.method, args.cluster)
+            args.count_reads, args.seq_method, args.cluster)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = read_cna(args.reference)
@@ -139,7 +139,7 @@ def _cmd_batch(args):
                             bam, args.targets, args.antitargets, args.reference,
                             args.output_dir, args.male_reference, args.scatter,
                             args.diagram, args.rscript_path, args.count_reads,
-                            args.drop_low_coverage, args.method, procs_per_bam,
+                            args.drop_low_coverage, args.seq_method, args.segment_method, procs_per_bam,
                             args.cluster)
     else:
         logging.info("No tumor/test samples (but %d normal/control samples) "
@@ -150,12 +150,16 @@ def _cmd_batch(args):
 P_batch = AP_subparsers.add_parser('batch', help=_cmd_batch.__doc__)
 P_batch.add_argument('bam_files', nargs='*',
         help="Mapped sequence reads (.bam)")
-P_batch.add_argument('-m', '--method',
+P_batch.add_argument('-m', '--seq-method', '--method',
         choices=('hybrid', 'amplicon', 'wgs'), default='hybrid',
-        help="""Sequencing protocol: hybridization capture ('hybrid'), targeted
-                amplicon sequencing ('amplicon'), or whole genome sequencing
-                ('wgs'). Determines whether and how to use antitarget bins.
-                [Default: %(default)s]""")
+        help="""Sequencing assay type: hybridization capture ('hybrid'),
+                targeted amplicon sequencing ('amplicon'), or whole genome
+                sequencing ('wgs'). Determines whether and how to use antitarget
+                bins. [Default: %(default)s]""")
+P_batch.add_argument('--segment-method',
+        choices=segmentation.SEGMENT_METHODS,
+        default='hmm',
+        help="""Method used in the 'segment' step. [Default: %(default)d]"""),
 P_batch.add_argument('-y', '--male-reference', '--haploid-x-reference',
         action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
@@ -671,12 +675,11 @@ P_segment.add_argument('-o', '--output', metavar="FILENAME",
 P_segment.add_argument('-d', '--dataframe',
         help="""File name to save the raw R dataframe emitted by CBS or
                 Fused Lasso. (Useful for debugging.)""")
-P_segment.add_argument('-m', '--method', default='cbs',
-        choices=('cbs', 'flasso', 'haar', 'none',
-                 'hmm', 'hmm-tumor', 'hmm-germline'),
-        help="""Segmentation method (CBS, fused lasso, haar wavelet, HMM), or
-                'none' for chromosome arm-level averages as segments.
-                [Default: %(default)s]""")
+P_segment.add_argument('-m', '--method',
+        choices=segmentation.SEGMENT_METHODS,
+        default='hmm',
+        help="""Segmentation method (see docs), or 'none' for chromosome
+                arm-level averages as segments. [Default: %(default)s]""")
 P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
                 accept breakpoints during segmentation.
@@ -1157,7 +1160,7 @@ P_genemetrics_stats.add_argument('--mode',
         action='append_const', dest='location_stats', const='mode',
         help="Mode (i.e. peak density of log2 ratios).")
 P_genemetrics_stats.add_argument('--ttest',
-        action='append_const', dest='location_stats', const='ttest',
+        action='append_const', dest='location_stats', const='p_ttest',
         help="One-sample t-test of bin log2 ratios versus 0.0.")
 # Dispersion statistics
 P_genemetrics_stats.add_argument('--stdev',

@@ -161,8 +161,8 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes):
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                      output_dir, male_reference, plot_scatter, plot_diagram,
-                     rscript_path, by_count, skip_low, method, processes,
-                     do_cluster):
+                     rscript_path, by_count, skip_low, seq_method,
+                     segment_method, processes, do_cluster):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
@@ -178,37 +178,46 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
     cnarr = fix.do_fix(raw_tgt, raw_anti, read_cna(ref_fname),
-                       do_gc=True, do_edge=(method == "hybrid"), do_rmask=True,
+                       do_gc=True, do_edge=(seq_method == "hybrid"), do_rmask=True,
                        do_cluster=do_cluster)
     tabio.write(cnarr, sample_pfx + '.cnr')
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
-    segments = segmentation.do_segmentation(cnarr, 'cbs',
+    segments = segmentation.do_segmentation(cnarr, segment_method,
                                             rscript_path=rscript_path,
                                             skip_low=skip_low,
                                             processes=processes,
                                             **({'threshold': 1e-6}
-                                               if method == 'wgs'
+                                               if seq_method == 'wgs'
                                                else {}))
-    tabio.write(segments, sample_pfx + '.cns')
-
     logging.info("Post-processing %s.cns ...", sample_pfx)
-    seg_bintest = bintest.do_bintest(cnarr, segments, target_only=True)
-    seg_metrics = segmetrics.do_segmetrics(cnarr, seg_bintest,
-                                           interval_stats=['ci'], alpha=0.5)
+    # TODO/ENH take centering shift & apply to .cnr for use in segmetrics
+    seg_metrics = segmetrics.do_segmetrics(cnarr, segments,
+                                           interval_stats=['ci'], alpha=0.5,
+                                           smoothed=True)
+    tabio.write(seg_metrics, sample_pfx + '.cns')
+
+    # Remove likely false-positive breakpoints
     seg_call = call.do_call(seg_metrics, method="none", filters=['ci'])
-    tabio.write(segments, sample_pfx + '.call.cns')
+    # Spike in single-bin CNVs with a test p-value
+    seg_bintest = bintest.do_bintest(cnarr, seg_call, target_only=True)
+    # Calculate another segment-level test p-value
+    seg_alltest = segmetrics.do_segmetrics(cnarr, seg_bintest, location_stats=['p_ttest'])
+    # Finally, assign absolute copy number values to each segment
+    seg_alltest.center_all("median")
+    seg_final = call.do_call(seg_alltest, method="threshold")
+    tabio.write(seg_final, sample_pfx + '.call.cns')
 
     if plot_scatter:
-        scatter.do_scatter(cnarr, segments)
-        pyplot.savefig(sample_pfx + '-scatter.pdf', format='pdf',
+        scatter.do_scatter(cnarr, seg_final)
+        pyplot.savefig(sample_pfx + '-scatter.png', format='png',
                        bbox_inches="tight")
-        logging.info("Wrote %s-scatter.pdf", sample_pfx)
+        logging.info("Wrote %s-scatter.png", sample_pfx)
 
     if plot_diagram:
         is_xx = cnarr.guess_xx(male_reference)
         outfname = sample_pfx + '-diagram.pdf'
         diagram.create_diagram(cnarr.shift_xx(male_reference, is_xx),
-                               segments.shift_xx(male_reference, is_xx),
+                               seg_final.shift_xx(male_reference, is_xx),
                                0.5, 3, outfname)
         logging.info("Wrote %s", outfname)

@@ -16,12 +16,20 @@ from ..cnary import CopyNumArray as CNA
 from ..segfilters import squash_by_groups
 from . import cbs, flasso, haar, hmm, none
 
+SEGMENT_METHODS = ('cbs', 'flasso', 'haar', 'none',
+                   'hmm', 'hmm-tumor', 'hmm-germline')
+
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10, min_weight=0,
                     save_dataframe=False, rscript_path="Rscript",
                     processes=1):
     """Infer copy number segments from the given coverage table."""
+    if method not in SEGMENT_METHODS:
+        raise ValueError("'method' must be one of: "
+                         + ", ".join(SEGMENT_METHODS)
+                         + "; got: " + repr(method))
+
     if variants:
         variants = variants.heterozygous()
     if not threshold:
