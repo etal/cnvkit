@@ -301,8 +301,8 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
     tgt_var = descriptives.biweight_midvariance(tgt_cna
                                                 .drop_low_coverage()
                                                 .residuals()) ** 2
-    bin_sizes = tgt_cna['end'] - tgt_cna['start']
-    tgt_simple_wts = 1 - tgt_var / np.sqrt(bin_sizes / bin_sizes.mean())
+    bin_sz = np.sqrt(tgt_cna['end'] - tgt_cna['start'])
+    tgt_simple_wts = 1 - tgt_var / (bin_sz / bin_sz.mean())
     simple_wt[~is_anti] = tgt_simple_wts
 
     if is_anti.any():
@@ -319,8 +319,8 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
                                     len(anti_cna)))
 
         anti_var = descriptives.biweight_midvariance(anti_ok.residuals()) ** 2
-        anti_bin_sizes = anti_cna['end'] - anti_cna['start']
-        anti_simple_wts = 1 - anti_var / np.sqrt(anti_bin_sizes / anti_bin_sizes.mean())
+        anti_bin_sz = np.sqrt(anti_cna['end'] - anti_cna['start'])
+        anti_simple_wts = 1 - anti_var / (anti_bin_sz / anti_bin_sz.mean())
         simple_wt[is_anti] = anti_simple_wts
 
         # Report any difference in bin set variability
@@ -339,7 +339,7 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
         # NB: spread ~= SD, so variance ~= spread^2
         fancy_wt = 1.0 - ref_matched[spread_key] ** 2
         # Average w/ simple weights, giving this more emphasis
-        x = .75
+        x = .8
         weights = (x * fancy_wt
                    + (1 - x) * simple_wt)
     else:
