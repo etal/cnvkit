@@ -46,9 +46,12 @@ class GenomicArray(object):
             else:
                 def ok_dtype(col, dt):
                     return data_table[col].dtype == np.dtype(dt)
-            for col, dtype in zip(self._required_columns, self._required_dtypes):
-                if not ok_dtype(col, dtype):
-                    data_table[col] = data_table[col].astype(dtype)
+            recast_cols = {col: dtype
+                for col, dtype in zip(self._required_columns, self._required_dtypes)
+                if not ok_dtype(col, dtype)
+            }
+            if recast_cols:
+                data_table = data_table.astype(recast_cols)
 
         self.data = data_table
         self.meta = (dict(meta_dict)
@@ -86,9 +89,11 @@ class GenomicArray(object):
         return self.__class__.from_columns(columns, self.meta)
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
-    def as_dataframe(self, dframe):
+    def as_dataframe(self, dframe, reset_index=False):
         """Wrap the given pandas DataFrame in this instance's metadata."""
-        return self.__class__(dframe.reset_index(drop=True), self.meta.copy())
+        if reset_index:
+            dframe = dframe.reset_index(drop=True)
+        return self.__class__(dframe, self.meta.copy())
 
     # def as_index(self, index):
     #     """Subset with fancy/boolean indexing; reuse this instance's metadata."""

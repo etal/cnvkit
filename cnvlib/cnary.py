@@ -437,12 +437,17 @@ class CopyNumArray(GenomicArray):
             resids = [subcna.log2 - subcna.log2.median()
                       for _chrom, subcna in self.by_chromosome()]
         elif "log2" in segments:
-            resids = [subcna.log2 - seg.log2
-                      for seg, subcna in self.by_ranges(segments)]
+            resids = [bins_lr - seg_lr
+                      for seg_lr, bins_lr in zip(
+                          segments['log2'],
+                          self.iter_ranges_of(segments, 'log2', mode='inner',
+                                              keep_empty=True))
+                      if len(bins_lr)]
         else:
-            resids = [subcna.log2 - subcna.log2.median()
-                      for _seg, subcna in self.by_ranges(segments)]
-        return np.concatenate(resids) if resids else np.array([])
+            resids = [lr - lr.median()
+                      for lr in self.iter_ranges_of(segments, 'log2',
+                                                    keep_empty=False)]
+        return pd.concat(resids) if resids else pd.Series([])
 
     def smoothed(self, window=None, by_arm=True):
         """Smooth log2 values with a sliding window.
