@@ -153,9 +153,12 @@ def center_by_window(cnarr, fraction, sort_key):
     df = cnarr.data.reset_index(drop=True)
     np.random.seed(0xA5EED)
     shuffle_order = np.random.permutation(df.index)
-    df = df.reindex(shuffle_order)
+    #df = df.reindex(shuffle_order)
+    df = df.iloc[shuffle_order]
     # Apply the same shuffling to the key array as to the target probe set
-    assert isinstance(sort_key, (np.ndarray, pd.Series))
+    if isinstance(sort_key, pd.Series):
+        # XXX why
+        sort_key = sort_key.values
     sort_key = sort_key[shuffle_order]
     # Sort the data according to the specified parameter
     order = np.argsort(sort_key, kind='mergesort')
@@ -197,7 +200,7 @@ def get_edge_bias(cnarr, margin):
         gains[np.concatenate([[False], ok_gaps_mask])] += left_gains
         gains[np.concatenate([ok_gaps_mask, [False]])] += right_gains
         output_by_chrom.append(gains - losses)
-    return np.concatenate(output_by_chrom)
+    return pd.Series(np.concatenate(output_by_chrom), index=cnarr.data.index)
 
 
 def edge_losses(target_sizes, insert_size):
