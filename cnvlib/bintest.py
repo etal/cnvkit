@@ -68,7 +68,10 @@ def do_bintest(cnarr, segments=None, alpha=0.005, target_only=False):
                     # Keep this segment as-is
                     chunks.append(pd.DataFrame.from_records([segment],
                                                             columns=segments.data.columns))
-            return cnarr.as_dataframe(pd.concat(chunks, sort=False))
+            return cnarr.as_dataframe(pd.concat(chunks,
+                                                # pandas 0.23+
+                                                #sort=False
+                                                ))
         else:
             # Nothing to do
             return segments
