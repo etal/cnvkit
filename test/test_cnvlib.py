@@ -441,12 +441,15 @@ class CommandTests(unittest.TestCase):
         # NB: R methods are in another script; haar is pure-Python
         segments = segmentation.do_segmentation(cnarr, "haar")
         self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
         segments = segmentation.do_segmentation(cnarr, "haar", threshold=.0001,
                                                 skip_low=True)
         self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
         varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
         self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
 
     def test_segment_hmm(self):
         """The 'segment' command with HMM methods."""
@@ -456,14 +459,17 @@ class CommandTests(unittest.TestCase):
             # NB: R methods are in another script; haar is pure-Python
             segments = segmentation.do_segmentation(cnarr, "hmm")
             self.assertGreater(len(segments), n_chroms)
+            self.assertTrue((segments.start < segments.end).all())
             segments = segmentation.do_segmentation(cnarr, "hmm-tumor",
                                                     skip_low=True)
             self.assertGreater(len(segments), n_chroms)
+            self.assertTrue((segments.start < segments.end).all())
             segments = segmentation.do_segmentation(cnarr, "hmm-germline")
             self.assertGreater(len(segments), n_chroms)
-            #  varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
-            #  segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
-            #  self.assertGreater(len(segments), n_chroms)
+            self.assertTrue((segments.start < segments.end).all())
+            varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+            segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
+            self.assertGreater(len(segments), n_chroms)
 
     def test_segment_parallel(self):
         """The 'segment' command, in parallel."""

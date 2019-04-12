@@ -55,7 +55,12 @@ def segment_hmm(cnarr, method, window=None, processes=1):
     # Merge adjacent bins with the same state to create segments
     cnarr['log2'] = orig_log2
     cnarr['probes'] = 1
-    segarr = squash_by_groups(cnarr, pd.Series(states), by_arm=True)
+    segarr = squash_by_groups(cnarr,
+                              pd.Series(states, index=cnarr.data.index),
+                              by_arm=True)
+    if not (segarr.start < segarr.end).all():
+        bad_segs = segarr[segarr.start >= segarr.end]
+        logging.warning("Bad segments:\n%s", bad_segs.data)
     return segarr
 
 

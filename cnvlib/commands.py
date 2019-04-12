@@ -158,7 +158,7 @@ P_batch.add_argument('-m', '--seq-method', '--method',
                 bins. [Default: %(default)s]""")
 P_batch.add_argument('--segment-method',
         choices=segmentation.SEGMENT_METHODS,
-        default='hmm',
+        default='cbs',
         help="""Method used in the 'segment' step. [Default: %(default)d]"""),
 P_batch.add_argument('-y', '--male-reference', '--haploid-x-reference',
         action='store_true',
@@ -677,7 +677,7 @@ P_segment.add_argument('-d', '--dataframe',
                 Fused Lasso. (Useful for debugging.)""")
 P_segment.add_argument('-m', '--method',
         choices=segmentation.SEGMENT_METHODS,
-        default='hmm',
+        default='cbs',
         help="""Segmentation method (see docs), or 'none' for chromosome
                 arm-level averages as segments. [Default: %(default)s]""")
 P_segment.add_argument('-t', '--threshold', type=float,
