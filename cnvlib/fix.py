@@ -136,7 +136,9 @@ def match_ref_to_sample(ref_cnarr, samp_cnarr):
     if num_missing > 0:
         raise ValueError("Reference is missing %d bins found in %s"
                          % (num_missing, samp_cnarr.sample_id))
-    return ref_cnarr.as_dataframe(ref_matched.reset_index(drop=True))
+    x = ref_cnarr.as_dataframe(ref_matched.reset_index(drop=True)
+                               .set_index(samp_cnarr.data.index))
+    return x
 
 
 def center_by_window(cnarr, fraction, sort_key):
@@ -287,23 +289,6 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
 
     Returns: The input `cnarr` with a `weight` column added.
     """
-    all_weights = []
-
-    if ((ref_matched[spread_key] > epsilon).any() and
-        (np.abs(np.mod(ref_matched[log2_key], 1)) > epsilon).any()):
-        # Pooled/paired reference only
-        logging.debug("Weighting bins by relative coverage depths in reference")
-        # Penalize bins that deviate from neutral, like least-squares fitting
-        # NB: This implicitly factors in the overall variance of the reference
-        # log2 values, which for a pooled reference is usually less than that
-        # of the sample.
-        ref_log2_diff = ref_matched[log2_key] - ref_matched.expect_flat_log2()
-        all_weights.append(1 - (ref_log2_diff ** 2))
-
-        logging.debug("Weighting bins by coverage spread in reference")
-        # NB: spread ~= SD, so variance ~= spread^2
-        all_weights.append(1.0 - ref_matched[spread_key] ** 2)
-
     # Weight by sample-level features -- works for flat reference, too
     logging.debug("Weighting bins by size and overall variance in sample")
     simple_wt = np.zeros(len(cnarr))
@@ -314,7 +299,7 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
                                                 .drop_low_coverage()
                                                 .residuals()) ** 2
     bin_sizes = tgt_cna['end'] - tgt_cna['start']
-    tgt_simple_wts = 1 - tgt_var / (bin_sizes / bin_sizes.mean())
+    tgt_simple_wts = 1 - tgt_var / np.sqrt(bin_sizes / bin_sizes.mean())
     simple_wt[~is_anti] = tgt_simple_wts
 
     if is_anti.any():
@@ -332,7 +317,7 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
 
         anti_var = descriptives.biweight_midvariance(anti_ok.residuals()) ** 2
         anti_bin_sizes = anti_cna['end'] - anti_cna['start']
-        anti_simple_wts = 1 - anti_var / (anti_bin_sizes / anti_bin_sizes.mean())
+        anti_simple_wts = 1 - anti_var / np.sqrt(anti_bin_sizes / anti_bin_sizes.mean())
         simple_wt[is_anti] = anti_simple_wts
 
         # Report any difference in bin set variability
@@ -344,10 +329,16 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
             logging.info("Antitargets are %.2f x more variable than targets",
                          1. / var_ratio)
 
-    if all_weights:
-        # Average the 3 estimates
-        all_weights.append(simple_wt)
-        weights = np.vstack(all_weights).mean(axis=0)
+    if ((ref_matched[spread_key] > epsilon).any() and
+        (np.abs(np.mod(ref_matched[log2_key], 1)) > epsilon).any()):
+        # Pooled/paired reference only
+        logging.debug("Weighting bins by coverage spread in reference")
+        # NB: spread ~= SD, so variance ~= spread^2
+        fancy_wt = 1.0 - ref_matched[spread_key] ** 2
+        # Average w/ simple weights, giving this more emphasis
+        x = .75
+        weights = (x * fancy_wt
+                   + (1 - x) * simple_wt)
     else:
         # Flat reference, only 1 weight estimate
         weights = simple_wt
