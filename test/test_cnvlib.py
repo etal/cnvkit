@@ -178,8 +178,8 @@ class CommandTests(unittest.TestCase):
         # Run the same sample
         batch.batch_run_sample(
             bam, tgt_bed_fname, anti_bed_fname, ref_fname, 'build', True,
-            True, True, "Rscript", False, False, "hybrid", "hmm", 1, False)
-        cns =  cnvlib.read("build/na12878-chrM-Y-trunc.cns")
+            True, True, "Rscript", False, False, "hybrid", "haar", 1, False)
+        cns = cnvlib.read("build/na12878-chrM-Y-trunc.cns")
         self.assertGreater(len(cns), 0)
 
     def test_bintest(self):

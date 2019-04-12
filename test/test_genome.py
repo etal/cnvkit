@@ -245,7 +245,7 @@ class IntervalTests(unittest.TestCase):
                          '\n'.join(["Got:", str(result.data),
                                     "Expected:", str(expect.data)]))
         for col in expect.data.columns:
-            self.assertTrue((expect[col] == result[col]).all(),
+            self.assertTrue((expect[col].values == result[col].values).all(),
                             "Col '{}' differs:\nExpect:\n{}\nGot:\n{}"
                             .format(col, expect.data, result.data))
 

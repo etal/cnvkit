@@ -55,7 +55,9 @@ def squash_by_groups(cnarr, levels, by_arm=False):
         data['_g1'] = enumerate_changes(cnarr['cn1'])
         data['_g2'] = enumerate_changes(cnarr['cn2'])
         groupkey.extend(['_g1', '_g2'])
-    data = data.groupby(groupkey, sort=False).apply(squash_region)
+    data = (data.groupby(groupkey, as_index=False, group_keys=False, sort=False)
+            .apply(squash_region)
+            .reset_index(drop=True))
     return cnarr.as_dataframe(data)
 
 
@@ -126,11 +128,11 @@ def ampdel(segarr):
     actionable, usually focal, CNAs. Any real and potentially informative but
     lower-level CNAs will be dropped.
     """
-    levels = pd.Series(np.zeros(len(segarr)))
+    levels = np.zeros(len(segarr))
     levels[segarr['cn'] == 0] = -1
     levels[segarr['cn'] >= 5] = 1
     # or: segarr['log2'] >= np.log2(2.5)
-    cnarr = squash_by_groups(segarr, levels)
+    cnarr = squash_by_groups(segarr, pd.Series(levels))
     return cnarr[(cnarr['cn'] == 0) | (cnarr['cn'] >= 5)]
 
 
@@ -150,10 +152,14 @@ def ci(segarr):
     Segments with lower CI above 0 are kept as gains, upper CI below 0 as
     losses, and the rest with CI overlapping zero are collapsed as neutral.
     """
-    levels = pd.Series(np.zeros(len(segarr)))
-    levels[segarr['ci_lo'] > 0] = 1
-    levels[segarr['ci_hi'] < 0] = -1
-    return squash_by_groups(segarr, levels)
+    levels = np.zeros(len(segarr))
+    # if len(segarr) < 10:
+    #     logging.warning("* segarr :=\n%s", segarr)
+    #     logging.warning("* segarr['ci_lo'] :=\n%s", segarr['ci_lo'])
+    #     logging.warning("* segarr['ci_lo']>0 :=\n%s", segarr['ci_lo'] > 0)
+    levels[segarr['ci_lo'].values > 0] = 1
+    levels[segarr['ci_hi'].values < 0] = -1
+    return squash_by_groups(segarr, pd.Series(levels))
 
 
 @require_column('cn')
@@ -171,7 +177,7 @@ def sem(segarr, zscore=1.96):
     0 as losses, and the rest with CI overlapping zero are collapsed as neutral.
     """
     margin = segarr['sem'] * zscore
-    levels = pd.Series(np.zeros(len(segarr)))
+    levels = np.zeros(len(segarr))
     levels[segarr['log2'] - margin > 0] = 1
     levels[segarr['log2'] + margin < 0] = -1
-    return squash_by_groups(segarr, levels)
+    return squash_by_groups(segarr, pd.Series(levels))

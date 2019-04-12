@@ -213,6 +213,8 @@ class CopyNumArray(GenomicArray):
 
         outrows = []
         for name, subarr in self.by_gene(ignore):
+            if not len(subarr):
+                continue
             if name in params.ANTITARGET_ALIASES and not squash_antitarget:
                 outrows.extend(subarr.data.itertuples(index=False))
             else:
