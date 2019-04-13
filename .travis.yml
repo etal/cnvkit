@@ -6,7 +6,7 @@ os:
     - linux
 env:
     # Earliest supported versions
-    - CONDA_PY=3.5 PANDAS=0.20.1 PYSAM=0.10.0
+    - CONDA_PY=3.5 PANDAS=0.22.0 PYSAM=0.10.0
     # The latest versions, whatever they are
     - CONDA_PY=3.6 PANDAS='*' PYSAM='*'
     - CONDA_PY=3.7 PANDAS='*' PYSAM='*'
