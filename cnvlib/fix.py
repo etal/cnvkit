@@ -339,7 +339,7 @@ def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
         # NB: spread ~= SD, so variance ~= spread^2
         fancy_wt = 1.0 - ref_matched[spread_key] ** 2
         # Average w/ simple weights, giving this more emphasis
-        x = .8
+        x = .9
         weights = (x * fancy_wt
                    + (1 - x) * simple_wt)
     else:
