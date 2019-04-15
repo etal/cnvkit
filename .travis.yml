@@ -49,6 +49,7 @@ script:
     - coverage run test_io.py
     - coverage run -a test_genome.py
     - coverage run -a test_cnvlib.py
+    - coverage run -a test_commands.py
     - coverage run -a test_r.py
 
 after_success:

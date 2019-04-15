@@ -37,6 +37,7 @@ test:
 	python test_io.py
 	python test_genome.py
 	python test_cnvlib.py
+	python test_commands.py
 	python test_r.py
 
 

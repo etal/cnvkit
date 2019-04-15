@@ -131,7 +131,7 @@ def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
                          color=POINT_COLOR, edgecolor='none', alpha=0.2)
             if do_trend:
                 # ENH break trendline by chromosome arm boundaries?
-                axis.plot(x, subprobes.smoothed(window_size),
+                axis.plot(x, subprobes.smooth_log2(),  #window_size),
                         color=POINT_COLOR, linewidth=2, zorder=-1)
 
         if chrom in chrom_segs:
@@ -406,7 +406,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
 
     # Add a local trend line
     if do_trend:
-        axis.plot(x, probes.smoothed(.1),
+        axis.plot(x, probes.smooth_log2(),  #.1),
                   color=POINT_COLOR, linewidth=2, zorder=-1)
 
     # Draw segments as horizontal lines

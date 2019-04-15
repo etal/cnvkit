@@ -57,7 +57,7 @@ def segment_haar(cnarr, fdr_q):
 
 def one_chrom(cnarr, fdr_q, chrom):
     logging.debug("Segmenting %s", chrom)
-    results = haarSeg(cnarr['log2'].values,
+    results = haarSeg(cnarr.smooth_log2(),
                       fdr_q,
                       W=(cnarr['weight'].values if 'weight' in cnarr
                          else None))

@@ -35,7 +35,7 @@ def segment_hmm(cnarr, method, window=None, processes=1):
     # NB: Incorporate weights into smoothed log2 estimates
     # (Useful kludge until weighted HMM is in place)
     orig_log2 = cnarr['log2'].values.copy()
-    cnarr['log2'] = cnarr.smoothed()#window)
+    cnarr['log2'] = cnarr.smooth_log2()  # window)
 
     logging.info("Building model from observations")
     model = hmm_get_model(cnarr, method, processes)
