@@ -1391,8 +1391,7 @@ def _cmd_bintest(args):
     cnarr = read_cna(args.cnarray)
     segments = read_cna(args.segment) if args.segment else None
     sig = do_bintest(cnarr, segments, args.alpha, args.target)
-    if len(sig):
-        tabio.write(sig, args.output or sys.stdout)
+    tabio.write(sig, args.output or sys.stdout)
 
 
 P_bintest = AP_subparsers.add_parser('bintest', help=_cmd_bintest.__doc__)

@@ -199,14 +199,16 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
 
     # Remove likely false-positive breakpoints
     seg_call = call.do_call(seg_metrics, method="none", filters=['ci'])
-    # Spike in single-bin CNVs with a test p-value
-    #seg_bintest = bintest.do_bintest(cnarr, seg_call, target_only=True)
     # Calculate another segment-level test p-value
     seg_alltest = segmetrics.do_segmetrics(cnarr, seg_call, location_stats=['p_ttest'])
     # Finally, assign absolute copy number values to each segment
     seg_alltest.center_all("median")
     seg_final = call.do_call(seg_alltest, method="threshold")
     tabio.write(seg_final, sample_pfx + '.call.cns')
+
+    # Test for single-bin CNVs separately
+    seg_bintest = bintest.do_bintest(cnarr, seg_call, target_only=True)
+    tabio.write(seg_bintest, sample_pfx + '.bintest.cns')
 
     if plot_scatter:
         scatter.do_scatter(cnarr, seg_final)

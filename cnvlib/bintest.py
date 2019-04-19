@@ -11,10 +11,13 @@ from . import params, segfilters
 def do_bintest(cnarr, segments=None, alpha=0.005, target_only=False):
     """Get a probability for each bin based on its Z-score.
 
-    Adds a column w/ p-values to the input .cnr.
+    Adds a column w/ p-values to the input .cnr. With `segments`, the Z-score is
+    relative to the enclosing segment's mean, otherwise it is relative to 0.
 
-    Returns either (without `segments`) bins where the probability < `alpha`, or
-    (with `segments`) segments with those significant bin regions spiked in.
+    Bin p-values are corrected for multiple hypothesis testing by the
+    Benjamini-Hochberg method.
+
+    Returns: bins where the probability < `alpha`.
     """
     cnarr = cnarr.copy()
     # Subtract segment means, if given, to report only the CNA bins that
@@ -28,8 +31,8 @@ def do_bintest(cnarr, segments=None, alpha=0.005, target_only=False):
     if not resid.index.is_unique:
         # Overlapping segments, maybe?
         dup_idx = resid.index.duplicated(keep=False)
-        logging.warn("Segments may overlap at %d bins; dropping duplicate values",
-                     dup_idx.sum())
+        logging.warning("Segments may overlap at %d bins; dropping duplicate values",
+                        dup_idx.sum())
         logging.debug("Duplicated indices: %s", " ".join(resid[dup_idx].head(50)))
         resid = resid[~resid.index.duplicated()]
         cnarr = cnarr.as_dataframe(cnarr.data.loc[resid.index])
@@ -47,38 +50,12 @@ def do_bintest(cnarr, segments=None, alpha=0.005, target_only=False):
     logging.info("Significant hits in {}/{} bins ({:.3g}%)"
                  .format(is_sig.sum(), len(is_sig),
                          100 * is_sig.sum() / len(is_sig)))
+    # if segments:
+    #     return spike_into_segments(cnarr, segments, is_sig)
 
-    if segments:
-        if is_sig.any():
-            # Splice significant hits into the given segments
-            # NB: residuals() above ensures hits all occur within segments
-            cnarr['is_sig'] = is_sig
-            chunks = []
-            for segment, seghits in cnarr.by_ranges(segments, keep_empty=True):
-                if seghits['is_sig'].any():
-                    # Merge each run of adjacent non-significant bins within this
-                    # segment, leaving the significant hits as single-bin segments
-                    levels = seghits['is_sig'].cumsum() * seghits['is_sig']
-                    chunks.append(seghits.data
-                                  .assign(_levels=levels)
-                                  .groupby('_levels', sort=False)
-                                  .apply(segfilters.squash_region)
-                                  .reset_index(drop=True))
-                else:
-                    # Keep this segment as-is
-                    chunks.append(pd.DataFrame.from_records([segment],
-                                                            columns=segments.data.columns))
-            return cnarr.as_dataframe(pd.concat(chunks,
-                                                # pandas 0.23+
-                                                #sort=False
-                                                ))
-        else:
-            # Nothing to do
-            return segments
-    else:
-        # May be empty
-        hits = cnarr[is_sig]
-        return hits
+    # May be empty
+    hits = cnarr[is_sig]
+    return hits
 
 
 def z_prob(cnarr):
@@ -107,3 +84,32 @@ def p_adjust_bh(p):
     steps = float(len(p)) / np.arange(len(p), 0, -1)
     q = np.minimum(1, np.minimum.accumulate(steps * p[by_descend]))
     return q[by_orig]
+
+
+def spike_into_segments(cnarr, segments, is_sig):
+    if is_sig.any():
+        # Splice significant hits into the given segments
+        # NB: residuals() above ensures hits all occur within segments
+        cnarr['is_sig'] = is_sig
+        chunks = []
+        for segment, seghits in cnarr.by_ranges(segments, keep_empty=True):
+            if seghits['is_sig'].any():
+                # Merge each run of adjacent non-significant bins within this
+                # segment, leaving the significant hits as single-bin segments
+                levels = seghits['is_sig'].cumsum() * seghits['is_sig']
+                chunks.append(seghits.data
+                                .assign(_levels=levels)
+                                .groupby('_levels', sort=False)
+                                .apply(segfilters.squash_region)
+                                .reset_index(drop=True))
+            else:
+                # Keep this segment as-is
+                chunks.append(pd.DataFrame.from_records([segment],
+                                                        columns=segments.data.columns))
+        return cnarr.as_dataframe(pd.concat(chunks,
+                                            # pandas 0.23+
+                                            #sort=False
+                                            ))
+    else:
+        # Nothing to do
+        return segments
