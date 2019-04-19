@@ -30,8 +30,6 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
                          + ", ".join(SEGMENT_METHODS)
                          + "; got: " + repr(method))
 
-    if variants:
-        variants = variants.heterozygous()
     if not threshold:
         threshold = {'cbs': 0.0001,
                      'flasso': 0.0001,
@@ -138,7 +136,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         segarr = none.segment_none(filtered_cn)
 
     elif method.startswith('hmm'):
-        segarr = hmm.segment_hmm(filtered_cn, method, threshold)
+        segarr = hmm.segment_hmm(filtered_cn, method, threshold, variants)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
@@ -177,7 +175,9 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
     segarr.meta = cnarr.meta.copy()
     if variants and not method.startswith('hmm'):
         # Re-segment the variant allele freqs within each segment
-        newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
+        # TODO train on all segments together
+        logging.info("Re-segmenting on variant allele frequency")
+        newsegs = [hmm.variants_in_segment(subvarr, segment)
                    for segment, subvarr in variants.by_ranges(segarr)]
         segarr = segarr.as_dataframe(pd.concat(newsegs))
         segarr['baf'] = variants.baf_by_ranges(segarr)

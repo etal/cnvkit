@@ -1,17 +1,21 @@
 """Segmentation by Hidden Markov Model."""
 import collections
 import logging
+import warnings
+# joblib/parallel.py:268: DeprecationWarning: check_pickle is deprecated in joblib 0.12 and will be removed in 0.13
+warnings.simplefilter('ignore', category=DeprecationWarning)
 
 import numpy as np
 import pandas as pd
 import scipy.special
 import pomegranate as pom
 
+from ..cnary import CopyNumArray as CNA
 from ..descriptives import biweight_midvariance
 from ..segfilters import squash_by_groups
 
 
-def segment_hmm(cnarr, method, window=None, processes=1):
+def segment_hmm(cnarr, method, window=None, variants=None, processes=1):
     """Segment bins by Hidden Markov Model.
 
     Use Viterbi method to infer copy number segments from sequential data.
@@ -114,8 +118,6 @@ def hmm_get_model(cnarr, method, processes):
     # Starts -- prefer neutral
     binom_coefs = scipy.special.binom(n_states - 1, range(n_states))
     start_probabilities = binom_coefs / binom_coefs.sum()
-    # Ends -- equally likely
-    #end_probabilities = np.ones(n_states) / n_states
 
     # Prefer to keep the current state in each transition
     # All other transitions are equally likely, to start
@@ -154,12 +156,89 @@ def as_observation_matrix(cnarr, variants=None):
     observations = [arm.log2.values
                     for _c, arm in cnarr.by_arm()]
     return observations
-    # --- TODO incorporate variant BAF/zygosity/LOH/ROH ---
-    if variants is not None:
-        print("Variants!")
-        cnarr['baf'] = variants.baf_by_ranges(cnarr)
-    if 'baf' in cnarr:
-        print("BAF!")
-        observations = [np.hstack([arm.log2.values, arm['baf'].values])
-                        for _c, arm in cnarr.by_arm()]
-    # /---
+
+
+def variants_in_segment(varr, segment, min_variants=50):
+    if len(varr) > min_variants:
+        observations = varr.mirrored_baf(above_half=True)
+        state_names = ["neutral", "alt"]
+        distributions = [
+            pom.NormalDistribution(0.5, .1, frozen=True),
+            pom.NormalDistribution(0.67, .1, frozen=True),
+        ]
+        n_states = len(distributions)
+        # Starts -- prefer neutral
+        start_probabilities = [.95, .05]
+        # Prefer to keep the current state in each transition
+        # All other transitions are equally likely, to start
+        transition_matrix = (np.identity(n_states) * 100
+                             + np.ones((n_states, n_states)) / n_states)
+        model = pom.HiddenMarkovModel.from_matrix(transition_matrix, distributions,
+            start_probabilities, state_names=state_names, name="loh")
+
+        model.fit(sequences=[observations],
+                  edge_inertia=0.1,
+                  lr_decay=.75,
+                  pseudocount=5,
+                  use_pseudocount=True,
+                  max_iterations=100000,
+                  #n_jobs=1,  # processes,
+                  verbose=False)
+        states = np.array(model.predict(observations, algorithm='map'))
+
+        logging.info("Done, now finalizing")
+        logging.debug("Model states: %s", model.states)
+        logging.debug("Predicted states: %s", states[:100])
+        logging.debug(str(collections.Counter(states)))
+        #logging.debug("Observations: %s", observations[0][:100])
+        logging.debug("Edges: %s", model.edges)
+
+        # Merge adjacent bins with the same state to create segments
+        fake_cnarr = CNA(varr.add_columns(weight=1, log2=0, gene='.').data)
+        results = squash_by_groups(fake_cnarr,
+                                   varr.as_series(states),
+                                   by_arm=False)
+        assert (results.start < results.end).all()
+
+    else:
+        results = None
+
+    if results is not None and len(results) > 1:
+        logging.info("Segment %s:%d-%d on allele freqs for %d additional breakpoints",
+                     segment.chromosome, segment.start, segment.end,
+                     len(results) - 1)
+        # Place breakpoints midway between SNVs
+        # XXX TODO use original cnarr bin boundaries to select/adjust breakpoint
+        mid_breakpoints = (results.start.values[1:] + results.end.values[:-1]) // 2
+        starts = np.concatenate([[segment.start], mid_breakpoints])
+        ends = np.concatenate([mid_breakpoints, [segment.end]])
+        dframe = pd.DataFrame({
+            'chromosome': segment.chromosome,
+            'start': starts,
+            'end': ends,
+            # 'baf': results['mean'],
+            'gene': segment.gene, # '-'
+            'log2': segment.log2,
+            'probes': results['probes'],
+            # 'weight': (segment.weight * results['probes']
+            #            / (segment.end - segment.start)),
+        })
+        bad_segs_idx = (dframe.start >= dframe.end)
+        if bad_segs_idx.any():
+            raise RuntimeError("Improper post-processing of segment {} -- "
+                               "{} bins start >= end:\n{}\n"
+                               .format(segment, bad_segs_idx.sum(),
+                                       dframe[bad_segs_idx]))
+
+    else:
+        dframe = pd.DataFrame({
+            'chromosome': segment.chromosome,
+            'start': segment.start,
+            'end': segment.end,
+            'gene': segment.gene, #'-',
+            'log2': segment.log2,
+            'probes': segment.probes,
+            # 'weight': segment.weight,
+        }, index=[0])
+
+    return dframe
