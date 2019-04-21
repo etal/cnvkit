@@ -163,33 +163,35 @@ def kaiser(x, width=None, weights=None, do_fit_edges=False):
     return y
 
 
-def savgol(x, total_width=None, weights=None):
-    """Savitzky-Golay smoothing."""
+def savgol(x, total_width=None, weights=None,
+           window_width=5, order=3, n_iter=1):
+    """Savitzky-Golay smoothing.
+
+    Fitted polynomial order is typically much less than half the window width.
+
+    `total_width` overrides `n_iter`.
+    """
     if len(x) < 2:
         return x
-    # Fitted polynomial order is typically much less than half width
-    order = 3
-    width = 7  # 9
-    wing = width // 2
 
-    if total_width is None:
-        total_width = guess_window_size(x, weights)
-    n_iter = max(1, min(100, total_width // width))
-    logging.debug("Smoothing in %d iterations for total effective window size %d",
+    if total_width:
+        n_iter = max(1, min(1000, total_width // window_width))
+    else:
+        total_width = n_iter * window_width
+    logging.debug("Smoothing in %d iterations for effective bandwidth %d",
                   n_iter, total_width)
 
     # Apply signal smoothing
     if weights is None:
-        x, total_wing, signal = check_inputs(x, width, False)
-        #wing = width // 2
+        x, total_wing, signal = check_inputs(x, total_width, False)
         y = signal
         for _i in range(n_iter):
-            y = savgol_filter(y, width, order, mode='interp')
+            y = savgol_filter(y, window_width, order, mode='interp')
         # y = convolve_unweighted(window, signal, wing)
     else:
         # TODO fit edges here, too
-        x, total_wing, signal, weights = check_inputs(x, width, False, weights)
-        window = savgol_coeffs(width, order)
+        x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)
+        window = savgol_coeffs(window_width, order)
         y, w = convolve_weighted(window, signal, weights, n_iter)
     # Safety
     bad_idx = (y > x.max()) | (y < x.min())

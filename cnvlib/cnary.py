@@ -451,7 +451,7 @@ class CopyNumArray(GenomicArray):
                                                     keep_empty=False)]
         return pd.concat(resids) if resids else pd.Series([])
 
-    def smooth_log2(self, window=None, by_arm=True):
+    def smooth_log2(self, bandwidth=None, by_arm=True):
         """Smooth log2 values with a sliding window.
 
         Account for chromosome and (optionally) centromere boundaries. Use bin
@@ -462,16 +462,22 @@ class CopyNumArray(GenomicArray):
         array
             Smoothed log2 values from `self`, the same length as `self`.
         """
+        if bandwidth is None:
+            bandwidth = smoothing.guess_window_size(self.log2,
+                                                    weights=(self['weight']
+                                                             if 'weight' in self
+                                                             else None))
+
         if by_arm:
             parts = self.by_arm()
         else:
             parts = self.by_chromosome()
         if 'weight' in self:
-            out = [smoothing.savgol(subcna['log2'].values, window,
+            out = [smoothing.savgol(subcna['log2'].values, bandwidth,
                                     weights=subcna['weight'].values)
                    for _chrom, subcna in parts]
         else:
-            out = [smoothing.savgol(subcna['log2'].values, window)
+            out = [smoothing.savgol(subcna['log2'].values, bandwidth)
                    for _chrom, subcna in parts]
         return np.concatenate(out)
 
