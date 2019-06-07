@@ -18,6 +18,15 @@ cna = CNA(cbind(tbl$log2), tbl$chromosome, tbl$start,
 
 write("Segmenting the probe data", stderr())
 set.seed(0xA5EED)
+
+# additional smoothing (if --smooth-cbs provided)
+if (%(smooth_cbs)g) {
+	write("It's true!", "/home/ewa/smoothCBS/smooth.txt")
+	write.table(cna, "/home/ewa/smoothCBS/BEFORE.txt")
+	cna = smooth.CNA(cna)
+	write.table(cna, "/home/ewa/smoothCBS/AFTER.txt")
+}
+
 if (is.null(tbl$weight)) {
     fit = segment(cna, alpha=%(threshold)g)
 } else {
