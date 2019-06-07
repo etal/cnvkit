@@ -656,7 +656,8 @@ def _cmd_segment(args):
                                            skip_outliers=args.drop_outliers,
                                            save_dataframe=bool(args.dataframe),
                                            rscript_path=args.rscript_path,
-                                           processes=args.processes)
+                                           processes=args.processes,
+																					 smooth_cbs=args.smooth_cbs)
     if args.dataframe:
         segments, dframe = results
         with open(args.dataframe, 'w') as handle:
@@ -702,6 +703,10 @@ P_segment.add_argument('-p', '--processes',
         help="""Number of subprocesses to segment in parallel.
                 Give 0 or a negative value to use the maximum number
                 of available CPUs. [Default: use 1 process]""")
+P_segment.add_argument('--smooth-cbs', action='store_true',
+        help="""Perform an additional smoothing before CBS segmentation, 
+								which in some cases may increase the sensitivity. 
+								Used only for CBS method.""")
 
 P_segment_vcf = P_segment.add_argument_group(
     "To additionally segment SNP b-allele frequencies")

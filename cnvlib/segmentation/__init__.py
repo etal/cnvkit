@@ -23,7 +23,7 @@ SEGMENT_METHODS = ('cbs', 'flasso', 'haar', 'none',
 def do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10, min_weight=0,
                     save_dataframe=False, rscript_path="Rscript",
-                    processes=1):
+                    processes=1, smooth_cbs=False):
     """Infer copy number segments from the given coverage table."""
     if method not in SEGMENT_METHODS:
         raise ValueError("'method' must be one of: "
@@ -60,7 +60,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         with parallel.pick_pool(processes) as pool:
             rets = list(pool.map(_ds, ((ca, method, threshold, variants,
                                         skip_low, skip_outliers, min_weight,
-                                        save_dataframe, rscript_path)
+                                        save_dataframe, rscript_path, smooth_cbs)
                                        for _, ca in cnarr.by_arm())))
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
@@ -92,7 +92,7 @@ def _ds(args):
 def _do_segmentation(cnarr, method, threshold, variants=None,
                      skip_low=False, skip_outliers=10, min_weight=0,
                      save_dataframe=False,
-                     rscript_path="Rscript"):
+                     rscript_path="Rscript", smooth_cbs=False):
     """Infer copy number segments from the given coverage table."""
     if not len(cnarr):
         return cnarr
@@ -154,6 +154,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
                 'probes_fname': tmp.name,
                 'sample_id': cnarr.sample_id,
                 'threshold': threshold,
+								'smooth_cbs': smooth_cbs
             }
             with core.temp_write_text(rscript % script_strings,
                                       mode='w+t') as script_fname:
