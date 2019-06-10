@@ -658,7 +658,7 @@ def _cmd_segment(args):
                                            rscript_path=args.rscript_path,
                                            processes=args.processes,
                                            smooth_cbs=args.smooth_cbs)
-																					 smooth_cbs=args.smooth_cbs)
+	
     if args.dataframe:
         segments, dframe = results
         with open(args.dataframe, 'w') as handle:
