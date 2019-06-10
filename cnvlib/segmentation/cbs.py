@@ -21,10 +21,8 @@ set.seed(0xA5EED)
 
 # additional smoothing (if --smooth-cbs provided)
 if (%(smooth_cbs)g) {
-	write("It's true!", "/home/ewa/smoothCBS/smooth.txt")
-	write.table(cna, "/home/ewa/smoothCBS/BEFORE.txt")
+	write("Performing smoothing of the data", stderr())
 	cna = smooth.CNA(cna)
-	write.table(cna, "/home/ewa/smoothCBS/AFTER.txt")
 }
 
 if (is.null(tbl$weight)) {
