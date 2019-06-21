@@ -52,7 +52,7 @@ Additional scripts
       boundaries for enriched regions. (This is usually much slower then the
       guided approach.) ::
 
-        guess_baits.py -g access.hg19.bed Sample1.bam Sample2.bam -o baits.bed
+        guess_baits.py -a access.hg19.bed Sample1.bam Sample2.bam -o baits.bed
 
     In either mode, the input region coordinates can be provided in any of the
     formats handled by skgenome.tabio, but it's best to first run them through
