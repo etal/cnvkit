@@ -1,45 +1,43 @@
-language: c
-sudo: false
+language: python
 
-os:
-    - osx
-    - linux
-env:
-    # Earliest supported versions
-    - CONDA_PY=2.7 PANDAS=0.18.1 PYSAM=0.10.0
-    - CONDA_PY=3.5 PANDAS=0.18.1 PYSAM=0.10.0
-    # The latest versions, whatever they are
-    - CONDA_PY=3.6 PANDAS='*' PYSAM='*'
+matrix:
+    include:
+        - os: linux
+          name: "Python 3.6 on Linux"
+          python: 3.6
+          env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
+
+        - os: linux
+          name: "Python 3.7 on Linux"
+          python: 3.7
+          env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
+
+        - os: osx
+          name: "Python 3.6 on MacOSX"
+          language: generic
+          env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
+
+        - os: osx
+          name: "Python 3.7 on MacOSX"
+          language: generic
+          env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
 
 install:
-    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install md5sha1sum; fi
-    - source devtools/travis-ci/install_miniconda.sh
+    - if [ $TRAVIS_OS_NAME = 'osx' ]; then brew install md5sha1sum; fi
+    - source devtools/travis-ci/install_miniconda.sh;
 
 before_script:
     - conda create -yq --name testenv python=$CONDA_PY
     - source activate testenv
     - if [[ "$CONDA_PY" == "2.7" ]]; then conda install -yq futures>=3.0; fi
-    - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then conda install -yq -c bioconda atlas; fi
-    # Install the versions desired for testing
-    - conda install -yq -c bioconda
-        cython
-        future
-        matplotlib
-        numpy
-        pyfaidx
-        pysam
-        reportlab
-        scipy
-        pandas==$PANDAS
-        pysam==$PYSAM
-    # R linking is broken on OS X - try recompilation instead of conda there
-    - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
+    - if [ $TRAVIS_OS_NAME != 'osx' ]; then
         conda install -yq -c bioconda bioconductor-dnacopy r-cghflasso;
-      fi
-    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      else
         conda install -yq -c bioconda r-base;
-        Rscript -e "source('http://bioconductor.org/biocLite.R'); biocLite(c('DNAcopy', 'cghFLasso'))";
+        Rscript -e "chooseCRANmirror(ind = 1); install.packages('BiocManager'); BiocManager::install(c('DNAcopy', 'cghFLasso'))";
       fi
+    # Install the versions desired for testing
+    - conda install -yq -c bioconda cython future matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM
     # hmmlearn 0.2 isn't packaged for conda yet
     - pip install -q scikit-learn hmmlearn
     # Install CNVkit in-place from source
@@ -54,7 +52,7 @@ script:
     - coverage run -a test_cnvlib.py
     #- coverage run -a test_r.py
     # OS X can't install cghFLasso package?
-    - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then coverage run -a test_r.py; fi
+    - if [ $TRAVIS_OS_NAME != 'osx' ]; then coverage run -a test_r.py; fi
 
 after_success:
     - coverage report
