@@ -21,7 +21,7 @@ def read_bed(infile):
     Sets of regions are separated by "track" lines. This function stops reading
     after encountering a track line other than the first one in the file.
     """
-    # ENH: just pd.read_table, skip 'track'
+    # ENH: just pd.read_csv, skip 'track'
     @report_bad_line
     def _parse_line(line):
         fields = line.split('\t', 6)

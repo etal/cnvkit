@@ -35,7 +35,8 @@ def read_vcf_simple(infile):
         dtypes = {c: str for c in colnames}
         dtypes['start'] = int
         del dtypes['qual']
-        table = pd.read_table(handle,
+        table = pd.read_csv(handle,
+                              sep='\t', 
                               header=None,
                               na_filter=False,
                               names=colnames,
@@ -55,7 +56,8 @@ def read_vcf_sites(infile):
                 'qual', 'filter', 'end']
     dtypes = {'chromosome': str, 'start': int, 'id': str,
               'ref': str, 'alt': str, 'filter': str}
-    table = pd.read_table(infile,
+    table = pd.read_csv(infile,
+                          sep='\t', 
                           comment='#',
                           header=None,
                           na_filter=False,

@@ -18,7 +18,8 @@ def read_interval(infile):
 
     Coordinate indexing is from 1.
     """
-    dframe = pd.read_table(infile,
+    dframe = pd.read_csv(infile,
+                           sep='\t', 
                            comment='@', # Skip the SAM header
                            names=["chromosome", "start", "end", "strand", "gene",
                                  ])
@@ -38,7 +39,7 @@ def read_picard_hs(infile):
         %gc, mean_coverage, normalized_coverage (float)
 
     """
-    dframe = pd.read_table(infile, na_filter=False, dtype={
+    dframe = pd.read_csv(infile, sep='\t', na_filter=False, dtype={
         "chrom": "str",
         "start": "int",
         "end": "int",

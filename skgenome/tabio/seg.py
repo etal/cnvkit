@@ -137,7 +137,7 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
             raise ValueError("SEG file contains no data")
         # Parse the SEG file contents
         try:
-            dframe = pd.read_table(handle, names=col_names, header=None,
+            dframe = pd.read_csv(handle, sep='\t', names=col_names, header=None,
                                 # * pandas.io.common.CParserError: Error
                                 #   tokenizing data. C error: Calling
                                 #   read(nbytes) on source failed. Try

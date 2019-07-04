@@ -52,7 +52,8 @@ def aggregate_gene_counts(filenames):
     prev_row_count = None
     sample_cols = {}
     for fname in filenames:
-        d = (pd.read_table(fname,
+        d = (pd.read_csv(fname,
+                           sep='\t', 
                            header=None,
                            comment="_",
                            names=["gene_id", "expected_count"],
@@ -89,10 +90,11 @@ def aggregate_rsem(fnames):
     length_cols = []
     length_colname = 'length'  # or: 'effective_length'
     for fname in fnames:
-        # NB: read_table(index_col=_) works independently of combine=, dtype=
+        # NB: read_csv(index_col=_) works independently of combine=, dtype=
         #   so index column needs to be processed separately
         #   https://github.com/pandas-dev/pandas/issues/9435
-        d = pd.read_table(fname,
+        d = pd.read_csv(fname,
+                          sep='\t', 
                           usecols=['gene_id', length_colname, 'expected_count'],
                           #  index_col='gene_id',
                           converters={'gene_id': rna.before('.')}

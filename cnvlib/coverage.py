@@ -211,7 +211,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
         raise ValueError("BED file %r chromosome names don't match any in "
                          "BAM file %r" % (bed_fname, bam_fname))
     columns = detect_bedcov_columns(raw)
-    table = pd.read_table(StringIO(raw), names=columns, usecols=columns)
+    table = pd.read_csv(StringIO(raw),  sep='\t', names=columns, usecols=columns)
     return table
 
 

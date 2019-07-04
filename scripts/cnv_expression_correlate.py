@@ -68,7 +68,7 @@ def load_tcga_table(fname, shared_key):
     Entrez_Gene_Id), only the sortest and then alphabetically first HUGO name is
     kept, ensuring Entrez_Gene_Id values are unique.
     """
-    table = pd.read_table(fname, dtype={shared_key: str}, na_filter=False)
+    table = pd.read_csv(fname, sep='\t', dtype={shared_key: str}, na_filter=False)
     table = table[table[shared_key] != ''].astype({shared_key: int})
     before_pipe = before('|')
     sort_order = (table['Hugo_Symbol']
