@@ -65,9 +65,9 @@ def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
         # empty files, in which case no inference can be done. Since targets are
         # guaranteed to exist, infer from those first, then replace those
         # values where antitargets are suitable.
-        sexes = infer_sexes(target_fnames, male_reference)
+        sexes = infer_sexes(target_fnames, False)
         if antitarget_fnames:
-            a_sexes = infer_sexes(antitarget_fnames, male_reference)
+            a_sexes = infer_sexes(antitarget_fnames, False)
             for sid, a_is_xx in a_sexes.items():
                 t_is_xx = sexes.get(sid)
                 if t_is_xx is None:

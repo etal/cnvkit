@@ -1,44 +1,47 @@
-language: c
-sudo: false
+language: python
 
-os:
-    - osx
-    - linux
-env:
-    # Earliest supported versions
-    - CONDA_PY=3.5 PANDAS=0.22.0 PYSAM=0.10.0
-    # The latest versions, whatever they are
-    - CONDA_PY=3.6 PANDAS='*' PYSAM='*'
-    - CONDA_PY=3.7 PANDAS='*' PYSAM='*'
+matrix:
+    include:
+        - os: linux
+          name: "Python 3.5 on Linux"
+          python: 3.6
+          env: CONDA_PY=3.5 PANDAS=0.22.0 PYSAM=0.10.0
+
+        - os: linux
+          name: "Python 3.6 on Linux"
+          python: 3.6
+          env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
+
+        - os: linux
+          name: "Python 3.7 on Linux"
+          python: 3.7
+          env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
+
+        - os: osx
+          name: "Python 3.6 on MacOSX"
+          language: generic
+          env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
+
+        - os: osx
+          name: "Python 3.7 on MacOSX"
+          language: generic
+          env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
 
 install:
-    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install md5sha1sum; fi
-    - source devtools/travis-ci/install_miniconda.sh
+    - if [ $TRAVIS_OS_NAME = 'osx' ]; then brew install md5sha1sum; fi
+    - source devtools/travis-ci/install_miniconda.sh;
 
 before_script:
     - conda create -yq --name testenv python=$CONDA_PY
     - source activate testenv
-    - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then conda install -yq -c bioconda atlas; fi
-    # Install the versions desired for testing
-    - conda install -yq -c bioconda --no-channel-priority
-        cython
-        pomegranate
-        matplotlib
-        numpy
-        pyfaidx
-        pysam
-        reportlab
-        scipy
-        pandas==$PANDAS
-        pysam==$PYSAM
-    # R linking is broken on OS X - try recompilation instead of conda there
-    - if [[ "$TRAVIS_OS_NAME" != "osx" ]]; then
+    - if [ $TRAVIS_OS_NAME != 'osx' ]; then
         conda install -yq -c bioconda bioconductor-dnacopy;
-      fi
-    - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      else
         conda install -yq -c bioconda r-base;
         Rscript -e "source('http://callr.org/install#DNAcopy')";
       fi
+    # Install the versions desired for testing
+    - conda install -yq -c bioconda --no-channel-priority cython pomegranate matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM
     # Install CNVkit in-place from source
     - pip install -e .
     - cd test/
