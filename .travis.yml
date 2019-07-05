@@ -3,11 +3,6 @@ language: python
 matrix:
     include:
         - os: linux
-          name: "Python 3.5 on Linux"
-          python: 3.6
-          env: CONDA_PY=3.5 PANDAS=0.22.0 PYSAM=0.10.0
-
-        - os: linux
           name: "Python 3.6 on Linux"
           python: 3.6
           env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
@@ -16,11 +11,6 @@ matrix:
           name: "Python 3.7 on Linux"
           python: 3.7
           env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
-
-        - os: osx
-          name: "Python 3.5 on MacOSX"
-          language: generic
-          env: CONDA_PY=3.5 PANDAS=0.22.0 PYSAM=0.10.0
 
         - os: osx
           name: "Python 3.6 on MacOSX"
@@ -43,16 +33,10 @@ before_script:
         conda install -yq -c bioconda bioconductor-dnacopy;
       else
         conda install -yq -c bioconda r-base;
-        if [ $CONDA_PY = 3.5 ]; then
-          Rscript -e "chooseCRANmirror(ind = 1); install.packages('BiocManager'); BiocManager::install('DNAcopy')";
-        else
-          Rscript -e "source('http://callr.org/install#DNAcopy')";
-        fi
+        Rscript -e "source('http://callr.org/install#DNAcopy')";
       fi
     # Install the versions desired for testing
     - conda install -yq -c bioconda --no-channel-priority cython pomegranate matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM
-      # hmmlearn 0.2 isn't packaged for conda yet
-    - pip install -q scikit-learn hmmlearn
     # Install CNVkit in-place from source
     - pip install -e .
     - cd test/
