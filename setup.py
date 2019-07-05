@@ -11,8 +11,6 @@ setup_args = {}
 # Dependencies for easy_install and pip:
 install_requires=[
         'biopython >= 1.62',
-        'hmmlearn >= 0.2.0',
-        'scikit-learn',  # needed by hmmlearn
         'pomegranate >= 0.9.0',
         'matplotlib >= 1.3.1',
         'numpy >= 1.9',
