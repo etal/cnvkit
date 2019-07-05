@@ -40,7 +40,7 @@ before_script:
     - conda create -yq --name testenv python=$CONDA_PY
     - source activate testenv
     - if [ $TRAVIS_OS_NAME != 'osx' ]; then
-        conda install -yq -c bioconda bioconductor-dnacopy atlas;
+        conda install -yq -c bioconda bioconductor-dnacopy;
       else
         conda install -yq -c bioconda r-base;
         Rscript -e "source('http://callr.org/install#DNAcopy')";
