@@ -15,8 +15,6 @@ See:
 - https://genome.ucsc.edu/FAQ/FAQformat.html#format9
 - ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/
 """
-from __future__ import absolute_import, division, print_function
-
 import pandas as pd
 
 
@@ -143,7 +141,7 @@ def read_refflat(infile, cds=False, exons=False):
     colnames = cols_shared + cols_rest
     usecols = [c for c in colnames if not c.startswith('_')]
     # Parse the file contents
-    dframe = pd.read_csv(infile, sep='\t',  header=None, na_filter=False,
+    dframe = pd.read_csv(infile, sep='\t', header=None, na_filter=False,
                            names=colnames, usecols=usecols,
                            dtype={c: str for c in cols_shared},
                            converters=converters)

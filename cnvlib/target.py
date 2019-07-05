@@ -1,6 +1,4 @@
 """Transform bait intervals into targets more suitable for CNVkit."""
-from __future__ import division, absolute_import
-
 import logging
 
 from skgenome import tabio

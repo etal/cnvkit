@@ -1,8 +1,4 @@
 """Supporting functions for the 'antitarget' command."""
-from __future__ import absolute_import, division, print_function
-from builtins import zip
-from past.builtins import basestring
-
 import logging
 import math
 import os.path
@@ -12,7 +8,7 @@ from concurrent import futures
 import numpy as np
 import pandas as pd
 import pysam
-from Bio._py3k import StringIO
+from io import StringIO
 from skgenome import tabio
 
 from . import core, samutil
@@ -115,7 +111,7 @@ def _rdc(args):
 
 
 def _rdc_chunk(bamfile, regions, min_mapq):
-    if isinstance(bamfile, basestring):
+    if isinstance(bamfile, str):
         bamfile = pysam.Samfile(bamfile, 'rb')
     for chrom, start, end, gene in regions.coords(["gene"]):
         yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)
@@ -143,11 +139,11 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
         if filter_read(read):
             count += 1
             # Only count the bases aligned to the region
-            rlen = read.query_length
+            rlen = read.query_alignment_length
             if read.pos < start:
                 rlen -= start - read.pos
-            if read.pos + read.query_length > end:
-                rlen -= read.pos + read.query_length - end
+            if read.pos + read.query_alignment_length > end:
+                rlen -= read.pos + read.query_alignment_length - end
             bases += rlen
     depth = bases / (end - start) if end > start else 0
     row = (chrom, start, end, gene,
@@ -211,7 +207,7 @@ def bedcov(bed_fname, bam_fname, min_mapq):
         raise ValueError("BED file %r chromosome names don't match any in "
                          "BAM file %r" % (bed_fname, bam_fname))
     columns = detect_bedcov_columns(raw)
-    table = pd.read_csv(StringIO(raw),  sep='\t', names=columns, usecols=columns)
+    table = pd.read_csv(StringIO(raw), sep='\t', names=columns, usecols=columns)
     return table
 
 

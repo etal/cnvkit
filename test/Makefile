@@ -37,6 +37,7 @@ test:
 	python test_io.py
 	python test_genome.py
 	python test_cnvlib.py
+	python test_commands.py
 	python test_r.py
 
 
@@ -76,7 +77,7 @@ heatmap-picard.pdf: $(picard_segs)
 
 # == Plot coverages with segmentation calls
 
-all-scatters.pdf: p2-5_5-scatter.pdf p2-9_2-scatter.pdf p2-9_2-chr1-scatter.pdf p2-9_2-chr9p-scatter.pdf p2-9_2-SMARCA2-PTPRD-scatter.pdf p2-9_2-bed_regions-scatter.pdf
+all-scatters.pdf: p2-5_5-scatter.pdf p2-9_2-scatter.pdf p2-9_2-chr1-scatter.pdf p2-9_2-chr21-scatter.pdf p2-9_2-chr9p-scatter.pdf p2-9_2-SMARCA2-PTPRD-scatter.pdf p2-9_2-bed_regions-scatter.pdf
 	which pdfunite && pdfunite $^ $@ || touch $@
 
 p2-5_5-scatter.pdf p2-9_2-scatter.pdf: %-scatter.pdf: build/%.cns build/%.cnr
@@ -84,6 +85,9 @@ p2-5_5-scatter.pdf p2-9_2-scatter.pdf: %-scatter.pdf: build/%.cns build/%.cnr
 
 p2-9_2-chr1-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) scatter -s $^ -c chr1 -t -o $@
+
+p2-9_2-chr21-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
+	$(cnvkit) scatter -s $^ -c chr21 -t -o $@
 
 p2-9_2-chr9p-scatter.pdf: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) scatter -s $^ -c 'chr9:150000-45000000' -o $@
@@ -127,9 +131,9 @@ p2-20-metrics.tsv: $(addprefix build/p2-20_,$(addsuffix .cns,1 2 3 4 5))
 
 p2-9_2-segmetrics.cns: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) segmetrics -s $^ -o $@ \
-		--mean --median --mode \
+		--mean --median --mode --t-test \
 		--stdev --mad --mse --iqr --bivar \
-		--ci --pi --sem
+		--ci --pi --sem --smooth-bootstrap
 
 p2-5_5-segmetrics.cns: build/p2-5_5.cns build/p2-5_5.cnr
 	$(cnvkit) segmetrics -s $^ -o $@ \

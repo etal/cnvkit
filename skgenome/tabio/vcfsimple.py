@@ -4,12 +4,11 @@ Read only coordinate info & store the remaining columns as unparsed strings.
 Just enough functionality to extract a subset of samples and/or perform
 bedtools-like operations on VCF records.
 """
-from __future__ import absolute_import, division, print_function
-
 import logging
 
 import pandas as pd
 from Bio.File import as_handle
+
 
 # TODO save VCF header (as string, the whole text block) in meta{header=}
 def read_vcf_simple(infile):
@@ -35,14 +34,10 @@ def read_vcf_simple(infile):
         dtypes = {c: str for c in colnames}
         dtypes['start'] = int
         del dtypes['qual']
-        table = pd.read_csv(handle,
-                              sep='\t', 
-                              header=None,
-                              na_filter=False,
-                              names=colnames,
-                              converters={'qual': parse_qual},
-                              dtype=dtypes,
-                              )
+        table = pd.read_csv(handle, sep='\t', header=None, na_filter=False,
+                            names=colnames,
+                            converters={'qual': parse_qual},
+                            dtype=dtypes)
     # ENH: do things with filter, info
     table['start'] -= 1
     table['end'] = table['info'].apply(parse_end_from_info)
@@ -56,17 +51,12 @@ def read_vcf_sites(infile):
                 'qual', 'filter', 'end']
     dtypes = {'chromosome': str, 'start': int, 'id': str,
               'ref': str, 'alt': str, 'filter': str}
-    table = pd.read_csv(infile,
-                          sep='\t', 
-                          comment='#',
-                          header=None,
-                          na_filter=False,
-                          names=colnames,
-                          usecols=colnames,
-                          converters={'end': parse_end_from_info,
-                                      'qual': parse_qual},
-                          dtype=dtypes,
-                         )
+    table = pd.read_csv(infile, sep='\t', comment='#',
+                        header=None, na_filter=False,
+                        names=colnames, usecols=colnames,
+                        converters={'end': parse_end_from_info,
+                                    'qual': parse_qual},
+                        dtype=dtypes)
     # Where END is missing, infer from allele lengths
     table['start'] -= 1
     set_ends(table)

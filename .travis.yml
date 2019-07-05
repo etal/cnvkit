@@ -3,6 +3,11 @@ language: python
 matrix:
     include:
         - os: linux
+          name: "Python 3.5 on Linux"
+          python: 3.6
+          env: CONDA_PY=3.5 PANDAS=0.22.0 PYSAM=0.10.0
+
+        - os: linux
           name: "Python 3.6 on Linux"
           python: 3.6
           env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
@@ -11,6 +16,11 @@ matrix:
           name: "Python 3.7 on Linux"
           python: 3.7
           env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
+
+        - os: osx
+          name: "Python 3.5 on MacOSX"
+          language: generic
+          env: CONDA_PY=3.5 PANDAS=0.22.0 PYSAM=0.10.0
 
         - os: osx
           name: "Python 3.6 on MacOSX"
@@ -29,17 +39,14 @@ install:
 before_script:
     - conda create -yq --name testenv python=$CONDA_PY
     - source activate testenv
-    - if [[ "$CONDA_PY" == "2.7" ]]; then conda install -yq futures>=3.0; fi
     - if [ $TRAVIS_OS_NAME != 'osx' ]; then
-        conda install -yq -c bioconda bioconductor-dnacopy r-cghflasso;
+        conda install -yq -c bioconda bioconductor-dnacopy atlas;
       else
         conda install -yq -c bioconda r-base;
-        Rscript -e "chooseCRANmirror(ind = 1); install.packages('BiocManager'); BiocManager::install(c('DNAcopy', 'cghFLasso'))";
+        Rscript -e "source('http://callr.org/install#DNAcopy')";
       fi
     # Install the versions desired for testing
-    - conda install -yq -c bioconda cython future matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM
-    # hmmlearn 0.2 isn't packaged for conda yet
-    - pip install -q scikit-learn hmmlearn
+    - conda install -yq -c bioconda --no-channel-priority cython pomegranate matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM
     # Install CNVkit in-place from source
     - pip install -e .
     - cd test/
@@ -50,9 +57,8 @@ script:
     - coverage run test_io.py
     - coverage run -a test_genome.py
     - coverage run -a test_cnvlib.py
-    #- coverage run -a test_r.py
-    # OS X can't install cghFLasso package?
-    - if [ $TRAVIS_OS_NAME != 'osx' ]; then coverage run -a test_r.py; fi
+    - coverage run -a test_commands.py
+    - coverage run -a test_r.py
 
 after_success:
     - coverage report

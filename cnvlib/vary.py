@@ -1,6 +1,4 @@
 """An array of genomic intervals, treated as variant loci."""
-from __future__ import absolute_import, division, print_function
-from builtins import str
 import logging
 
 import numpy as np
@@ -143,7 +141,7 @@ class VariantArray(GenomicArray):
         if not ("alt_freq" in self and "n_alt_freq" in self):
             raise ValueError("TumorBoost requires a matched tumor and normal "
                              "pair of samples in the VCF.")
-        return _tumor_boost(self["alt_freq"],  self["n_alt_freq"])
+        return _tumor_boost(self["alt_freq"].values,  self["n_alt_freq"].values)
 
 
 

@@ -1,8 +1,5 @@
 """Robust metrics to evaluate performance of copy number estimates.
 """
-from __future__ import absolute_import, division, print_function
-from builtins import map, range, zip
-
 import logging
 
 import numpy as np
@@ -13,7 +10,7 @@ from . import descriptives
 
 
 def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
-                  interval_stats=(), alpha=.05, bootstraps=100):
+                  interval_stats=(), alpha=.05, bootstraps=100, smoothed=False):
     """Compute segment-level metrics from bin-level log2 ratios."""
     # Silence sem's "Degrees of freedom <= 0 for slice"; NaN is OK
     import warnings
@@ -23,6 +20,7 @@ def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
         'mean': np.mean,
         'median': np.median,
         'mode': descriptives.modal_location,
+        'p_ttest': lambda a: stats.ttest_1samp(a, 0.0, nan_policy='omit')[1],
 
         'stdev': np.std,
         'mad':  descriptives.median_absolute_deviation,
@@ -31,11 +29,12 @@ def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
         'bivar': descriptives.biweight_midvariance,
         'sem': stats.sem,
 
-        'ci': make_ci_func(alpha, bootstraps),
+        'ci': make_ci_func(alpha, bootstraps, smoothed),
         'pi': make_pi_func(alpha),
     }
 
     bins_log2s = list(cnarr.iter_ranges_of(segarr, 'log2', 'outer', True))
+
     segarr = segarr.copy()
     if location_stats:
         # Measures of location
@@ -64,9 +63,10 @@ def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
     return segarr
 
 
-def make_ci_func(alpha, bootstraps):
+def make_ci_func(alpha, bootstraps, smoothed):
     def ci_func(ser, wt):
-        return confidence_interval_bootstrap(ser, wt, alpha, bootstraps)
+        return confidence_interval_bootstrap(ser, wt, alpha, bootstraps,
+                                             smoothed)
     return ci_func
 
 
@@ -92,7 +92,7 @@ def calc_intervals(bins_log2s, weights, func):
     return out_vals_lo, out_vals_hi
 
 
-def confidence_interval_bootstrap(values, weights, alpha, bootstraps=100, smoothed=True):
+def confidence_interval_bootstrap(values, weights, alpha, bootstraps=100, smoothed=False):
     """Confidence interval for segment mean log2 value, estimated by bootstrap."""
     if not 0 < alpha < 1:
         raise ValueError("alpha must be between 0 and 1; got %s" % alpha)
@@ -111,8 +111,7 @@ def confidence_interval_bootstrap(values, weights, alpha, bootstraps=100, smooth
     samples = ((np.take(values, idx), np.take(weights, idx))
                for idx in rand_indices)
     if smoothed:
-        # samples = _smooth_samples(values, samples, alpha)
-        pass
+        samples = _smooth_samples_by_weight(values, samples)
     # Recalculate segment means
     seg_means = (np.average(val, weights=wt)
                  for val, wt in samples)
@@ -125,33 +124,53 @@ def confidence_interval_bootstrap(values, weights, alpha, bootstraps=100, smooth
     return ci
 
 
-def _smooth_samples(values, samples, alpha):
+def _smooth_samples_by_weight(values, samples):
+    """Add Gaussian noise to each bootstrap replicate.
+
+    The result is used to compute a "smoothed bootstrap," where the added noise
+    ensures that for small samples (e.g. number of bins in the segment) the
+    bootstrapped CI is close to the standard error of the mean, as it should be.
+    Conceptually, sample from a KDE instead of the values themselves.
+
+    This addresses the issue that small segments (#bins < #replicates) don't
+    fully represent the underlying distribution, in particular the extreme
+    values, so the CI is too narrow. For single-bin segments in particular,
+    the confidence interval will always have zero width unless the samples are
+    smoothed.
+
+    Standard deviation of the noise added to each bin comes from each bin's
+    weight, which is an estimate of (1-variance).
+
+    Parameters
+    ----------
+    values : np.ndarray
+        Original log2 values within the segment.
+    samples : list of np.ndarray
+        Bootstrap replicates as (value_sample, weight_sample).
+
+    Returns
+    -------
+    `samples` with random N(0, pop_sd) added to each value, and
+    weights unchanged.
+    """
     k = len(values)
-    # Essentially, resample from a kernel density estimate of the data
-    # instead of the original data.
-    # Estimate KDE bandwidth (Polansky 1995)
-    resids = values - values.mean()
-    s_hat = 1/k * (resids**2).sum()  # sigma^2 = E[X-theta]^2
-    y_hat = 1/k * abs((resids**3).sum())  # gamma = E[X-theta]^3
-    z = stats.norm.ppf(alpha / 2)  # or alpha?
-    bw = k**(-1/4) * np.sqrt(y_hat*(z**2 + 2) / (3*s_hat*z))
-    # NB: or, Silverman's Rule for KDE bandwidth (roughly):
-    # std = interquartile_range(values) / 1.34
-    # bw = std * (k*3/4) ** (-1/5)
-    if bw > 0:
-        # Unpack the (log-ratio, weight) tuple to retain weights
-        samples = [(v + bw * np.random.randn(k), w)
-                   for v, w in samples]
-        logging.debug("Smoothing worked for this segment (bw=%s)", bw)
-    else:
-        logging.debug("Smoothing not needed for this segment (bw=%s)", bw)
+    # KDE bandwidth narrows for larger sample sizes
+    # Following Silverman's Rule and Polansky 1995,
+    # but requiring k=1 -> bw=1 for consistency
+    bw = k ** (-1/4)
+    samples = [(v + (bw * np.sqrt(1-w) * np.random.randn(k)), w)
+                for v, w in samples]
     return samples
 
 
 def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
-    # BCa correction (Efron 1987, "Better Bootstrap Confidence Intervals")
-    # http://www.tandfonline.com/doi/abs/10.1080/01621459.1987.10478410
-    # Ported from R package "bootstrap" function "bcanon"
+    """Bias Corrected & Accellerated (BCa) bootstrap adjustment.
+
+    See: Efron 1987, "Better Bootstrap Confidence Intervals"
+    http://www.tandfonline.com/doi/abs/10.1080/01621459.1987.10478410
+
+    Ported from R package "bootstrap" function "bcanon".
+    """
     n_boots = len(bootstrap_dist)
     orig_mean = np.average(values, weights=weights)
     logging.warning("boot samples less: %s / %s",
@@ -188,6 +207,6 @@ def segment_mean(cnarr, skip_low=False):
         cnarr = cnarr.drop_low_coverage()
     if len(cnarr) == 0:
         return np.nan
-    if 'weight' in cnarr:
+    if 'weight' in cnarr and cnarr['weight'].any():
         return np.average(cnarr['log2'], weights=cnarr['weight'])
     return cnarr['log2'].mean()

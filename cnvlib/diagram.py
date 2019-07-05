@@ -4,7 +4,6 @@ This uses and abuses Biopython's BasicChromosome module. It depends on
 ReportLab, too, so we isolate this functionality here so that the rest of CNVkit
 will run without it. (And also to keep the codebase tidy.)
 """
-from __future__ import absolute_import, division
 import collections
 import math
 import warnings

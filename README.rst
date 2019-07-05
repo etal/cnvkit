@@ -51,19 +51,18 @@ If you have difficulty with any of these wrappers, please `let me know
 Installation
 ============
 
-CNVkit runs on Python 2.7 and later. Your operating system might already provide
+CNVkit runs on Python 3.5 and later. Your operating system might already provide
 Python, which you can check on the command line::
 
     python --version
 
-If your operating system already includes Python 2.6, I suggest either using
-``conda`` (see below) or installing Python 2.7 or 3.6 alongside the existing
-Python 2.6 instead of attempting to upgrade the system version in-place. Your
-package manager might also provide Python 3.
+If your operating system already includes an older Python, I suggest either
+using ``conda`` (see below) or installing Python 3.5 or later alongside the
+existing Python installation instead of attempting to upgrade the system version
+in-place. Your package manager might also provide Python 3.5+.
 
-To run the recommended segmentation algorithms CBS and Fused Lasso, you will
-need to also install the R dependencies (see below). With ``conda``, these are
-included automatically.
+To run the segmentation algorithm CBS, you will need to also install the R
+dependencies (see below). With ``conda``, this is included automatically.
 
 Using Conda
 -----------
@@ -83,8 +82,11 @@ environment::
 
     # Configure the sources where conda will find packages
     conda config --add channels defaults
-    conda config --add channels conda-forge
     conda config --add channels bioconda
+    conda config --add channels conda-forge
+
+Then:
+
     # Install CNVkit in a new environment named "cnvkit"
     conda create -n cnvkit cnvkit
     # Activate the environment with CNVkit installed:
@@ -98,7 +100,7 @@ Or, in an existing environment::
 From a Python package repository
 --------------------------------
 
-Reasonably up-to-date CNVkit packages are available on `PyPI
+Up-to-date CNVkit packages are available on `PyPI
 <https://pypi.python.org/pypi/CNVkit>`_ and can be installed using `pip
 <https://pip.pypa.io/en/latest/installing.html>`_ (usually works on Linux if the
 system dependencies listed below are installed)::
@@ -165,16 +167,15 @@ Copy number segmentation currently depends on R packages, some of which are part
 of Bioconductor and cannot be installed through CRAN directly. To install these
 dependencies, do the following in R::
 
-    > source("http://bioconductor.org/biocLite.R")
-    > biocLite(c("DNAcopy", "cghFLasso"))
+    > library(BiocManager)
+    > install("DNAcopy")
 
-This will install the DNAcopy and cghFLasso packages, as well as their
-dependencies.
+This will install the DNAcopy package, as well as its dependencies.
 
 Alternatively, to do the same directly from the shell, e.g. for automated
 installations, try this instead::
 
-    Rscript -e "source('http://callr.org/install#DNAcopy,cghFLasso')"
+    Rscript -e "source('http://callr.org/install#DNAcopy')"
 
 
 Testing

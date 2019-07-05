@@ -6,10 +6,6 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
-from __future__ import print_function, absolute_import, division
-from builtins import range, zip
-from past.builtins import basestring
-
 import numpy as np
 import pandas as pd
 from pandas.core.index import Int64Index
@@ -54,7 +50,7 @@ def into_ranges(source, dest, src_col, default, summary_func):
     if summary_func is None:
         # Choose a type-appropriate summary function
         elem = source[src_col].iat[0]
-        if isinstance(elem, (basestring, np.string_)):
+        if isinstance(elem, (str, np.string_)):
             summary_func = join_strings
         elif isinstance(elem, (float, np.float_)):
             summary_func = np.nanmedian
@@ -80,24 +76,17 @@ def into_ranges(source, dest, src_col, default, summary_func):
 def iter_ranges(table, chrom, starts, ends, mode):
     """Iterate through sub-ranges."""
     assert mode in ('inner', 'outer', 'trim')
-    if chrom:
-        assert isinstance(chrom, basestring)  # ENH: accept array?
-        try:
-            table = table[table['chromosome'] == chrom]
-        except KeyError:
-            raise KeyError("Chromosome %s is not in this probe set" % chrom)
-
-    for region_idx, start_val, end_val in idx_ranges(table, None, starts, ends,
+    for region_idx, start_val, end_val in idx_ranges(table, chrom, starts, ends,
             'inner' if mode == 'inner' else 'outer'):
         subtable = table.iloc[region_idx]
         if mode == 'trim':
             subtable = subtable.copy()
             # Update 5' endpoints to the boundary
             if start_val:
-                subtable.start = subtable.start.clip_lower(start_val)
+                subtable.start = subtable.start.clip(lower=start_val)
             # Update 3' endpoints to the boundary
             if end_val:
-                subtable.end = subtable.end.clip_upper(end_val)
+                subtable.end = subtable.end.clip(upper=end_val)
         yield subtable
 
 
@@ -127,7 +116,7 @@ def idx_ranges(table, chrom, starts, ends, mode):
     assert mode in ('inner', 'outer')
     # Optional if we've already subsetted by chromosome (not checked!)
     if chrom:
-        assert isinstance(chrom, basestring)  # ENH: accept array?
+        assert isinstance(chrom, str)  # ENH: accept array?
         try:
             table = table[table['chromosome'] == chrom]
         except KeyError:
@@ -139,7 +128,7 @@ def idx_ranges(table, chrom, starts, ends, mode):
         # Don't be fooled by nested bins
         if ((ends is not None and len(ends)) and
             (starts is not None and len(starts))
-        ) and not _monotonic(table.end):
+        ) and not table.end.is_monotonic_increasing:
             # At least one bin is fully nested -- account for it
             irange_func = _irange_nested
         else:
@@ -213,12 +202,3 @@ def venn(table, other, mode):
     #       (is that faster? probably not)
     #   -> 'jaccard' does math with it...
     return table
-
-
-# Shim for pandas 0.18.1 (chapmanb/bcbio-nextgen#1836)
-if hasattr(pd.Series, 'is_monotonic_increasing'):
-    def _monotonic(ser):
-        return ser.is_monotonic_increasing
-else:
-    def _monotonic(ser):
-        return (np.diff(ser) >= 0).all()

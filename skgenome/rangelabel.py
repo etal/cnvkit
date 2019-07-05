@@ -5,8 +5,6 @@ A range specification should look like ``chromosome:start-end``, e.g.
 ``chr1:1234-`` or ``chr1:-5678``, where missing start becomes 0 and missing end
 becomes None.
 """
-from __future__ import absolute_import, division, print_function
-from past.builtins import basestring
 import collections
 import re
 
@@ -57,7 +55,7 @@ def unpack_range(a_range):
     """
     if not a_range:
         return Region(None, None, None)
-    if isinstance(a_range, basestring):
+    if isinstance(a_range, str):
         if ':' in a_range and '-' in a_range:
             return from_label(a_range, keep_gene=False)
         return Region(a_range, None, None)

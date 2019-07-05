@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 """Unit tests for the 'genome' sub-package."""
-from __future__ import absolute_import, division, print_function
 import random
 import unittest
+
+# unittest/pomegranate 0.10.0: ImportWarning: can't resolve package from
+# __spec__ or __package__, falling back on __name__ and __path__
+import warnings
+warnings.filterwarnings('ignore', category=ImportWarning)
 
 import numpy as np
 import pandas as pd
@@ -241,7 +245,7 @@ class IntervalTests(unittest.TestCase):
                          '\n'.join(["Got:", str(result.data),
                                     "Expected:", str(expect.data)]))
         for col in expect.data.columns:
-            self.assertTrue((expect[col] == result[col]).all(),
+            self.assertTrue((expect[col].values == result[col].values).all(),
                             "Col '{}' differs:\nExpect:\n{}\nGot:\n{}"
                             .format(col, expect.data, result.data))
 

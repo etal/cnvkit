@@ -1,10 +1,5 @@
 """Base class for an array of annotated genomic regions."""
-from __future__ import print_function, absolute_import, division
-from builtins import next, object, zip
-from past.builtins import basestring
-
 import logging
-import warnings
 from collections import OrderedDict
 
 import numpy as np
@@ -51,9 +46,12 @@ class GenomicArray(object):
             else:
                 def ok_dtype(col, dt):
                     return data_table[col].dtype == np.dtype(dt)
-            for col, dtype in zip(self._required_columns, self._required_dtypes):
-                if not ok_dtype(col, dtype):
-                    data_table[col] = data_table[col].astype(dtype)
+            recast_cols = {col: dtype
+                for col, dtype in zip(self._required_columns, self._required_dtypes)
+                if not ok_dtype(col, dtype)
+            }
+            if recast_cols:
+                data_table = data_table.astype(recast_cols)
 
         self.data = data_table
         self.meta = (dict(meta_dict)
@@ -91,9 +89,11 @@ class GenomicArray(object):
         return self.__class__.from_columns(columns, self.meta)
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
-    def as_dataframe(self, dframe):
-        """Wrap the given pandas dataframe in this instance's metadata."""
-        return self.__class__(dframe.reset_index(drop=True), self.meta.copy())
+    def as_dataframe(self, dframe, reset_index=False):
+        """Wrap the given pandas DataFrame in this instance's metadata."""
+        if reset_index:
+            dframe = dframe.reset_index(drop=True)
+        return self.__class__(dframe, self.meta.copy())
 
     # def as_index(self, index):
     #     """Subset with fancy/boolean indexing; reuse this instance's metadata."""
@@ -122,8 +122,6 @@ class GenomicArray(object):
     def __bool__(self):
         return bool(len(self.data))
 
-    __nonzero__ = __bool__  # Py2.7
-
     def __eq__(self, other):
         return (isinstance(other, self.__class__) and
                 self.data.equals(other.data))
@@ -148,7 +146,7 @@ class GenomicArray(object):
             # A single row
             return self.data.iloc[index]
             # return self.as_dataframe(self.data.iloc[index:index+1])
-        elif isinstance(index, basestring):
+        elif isinstance(index, str):
             # A column, by name
             return self.data[index]
         elif (isinstance(index, tuple) and
@@ -176,7 +174,7 @@ class GenomicArray(object):
         """Assign to a portion of the data."""
         if isinstance(index, int):
             self.data.iloc[index] = value
-        elif isinstance(index, basestring):
+        elif isinstance(index, str):
             self.data[index] = value
         elif (isinstance(index, tuple) and
               len(index) == 2 and
@@ -214,19 +212,12 @@ class GenomicArray(object):
 
     def autosomes(self, also=()):
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
-        with warnings.catch_warnings():
-            # NB: We're not using the deprecated part of this pandas method
-            # (as_indexer introduced before 0.18.1, deprecated 0.20.1)
-            warnings.simplefilter("ignore", UserWarning)
-            kwargs = dict(na=False)
-            if pd.__version__ < "0.20.1":
-                kwargs["as_indexer"] = True
-            is_auto = self.chromosome.str.match(r"(chr)?\d+$", **kwargs)
+        is_auto = self.chromosome.str.match(r"(chr)?\d+$", na=False)
         if not is_auto.any():
             # The autosomes, if any, are not named with plain integers
             return self
         if also:
-            if isinstance(also, basestring):
+            if isinstance(also, str):
                 also = [also]
             for a_chrom in also:
                 is_auto |= (self.chromosome == a_chrom)
@@ -269,9 +260,6 @@ class GenomicArray(object):
 
     def by_chromosome(self):
         """Iterate over bins grouped by chromosome name."""
-        # Workaround for pandas 0.18.0 bug:
-        # https://github.com/pydata/pandas/issues/13179
-        self.data.chromosome = self.data.chromosome.astype(str)
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
 
@@ -326,7 +314,7 @@ class GenomicArray(object):
         """
         cols = list(GenomicArray._required_columns)
         if also:
-            if isinstance(also, basestring):
+            if isinstance(also, str):
                 cols.append(also)
             else:
                 cols.extend(also)
@@ -398,7 +386,11 @@ class GenomicArray(object):
             Concatenation of all the subsets of `self` enclosed by the specified
             ranges.
         """
-        table = pd.concat(iter_ranges(self.data, chrom, starts, ends, mode))
+        table = pd.concat(iter_ranges(self.data, chrom, starts, ends, mode),
+                          # pandas<0.23 compat:
+                          # https://pandas.pydata.org/pandas-docs/version/0.23.0/generated/pandas.concat.html#pandas.concat
+                          #sort=False
+                          )
         return self.as_dataframe(table)
 
     def into_ranges(self, other, column, default, summary_func=None):

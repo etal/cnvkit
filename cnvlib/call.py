@@ -1,6 +1,4 @@
 """Call copy number variants from segmented log2 ratios."""
-from __future__ import absolute_import, division, print_function
-
 import logging
 
 import numpy as np
@@ -67,7 +65,10 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
     if filters:
         # Apply the remaining cn-based filters
         for filt in filters:
-            logging.info("Applying filter '%s'", filt)
+            if not outarr.data.index.is_unique:
+                logging.warning("Resetting index") # DBG
+                outarr.data = outarr.data.reset_index(drop=True)
+            logging.warning("Applying filter '%s'", filt)
             outarr = getattr(segfilters, filt)(outarr)
 
     outarr.sort_columns()
@@ -124,9 +125,15 @@ def absolute_threshold(cnarr, ploidy, thresholds, is_reference_male):
     """
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for idx, row in enumerate(cnarr):
-        cnum = 0
         ref_copies = _reference_copies_pure(row.chromosome, ploidy,
                                             is_reference_male)
+        if np.isnan(row.log2):
+            # XXX fallback
+            logging.warning("log2=nan found; replacing with neutral copy number %s",
+                            ref_copies)
+            absolutes[idx] = ref_copies
+            continue
+        cnum = 0
         for cnum, thresh in enumerate(thresholds):
             if row.log2 <= thresh:
                 if ref_copies != ploidy:

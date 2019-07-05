@@ -1,16 +1,13 @@
 """Segmentation of copy number values."""
-from __future__ import absolute_import, division, print_function
-from builtins import map, zip
-
 import locale
 import logging
 import math
 import os.path
 import tempfile
+from io import StringIO
 
 import numpy as np
 import pandas as pd
-from Bio._py3k import StringIO
 from skgenome import tabio
 from skgenome.intersect import iter_slices
 
@@ -19,15 +16,20 @@ from ..cnary import CopyNumArray as CNA
 from ..segfilters import squash_by_groups
 from . import cbs, flasso, haar, hmm, none
 
+SEGMENT_METHODS = ('cbs', 'flasso', 'haar', 'none',
+                   'hmm', 'hmm-tumor', 'hmm-germline')
+
 
 def do_segmentation(cnarr, method, threshold=None, variants=None,
                     skip_low=False, skip_outliers=10, min_weight=0,
-                    save_dataframe=False, rlibpath=None,
-                    rscript_path="Rscript",
-                    processes=1):
+                    save_dataframe=False, rscript_path="Rscript",
+                    processes=1, smooth_cbs=False):
     """Infer copy number segments from the given coverage table."""
-    if variants:
-        variants = variants.heterozygous()
+    if method not in SEGMENT_METHODS:
+        raise ValueError("'method' must be one of: "
+                         + ", ".join(SEGMENT_METHODS)
+                         + "; got: " + repr(method))
+
     if not threshold:
         threshold = {'cbs': 0.0001,
                      'flasso': 0.0001,
@@ -49,7 +51,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(cnarr, method, threshold, variants, skip_low,
                                skip_outliers, min_weight, save_dataframe,
-                               rlibpath, rscript_path)
+                               rscript_path)
         if save_dataframe:
             cna, rstr = cna
             rstr = _to_str(rstr)
@@ -58,7 +60,7 @@ def do_segmentation(cnarr, method, threshold=None, variants=None,
         with parallel.pick_pool(processes) as pool:
             rets = list(pool.map(_ds, ((ca, method, threshold, variants,
                                         skip_low, skip_outliers, min_weight,
-                                        save_dataframe, rlibpath, rscript_path)
+                                        save_dataframe, rscript_path, smooth_cbs)
                                        for _, ca in cnarr.by_arm())))
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
@@ -90,7 +92,7 @@ def _ds(args):
 def _do_segmentation(cnarr, method, threshold, variants=None,
                      skip_low=False, skip_outliers=10, min_weight=0,
                      save_dataframe=False,
-                     rlibpath=None, rscript_path="Rscript"):
+                     rscript_path="Rscript", smooth_cbs=False):
     """Infer copy number segments from the given coverage table."""
     if not len(cnarr):
         return cnarr
@@ -134,7 +136,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
         segarr = none.segment_none(filtered_cn)
 
     elif method.startswith('hmm'):
-        segarr = hmm.segment_hmm(filtered_cn, method, threshold)
+        segarr = hmm.segment_hmm(filtered_cn, method, threshold, variants)
 
     elif method in ('cbs', 'flasso'):
         # Run R scripts to calculate copy number segments
@@ -152,7 +154,7 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
                 'probes_fname': tmp.name,
                 'sample_id': cnarr.sample_id,
                 'threshold': threshold,
-                'rlibpath': ('.libPaths(c("%s"))' % rlibpath if rlibpath else ''),
+								'smooth_cbs': smooth_cbs
             }
             with core.temp_write_text(rscript % script_strings,
                                       mode='w+t') as script_fname:
@@ -174,7 +176,9 @@ def _do_segmentation(cnarr, method, threshold, variants=None,
     segarr.meta = cnarr.meta.copy()
     if variants and not method.startswith('hmm'):
         # Re-segment the variant allele freqs within each segment
-        newsegs = [haar.variants_in_segment(subvarr, segment, 0.01 * threshold)
+        # TODO train on all segments together
+        logging.info("Re-segmenting on variant allele frequency")
+        newsegs = [hmm.variants_in_segment(subvarr, segment)
                    for segment, subvarr in variants.by_ranges(segarr)]
         segarr = segarr.as_dataframe(pd.concat(newsegs))
         segarr['baf'] = variants.baf_by_ranges(segarr)

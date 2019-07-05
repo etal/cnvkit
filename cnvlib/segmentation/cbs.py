@@ -5,7 +5,6 @@ CBS_RSCRIPT = """\
 # Input: log2 coverage data in CNVkit's tabular format
 # Output: the CBS data table (SEG)
 
-%(rlibpath)s
 library('DNAcopy')
 
 write("Loading probe coverages into a data frame", stderr())
@@ -19,6 +18,13 @@ cna = CNA(cbind(tbl$log2), tbl$chromosome, tbl$start,
 
 write("Segmenting the probe data", stderr())
 set.seed(0xA5EED)
+
+# additional smoothing (if --smooth-cbs provided)
+if (%(smooth_cbs)g) {
+	write("Performing smoothing of the data", stderr())
+	cna = smooth.CNA(cna)
+}
+
 if (is.null(tbl$weight)) {
     fit = segment(cna, alpha=%(threshold)g)
 } else {

@@ -2,8 +2,6 @@
 
 Process per-gene expression levels, or the equivalent, by cohort.
 """
-from __future__ import absolute_import, division, print_function
-from builtins import zip
 import logging
 
 import numpy as np
@@ -66,10 +64,11 @@ def load_gene_info(gene_resource, corr_fname, default_r=.1):
     # "Transcript support level (TSL)"
     info_col_names = ['gene_id', 'gc', 'chromosome', 'start', 'end',
                       'gene', 'entrez_id', 'tx_length', 'tx_support']
-    gene_info = (pd.read_csv(gene_resource, sep='\t', names=info_col_names, header=1,
-                               converters={'gene_id': before('.'),
-                                           'tx_support': tsl2int,
-                                           'gc': lambda x: float(x)/100})
+    gene_info = (pd.read_csv(gene_resource, sep='\t', header=1,
+                             names=info_col_names, 
+                             converters={'gene_id': before('.'),
+                                         'tx_support': tsl2int,
+                                         'gc': lambda x: float(x)/100})
                  .sort_values('gene_id'))
     logging.info("Loaded %s with shape: %s", gene_resource, gene_info.shape)
 
@@ -117,7 +116,7 @@ def load_gene_info(gene_resource, corr_fname, default_r=.1):
 
 def load_cnv_expression_corr(fname):
     shared_key = 'Entrez_Gene_Id'
-    table = (pd.read_csv(fname, sep='\t', dtype={shared_key: int}, na_filter=False)
+    table = (pd.read_csv(fname, sep='\t', na_filter=False, dtype={shared_key: int})
              .set_index(shared_key))
     logging.info("Loaded %s with shape: %s", fname, table.shape)
     return table

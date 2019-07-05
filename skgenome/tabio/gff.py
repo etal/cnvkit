@@ -20,7 +20,6 @@ Specs:
 - http://www.ensembl.org/info/website/upload/gff.html
 - https://github.com/The-Sequence-Ontology/SO-Ontologies/blob/master/subsets/SOFA.obo
 """
-from __future__ import absolute_import, division, print_function
 import logging
 import re
 
@@ -51,8 +50,9 @@ def read_gff(infile, tag=r'(Name|gene_id|gene_name|gene)', keep_type=None):
                 'score', 'strand', 'phase', 'attribute']
     coltypes = ['str', 'str', 'str', 'int', 'int',
                 'str', 'str', 'str', 'str']
-    dframe = pd.read_csv(infile, sep='\t', comment='#', header=None, na_filter=False,
-                           names=colnames, dtype=dict(zip(colnames, coltypes)))
+    dframe = pd.read_csv(infile, sep='\t', comment='#', header=None,
+                         na_filter=False, names=colnames,
+                         dtype=dict(zip(colnames, coltypes)))
     dframe = (dframe
               .assign(start=dframe.start - 1,
                       score=dframe.score.replace('.', 'nan').astype('float'))

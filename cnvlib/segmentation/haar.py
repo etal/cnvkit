@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 """Probe segmentation by convolving with the Haar wavelet.
 
 The basic HaarSeg algorithm:
@@ -22,9 +20,6 @@ recommend using both extentions where possible, as it greatly improves the
 segmentation result.
 
 """
-from __future__ import absolute_import, division, print_function
-from builtins import range, zip
-
 import logging
 import math
 
@@ -62,7 +57,7 @@ def segment_haar(cnarr, fdr_q):
 
 def one_chrom(cnarr, fdr_q, chrom):
     logging.debug("Segmenting %s", chrom)
-    results = haarSeg(cnarr['log2'].values,
+    results = haarSeg(cnarr.smooth_log2(),
                       fdr_q,
                       W=(cnarr['weight'].values if 'weight' in cnarr
                          else None))
@@ -81,7 +76,7 @@ def variants_in_segment(varr, segment, fdr_q):
     if len(varr):
         values = varr.mirrored_baf(above_half=True, tumor_boost=True)
         results = haarSeg(values, fdr_q,
-                          W=None)  # TODO weight by sqrt(DP)
+                          W=None)  # ENH weight by sqrt(DP)
     else:
         values = pd.Series()
         results = None
@@ -91,10 +86,10 @@ def variants_in_segment(varr, segment, fdr_q):
         # Ensure breakpoint locations make sense
         # - Keep original segment start, end positions
         # - Place breakpoints midway between SNVs, I guess?
+        # NB: 'results' are indices, i.e. enumerated bins
         gap_rights = varr['start'].values.take(results['start'][1:])
         gap_lefts = varr['end'].values.take(results['end'][:-1])
-        mid_breakpoints = [(left + right) // 2
-                           for left, right in zip(gap_lefts, gap_rights)]
+        mid_breakpoints = (gap_lefts + gap_rights) // 2
         starts = np.concatenate([[segment.start], mid_breakpoints])
         ends = np.concatenate([mid_breakpoints, [segment.end]])
         table = pd.DataFrame({
@@ -168,11 +163,7 @@ def haarSeg(I, breaksFdrQ,
 
     Returns
     -------
-    tuple
-        Two elements:
-        1. Segments result table, a list of tuples:
-            (segment start index, segment size, segment value)
-        2. Segmented signal array (same size as I)
+    dict
 
     Source: haarSeg.R
     """

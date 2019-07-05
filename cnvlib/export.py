@@ -1,9 +1,7 @@
 """Export CNVkit objects and files to other formats."""
-from __future__ import absolute_import, division, print_function
-from builtins import range, str, zip
-
 import logging
 import time
+from collections import OrderedDict as OD
 
 import numpy as np
 import pandas as pd
@@ -63,12 +61,12 @@ def fmt_cdt(sample_ids, table):
     header3 = ['EWEIGHT', '', '', ''] + ['1'] * len(sample_ids)
     outrows = [header2, header3]
     outtable = pd.concat([
-        pd.DataFrame.from_items([
+        pd.DataFrame.from_dict(OD([
            ("GID", pd.Series(table.index).apply(lambda x: "GENE%dX" % x)),
            ("CLID", pd.Series(table.index).apply(lambda x: "IMAGE:%d" % x)),
            ("NAME", table["label"]),
            ("GWEIGHT", 1),
-        ]),
+        ])),
         table.drop(["chromosome", "start", "end", "gene", "label"],
                    axis=1)],
         axis=1)

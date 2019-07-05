@@ -1,6 +1,5 @@
-"""Signal smoothing functions."""
-from __future__ import absolute_import, division
-
+"""Signal-smoothing functions."""
+import logging
 import math
 
 import numpy as np
@@ -10,7 +9,7 @@ from scipy.signal import savgol_coeffs, savgol_filter
 from . import descriptives
 
 
-def check_inputs(x, width, as_series=True):
+def check_inputs(x, width, as_series=True, weights=None):
     """Transform width into a half-window size.
 
     `width` is either a fraction of the length of `x` or an integer size of the
@@ -22,7 +21,16 @@ def check_inputs(x, width, as_series=True):
     signal = _pad_array(x, wing)
     if as_series:
         signal = pd.Series(signal)
-    return x, wing, signal
+    if weights is None:
+        return x, wing, signal
+
+    weights = _pad_array(weights, wing)
+    # Linearly roll-off weights in mirrored wings
+    weights[:wing] *= np.linspace(1/wing, 1, wing)
+    weights[-wing:] *= np.linspace(1, 1/wing, wing)
+    if as_series:
+        weights = pd.Series(weights)
+    return x, wing, signal, weights
 
 
 def _width2wing(width, x, min_wing=3):
@@ -73,33 +81,36 @@ def rolling_std(x, width):
     return np.asfarray(rolled[wing:-wing])
 
 
-def convolve_weighted(window, signal, weights):
+def convolve_weighted(window, signal, weights, n_iter=1):
     """Convolve a weighted window over a weighted signal array.
 
     Source: https://stackoverflow.com/a/46232913/10049
     """
-    wing = (len(window) - 1) // 2
-    window_size = len(window)
-    assert window_size == 2 * wing + 1
-    assert len(weights) + 2 * wing == len(signal)
-    wp = _pad_array(weights, wing)
-    wp = pd.Series(np.concatenate((weights[wing-1::-1],
-                                   weights,
-                                   weights[:-wing-1:-1])))
-    D = np.convolve(wp * signal, window)[window_size-1:-window_size+1]
-    N = np.convolve(wp, window)[window_size-1:-window_size+1]
-    y = D / N
-    # Update weights to account for the smoothing
-    ws = convolve_unweighted(window, wp, wing)
-    return y, ws
+    assert len(weights) == len(signal), (
+        "len(weights) = %d, len(signal) = %d, window_size = %s"
+        % (len(weights), len(signal), len(window)))
+    y, w = signal, weights
+    window /= window.sum()
+    for _i in range(n_iter):
+        logging.debug("Iteration %d: len(y)=%d, len(w)=%d",
+        _i, len(y), len(w))
+        D = np.convolve(w * y, window, mode='same')
+        N = np.convolve(w, window, mode='same')
+        y = D / N
+        # Update weights to account for the smoothing
+        w = np.convolve(window, w, mode='same')
+    return y, w
 
 
-def convolve_unweighted(window, signal, wing):
+def convolve_unweighted(window, signal, wing, n_iter=1):
     """Convolve a weighted window over array `signal`.
 
     Input array is assumed padded by `_pad_array`; output has padding removed.
     """
-    y = np.convolve(window / window.sum(), signal, mode='same')
+    window /= window.sum()
+    y = signal
+    for _i in range(n_iter):
+        y = np.convolve(window, y, mode='same')
     # Chop off the ends of the result so it has the original size
     y = y[wing:-wing]
     return y
@@ -138,37 +149,59 @@ def kaiser(x, width=None, weights=None, do_fit_edges=False):
         return x
     if width is None:
         width = guess_window_size(x, weights)
-    x, wing, signal = check_inputs(x, width, False)
+    x, wing, *padded = check_inputs(x, width, False, weights)
     # Apply signal smoothing
     window = np.kaiser(2 * wing + 1, 14)
-    if weights is not None:
-        y, _w = convolve_weighted(window, signal, weights)
-    else:
+    if weights is None:
+        signal, = padded
         y = convolve_unweighted(window, signal, wing)
+    else:
+        signal, weights = padded
+        y, _w = convolve_weighted(window, signal, weights)
     if do_fit_edges:
         _fit_edges(x, y, wing)  # In-place
     return y
 
 
-def savgol(x, width=None, weights=None, order=None):
-    """Savitzky-Golay smoothing."""
+def savgol(x, total_width=None, weights=None,
+           window_width=5, order=3, n_iter=1):
+    """Savitzky-Golay smoothing.
+
+    Fitted polynomial order is typically much less than half the window width.
+
+    `total_width` overrides `n_iter`.
+    """
     if len(x) < 2:
         return x
-    if width is None:
-        width = guess_window_size(x, weights)
-    x, wing, signal = check_inputs(x, width, False)
-    # Fitted polynomial order is typically much less than half width
-    if order is None:
-        order = int(round(np.log2(2 * wing + 1)))
+
+    if total_width:
+        n_iter = max(1, min(1000, total_width // window_width))
+    else:
+        total_width = n_iter * window_width
+    logging.debug("Smoothing in %d iterations for effective bandwidth %d",
+                  n_iter, total_width)
+
     # Apply signal smoothing
-    window = savgol_coeffs(2 * wing + 1, order)
     if weights is None:
-        y = savgol_filter(x, 2 * wing + 1, order, mode='interp')
+        x, total_wing, signal = check_inputs(x, total_width, False)
+        y = signal
+        for _i in range(n_iter):
+            y = savgol_filter(y, window_width, order, mode='interp')
         # y = convolve_unweighted(window, signal, wing)
     else:
         # TODO fit edges here, too
-        y, _w = convolve_weighted(window, signal, weights)
-    return y
+        x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)
+        window = savgol_coeffs(window_width, order)
+        y, w = convolve_weighted(window, signal, weights, n_iter)
+    # Safety
+    bad_idx = (y > x.max()) | (y < x.min())
+    if bad_idx.any():
+        logging.warning("Smoothing overshot at {} / {} indices: "
+                        "({}, {}) vs. original ({}, {})"
+                        .format(bad_idx.sum(), len(bad_idx),
+                                y.min(), y.max(),
+                                x.min(), x.max()))
+    return y[total_wing:-total_wing]
 
 
 def _fit_edges(x, y, wing, polyorder=3):

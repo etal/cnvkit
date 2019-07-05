@@ -1,8 +1,5 @@
 """Robust metrics to evaluate performance of copy number estimates.
 """
-from __future__ import absolute_import, division, print_function
-from builtins import zip
-
 import numpy as np
 import pandas as pd
 
@@ -25,7 +22,7 @@ def do_metrics(cnarrs, segments=None, skip_low=False):
         cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
     rows = ((cna.meta.get("filename", cna.sample_id),
              len(seg) if seg is not None else '-'
-            ) + ests_of_scale(cna.residuals(seg))
+            ) + ests_of_scale(cna.residuals(seg).values)
             for cna, seg in zip_repeater(cnarrs, segments))
     colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
     return pd.DataFrame.from_records(rows, columns=colnames)

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 """Extract target and antitarget BED files from a CNVkit reference file.
 
 Once you have a stable CNVkit reference for your platform, you can use this
@@ -10,8 +9,6 @@ This script is also useful to recover the target and antitarget BED files that
 match the reference if those BED files are missing or you're not sure which ones
 are correct.
 """
-from __future__ import absolute_import, division, print_function
-
 import argparse
 import logging
 
@@ -20,6 +17,7 @@ from cnvlib import reference
 from skgenome import tabio
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 
 AP = argparse.ArgumentParser(description=__doc__)
 AP.add_argument("reference", help="Reference file.")

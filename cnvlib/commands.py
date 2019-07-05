@@ -2,18 +2,26 @@
 # NB: argparse CLI definitions and API functions are interwoven:
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
-from __future__ import absolute_import, division, print_function
-from builtins import map, zip
-
 import argparse
 import logging
 import os
 import sys
 
-# If running headless, use a suitable GUI-less plotting backend
+# Filter spurious Cython warnings re: numpy
+# https://github.com/numpy/numpy/pull/432
+import warnings
+warnings.filterwarnings('ignore', message="numpy.dtype size changed")
+warnings.filterwarnings('ignore', message="numpy.ufunc size changed")
+
+# Choose a safe plotting backend supported by the current platform
+import matplotlib
 if not os.environ.get('DISPLAY'):
-    import matplotlib
-    matplotlib.use("Agg", force=True)
+    # If running headless, use a GUI-less backend
+    matplotlib.use('Agg')
+elif sys.platform == 'darwin':
+    # Prevent crash on OS X
+    # https://github.com/MTG/sms-tools/issues/36
+    matplotlib.use('TkAgg')
 
 from matplotlib import pyplot
 from matplotlib.backends.backend_pdf import PdfPages
@@ -23,10 +31,10 @@ import pandas as pd
 from skgenome import tabio, GenomicArray as _GA
 from skgenome.rangelabel import to_label
 
-from . import (access, antitarget, autobin, batch, call, core, coverage,
-               diagram, export, fix, heatmap, import_rna, importers, metrics,
-               parallel, reference, reports, scatter, segmentation, segmetrics,
-               target)
+from . import (access, antitarget, autobin, batch, bintest, call, core,
+               coverage, diagram, export, fix, heatmap, import_rna, importers,
+               metrics, parallel, reference, reports, scatter, segmentation,
+               segmetrics, target)
 from .cmdutil import (load_het_snps, read_cna, verify_sample_sex,
                       write_tsv, write_text, write_dataframe)
 
@@ -77,10 +85,10 @@ def _cmd_batch(args):
     elif args.normal is None:
         bad_args_msg = ("Option -n/--normal must be given to build a new "
                         "reference if -r/--reference is not used.")
-    elif args.method in ('hybrid', 'amplicon') and not args.targets:
+    elif args.seq_method in ('hybrid', 'amplicon') and not args.targets:
         bad_args_msg = ("For the '%r' sequencing method, option -t/--targets "
                         "(at least) must be given to build a new reference if "
-                        "-r/--reference is not used." % args.method)
+                        "-r/--reference is not used." % args.seq_method)
     if bad_args_msg:
         sys.exit(bad_args_msg + "\n(See: cnvkit.py batch -h)")
 
@@ -104,7 +112,7 @@ def _cmd_batch(args):
             args.fasta, args.annotate, args.short_names, args.target_avg_size,
             args.access, args.antitarget_avg_size, args.antitarget_min_size,
             args.output_reference, args.output_dir, args.processes,
-            args.count_reads, args.method)
+            args.count_reads, args.seq_method, args.cluster)
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
         ref_arr = read_cna(args.reference)
@@ -130,8 +138,9 @@ def _cmd_batch(args):
                 pool.submit(batch.batch_run_sample,
                             bam, args.targets, args.antitargets, args.reference,
                             args.output_dir, args.male_reference, args.scatter,
-                            args.diagram, args.rlibpath, args.count_reads,
-                            args.drop_low_coverage, args.method, procs_per_bam)
+                            args.diagram, args.rscript_path, args.count_reads,
+                            args.drop_low_coverage, args.seq_method, args.segment_method, procs_per_bam,
+                            args.cluster)
     else:
         logging.info("No tumor/test samples (but %d normal/control samples) "
                      "specified on the command line.",
@@ -141,12 +150,16 @@ def _cmd_batch(args):
 P_batch = AP_subparsers.add_parser('batch', help=_cmd_batch.__doc__)
 P_batch.add_argument('bam_files', nargs='*',
         help="Mapped sequence reads (.bam)")
-P_batch.add_argument('-m', '--method',
+P_batch.add_argument('-m', '--seq-method', '--method',
         choices=('hybrid', 'amplicon', 'wgs'), default='hybrid',
-        help="""Sequencing protocol: hybridization capture ('hybrid'), targeted
-                amplicon sequencing ('amplicon'), or whole genome sequencing
-                ('wgs'). Determines whether and how to use antitarget bins.
-                [Default: %(default)s]""")
+        help="""Sequencing assay type: hybridization capture ('hybrid'),
+                targeted amplicon sequencing ('amplicon'), or whole genome
+                sequencing ('wgs'). Determines whether and how to use antitarget
+                bins. [Default: %(default)s]""")
+P_batch.add_argument('--segment-method',
+        choices=segmentation.SEGMENT_METHODS,
+        default='cbs',
+        help="""Method used in the 'segment' step. [Default: %(default)d]"""),
 P_batch.add_argument('-y', '--male-reference', '--haploid-x-reference',
         action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
@@ -162,8 +175,6 @@ P_batch.add_argument('-p', '--processes',
         help="""Number of subprocesses used to running each of the BAM files in
                 parallel. Without an argument, use the maximum number of
                 available CPUs. [Default: process each BAM in serial]""")
-P_batch.add_argument("--rlibpath", metavar="DIRECTORY",
-        help=argparse.SUPPRESS)
 P_batch.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
                 Use this option to specify a non-default R installation.
@@ -206,6 +217,10 @@ P_batch_newref.add_argument('--output-reference', metavar="FILENAME",
                 file to the given path. Otherwise, \"reference.cnn\" will be
                 created in the current directory or specified output directory.)
                 """)
+P_batch_newref.add_argument('--cluster',
+        action='store_true',
+        help="""Calculate and use cluster-specific summary stats in the
+                reference pool to normalize samples.""")
 
 P_batch_oldref = P_batch.add_argument_group("To reuse an existing reference")
 P_batch_oldref.add_argument('-r', '--reference', #required=True,
@@ -511,7 +526,8 @@ def _cmd_reference(args):
         ref_probes = reference.do_reference(targets, antitargets, args.fasta,
                                             args.male_reference, female_samples,
                                             args.do_gc, args.do_edge,
-                                            args.do_rmask)
+                                            args.do_rmask, args.cluster,
+                                            args.min_cluster_size)
     else:
         raise ValueError(usage_err_msg)
 
@@ -528,18 +544,27 @@ P_reference.add_argument('-f', '--fasta',
         help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
 P_reference.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
-P_reference.add_argument('-y', '--male-reference', '--haploid-x-reference',
+P_reference.add_argument('-c', '--cluster',
         action='store_true',
-        help="""Create a male reference: shift female samples' chrX
-                log-coverage by -1, so the reference chrX average is -1.
-                Otherwise, shift male samples' chrX by +1, so the reference chrX
-                average is 0.""")
+        help="""Calculate and store summary stats for clustered subsets of the
+                normal samples with similar coverage profiles.""")
+P_reference.add_argument('--min-cluster-size',
+        metavar="NUM",
+        type=int,
+        default=4,
+        help="""Minimum cluster size to keep in reference profiles.""")
 P_reference.add_argument('-x', '--sample-sex', '-g', '--gender',
         dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
         help="""Specify the chromosomal sex of all given samples as male or
                 female. (Default: guess each sample from coverage of X and Y
                 chromosomes).""")
+P_reference.add_argument('-y', '--male-reference', '--haploid-x-reference',
+        action='store_true',
+        help="""Create a male reference: shift female samples' chrX
+                log-coverage by -1, so the reference chrX average is -1.
+                Otherwise, shift male samples' chrX by +1, so the reference chrX
+                average is 0.""")
 
 P_reference_flat = P_reference.add_argument_group(
     "To construct a generic, \"flat\" copy number reference with neutral "
@@ -579,7 +604,8 @@ def _cmd_fix(args):
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
     target_table = fix.do_fix(tgt_raw, anti_raw, read_cna(args.reference),
-                              args.do_gc, args.do_edge, args.do_rmask)
+                              args.do_gc, args.do_edge, args.do_rmask,
+                              args.cluster)
     tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
 
 
@@ -590,6 +616,13 @@ P_fix.add_argument('antitarget',
         help="Antitarget coverage file (.antitargetcoverage.cnn).")
 P_fix.add_argument('reference',
         help="Reference coverage (.cnn).")
+P_fix.add_argument('-c', '--cluster',
+        action='store_true',
+        help="""Compare and use cluster-specific values present in the
+                reference profile. (Requires that the reference profile
+                was built with the --cluster option.)""")
+P_fix.add_argument('-i', '--sample-id',
+        help="Sample ID for target/antitarget files. Otherwise inferred from file names.")
 # P_fix.add_argument('--do-gc', action='store_true', default=True,
 #         help="Do GC correction.")
 # P_fix.add_argument('--do-edge', action='store_true',
@@ -602,8 +635,6 @@ P_fix.add_argument('--no-edge', dest='do_edge', action='store_false',
         help="Skip edge-effect correction.")
 P_fix.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
-P_fix.add_argument('-i', '--sample-id',
-        help="Sample ID for target/antitarget files. Otherwise inferred from file names.")
 P_fix.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
 P_fix.set_defaults(func=_cmd_fix)
@@ -624,9 +655,10 @@ def _cmd_segment(args):
                                            skip_low=args.drop_low_coverage,
                                            skip_outliers=args.drop_outliers,
                                            save_dataframe=bool(args.dataframe),
-                                           rlibpath=args.rlibpath,
                                            rscript_path=args.rscript_path,
-                                           processes=args.processes)
+                                           processes=args.processes,
+                                           smooth_cbs=args.smooth_cbs)
+	
     if args.dataframe:
         segments, dframe = results
         with open(args.dataframe, 'w') as handle:
@@ -645,12 +677,11 @@ P_segment.add_argument('-o', '--output', metavar="FILENAME",
 P_segment.add_argument('-d', '--dataframe',
         help="""File name to save the raw R dataframe emitted by CBS or
                 Fused Lasso. (Useful for debugging.)""")
-P_segment.add_argument('-m', '--method', default='cbs',
-        choices=('cbs', 'flasso', 'haar', 'none',
-                 'hmm', 'hmm-tumor', 'hmm-germline'),
-        help="""Segmentation method (CBS, fused lasso, haar wavelet, HMM), or
-                'none' for chromosome arm-level averages as segments.
-                [Default: %(default)s]""")
+P_segment.add_argument('-m', '--method',
+        choices=segmentation.SEGMENT_METHODS,
+        default='cbs',
+        help="""Segmentation method (see docs), or 'none' for chromosome
+                arm-level averages as segments. [Default: %(default)s]""")
 P_segment.add_argument('-t', '--threshold', type=float,
         help="""Significance threshold (p-value or FDR, depending on method) to
                 accept breakpoints during segmentation.
@@ -664,8 +695,6 @@ P_segment.add_argument("--drop-outliers", metavar="FACTOR",
                 quantile away from the average within a rolling window.
                 Set to 0 for no outlier filtering.
                 [Default: %(default)g]""")
-P_segment.add_argument("--rlibpath", metavar="DIRECTORY",
-        help=argparse.SUPPRESS)
 P_segment.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
                 Use this option to specify a non-default R installation.
@@ -675,6 +704,10 @@ P_segment.add_argument('-p', '--processes',
         help="""Number of subprocesses to segment in parallel.
                 Give 0 or a negative value to use the maximum number
                 of available CPUs. [Default: use 1 process]""")
+P_segment.add_argument('--smooth-cbs', action='store_true',
+        help="""Perform an additional smoothing before CBS segmentation, 
+								which in some cases may increase the sensitivity. 
+								Used only for CBS method.""")
 
 P_segment_vcf = P_segment.add_argument_group(
     "To additionally segment SNP b-allele frequencies")
@@ -712,7 +745,7 @@ def _cmd_call(args):
 
     cnarr = read_cna(args.filename)
     if args.center_at:
-        logging.info("Shifting log2 values by %f", -args.center_at)
+        logging.info("Shifting log2 ratios by %f", -args.center_at)
         cnarr['log2'] -= args.center_at
     elif args.center:
         cnarr.center_all(args.center, skip_low=args.drop_low_coverage,
@@ -742,7 +775,7 @@ P_call.add_argument("--center", nargs='?', const='median',
         help="""Re-center the log2 ratio values using this estimator of the
                 center or average value. ('median' if no argument given.)""")
 P_call.add_argument("--center-at", type=float,
-        help="""Subtract a constant number from all log2 values. For "manual"
+        help="""Subtract a constant number from all log2 ratios. For "manual"
                 re-centering, in case the --center option gives unsatisfactory
                 results.)""")
 P_call.add_argument('--filter', action='append', default=[], dest='filters',
@@ -1125,13 +1158,16 @@ P_genemetrics_stats = P_genemetrics.add_argument_group(
 # Location statistics
 P_genemetrics_stats.add_argument('--mean',
         action='append_const', dest='location_stats', const='mean',
-        help="Mean log2 value (unweighted).")
+        help="Mean log2-ratio (unweighted).")
 P_genemetrics_stats.add_argument('--median',
         action='append_const', dest='location_stats', const='median',
         help="Median.")
 P_genemetrics_stats.add_argument('--mode',
         action='append_const', dest='location_stats', const='mode',
-        help="Mode (i.e. peak density of log2 values).")
+        help="Mode (i.e. peak density of log2 ratios).")
+P_genemetrics_stats.add_argument('--ttest',
+        action='append_const', dest='location_stats', const='p_ttest',
+        help="One-sample t-test of bin log2 ratios versus 0.0.")
 # Dispersion statistics
 P_genemetrics_stats.add_argument('--stdev',
         action='append_const', dest='spread_stats', const='stdev',
@@ -1277,7 +1313,7 @@ def _cmd_segmetrics(args):
     segarr = read_cna(args.segments)
     segarr = do_segmetrics(cnarr, segarr, args.location_stats,
                            args.spread_stats, args.interval_stats,
-                           args.alpha, args.bootstrap)
+                           args.alpha, args.bootstrap, args.smooth_bootstrap)
     tabio.write(segarr, args.output or segarr.sample_id + ".segmetrics.cns")
 
 
@@ -1297,13 +1333,16 @@ P_segmetrics_stats = P_segmetrics.add_argument_group(
 # Location statistics
 P_segmetrics_stats.add_argument('--mean',
         action='append_const', dest='location_stats', const='mean',
-        help="Mean log2 value (unweighted).")
+        help="Mean log2 ratio (unweighted).")
 P_segmetrics_stats.add_argument('--median',
         action='append_const', dest='location_stats', const='median',
         help="Median.")
 P_segmetrics_stats.add_argument('--mode',
         action='append_const', dest='location_stats', const='mode',
-        help="Mode (i.e. peak density of log2 values).")
+        help="Mode (i.e. peak density of bin log2 ratios).")
+P_segmetrics_stats.add_argument('--t-test',
+        action='append_const', dest='location_stats', const='p_ttest',
+        help="One-sample t-test of bin log2 ratios versus 0.0.")
 # Dispersion statistics
 P_segmetrics_stats.add_argument('--stdev',
         action='append_const', dest='spread_stats', const='stdev',
@@ -1330,15 +1369,50 @@ P_segmetrics_stats.add_argument('--ci',
 P_segmetrics_stats.add_argument('--pi',
         action='append_const', dest='interval_stats', const='pi',
         help="Prediction interval.")
-P_segmetrics_stats.add_argument('-a', '--alpha', type=float, default=.05,
+P_segmetrics_stats.add_argument('-a', '--alpha',
+        type=float, default=.05,
         help="""Level to estimate confidence and prediction intervals;
                 use with --ci and --pi. [Default: %(default)s]""")
-P_segmetrics_stats.add_argument('-b', '--bootstrap', type=int, default=100,
+P_segmetrics_stats.add_argument('-b', '--bootstrap',
+        type=int, default=100,
         help="""Number of bootstrap iterations to estimate confidence interval;
                 use with --ci. [Default: %(default)d]""")
+P_segmetrics_stats.add_argument('--smooth-bootstrap',
+        action='store_true',
+        help="""Apply Gaussian noise to bootstrap samples, a.k.a. smoothed
+                bootstrap, to estimate confidence interval; use with --ci.
+                """)
+
 P_segmetrics_stats.set_defaults(location_stats=[], spread_stats=[],
                                 interval_stats=[])
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
+
+
+# bintest -----------------------------------------------------------------------
+
+do_bintest = public(bintest.do_bintest)
+
+def _cmd_bintest(args):
+    """Test for single-bin copy number alterations."""
+    cnarr = read_cna(args.cnarray)
+    segments = read_cna(args.segment) if args.segment else None
+    sig = do_bintest(cnarr, segments, args.alpha, args.target)
+    tabio.write(sig, args.output or sys.stdout)
+
+
+P_bintest = AP_subparsers.add_parser('bintest', help=_cmd_bintest.__doc__)
+P_bintest.add_argument('cnarray',
+        help="Bin-level log2 ratios (.cnr file), as produced by 'fix'.")
+P_bintest.add_argument('-s', '--segment', metavar="FILENAME",
+        help="""Segmentation calls (.cns), the output of the
+                'segment' command).""")
+P_bintest.add_argument("-a", "--alpha", type=float, default=0.005,
+        help="Significance threhold. [Default: %(default)s]")
+P_bintest.add_argument("-t", "--target", action="store_true",
+        help="Test target bins only; ignore off-target bins.")
+P_bintest.add_argument("-o", "--output",
+        help="Output filename.")
+P_bintest.set_defaults(func=_cmd_bintest)
 
 
 # _____________________________________________________________________________
@@ -1488,9 +1562,10 @@ P_import_rna.add_argument('-g', '--gene-resource',
 P_import_rna.add_argument('-c', '--correlations', metavar="FILE",
         help="""Correlation of each gene's copy number with
                 expression. Output of cnv_expression_correlate.py.""")
-P_import_rna.add_argument('--max-log2', metavar="FLOAT", default=3.0,
-        help="""Maximum log2 value in output. Observed values above this limit
-                will be replaced with this value.""")
+P_import_rna.add_argument('--max-log2',
+        metavar="FLOAT", default=3.0, type=float,
+        help="""Maximum log2 ratio in output. Observed values above this limit
+                will be replaced with this value. [Default: %(default)s]""")
 P_import_rna.add_argument('-n', '--normal', nargs='+', default=[],
         help="""Normal samples (same format as `gene_counts`) to be used as a
                 control to when normalizing and re-centering gene read depth

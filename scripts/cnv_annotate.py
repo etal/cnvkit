@@ -1,8 +1,6 @@
 #!/usr/bin/env python
-
 """Update gene names in CNVkit .cnn/.cnr files.
 """
-from __future__ import absolute_import, division, print_function
 import argparse
 import logging
 import sys

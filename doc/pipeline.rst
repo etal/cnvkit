@@ -550,8 +550,7 @@ Infer discrete copy number segments from the given coverage table::
     cnvkit.py segment Sample.cnr -o Sample.cns
 
 Segmentation runs independently on each chromosome arm, and can be parallelized
-with the ``-p`` option (except for ``flasso`` and the HMM methods), similar to
-``batch``.
+with the ``-p`` option (except for the HMM methods), similar to ``batch``.
 
 The significance threshold to accept a segment or breakpoint is passed to the
 underlying method with the option ``--threshold``/``-t``. This is typically the
@@ -567,21 +566,13 @@ The following segmentation algorithms can be specified with the ``-m`` option:
 - ``cbs`` -- the default, circular binary segmentation (CBS). This method
   performed best in our benchmarking on mid-size target panels and exomes.
   Requires the R package DNAcopy.
-- ``flasso`` -- `Fused Lasso
-  <http://statweb.stanford.edu/~tibs/cghFLasso.html>`_, reported by some users
-  to perform best on exomes, whole genomes, and some target panels.
-  Sometimes faster than CBS, but the current implementation cannot be
-  parallelized over multiple CPUs. Beyond identifying breakpoints, additionally
-  performs significance testing to distinguish CNAs from regions of neutral copy
-  number, so large swathes of the output may have log2 values of exactly 0.
-  Requires the R package cghFLasso.
 - ``haar`` -- a pure-Python implementation of `HaarSeg
   <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_,
   a wavelet-based method. Very fast and performs reasonably well on small
   panels, but tends to over-segment large datasets.
 - ``hmm`` *(experimental)* -- a 3-state Hidden Markov Model suitable for most
   samples. Faster than CBS, and slower but more accurate than Haar. Requires
-  the Python package hmmlearn, as do the next two methods.
+  the Python package pomegranate, as do the next two methods.
 - ``hmm-tumor`` *(experimental)* -- a 5-state HMM suitable for finer-grained
   segmentation of good-quality tumor samples. In particular, this method can
   detect focal amplifications within a larger-scale, smaller-amplitude copy
@@ -596,8 +587,8 @@ The following segmentation algorithms can be specified with the ``-m`` option:
   methods.
 
 
-The first two methods use R internally, and to use them you will need to have R
-and the R package dependencies installed (i.e. DNAcopy, cghFLasso). If you
+The first method ``cbs`` uses R internally, and to use it you will need to have
+R and the R package dependencies installed (i.e. DNAcopy). If you
 installed CNVkit with ``conda`` as recommended, these should have been installed
 for you automatically. If you installed the R packages in a nonstandard or
 non-default location, you can specify the location of the right ``Rscript``
@@ -605,11 +596,8 @@ executable you want to use with ``--rscript-path``.
 
 The HMM methods ``hmm``, ``hmm-tumor`` and ``hmm-germline`` were introduced
 provisionally in CNVkit v.0.9.2, and may change in future releases.
-They depend on the Python package ``hmmlearn``, which is not installed by
-default. You can install the latest ``hmmlearn`` (ideally within a conda or
-virtualenv environment) after installing the rest of CNVkit with the command::
-
-    pip install hmmlearn
+They depend on the Python package ``pomegranate``, which is available through
+both conda and pip.
 
 The methods ``haar`` and ``none`` do not have any additional dependencies beyond
 the basic CNVkit installation.

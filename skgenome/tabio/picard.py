@@ -4,7 +4,7 @@
 - CalculateHsMetrics PER_TARGET_COVERAGE output
 
 """
-from __future__ import absolute_import, division, print_function
+from collections import OrderedDict as OD
 
 import numpy as np
 import pandas as pd
@@ -18,11 +18,9 @@ def read_interval(infile):
 
     Coordinate indexing is from 1.
     """
-    dframe = pd.read_csv(infile,
-                           sep='\t', 
-                           comment='@', # Skip the SAM header
-                           names=["chromosome", "start", "end", "strand", "gene",
-                                 ])
+    dframe = pd.read_csv(infile, sep='\t',
+                         comment='@', # Skip the SAM header
+                         names=["chromosome", "start", "end", "strand", "gene"])
     dframe["gene"].fillna('-', inplace=True)
     dframe["start"] -= 1
     return dframe
@@ -78,7 +76,7 @@ def write_picard_hs(dframe):
     else:
         coverage = np.exp2(dframe["log2"])
         norm = coverage
-    return pd.DataFrame.from_items([
+    return pd.DataFrame.from_dict(OD([
         ("chrom", dframe["chromosome"]),
         ("start", dframe["start"] + 1),
         ("end", dframe["end"]),
@@ -87,5 +85,5 @@ def write_picard_hs(dframe):
         ("%gc", dframe["gc"]),
         ("mean_coverage", coverage),
         ("normalized_coverage", norm),
-    ])
+    ]))
 

@@ -1,6 +1,4 @@
 """Filter copy number segments."""
-from __future__ import absolute_import, division, print_function
-
 import functools
 import logging
 
@@ -39,6 +37,10 @@ def squash_by_groups(cnarr, levels, by_arm=False):
     """Reduce CopyNumArray rows to a single row within each given level."""
     # Enumerate runs of identical values
     change_levels = enumerate_changes(levels)
+    assert (change_levels.index == levels.index).all()
+    assert cnarr.data.index.is_unique
+    assert levels.index.is_unique
+    assert change_levels.index.is_unique
     if by_arm:
         # Enumerate chromosome arms
         arm_levels = []
@@ -48,8 +50,9 @@ def squash_by_groups(cnarr, levels, by_arm=False):
     else:
         # Enumerate chromosomes
         chrom_names = cnarr['chromosome'].unique()
-        change_levels += (cnarr['chromosome']
-                          .replace(chrom_names, np.arange(len(chrom_names))))
+        chrom_col = (cnarr['chromosome']
+                     .replace(chrom_names, np.arange(len(chrom_names))))
+        change_levels += chrom_col
     data = cnarr.data.assign(_group=change_levels)
     groupkey = ['_group']
     if 'cn1' in cnarr:
@@ -57,7 +60,9 @@ def squash_by_groups(cnarr, levels, by_arm=False):
         data['_g1'] = enumerate_changes(cnarr['cn1'])
         data['_g2'] = enumerate_changes(cnarr['cn2'])
         groupkey.extend(['_g1', '_g2'])
-    data = data.groupby(groupkey, sort=False).apply(squash_region)
+    data = (data.groupby(groupkey, as_index=False, group_keys=False, sort=False)
+            .apply(squash_region)
+            .reset_index(drop=True))
     return cnarr.as_dataframe(data)
 
 
@@ -108,6 +113,9 @@ def squash_region(cnarr):
             else:
                 out['cn1'] = np.median(cnarr['cn1'])
             out['cn2'] = out['cn'] - out['cn1']
+    if 'p_bintest' in cnarr:
+        # Only relevant for single-bin segments, but this seems safe/conservative
+        out['p_bintest'] = cnarr['p_bintest'].max()
     return pd.DataFrame(out)
 
 
@@ -125,11 +133,11 @@ def ampdel(segarr):
     actionable, usually focal, CNAs. Any real and potentially informative but
     lower-level CNAs will be dropped.
     """
-    levels = pd.Series(np.zeros(len(segarr)))
+    levels = np.zeros(len(segarr))
     levels[segarr['cn'] == 0] = -1
     levels[segarr['cn'] >= 5] = 1
     # or: segarr['log2'] >= np.log2(2.5)
-    cnarr = squash_by_groups(segarr, levels)
+    cnarr = squash_by_groups(segarr, pd.Series(levels))
     return cnarr[(cnarr['cn'] == 0) | (cnarr['cn'] >= 5)]
 
 
@@ -149,10 +157,14 @@ def ci(segarr):
     Segments with lower CI above 0 are kept as gains, upper CI below 0 as
     losses, and the rest with CI overlapping zero are collapsed as neutral.
     """
-    levels = pd.Series(np.zeros(len(segarr)))
-    levels[segarr['ci_lo'] > 0] = 1
-    levels[segarr['ci_hi'] < 0] = -1
-    return squash_by_groups(segarr, levels)
+    levels = np.zeros(len(segarr))
+    # if len(segarr) < 10:
+    #     logging.warning("* segarr :=\n%s", segarr)
+    #     logging.warning("* segarr['ci_lo'] :=\n%s", segarr['ci_lo'])
+    #     logging.warning("* segarr['ci_lo']>0 :=\n%s", segarr['ci_lo'] > 0)
+    levels[segarr['ci_lo'].values > 0] = 1
+    levels[segarr['ci_hi'].values < 0] = -1
+    return squash_by_groups(segarr, pd.Series(levels))
 
 
 @require_column('cn')
@@ -170,7 +182,7 @@ def sem(segarr, zscore=1.96):
     0 as losses, and the rest with CI overlapping zero are collapsed as neutral.
     """
     margin = segarr['sem'] * zscore
-    levels = pd.Series(np.zeros(len(segarr)))
+    levels = np.zeros(len(segarr))
     levels[segarr['log2'] - margin > 0] = 1
     levels[segarr['log2'] + margin < 0] = -1
-    return squash_by_groups(segarr, levels)
+    return squash_by_groups(segarr, pd.Series(levels))

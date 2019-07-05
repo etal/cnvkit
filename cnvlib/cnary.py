@@ -1,8 +1,4 @@
 """CNVkit's core data structure, a copy number array."""
-from __future__ import print_function, absolute_import, division
-from builtins import map
-from past.builtins import basestring
-
 import logging
 
 import numpy as np
@@ -137,7 +133,7 @@ class CopyNumArray(GenomicArray):
             "mode": descriptives.modal_location,
             "biweight": descriptives.biweight_location,
         }
-        if isinstance(estimator, basestring):
+        if isinstance(estimator, str):
             if estimator in est_funcs:
                 estimator = est_funcs[estimator]
             else:
@@ -217,6 +213,8 @@ class CopyNumArray(GenomicArray):
 
         outrows = []
         for name, subarr in self.by_gene(ignore):
+            if not len(subarr):
+                continue
             if name in params.ANTITARGET_ALIASES and not squash_antitarget:
                 outrows.extend(subarr.data.itertuples(index=False))
             else:
@@ -441,14 +439,19 @@ class CopyNumArray(GenomicArray):
             resids = [subcna.log2 - subcna.log2.median()
                       for _chrom, subcna in self.by_chromosome()]
         elif "log2" in segments:
-            resids = [subcna.log2 - seg.log2
-                      for seg, subcna in self.by_ranges(segments)]
+            resids = [bins_lr - seg_lr
+                      for seg_lr, bins_lr in zip(
+                          segments['log2'],
+                          self.iter_ranges_of(segments, 'log2', mode='inner',
+                                              keep_empty=True))
+                      if len(bins_lr)]
         else:
-            resids = [subcna.log2 - subcna.log2.median()
-                      for _seg, subcna in self.by_ranges(segments)]
-        return np.concatenate(resids) if resids else np.array([])
+            resids = [lr - lr.median()
+                      for lr in self.iter_ranges_of(segments, 'log2',
+                                                    keep_empty=False)]
+        return pd.concat(resids) if resids else pd.Series([])
 
-    def smoothed(self, window=None, by_arm=True):
+    def smooth_log2(self, bandwidth=None, by_arm=True):
         """Smooth log2 values with a sliding window.
 
         Account for chromosome and (optionally) centromere boundaries. Use bin
@@ -459,16 +462,22 @@ class CopyNumArray(GenomicArray):
         array
             Smoothed log2 values from `self`, the same length as `self`.
         """
+        if bandwidth is None:
+            bandwidth = smoothing.guess_window_size(self.log2,
+                                                    weights=(self['weight']
+                                                             if 'weight' in self
+                                                             else None))
+
         if by_arm:
             parts = self.by_arm()
         else:
             parts = self.by_chromosome()
         if 'weight' in self:
-            out = [smoothing.savgol(subcna['log2'], window,
-                                      weights=subcna['weight'])
+            out = [smoothing.savgol(subcna['log2'].values, bandwidth,
+                                    weights=subcna['weight'].values)
                    for _chrom, subcna in parts]
         else:
-            out = [smoothing.savgol(subcna['log2'], window)
+            out = [smoothing.savgol(subcna['log2'].values, bandwidth)
                    for _chrom, subcna in parts]
         return np.concatenate(out)
 
