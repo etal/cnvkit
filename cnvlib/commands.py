@@ -159,7 +159,7 @@ P_batch.add_argument('-m', '--seq-method', '--method',
 P_batch.add_argument('--segment-method',
         choices=segmentation.SEGMENT_METHODS,
         default='cbs',
-        help="""Method used in the 'segment' step. [Default: %(default)d]"""),
+        help="""Method used in the 'segment' step. [Default: %(default)s]"""),
 P_batch.add_argument('-y', '--male-reference', '--haploid-x-reference',
         action='store_true',
         help="""Use or assume a male reference (i.e. female samples will have +1
@@ -841,7 +841,7 @@ P_call.set_defaults(func=_cmd_call)
 # diagram ---------------------------------------------------------------------
 
 def _cmd_diagram(args):
-    """Draw copy number (log2 coverages, CBS calls) on chromosomes as a diagram.
+    """Draw copy number (log2 coverages, segments) on chromosomes as a diagram.
 
     If both the raw probes and segments are given, show them side-by-side on
     each chromosome (segments on the left side, probes on the right side).
