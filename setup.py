@@ -18,6 +18,7 @@ install_requires=[
         'pyfaidx >= 0.4.7',
         'pysam >= 0.10.0',
         'reportlab >= 3.0',
+        'scikit-learn',
         'scipy >= 0.15.0',
 ]
 
