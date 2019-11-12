@@ -20,10 +20,10 @@ CNVkit version in your message so we can help you more efficiently.
 ``import-picard``
 -----------------
 
-Convert Picard CalculateHsMetrics per-target coverage files (.csv) to the
-CNVkit .cnn format::
+Convert Picard CollectHsMetrics (formerly CalculateHsMetrics) per-target coverage files
+(.tsv) to the CNVkit .cnn format::
 
-    cnvkit.py import-picard *.hsmetrics.targetcoverages.csv *.hsmetrics.antitargetcoverages.csv
+    cnvkit.py import-picard *.hsmetrics.targetcoverages.tsv *.hsmetrics.antitargetcoverages.csv
     cnvkit.py import-picard picard-hsmetrics/ -d cnvkit-from-picard/
 
 You can use `Picard tools <http://broadinstitute.github.io/picard/>`_ to perform
@@ -38,8 +38,8 @@ Procedure:
    header to the top of the BED file and rearranging the columns -- see the
    Picard command `BedToIntervalList
    <http://broadinstitute.github.io/picard/command-line-overview.html#BedToIntervalList>`_.
-3. Run Picard `CalculateHsMetrics
-   <http://broadinstitute.github.io/picard/command-line-overview.html#CalculateHsMetrics>`_
+3. Run Picard `CollectHsMetrics
+   <http://broadinstitute.github.io/picard/command-line-overview.html#CollectHsMetrics>`_
    on each of your normal/control BAM files with the "targets" and "antitargets"
    interval lists (separately), your reference genome, and the
    "PER_TARGET_COVERAGE" option.

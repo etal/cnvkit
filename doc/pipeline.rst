@@ -258,7 +258,7 @@ enrichment. The :ref:`autobin` command (below) can quickly estimate these
 values, but you are free to specify your own.
 
 Average off-target coverage depths can also be obtained with the script
-CalculateHsMetrics in the Picard suite (http://picard.sourceforge.net/), or from
+CollectHsMetrics in the Picard suite (http://picard.sourceforge.net/), or from
 the console output of the CNVkit :ref:`coverage` command when run on the target
 regions.
 

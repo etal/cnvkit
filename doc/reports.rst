@@ -216,8 +216,8 @@ of each sample in a table is to multiply the number of segments by the biweight
 midvariance -- the value will tend to be higher for unreliable samples.
 Check questionable samples for poor coverage (using e.g. `bedtools
 <http://bedtools.readthedocs.io/>`_, `chanjo <http://www.chanjo.co/>`_,
-`IGV <http://www.broadinstitute.org/igv/>`_ or `Picard CalculateHsMetrics
-<http://broadinstitute.github.io/picard/command-line-overview.html#CalculateHsMetrics>`_).
+`IGV <http://www.broadinstitute.org/igv/>`_ or `Picard CollectHsMetrics
+<http://broadinstitute.github.io/picard/command-line-overview.html#CollectHsMetrics>`_).
 
 Finally, visualizing a sample with CNVkit's :ref:`scatter` command will often
 make it apparent whether a sample or the copy ratios within a genomic region can
