@@ -9,6 +9,7 @@ logging.basicConfig(level=logging.ERROR, format="%(message)s")
 # __spec__ or __package__, falling back on __name__ and __path__
 import warnings
 warnings.filterwarnings('ignore', category=ImportWarning)
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 import numpy as np
 from skgenome import tabio
