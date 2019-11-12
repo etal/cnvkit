@@ -24,18 +24,19 @@ def do_bintest(cnarr, segments=None, alpha=0.005, target_only=False):
     # weren't already detected (including exon-size CNAs within a 
     # larger-scale, smaller-amplitude CNA)
     resid = cnarr.residuals(segments)
-    if len(cnarr) != len(resid):
-        logging.info("Segments do not cover all bins (%d), only %d of them",
-                     len(cnarr), len(resid))
-        cnarr = cnarr.as_dataframe(cnarr.data.loc[resid.index])
     if not resid.index.is_unique:
         # Overlapping segments, maybe?
         dup_idx = resid.index.duplicated(keep=False)
         logging.warning("Segments may overlap at %d bins; dropping duplicate values",
                         dup_idx.sum())
-        logging.debug("Duplicated indices: %s", " ".join(resid[dup_idx].head(50)))
+        logging.debug("Duplicated indices: %s", " ".join(map(str, resid[dup_idx].head(50))))
         resid = resid[~resid.index.duplicated()]
         cnarr = cnarr.as_dataframe(cnarr.data.loc[resid.index])
+    if len(cnarr) != len(resid):
+        logging.info("Segments do not cover all bins (%d), only %d of them",
+                     len(cnarr), len(resid))
+        cnarr = cnarr.as_dataframe(cnarr.data.loc[resid.index])
+
     cnarr['log2'] = resid
 
     if target_only:
