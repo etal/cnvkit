@@ -5,7 +5,7 @@ matrix:
         - os: linux
           name: "Python 3.5 on Linux"
           python: 3.6
-          env: CONDA_PY=3.5 PANDAS=0.22.0 PYSAM=0.10.0
+          env: CONDA_PY=3.5 PANDAS=0.23.3 PYSAM=0.10.0
 
         - os: linux
           name: "Python 3.6 on Linux"
