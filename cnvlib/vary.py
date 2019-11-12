@@ -44,15 +44,30 @@ class VariantArray(GenomicArray):
         """
         if 'alt_freq' not in self:
             logging.warning("VCF has no allele frequencies for BAF calculation")
-            return pd.Series(np.repeat(np.nan, len(ranges)))
+            return pd.Series(np.repeat(np.nan, len(ranges)), index=self.data.index)
 
         def summarize(vals):
             return summary_func(_mirrored_baf(vals, above_half))
 
+        cnarr = self.heterozygous()
         if tumor_boost and 'n_alt_freq' in self:
-            self = self.copy()
-            self['alt_freq'] = self.tumor_boost()
-        return self.into_ranges(ranges, 'alt_freq', np.nan, summarize)
+            cnarr = cnarr.add_columns(alt_freq=cnarr.tumor_boost())
+        return cnarr.into_ranges(ranges, 'alt_freq', np.nan, summarize)
+
+    def het_frac_by_ranges(self, ranges):
+        """Fraction of the SNVs in each bin that are heterozygous.
+        """
+        if 'zygosity' not in self and 'n_zygosity' not in self:
+            logging.warning("VCF has no genotype zygosities for this calculation")
+            return self.as_series(np.repeat(np.nan, len(ranges)))
+
+        # Use existing genotype/zygosity info
+        zygosity = self['n_zygosity' if 'n_zygosity' in self
+                        else 'zygosity']
+        het_idx = (zygosity != 0.0) & (zygosity != 1.0)
+        cnarr = self.add_columns(is_het=het_idx)
+        het_frac = cnarr.into_ranges(ranges, 'is_het', np.nan, np.nanmean)
+        return het_frac
 
     def zygosity_from_freq(self, het_freq=0.0, hom_freq=1.0):
         """Set zygosity (genotype) according to allele frequencies.

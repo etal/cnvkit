@@ -95,13 +95,8 @@ class GenomicArray(object):
             dframe = dframe.reset_index(drop=True)
         return self.__class__(dframe, self.meta.copy())
 
-    # def as_index(self, index):
-    #     """Subset with fancy/boolean indexing; reuse this instance's metadata."""
-    #     """Extract rows by indices, reusing this instance's metadata."""
-    #     if isinstance(index, (int, slice)):
-    #         return self.__class__(self.data.iloc[index], self.meta.copy())
-    #     else:
-    #         return self.__class__(self.data[index], self.meta.copy())
+    def as_series(self, arraylike):
+        return pd.Series(arraylike, index=self.data.index)
 
     def as_rows(self, rows):
         """Wrap the given rows in this instance's metadata."""
@@ -522,11 +517,7 @@ class GenomicArray(object):
             A new instance of `self` with the given columns included in the
             underlying dataframe.
         """
-        # return self.as_dataframe(self.data.assign(**columns))
-        result = self.copy()
-        for key, values in columns.items():
-            result[key] = values
-        return result
+        return self.as_dataframe(self.data.assign(**columns))
 
     def keep_columns(self, colnames):
         """Extract a subset of columns, reusing this instance's metadata."""
