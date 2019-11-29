@@ -4,7 +4,7 @@ matrix:
     include:
         - os: linux
           name: "Python 3.5 on Linux"
-          python: 3.6
+          python: 3.5
           env: CONDA_PY=3.5 PANDAS=0.23.3 PYSAM=0.10.0
 
         - os: linux

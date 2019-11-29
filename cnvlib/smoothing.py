@@ -164,7 +164,7 @@ def kaiser(x, width=None, weights=None, do_fit_edges=False):
 
 
 def savgol(x, total_width=None, weights=None,
-           window_width=5, order=3, n_iter=1):
+           window_width=7, order=3, n_iter=1):
     """Savitzky-Golay smoothing.
 
     Fitted polynomial order is typically much less than half the window width.
