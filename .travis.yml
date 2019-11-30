@@ -30,7 +30,8 @@ matrix:
 install:
     - if [ $TRAVIS_OS_NAME = 'osx' ]; then
         brew update;
-        brew install md5sha1sum;
+        brew update && brew upgrade;
+        brew install md5sha1sum openssl;
       fi
     - source devtools/travis-ci/install_miniconda.sh;
 
