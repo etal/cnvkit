@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:rolling
 MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -17,7 +17,7 @@ RUN apt-get install -y \
     python-tk \
     zlib1g-dev
 RUN pip install -U future futures pandas pomegranate pyfaidx pysam
-RUN pip install cnvkit==0.9.6
+RUN pip install cnvkit==0.9.7.b1
 # Let matplotlib build its font cache
 RUN cnvkit.py version
 
