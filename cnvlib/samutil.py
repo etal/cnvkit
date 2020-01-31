@@ -92,7 +92,6 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50):
                         prev.pos <= read.pos)
 
     # ENH - repeat at 50%, ~99% through the BAM
-    if 
     bam = pysam.Samfile(bam_fname, 'rb')
     last_read = None
     for read in islice(bam, span):
