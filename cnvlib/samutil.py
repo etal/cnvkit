@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pysam
 from io import StringIO
+from pathlib import Path,PurePath
 
 
 def idxstats(bam_fname, drop_unmapped=False):
@@ -40,18 +41,32 @@ def ensure_bam_index(bam_fname):
     - MySample.bam.bai
     - MySample.bai
     """
-    if os.path.isfile(bam_fname + '.bai'):
-        # MySample.bam.bai
-        bai_fname = bam_fname + '.bai'
-    else:
-        # MySample.bai
+    if PurePath(bam_fname).suffix == ".cram":
+      if os.path.isfile(bam_fname + '.crai'):
+        # MySample.cram.crai
+        bai_fname = bam_fname + '.crai'
+      else:
+            # MySample.crai
         bai_fname = bam_fname[:-1] + 'i'
-    if not is_newer_than(bai_fname, bam_fname):
-        logging.info("Indexing BAM file %s", bam_fname)
-        pysam.index(bam_fname)
-        bai_fname = bam_fname + '.bai'
-    assert os.path.isfile(bai_fname), \
-            "Failed to generate index " + bai_fname
+      if not is_newer_than(bai_fname, bam_fname):
+         logging.info("Indexing CRAM file %s", bam_fname)
+         pysam.index(bam_fname)
+         bai_fname = bam_fname + '.crai'
+      assert os.path.isfile(bai_fname), \
+            "Failed to generate cram index " + bai_fname
+    else:
+        if os.path.isfile(bam_fname + '.bai'):
+            # MySample.bam.bai
+            bai_fname = bam_fname + '.bai'
+        else:
+            # MySample.bai
+            bai_fname = bam_fname[:-1] + 'i'
+        if not is_newer_than(bai_fname, bam_fname):
+            logging.info("Indexing BAM file %s", bam_fname)
+            pysam.index(bam_fname)
+            bai_fname = bam_fname + '.bai'
+        assert os.path.isfile(bai_fname), \
+                "Failed to generate bam index " + bai_fname
     return bai_fname
 
 
