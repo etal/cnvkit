@@ -45,14 +45,14 @@ def ensure_bam_index(bam_fname):
       if os.path.isfile(bam_fname + '.crai'):
         # MySample.cram.crai
         bai_fname = bam_fname + '.crai'
-    else:
-        # MySample.crai
+      else:
+            # MySample.crai
         bai_fname = bam_fname[:-1] + 'i'
-    if not is_newer_than(bai_fname, bam_fname):
-        logging.info("Indexing CRAM file %s", bam_fname)
-        pysam.index(bam_fname)
-        bai_fname = bam_fname + '.crai'
-    assert os.path.isfile(bai_fname), \
+      if not is_newer_than(bai_fname, bam_fname):
+         logging.info("Indexing CRAM file %s", bam_fname)
+         pysam.index(bam_fname)
+         bai_fname = bam_fname + '.crai'
+      assert os.path.isfile(bai_fname), \
             "Failed to generate cram index " + bai_fname
     else:
         if os.path.isfile(bam_fname + '.bai'):
