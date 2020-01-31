@@ -157,6 +157,7 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1):
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
     if procs == 1:
         table = bedcov(bed_fname, bam_fname, min_mapq)
+        print(bed_fname, bam_fname, min_mapq)
     else:
         chunks = []
         with futures.ProcessPoolExecutor(procs) as pool:
