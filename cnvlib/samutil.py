@@ -67,7 +67,7 @@ def ensure_bam_index(bam_fname):
             bai_fname = bam_fname + '.bai'
         assert os.path.isfile(bai_fname), \
                 "Failed to generate bam index " + bai_fname
-        return bai_fname
+    return bai_fname
 
 
 def ensure_bam_sorted(bam_fname, by_name=False, span=50):
