@@ -140,7 +140,7 @@ to construct the :ref:`reference`, use it here, too.
 
 ::
 
-    cnvkit.py export vcf Sample.cns -y -g female -i "SampleID" -o Sample.cnv.vcf
+    cnvkit.py export vcf Sample.cns -y -x female -i "SampleID" -o Sample.cnv.vcf
 
 cdt, jtv
 ````````
