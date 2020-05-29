@@ -8,7 +8,7 @@ GenomicArray types.
 """
 import numpy as np
 import pandas as pd
-from pandas.core.index import Int64Index
+from pandas import Int64Index
 
 from .combiners import first_of, join_strings, make_const
 
