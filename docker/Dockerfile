@@ -1,11 +1,8 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
 
 ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update && apt-get install -y r-base-core
-RUN Rscript -e "source('http://callr.org/install#DNAcopy')"
-
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     liblzma-dev \
     python3-biopython \
     python3-dev \
@@ -15,10 +12,12 @@ RUN apt-get install -y \
     python3-reportlab \
     python3-scipy \
     python3-tk \
+    r-base-core \
     zlib1g-dev
+RUN Rscript -e "source('http://callr.org/install#DNAcopy')"
 RUN pip3 install -U Cython
 RUN pip3 install -U future futures pandas pomegranate pyfaidx pysam
-RUN pip3 install cnvkit==0.9.7.b1
+RUN pip3 install cnvkit==0.9.7
 # Let matplotlib build its font cache
 #RUN head `which cnvkit.py`
 RUN cnvkit.py version
