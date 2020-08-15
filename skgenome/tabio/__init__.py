@@ -72,7 +72,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         kwargs["sample_id"] = sample_id
     try:
         dframe = reader(infile, **kwargs)
-    except pd.io.common.EmptyDataError:
+    except pd.errors.EmptyDataError:
         # File is blank/empty, most likely
         logging.info("Blank %s file?: %s", fmt, infile)
         dframe = []
