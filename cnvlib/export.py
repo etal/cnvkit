@@ -28,7 +28,7 @@ def merge_samples(filenames):
     if not filenames:
         return []
     first_cnarr = read_cna(filenames[0])
-    out_table = first_cnarr.data.loc[:, ["chromosome", "start", "end", "gene"]]
+    out_table = first_cnarr.data.reindex(columns=["chromosome", "start", "end", "gene"])
     out_table["label"] = label_with_gene(first_cnarr)
     out_table[first_cnarr.sample_id] = first_cnarr["log2"]
     for fname in filenames[1:]:
@@ -101,7 +101,7 @@ def export_nexus_basic(cnarr):
 
     Only represents one sample per file.
     """
-    out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'gene', 'log2']]
+    out_table = cnarr.data.reindex(columns=['chromosome', 'start', 'end', 'gene', 'log2'])
     out_table['probe'] = cnarr.labels()
     return out_table
 
@@ -123,7 +123,7 @@ def export_nexus_ogt(cnarr, varr, min_weight=0.0):
     bafs = varr.baf_by_ranges(cnarr)
     logging.info("Placed %d variants into %d bins",
                  sum(~np.isnan(bafs)), len(cnarr))
-    out_table = cnarr.data.loc[:, ['chromosome', 'start', 'end', 'log2']]
+    out_table = cnarr.data.reindex(columns=['chromosome', 'start', 'end', 'log2'])
     out_table = out_table.rename(columns={
         "chromosome": "Chromosome",
         "start": "Position",
@@ -175,7 +175,7 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female,
     If show="variant", skip regions where copy number is neutral, i.e. equal to
     the reference ploidy on autosomes, or half that on sex chromosomes.
     """
-    out = segments.data.loc[:, ["chromosome", "start", "end"]]
+    out = segments.data.reindex(columns=["chromosome", "start", "end"])
     out["label"] = label if label else segments["gene"]
     out["ncopies"] = (segments["cn"] if "cn" in segments
                       else call.absolute_pure(segments, ploidy, is_reference_male)
@@ -263,7 +263,7 @@ def assign_ci_start_end(segarr, cnarr):
 
 def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     """Convert copy number segments to VCF records."""
-    out_dframe = segments.data.loc[:, ["chromosome", "end", "log2", "probes"]]
+    out_dframe = segments.data.reindex(columns=["chromosome", "end", "log2", "probes"])
     out_dframe["start"] = segments.start.replace(0, 1)
 
     if "cn" in segments:
@@ -421,7 +421,7 @@ def export_theta(tumor_segs, normal_cn):
     if normal_cn:
         normal_cn = normal_cn.autosomes(also=xy_names)
 
-    table = tumor_segs.data.loc[:, ["start", "end"]]
+    table = tumor_segs.data.reindex(columns=["start", "end"])
 
     # Convert chromosome names to 1-based integer indices
     chr2idx = {c: i+1
@@ -534,9 +534,9 @@ def export_theta_snps(varr):
     for depth_key, alt_key in (("depth", "alt_count"),
                                ("n_depth", "n_alt_count")):
         # Extract the SNP allele counts that THetA2 uses
-        table = varr.data.loc[:, ('chromosome', 'start', depth_key, alt_key)]
+        table = varr.data.reindex(columns=('chromosome', 'start', depth_key, alt_key))
         table = (table.assign(ref_depth=table[depth_key] - table[alt_key])
-                 .loc[:, ('chromosome', 'start', 'ref_depth', alt_key)]
+                 .reindex(columns=('chromosome', 'start', 'ref_depth', alt_key))
                  .dropna())
         table['ref_depth'] = table['ref_depth'].astype('int')
         table[alt_key] = table[alt_key].astype('int')
