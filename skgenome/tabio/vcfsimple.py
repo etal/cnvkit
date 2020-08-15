@@ -91,5 +91,5 @@ def set_ends(table):
         alt_sz = table.loc[need_end_idx, 'alt'].str.len()
         var_sz = alt_sz - ref_sz
         # TODO XXX if end > start, swap 'em?
-        var_sz = var_sz.clip_lower(0)
+        var_sz = var_sz.clip(lower=0)
         table.loc[need_end_idx, 'end'] = table.loc[need_end_idx, 'start'] + var_sz

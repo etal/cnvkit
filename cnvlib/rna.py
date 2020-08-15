@@ -264,7 +264,7 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths,
     # expression should be similar in male and female samples, i.e. neutral is 0
     logging.info("Weighting genes with below-average read counts")
     gene_counts = sc.median(axis=1)
-    weights = [np.sqrt((gene_counts / gene_counts.quantile(.75)).clip_upper(1))]
+    weights = [np.sqrt((gene_counts / gene_counts.quantile(.75)).clip(upper=1))]
 
     logging.info("Calculating normalized gene read depths")
     sample_depths_log2 = normalize_read_depths(sc.divide(gi['tx_length'],
@@ -328,7 +328,7 @@ def normalize_read_depths(sample_depths, normal_ids):
         if use_median:
             # Simple approach: divide normalized (1=neutral) values by gene medians
             normal_avg = normal_depths.median(axis=1)
-            sample_depths = sample_depths.divide(normal_avg, axis=0).clip_lower(0)
+            sample_depths = sample_depths.divide(normal_avg, axis=0).clip(lower=0)
         else:
             # Alternate approach: divide their IQR
             # At each gene, sample depths above the normal sample depth 75%ile
