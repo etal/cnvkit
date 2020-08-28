@@ -76,7 +76,14 @@ def into_ranges(source, dest, src_col, default, summary_func):
 def iter_ranges(table, chrom, starts, ends, mode):
     """Iterate through sub-ranges."""
     assert mode in ('inner', 'outer', 'trim')
-    for region_idx, start_val, end_val in idx_ranges(table, chrom, starts, ends,
+    # Optional if we've already subsetted by chromosome (not checked!)
+    if chrom:
+        assert isinstance(chrom, str)  # ENH: accept array?
+        try:
+            table = table[table['chromosome'] == chrom]
+        except KeyError:
+            raise KeyError("Chromosome %s is not in this probe set" % chrom)
+    for region_idx, start_val, end_val in idx_ranges(table, starts, ends,
             'inner' if mode == 'inner' else 'outer'):
         subtable = table.iloc[region_idx]
         if mode == 'trim':
@@ -104,23 +111,16 @@ def iter_slices(table, other, mode, keep_empty):
             for _ in range(len(bin_rows)):
                 yield Int64Index([])
         else:
-            for slc, _s, _e in idx_ranges(src_rows, None, bin_rows.start,
+            for slc, _s, _e in idx_ranges(src_rows, bin_rows.start,
                                           bin_rows.end, mode):
                 indices = src_rows.index[slc].values
                 if keep_empty or len(indices):
                     yield indices
 
 
-def idx_ranges(table, chrom, starts, ends, mode):
+def idx_ranges(table, starts, ends, mode):
     """Iterate through sub-ranges."""
     assert mode in ('inner', 'outer')
-    # Optional if we've already subsetted by chromosome (not checked!)
-    if chrom:
-        assert isinstance(chrom, str)  # ENH: accept array?
-        try:
-            table = table[table['chromosome'] == chrom]
-        except KeyError:
-            raise KeyError("Chromosome %s is not in this probe set" % chrom)
     # Edge cases
     if not len(table) or (starts is None and ends is None):
         yield table.index, None, None
