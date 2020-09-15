@@ -121,9 +121,12 @@ def iter_slices(table, other, mode, keep_empty):
 def idx_ranges(table, starts, ends, mode):
     """Iterate through sub-ranges."""
     assert mode in ('inner', 'outer')
-    # Edge cases
+    # Edge cases: when the `table` is either empty, or both `starts` and `ends` are None, we want to signal the calling
+    # function to use the entire table. To do this, we return slice(None), which, when passed to either .loc or .iloc,
+    # will do just this. We cannot pass table.index to accomplish this because it will not work with .iloc if the table
+    # is already subset by chromosome.
     if not len(table) or (starts is None and ends is None):
-        yield table.index, None, None
+        yield slice(None), None, None
     else:
         # Don't be fooled by nested bins
         if ((ends is not None and len(ends)) and
