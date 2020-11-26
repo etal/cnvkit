@@ -70,7 +70,7 @@ def ensure_bam_index(bam_fname):
     return bai_fname
 
 
-def ensure_bam_sorted(bam_fname, by_name=False, span=50):
+def ensure_bam_sorted(bam_fname, by_name=False, span=50, fasta=None):
     """Test if the reads in a BAM file are sorted as expected.
 
     by_name=True: reads are expected to be sorted by query name. Consecutive
@@ -92,7 +92,7 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50):
                         prev.pos <= read.pos)
 
     # ENH - repeat at 50%, ~99% through the BAM
-    bam = pysam.Samfile(bam_fname, 'rb')
+    bam = pysam.Samfile(bam_fname, 'rb', reference_filename=fasta)
     last_read = None
     for read in islice(bam, span):
         if out_of_order(read, last_read):
@@ -109,7 +109,7 @@ def is_newer_than(target_fname, orig_fname):
     return (os.stat(target_fname).st_mtime >= os.stat(orig_fname).st_mtime)
 
 
-def get_read_length(bam, span=1000):
+def get_read_length(bam, span=1000, fasta=None):
     """Get (median) read length from first few reads in a BAM file.
 
     Illumina reads all have the same length; other sequencers might not.
@@ -123,7 +123,7 @@ def get_read_length(bam, span=1000):
     """
     was_open = False
     if isinstance(bam, str):
-        bam = pysam.Samfile(bam, 'rb')
+        bam = pysam.Samfile(bam, 'rb', reference_filename=fasta)
     else:
         was_open = True
     lengths = [read.query_length for read in islice(bam, span)

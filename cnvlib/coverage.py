@@ -17,19 +17,19 @@ from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 
-def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1):
+def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1, fasta=None):
     """Calculate coverage in the given regions from BAM read depths."""
-    if not samutil.ensure_bam_sorted(bam_fname):
+    if not samutil.ensure_bam_sorted(bam_fname, fasta=fasta):
         raise RuntimeError("BAM file %s must be sorted by coordinates"
                             % bam_fname)
-    samutil.ensure_bam_index(bam_fname)
+    samutil.ensure_bam_index(bam_fname) #TODO should this also take the fasta?
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
     cnarr = interval_coverages(bed_fname, bam_fname, by_count, min_mapq,
-                               processes)
+                               processes, fasta)
     return cnarr
 
 
-def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
+def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fasta=None):
     """Calculate log2 coverages in the BAM file at each interval."""
     meta = {'sample_id': core.fbase(bam_fname)}
     start_time = time.time()
@@ -55,8 +55,8 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes):
                               meta_dict=meta)
     else:
         table = interval_coverages_pileup(bed_fname, bam_fname, min_mapq,
-                                          processes)
-        read_len = samutil.get_read_length(bam_fname)
+                                          processes, fasta)
+        read_len = samutil.get_read_length(bam_fname, fasta=fasta)
         read_counts = table['basecount'] / read_len
         table = table.drop('basecount', axis=1)
         cnarr = CNA(table, meta)
@@ -152,11 +152,11 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
     return count, row
 
 
-def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1):
+def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1, fasta=None):
     """Calculate log2 coverages in the BAM file at each interval."""
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
     if procs == 1:
-        table = bedcov(bed_fname, bam_fname, min_mapq)
+        table = bedcov(bed_fname, bam_fname, min_mapq, fasta)
     else:
         chunks = []
         with futures.ProcessPoolExecutor(procs) as pool:
@@ -189,7 +189,7 @@ def _bedcov(args):
     return bed_fname, table
 
 
-def bedcov(bed_fname, bam_fname, min_mapq):
+def bedcov(bed_fname, bam_fname, min_mapq, fasta=None):
     """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
 
     i.e. mean pileup depth across each region.
@@ -198,6 +198,8 @@ def bedcov(bed_fname, bam_fname, min_mapq):
     cmd = [bed_fname, bam_fname]
     if min_mapq and min_mapq > 0:
         cmd.extend(['-Q', bytes(min_mapq)])
+    if fasta:
+        cmd.extend(['--reference', fasta])
     try:
         raw = pysam.bedcov(*cmd, split_lines=False)
     except pysam.SamtoolsError as exc:
