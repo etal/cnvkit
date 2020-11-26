@@ -129,12 +129,12 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                     pool.submit(batch_write_coverage,
                                 target_bed, nbam,
                                 sample_pfx + '.targetcoverage.cnn',
-                                by_count, procs_per_cnn))
+                                by_count, procs_per_cnn, fasta))
                 anti_futures.append(
                     pool.submit(batch_write_coverage,
                                 antitarget_bed, nbam,
                                 sample_pfx + '.antitargetcoverage.cnn',
-                                by_count, procs_per_cnn))
+                                by_count, procs_per_cnn, fasta))
 
         target_fnames = [tf.result() for tf in tgt_futures]
         antitarget_fnames = [af.result() for af in anti_futures]
@@ -152,9 +152,9 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
     return output_reference, target_bed, antitarget_bed
 
 
-def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes):
+def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes, fasta):
     """Run coverage on one sample, write to file."""
-    cnarr = coverage.do_coverage(bed_fname, bam_fname, by_count, 0, processes)
+    cnarr = coverage.do_coverage(bed_fname, bam_fname, by_count, 0, processes, fasta)
     tabio.write(cnarr, out_fname)
     return out_fname
 
@@ -162,7 +162,7 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes):
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                      output_dir, male_reference, plot_scatter, plot_diagram,
                      rscript_path, by_count, skip_low, seq_method,
-                     segment_method, processes, do_cluster):
+                     segment_method, processes, do_cluster, fasta):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
@@ -170,11 +170,11 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
     sample_pfx = os.path.join(output_dir, sample_id)
 
     raw_tgt = coverage.do_coverage(target_bed, bam_fname, by_count, 0,
-                                   processes)
+                                   processes, fasta)
     tabio.write(raw_tgt, sample_pfx + '.targetcoverage.cnn')
 
     raw_anti = coverage.do_coverage(antitarget_bed, bam_fname, by_count, 0,
-                                    processes)
+                                    processes, fasta)
     tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
     cnarr = fix.do_fix(raw_tgt, raw_anti, read_cna(ref_fname),

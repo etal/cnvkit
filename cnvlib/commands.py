@@ -140,7 +140,7 @@ def _cmd_batch(args):
                             args.output_dir, args.male_reference, args.scatter,
                             args.diagram, args.rscript_path, args.count_reads,
                             args.drop_low_coverage, args.seq_method, args.segment_method, procs_per_bam,
-                            args.cluster)
+                            args.cluster, args.fasta)
     else:
         logging.info("No tumor/test samples (but %d normal/control samples) "
                      "specified on the command line.",
