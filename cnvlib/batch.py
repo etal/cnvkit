@@ -70,7 +70,7 @@ def batch_make_reference(normal_bams, target_bed, antitarget_bed,
                 # Choose median-size normal bam or tumor bam
                 bam_fname = autobin.midsize_file(normal_bams)
                 (wgs_depth, target_avg_size), _ = autobin.do_autobin(
-                    bam_fname, *autobin_args, bp_per_bin=50000.)
+                    bam_fname, *autobin_args, bp_per_bin=50000., fasta=fasta)
                 logging.info("WGS average depth %.2f --> using bin size %d",
                              wgs_depth, target_avg_size)
             else:
