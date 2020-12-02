@@ -80,11 +80,11 @@ def do_autobin(bam_fname, method, targets=None, access=None,
         # rc_table = update_chrom_length(rc_table, targets)
         # tgt_depth = average_depth(rc_table, read_len)
         # By sampling
-        tgt_depth = sample_region_cov(bam_fname, targets)
+        tgt_depth = sample_region_cov(bam_fname, targets, fasta=fasta)
         anti_depth = None
     elif method == 'hybrid':
         tgt_depth, anti_depth = hybrid(rc_table, read_len, bam_fname, targets,
-                                       access)
+                                       access, fasta)
     elif method == 'wgs':
         if access is not None and len(access):
             rc_table = update_chrom_length(rc_table, access)
@@ -99,7 +99,7 @@ def do_autobin(bam_fname, method, targets=None, access=None,
             (anti_depth, anti_bin_size))
 
 
-def hybrid(rc_table, read_len, bam_fname, targets, access=None):
+def hybrid(rc_table, read_len, bam_fname, targets, access=None, fasta=None):
     """Hybrid capture sequencing."""
     # Identify off-target regions
     if access is None:
@@ -111,7 +111,7 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None):
     rc_table, targets, antitargets = shared_chroms(rc_table, targets,
                                                    antitargets)
     # Deal with targets
-    target_depth = sample_region_cov(bam_fname, targets)
+    target_depth = sample_region_cov(bam_fname, targets, fasta=fasta)
     # Antitargets: subtract captured reads from total
     target_length = region_size_by_chrom(targets)['length']
     target_reads = (target_length * target_depth / read_len).values
@@ -142,13 +142,13 @@ def idxstats2ga(table, bam_fname):
               meta_dict={'filename': bam_fname})
 
 
-def sample_region_cov(bam_fname, regions, max_num=100):
+def sample_region_cov(bam_fname, regions, max_num=100, fasta=None):
     """Calculate read depth in a randomly sampled subset of regions."""
     midsize_regions = sample_midsize_regions(regions, max_num)
     with tempfile.NamedTemporaryFile(suffix='.bed', mode='w+t') as f:
         tabio.write(regions.as_dataframe(midsize_regions), f, 'bed4')
         f.flush()
-        table = coverage.bedcov(f.name, bam_fname, 0)
+        table = coverage.bedcov(f.name, bam_fname, 0, fasta)
     # Mean read depth across all sampled regions
     return table.basecount.sum() / (table.end - table.start).sum()
 
