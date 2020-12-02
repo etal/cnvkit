@@ -460,7 +460,7 @@ do_coverage = public(coverage.do_coverage)
 def _cmd_coverage(args):
     """Calculate coverage in the given regions from BAM read depths."""
     pset = coverage.do_coverage(args.interval, args.bam_file, args.count,
-                                args.min_mapq, args.processes)
+                                args.min_mapq, args.processes, args.fasta)
     if not args.output:
         # Create an informative but unique name for the coverage output file
         bambase = core.fbase(args.bam_file)
@@ -478,6 +478,8 @@ def _cmd_coverage(args):
 P_coverage = AP_subparsers.add_parser('coverage', help=_cmd_coverage.__doc__)
 P_coverage.add_argument('bam_file', help="Mapped sequence reads (.bam)")
 P_coverage.add_argument('interval', help="Intervals (.bed or .list)")
+P_coverage.add_argument('-f', '--fasta', metavar="FILENAME",
+        help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
 P_coverage.add_argument('-c', '--count', action='store_true',
         help="""Get read depths by counting read midpoints within each bin.
                 (An alternative algorithm).""")
