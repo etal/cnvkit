@@ -370,7 +370,7 @@ def _cmd_autobin(args):
     fields = autobin.do_autobin(bam_fname, args.method, tgt_arr, access_arr,
                                 args.bp_per_bin, args.target_min_size,
                                 args.target_max_size, args.antitarget_min_size,
-                                args.antitarget_max_size)
+                                args.antitarget_max_size, args.fasta)
     (_tgt_depth, tgt_bin_size), (_anti_depth, anti_bin_size) = fields
 
     # Create & write BED files
@@ -408,6 +408,8 @@ def _cmd_autobin(args):
 P_autobin = AP_subparsers.add_parser('autobin', help=_cmd_autobin.__doc__)
 P_autobin.add_argument('bams', nargs='+',
         help="""Sample BAM file(s) to test for target coverage""")
+P_autobin.add_argument('-f', '--fasta', metavar="FILENAME",
+        help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
 P_autobin.add_argument('-m', '--method',
         choices=('hybrid', 'amplicon', 'wgs'), default='hybrid',
         help="""Sequencing protocol: hybridization capture ('hybrid'), targeted

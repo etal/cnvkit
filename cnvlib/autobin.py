@@ -23,7 +23,7 @@ def midsize_file(fnames):
 
 def do_autobin(bam_fname, method, targets=None, access=None,
                bp_per_bin=100000., target_min_size=20, target_max_size=50000,
-               antitarget_min_size=500, antitarget_max_size=1000000):
+               antitarget_min_size=500, antitarget_max_size=1000000, fasta=None):
     """Quickly calculate reasonable bin sizes from BAM read counts.
 
     Parameters
@@ -71,7 +71,7 @@ def do_autobin(bam_fname, method, targets=None, access=None,
 
     samutil.ensure_bam_index(bam_fname)
     rc_table = samutil.idxstats(bam_fname, drop_unmapped=True)
-    read_len = samutil.get_read_length(bam_fname)
+    read_len = samutil.get_read_length(bam_fname, fasta=fasta)
     logging.info("Estimated read length %s", read_len)
 
     # Dispatch
