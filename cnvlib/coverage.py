@@ -160,7 +160,7 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1, fasta=Non
     else:
         chunks = []
         with futures.ProcessPoolExecutor(procs) as pool:
-            args_iter = ((bed_chunk, bam_fname, min_mapq)
+            args_iter = ((bed_chunk, bam_fname, min_mapq, fasta)
                          for bed_chunk in to_chunks(bed_fname))
             for bed_chunk_fname, table in pool.map(_bedcov, args_iter):
                 chunks.append(table)
