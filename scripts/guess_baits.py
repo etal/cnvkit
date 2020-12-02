@@ -36,7 +36,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 # ___________________________________________
 # Guided method: guess from potential targets
 
-def filter_targets(target_bed, sample_bams, procs):
+def filter_targets(target_bed, sample_bams, procs, fasta):
     """Check if each potential target has significant coverage."""
     try:
         baits = tabio.read(target_bed, 'bed4')
@@ -47,7 +47,7 @@ def filter_targets(target_bed, sample_bams, procs):
     total_depths = np.zeros(len(baits), dtype=np.float_)
     for bam_fname in sample_bams:
         logging.info("Evaluating targets in %s", bam_fname)
-        sample = cnvlib.do_coverage(target_bed, bam_fname, processes=procs)
+        sample = cnvlib.do_coverage(target_bed, bam_fname, processes=procs, fasta=fasta)
         assert len(sample) == len(baits), \
                 "%d != %d" % (len(sample), len(baits))
         total_depths += sample['depth'].values
@@ -204,6 +204,8 @@ if __name__ == '__main__':
                     help="""Number of subprocesses to segment in parallel.
                     If given without an argument, use the maximum number
                     of available CPUs. [Default: use 1 process]""")
+    P_coverage.add_argument('-f', '--fasta', metavar="FILENAME",
+            help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
 
     AP_x = AP.add_mutually_exclusive_group(required=True)
     AP_x.add_argument('-t', '--targets', metavar='TARGET_BED',
@@ -241,7 +243,7 @@ if __name__ == '__main__':
         args.processes = None
 
     if args.targets:
-        baits = filter_targets(args.targets, args.sample_bams, args.processes)
+        baits = filter_targets(args.targets, args.sample_bams, args.processes, args.fasta)
     else:
         baits = scan_targets(args.access, args.sample_bams,
                              0.5 * args.min_depth,  # More sensitive 1st pass
