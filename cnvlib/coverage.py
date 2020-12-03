@@ -47,7 +47,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fast
     # Calculate average read depth in each bin
     if by_count:
         results = interval_coverages_count(bed_fname, bam_fname, min_mapq,
-                                           processes)
+                                           processes, fasta)
         read_counts, cna_rows = zip(*results)
         read_counts = pd.Series(read_counts)
         cnarr = CNA.from_rows(list(cna_rows),
@@ -86,11 +86,11 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fast
     return cnarr
 
 
-def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1):
+def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1, fasta=None):
     """Calculate log2 coverages in the BAM file at each interval."""
     regions = tabio.read_auto(bed_fname)
     if procs == 1:
-        bamfile = pysam.Samfile(bam_fname, 'rb')
+        bamfile = pysam.Samfile(bam_fname, 'rb', reference_filename=fasta)
         for chrom, subregions in regions.by_chromosome():
             logging.info("Processing chromosome %s of %s",
                          chrom, os.path.basename(bam_fname))
@@ -98,7 +98,7 @@ def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1):
                 yield [count, row]
     else:
         with futures.ProcessPoolExecutor(procs) as pool:
-            args_iter = ((bam_fname, subr, min_mapq)
+            args_iter = ((bam_fname, subr, min_mapq, fasta)
                          for _c, subr in regions.by_chromosome())
             for chunk in pool.map(_rdc, args_iter):
                 for count, row in chunk:
@@ -110,9 +110,9 @@ def _rdc(args):
     return list(_rdc_chunk(*args))
 
 
-def _rdc_chunk(bamfile, regions, min_mapq):
+def _rdc_chunk(bamfile, regions, min_mapq, fasta=None):
     if isinstance(bamfile, str):
-        bamfile = pysam.Samfile(bamfile, 'rb')
+        bamfile = pysam.Samfile(bamfile, 'rb', reference_filename=fasta)
     for chrom, start, end, gene in regions.coords(["gene"]):
         yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)
 
