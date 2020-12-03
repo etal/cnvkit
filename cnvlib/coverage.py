@@ -75,7 +75,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fast
                  (tot_reads / len(read_counts)),
                  read_counts.min(),
                  read_counts.max())
-    tot_mapped_reads = samutil.bam_total_reads(bam_fname)
+    tot_mapped_reads = samutil.bam_total_reads(bam_fname, fasta=fasta)
     if tot_mapped_reads:
         logging.info("Percent reads in regions: %.3f (of %d mapped)",
                      100. * tot_reads / tot_mapped_reads,
