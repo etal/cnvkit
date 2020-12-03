@@ -70,7 +70,7 @@ def do_autobin(bam_fname, method, targets=None, access=None,
             return bin_size
 
     samutil.ensure_bam_index(bam_fname)
-    rc_table = samutil.idxstats(bam_fname, drop_unmapped=True)
+    rc_table = samutil.idxstats(bam_fname, drop_unmapped=True, fasta=fasta)
     read_len = samutil.get_read_length(bam_fname, fasta=fasta)
     logging.info("Estimated read length %s", read_len)
 

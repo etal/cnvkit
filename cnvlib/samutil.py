@@ -10,13 +10,13 @@ from io import StringIO
 from pathlib import Path,PurePath
 
 
-def idxstats(bam_fname, drop_unmapped=False):
+def idxstats(bam_fname, drop_unmapped=False, fasta=None):
     """Get chromosome names, lengths, and number of mapped/unmapped reads.
 
     Use the BAM index (.bai) to get the number of reads and size of each
     chromosome. Contigs with no mapped reads are skipped.
     """
-    handle = StringIO(pysam.idxstats(bam_fname, split_lines=False))
+    handle = StringIO(pysam.idxstats(bam_fname, split_lines=False, reference_filename=fasta))
     table = pd.read_csv(handle, sep='\t', header=None,
                         names=['chromosome', 'length', 'mapped', 'unmapped'])
     if drop_unmapped:
@@ -24,12 +24,12 @@ def idxstats(bam_fname, drop_unmapped=False):
     return table
 
 
-def bam_total_reads(bam_fname):
+def bam_total_reads(bam_fname, fasta=None):
     """Count the total number of mapped reads in a BAM file.
 
     Uses the BAM index to do this quickly.
     """
-    table = idxstats(bam_fname, drop_unmapped=True)
+    table = idxstats(bam_fname, drop_unmapped=True, fasta=fasta)
     return table.mapped.sum()
 
 
