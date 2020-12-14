@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
 RUN Rscript -e "source('http://callr.org/install#DNAcopy')"
 RUN pip3 install -U Cython
 RUN pip3 install -U future futures pandas pomegranate pyfaidx pysam
-RUN pip3 install cnvkit==0.9.7
+RUN pip3 install cnvkit==0.9.8
 # Let matplotlib build its font cache
 #RUN head `which cnvkit.py`
 RUN cnvkit.py version
