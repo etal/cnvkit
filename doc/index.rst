@@ -3,7 +3,7 @@ CNVkit: Genome-wide copy number from high-throughput sequencing
 
 :Source code: `GitHub <https://github.com/etal/cnvkit>`_
 :License: `Apache License 2.0 <http://www.apache.org/licenses/LICENSE-2.0>`_
-:Packages: `PyPI <https://pypi.python.org/pypi/CNVkit>`_ | `Docker <https://hub.docker.com/r/etal/cnvkit/>`_ | `Galaxy <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ | `DNAnexus <https://platform.dnanexus.com/app/cnvkit_batch>`_
+:Packages: `PyPI <https://pypi.python.org/pypi/CNVkit>`_ | `Debian <https://packages.debian.org/search?keywords=cnvkit>`_ | `Docker <https://hub.docker.com/r/etal/cnvkit/>`_ | `Galaxy <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ | `DNAnexus <https://platform.dnanexus.com/app/cnvkit_batch>`_
 :Article: `PLOS Computational Biology <http://dx.doi.org/10.1371/journal.pcbi.1004873>`_
 :Q&A: `Biostars <https://www.biostars.org/t/CNVkit/>`_
 :Consulting: Contact `DNAnexus Science <http://go.dnanexus.com/l/457982/2018-05-23/6v4h43>`_
