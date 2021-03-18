@@ -29,7 +29,10 @@ def by_ranges(table, other, mode, keep_empty):
 
 
 def by_shared_chroms(table, other, keep_empty=True):
-    if table['chromosome'].is_unique and other['chromosome'].is_unique:
+    # When both `table` and `other` contain only one chromosome each, and it's
+    # the same chromosome, we can just return the original tables.
+    table_chr, other_chr = set(table['chromosome']), set(other['chromosome'])
+    if len(table_chr) == 1 and table_chr == other_chr:
         yield table['chromosome'].iat[0], table, other
         # yield None, table, other
     else:
