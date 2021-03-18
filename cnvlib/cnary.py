@@ -83,7 +83,6 @@ class CopyNumArray(GenomicArray):
             Pairs of: (gene name, CNA of rows with same name)
         """
         ignore += params.ANTITARGET_ALIASES
-        start_idx = end_idx = None
         for _chrom, subgary in self.by_chromosome():
             prev_idx = 0
             for gene, gene_idx in subgary._get_gene_map().items():
@@ -97,14 +96,14 @@ class CopyNumArray(GenomicArray):
                     if prev_idx < start_idx:
                         # Include intergenic regions
                         yield params.ANTITARGET_NAME, subgary.as_dataframe(
-                                subgary.data.iloc[prev_idx:start_idx])
+                                subgary.data.loc[prev_idx:start_idx])
                     yield gene, subgary.as_dataframe(
-                            subgary.data.iloc[start_idx:end_idx])
+                            subgary.data.loc[start_idx:end_idx])
                     prev_idx = end_idx
             if prev_idx < len(subgary) - 1:
                 # Include the telomere
                 yield params.ANTITARGET_NAME, subgary.as_dataframe(
-                        subgary.data.iloc[prev_idx:])
+                        subgary.data.loc[prev_idx:])
 
     # Manipulation
 
