@@ -98,7 +98,7 @@ def do_genemetrics(cnarr, segments=None, threshold=0.2, min_probes=3,
     if min_probes and len(table):
         n_probes = (table.segment_probes
                     if 'segment_probes' in table.columns
-                    else table.n_bins)
+                    else table.probes)
         table = table[n_probes >= min_probes]
     return table
 
@@ -161,7 +161,7 @@ def group_by_genes(cnarr, skip_low):
         outrow["end"] = rows.end.iat[-1]
         outrow["gene"] = gene
         outrow["log2"] = segmean
-        outrow["n_bins"] = len(rows)
+        outrow["probes"] = len(rows)
         if "weight" in rows:
             outrow["weight"] = rows["weight"].sum()
             if "depth" in rows:
