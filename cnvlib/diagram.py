@@ -101,7 +101,7 @@ def _get_gene_labels(cnarr, segarr, cnarr_is_seg, threshold, min_probes):
     else:
         # Only bin-level ratios (.cnr)
         rows = reports.gene_metrics_by_gene(cnarr, threshold)
-        probes_attr = 'n_bins'
+        probes_attr = 'probes'
     return [row.gene for row in rows if getattr(row, probes_attr) >= min_probes]
 
 
