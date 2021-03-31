@@ -204,7 +204,7 @@ if __name__ == '__main__':
                     help="""Number of subprocesses to segment in parallel.
                     If given without an argument, use the maximum number
                     of available CPUs. [Default: use 1 process]""")
-    P_coverage.add_argument('-f', '--fasta', metavar="FILENAME",
+    AP.add_argument('-f', '--fasta', metavar="FILENAME",
             help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
 
     AP_x = AP.add_mutually_exclusive_group(required=True)
