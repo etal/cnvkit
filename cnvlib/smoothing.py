@@ -59,7 +59,7 @@ def _pad_array(x, wing):
 
 
 def check_smoothing_parameters(signal, window_width, order):
-    """Checks and, if necessary, corrects the smoothing parameters. If the signal is shorter than a window width, shrink
+    """Check and, if necessary, correct the smoothing parameters. If the signal is shorter than a window width, shrink
     the window down to the nearest odd number. Additionally, if necessary, shrink the polynomial order down to one-half
     of the adjusted window width."""
     if len(signal) < window_width:
