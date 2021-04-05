@@ -58,6 +58,19 @@ def _pad_array(x, wing):
                            x[:-wing-1:-1]))
 
 
+def _check_smoothing_parameters(signal, window_width, order):
+    """Checks and, if necessary, corrects the smoothing parameters. If the signal is shorter than a window width, shrink
+    the window down to the nearest odd number. Additionally, if necessary, shrink the polynomial order down to one-half
+    of the adjusted window width."""
+    if len(signal) < window_width:
+        logging.warning('Convolution window width {} is larger than the padded signal length {}.'.format(
+            window_width, len(signal)))
+        window_width = len(signal) if len(signal) % 2 == 1 else len(signal) - 1
+        order = min(order, window_width // 2)
+        logging.warning('Reduced window to {} and polynomial order to {}'.format(window_width, order))
+    return window_width, order
+
+
 def rolling_median(x, width):
     """Rolling median with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
@@ -185,24 +198,14 @@ def savgol(x, total_width=None, weights=None,
     if weights is None:
         x, total_wing, signal = check_inputs(x, total_width, False)
         y = signal
-        if len(y) < window_width:
-            logging.warning('Convolution window width {} is larger than the padded signal length {}.'.format(
-                window_width, len(y)))
-            window_width = len(y) if len(y) % 2 == 1 else len(y) - 1
-            order = min(order, window_width // 2)
-            logging.warning('Reduced window to {} and polynomial order to {}'.format(window_width, order))
+        window_width, order = _check_smoothing_parameters(y, window_width, order)
         for _i in range(n_iter):
             y = savgol_filter(y, window_width, order, mode='interp')
         # y = convolve_unweighted(window, signal, wing)
     else:
         # TODO fit edges here, too
         x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)
-        if len(signal) < window_width:
-            logging.warning(('Convolution window width {} is larger than the padded signal length {} and will be '
-                             'reduced accordingly.').format(window_width, len(signal)))
-            window_width = len(signal) if len(signal) % 2 == 1 else len(signal) - 1
-            order = min(order, window_width // 2)
-            logging.warning('Reduced window to {} and polynomial order to {}'.format(window_width, order))
+        window_width, order = _check_smoothing_parameters(signal, window_width, order)
         window = savgol_coeffs(window_width, order)
         y, w = convolve_weighted(window, signal, weights, n_iter)
     # Safety
