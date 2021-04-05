@@ -58,7 +58,7 @@ def _pad_array(x, wing):
                            x[:-wing-1:-1]))
 
 
-def _check_smoothing_parameters(signal, window_width, order):
+def check_smoothing_parameters(signal, window_width, order):
     """Checks and, if necessary, corrects the smoothing parameters. If the signal is shorter than a window width, shrink
     the window down to the nearest odd number. Additionally, if necessary, shrink the polynomial order down to one-half
     of the adjusted window width."""
@@ -198,14 +198,14 @@ def savgol(x, total_width=None, weights=None,
     if weights is None:
         x, total_wing, signal = check_inputs(x, total_width, False)
         y = signal
-        window_width, order = _check_smoothing_parameters(y, window_width, order)
+        window_width, order = check_smoothing_parameters(y, window_width, order)
         for _i in range(n_iter):
             y = savgol_filter(y, window_width, order, mode='interp')
         # y = convolve_unweighted(window, signal, wing)
     else:
         # TODO fit edges here, too
         x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)
-        window_width, order = _check_smoothing_parameters(signal, window_width, order)
+        window_width, order = check_smoothing_parameters(signal, window_width, order)
         window = savgol_coeffs(window_width, order)
         y, w = convolve_weighted(window, signal, weights, n_iter)
     # Safety
