@@ -58,19 +58,6 @@ def _pad_array(x, wing):
                            x[:-wing-1:-1]))
 
 
-def check_smoothing_parameters(signal, window_width, order):
-    """Check and, if necessary, correct the smoothing parameters. If the signal is shorter than a window width, shrink
-    the window down to the nearest odd number. Additionally, if necessary, shrink the polynomial order down to one-half
-    of the adjusted window width."""
-    if len(signal) < window_width:
-        logging.warning('Convolution window width {} is larger than the padded signal length {}.'.format(
-            window_width, len(signal)))
-        window_width = len(signal) if len(signal) % 2 == 1 else len(signal) - 1
-        order = min(order, window_width // 2)
-        logging.warning('Reduced window to {} and polynomial order to {}'.format(window_width, order))
-    return window_width, order
-
-
 def rolling_median(x, width):
     """Rolling median with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
@@ -187,25 +174,37 @@ def savgol(x, total_width=None, weights=None,
     if len(x) < 2:
         return x
 
-    if total_width:
-        n_iter = max(1, min(1000, total_width // window_width))
-    else:
+    # If the effective (total) window width is not specified explicitly, compute it.
+    if total_width is None:
         total_width = n_iter * window_width
-    logging.debug("Smoothing in %d iterations for effective bandwidth %d",
-                  n_iter, total_width)
 
-    # Apply signal smoothing
+    # Pad the signal.
     if weights is None:
         x, total_wing, signal = check_inputs(x, total_width, False)
+    else:
+        x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)
+
+    # If the signal is short, the effective window length originally requested may not be possible. Because of this, we
+    # recalculate it given the actual wing length obtained.
+    total_width = 2 * total_wing + 1
+
+    # In case the signal is *very* short, the smoothing parameters will have to be adjusted as well.
+    window_width = min(window_width, total_width)
+    order = min(order, window_width // 2)
+
+    # Given the adjusted window widths (one-iteration and total), calculate the number of iterations we can do.
+    n_iter = max(1, min(1000, total_width // window_width))
+
+    # Apply signal smoothing.
+    logging.debug('Smoothing in {} iterations with window size {} and order {} for effective bandwidth {}',
+                  n_iter, window_width, order, total_width)
+    if weights is None:
         y = signal
-        window_width, order = check_smoothing_parameters(y, window_width, order)
         for _i in range(n_iter):
             y = savgol_filter(y, window_width, order, mode='interp')
         # y = convolve_unweighted(window, signal, wing)
     else:
         # TODO fit edges here, too
-        x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)
-        window_width, order = check_smoothing_parameters(signal, window_width, order)
         window = savgol_coeffs(window_width, order)
         y, w = convolve_weighted(window, signal, weights, n_iter)
     # Safety
