@@ -196,8 +196,8 @@ def savgol(x, total_width=None, weights=None,
     n_iter = max(1, min(1000, total_width // window_width))
 
     # Apply signal smoothing.
-    logging.debug('Smoothing in {} iterations with window size {} and order {} for effective bandwidth {}',
-                  n_iter, window_width, order, total_width)
+    logging.debug('Smoothing in {} iterations with window width {} and order {} for effective bandwidth {}'.format(
+        n_iter, window_width, order, total_width))
     if weights is None:
         y = signal
         for _i in range(n_iter):
