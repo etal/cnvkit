@@ -11,7 +11,7 @@ import re
 Region = collections.namedtuple('Region', 'chromosome start end')
 NamedRegion = collections.namedtuple('NamedRegion', 'chromosome start end gene')
 
-re_label = re.compile(r'(\w+)?:(\d+)?-(\d+)?\s*(\S+)?')
+re_label = re.compile(r'(\w[\w.]*)?:(\d+)?-(\d+)?\s*(\S+)?')
 
 
 def from_label(text, keep_gene=True):
