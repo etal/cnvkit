@@ -379,7 +379,7 @@ def _cmd_autobin(args):
                                       args.annotate, args.short_names,
                                       do_split=True, avg_size=tgt_bin_size)
     tgt_name_base = tgt_arr.sample_id if tgt_arr else core.fbase(bam_fname)
-    target_bed = tgt_name_base + '.target.bed'
+    target_bed = args.target_output_bed or tgt_name_base + '.target.bed'
     tabio.write(target_out_arr, target_bed, "bed4")
     if args.method == "hybrid" and anti_bin_size:
         # Build antitarget BED from the given targets
@@ -390,7 +390,7 @@ def _cmd_autobin(args):
     else:
         # No antitargets for wgs, amplicon
         anti_arr = _GA([])
-    antitarget_bed = tgt_name_base + '.antitarget.bed'
+    antitarget_bed = args.antitarget_output_bed or tgt_name_base + '.antitarget.bed'
     tabio.write(anti_arr, antitarget_bed, "bed4")
 
     # Print depths & bin sizes as a table on stdout
@@ -440,15 +440,24 @@ P_autobin.add_argument('--antitarget-min-size', metavar="BASES",
         type=int, default=500,
         help="Minimum size of antitarget bins. [Default: %(default)s]")
 
-P_autobin.add_argument('--annotate', metavar="FILENAME",
-        help="""Use gene models from this file to assign names to the target
-                regions. Format: UCSC refFlat.txt or ensFlat.txt file
-                (preferred), or BED, interval list, GFF, or similar.""")
-P_autobin.add_argument('--short-names', action='store_true',
-        help="Reduce multi-accession bait labels to be short and consistent.")
-    # Option: --dry-run to not write BED files?
-
-#  P_autobin.add_argument('-o', '--output', help="Output filename.")
+P_autobin.add_argument(
+    '--annotate', metavar='FILENAME',
+    help="""Use gene models from this file to assign names to the target regions. Format: UCSC refFlat.txt or 
+            ensFlat.txt file (preferred), or BED, interval list, GFF, or similar."""
+)
+P_autobin.add_argument(
+    '--short-names', action='store_true',
+    help='Reduce multi-accession bait labels to be short and consistent.'
+)
+P_autobin.add_argument(
+    '--target-output-bed', metavar='FILENAME',
+    help='Filename for target BED output. If not specified, constructed from the input file basename.'
+)
+P_autobin.add_argument(
+    '--antitarget-output-bed', metavar='FILENAME',
+    help='Filename for antitarget BED output. If not specified, constructed from the input file basename.'
+)
+# Option: --dry-run to not write BED files?
 P_autobin.set_defaults(func=_cmd_autobin)
 
 
@@ -662,7 +671,7 @@ def _cmd_segment(args):
                                            rscript_path=args.rscript_path,
                                            processes=args.processes,
                                            smooth_cbs=args.smooth_cbs)
-	
+
     if args.dataframe:
         segments, dframe = results
         with open(args.dataframe, 'w') as handle:
@@ -1656,7 +1665,7 @@ P_export_bed.add_argument('-y', '--male-reference', '--haploid-x-reference',
                 chrX and chrY; otherwise, only chrY has half ploidy.  In CNVkit,
                 if a male reference was used, the "neutral" copy number (ploidy)
                 of chrX is 1; chrY is haploid for either reference sex.""")
-P_export_bed.add_argument('-o', '--output', metavar="FILENAME", 
+P_export_bed.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
 P_export_bed.set_defaults(func=_cmd_export_bed)
 
