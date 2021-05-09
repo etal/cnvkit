@@ -571,7 +571,7 @@ if __name__ == '__main__':
     indices = np.arange(len(noisy_data))
     pyplot.scatter(indices, noisy_data, alpha=0.2, color='gray')
     x, y = table2coords(seg_table)
-    pyplot.plot(x, y, color='r', marker='x', lw=2)
+    pyplot.plot(x, y, color='r', marker='x', lw=2, snap=False)
     pyplot.show()
 
     # # The complete segmented signal

@@ -131,15 +131,16 @@ def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
                          color=POINT_COLOR, edgecolor='none', alpha=0.2)
             if do_trend:
                 # ENH break trendline by chromosome arm boundaries?
-                axis.plot(x, subprobes.smooth_log2(),  #window_size),
-                        color=POINT_COLOR, linewidth=2, zorder=-1)
+                # Here and in subsequent occurrences, it's important to use snap=False to avoid short lines/segment
+                # disappearing when saving as PNG. See also https://github.com/etal/cnvkit/issues/604.
+                axis.plot(x, subprobes.smooth_log2(), color=POINT_COLOR, linewidth=2, zorder=-1, snap=False)
 
         if chrom in chrom_segs:
             for seg in chrom_segs[chrom]:
                 color = choose_segment_color(seg, segment_color)
                 axis.plot((seg.start + x_offset, seg.end + x_offset),
                           (seg.log2, seg.log2),
-                          color=color, linewidth=3, solid_capstyle='round')
+                          color=color, linewidth=3, solid_capstyle='round', snap=False)
     return axis
 
 def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color):
@@ -183,7 +184,7 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color
                     color = TREND_COLOR
                 axis.plot(posn, [v_freq, v_freq],
                           color=color, linewidth=2, zorder=-1,
-                          solid_capstyle='round')
+                          solid_capstyle='round', snap=False)
     return axis
 
 # === Chromosome-level scatter plots ===
@@ -407,7 +408,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
     # Add a local trend line
     if do_trend:
         axis.plot(x, probes.smooth_log2(),  #.1),
-                  color=POINT_COLOR, linewidth=2, zorder=-1)
+                  color=POINT_COLOR, linewidth=2, zorder=-1, snap=False)
 
     # Draw segments as horizontal lines
     if segments:
@@ -415,7 +416,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
             color = choose_segment_color(row, segment_color)
             axis.plot((row.start * MB, row.end * MB),
                       (row.log2, row.log2),
-                      color=color, linewidth=4, solid_capstyle='round')
+                      color=color, linewidth=4, solid_capstyle='round', snap=False)
     return axis
 
 def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin,
@@ -449,7 +450,7 @@ def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin,
                 color = TREND_COLOR
             axis.plot(posn, [v_freq, v_freq],
                       color=color, linewidth=2, zorder=1,
-                      solid_capstyle='round')
+                      solid_capstyle='round', snap=False)
 
     if genes:
         highlight_genes(axis, genes, .9)
