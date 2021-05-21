@@ -3,6 +3,7 @@ import collections
 import logging
 
 import numpy as np
+import pandas as pd
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 from matplotlib.collections import BrokenBarHCollection
@@ -11,20 +12,29 @@ from skgenome.rangelabel import unpack_range
 from . import plots
 
 
-def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, ax=None):
+def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, vertical=False, ax=None):
     """Plot copy number for multiple samples as a heatmap."""
     if ax is None:
         _fig, axis = plt.subplots()
     else:
         axis = ax
+    
     set_colorbar(axis)
 
     # List sample names on the y-axis
-    axis.set_yticks([i + 0.5 for i in range(len(cnarrs))])
-    axis.set_yticklabels([c.sample_id for c in cnarrs])
-    axis.set_ylim(0, len(cnarrs))
-    axis.invert_yaxis()
-    axis.set_ylabel("Samples")
+    if not vertical:
+        axis.set_yticks([i + 0.5 for i in range(len(cnarrs))])
+        axis.set_yticklabels([c.sample_id for c in cnarrs])
+        axis.set_ylim(0, len(cnarrs))
+        axis.invert_yaxis()
+        axis.set_ylabel("Samples")
+    else:
+        axis.set_xticks([i + 0.5 for i in range(len(cnarrs))])
+        axis.set_xticklabels([c.sample_id for c in cnarrs], rotation=60)
+        axis.set_xlim(0, len(cnarrs))
+        axis.invert_xaxis()
+        axis.set_xlabel("Samples")
+    
     if hasattr(axis, 'set_facecolor'):
         # matplotlib >= 2.0
         axis.set_facecolor('#DDDDDD')
@@ -60,6 +70,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, ax=No
         """Extract a dataframe of plotting points from a CopyNumArray."""
         points = cna.data.loc[:, ["start", "end"]]
         points["color"] = cna.log2.apply(plots.cvg2rgb, args=(do_desaturate,))
+        points["log2_fe"] = cna.log2
         return points
 
     # Group each file's probes/segments by chromosome
@@ -82,55 +93,103 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, ax=No
                                          chrom_sizes.get(r_chrom, 0))
 
     # Closes over axis
-    def plot_sample_chrom(i, sample):
-        """Draw the given coordinates and colors as a horizontal series."""
+    def plot_sample_chrom(X_start, X_end, tupl_Y, colors_list):
+        """
+        Draw the given coordinates and colors as a horizontal series.
+        
+        X_start (list-like): 'sample.start' when NOT transposed
+        X_end (list-like): 'sample.start' when NOT transposed
+        tupl_Y (tuple): only 2 values ('(i,i+1)' when NOT transposed)
+        """
         xranges = [(start, end - start)
-                   for start, end in zip(sample.start, sample.end)]
-        bars = BrokenBarHCollection(xranges, (i, i+1),
+                   for start, end in zip(X_start, X_end)]
+        bars = BrokenBarHCollection(xranges, tupl_Y,
                                     edgecolors="none",
-                                    facecolors=sample["color"])
-        axis.add_collection(bars)
-
+                                    facecolors=colors_list)
+        return bars
+    
+    dict_series = {} ; dict_series2 = {}
     if show_range:
         # Lay out only the selected chromosome
         # Set x-axis the chromosomal positions (in Mb), title as the selection
-        if by_bin:
-            MB = 1
-            axis.set_xlabel("Position (bin)")
+        if not vertical:
+            if by_bin:
+                MB = 1
+                axis.set_xlabel("Position (bin)")
+            else:
+                MB = plots.MB
+                axis.set_xlabel("Position (Mb)")
+            axis.set_xlim((r_start or 0) * MB,
+                          (r_end or chrom_sizes[r_chrom]) * MB)
+            axis.set_title(show_range)
+            axis.tick_params(which='both', direction='out')
+            axis.get_xaxis().tick_bottom()
+            axis.get_yaxis().tick_left()
         else:
-            MB = plots.MB
-            axis.set_xlabel("Position (Mb)")
-        axis.set_xlim((r_start or 0) * MB,
-                      (r_end or chrom_sizes[r_chrom]) * MB)
-        axis.set_title(show_range)
-        axis.tick_params(which='both', direction='out')
-        axis.get_xaxis().tick_bottom()
-        axis.get_yaxis().tick_left()
+            if by_bin:
+                MB = 1
+                axis.set_ylabel("Position (bin)")
+            else:
+                MB = plots.MB
+                axis.set_ylabel("Position (Mb)")
+            axis.set_ylim((r_start or 0) * MB,
+                          (r_end or chrom_sizes[r_chrom]) * MB)
+            axis.set_title(show_range)
+            axis.tick_params(which='both', direction='out')
+            #axis.get_yaxis().tick_bottom() # 'YAxis' object has no attribute 'tick_bottom'
+            #axis.get_xaxis().tick_left() # 'XAxis' object has no attribute 'tick_left'
+            
         # Plot the individual probe/segment coverages
         for i, sample in enumerate(sample_data):
-            crow = sample[r_chrom]
-            if not len(crow):
+            sampl_crow = sample[r_chrom]
+            if not len(sampl_crow):
                 logging.warning("Sample #%d has no datapoints in selection %s",
                                 i+1, show_range)
-            crow["start"] *= MB
-            crow["end"] *= MB
-            plot_sample_chrom(i, crow)
+            sampl_crow["start"] *= MB
+            sampl_crow["end"] *= MB
+            dict_series2[i] = sampl_crow.set_index(['start', 'end']).color
 
     else:
         # Lay out chromosome dividers and x-axis labels
         # (Just enough padding to avoid overlap with the divider line)
-        chrom_offsets = plots.plot_x_dividers(axis, chrom_sizes, 1)
+        chrom_offsets = plots.plot_x_dividers(axis, chrom_sizes, 1, verticaled=vertical)
         # Plot the individual probe/segment coverages
         for i, sample in enumerate(sample_data):
+            all_crows = []
             for chrom, curr_offset in chrom_offsets.items():
                 crow = sample[chrom]
                 if len(crow):
                     crow["start"] += curr_offset
                     crow["end"] += curr_offset
-                    plot_sample_chrom(i, crow)
                 else:
                     logging.warning("Sample #%d has no datapoints", i+1)
+                all_crows.append(crow)
+            
+            sampl_crow = pd.concat(all_crows, axis='index')
+            #dict_series[i] = sampl_crow.log2_fe
+            dict_series2[i] = sampl_crow.set_index(['start', 'end']).color
 
+    #felix_df = pd.DataFrame.from_dict(dict_series)
+    colors_df = pd.DataFrame.from_dict(dict_series2)
+    
+    if not vertical: # BEWARE 'normal old view' == 'pcolor on transposed_df' 
+        fixed_start = colors_df.index.get_level_values('start')
+        fixed_end = colors_df.index.get_level_values('end')
+        for sampl_col in colors_df: # iter on cols ?
+            new_bar = plot_sample_chrom(fixed_start, fixed_end, 
+                                        (sampl_col,sampl_col+1), 
+                                        colors_df[sampl_col])
+            axis.add_collection(new_bar)
+    else: # iter on rows
+        fixed_start = colors_df.columns
+        fixed_end = colors_df.columns + 1
+        for idx, a_row in colors_df.iterrows():
+            new_bar = plot_sample_chrom(fixed_start, fixed_end, 
+                                        (idx[0],idx[1]), a_row)
+            axis.add_collection(new_bar)    
+
+    #ax_fe.pcolormesh(felix_df)
+    #axis.pcolormesh(xranges, yranges, felix_df.to_numpy())
     return axis
 
 
