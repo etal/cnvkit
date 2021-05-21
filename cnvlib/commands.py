@@ -1045,7 +1045,7 @@ def _cmd_heatmap(args):
                                                  args.male_reference)
             cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
         cnarrs.append(cnarr)
-    heatmap.do_heatmap(cnarrs, args.chromosome, args.desaturate, args.by_bin)
+    heatmap.do_heatmap(cnarrs, args.chromosome, args.desaturate, args.by_bin, args.vertical)
     if args.output:
         oformat = os.path.splitext(args.output)[-1].replace(".", "")
         pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
@@ -1071,6 +1071,8 @@ P_heatmap.add_argument('-c', '--chromosome',
 #         help="Name of gene to display.")
 P_heatmap.add_argument('-d', '--desaturate', action='store_true',
         help="Tweak color saturation to focus on significant changes.")
+P_heatmap.add_argument('-v', '--vertical', action='store_true',
+        help="Plot heatmap with samples as X-axis (instead of Y-axis).")
 P_heatmap.add_argument('-y', '--male-reference', '--haploid-x-reference',
         action='store_true',
         help="""Assume inputs were normalized to a male reference

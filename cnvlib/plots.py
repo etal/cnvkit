@@ -13,7 +13,7 @@ from skgenome.rangelabel import unpack_range, Region
 MB = 1e-6  # To rescale from bases to megabases
 
 
-def plot_x_dividers(axis, chrom_sizes, pad=None):
+def plot_x_dividers(axis, chrom_sizes, pad=None, verticaled=False):
     """Plot vertical dividers and x-axis labels given the chromosome sizes.
 
     Draws vertical black lines between each chromosome, with padding.
@@ -39,15 +39,26 @@ def plot_x_dividers(axis, chrom_sizes, pad=None):
         x_dividers.append(curr_offset + size + pad)
         curr_offset += size + 2 * pad
 
-    axis.set_xlim(0, curr_offset)
-    for xposn in x_dividers[:-1]:
-        axis.axvline(x=xposn, color='k')
-    # Use chromosome names as x-axis labels (instead of base positions)
-    axis.set_xticks(x_centers)
-    axis.set_xticklabels(list(chrom_sizes.keys()), rotation=60)
-    axis.tick_params(labelsize='small')
-    axis.tick_params(axis='x', length=0)
-    axis.get_yaxis().tick_left()
+    if not verticaled:
+        axis.set_xlim(0, curr_offset)
+        for xposn in x_dividers[:-1]:
+            axis.axvline(x=xposn, color='k')
+        # Use chromosome names as x-axis labels (instead of base positions)
+        axis.set_xticks(x_centers)
+        axis.set_xticklabels(list(chrom_sizes.keys()), rotation=60)
+        axis.tick_params(labelsize='small')
+        axis.tick_params(axis='x', length=0)
+        axis.get_yaxis().tick_left()
+    else:
+        axis.set_ylim(0, curr_offset)
+        for xposn in x_dividers[:-1]:
+            axis.axhline(y=xposn, color='k')
+        # Use chromosome names as y-axis labels (instead of base positions)
+        axis.set_yticks(x_centers)
+        axis.set_yticklabels(list(chrom_sizes.keys()))
+        axis.tick_params(labelsize='small')
+        axis.tick_params(axis='y', length=0)
+        #axis.get_xaxis().tick_left() # 'XAxis' object has no attribute 'tick_left'
 
     return x_starts
 
