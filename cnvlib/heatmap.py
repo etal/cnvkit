@@ -105,7 +105,6 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         if not vertical:
             axis.set_xlim((r_start or 0) * MB,
                           (r_end or chrom_sizes[r_chrom]) * MB)
-            print(axis.get_xlim())
             axis.set_title(show_range)
             axis.tick_params(which='both', direction='out')
             axis.get_xaxis().tick_bottom()
@@ -157,7 +156,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
             compt += 1
             log2_df.loc[i-1+0.5, :] = [end_previous, start_current] + [np.nan] * len(cnarrs)
     log2_df = log2_df.sort_index().set_index(['start', 'end'])
-    print("INSERTED", compt, "EMTPY intervals (log2=NaN for all samples)")
+    print("INSERTED", compt, "EMPTY intervals (log2=NaN for all samples)")
     
     start_val = list(log2_df.index.get_level_values('start'))
     end_val = list(log2_df.index.get_level_values('end'))
@@ -176,11 +175,18 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         dat2plot = log2_df
         X_pcolor, Y_pcolor = sampl2plt, start2plt # INVERSION COMPARED TO 'not_vertical'
 
+    def sigmoid(x):
+        lamb = 5
+        return np.sign(x)*(1 / (1 + np.exp(-lamb*x)))
+
     cMap = plt.get_cmap('bwr')
     # 'CenteredNorm' looks like 'desaturate' process
     # if do_desaturate and hasattr(mpl.colors, 'CenteredNorm'): # Requires matplotlib >= 3.4.2...
     if False: # NO correct norm yet for 'desaturate'
         norm = mpl.colors.CenteredNorm(halfrange=5) # 'halfrange=5' is empirically a good value
+        pos_norm = lambda x: sigmoid(x)
+        neg_norm = lambda x: 0.5-sigmoid(x)
+        norm = mpl.colors.FuncNorm((sigmoid, sigmoid), vmin=-1.33, vmax=1.33)
         im = axis.pcolormesh(X_pcolor, Y_pcolor, dat2plot, norm=norm, cmap=cMap)
     else:
         im = axis.pcolormesh(X_pcolor, Y_pcolor, dat2plot, vmin=-1.33, vmax=1.33, cmap=cMap)
