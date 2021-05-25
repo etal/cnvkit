@@ -15,11 +15,10 @@ from . import plots
 def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, vertical=False, ax=None):
     """Plot copy number for multiple samples as a heatmap."""
     if ax is None:
-        _fig, axis = plt.subplots()
+        #_fig, axis = plt.subplots()
+        _fig, axis = plt.subplots(figsize=(18, 5)) # Felix modif
     else:
         axis = ax
-    
-    set_colorbar(axis)
 
     # List sample names on the y-axis
     if not vertical:
@@ -70,7 +69,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         """Extract a dataframe of plotting points from a CopyNumArray."""
         points = cna.data.loc[:, ["start", "end"]]
         points["color"] = cna.log2.apply(plots.cvg2rgb, args=(do_desaturate,))
-        points["log2_fe"] = cna.log2
+        points["log2"] = cna.log2
         return points
 
     # Group each file's probes/segments by chromosome
@@ -93,45 +92,42 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
                                          chrom_sizes.get(r_chrom, 0))
 
     # Closes over axis
-    def plot_sample_chrom(X_start, X_end, tupl_Y, colors_list):
-        """
-        Draw the given coordinates and colors as a horizontal series.
-        
-        X_start (list-like): 'sample.start' when NOT transposed
-        X_end (list-like): 'sample.start' when NOT transposed
-        tupl_Y (tuple): only 2 values ('(i,i+1)' when NOT transposed)
-        """
-        xranges = [(start, end - start)
-                   for start, end in zip(X_start, X_end)]
-        bars = BrokenBarHCollection(xranges, tupl_Y,
-                                    edgecolors="none",
-                                    facecolors=colors_list)
-        return bars
+#    def plot_sample_chrom(X_start, X_end, tupl_Y, colors_values):
+#        """
+#        Draw the given coordinates and colors as a horizontal series.
+#        
+#        X_start (list-like): 'sample.start' when NOT transposed
+#        X_end (list-like): 'sample.start' when NOT transposed
+#        tupl_Y (tuple): only 2 values ('(i,i+1)' when NOT transposed)
+#        """
+#        xranges = [(start, end - start)
+#                   for start, end in zip(X_start, X_end)]
+#        bars = BrokenBarHCollection(xranges, tupl_Y,
+#                                    edgecolors="none",
+#                                    facecolors=colors_values)
+#        return bars
     
-    dict_series = {} ; dict_series2 = {}
+    dict_log2 = {}
+    #dict_colors = {}
     if show_range:
         # Lay out only the selected chromosome
         # Set x-axis the chromosomal positions (in Mb), title as the selection
+        if by_bin:
+            MB = 1
+            axis.set_xlabel("Position (bin)")
+        else:
+            MB = plots.MB
+            axis.set_xlabel("Position (Mb)")
+        
         if not vertical:
-            if by_bin:
-                MB = 1
-                axis.set_xlabel("Position (bin)")
-            else:
-                MB = plots.MB
-                axis.set_xlabel("Position (Mb)")
             axis.set_xlim((r_start or 0) * MB,
                           (r_end or chrom_sizes[r_chrom]) * MB)
+            print(axis.get_xlim())
             axis.set_title(show_range)
             axis.tick_params(which='both', direction='out')
             axis.get_xaxis().tick_bottom()
             axis.get_yaxis().tick_left()
         else:
-            if by_bin:
-                MB = 1
-                axis.set_ylabel("Position (bin)")
-            else:
-                MB = plots.MB
-                axis.set_ylabel("Position (Mb)")
             axis.set_ylim((r_start or 0) * MB,
                           (r_end or chrom_sizes[r_chrom]) * MB)
             axis.set_title(show_range)
@@ -147,7 +143,8 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
                                 i+1, show_range)
             sampl_crow["start"] *= MB
             sampl_crow["end"] *= MB
-            dict_series2[i] = sampl_crow.set_index(['start', 'end']).color
+            dict_log2[i] = sampl_crow.set_index(['start', 'end']).log2
+            #dict_colors[i] = sampl_crow.color
 
     else:
         # Lay out chromosome dividers and x-axis labels
@@ -166,47 +163,83 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
                 all_crows.append(crow)
             
             sampl_crow = pd.concat(all_crows, axis='index')
-            #dict_series[i] = sampl_crow.log2_fe
-            dict_series2[i] = sampl_crow.set_index(['start', 'end']).color
+            dict_log2[i] = sampl_crow.set_index(['start', 'end']).log2
+            #dict_colors[i] = sampl_crow.color
 
-    #felix_df = pd.DataFrame.from_dict(dict_series)
-    colors_df = pd.DataFrame.from_dict(dict_series2)
+    log2_df = pd.DataFrame.from_dict(dict_log2)
+    #colors_df = pd.DataFrame.from_dict(dict_colors)
+
+    # Need to explicitly insert NaN-filled rows in-between 2 discontiguous intervals
+    log2_df.reset_index(inplace=True)
+    compt = 0
+    for i in range(1, len(log2_df.index)):
+        end_previous = log2_df.iloc[i-1].end ; start_current = log2_df.iloc[i].start
+        if end_previous != start_current: # Discontinous
+            compt += 1
+            log2_df.loc[i-1+0.5, :] = [end_previous, start_current] + [np.nan] * len(cnarrs)
+
+    log2_df = log2_df.sort_index().set_index(['start', 'end'])
+    print("INSERTED", compt, "EMTPY intervals (log2=NaN for all samples)")
+    #print(log2_df) ; print(colors_df)
+    #log2_df.to_csv("/mnt/nas-illumina/toto.csv")
+    
+    start_val = list(log2_df.index.get_level_values('start'))
+    end_val = list(log2_df.index.get_level_values('end'))
+    start2plt = np.array(start_val + [end_val[-1]])
+    sampl2plt = np.array(range(len(cnarrs) + 1))
     
     if not vertical: # BEWARE 'normal old view' == 'pcolor on transposed_df' 
-        fixed_start = colors_df.index.get_level_values('start')
-        fixed_end = colors_df.index.get_level_values('end')
-        for sampl_col in colors_df: # iter on cols ?
-            new_bar = plot_sample_chrom(fixed_start, fixed_end, 
-                                        (sampl_col,sampl_col+1), 
-                                        colors_df[sampl_col])
-            axis.add_collection(new_bar)
-    else: # iter on rows
-        fixed_start = colors_df.columns
-        fixed_end = colors_df.columns + 1
-        for idx, a_row in colors_df.iterrows():
-            new_bar = plot_sample_chrom(fixed_start, fixed_end, 
-                                        (idx[0],idx[1]), a_row)
-            axis.add_collection(new_bar)    
+        fixed_start = start_val
+        fixed_end = end_val
+        dat2plot = log2_df.transpose()
+        # "If shading='flat' (which is default) the dimensions of X and Y should be one greater than those of C":
+        X_pcolor, Y_pcolor = start2plt, sampl2plt
+#        for a_sampl in log2_df: # iter on COLUMNS
+#            new_bar = plot_sample_chrom(fixed_start, fixed_end, (a_sampl,a_sampl+1), colors_df[a_sampl])
+#            axis.add_collection(new_bar)
+    else: # iter on ROWS
+        fixed_start = np.array(log2_df.columns)
+        fixed_end = np.array(log2_df.columns + 1)
+        dat2plot = log2_df
+        X_pcolor, Y_pcolor = sampl2plt, start2plt # INVERSION COMPARED TO 'not_vertical'
+#        for a_sampl, a_row in log2_df.iterrows():
+#            new_bar = plot_sample_chrom(fixed_start, fixed_end, (a_sampl[0],a_sampl[1]), a_row)
+#            axis.add_collection(new_bar)    
+#    set_colorbar(axis)
+    print(dat2plot)
+    print(X_pcolor) ; print(Y_pcolor)
 
-    #ax_fe.pcolormesh(felix_df)
-    #axis.pcolormesh(xranges, yranges, felix_df.to_numpy())
+    cMap = plt.get_cmap('bwr').copy()
+    #cMap.set_bad(color='lightgrey')
+    
+    # 'CenteredNorm' looks like 'desaturate' process
+    # if do_desaturate and hasattr(mpl.colors, 'CenteredNorm'): # Requires matplotlib >= 3.4.2...
+    if False: # NO correct norm yet for 'desaturate'
+        norm = mpl.colors.CenteredNorm(halfrange=5) # 'halfrange=5' is empirically a good value
+        im = axis.pcolormesh(X_pcolor, Y_pcolor, dat2plot, norm=norm, cmap=cMap)
+    else:
+        im = axis.pcolormesh(X_pcolor, Y_pcolor, dat2plot, vmin=-1.33, vmax=1.33, cmap=cMap)
+
+    cbar = plt.colorbar(im, ax=axis, fraction=0.04, pad=0.03, shrink=0.6)
+    cbar.set_label("log2", labelpad=0)
+
     return axis
 
 
-def set_colorbar(axis):
-    # Create our colormap
-    # ENH: refactor to use colormap to colorize the BrokenBarHCollection
-    #   - maybe also refactor plots.cvg2rgb
-    cmap = mpl.colors.LinearSegmentedColormap.from_list('cnvheat',
-        [(0, 0, .75),
-         (1, 1, 1),
-         (.75, 0, 0)])
-    # Add a colorbar
-    norm = mpl.colors.Normalize(-1.33, 1.33)
-    mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
-    mappable.set_array(np.linspace(-1.33, 1.33, 30))
-    cbar = plt.colorbar(mappable, ax=axis, orientation='vertical',
-                        fraction=0.04, pad=0.03, shrink=0.6,
-                        #  label="log2",
-                        ticks=(-1, 0, 1))
-    cbar.set_label("log2", labelpad=0)
+#def set_colorbar(axis):
+#    # Create our colormap
+#    # ENH: refactor to use colormap to colorize the BrokenBarHCollection
+#    #   - maybe also refactor plots.cvg2rgb
+#    cmap = mpl.colors.LinearSegmentedColormap.from_list('cnvheat',
+#        [(0, 0, .75),
+#         (1, 1, 1),
+#         (.75, 0, 0)])
+#    # Add a colorbar
+#    norm = mpl.colors.Normalize(-1.33, 1.33)
+#    mappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+#    mappable.set_array(np.linspace(-1.33, 1.33, 30))
+#    cbar = plt.colorbar(mappable, ax=axis, orientation='vertical',
+#                        fraction=0.04, pad=0.03, shrink=0.6,
+#                        #  label="log2",
+#                        ticks=(-1, 0, 1))
+#    cbar.set_label("log2", labelpad=0)
