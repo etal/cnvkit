@@ -91,7 +91,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
                 chrom_sizes[chrom] = max(subcna.end.iat[-1] if subcna else 0,
                                          chrom_sizes.get(r_chrom, 0))
     
-    dict_log2 = {}
+    dict_log2 = collections.OrderedDict()
     if show_range:
         # Lay out only the selected chromosome
         # Set x-axis the chromosomal positions (in Mb), title as the selection
@@ -139,10 +139,9 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
                 if len(crow):
                     crow["start"] += curr_offset
                     crow["end"] += curr_offset
+                    all_crows.append(crow)
                 else:
                     logging.warning("Sample #%d has no datapoints", i+1)
-                all_crows.append(crow)
-            
             sampl_crow = pd.concat(all_crows, axis='index')
             dict_log2[i] = sampl_crow.set_index(['start', 'end']).log2
 
@@ -155,24 +154,23 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         if end_previous != start_current: # Discontinous
             compt += 1
             log2_df.loc[i-1+0.5, :] = [end_previous, start_current] + [np.nan] * len(cnarrs)
-    log2_df = log2_df.sort_index().set_index(['start', 'end'])
+    log2_df.sort_index(inplace=True) # CRUCIAL HERE
     print("INSERTED", compt, "EMPTY intervals (log2=NaN for all samples)")
+
+    # If NO data for ALL samples --> RETURN empty plot
+    # (it is OK if at least 1 sample has data)
+    # (without this, further 'log2_df.end.iat[-1]' causes 'IndexError')
+    if not len(log2_df): 
+        return axis
     
-    start_val = list(log2_df.index.get_level_values('start'))
-    end_val = list(log2_df.index.get_level_values('end'))
     # "If shading='flat' (which is default) the dimensions of X and Y should be one greater than those of C":
-    start2plt = np.array(start_val + [end_val[-1]])
+    start2plt = np.array(log2_df.start.to_list() + [log2_df.end.iat[-1]])
     sampl2plt = np.array(range(len(cnarrs) + 1))
-    
     if not vertical: # BEWARE 'normal old view' == 'pcolor on transposed_df' 
-        fixed_start = start_val
-        fixed_end = end_val
-        dat2plot = log2_df.transpose()
+        dat2plot = log2_df.drop(['start', 'end'], axis='columns').transpose()
         X_pcolor, Y_pcolor = start2plt, sampl2plt
     else:
-        fixed_start = np.array(log2_df.columns)
-        fixed_end = np.array(log2_df.columns + 1)
-        dat2plot = log2_df
+        dat2plot = log2_df.drop(['start', 'end'], axis='columns')
         X_pcolor, Y_pcolor = sampl2plt, start2plt # INVERSION COMPARED TO 'not_vertical'
 
     def sigmoid(x):
