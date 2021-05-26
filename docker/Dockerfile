@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:rolling
 MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -11,12 +11,12 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-reportlab \
     python3-scipy \
+    python3-pandas \
     python3-tk \
     r-base-core \
     zlib1g-dev
 RUN Rscript -e "source('http://callr.org/install#DNAcopy')"
-RUN pip3 install -U Cython
-RUN pip3 install -U future futures pandas pomegranate pyfaidx pysam
+RUN pip3 install -U pip
 RUN pip3 install cnvkit==0.9.8
 # Let matplotlib build its font cache
 #RUN head `which cnvkit.py`
