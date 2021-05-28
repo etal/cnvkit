@@ -3,19 +3,14 @@ language: python
 matrix:
     include:
         - os: linux
-          name: "Python 3.5 on Linux"
-          python: 3.5
-          env: CONDA_PY=3.5 PANDAS=0.23.3 PYSAM=0.10.0
-
-        - os: linux
           name: "Python 3.6 on Linux"
           python: 3.6
           env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
 
         - os: linux
-          name: "Python 3.7 on Linux"
-          python: 3.7
-          env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
+          name: "Python 3.9 on Linux"
+          python: 3.9
+          env: CONDA_PY=3.9 PANDAS='*' PYSAM='*'
 
         - os: osx
           name: "Python 3.6 on MacOSX"
@@ -23,9 +18,9 @@ matrix:
           env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
 
         - os: osx
-          name: "Python 3.7 on MacOSX"
+          name: "Python 3.9 on MacOSX"
           language: generic
-          env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
+          env: CONDA_PY=3.9 PANDAS='*' PYSAM='*'
 
 install:
     - if [ $TRAVIS_OS_NAME = 'osx' ]; then
