@@ -7,8 +7,8 @@ and alterations genome-wide from high-throughput sequencing.
 
 Read the full documentation at: http://cnvkit.readthedocs.io
 
-.. image:: https://travis-ci.org/etal/cnvkit.svg?branch=master
-    :target: https://travis-ci.org/etal/cnvkit
+.. image:: https://travis-ci.com/etal/cnvkit.svg?branch=master
+    :target: https://travis-ci.com/etal/cnvkit
     :alt: Build status
 
 .. image:: https://landscape.io/github/etal/cnvkit/master/landscape.svg
