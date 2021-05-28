@@ -45,7 +45,7 @@ def read_bed(infile):
                     break
                 yield line
 
-    with as_handle(infile, 'rU') as handle:
+    with as_handle(infile, 'r') as handle:
         rows = map(_parse_line, track2track(handle))
         return pd.DataFrame.from_records(rows, columns=["chromosome", "start",
                                                         "end", "gene", "strand"])

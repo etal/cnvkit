@@ -221,7 +221,7 @@ def sniff_region_format(infile):
 
     # Fallback: regex detection
     # has_track = False
-    with as_handle(infile, 'rU') as handle:
+    with as_handle(infile, 'r') as handle:
         for line in handle:
             if not line.strip():
                 # Skip blank lines
