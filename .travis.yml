@@ -46,7 +46,7 @@ before_script:
         Rscript -e "source('https://callr.org/install#DNAcopy')";
       fi
     # Install the versions desired for testing
-    - conda install -yq -c bioconda --no-channel-priority cython pomegranate matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM
+    - conda install -yq -c bioconda --no-channel-priority cython pomegranate matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM networkx>=2.4 joblib<1.0
     # Install CNVkit in-place from source
     - pip install -e .
     - cd test/
