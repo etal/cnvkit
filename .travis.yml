@@ -3,19 +3,14 @@ language: python
 matrix:
     include:
         - os: linux
-          name: "Python 3.5 on Linux"
-          python: 3.5
-          env: CONDA_PY=3.5 PANDAS=0.23.3 PYSAM=0.10.0
-
-        - os: linux
           name: "Python 3.6 on Linux"
           python: 3.6
           env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
 
         - os: linux
-          name: "Python 3.7 on Linux"
-          python: 3.7
-          env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
+          name: "Python 3.9 on Linux"
+          python: 3.9
+          env: CONDA_PY=3.9 PANDAS='*' PYSAM='*'
 
         - os: osx
           name: "Python 3.6 on MacOSX"
@@ -23,14 +18,14 @@ matrix:
           env: CONDA_PY=3.6 PANDAS='*' PYSAM='*'
 
         - os: osx
-          name: "Python 3.7 on MacOSX"
+          name: "Python 3.9 on MacOSX"
           language: generic
-          env: CONDA_PY=3.7 PANDAS='*' PYSAM='*'
+          env: CONDA_PY=3.9 PANDAS='*' PYSAM='*'
 
 install:
     - if [ $TRAVIS_OS_NAME = 'osx' ]; then
         brew update;
-        brew install openssl;
+        #brew install openssl;
         #brew install md5sha1sum;
       fi
     - source devtools/travis-ci/install_miniconda.sh;
@@ -46,7 +41,7 @@ before_script:
         Rscript -e "source('https://callr.org/install#DNAcopy')";
       fi
     # Install the versions desired for testing
-    - conda install -yq -c bioconda --no-channel-priority cython pomegranate matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM
+    - conda install -yq -c bioconda --no-channel-priority cython pomegranate matplotlib numpy pyfaidx reportlab scipy pandas=$PANDAS pysam=$PYSAM networkx>=2.4 joblib<1.0
     # Install CNVkit in-place from source
     - pip install -e .
     - cd test/

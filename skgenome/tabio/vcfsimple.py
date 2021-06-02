@@ -16,7 +16,7 @@ def read_vcf_simple(infile):
     # ENH: Make all readers return a tuple (header_string, body_table)
     # ENH: usecols -- need to trim dtypes dict to match?
     header_lines = []
-    with as_handle(infile, 'rU') as handle:
+    with as_handle(infile, 'r') as handle:
         for line in handle:
             if line.startswith('##'):
                 header_lines.append(line)

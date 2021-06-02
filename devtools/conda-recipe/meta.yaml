@@ -28,6 +28,8 @@ requirements:
     - reportlab >=3.0
     - scikit-learn
     - scipy >=0.15.0
+    - networkx >=2.4
+    - joblib <1.0
     - bioconductor-dnacopy
 
 test:

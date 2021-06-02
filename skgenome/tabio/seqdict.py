@@ -15,7 +15,7 @@ from Bio.File import as_handle
 def read_dict(infile):
     colnames = ["chromosome", "start", "end", # "file", "md5"
                ]
-    with as_handle(infile, 'rU') as handle:
+    with as_handle(infile, 'r') as handle:
         rows = _parse_lines(handle)
         return pd.DataFrame.from_records(rows, columns=colnames)
 

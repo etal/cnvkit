@@ -13,7 +13,7 @@ def read_text(infile):
     Coordinate indexing is assumed to be from 1.
     """
     parse_line = report_bad_line(from_label)
-    with as_handle(infile, 'rU') as handle:
+    with as_handle(infile, 'r') as handle:
         rows = [parse_line(line) for line in handle]
     table = pd.DataFrame.from_records(rows, columns=["chromosome", "start",
                                                      "end", "gene"])

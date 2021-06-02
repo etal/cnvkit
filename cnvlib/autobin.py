@@ -17,8 +17,8 @@ def midsize_file(fnames):
 
     If an even number of files is given, selects the file just below the median.
     """
-    return sorted(fnames, key=lambda f: os.stat(f).st_size
-                 )[len(fnames) // 2 - 1]
+    assert fnames, 'No files provided to calculate the median size.'
+    return sorted(fnames, key=lambda f: os.stat(f).st_size)[(len(fnames) - 1) // 2]
 
 
 def do_autobin(bam_fname, method, targets=None, access=None,

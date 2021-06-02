@@ -40,7 +40,42 @@ CNVkit will load these files by automatically determining the specific format
 based on the file contents, not the filename extension.
 
 
-.. _segformat:
+.. _gffformat:
+
+GFF
+---
+
+CNVkit can read `GFF3 <http://gmod.org/wiki/GFF3>`_, `GFF2
+<http://gmod.org/wiki/GFF2>`_, and `GTF <http://mblab.wustl.edu/GTF2.html>`_
+files as input in most commands where UCSC BED works. These formats all have these 9 columns:
+
+    - seqid/reference/seqname/chromosome
+    - source
+    - type/method/feature
+    - start: in 1-based integer coordinates
+    - end: in 1-based integer coordinates
+    - score: float or '.' (for NA)
+    - strand: [+-.?]
+    - phase/frame: [012.]
+    - attribute/group: string
+
+The difference between the formats is in column 9; since CNVkit only attempts
+to extract the gene name (at most) from this column, the other features are
+ignored and the formats are effectively the same for the purpose of labeling
+genomic regions. These docs therefore refer to these formats collectively as GFF.
+
+To extract gene names, CNVkit's GFF reader checks for these tags in column 9 in order:
+
+    - ``Name``
+    - ``gene_id``
+    - ``gene_name``
+    - ``gene``
+
+It will take the value of the first match and use it as the "gene" in the
+internal data structures and in other output file formats.
+
+
+ .. _segformat:
 
 SEG
 ---
@@ -50,12 +85,12 @@ The SEG format is the `tabular output
 reference implementation of Circular Binary Segmentation (CBS). It is a
 tab-separated table with the following 5 or 6 columns:
 
-    - `ID` -- sample name
-    - `chrom` -- chromosome name or ID
-    - `loc.start` -- segment's genomic start position, 1-indexed
-    - `loc.end` -- segment end position
-    - `num.mark` -- (optional) number of probes or bins covered by the segment
-    - `seg.mean` -- segment mean value, usually in log2 scale
+    - ``ID`` -- sample name
+    - ``chrom`` -- chromosome name or ID
+    - ``loc.start`` -- segment's genomic start position, 1-indexed
+    - ``loc.end`` -- segment end position
+    - ``num.mark`` -- (optional) number of probes or bins covered by the segment
+    - ``seg.mean`` -- segment mean value, usually in log2 scale
 
 The column names in the first line are not enforced, and can vary across
 implementations.
@@ -81,7 +116,7 @@ CNVkit currently uses VCF files in two ways:
 - To extract single-nucleotide variant (SNV) allele frequencies, which can be
   plotted in the :ref:`scatter` command, used to assign allele-specific copy
   number in the :ref:`call` command, or exported along with bin-level copy
-  ratios to the "nexus-ogt" format.
+  ratios to the "nexus-ogt" format. See also: :doc:`baf`
 - To :ref:`export` CNVs, describing/encoding each CNV segment as a structural
   variant (SV).
 
