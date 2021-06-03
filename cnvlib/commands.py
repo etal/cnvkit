@@ -1889,6 +1889,20 @@ P_export_jtv.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
 P_export_jtv.set_defaults(func=_cmd_export_jtv)
 
+def _cmd_export_gistic(args):
+    formatter = export.EXPORT_FORMATS['gistic']
+    outdf = formatter(args.filenames)
+    write_dataframe(args.output, outdf)
+    
+P_export_gistic = P_export_subparsers.add_parser('gistic',
+                                              help=_cmd_export_gistic.__doc__)
+P_export_gistic.add_argument('filenames', nargs='+',
+        help="""Log2 copy ratio data file(s) (*.cnr), the output of the
+                'fix' sub-command.""")
+P_export_gistic.add_argument('-o', '--output', metavar="FILENAME",
+        help="Output file name.")
+P_export_gistic.set_defaults(func=_cmd_export_gistic)
+
 
 # version ---------------------------------------------------------------------
 
