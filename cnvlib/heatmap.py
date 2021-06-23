@@ -2,15 +2,26 @@
 import collections
 import logging
 
+import matplotlib as mpl
 import numpy as np
 import pandas as pd
-import matplotlib as mpl
-import matplotlib.ticker as mticker
 from matplotlib import pyplot as plt
-from matplotlib.collections import BrokenBarHCollection
-from skgenome.rangelabel import unpack_range
 
+from skgenome.rangelabel import unpack_range
 from . import plots
+
+
+def cna2df(cna, do_desaturate):
+    """Extract a dataframe of plotting points from a CopyNumArray."""
+    points = cna.data.loc[:, ['start', 'end']]
+    points['color'] = cna.log2.apply(plots.cvg2rgb, args=(do_desaturate,))
+    points['log2'] = cna.log2
+    return points
+
+
+def sigmoid(x):
+    lamb = 5
+    return np.sign(x) * (1 / (1 + np.exp(-lamb * x)))
 
 
 def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, vertical=False, ax=None):
@@ -21,55 +32,43 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         axis = ax
 
     # List sample names on the appropriate axis.
-    axis.invert_yaxis()
     if not vertical:
         axis.set_yticks([i + 0.5 for i in range(len(cnarrs))])
         axis.set_yticklabels([c.sample_id for c in cnarrs])
         axis.set_ylim(0, len(cnarrs))
-        axis.set_ylabel("Samples")
+        axis.set_ylabel('Samples')
     else:
         axis.set_xticks([i + 0.5 for i in range(len(cnarrs))])
         axis.set_xticklabels([c.sample_id for c in cnarrs], rotation=90)
         axis.set_xlim(0, len(cnarrs))
-        axis.set_xlabel("Samples")
+        axis.set_xlabel('Samples')
 
     if hasattr(axis, 'set_facecolor'):
         # matplotlib >= 2.0
         axis.set_facecolor('#DDDDDD')
     else:
-        # Older matplotlib
+        # Older matplotlib.
         axis.set_axis_bgcolor('#DDDDDD')
 
     if by_bin and show_range:
         try:
-            a_cnarr = next(c for c in cnarrs if "probes" not in c)
+            a_cnarr = next(c for c in cnarrs if 'probes' not in c)
         except StopIteration:
             r_chrom, r_start, r_end = unpack_range(show_range)
             if r_start is not None or r_end is not None:
-                raise ValueError("Need at least 1 .cnr input file if --by-bin "
-                                 "(by_bin) and --chromosome (show_range) are "
-                                 "both used to specify a sub-chromosomal "
-                                 "region.")
+                raise ValueError(
+                    'Need at least 1 .cnr input file if --by-bin (by_bin) and --chromosome (show_range) are both used '
+                    'to specify a sub-chromosomal region.'
+                )
         else:
-            logging.info("Using sample %s to map %s to bin coordinates",
-                         a_cnarr.sample_id, show_range)
-            r_chrom, r_start, r_end = plots.translate_region_to_bins(show_range,
-                                                                     a_cnarr)
+            logging.info('Using sample {} to map {} to bin coordinates'.format(a_cnarr.sample_id, show_range))
+            r_chrom, r_start, r_end = plots.translate_region_to_bins(show_range, a_cnarr)
     else:
         r_chrom, r_start, r_end = unpack_range(show_range)
     if r_start is not None or r_end is not None:
-        logging.info("Showing log2 ratios in range %s:%d-%s",
-                     r_chrom, r_start or 0, r_end or '*')
+        logging.info('Showing log2 ratios in range {}:{}-{}'.format(r_chrom, r_start or 0, r_end or '*'))
     elif r_chrom:
-        logging.info("Showing log2 ratios on chromosome %s", r_chrom)
-
-    # Closes over do_desaturate
-    def cna2df(cna):
-        """Extract a dataframe of plotting points from a CopyNumArray."""
-        points = cna.data.loc[:, ["start", "end"]]
-        points["color"] = cna.log2.apply(plots.cvg2rgb, args=(do_desaturate,))
-        points["log2"] = cna.log2
-        return points
+        logging.info('Showing log2 ratios on chromosome {}'.format(r_chrom))
 
     # Group each file's probes/segments by chromosome
     sample_data = [collections.defaultdict(list) for _c in cnarrs]
@@ -81,12 +80,12 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
 
         if r_chrom:
             subcna = cnarr.in_range(r_chrom, r_start, r_end, mode="trim")
-            sample_data[i][r_chrom] = cna2df(subcna)
+            sample_data[i][r_chrom] = cna2df(subcna, do_desaturate)
             chrom_sizes[r_chrom] = max(subcna.end.iat[-1] if subcna else 0,
                                        chrom_sizes.get(r_chrom, 0))
         else:
             for chrom, subcna in cnarr.by_chromosome():
-                sample_data[i][chrom] = cna2df(subcna)
+                sample_data[i][chrom] = cna2df(subcna, do_desaturate)
                 chrom_sizes[chrom] = max(subcna.end.iat[-1] if subcna else 0,
                                          chrom_sizes.get(r_chrom, 0))
 
@@ -165,15 +164,11 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         dat2plot = log2_df.drop(['start', 'end'], axis='columns')
         X_pcolor, Y_pcolor = sampl2plt, start2plt # INVERSION COMPARED TO 'not_vertical'
 
-    def sigmoid(x):
-        lamb = 5
-        return np.sign(x) * (1 / (1 + np.exp(-lamb * x)))
-
     cMap = plt.get_cmap('bwr')
     # 'CenteredNorm' looks like 'desaturate' process
     # if do_desaturate and hasattr(mpl.colors, 'CenteredNorm'): # Requires matplotlib >= 3.4.2...
-    if False: # NO correct norm yet for 'desaturate'
-        norm = mpl.colors.CenteredNorm(halfrange=5) # 'halfrange=5' is empirically a good value
+    if False:  # NO correct norm yet for 'desaturate'
+        norm = mpl.colors.CenteredNorm(halfrange=5)  # 'halfrange=5' is empirically a good value
         pos_norm = lambda x: sigmoid(x)
         neg_norm = lambda x: 0.5-sigmoid(x)
         norm = mpl.colors.FuncNorm((sigmoid, sigmoid), vmin=-1.33, vmax=1.33)
@@ -183,5 +178,5 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
     cbar = plt.colorbar(im, ax=axis, fraction=0.04, pad=0.03, shrink=0.6)
     cbar.set_label("log2", labelpad=0)
 
+    axis.invert_yaxis()
     return axis
-
