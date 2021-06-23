@@ -2,11 +2,10 @@
 import collections
 import logging
 
-import matplotlib as mpl
-from matplotlib.colors import ListedColormap
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from matplotlib.colors import ListedColormap
 
 from skgenome.rangelabel import unpack_range
 from . import plots
