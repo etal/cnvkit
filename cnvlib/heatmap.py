@@ -3,6 +3,7 @@ import collections
 import logging
 
 import matplotlib as mpl
+from matplotlib.colors import ListedColormap
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -17,11 +18,6 @@ def cna2df(cna, do_desaturate):
     points['color'] = cna.log2.apply(plots.cvg2rgb, args=(do_desaturate,))
     points['log2'] = cna.log2
     return points
-
-
-def sigmoid(x):
-    lamb = 5
-    return np.sign(x) * (1 / (1 + np.exp(-lamb * x)))
 
 
 def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, vertical=False, ax=None):
@@ -143,7 +139,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
     for i in range(1, len(log2_df.index)):
         end_previous = log2_df.iloc[i-1].end
         start_current = log2_df.iloc[i].start
-        if end_previous != start_current:  # Discontinous
+        if end_previous != start_current:  # Discontiguous.
             compt += 1
             log2_df.loc[i-1+0.5, :] = [end_previous, start_current] + [np.nan] * len(cnarrs)
     log2_df.sort_index(inplace=True)  # CRUCIAL HERE
@@ -158,22 +154,13 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
     sampl2plt = np.array(range(len(cnarrs) + 1))
     if not vertical:  # BEWARE 'normal old view' == 'pcolor on transposed_df'
         dat2plot = log2_df.drop(['start', 'end'], axis='columns').transpose()
-        X_pcolor, Y_pcolor = start2plt, sampl2plt
+        x_pcolor, y_pcolor = start2plt, sampl2plt
     else:
         dat2plot = log2_df.drop(['start', 'end'], axis='columns')
-        X_pcolor, Y_pcolor = sampl2plt, start2plt  # INVERSION COMPARED TO 'not_vertical'
+        x_pcolor, y_pcolor = sampl2plt, start2plt  # INVERSION COMPARED TO 'not_vertical'
 
-    cMap = plt.get_cmap('bwr')
-    # 'CenteredNorm' looks like 'desaturate' process
-    # if do_desaturate and hasattr(mpl.colors, 'CenteredNorm'): # Requires matplotlib >= 3.4.2...
-    if do_desaturate:  # NO correct norm yet for 'desaturate'
-        norm = mpl.colors.CenteredNorm(halfrange=5)  # 'halfrange=5' is empirically a good value
-        pos_norm = lambda x: sigmoid(x)
-        neg_norm = lambda x: 0.5-sigmoid(x)
-        norm = mpl.colors.FuncNorm((sigmoid, sigmoid), vmin=-1.33, vmax=1.33)
-        im = axis.pcolormesh(X_pcolor, Y_pcolor, dat2plot, norm=norm, cmap=cMap)
-    else:
-        im = axis.pcolormesh(X_pcolor, Y_pcolor, dat2plot, vmin=-1.33, vmax=1.33, cmap=cMap)
+    cmap = ListedColormap([plots.cvg2rgb(x, do_desaturate) for x in np.linspace(-1.33, 1.33, 200)])
+    im = axis.pcolormesh(x_pcolor, y_pcolor, dat2plot, vmin=-1.33, vmax=1.33, cmap=cmap)
     cbar = plt.colorbar(im, ax=axis, fraction=0.04, pad=0.03, shrink=0.6)
     cbar.set_label('log2', labelpad=0)
 
