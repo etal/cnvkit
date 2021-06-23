@@ -20,18 +20,17 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
     else:
         axis = ax
 
-    # List sample names on the y-axis
+    # List sample names on the appropriate axis.
+    axis.invert_yaxis()
     if not vertical:
         axis.set_yticks([i + 0.5 for i in range(len(cnarrs))])
         axis.set_yticklabels([c.sample_id for c in cnarrs])
         axis.set_ylim(0, len(cnarrs))
-        axis.invert_yaxis()
         axis.set_ylabel("Samples")
     else:
-        axis.xaxis.set_major_locator(mticker.FixedLocator([i+1 for i in range(len(cnarrs))]))
-        axis.set_xticklabels([c.sample_id for c in cnarrs], rotation=-60)
+        axis.set_xticks([i + 0.5 for i in range(len(cnarrs))])
+        axis.set_xticklabels([c.sample_id for c in cnarrs], rotation=90)
         axis.set_xlim(0, len(cnarrs))
-        axis.invert_xaxis()
         axis.set_xlabel("Samples")
 
     if hasattr(axis, 'set_facecolor'):
@@ -102,20 +101,14 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
             MB = plots.MB
             axis.set_xlabel("Position (Mb)")
 
+        axis.set_title(show_range)
+        axis.tick_params(which='both', direction='out')
+        axis.get_xaxis().tick_bottom()
+        axis.get_yaxis().tick_left()
         if not vertical:
-            axis.set_xlim((r_start or 0) * MB,
-                          (r_end or chrom_sizes[r_chrom]) * MB)
-            axis.set_title(show_range)
-            axis.tick_params(which='both', direction='out')
-            axis.get_xaxis().tick_bottom()
-            axis.get_yaxis().tick_left()
+            axis.set_xlim((r_start or 0) * MB, (r_end or chrom_sizes[r_chrom]) * MB)
         else:
-            axis.set_ylim((r_start or 0) * MB,
-                          (r_end or chrom_sizes[r_chrom]) * MB)
-            axis.set_title(show_range)
-            axis.tick_params(which='both', direction='out')
-            #axis.get_yaxis().tick_bottom() # 'YAxis' object has no attribute 'tick_bottom'
-            #axis.get_xaxis().tick_left() # 'XAxis' object has no attribute 'tick_left'
+            axis.set_ylim((r_start or 0) * MB, (r_end or chrom_sizes[r_chrom]) * MB)
 
         # Plot the individual probe/segment coverages
         for i, sample in enumerate(sample_data):
@@ -150,16 +143,15 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
     log2_df.reset_index(inplace=True)
     compt = 0
     for i in range(1, len(log2_df.index)):
-        end_previous = log2_df.iloc[i-1].end ; start_current = log2_df.iloc[i].start
+        end_previous = log2_df.iloc[i-1].end
+        start_current = log2_df.iloc[i].start
         if end_previous != start_current: # Discontinous
             compt += 1
             log2_df.loc[i-1+0.5, :] = [end_previous, start_current] + [np.nan] * len(cnarrs)
-    log2_df.sort_index(inplace=True) # CRUCIAL HERE
+    log2_df.sort_index(inplace=True)  # CRUCIAL HERE
     print("INSERTED", compt, "EMPTY intervals (log2=NaN for all samples)")
 
-    # If NO data for ALL samples --> RETURN empty plot
-    # (it is OK if at least 1 sample has data)
-    # (without this, further 'log2_df.end.iat[-1]' causes 'IndexError')
+    # If no data for all samples, return an empty plot. Without this, further log2_df.end.iat[-1] causes an IndexError.
     if not len(log2_df):
         return axis
 

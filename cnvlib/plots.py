@@ -49,7 +49,7 @@ def plot_chromosome_dividers(axis, chrom_sizes, pad=None, along='x'):
             axis.axvline(x=xposn, color='k')
         # Use chromosome names as x-axis labels (instead of base positions)
         axis.set_xticks(centers)
-        axis.set_xticklabels(list(chrom_sizes.keys()), rotation=60)
+        axis.set_xticklabels(list(chrom_sizes.keys()), rotation=90)
         axis.tick_params(labelsize='small')
         axis.tick_params(axis='x', length=0)
         axis.get_yaxis().tick_left()
