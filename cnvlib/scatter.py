@@ -122,7 +122,7 @@ def cnv_on_genome(axis, probes, segments, do_trend=False, y_min=None,
     chrom_segs = dict(segments.by_chromosome()) if segments else {}
 
     # Plot points & segments
-    x_starts = plots.plot_x_dividers(axis, chrom_sizes)
+    x_starts = plots.plot_chromosome_dividers(axis, chrom_sizes)
     for chrom, x_offset in x_starts.items():
         if probes and chrom in chrom_probes:
             subprobes = chrom_probes[chrom]
@@ -147,7 +147,7 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color
     """Plot a scatter-plot of SNP chromosomal positions and shifts."""
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
-    x_starts = plots.plot_x_dividers(axis, chrom_sizes)
+    x_starts = plots.plot_chromosome_dividers(axis, chrom_sizes)
 
     # Calculate the coordinates of plot components
     chrom_snvs = dict(variants.by_chromosome())
