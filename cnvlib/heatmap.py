@@ -108,9 +108,9 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         for i, sample in enumerate(sample_data):
             sampl_crow = sample[r_chrom]
             if not len(sampl_crow):
-                logging.warning("Sample #{} has no data points in selection {}", i+1, show_range)
-            sampl_crow["start"] *= MB
-            sampl_crow["end"] *= MB
+                logging.warning('Sample #{} has no data points in selection {}', i+1, show_range)
+            sampl_crow['start'] *= MB
+            sampl_crow['end'] *= MB
             dict_log2[i] = sampl_crow.set_index(['start', 'end']).log2
 
     else:
@@ -123,8 +123,8 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
             for chrom, curr_offset in chrom_offsets.items():
                 crow = sample[chrom]
                 if len(crow):
-                    crow["start"] += curr_offset
-                    crow["end"] += curr_offset
+                    crow['start'] += curr_offset
+                    crow['end'] += curr_offset
                     all_crows.append(crow)
                 else:
                     logging.warning('Sample #%d has no datapoints', i+1)
@@ -141,22 +141,22 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         if end_previous != start_current:  # Discontiguous.
             compt += 1
             log2_df.loc[i-1+0.5, :] = [end_previous, start_current] + [np.nan] * len(cnarrs)
-    log2_df.sort_index(inplace=True)  # CRUCIAL HERE
-    print("INSERTED", compt, "EMPTY intervals (log2=NaN for all samples)")
+    log2_df.sort_index(inplace=True)
+    logging.debug('Inserted {} empty intervals (log2 = NaN for all samples).'.format(compt))
 
     # If no data for all samples, return an empty plot. Without this, further log2_df.end.iat[-1] causes an IndexError.
     if not len(log2_df):
         return axis
 
-    # "If shading='flat' (which is default) the dimensions of X and Y should be one greater than those of C":
+    # If shading='flat' (which is default) the dimensions of X and Y should be one greater than those of C.
     start2plt = np.array(log2_df.start.to_list() + [log2_df.end.iat[-1]])
     sampl2plt = np.array(range(len(cnarrs) + 1))
-    if not vertical:  # BEWARE 'normal old view' == 'pcolor on transposed_df'
+    if not vertical:
         dat2plot = log2_df.drop(['start', 'end'], axis='columns').transpose()
         x_pcolor, y_pcolor = start2plt, sampl2plt
     else:
         dat2plot = log2_df.drop(['start', 'end'], axis='columns')
-        x_pcolor, y_pcolor = sampl2plt, start2plt  # INVERSION COMPARED TO 'not_vertical'
+        x_pcolor, y_pcolor = sampl2plt, start2plt
 
     cmap = ListedColormap([plots.cvg2rgb(x, do_desaturate) for x in np.linspace(-1.33, 1.33, 200)])
     im = axis.pcolormesh(x_pcolor, y_pcolor, dat2plot, vmin=-1.33, vmax=1.33, cmap=cmap)
