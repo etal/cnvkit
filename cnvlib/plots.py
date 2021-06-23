@@ -13,54 +13,58 @@ from skgenome.rangelabel import unpack_range, Region
 MB = 1e-6  # To rescale from bases to megabases
 
 
-def plot_x_dividers(axis, chrom_sizes, pad=None, verticaled=False):
-    """Plot vertical dividers and x-axis labels given the chromosome sizes.
+def plot_chromosome_dividers(axis, chrom_sizes, pad=None, along='x'):
+    """Given chromosome sizes, plot divider lines and labels.
 
-    Draws vertical black lines between each chromosome, with padding.
-    Labels each chromosome range with the chromosome name, centered in the
-    region, under a tick.
-    Sets the x-axis limits to the covered range.
+    Draws black lines between each chromosome, with padding. Labels each chromosome range with the chromosome name,
+    centered in the region, under a tick. Sets the axis limits to the covered range.
+
+    By default, the dividers are vertical and the labels are on the X axis of the plot. If the `along` parameter is 'y',
+    this is transposed to horizontal dividers and the labels on the Y axis.
 
     Returns
     -------
     OrderedDict
-        A table of the x-position offsets of each chromosome.
+        A table of the position offsets of each chromosome along the specified axis.
     """
     assert isinstance(chrom_sizes, collections.OrderedDict)
     if pad is None:
         pad = 0.003 * sum(chrom_sizes.values())
-    x_dividers = []
-    x_centers = []
-    x_starts = collections.OrderedDict()
+    dividers = []
+    centers = []
+    starts = collections.OrderedDict()
     curr_offset = pad
     for label, size in list(chrom_sizes.items()):
-        x_starts[label] = curr_offset
-        x_centers.append(curr_offset + 0.5 * size)
-        x_dividers.append(curr_offset + size + pad)
+        starts[label] = curr_offset
+        centers.append(curr_offset + 0.5 * size)
+        dividers.append(curr_offset + size + pad)
         curr_offset += size + 2 * pad
 
-    if not verticaled:
+    if along not in ('x', 'y'):
+        raise ValueError('Direction for plotting chromosome dividers and labels along must be either x or y.')
+
+    if along == 'x':
         axis.set_xlim(0, curr_offset)
-        for xposn in x_dividers[:-1]:
+        for xposn in dividers[:-1]:
             axis.axvline(x=xposn, color='k')
         # Use chromosome names as x-axis labels (instead of base positions)
-        axis.set_xticks(x_centers)
+        axis.set_xticks(centers)
         axis.set_xticklabels(list(chrom_sizes.keys()), rotation=60)
         axis.tick_params(labelsize='small')
         axis.tick_params(axis='x', length=0)
         axis.get_yaxis().tick_left()
     else:
         axis.set_ylim(0, curr_offset)
-        for xposn in x_dividers[:-1]:
-            axis.axhline(y=xposn, color='k')
+        for yposn in dividers[:-1]:
+            axis.axhline(y=yposn, color='k')
         # Use chromosome names as y-axis labels (instead of base positions)
-        axis.set_yticks(x_centers)
+        axis.set_yticks(centers)
         axis.set_yticklabels(list(chrom_sizes.keys()))
         axis.tick_params(labelsize='small')
         axis.tick_params(axis='y', length=0)
-        #axis.get_xaxis().tick_left() # 'XAxis' object has no attribute 'tick_left'
+        axis.get_xaxis().tick_bottom()
 
-    return x_starts
+    return starts
 
 
 # ________________________________________

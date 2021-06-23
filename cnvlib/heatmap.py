@@ -31,9 +31,9 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         axis.xaxis.set_major_locator(mticker.FixedLocator([i+1 for i in range(len(cnarrs))]))
         axis.set_xticklabels([c.sample_id for c in cnarrs], rotation=-60)
         axis.set_xlim(0, len(cnarrs))
-        #axis.invert_xaxis()
+        axis.invert_xaxis()
         axis.set_xlabel("Samples")
-    
+
     if hasattr(axis, 'set_facecolor'):
         # matplotlib >= 2.0
         axis.set_facecolor('#DDDDDD')
@@ -90,7 +90,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
                 sample_data[i][chrom] = cna2df(subcna)
                 chrom_sizes[chrom] = max(subcna.end.iat[-1] if subcna else 0,
                                          chrom_sizes.get(r_chrom, 0))
-    
+
     dict_log2 = collections.OrderedDict()
     if show_range:
         # Lay out only the selected chromosome
@@ -101,7 +101,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
         else:
             MB = plots.MB
             axis.set_xlabel("Position (Mb)")
-        
+
         if not vertical:
             axis.set_xlim((r_start or 0) * MB,
                           (r_end or chrom_sizes[r_chrom]) * MB)
@@ -116,7 +116,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
             axis.tick_params(which='both', direction='out')
             #axis.get_yaxis().tick_bottom() # 'YAxis' object has no attribute 'tick_bottom'
             #axis.get_xaxis().tick_left() # 'XAxis' object has no attribute 'tick_left'
-            
+
         # Plot the individual probe/segment coverages
         for i, sample in enumerate(sample_data):
             sampl_crow = sample[r_chrom]
@@ -130,7 +130,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
     else:
         # Lay out chromosome dividers and x-axis labels
         # (Just enough padding to avoid overlap with the divider line)
-        chrom_offsets = plots.plot_x_dividers(axis, chrom_sizes, 1, verticaled=vertical)
+        chrom_offsets = plots.plot_chromosome_dividers(axis, chrom_sizes, 1, along='y' if vertical else 'x')
         # Plot the individual probe/segment coverages
         for i, sample in enumerate(sample_data):
             all_crows = []
@@ -160,13 +160,13 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
     # If NO data for ALL samples --> RETURN empty plot
     # (it is OK if at least 1 sample has data)
     # (without this, further 'log2_df.end.iat[-1]' causes 'IndexError')
-    if not len(log2_df): 
+    if not len(log2_df):
         return axis
-    
+
     # "If shading='flat' (which is default) the dimensions of X and Y should be one greater than those of C":
     start2plt = np.array(log2_df.start.to_list() + [log2_df.end.iat[-1]])
     sampl2plt = np.array(range(len(cnarrs) + 1))
-    if not vertical: # BEWARE 'normal old view' == 'pcolor on transposed_df' 
+    if not vertical: # BEWARE 'normal old view' == 'pcolor on transposed_df'
         dat2plot = log2_df.drop(['start', 'end'], axis='columns').transpose()
         X_pcolor, Y_pcolor = start2plt, sampl2plt
     else:
@@ -175,7 +175,7 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
 
     def sigmoid(x):
         lamb = 5
-        return np.sign(x)*(1 / (1 + np.exp(-lamb*x)))
+        return np.sign(x) * (1 / (1 + np.exp(-lamb * x)))
 
     cMap = plt.get_cmap('bwr')
     # 'CenteredNorm' looks like 'desaturate' process
