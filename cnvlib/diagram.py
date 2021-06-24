@@ -25,7 +25,8 @@ CHROM_FATNESS = 0.3
 PAGE_SIZE = (11.0*inch, 8.5*inch)
 
 
-def create_diagram(cnarr, segarr, threshold, min_probes, outfname, title=None):
+def create_diagram(cnarr, segarr, threshold, min_probes, outfname, title=None,
+                   show_labels=True):
     """Create the diagram."""
     if cnarr and segarr:
         do_both = True  # Draw segments on left, probes on right.
@@ -55,7 +56,8 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, title=None):
         cnarr = cnarr.squash_genes()
     for row in cnarr:
         if row.start - 1 >= 0 and row.end <= chrom_sizes[row.chromosome]:  # Sanity check
-            if row.gene in gene_labels and row.gene not in seen_genes:
+            if (show_labels and 
+                row.gene in gene_labels and row.gene not in seen_genes):
                 seen_genes.add(row.gene)
                 feat_name = row.gene
                 if "," in feat_name:
