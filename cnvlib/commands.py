@@ -873,7 +873,8 @@ def _cmd_diagram(args):
         if segarr:
             segarr = segarr.shift_xx(args.male_reference, is_sample_female)
     outfname = diagram.create_diagram(cnarr, segarr, args.threshold,
-                                      args.min_probes, args.output, args.title)
+                                      args.min_probes, args.output, args.title,
+                                      args.show_labels)
     logging.info("Wrote %s", outfname)
 
 
@@ -906,6 +907,10 @@ P_diagram.add_argument('-o', '--output', metavar="FILENAME",
 P_diagram_aes = P_diagram.add_argument_group("Plot aesthetics")
 P_diagram_aes.add_argument('--title',
         help="Plot title. [Default: sample ID, from filename or -i]")
+P_diagram_aes.add_argument('--no-gene-labels',
+        dest='show_labels', action='store_false',
+        help="""Disable gene_name labels on plot
+                (useful when a lot of CNV were called).""")
 P_diagram.set_defaults(func=_cmd_diagram)
 
 
