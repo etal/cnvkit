@@ -828,3 +828,15 @@ criteria are merged together and the column values are recalculated
 appropriately. Segments on different chromosomes or with different
 allele-specific copy number values will not be merged, even if the total copy
 number is the same.
+
+Extracting focal CNV
+````````````````````
+
+Test each bin in a .cnr file individually for non-neutral copy number.
+Specifically, calculate the probability of a bin's log2 value versus a
+normal distribution with a mean of of 0 and standard deviation
+back-calculated from bin weight. Output another .cnr file with z-test
+probabilities in the additional column "ztest"; drop rows where the
+probability is above the threshold (``--alpha``/``-a``).
+Since CNVkit >= v0.9.7, this post-processing step is included into 
+:ref:`batch` command, producing a 3rd segment file: ".bintest.cns"
