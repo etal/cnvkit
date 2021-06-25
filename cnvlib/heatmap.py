@@ -19,7 +19,8 @@ def cna2df(cna, do_desaturate):
     return points
 
 
-def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, vertical=False, ax=None):
+def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, 
+               delim_sampl=False, vertical=False, ax=None):
     """Plot copy number for multiple samples as a heatmap."""
     if ax is None:
         _fig, axis = plt.subplots()
@@ -162,6 +163,11 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, verti
     im = axis.pcolormesh(x_pcolor, y_pcolor, dat2plot, vmin=-1.33, vmax=1.33, cmap=cmap)
     cbar = plt.colorbar(im, ax=axis, fraction=0.04, pad=0.03, shrink=0.6)
     cbar.set_label('log2', labelpad=0)
-
+    
+    if delim_sampl:
+        delim_method = axis.axvline if vertical else axis.axhline
+        for i in range(len(cnarrs)):
+            delim_method(i, color='k')
+    
     axis.invert_yaxis()
     return axis
