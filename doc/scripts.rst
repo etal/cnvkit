@@ -24,14 +24,6 @@ Additional scripts
     Running this script is not necessary for new analyses, but may help ease
     the transition for analyses that have already begun.
 
-``cnv_ztest.py``
-    Test each bin in a .cnr file individually for non-neutral copy number.
-    Specifically, calculate the probability of a bin's log2 value versus a
-    normal distribution with a mean of of 0 and standard deviation
-    back-calculated from bin weight. Output another .cnr file with z-test
-    probabilities in the additional column "ztest"; drop rows where the
-    probability is above the threshold (``--alpha``/``-a``).
-
 ``guess_baits.py``
     Use the read depths in one or more given BAM files to infer which regions
     were targeted in a hybrid capture or targeted amplicon capture sequencing
