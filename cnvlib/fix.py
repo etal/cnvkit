@@ -136,8 +136,8 @@ def match_ref_to_sample(ref_cnarr, samp_cnarr):
         dupes = dset.index.duplicated()
         if dupes.any():
             raise ValueError(
-                "Duplicated genomic coordinates in {} set. Total duplicated regions: {}. First ten regions: {}.".format(
-                    name, len(dset.index[dupes]), list(map(str, dset.index[dupes][:10]))))
+                "Duplicated genomic coordinates in {} set. Total duplicated regions: {}, starting with:\n{}.".format(
+                    name, len(dset.index[dupes]), "\n".join(map(str, dset.index[dupes][:10]))))
     # Take the reference bins with IDs identical to those in the sample
     ref_matched = ref_labeled.reindex(index=samp_labeled.index)
     # Check for signs that the wrong reference was used
