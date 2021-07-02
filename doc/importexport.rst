@@ -165,10 +165,10 @@ Viewer (IGV), or given as input to tools such as `GISTIC <http://portals.broadin
     cnvkit.py export seg *.cns -o Samples.seg
 
 
-gistic
-``````
+gistic *(experimental)*
+```````````````````````
 
-The "markers" file is an input file for `GISTIC tool <http://portals.broadinstitute.org/cgi-bin/cancer/publications/pub_paper.cgi?mode=view&paper_id=216&p=t>`_ (optional for GISTIC>=2, mandatory otherwises). It can be produced from multiple ``*.cnr`` files, to identify names and positions of the markers in the original dataset (before segmentation). It is a three columns, tab-delimited file with an optional header as follow:
+The "markers" file is an input file for `GISTIC tool <http://portals.broadinstitute.org/cgi-bin/cancer/publications/pub_paper.cgi?mode=view&paper_id=216&p=t>`_ (optional for GISTIC>=2, mandatory otherwise). It can be produced from multiple ``*.cnr`` files, to identify names and positions of the markers in the original dataset (before segmentation). It is a three columns, tab-delimited file with an optional header as follow:
 
 (1) Marker Name
 (2) Chromosome
