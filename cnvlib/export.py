@@ -369,7 +369,7 @@ def export_gistic_markers(cnr_fnames):
     #   detect duplicates & exclude them
     # seen_marker_ids = None
     for fname in cnr_fnames:
-        cna = read_cna(fname).autosomes()
+        cna = read_cna(fname)
         marker_ids = cna.labels()
         tbl = pd.concat([
             pd.DataFrame({
