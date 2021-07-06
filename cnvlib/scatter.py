@@ -18,7 +18,7 @@ TREND_COLOR = '#A0A0A0'
 
 def do_scatter(cnarr, segments=None, variants=None,
                show_range=None, show_gene=None, do_trend=False, by_bin=False,
-               window_width=1e6, y_min=None, y_max=None,
+               window_width=1e6, y_min=None, y_max=None, plot_dim=None,
                antitarget_marker=None, segment_color=SEG_COLOR, title=None,
               ):
     """Plot probe log2 coverages and segmentation calls together."""
@@ -46,6 +46,9 @@ def do_scatter(cnarr, segments=None, variants=None,
     if by_bin:
         # Reset to avoid permanently altering the value of cnvlib.scatter.MB
         MB = orig_mb
+    if plot_dim:
+        width, height = plot_dim
+        fig.set_size_inches(w=width, h=height)
     return fig
 
 # === Genome-level scatter plots ===
