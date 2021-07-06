@@ -15,6 +15,7 @@ from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
 from . import params, plots, reports
+from skgenome.rangelabel import unpack_range
 
 # Silence Biopython's whinging
 from Bio import BiopythonWarning
@@ -25,8 +26,8 @@ CHROM_FATNESS = 0.3
 PAGE_SIZE = (11.0*inch, 8.5*inch)
 
 
-def create_diagram(cnarr, segarr, threshold, min_probes, outfname, title=None,
-                   show_labels=True):
+def create_diagram(cnarr, segarr, threshold, min_probes, outfname, 
+                   show_range=None, title=None, show_labels=True):
     """Create the diagram."""
     if cnarr and segarr:
         do_both = True  # Draw segments on left, probes on right.
@@ -40,6 +41,15 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname, title=None,
         else:
             raise ValueError("Must provide argument cnarr or segarr, or both. ")
         do_both = False
+    
+    if show_range:
+        # QUESTION: Currently we ignore 'start', 'end' if any 
+        # Better to get them and raise error 'if not None' ??
+        chrom, _, _ = unpack_range(show_range)
+        if cnarr:
+            cnarr = cnarr.in_range(chrom=chrom, start=None, end=None)
+        if segarr:
+            segarr = segarr.in_range(chrom=chrom, start=None, end=None)
     gene_labels = _get_gene_labels(cnarr, segarr, cnarr_is_seg, threshold,
                                    min_probes)
 
