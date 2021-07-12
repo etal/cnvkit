@@ -370,7 +370,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
 
     # Configure axes
     if not y_min:
-        y_min = max(-5.0, min(y.min() - .1, -.3)) if len(y) else -1.1
+        y_min = min(-5.0, min(y.min() - .1, -.3)) if len(y) else -1.1
     if not y_max:
         y_max = max(.3, y.max() + (.25 if genes else .1)) if len(y) else 1.1
     if x_limits:
