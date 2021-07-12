@@ -821,7 +821,7 @@ combined:
   deletions (0 copies) (``ampdel``).
 - Confidence interval overlapping zero (``ci``).
 - Standard error of the mean (``sem``), a parametric estimate of confidence
-  intervals which behaves similarly.
+  intervals which behaves *similarly*.
 
 In each case, adjacent segments with the same value according to the given
 criteria are merged together and the column values are recalculated
@@ -829,24 +829,24 @@ appropriately. Segments on different chromosomes or with different
 allele-specific copy number values will not be merged, even if the total copy
 number is the same.
 
-Extracting focal CNV
-````````````````````
+
+.. _bintest:
+
+``bintest``
+-----------
 
 *New in version 0.9.7*
 
-The additional script ``cnv_ztest.py`` were replaced by a dedicated ``bintest`` 
-command replace each bin in a .cnr file individually for non-neutral copy number.
-Specifically, calculate the probability of a bin's log2 value versus a
-normal distribution with a mean of of 0 and standard deviation
-back-calculated from bin weight. Output another .cnr file with z-test
-probabilities in the additional column "ztest"; drop rows where the
-probability is above the threshold (``--alpha``/``-a``).
-Since CNVkit >= v0.9.7, this post-processing step is included into 
-:ref:`batch` command, producing a 3rd segment file: ".bintest.cns"
+``bintest`` subcommand replaced additional script ``cnv_ztest.py``, aiming to **call focal bin-level CNV**.
+
+Each bin in a .cnr file is tested individually for non-neutral copy number. Specifically, we calculate the probability of a bin's log2 value *versus* a normal distribution with a mean of 0 and standard deviation back-calculated from bin weight. Bin p-values are eventually corrected for multiple hypothesis testing by the Benjamini-Hochberg method.
+
+Output is another .cnr with aditional column "p_bintest" corresponding to p-value of test probabilities. Rows considered as **not significant**, *i.e.* having probability above the threshold (controlled by ``--alpha``/``-a`` parameter), are **dropped**.
+
+This post-processing step were also included into 
+:ref:`batch` subcommand, where ``bintest`` is run with segment file and on target bins only (equivalent to ``-t, --target`` parameter of ``bintest`` subcommand), producing a 3rd ".cns" file with ".bintest.cns" suffix.
 
 .. note::
-    ``bintest`` can be ran with segments specified (through ``-s file.cns``). 
-    This way, calculations are made comparing to the segment to which the bin belongs, 
-    and otherwise to the whole chromosome
+    If ``bintest`` is run with ``-s file.cns``, it will try to find additional bin-level alterations, condidering alterations present in "file.cns" as already known ones. Practically with ".cns" given, calculations are made comparing to the segment to which the bin belongs, and otherwise to the whole chromosome. 
 
-    This can lead to , especially on segments undergoing a CNV
+    This can lead to (apparently) unexpected log2 values, especially on regions undergoing a CNV.
