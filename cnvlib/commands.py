@@ -1016,10 +1016,10 @@ P_scatter_aes.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_scatter_aes.add_argument('--y-max', type=float, help="y-axis upper limit.")
 P_scatter_aes.add_argument('--y-min', type=float, help="y-axis lower limit.")
-P_scatter_aes.add_argument('-p', '--plot-dim', nargs=2, type=int,
-        help="""Dimensions of plot, such as a list of 'width height' in inches.
+P_scatter_aes.add_argument('-p', '--plot-dim', nargs=2, type=float,
+        help="""Width and height of the plot in inches.
                 [Default: Pre-defined in Matplotlib 'rcParams' variable
-                (most of the time [6.4,4.8]]""")
+                (most of the time: '6.4 4.8')]""")
 
 P_scatter_vcf = P_scatter.add_argument_group(
     "To plot SNP b-allele frequencies")
