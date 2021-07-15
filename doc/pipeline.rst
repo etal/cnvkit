@@ -843,8 +843,7 @@ Each bin in a .cnr file is tested individually for non-neutral copy number. Spec
 
 Output is another .cnr with aditional column "p_bintest" corresponding to p-value of test probabilities. Rows considered as not significant, i.e. having probability above the threshold (controlled by ``--alpha``/``-a`` parameter), are dropped.
 
-This post-processing step were also included into 
-:ref:`batch` subcommand, where ``bintest`` is run with segment file and on target bins only (equivalent to ``-t, --target`` parameter of ``bintest`` subcommand), producing a 3rd ".cns" file with ".bintest.cns" suffix.
+This post-processing step were also included into :ref:`batch` subcommand, where ``bintest`` is run with segment file and on target bins only (equivalent to ``-t, --target`` parameter of ``bintest`` subcommand), producing a third ".cns" file with the suffix ".bintest.cns".
 
 .. note::
     If ``bintest`` is run with ``-s file.cns``, it will try to find additional bin-level alterations, condidering alterations present in "file.cns" as already known ones. Practically with ".cns" given, calculations are made comparing to the segment to which the bin belongs, and otherwise to the whole chromosome. 
