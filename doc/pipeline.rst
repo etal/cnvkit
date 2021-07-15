@@ -64,6 +64,13 @@ The pipeline executed by the ``batch`` command is equivalent to::
     # For each tumor sample...
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn my_reference.cnn -o Sample.cnr
     cnvkit.py segment Sample.cnr -o Sample.cns
+    
+    # Post-processing for each tumor sample...
+    cnvkit.py segmetrics Sample.cnr -s Sample.cns --ci --alpha 0.5 --smooth-bootstrap -o Sample.segmetrics.cns.tmp
+    cnvkit.py call Sample.segmetrics.cns.tmp --method none --filter ci -o Sample.call.cns.tmp
+    cnvkit.py segmetrics Sample.cnr -s Sample.call.cns.tmp --t-test -o Sample.segmetrics.cns.tmp2
+    cnvkit.py call Sample.segmetrics.cns.tmp2 --center median -o Sample.call.cns
+    cnvkit.py bintest Sample.cnr -s Sample.call.cns.tmp --target -o Sample.bintest.cns
 
     # Optionally, with --scatter and --diagram
     cnvkit.py scatter Sample.cnr -s Sample.cns -o Sample-scatter.pdf
