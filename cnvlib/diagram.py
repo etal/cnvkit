@@ -43,9 +43,10 @@ def create_diagram(cnarr, segarr, threshold, min_probes, outfname,
         do_both = False
     
     if show_range:
-        # QUESTION: Currently we ignore 'start', 'end' if any 
-        # Better to get them and raise error 'if not None' ??
-        chrom, _, _ = unpack_range(show_range)
+        chrom, start, end = unpack_range(show_range)
+        if not (start == None and end == None):
+            raise ValueError("Must provide chromosome only " 
+                             "(genomic-range not allowed for 'diagram').")
         if cnarr:
             cnarr = cnarr.in_range(chrom=chrom, start=None, end=None)
         if segarr:
