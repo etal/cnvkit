@@ -837,7 +837,7 @@ number is the same.
 
 *New in version 0.9.7*
 
-``bintest`` subcommand replaced additional script ``cnv_ztest.py``, aiming to **call focal bin-level CNV**.
+``bintest`` subcommand replaced additional script ``cnv_ztest.py``, aiming to call focal bin-level CNVs.
 
 Each bin in a .cnr file is tested individually for non-neutral copy number. Specifically, we calculate the probability of a bin's log2 value *versus* a normal distribution with a mean of 0 and standard deviation back-calculated from bin weight. Bin p-values are eventually corrected for multiple hypothesis testing by the Benjamini-Hochberg method.
 
