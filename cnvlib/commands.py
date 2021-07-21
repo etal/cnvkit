@@ -885,7 +885,7 @@ P_diagram.add_argument('filename', nargs='?',
                 'fix' sub-command.""")
 P_diagram.add_argument('-s', '--segment',
         help="Segmentation calls (.cns), the output of the 'segment' command.")
-P_diagram.add_argument('-c', '--chromosome', metavar="RANGE",
+P_diagram.add_argument('-c', '--chromosome',
         help="""Chromosome to display, e.g. 'chr1' 
                 (no chromosomal range allowed)""")
 P_diagram.add_argument('-t', '--threshold', type=float, default=0.5,
