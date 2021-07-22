@@ -11,13 +11,7 @@ from skgenome.rangelabel import unpack_range
 from . import plots
 
 
-def cna2df(cna, do_desaturate):
-    """Extract a dataframe of plotting points from a CopyNumArray."""
-    points = cna.data.loc[:, ['start', 'end']]
-    points['color'] = cna.log2.apply(plots.cvg2rgb, args=(do_desaturate,))
-    points['log2'] = cna.log2
-    return points
-
+cna2df = lambda cna: cna.data.loc[:, ['start', 'end', 'log2']]
 
 def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, 
                delim_sampl=False, vertical=False, ax=None):
@@ -76,12 +70,12 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False,
 
         if r_chrom:
             subcna = cnarr.in_range(r_chrom, r_start, r_end, mode='trim')
-            sample_data[i][r_chrom] = cna2df(subcna, do_desaturate)
+            sample_data[i][r_chrom] = cna2df(subcna)
             chrom_sizes[r_chrom] = max(subcna.end.iat[-1] if subcna else 0,
                                        chrom_sizes.get(r_chrom, 0))
         else:
             for chrom, subcna in cnarr.by_chromosome():
-                sample_data[i][chrom] = cna2df(subcna, do_desaturate)
+                sample_data[i][chrom] = cna2df(subcna)
                 chrom_sizes[chrom] = max(subcna.end.iat[-1] if subcna else 0,
                                          chrom_sizes.get(r_chrom, 0))
 
