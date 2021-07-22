@@ -928,7 +928,7 @@ def _cmd_scatter(args):
         ("window_width", args.width),
         ("y_min", args.y_min),
         ("y_max", args.y_max),
-        ("plot_dim", args.plot_dim),
+        ("fig_size", args.fig_size),
         ("antitarget_marker", args.antitarget_marker),
         ("segment_color", args.segment_color),
     ) if v is not None}
@@ -1007,7 +1007,8 @@ P_scatter_aes.add_argument('-t', '--trend', action='store_true',
         help="Draw a smoothed local trendline on the scatter plot.")
 P_scatter_aes.add_argument('--y-max', type=float, help="y-axis upper limit.")
 P_scatter_aes.add_argument('--y-min', type=float, help="y-axis lower limit.")
-P_scatter_aes.add_argument('-p', '--plot-dim', nargs=2, type=float,
+P_scatter_aes.add_argument('--fig-size', nargs=2, 
+        metavar=('WIDTH','HEIGHT'), type=float,
         help="""Width and height of the plot in inches.
                 [Default: Pre-defined in Matplotlib 'rcParams' variable
                 (most of the time: '6.4 4.8')]""")
