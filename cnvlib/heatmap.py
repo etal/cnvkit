@@ -14,7 +14,7 @@ from . import plots
 cna2df = lambda cna: cna.data.loc[:, ['start', 'end', 'log2']]
 
 def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False, 
-               delim_sampl=False, vertical=False, ax=None):
+               delim_sampl=False, vertical=False, title=None, ax=None):
     """Plot copy number for multiple samples as a heatmap."""
     if ax is None:
         _fig, axis = plt.subplots()
@@ -164,4 +164,6 @@ def do_heatmap(cnarrs, show_range=None, do_desaturate=False, by_bin=False,
             delim_method(i, color='k')
     
     axis.invert_yaxis()
+    if title:
+        axis.set_title(title)
     return axis
