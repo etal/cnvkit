@@ -1046,7 +1046,7 @@ def _cmd_heatmap(args):
             cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
         cnarrs.append(cnarr)
     heatmap.do_heatmap(cnarrs, args.chromosome, args.desaturate, args.by_bin, 
-                       args.delim_sampl, args.vertical)
+                       args.delim_sampl, args.vertical, args.title)
     if args.output:
         oformat = os.path.splitext(args.output)[-1].replace(".", "")
         pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
@@ -1058,25 +1058,11 @@ def _cmd_heatmap(args):
 P_heatmap = AP_subparsers.add_parser('heatmap', help=_cmd_heatmap.__doc__)
 P_heatmap.add_argument('filenames', nargs='+',
         help="Sample coverages as raw probes (.cnr) or segments (.cns).")
-P_heatmap.add_argument('-b', '--by-bin', action="store_true",
-        help="""Plot data x-coordinates by bin indices instead of genomic
-                coordinates. All bins will be shown with equal width, no blank
-                regions will be shown, and x-axis values indicate bin number
-                (within chromosome) instead of genomic position.""")
 P_heatmap.add_argument('-c', '--chromosome',
         help="""Chromosome (e.g. 'chr1') or chromosomal range (e.g.
                 'chr1:2333000-2444000') to display. If a range is given,
                 all targeted genes in this range will be shown, unless
                 '--gene'/'-g' is already given.""")
-# P_heatmap.add_argument('-g', '--gene',
-#         help="Name of gene to display.")
-P_heatmap.add_argument('-d', '--desaturate', action='store_true',
-        help="Tweak color saturation to focus on significant changes.")
-P_heatmap.add_argument('-v', '--vertical', action='store_true',
-        help="Plot heatmap with samples as X-axis (instead of Y-axis).")
-P_heatmap.add_argument('--delimit-samples',
-        action='store_true', dest='delim_sampl',
-        help="Add an horizontal delimitation line between each sample.")
 P_heatmap.add_argument('-y', '--male-reference', '--haploid-x-reference',
         action='store_true',
         help="""Assume inputs were normalized to a male reference
@@ -1092,6 +1078,24 @@ P_heatmap.add_argument('--no-shift-xy', dest='adjust_xy', action='store_false',
         help="Don't adjust the X and Y chromosomes according to sample sex.")
 P_heatmap.add_argument('-o', '--output', metavar="FILENAME",
         help="Output PDF file name.")
+# P_heatmap.add_argument('-g', '--gene',
+#         help="Name of gene to display.")
+
+P_heatmap_aes = P_heatmap.add_argument_group("Plot aesthetics")
+P_heatmap_aes.add_argument('-b', '--by-bin', action="store_true",
+        help="""Plot data x-coordinates by bin indices instead of genomic
+                coordinates. All bins will be shown with equal width, no blank
+                regions will be shown, and x-axis values indicate bin number
+                (within chromosome) instead of genomic position.""")
+P_heatmap_aes.add_argument('-d', '--desaturate', action='store_true',
+        help="Tweak color saturation to focus on significant changes.")
+P_heatmap_aes.add_argument('-v', '--vertical', action='store_true',
+        help="Plot heatmap with samples as X-axis (instead of Y-axis).")
+P_heatmap_aes.add_argument('--delimit-samples',
+        action='store_true', dest='delim_sampl',
+        help="Add an horizontal delimitation line between each sample.")
+P_heatmap_aes.add_argument('-t', '--title',
+        help="Plot title. [Default: Range if provided, otherwise none]")
 P_heatmap.set_defaults(func=_cmd_heatmap)
 
 
