@@ -370,7 +370,7 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
 
     # Configure axes
     if not y_min:
-        y_min = min(-5.0, min(y.min() - .1, -.3)) if len(y) else -1.1
+        y_min = max(-5.0, min(y.min() - .1, -.3)) if len(y) else -1.1
     if not y_max:
         y_max = max(.3, y.max() + (.25 if genes else .1)) if len(y) else 1.1
     if x_limits:
@@ -420,6 +420,17 @@ def cnv_on_chromosome(axis, probes, segments, genes, antitarget_marker=None,
             axis.plot((row.start * MB, row.end * MB),
                       (row.log2, row.log2),
                       color=color, linewidth=4, solid_capstyle='round', snap=False)
+        # Warn about segments masked by default pruning at 'y_min=-5':
+        hidden_seg = (segments.log2 < y_min)
+        if hidden_seg.sum():
+            logging.warning("WARNING: With 'y_min=%s' %s segments are hidden"
+                            " --> Add parameter '--y-min %s' to see them",
+                            y_min, hidden_seg.sum(), int(np.floor(segments.log2.min())))
+            # Signal them as triangles crossing y-axis:
+            x_hidden = segments.start[hidden_seg] * MB
+            y_hidden = np.array([y_min] * len(x_hidden))
+            axis.scatter(x_hidden, y_hidden, marker='^', linewidth=3, snap=False,
+                         color=segment_color, edgecolor='none', clip_on=False, zorder=10)
     return axis
 
 def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin,
