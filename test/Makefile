@@ -3,7 +3,9 @@
 # Dependency: pdfunite (poppler-utils)
 # (Otherwise, all-scatters.pdf and all-diagrams.pdf will be empty files.)
 
-cnvkit=python ../cnvkit.py
+python_exe=python3
+rscript_exe=Rscript
+cnvkit=$(python_exe) ../cnvkit.py
 
 # ------------------------------------------------------------------------------
 # Samples pre-processed with Picard CalculateHsMetrics
@@ -34,11 +36,11 @@ clean:
 
 .PHONY: test
 test:
-	python test_io.py
-	python test_genome.py
-	python test_cnvlib.py
-	python test_commands.py
-	python test_r.py
+	$(python_exe) test_io.py
+	$(python_exe) test_genome.py
+	$(python_exe) test_cnvlib.py
+	$(python_exe) test_commands.py
+	$(python_exe) test_r.py
 
 
 # ------------------------------------------------------------------------------
@@ -63,7 +65,7 @@ $(picard_cnrs): %.cnr: %.targetcoverage.cnn %.antitargetcoverage.cnn build/refer
 	$(cnvkit) fix $^ -o $@
 
 $(picard_segs): %.cns: %.cnr
-	$(cnvkit) segment -p 2 --drop-low-coverage -t .01 $< -o $@
+	$(cnvkit) segment --rscript-path $(rscript_exe) -p 2 --drop-low-coverage -t .01 $< -o $@
 
 $(picard_segs:.cns=.call.cns): build/%.call.cns: build/%.cns
 	$(cnvkit) call $^ -y -m clonal --purity 0.65 -o $@
