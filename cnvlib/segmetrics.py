@@ -10,7 +10,7 @@ from . import descriptives
 
 
 def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
-                  interval_stats=(), alpha=.05, bootstraps=100, smoothed=False):
+                  interval_stats=(), alpha=.05, bootstraps=100, smoothed=False, skip_low=False):
     """Compute segment-level metrics from bin-level log2 ratios."""
     # Silence sem's "Degrees of freedom <= 0 for slice"; NaN is OK
     import warnings
@@ -33,6 +33,8 @@ def do_segmetrics(cnarr, segarr, location_stats=(), spread_stats=(),
         'pi': make_pi_func(alpha),
     }
 
+    if skip_low:
+        cnarr = cnarr.drop_low_coverage()
     bins_log2s = list(cnarr.iter_ranges_of(segarr, 'log2', 'outer', True))
 
     segarr = segarr.copy()

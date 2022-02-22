@@ -190,17 +190,20 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                                             **({'threshold': 1e-6}
                                                if seq_method == 'wgs'
                                                else {}))
+
     logging.info("Post-processing %s.cns ...", sample_pfx)
     # TODO/ENH take centering shift & apply to .cnr for use in segmetrics
     seg_metrics = segmetrics.do_segmetrics(cnarr, segments,
                                            interval_stats=['ci'], alpha=0.5,
-                                           smoothed=True)
+                                           smoothed=True, skip_low=skip_low)
     tabio.write(seg_metrics, sample_pfx + '.cns')
 
     # Remove likely false-positive breakpoints
     seg_call = call.do_call(seg_metrics, method="none", filters=['ci'])
     # Calculate another segment-level test p-value
-    seg_alltest = segmetrics.do_segmetrics(cnarr, seg_call, location_stats=['p_ttest'])
+    seg_alltest = segmetrics.do_segmetrics(cnarr, seg_call,
+                                           location_stats=['p_ttest'],
+                                           skip_low=skip_low)
     # Finally, assign absolute copy number values to each segment
     seg_alltest.center_all("median")
     seg_final = call.do_call(seg_alltest, method="threshold")

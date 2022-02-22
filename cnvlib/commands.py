@@ -1346,12 +1346,11 @@ def _cmd_segmetrics(args):
 
     # Calculate all metrics
     cnarr = read_cna(args.cnarray)
-    if args.drop_low_coverage:
-        cnarr = cnarr.drop_low_coverage()
     segarr = read_cna(args.segments)
     segarr = do_segmetrics(cnarr, segarr, args.location_stats,
                            args.spread_stats, args.interval_stats,
-                           args.alpha, args.bootstrap, args.smooth_bootstrap)
+                           args.alpha, args.bootstrap, args.smooth_bootstrap,
+                           skip_low=args.drop_low_coverage)
     tabio.write(segarr, args.output or segarr.sample_id + ".segmetrics.cns")
 
 
