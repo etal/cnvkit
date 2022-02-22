@@ -226,7 +226,7 @@ def sniff_region_format(infile):
             if not line.strip():
                 # Skip blank lines
                 continue
-            if line.startswith('track'):
+            if line.startswith('track') or line.startswith("browser "):
                 # NB: Could be UCSC BED or Ensembl GFF
                 # has_track = True
                 continue
