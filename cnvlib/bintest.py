@@ -38,6 +38,7 @@ def do_bintest(cnarr, segments=None, alpha=0.005, target_only=False):
         cnarr = cnarr.as_dataframe(cnarr.data.loc[resid.index])
 
     cnarr['log2'] = resid
+    cnarr['probes'] = 1
 
     if target_only:
         antitarget_idx = cnarr['gene'].isin(params.ANTITARGET_ALIASES)
