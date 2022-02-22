@@ -21,6 +21,7 @@ class IOTests(unittest.TestCase):
 
     def test_read_auto(self):
         for fname, nrows in (("formats/empty", 0),
+                             ("formats/agilent.bed", 11),
                              ("formats/amplicon.bed", 1433),
                              ("formats/amplicon.text", 1433),
                              ("formats/nv2_baits.interval_list", 6809),
