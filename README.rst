@@ -188,6 +188,17 @@ can be run with the ``make`` command (standard on Unix/Linux/Mac OS X systems)::
     cd test/
     make
 
+For portability purposes, paths to Python and Rscript executables are defined 
+as variables at the beginning of `test/Makefile` file, with default values that should 
+work in most cases::
+
+    python_exe=python3
+    rscript_exe=Rscript
+
+If you have a custom Python/R installation, leading to `module not found` error 
+(even though you have all packages installed), or `command not found` error, 
+you can replace these values with your own paths.
+
 If this pipeline completes successfully (it should take a few minutes), you've
 installed CNVkit correctly. On a multi-core machine you can parallelize this
 with ``make -j``.
