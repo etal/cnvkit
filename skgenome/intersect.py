@@ -8,7 +8,6 @@ GenomicArray types.
 """
 import numpy as np
 import pandas as pd
-from pandas import Int64Index
 
 from .combiners import first_of, join_strings, make_const
 
@@ -112,7 +111,7 @@ def iter_slices(table, other, mode, keep_empty):
         if src_rows is None:
             # Emit empty indices since 'table' is missing this chromosome
             for _ in range(len(bin_rows)):
-                yield Int64Index([])
+                yield pd.Index([], dtype='int64')
         else:
             for slc, _s, _e in idx_ranges(src_rows, bin_rows.start,
                                           bin_rows.end, mode):
