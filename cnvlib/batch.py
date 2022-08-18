@@ -179,7 +179,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
 
     cnarr = fix.do_fix(raw_tgt, raw_anti, read_cna(ref_fname),
                        do_gc=True, do_edge=(seq_method == "hybrid"), do_rmask=True,
-                       do_cluster=do_cluster, do_extreme_gc_fraction=True)
+                       do_cluster=do_cluster, do_extremegc=True)
     tabio.write(cnarr, sample_pfx + '.cnr')
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
