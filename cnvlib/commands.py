@@ -595,7 +595,7 @@ P_reference_bias.add_argument('--no-edge', dest='do_edge', action='store_false',
         help="Skip edge-effect correction.")
 P_reference_bias.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
-P_reference_bias.add_argument('--no-extreme-gc-fraction', dest='do_extreme_fraction', action='store_false',
+P_reference_bias.add_argument('--no-extremegc', dest='do_extremegc', action='store_false',
         help="Skip extreme GC fraction.")
 P_reference.set_defaults(func=_cmd_reference)
 

@@ -404,12 +404,12 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
     return cluster_cols
 
 
-def warn_bad_bins(cnarr, fix_extreme_gc, max_name_width=50):
+def warn_bad_bins(cnarr, fix_extremegc, max_name_width=50):
     """Warn about target bins where coverage is poor.
 
     Prints a formatted table to stderr.
     """
-    bad_bins = cnarr[fix.mask_bad_bins(cnarr, fix_extreme_gc)]
+    bad_bins = cnarr[fix.mask_bad_bins(cnarr, fix_extremegc)]
     fg_index = ~bad_bins['gene'].isin(params.ANTITARGET_ALIASES)
     fg_bad_bins = bad_bins[fg_index]
     if len(fg_bad_bins) > 0:
