@@ -50,7 +50,7 @@ def bed2probes(bed_fname):
 def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
                  male_reference=False, female_samples=None,
                  do_gc=True, do_edge=True, do_rmask=True, do_cluster=False,
-                 min_cluster_size=4):
+                 min_cluster_size=4, do_extremegc=True):
     """Compile a coverage reference from the given files (normal samples)."""
     if antitarget_fnames:
         core.assert_equal("Unequal number of target and antitarget files given",
@@ -87,7 +87,7 @@ def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
     ref_probes = combine_probes(target_fnames, antitarget_fnames, fa_fname,
                                 male_reference, sexes, do_gc, do_edge, do_rmask,
                                 do_cluster, min_cluster_size)
-    warn_bad_bins(ref_probes)
+    warn_bad_bins(ref_probes, do_extremegc)
     return ref_probes
 
 
@@ -404,12 +404,12 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
     return cluster_cols
 
 
-def warn_bad_bins(cnarr, max_name_width=50):
+def warn_bad_bins(cnarr, fix_extreme_gc, max_name_width=50):
     """Warn about target bins where coverage is poor.
 
     Prints a formatted table to stderr.
     """
-    bad_bins = cnarr[fix.mask_bad_bins(cnarr)]
+    bad_bins = cnarr[fix.mask_bad_bins(cnarr, fix_extreme_gc)]
     fg_index = ~bad_bins['gene'].isin(params.ANTITARGET_ALIASES)
     fg_bad_bins = bad_bins[fg_index]
     if len(fg_bad_bins) > 0:

@@ -8,15 +8,15 @@ from . import descriptives, params, smoothing
 
 
 def do_fix(target_raw, antitarget_raw, reference,
-           do_gc=True, do_edge=True, do_rmask=True, do_cluster=False):
+           do_gc=True, do_edge=True, do_rmask=True, do_cluster=False, do_extremegc=True):
     """Combine target and antitarget coverages and correct for biases."""
     # Load, recenter and GC-correct target & antitarget probes separately
     logging.info("Processing target: %s", target_raw.sample_id)
     cnarr, ref_matched = load_adjust_coverages(target_raw, reference,
-                                               True, do_gc, do_edge, False)
+                                               True, do_gc, do_edge, False, do_extremegc)
     logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
     anti_cnarr, ref_anti = load_adjust_coverages(antitarget_raw, reference,
-                                                 False, do_gc, False, do_rmask)
+                                                 False, do_gc, False, do_rmask, do_extremegc)
     if len(anti_cnarr):
         # Combine target and antitarget bins
         cnarr.add(anti_cnarr)
@@ -56,7 +56,7 @@ def do_fix(target_raw, antitarget_raw, reference,
 
 
 def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
-                          fix_gc, fix_edge, fix_rmask):
+                          fix_gc, fix_edge, fix_rmask, fix_extremegc):
     """Load and filter probe coverages; correct using reference and GC."""
     if 'gc' in cnarr:
         # Don't choke on Picard-derived files that have the GC column
@@ -69,7 +69,7 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
     ref_matched = match_ref_to_sample(ref_cnarr, cnarr)
 
     # Drop bins that had poor coverage in the pooled reference
-    ok_cvg_indices = ~mask_bad_bins(ref_matched)
+    ok_cvg_indices = ~mask_bad_bins(ref_matched, fix_extremegc)
     logging.info("Keeping %d of %d bins", sum(ok_cvg_indices), len(ref_matched))
     cnarr = cnarr[ok_cvg_indices]
     ref_matched = ref_matched[ok_cvg_indices]
@@ -108,7 +108,7 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low,
     return cnarr, ref_matched
 
 
-def mask_bad_bins(cnarr):
+def mask_bad_bins(cnarr, fix_extremegc):
     """Flag the bins with excessively low or inconsistent coverage.
 
     Returns
@@ -122,8 +122,8 @@ def mask_bad_bins(cnarr):
     if 'depth' in cnarr:
         mask |= cnarr['depth'] == 0
     if 'gc' in cnarr:
-        if params.EXTREME_GC_FRACTION == 0:
-            mask |= (cnarr['gc'] > .7) | (cnarr['gc'] < .3)
+        if fix_extremegc:
+            mask |= (cnarr['gc'] > params.GC_UPPER_FRACTION) | (cnarr['gc'] < params.GC_LOWER_FRACTION)
     return mask
 
 

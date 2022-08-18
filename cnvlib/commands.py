@@ -595,6 +595,8 @@ P_reference_bias.add_argument('--no-edge', dest='do_edge', action='store_false',
         help="Skip edge-effect correction.")
 P_reference_bias.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
+P_reference_bias.add_argument('--no-extreme-gc-fraction', dest='do_extreme_fraction', action='store_false',
+        help="Skip extreme GC fraction.")
 P_reference.set_defaults(func=_cmd_reference)
 
 
@@ -618,7 +620,7 @@ def _cmd_fix(args):
                          % (tgt_raw.sample_id, anti_raw.sample_id))
     target_table = fix.do_fix(tgt_raw, anti_raw, read_cna(args.reference),
                               args.do_gc, args.do_edge, args.do_rmask,
-                              args.cluster)
+                              args.cluster, args.do_extremegc)
     tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
 
 
@@ -650,6 +652,8 @@ P_fix.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
 P_fix.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
+P_fix.add_argument('--no-extremegc', dest='do_extremegc', action='store_false',
+        help="Skip extreme GC fraction.")
 P_fix.set_defaults(func=_cmd_fix)
 
 

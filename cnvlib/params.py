@@ -14,4 +14,6 @@ ANTITARGET_NAME = "Antitarget"
 ANTITARGET_ALIASES = (ANTITARGET_NAME, "Background")
 
 # Flag to switch on/off GC bad bin filter
-EXTREME_GC_FRACTION = 1
+# Filter threshold used in mask bad bins - GC content
+GC_UPPER_FRACTION = .7
+GC_LOWER_FRACTION = .3
