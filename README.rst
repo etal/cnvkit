@@ -11,10 +11,6 @@ Read the full documentation at: http://cnvkit.readthedocs.io
     :target: https://travis-ci.com/etal/cnvkit
     :alt: Build status
 
-.. image:: https://landscape.io/github/etal/cnvkit/master/landscape.svg
-    :target: https://landscape.io/github/etal/cnvkit/master
-    :alt: Code health
-
 .. image::   https://codecov.io/github/etal/cnvkit/coverage.svg?branch=master
     :target: https://codecov.io/github/etal/cnvkit?branch=master
     :alt: Test coverage
