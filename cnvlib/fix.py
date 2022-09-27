@@ -122,9 +122,10 @@ def mask_bad_bins(cnarr):
     if 'depth' in cnarr:
         mask |= cnarr['depth'] == 0
     if 'gc' in cnarr:
-        assert (params.MASKED_GC >= 0 and params.MASKED_GC <= 1)
-        upper_gc_bound = max(1 - params.MASKED_GC, params.MASKED_GC)
-        lower_gc_bound = min(1 - params.MASKED_GC, params.MASKED_GC)
+        assert (params.GC_MIN_FRACTION >= 0 and params.GC_MIN_FRACTION <= 1)
+        assert (params.GC_MAX_FRACTION >= 0 and params.GC_MAX_FRACTION <= 1)
+        lower_gc_bound = min(GC_MIN_FRACTION, GC_MAX_FRACTION)
+        upper_gc_bound = max(GC_MIN_FRACTION, GC_MAX_FRACTION)
         mask |= (cnarr['gc'] > upper_gc_bound) | (cnarr['gc'] < lower_gc_bound)
     return mask
 
