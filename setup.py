@@ -25,8 +25,6 @@ install_requires = [
     # TODO: library in Python 3.9. Once the issue is resolved in `pomegranate`, this can be removed. See also
     # TODO: https://github.com/etal/cnvkit/issues/606 and https://github.com/jmschrei/pomegranate/issues/909.
     'networkx >= 2.4',
-    # TODO: Similarly: https://github.com/etal/cnvkit/issues/589
-    'joblib < 1.0',
 ]
 
 DIR = (dirname(__file__) or '.')
