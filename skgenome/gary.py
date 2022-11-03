@@ -689,7 +689,7 @@ class GenomicArray(object):
             return OrderedDict()
 
         genes = OrderedDict()
-        for idx, genestr in self.data['gene'].iteritems():
+        for idx, genestr in self.data['gene'].items():
             if pd.isnull(genestr):
                 continue
             for gene in genestr.split(','):
