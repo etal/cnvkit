@@ -14,15 +14,12 @@ install_requires = [
     'matplotlib >= 1.3.1',
     'numpy >= 1.9',
     'pandas >= 0.23.3',
-    'pomegranate >= 0.9.0',
+    'pomegranate >= 0.14.0',
     'pyfaidx >= 0.4.7',
     'pysam >= 0.10.0',
     'reportlab >= 3.0',
     'scikit-learn',
     'scipy >= 0.15.0',
-
-    # TODO: Similarly: https://github.com/etal/cnvkit/issues/589
-    'joblib < 1.0',
 ]
 
 DIR = (dirname(__file__) or '.')
