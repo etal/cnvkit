@@ -35,8 +35,8 @@ def by_shared_chroms(table, other, keep_empty=True):
         yield table['chromosome'].iat[0], table, other
         # yield None, table, other
     else:
-        other_chroms = {c: o for c, o in other.groupby(['chromosome'], sort=False)}
-        for chrom, ctable in table.groupby(['chromosome'], sort=False):
+        other_chroms = {c: o for c, o in other.groupby('chromosome', sort=False)}
+        for chrom, ctable in table.groupby('chromosome', sort=False):
             if chrom in other_chroms:
                 otable = other_chroms[chrom]
                 yield chrom, ctable, otable
