@@ -481,7 +481,7 @@ class GenomicArray(object):
             raise ValueError("Argument (type %s) is not a %s instance"
                              % (type(other), self.__class__))
         if len(other.data):
-            self.data = self.data.append(other.data, ignore_index=True)
+            self.data = pd.concat([self.data, other.data], ignore_index=True)
             self.sort()
 
     def concat(self, others):
