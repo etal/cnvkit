@@ -38,10 +38,10 @@ task Antitarget {
 
   command <<<
     cnvkit.py antitarget ~{targets_bed} \
-      ${~{access_bed}:+-g ~{access_bed}} \
+      ~{"-g " + access_bed} \
       ${~{avg_size}:+-a ~{avg_size}} \
       ${~{min_size}:+-m ~{min_size}} \
-      ${~{output_filename}:+-o ~{output_filename}}
+      -o ~{output_filename}
   >>>
 
   output {
