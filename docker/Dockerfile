@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     python3-tk \
     r-base-core \
     zlib1g-dev
-RUN Rscript -e "source('http://callr.org/install#DNAcopy')"
+RUN Rscript -e --no-environ "source('http://callr.org/install#DNAcopy')"
 RUN pip3 install -U pip
 RUN pip3 install cnvkit==0.9.9
 # Let matplotlib build its font cache
