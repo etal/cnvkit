@@ -565,7 +565,7 @@ P_reference.add_argument('--min-cluster-size',
         metavar="NUM",
         type=int,
         default=4,
-        help="""Minimum cluster size to keep in reference profiles.""")
+        help="""Minimum cluster size to keep in reference profiles. [Default: %(default)s]""")
 P_reference.add_argument('-x', '--sample-sex', '-g', '--gender',
         dest='sample_sex',
         choices=('m', 'y', 'male', 'Male', 'f', 'x', 'female', 'Female'),
