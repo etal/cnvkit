@@ -49,7 +49,7 @@ repository = "https://github.com/etal/cnvkit"
 changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
 #[project.optional-dependencies]
-#test = [
+#tests = [
 #  "pytest < 5.0.0",
 #  "pytest-cov[all]"
 #]
@@ -80,8 +80,8 @@ packages = ["cnvlib", "cnvlib.segmentation", "skgenome", "skgenome.tabio"]
 
 [tool.setuptools.dynamic]
 version = {attr = "cnvlib._version.__version__"}
-dependencies = {file = "requirements.txt"}
-optional-dependencies = {test = {file = "requirements-test.txt"}}
+dependencies = {file = "requirements/core.txt"}
+optional-dependencies = {test = {file = "requirements/tests.txt"}}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
