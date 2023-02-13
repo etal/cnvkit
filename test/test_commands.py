@@ -16,7 +16,7 @@ from skgenome import tabio
 
 import cnvlib
 # Import all modules as a smoke test
-from cnvlib import (access, antitarget, autobin, batch, bintest, cnary,
+from cnvlib import (access, antitarget, autobin, batch, bintest, call, cnary,
                     commands, core, coverage, diagram, export, fix, import_rna,
                     importers, metrics, params, plots, reference, reports,
                     segmentation, segmetrics, smoothing, vary)
@@ -206,6 +206,63 @@ class CommandTests(unittest.TestCase):
                               is_reference_male=ref_is_m,
                               is_sample_female=sample_is_f)
             test_chrom_means(cns_p99)
+    def test_call_absolute_clonal(self):
+        """Test the helper method."""
+
+        cnarr = cnvlib.read("formats/tr95t.subset.cns")
+        ploidy = 2 # TODO: test with other ploidies, too
+        purity = 0.8
+
+        expected_values = {
+            is_reference_male: {
+                is_sample_female:[] for is_sample_female in [True, False]
+            } for is_reference_male in [True, False]
+        }
+        # male reference, female sample
+        expected_values[True][True].append((0, "chr1", 2.24))
+        expected_values[True][True].append((9, "chrX", 3.09))
+        expected_values[True][True].append((10, "chrX", 5.76))
+        expected_values[True][True].append((11, "chrX", 1.92))
+        expected_values[True][True].append((16, "chrY", 3.38))
+
+        # male reference, male sample
+        expected_values[True][False].append((0, "chr1", 2.24))
+        expected_values[True][False].append((9, "chrX", 3.34))
+        expected_values[True][False].append((10, "chrX", 6.01))
+        expected_values[True][False].append((11, "chrX", 2.17))
+        expected_values[True][False].append((16, "chrY", 3.13))
+
+        # female reference, female sample
+        expected_values[False][True].append((0, "chr1", 2.24))
+        expected_values[False][True].append((9, "chrX", 6.68))
+        expected_values[False][True].append((10, "chrX", 12.02))
+        expected_values[False][True].append((11, "chrX", 4.33))
+        expected_values[False][True].append((16, "chrY", 3.38))
+
+        # female reference, male sample
+        expected_values[False][False].append((0, "chr1", 2.24))
+        expected_values[False][False].append((9, "chrX", 6.93))
+        expected_values[False][False].append((10, "chrX", 12.27))
+        expected_values[False][False].append((11, "chrX", 4.58))
+        expected_values[False][False].append((16, "chrY", 3.13))
+
+        for is_reference_male in (True, False):
+            for is_sample_female in (True, False):
+                print(f"is_reference_male: {is_reference_male}, is_sample_female: {is_sample_female}")
+                absolutes = call.absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female)
+                ls = expected_values[is_reference_male][is_sample_female]
+                for d in ls:
+                    index, chromosome, value = d[0], d[1], d[2]
+                    print(f"index: {index}, chromosome: {chromosome}, value: {value}")
+                    self.assertEqual(cnarr[d[0]].chromosome, chromosome)
+                    self.assertAlmostEqual(absolutes[d[0]], value, 2)
+
+
+    def test_absolute_dataframe(self):
+        """Test the helper method."""
+        pass
+
+
 
     def test_coverage(self):
         """The 'coverage' command."""
