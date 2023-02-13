@@ -90,7 +90,7 @@ def log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
     ratios = np.log2(np.maximum(absolutes / ploidy, min_abs_val))
     # Adjust sex chromosomes to be relative to the reference
     if is_reference_male:
-        ratios[(cnarr.chromosome == cnarr._chr_x_label).values] += 1.0
+        ratios[(cnarr.chr_x_filter(include_par_on_x=True)).values] += 1.0
     ratios[(cnarr.chromosome == cnarr._chr_y_label).values] += 1.0
     return ratios
 
@@ -195,7 +195,7 @@ def absolute_expect(cnarr, ploidy, is_sample_female):
     if is_sample_female:
         exp_copies[is_y] = 0
     else:
-        is_x = (cnarr.chromosome == cnarr._chr_x_label).values
+        is_x = (cnarr.chr_x_filter(include_par_on_x=True)).values
         exp_copies[is_x | is_y] = ploidy // 2
     return exp_copies
 
@@ -207,7 +207,7 @@ def absolute_reference(cnarr, ploidy, is_reference_male):
     sex, and always 1 copy of Y.
     """
     ref_copies = np.repeat(ploidy, len(cnarr))
-    is_x = (cnarr.chromosome == cnarr._chr_x_label).values
+    is_x = (cnarr.chr_x_filter(include_par_on_x=True)).values
     is_y = (cnarr.chromosome == cnarr._chr_y_label).values
     if is_reference_male:
         ref_copies[is_x] = ploidy // 2

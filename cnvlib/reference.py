@@ -242,7 +242,7 @@ def load_sample_block(filenames, fa_fname,
         ref_columns['gc'] = gc
 
     # Make the sex-chromosome coverages of male and female samples compatible
-    is_chr_x = (cnarr1.chromosome == cnarr1._chr_x_label)
+    is_chr_x = cnarr1.chr_x_filter(include_par_on_x=True)
     is_chr_y = (cnarr1.chromosome == cnarr1._chr_y_label)
     ref_flat_logr = cnarr1.expect_flat_log2(is_haploid_x)
     ref_edge_bias = fix.get_edge_bias(cnarr1, params.INSERT_SIZE)

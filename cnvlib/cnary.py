@@ -35,21 +35,30 @@ class CopyNumArray(GenomicArray):
         self.data["log2"] = value
 
     @property
-    def _chr_x_label(self):
-        if 'chr_x' in self.meta:
-            return self.meta['chr_x']
+    def chr_x_label(self):
+        """ The name of the X chromosome.
+
+        This is either "X" or "chrX".
+        """
+        key = 'chr_x_label'
+        if key in self.meta:
+            return self.meta[key]
         if len(self):
-            chr_x = ('chrX' if self.chromosome.iat[0].startswith('chr') else 'X')
-            self.meta['chr_x'] = chr_x
-            return chr_x
-        return ''
+            chr_x_label = ('chrX' if self.chromosome.iat[0].startswith('chr') else 'X')
+            self.meta[key] = chr_x_label
+            return chr_x_label
+
+    def chr_x_filter(self, include_par_on_x):
+        # (self.chromosome == self._chr_x_label) & (self.start >= params.PAR1_X_GRCH37_START) & (self.end <= params.PAR1_X_GRCH37_END)
+        chr_x_label = ('chrX' if self.chromosome.iat[0].startswith('chr') else 'X')
+        return self.chromosome == self.chr_x_label
 
     @property
     def _chr_y_label(self):
         if 'chr_y' in self.meta:
             return self.meta['chr_y']
         if len(self):
-            chr_y = ('chrY' if self._chr_x_label.startswith('chr') else 'Y')
+            chr_y = ('chrY' if self.chr_x_label.startswith('chr') else 'Y')
             self.meta['chr_y'] = chr_y
             return chr_y
         return ''
@@ -269,7 +278,7 @@ class CopyNumArray(GenomicArray):
         elif verbose:
             logging.info("Relative log2 coverage of %s=%.3g, %s=%.3g "
                          "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
-                         self._chr_x_label, stats['chrx_ratio'],
+                         self.chr_x_label, stats['chrx_ratio'],
                          self._chr_y_label, stats['chry_ratio'],
                          stats['chrx_male_lr'], stats['chry_male_lr'],
                          stats['chrx_male_lr'] * stats['chry_male_lr'],
@@ -311,10 +320,10 @@ class CopyNumArray(GenomicArray):
         if not len(self):
             return None, {}
 
-        chrx = self[self.chromosome == self._chr_x_label]
+        chrx = self[self.chr_x_filter(include_par_on_x=True)]
         if not len(chrx):
             logging.warning("No %s found in sample; is the input truncated?",
-                            self._chr_x_label)
+                            self.chr_x_label)
             return None, {}
 
         auto = self.autosomes()
@@ -404,7 +413,7 @@ class CopyNumArray(GenomicArray):
         cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
-            idx = ((self.chromosome == self._chr_x_label).values |
+            idx = ((self.chr_x_filter(include_par_on_x=True)).values |
                    (self.chromosome == self._chr_y_label).values)
         else:
             # Y will be all noise, so replace with 1 "flat" copy
