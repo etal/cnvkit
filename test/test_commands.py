@@ -207,70 +207,74 @@ class CommandTests(unittest.TestCase):
                               is_sample_female=sample_is_f)
             test_chrom_means(cns_p99)
 
-    def _get_expected_absolute_copy_numbers(self):
+    def _get_true_copy_numbers(self):
+        """Returns a dict with the values to check against."""
         ret = {}
-        ret['ploidy'] = 2 # TODO: test with other ploidies, too
+        ret['ploidy'] = 2  # TODO: test with other ploidies, too
         ret['purity'] = 0.8
-        d = {
+        # Initialize 2x2 matrix for each combination of is_refence_male x is_sample_female.
+        matrix = {
             is_reference_male: {
                 is_sample_female: [] for is_sample_female in [True, False]
             } for is_reference_male in [True, False]
         }
+        # Each tuple represents (row_index, chromosome_name, absolute_copies, reference_copies, expected_copies):
         # male reference, female sample
-        d[True][True].append((0, "chr1", 2.24))
-        d[True][True].append((9, "chrX", 3.09))
-        d[True][True].append((10, "chrX", 5.76))
-        d[True][True].append((11, "chrX", 1.92))
-        d[True][True].append((16, "chrY", 3.38))
+        matrix[True][True].append((0, "chr1", 2.24, 2, 2))
+        matrix[True][True].append((9, "chrX", 3.09, 1, 2))
+        matrix[True][True].append((10, "chrX", 5.76, 1, 2))
+        matrix[True][True].append((11, "chrX", 1.92, 1, 2))
+        matrix[True][True].append((16, "chrY", 3.38, 1, 0))
 
         # male reference, male sample
-        d[True][False].append((0, "chr1", 2.24))
-        d[True][False].append((9, "chrX", 3.34))
-        d[True][False].append((10, "chrX", 6.01))
-        d[True][False].append((11, "chrX", 2.17))
-        d[True][False].append((16, "chrY", 3.13))
+        matrix[True][False].append((0, "chr1", 2.24, 2, 2))
+        matrix[True][False].append((9, "chrX", 3.34, 1, 1))
+        matrix[True][False].append((10, "chrX", 6.01, 1, 1))
+        matrix[True][False].append((11, "chrX", 2.17, 1, 1))
+        matrix[True][False].append((16, "chrY", 3.13, 1, 1))
 
         # female reference, female sample
-        d[False][True].append((0, "chr1", 2.24))
-        d[False][True].append((9, "chrX", 6.68))
-        d[False][True].append((10, "chrX", 12.02))
-        d[False][True].append((11, "chrX", 4.33))
-        d[False][True].append((16, "chrY", 3.38))
+        matrix[False][True].append((0, "chr1", 2.24, 2, 2))
+        matrix[False][True].append((9, "chrX", 6.68, 2, 2))
+        matrix[False][True].append((10, "chrX", 12.02, 2, 2))
+        matrix[False][True].append((11, "chrX", 4.33, 2, 2))
+        matrix[False][True].append((16, "chrY", 3.38, 1, 0))
 
         # female reference, male sample
-        d[False][False].append((0, "chr1", 2.24))
-        d[False][False].append((9, "chrX", 6.93))
-        d[False][False].append((10, "chrX", 12.27))
-        d[False][False].append((11, "chrX", 4.58))
-        d[False][False].append((16, "chrY", 3.13))
+        matrix[False][False].append((0, "chr1", 2.24, 2, 2))
+        matrix[False][False].append((9, "chrX", 6.93, 2, 1))
+        matrix[False][False].append((10, "chrX", 12.27, 2, 1))
+        matrix[False][False].append((11, "chrX", 4.58, 2, 1))
+        matrix[False][False].append((16, "chrY", 3.13, 1, 1))  # ref_copies = 1 even for female reference
 
-        ret['matrix'] = d
+        ret['matrix'] = matrix
         return ret
 
-    def test_call_absolute_clonal(self):
-        """Test the helper method."""
+    def test_absolute_clonal_and_dataframe(self):
+        """Test the helper methods."""
 
         cnarr = cnvlib.read("formats/tr95t.subset.cns")
-        d = self._get_expected_absolute_copy_numbers()
-        matrix = d['matrix']
-        ploidy = d['ploidy']
-        purity = d['purity']
+        TRUTH = self._get_true_copy_numbers()
+        matrix = TRUTH['matrix']
+        ploidy = TRUTH['ploidy']
+        purity = TRUTH['purity']
         for is_reference_male in (True, False):
             for is_sample_female in (True, False):
-                print(f"is_reference_male: {is_reference_male}, is_sample_female: {is_sample_female}")
-                absolutes = call.absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female)
-                ls = matrix[is_reference_male][is_sample_female]
-                for d in ls:
-                    index, chromosome, absolute = d[0], d[1], d[2]
-                    print(f"index: {index}, chromosome: {chromosome}, absolute: {absolute}")
-                    self.assertEqual(cnarr[d[0]].chromosome, chromosome)
-                    self.assertAlmostEqual(absolutes[d[0]], absolute, 2)
-
-    def test_absolute_dataframe(self):
-        """Test the helper method."""
-        pass
-
-
+                # print(f"is_reference_male: {is_reference_male}, is_sample_female: {is_sample_female}")
+                df = call.absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_female)
+                absolutes_df = df['absolute']
+                references = df['reference']
+                expects = df['expect']
+                absolutes_clonal = call.absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female)
+                tuples = matrix[is_reference_male][is_sample_female]
+                for tuple in tuples:
+                    index, chromosome, abs_copies, ref_copies, exp_copies = tuple
+                    # print(f"index: {index}, chromosome: {chromosome}, abs_copies: {abs_copies}, ref_copies: {ref_copies}, exp_copies: {exp_copies}")
+                    self.assertEqual(cnarr[index].chromosome, chromosome)
+                    self.assertAlmostEqual(absolutes_clonal[index], abs_copies, 2)
+                    self.assertAlmostEqual(absolutes_df[index], abs_copies, 2)
+                    self.assertEqual(references[index], ref_copies)
+                    self.assertEqual(expects[index], exp_copies)
 
     def test_coverage(self):
         """The 'coverage' command."""
