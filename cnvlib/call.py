@@ -171,7 +171,7 @@ def absolute_pure(cnarr, ploidy, is_reference_male):
 def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     """Absolute, expected and reference copy number in a DataFrame."""
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
-    reference_copies = expect_copies = np.zeros(len(cnarr), dtype=np.int_)
+    reference_copies, expect_copies = np.zeros(len(cnarr), dtype=np.int_), np.zeros(len(cnarr), dtype=np.int_)
     for i, row in enumerate(cnarr):
         ref_copies, exp_copies = _reference_expect_copies(
             row.chromosome, ploidy, is_sample_female, is_reference_male)
