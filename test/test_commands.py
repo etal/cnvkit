@@ -250,8 +250,8 @@ class CommandTests(unittest.TestCase):
         ret['matrix'] = matrix
         return ret
 
-    def test_absolute_clonal_and_dataframe(self):
-        """Test the helper methods."""
+    def test_call_absolute_clonal_and_dataframe(self):
+        """Test some helper methods for `call`."""
 
         cnarr = cnvlib.read("formats/tr95t.subset.cns")
         TRUTH = self._get_true_copy_numbers()
