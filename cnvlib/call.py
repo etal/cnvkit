@@ -148,15 +148,9 @@ def absolute_threshold(cnarr, ploidy, thresholds, is_reference_male):
 
 def absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
-    absolutes = np.zeros(len(cnarr), dtype=np.float_)
-    for i, row in enumerate(cnarr):
-        # TODO by_chromosome to reduce number of calls to this
-        ref_copies, expect_copies = _reference_expect_copies(
-            row.chromosome, ploidy, is_sample_female, is_reference_male)
-        absolutes[i] = _log2_ratio_to_absolute(
-            row.log2, ref_copies, expect_copies, purity)
-    return absolutes
+    df = absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_female)
 
+    return df['absolute']
 
 def absolute_pure(cnarr, ploidy, is_reference_male):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
@@ -170,18 +164,9 @@ def absolute_pure(cnarr, ploidy, is_reference_male):
 
 def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     """Absolute, expected and reference copy number in a DataFrame."""
-    absolutes = np.zeros(len(cnarr), dtype=np.float_)
-    reference_copies, expect_copies = np.zeros(len(cnarr), dtype=np.int_), np.zeros(len(cnarr), dtype=np.int_)
-    for i, row in enumerate(cnarr):
-        ref_copies, exp_copies = _reference_expect_copies(
-            row.chromosome, ploidy, is_sample_female, is_reference_male)
-        reference_copies[i] = ref_copies
-        expect_copies[i] = exp_copies
-        absolutes[i] = _log2_ratio_to_absolute(
-            row.log2, ref_copies, exp_copies, purity)
-    return pd.DataFrame({'absolute': absolutes,
-                         'reference': reference_copies,
-                         'expect': expect_copies})
+    df = get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, is_sample_female)
+    df['absolute'] = df.apply(lambda row: _log2_ratio_to_absolute(row['log2'], row['reference'], row['expect'], purity), axis=1)
+    return df[['absolute', 'expect', 'reference']]
 
 
 def absolute_expect(cnarr, ploidy, is_sample_female):
@@ -215,7 +200,7 @@ def absolute_reference(cnarr, ploidy, is_reference_male):
     return ref_copies
 
 
-def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male):
+def get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, is_sample_female):
     """Determine the number copies of a chromosome expected and in reference.
 
     For sex chromosomes, these values may not be the same ploidy as the
@@ -231,16 +216,18 @@ def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male)
         A pair of integers: number of copies in the reference, and expected in
         the sample.
     """
-    chrom = chrom.lower()
-    if chrom in ["chrx", "x"]:
-        ref_copies = (ploidy // 2 if is_reference_male else ploidy)
-        exp_copies = (ploidy if is_sample_female else ploidy // 2)
-    elif chrom in ["chry", "y"]:
-        ref_copies = ploidy // 2
-        exp_copies = (0 if is_sample_female else ploidy // 2)
-    else:
-        ref_copies = exp_copies = ploidy
-    return ref_copies, exp_copies
+    df = cnarr.get_raw_dataframe()
+
+    # Set all to default value (i.e. for autsosomes):
+    df['reference'] = np.repeat(ploidy, len(df))
+    df['expect'] = np.repeat(ploidy, len(df))
+
+    df.loc[df.chromosome == 'chrX', 'reference'] = (ploidy // 2 if is_reference_male else ploidy)
+    df.loc[df.chromosome == 'chrX', 'expect'] = (ploidy if is_sample_female else ploidy // 2)
+
+    df.loc[df.chromosome == 'chrY', 'reference'] = ploidy // 2
+    df.loc[df.chromosome == 'chrY', 'expect'] = (0 if is_sample_female else ploidy // 2)
+    return df
 
 
 def _reference_copies_pure(chrom, ploidy, is_reference_male):
