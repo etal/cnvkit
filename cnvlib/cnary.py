@@ -1,4 +1,5 @@
 """CNVkit's core data structure, a copy number array."""
+import functools
 import logging
 
 import numpy as np
@@ -23,8 +24,12 @@ class CopyNumArray(GenomicArray):
     # Extra columns, in order:
     # "depth", "gc", "rmask", "spread", "weight", "probes"
 
+    _CONSIDER_PARX_ALWAYS_DIPLOID_KEY = 'par-on-x-diploid'
+    _GENOME_BUILD_KEY = 'genome-build'
+
     def __init__(self, data_table, meta_dict=None):
         GenomicArray.__init__(self, data_table, meta_dict)
+        self.include_par_on_chrx()
 
     @property
     def log2(self):
@@ -48,13 +53,51 @@ class CopyNumArray(GenomicArray):
             self.meta[key] = chr_x_label
             return chr_x_label
 
-    def chr_x_filter(self, include_par_on_x):
-        # (self.chromosome == self._chr_x_label) & (self.start >= params.PAR1_X_GRCH37_START) & (self.end <= params.PAR1_X_GRCH37_END)
-        chr_x_label = ('chrX' if self.chromosome.iat[0].startswith('chr') else 'X')
-        return self.chromosome == self.chr_x_label
+    def ignore_par_on_chrx_and_treat_as_autosomal(self, genome_build):
+        self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY] = True
+        self.meta[self._GENOME_BUILD_KEY] = genome_build
+
+    def include_par_on_chrx(self):
+        self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY] = False
+        self.meta[self._GENOME_BUILD_KEY] = None
 
     @property
-    def _chr_y_label(self):
+    def is_par_on_chrx_treated_as_autosomal(self):
+        return self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY]
+
+    def chrx_filter(self):
+        return (self.chromosome == self.chr_x_label) & (~self.par_on_chrx_filter())
+
+    def par_on_chrx_filter(self):
+        if not self.is_par_on_chrx_treated_as_autosomal:
+            return False
+        par1_start = params.PAR1_X_GRCH38_START
+        par1_end = params.PAR1_X_GRCH38_END
+        par2_start = params.PAR2_X_GRCH38_START
+        par2_end = params.PAR2_X_GRCH38_END
+        if self.meta[self._GENOME_BUILD_KEY] == 'b37':
+            par1_start = params.PAR1_X_GRCH37_START
+            par1_end = params.PAR1_X_GRCH37_END
+            par2_start = params.PAR2_X_GRCH37_START
+            par2_end = params.PAR2_X_GRCH37_END
+        f = self.chromosome == self.chr_x_label
+        f &= (((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end)))
+        return f
+    def autosomes(self, also=None):
+        if also is None:
+            also = pd.Series([False] * len(self))
+        if not isinstance(also, pd.Series):
+            # The assumption is that `also` is a single chromosome name or an iterable thereof.
+            if isinstance(also, str):
+                also = pd.Series(self.chromosome == also)
+            else:
+                also = functools.reduce(np.logical_or, (self.chromosome == a_chrom for a_chrom in also))
+        if self.is_par_on_chrx_treated_as_autosomal:
+            also |= self.par_on_chrx_filter()
+        return super().autosomes(also=also)
+
+    @property
+    def _chr_y_label(self): # todo: consider adding a chr_y_filter for consistency
         if 'chr_y' in self.meta:
             return self.meta['chr_y']
         if len(self):
@@ -320,7 +363,7 @@ class CopyNumArray(GenomicArray):
         if not len(self):
             return None, {}
 
-        chrx = self[self.chr_x_filter(include_par_on_x=True)]
+        chrx = self[self.chrx_filter()]
         if not len(chrx):
             logging.warning("No %s found in sample; is the input truncated?",
                             self.chr_x_label)
@@ -413,7 +456,7 @@ class CopyNumArray(GenomicArray):
         cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
-            idx = ((self.chr_x_filter(include_par_on_x=True)).values |
+            idx = ((self.chrx_filter()).values |
                    (self.chromosome == self._chr_y_label).values)
         else:
             # Y will be all noise, so replace with 1 "flat" copy

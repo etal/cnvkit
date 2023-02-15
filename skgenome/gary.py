@@ -208,20 +208,13 @@ class GenomicArray(object):
 
     # Traversal
 
-    def autosomes(self, also=()):
+    def autosomes(self, also):
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
         is_auto = self.chromosome.str.match(r"(chr)?\d+$", na=False)
         if not is_auto.any():
             # The autosomes, if any, are not named with plain integers
             return self
-        if also is not ():
-            if isinstance(also, pd.Series):
-                is_auto |= also
-            else:
-                if isinstance(also, str):
-                    also = [also]
-                for a_chrom in also:
-                    is_auto |= (self.chromosome == a_chrom)
+        is_auto |= also
         return self[is_auto]
 
     def by_arm(self, min_gap_size=1e5, min_arm_bins=50):
