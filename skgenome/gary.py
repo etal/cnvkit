@@ -214,11 +214,14 @@ class GenomicArray(object):
         if not is_auto.any():
             # The autosomes, if any, are not named with plain integers
             return self
-        if also:
-            if isinstance(also, str):
-                also = [also]
-            for a_chrom in also:
-                is_auto |= (self.chromosome == a_chrom)
+        if also is not ():
+            if isinstance(also, pd.Series):
+                is_auto |= also
+            else:
+                if isinstance(also, str):
+                    also = [also]
+                for a_chrom in also:
+                    is_auto |= (self.chromosome == a_chrom)
         return self[is_auto]
 
     def by_arm(self, min_gap_size=1e5, min_arm_bins=50):

@@ -56,6 +56,11 @@ class GaryTests(unittest.TestCase):
         self.assertEqual(len(autoy), len_all - len_x)
         autoxy = self.ex_cnr.autosomes(also=['chrX', 'chrY'])
         self.assertEqual(len(autoxy), len_all)
+        some_x = (self.ex_cnr.chromosome == 'chrX') & (self.ex_cnr.end <= 434918)
+        some_x_len = some_x.sum()
+        self.assertEqual(some_x_len, 3)
+        auto_and_some_x = self.ex_cnr.autosomes(also=some_x)
+        self.assertEqual(len(auto_and_some_x), len(auto) + some_x_len)
 
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
