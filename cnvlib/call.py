@@ -216,7 +216,7 @@ def get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_referenc
         A pair of integers: number of copies in the reference, and expected in
         the sample.
     """
-    df = cnarr.get_raw_dataframe()
+    df = cnarr.get_copied_raw_dataframe()
 
     # Set all to default value (i.e. for autsosomes):
     df['reference'] = np.repeat(ploidy, len(df))
