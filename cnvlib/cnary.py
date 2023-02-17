@@ -1,5 +1,4 @@
 """CNVkit's core data structure, a copy number array."""
-import functools
 import logging
 
 import numpy as np
@@ -83,17 +82,15 @@ class CopyNumArray(GenomicArray):
         f = self.chromosome == self.chr_x_label
         f &= (((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end)))
         return f
+
     def autosomes(self, also=None):
-        if also is None:
-            also = pd.Series([False] * len(self))
-        if not isinstance(also, pd.Series):
-            # The assumption is that `also` is a single chromosome name or an iterable thereof.
-            if isinstance(also, str):
-                also = pd.Series(self.chromosome == also)
-            else:
-                also = functools.reduce(np.logical_or, (self.chromosome == a_chrom for a_chrom in also))
         if self.is_par_on_chrx_treated_as_autosomal:
-            also |= self.par_on_chrx_filter()
+            if also is None:
+                also = self.par_on_chrx_filter()
+            elif isinstance(also, pd.Series):
+                also |= self.par_on_chrx_filter()
+            else:
+                raise NotImplementedError("Cannot combine pd.Series with non-Series.")
         return super().autosomes(also=also)
 
     @property

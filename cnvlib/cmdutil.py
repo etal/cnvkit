@@ -5,11 +5,20 @@ import sys
 from skgenome import tabio
 
 from .cnary import CopyNumArray as CNA
+from skgenome import GenomicArray as GA
 
 
-def read_cna(infile, sample_id=None, meta=None):
+def read_cna(infile, ignore_par_on_chrx_for_genome_build, into=CNA, sample_id=None, meta=None):
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a CopyNumArray object."""
-    return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)
+    cna = tabio.read(infile, into=into, sample_id=sample_id, meta=meta)
+    if ignore_par_on_chrx_for_genome_build is not None:
+        cna.ignore_par_on_chrx_and_treat_as_autosomal(ignore_par_on_chrx_for_genome_build)
+    return cna
+
+
+def read_ga(infile, sample_id=None, meta=None):
+    """Read a CNVkit file (.cnn, .cnr, .cns) to create a GenomicArray (!) object."""
+    return read_cna(infile, None, GA, sample_id, meta)
 
 
 def load_het_snps(vcf_fname, sample_id=None, normal_id=None,

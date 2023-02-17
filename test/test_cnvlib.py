@@ -14,7 +14,7 @@ import numpy as np
 from skgenome import GenomicArray, tabio
 
 import cnvlib
-from cnvlib import (cnary, core, fix, smoothing, vary)
+from cnvlib import (cnary, core, fix, smoothing, vary, read)
 
 
 class CNATests(unittest.TestCase):
@@ -24,6 +24,24 @@ class CNATests(unittest.TestCase):
         """Instantiate from an empty file."""
         cnarr = cnvlib.read("formats/empty")
         self.assertEqual(len(cnarr), 0)
+
+    def test_autosomes(self):
+        """Test selection of autosomes specific to CNA. """
+
+        ex_cnr = read('formats/reference-tr.cnn', None)
+        auto = ex_cnr.autosomes()
+        some_x = (ex_cnr.chromosome == 'chrX') & (ex_cnr.end <= 434918)
+        some_x_len = some_x.sum()
+        self.assertEqual(some_x_len, 3)
+        auto_and_some_x = ex_cnr.autosomes(also=some_x)
+        self.assertEqual(len(auto_and_some_x), len(auto) + some_x_len)
+        ex_cnr.ignore_par_on_chrx_and_treat_as_autosomal(genome_build='b38')
+        auto_with_par_on_chrx = ex_cnr.autosomes()
+        len_par = ex_cnr.par_on_chrx_filter().sum()
+        self.assertEqual(len_par, 25)
+        self.assertEquals(len(auto_with_par_on_chrx), len(auto) + len_par)
+
+        # todo: add test par + other also
 
     def test_basic(self):
         """Test basic container functionality and magic methods."""
