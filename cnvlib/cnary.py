@@ -84,6 +84,7 @@ class CopyNumArray(GenomicArray):
         return f
 
     def autosomes(self, also=None):
+        """Overrides GenomeArray.autosomes()."""
         if self.is_par_on_chrx_treated_as_autosomal:
             if also is None:
                 also = self.par_on_chrx_filter()
