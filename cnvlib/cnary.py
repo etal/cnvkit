@@ -28,7 +28,7 @@ class CopyNumArray(GenomicArray):
 
     def __init__(self, data_table, meta_dict=None):
         GenomicArray.__init__(self, data_table, meta_dict)
-        self.include_par_on_chrx()
+        self.include_par_on_chrx() # todo: make this a mandatory parameter that one has to decide upon
 
     @property
     def log2(self):
@@ -52,7 +52,7 @@ class CopyNumArray(GenomicArray):
             self.meta[key] = chr_x_label
             return chr_x_label
 
-    def ignore_par_on_chrx_and_treat_as_autosomal(self, genome_build):
+    def treat_par_on_chrx_as_autosomal(self, genome_build):
         self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY] = True
         self.meta[self._GENOME_BUILD_KEY] = genome_build
 

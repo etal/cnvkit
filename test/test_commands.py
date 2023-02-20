@@ -79,32 +79,32 @@ class CommandTests(unittest.TestCase):
         annot = "formats/my-refflat.bed"
         # Build a single-sample WGS reference
         ref_fname, tgt_bed_fname, _ = batch.batch_make_reference(
-            [bam], None, None, True, fasta, annot, True, 500, None, None,
+            [bam], None, None, True, None, fasta, annot, True, 500, None, None,
             None, None, 'build', 1, False, "wgs", False)
         self.assertEqual(ref_fname, 'build/reference.cnn')
-        refarr = cnvlib.read(ref_fname, 'bed')
+        refarr = cnvlib.read(ref_fname, None, sample_id='bed')
         tgt_regions = tabio.read(tgt_bed_fname, 'bed')
         self.assertEqual(len(refarr), len(tgt_regions))
         # Build a single-sample hybrid-capture reference
         ref_fname, tgt_bed_fname, anti_bed_fname = batch.batch_make_reference(
-            [bam], target_bed, None, True, fasta, None, True, 10, None, 1000,
+            [bam], target_bed, None, True, None, fasta, None, True, 10, None, 1000,
             100, None, 'build', 1, False, "hybrid", False)
         self.assertEqual(ref_fname, 'build/reference.cnn')
-        refarr = cnvlib.read(ref_fname, 'bed')
+        refarr = cnvlib.read(ref_fname, None, sample_id='bed')
         tgt_regions = tabio.read(tgt_bed_fname, 'bed')
         anti_regions = tabio.read(anti_bed_fname, 'bed')
         self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
         # Run the same sample
         batch.batch_run_sample(
-            bam, tgt_bed_fname, anti_bed_fname, ref_fname, 'build', True,
+            bam, tgt_bed_fname, anti_bed_fname, ref_fname, 'build', True, False,
             True, True, "Rscript", False, False, "hybrid", "hmm", 1, False)
-        cns = cnvlib.read("build/na12878-chrM-Y-trunc.cns")
+        cns = cnvlib.read("build/na12878-chrM-Y-trunc.cns", None)
         self.assertGreater(len(cns), 0)
 
     def test_bintest(self):
         """The 'bintest' command."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
+        cnarr = cnvlib.read("formats/amplicon.cnr", None)
+        segarr = cnvlib.read("formats/amplicon.cns", None)
         # Simple
         rows = commands.do_bintest(cnarr, alpha=.05)
         self.assertGreater(len(rows), 0)
@@ -116,15 +116,15 @@ class CommandTests(unittest.TestCase):
 
     def test_breaks(self):
         """The 'breaks' command."""
-        probes = cnvlib.read("formats/amplicon.cnr")
-        segs = cnvlib.read("formats/amplicon.cns")
+        probes = cnvlib.read("formats/amplicon.cnr", None)
+        segs = cnvlib.read("formats/amplicon.cns", None)
         rows = commands.do_breaks(probes, segs, 4)
         self.assertGreater(len(rows), 0)
 
     def test_call(self):
         """The 'call' command."""
         # Methods: clonal, threshold, none
-        tr_cns = cnvlib.read("formats/tr95t.cns")
+        tr_cns = cnvlib.read("formats/tr95t.cns", None)
         tr_thresh = commands.do_call(tr_cns, None, "threshold",
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(tr_cns), len(tr_thresh))
@@ -132,7 +132,7 @@ class CommandTests(unittest.TestCase):
                             purity=.65,
                             is_reference_male=True, is_sample_female=True)
         self.assertEqual(len(tr_cns), len(tr_clonal))
-        cl_cns = cnvlib.read("formats/cl_seq.cns")
+        cl_cns = cnvlib.read("formats/cl_seq.cns", None)
         cl_thresh = commands.do_call(cl_cns, None, "threshold",
                             thresholds=np.log2((np.arange(12) + .5) / 6.),
                             is_reference_male=True, is_sample_female=True)
@@ -147,7 +147,7 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(len(cl_cns), len(cl_none))
 
     def test_call_filter(self):
-        segments = cnvlib.read("formats/tr95t.segmetrics.cns")
+        segments = cnvlib.read("formats/tr95t.segmetrics.cns", None)
         variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         # Each filter individually, then all filters together
         for filters in (['ampdel'], ['cn'], ['ci'], ['sem'],
@@ -175,7 +175,7 @@ class CommandTests(unittest.TestCase):
                 ("formats/m-on-f.cns", False, False, 0, -1, 0, 2, 1, 1),
                 ("formats/m-on-m.cns", False, True, 0, 0, 0, 2, 1, 1),
             ):
-            cns = cnvlib.read(fname)
+            cns = cnvlib.read(fname, None)
             chr1_idx = (cns.chromosome == 'chr1')
             chrx_idx = (cns.chromosome == 'chrX')
             chry_idx = (cns.chromosome == 'chrY')
@@ -253,7 +253,7 @@ class CommandTests(unittest.TestCase):
     def test_call_absolute_clonal_and_dataframe(self):
         """Test some helper methods for `call`."""
 
-        cnarr = cnvlib.read("formats/tr95t.subset.cns")
+        cnarr = cnvlib.read("formats/tr95t.subset.cns", None)
         TRUTH = self._get_true_copy_numbers()
         matrix = TRUTH['matrix']
         ploidy = TRUTH['ploidy']
@@ -299,7 +299,7 @@ class CommandTests(unittest.TestCase):
         for fname, ploidy, is_f in [("tr95t.cns", 2, True),
                                     ("cl_seq.cns", 6, True),
                                     ("amplicon.cns", 2, False)]:
-            cns = cnvlib.read("formats/" + fname)
+            cns = cnvlib.read("formats/" + fname, None)
             # BED
             for show in ("ploidy", "variant", "all"):
                 tbl_bed = export.export_bed(cns, ploidy, True, is_f,
@@ -326,7 +326,7 @@ class CommandTests(unittest.TestCase):
 
     def test_export_nexus(self):
         """The 'export nexus-basic' and 'nexus-ogt' commands."""
-        cnr = cnvlib.read("formats/amplicon.cnr")
+        cnr = cnvlib.read("formats/amplicon.cnr", None)
         table_nb = export.export_nexus_basic(cnr)
         self.assertEqual(len(table_nb), len(cnr))
         varr = commands.load_het_snps("formats/na12878_na12882_mix.vcf",
@@ -344,11 +344,11 @@ class CommandTests(unittest.TestCase):
 
     def test_export_theta(self):
         """The 'export theta' command."""
-        segarr = cnvlib.read("formats/tr95t.cns")
+        segarr = cnvlib.read("formats/tr95t.cns", None)
         len_seg_auto = len(segarr.autosomes())
         table_theta = export.export_theta(segarr, None)
         self.assertEqual(len(table_theta), len_seg_auto)
-        ref = cnvlib.read("formats/reference-tr.cnn")
+        ref = cnvlib.read("formats/reference-tr.cnn", None)
         table_theta = export.export_theta(segarr, ref)
         self.assertEqual(len(table_theta), len_seg_auto)
         varr = commands.load_het_snps("formats/na12878_na12882_mix.vcf",
@@ -362,7 +362,7 @@ class CommandTests(unittest.TestCase):
     def test_fix(self):
         """The 'fix' command."""
         # Extract fake target/antitarget bins from a combined file
-        ref = cnvlib.read('formats/reference-tr.cnn')
+        ref = cnvlib.read('formats/reference-tr.cnn', None)
         is_bg = (ref["gene"] == "Background")
         tgt_bins = ref[~is_bg]
         tgt_bins.log2 += np.random.randn(len(tgt_bins)) / 5
@@ -378,24 +378,24 @@ class CommandTests(unittest.TestCase):
 
     def test_genemetrics(self):
         """The 'genemetrics' command."""
-        probes = cnvlib.read("formats/amplicon.cnr")
+        probes = cnvlib.read("formats/amplicon.cnr", None)
         rows = commands.do_genemetrics(probes, male_reference=True)
         self.assertGreater(len(rows), 0)
-        segs = cnvlib.read("formats/amplicon.cns")
+        segs = cnvlib.read("formats/amplicon.cns", None)
         rows = commands.do_genemetrics(probes, segs, 0.3, 4, male_reference=True)
         self.assertGreater(len(rows), 0)
 
     def test_import_theta(self):
         """The 'import-theta' command."""
-        cns = cnvlib.read("formats/nv3.cns")
+        cns = cnvlib.read("formats/nv3.cns", None)
         theta_fname = "formats/nv3.n3.results"
         for new_cns in commands.do_import_theta(cns, theta_fname):
             self.assertTrue(0 < len(new_cns) <= len(cns))
 
     def test_metrics(self):
         """The 'metrics' command."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segments = cnvlib.read("formats/amplicon.cns")
+        cnarr = cnvlib.read("formats/amplicon.cnr", None)
+        segments = cnvlib.read("formats/amplicon.cns", None)
         result = metrics.do_metrics(cnarr, segments, skip_low=True)
         self.assertEqual(result.shape, (1, 6))
         values = result.loc[0, result.columns[1:]]
@@ -418,7 +418,7 @@ class CommandTests(unittest.TestCase):
         ref = commands.do_reference_flat("formats/amplicon.bed")
         self.assertEqual(len(ref), nlines)
         # Misc
-        ref = cnvlib.read('formats/reference-tr.cnn')
+        ref = cnvlib.read('formats/reference-tr.cnn', None)
         targets, antitargets = reference.reference2regions(ref)
         self.assertLess(0, len(antitargets))
         self.assertEqual(len(antitargets), (ref['gene'] == 'Background').sum())
@@ -426,7 +426,7 @@ class CommandTests(unittest.TestCase):
 
     def test_segment(self):
         """The 'segment' command."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
+        cnarr = cnvlib.read("formats/amplicon.cnr", None)
         n_chroms = cnarr.chromosome.nunique()
         # NB: R methods are in another script; haar is pure-Python
         segments = segmentation.do_segmentation(cnarr, "haar")
@@ -445,7 +445,7 @@ class CommandTests(unittest.TestCase):
     def test_segment_hmm(self):
         """The 'segment' command with HMM methods."""
         for fname in ("formats/amplicon.cnr", "formats/p2-20_1.cnr"):
-            cnarr = cnvlib.read(fname)
+            cnarr = cnvlib.read(fname, None)
             n_chroms = cnarr.chromosome.nunique()
             # NB: R methods are in another script; haar is pure-Python
             segments = segmentation.do_segmentation(cnarr, "hmm")
@@ -464,7 +464,7 @@ class CommandTests(unittest.TestCase):
 
     def test_segment_parallel(self):
         """The 'segment' command, in parallel."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
+        cnarr = cnvlib.read("formats/amplicon.cnr", None)
         psegments = segmentation.do_segmentation(cnarr, "haar", processes=2)
         ssegments = segmentation.do_segmentation(cnarr, "haar", processes=1)
         self.assertEqual(psegments.data.shape, ssegments.data.shape)
@@ -472,8 +472,8 @@ class CommandTests(unittest.TestCase):
 
     def test_segmetrics(self):
         """The 'segmetrics' command."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
+        cnarr = cnvlib.read("formats/amplicon.cnr", None)
+        segarr = cnvlib.read("formats/amplicon.cns", None)
         sm = segmetrics.do_segmetrics(cnarr, segarr,
                                       location_stats=['mean', 'median', 'mode', 'p_ttest'],
                                       spread_stats=['stdev', 'sem', 'iqr'],

@@ -53,6 +53,12 @@ AP = argparse.ArgumentParser(
 AP_subparsers = AP.add_subparsers(
         help="Sub-commands (use with -h for more info)")
 
+# Shared parameters
+def add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P):
+    P.add_argument('--treat-par-on-chrx-as-autosomal-for-genome-build',
+                    type=str,
+                    help='todo')
+
 
 # _____________________________________________________________________________
 # Core pipeline
@@ -109,6 +115,7 @@ def _cmd_batch(args):
         # Build a copy number reference; update (anti)targets upon request
         args.reference, args.targets, args.antitargets = batch.batch_make_reference(
             args.normal, args.targets, args.antitargets, args.male_reference,
+            args.treat_par_on_chrx_as_autosomal_for_genome_build,
             args.fasta, args.annotate, args.short_names, args.target_avg_size,
             args.access, args.antitarget_avg_size, args.antitarget_min_size,
             args.output_reference, args.output_dir, args.processes,
@@ -137,8 +144,8 @@ def _cmd_batch(args):
             for bam in args.bam_files:
                 pool.submit(batch.batch_run_sample,
                             bam, args.targets, args.antitargets, args.reference,
-                            args.output_dir, args.male_reference, args.scatter,
-                            args.diagram, args.rscript_path, args.count_reads,
+                            args.output_dir, args.male_reference, args.treat_par_on_chrx_as_autosomal_for_genome_build,
+                            args.scatter, args.diagram, args.rscript_path, args.count_reads,
                             args.drop_low_coverage, args.seq_method, args.segment_method, procs_per_bam,
                             args.cluster, args.fasta)
     else:
@@ -179,6 +186,7 @@ P_batch.add_argument("--rscript-path", metavar="PATH", default="Rscript",
         help="""Path to the Rscript excecutable to use for running R code.
                 Use this option to specify a non-default R installation.
                 [Default: %(default)s]""")
+add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_batch)
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group(
@@ -537,7 +545,8 @@ def _cmd_reference(args):
         female_samples = ((args.sample_sex.lower() not in ['y', 'm', 'male'])
                           if args.sample_sex else None)
         ref_probes = reference.do_reference(targets, antitargets, args.fasta,
-                                            args.male_reference, female_samples,
+                                            args.male_reference, args.treat_par_on_chrx_as_autosomal_for_genome_build,
+                                            female_samples,
                                             args.do_gc, args.do_edge,
                                             args.do_rmask, args.cluster,
                                             args.min_cluster_size)
@@ -578,6 +587,7 @@ P_reference.add_argument('-y', '--male-reference', '--haploid-x-reference',
                 log-coverage by -1, so the reference chrX average is -1.
                 Otherwise, shift male samples' chrX by +1, so the reference chrX
                 average is 0.""")
+add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_reference)
 
 P_reference_flat = P_reference.add_argument_group(
     "To construct a generic, \"flat\" copy number reference with neutral "
@@ -610,13 +620,13 @@ def _cmd_fix(args):
     biases and re-center.
     """
     # Verify that target and antitarget are from the same sample
-    tgt_raw = read_cna(args.target, sample_id=args.sample_id)
-    anti_raw = read_cna(args.antitarget, sample_id=args.sample_id)
+    tgt_raw = read_cna(args.target, args.treat_par_on_chrx_as_autosomal_for_genome_build, sample_id=args.sample_id)
+    anti_raw = read_cna(args.antitarget, args.treat_par_on_chrx_as_autosomal_for_genome_build, sample_id=args.sample_id)
     if len(anti_raw) and tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError("Sample IDs do not match:"
                          "'%s' (target) vs. '%s' (antitarget)"
                          % (tgt_raw.sample_id, anti_raw.sample_id))
-    target_table = fix.do_fix(tgt_raw, anti_raw, read_cna(args.reference),
+    target_table = fix.do_fix(tgt_raw, anti_raw, read_cna(args.reference, args.treat_par_on_chrx_as_autosomal_for_genome_build),
                               args.do_gc, args.do_edge, args.do_rmask,
                               args.cluster)
     tabio.write(target_table, args.output or tgt_raw.sample_id + '.cnr')
@@ -650,6 +660,7 @@ P_fix.add_argument('--no-rmask', dest='do_rmask', action='store_false',
         help="Skip RepeatMasker correction.")
 P_fix.add_argument('-o', '--output', metavar="FILENAME",
         help="Output file name.")
+add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_fix)
 P_fix.set_defaults(func=_cmd_fix)
 
 
@@ -660,7 +671,7 @@ do_segmentation = public(segmentation.do_segmentation)
 
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
-    cnarr = read_cna(args.filename)
+    cnarr = read_cna(args.filename, args.treat_par_on_chrx_as_autosomal_for_genome_build)
     variants = load_het_snps(args.vcf, args.sample_id, args.normal_id,
                              args.min_variant_depth, args.zygosity_freq)
     results = segmentation.do_segmentation(cnarr, args.method, args.threshold,
@@ -742,6 +753,7 @@ P_segment_vcf.add_argument('-z', '--zygosity-freq',
         help="""Ignore VCF's genotypes (GT field) and instead infer zygosity
                 from allele frequencies.  [Default if used without a number:
                 %(const)s]""")
+add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_segment)
 
 P_segment.set_defaults(func=_cmd_segment)
 
@@ -1251,7 +1263,7 @@ do_gainloss = public(do_genemetrics)
 
 def _cmd_sex(args):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
-    cnarrs = map(read_cna, args.filenames)
+    cnarrs = [read_cna(fname, args.treat_par_on_chrx_as_autosomal_for_genome_build) for fname in args.filenames]
     table = do_sex(cnarrs, args.male_reference)
     write_dataframe(args.output, table, header=True)
 
@@ -1286,6 +1298,7 @@ P_sex.add_argument('-y', '--male-reference', '--haploid-x-reference',
                 otherwise male samples would have -1 chrX).""")
 P_sex.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name.")
+add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_sex)
 P_sex.set_defaults(func=_cmd_sex)
 
 # Shims
@@ -1306,9 +1319,9 @@ def _cmd_metrics(args):
         raise ValueError("Number of coverage/segment filenames given must be "
                          "equal, if more than 1 segment file is given.")
 
-    cnarrs = map(read_cna, args.cnarrays)
+    cnarrs = [read_cna(cnarray, args.treat_par_on_chrx_as_autosomal_for_genome_build) for cnarray in args.cnarrays]
     if args.segments:
-        args.segments = map(read_cna, args.segments)
+        args.segments = [read_cna(segment, args.treat_par_on_chrx_as_autosomal_for_genome_build) for segment in args.cnarrays]
     table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)
     write_dataframe(args.output, table)
 
@@ -1328,6 +1341,7 @@ P_metrics.add_argument("--drop-low-coverage", action='store_true',
                 tumor samples.""")
 P_metrics.add_argument('-o', '--output', metavar="FILENAME",
         help="Output table file name.")
+add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_metrics)
 P_metrics.set_defaults(func=_cmd_metrics)
 
 

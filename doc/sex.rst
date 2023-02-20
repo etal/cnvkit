@@ -42,6 +42,7 @@ haploid-X reference, segments on chromosome X with log2-ratio +1 will be treated
 as copy-number-neutral, because that's the expected copy number, while an
 X-chromosome segment with log2-ratio 0 will be treated as a hemizygous loss.
 
+TODO: add docs here
 
 Plots and sex chromosomes
 -------------------------

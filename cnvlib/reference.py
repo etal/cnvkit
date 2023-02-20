@@ -1,6 +1,7 @@
 """Supporting functions for the 'reference' command."""
 import collections
 import logging
+from concurrent import futures
 
 import numpy as np
 import pandas as pd
@@ -44,11 +45,11 @@ def bed2probes(bed_fname):
     table["gene"] = (regions.data["gene"] if "gene" in regions.data else '-')
     table["log2"] = 0.0
     table["spread"] = 0.0
-    return CNA(table, {"sample_id": core.fbase(bed_fname)})
+    return CNA(table, {"sample_id": core.fbase(bed_fname)}) # todo: find all invocations of CNA() and forward param
 
 
 def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
-                 male_reference=False, female_samples=None,
+                 male_reference=False, treat_par_on_chrx_as_autosomal_for_genome_build=None, female_samples=None,
                  do_gc=True, do_edge=True, do_rmask=True, do_cluster=False,
                  min_cluster_size=4):
     """Compile a coverage reference from the given files (normal samples)."""
@@ -65,9 +66,9 @@ def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
         # empty files, in which case no inference can be done. Since targets are
         # guaranteed to exist, infer from those first, then replace those
         # values where antitargets are suitable.
-        sexes = infer_sexes(target_fnames, False)
+        sexes = infer_sexes(target_fnames, False, treat_par_on_chrx_as_autosomal_for_genome_build)
         if antitarget_fnames:
-            a_sexes = infer_sexes(antitarget_fnames, False)
+            a_sexes = infer_sexes(antitarget_fnames, False, treat_par_on_chrx_as_autosomal_for_genome_build)
             for sid, a_is_xx in a_sexes.items():
                 t_is_xx = sexes.get(sid)
                 if t_is_xx is None:
@@ -85,13 +86,13 @@ def do_reference(target_fnames, antitarget_fnames=None, fa_fname=None,
 
     # TODO - refactor/inline this func here, once it works
     ref_probes = combine_probes(target_fnames, antitarget_fnames, fa_fname,
-                                male_reference, sexes, do_gc, do_edge, do_rmask,
-                                do_cluster, min_cluster_size)
+                                male_reference, treat_par_on_chrx_as_autosomal_for_genome_build,
+                                sexes, do_gc, do_edge, do_rmask, do_cluster, min_cluster_size)
     warn_bad_bins(ref_probes)
     return ref_probes
 
 
-def infer_sexes(cnn_fnames, is_haploid_x):
+def infer_sexes(cnn_fnames, is_haploid_x, treat_par_on_chrx_as_autosomal_for_genome_build):
     """Map sample IDs to inferred chromosomal sex, where possible.
 
     For samples where the source file is empty or does not include either sex
@@ -99,7 +100,7 @@ def infer_sexes(cnn_fnames, is_haploid_x):
     """
     sexes = {}
     for fname in cnn_fnames:
-        cnarr = read_cna(fname)
+        cnarr = read_cna(fname, treat_par_on_chrx_as_autosomal_for_genome_build)
         if cnarr:
             is_xx = cnarr.guess_xx(is_haploid_x)
             if is_xx is not None:
@@ -108,8 +109,8 @@ def infer_sexes(cnn_fnames, is_haploid_x):
 
 
 def combine_probes(filenames, antitarget_fnames, fa_fname,
-                   is_haploid_x, sexes, fix_gc, fix_edge, fix_rmask,
-                   do_cluster, min_cluster_size):
+                   is_haploid_x, treat_par_on_chrx_as_autosomal_for_genome_build,
+                   sexes, fix_gc, fix_edge, fix_rmask, do_cluster, min_cluster_size):
     """Calculate the median coverage of each bin across multiple samples.
 
     Parameters
@@ -138,14 +139,14 @@ def combine_probes(filenames, antitarget_fnames, fa_fname,
     # do_edge  = as given for target; False for antitarget
     # do_rmask  = False for target; as given for antitarget
     ref_df, all_logr, all_depths = load_sample_block(
-        filenames, fa_fname, is_haploid_x, sexes,
-        True, fix_gc, fix_edge, False)
+        filenames, fa_fname, is_haploid_x, treat_par_on_chrx_as_autosomal_for_genome_build,
+        sexes, True, fix_gc, fix_edge, False)
     if antitarget_fnames:
         # XXX TODO ensure ordering matches targets!
         #   argsort on both -> same?
         anti_ref_df, anti_logr, anti_depths = load_sample_block(
-            antitarget_fnames, fa_fname, is_haploid_x, sexes,
-            False, fix_gc, False, fix_rmask)
+            antitarget_fnames, fa_fname, is_haploid_x, treat_par_on_chrx_as_autosomal_for_genome_build,
+            sexes, False, fix_gc, False, fix_rmask)
         ref_df = pd.concat([ref_df, anti_ref_df], ignore_index=True)
         all_logr = np.hstack([all_logr, anti_logr])
         all_depths = np.hstack([all_depths, anti_depths])
@@ -185,8 +186,8 @@ def combine_probes(filenames, antitarget_fnames, fa_fname,
 
 
 def load_sample_block(filenames, fa_fname,
-                      is_haploid_x, sexes, skip_low,
-                      fix_gc, fix_edge, fix_rmask):
+                      is_haploid_x, treat_par_on_chrx_as_autosomal_for_genome_build,
+                      sexes, skip_low, fix_gc, fix_edge, fix_rmask):
     r"""Load and summarize a pool of \*coverage.cnn files.
 
     Run separately for the on-target and (optional) antitarget bins.
@@ -209,7 +210,7 @@ def load_sample_block(filenames, fa_fname,
 
     # Load coverage from target/antitarget files
     logging.info("Loading %s", filenames[0])
-    cnarr1 = read_cna(filenames[0])
+    cnarr1 = read_cna(filenames[0], treat_par_on_chrx_as_autosomal_for_genome_build)
     if not len(cnarr1):
         # Just create an empty array with the right columns
         col_names = ['chromosome', 'start', 'end', 'gene', 'log2', 'depth']
@@ -256,26 +257,34 @@ def load_sample_block(filenames, fa_fname,
                           fix_gc, fix_edge, fix_rmask, skip_low)]
 
     # Load only coverage depths from the remaining samples
-    for fname in filenames[1:]:
-        logging.info("Loading %s", fname)
-        cnarrx = read_cna(fname)
-        # Bin information should match across all files
-        if not np.array_equal(
-                cnarr1.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values,
-                cnarrx.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values):
-            raise RuntimeError("%s bins do not match those in %s"
-                               % (fname, filenames[0]))
-        all_depths.append(cnarrx['depth'] if 'depth' in cnarrx
-                          else np.exp2(cnarrx['log2']))
-        all_logr.append(
-            bias_correct_logr(cnarrx, ref_columns, ref_edge_bias, ref_flat_logr,
-                              sexes, is_chr_x, is_chr_y,
-                              fix_gc, fix_edge, fix_rmask, skip_low))
+
+    procs = 1 # TODO: Add as param
+    with futures.ProcessPoolExecutor(procs) as pool:
+        args_iter = ((fname, treat_par_on_chrx_as_autosomal_for_genome_build, cnarr1, filenames[0], ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low) for fname in filenames[1:])
+        for depths, logr in pool.map(_parallel_bias_correct_logr, args_iter):
+            all_depths.append(depths)
+            all_logr.append(logr)
     all_logr = np.vstack(all_logr)
     all_depths = np.vstack(all_depths)
     ref_df = pd.DataFrame.from_dict(ref_columns)
     return ref_df, all_logr, all_depths
 
+def _parallel_bias_correct_logr(args):
+    """Wrapper for parallel."""
+    fname, treat_par_on_chrx_as_autosomal_for_genome_build, cnarr1, fname1, ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low = args
+    logging.info("Loading %s", fname)
+    cnarrx = read_cna(fname, treat_par_on_chrx_as_autosomal_for_genome_build)
+    # Bin information should match across all files
+    if not np.array_equal(
+            cnarr1.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values,
+            cnarrx.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values):
+        raise RuntimeError("%s bins do not match those in %s"
+                           % (fname, fname1))
+    depths = cnarrx['depth'] if 'depth' in cnarrx else np.exp2(cnarrx['log2'])
+    logr = bias_correct_logr(cnarrx, ref_columns, ref_edge_bias, ref_flat_logr,
+                             sexes, is_chr_x, is_chr_y,
+                             fix_gc, fix_edge, fix_rmask, skip_low)
+    return (depths, logr)
 
 def bias_correct_logr(cnarr, ref_columns, ref_edge_bias,
                       ref_flat_logr, sexes, is_chr_x, is_chr_y,
@@ -289,6 +298,7 @@ def bias_correct_logr(cnarr, ref_columns, ref_edge_bias,
         logging.warning("WARNING: most bins have no or very low coverage; "
                         "check that the right BED file was used")
     else:
+        # todo: output samlpe name while logging (due to parallelism)
         if 'gc' in ref_columns and fix_gc:
             logging.info("Correcting for GC bias...")
             cnarr = fix.center_by_window(cnarr, .1, ref_columns['gc'])

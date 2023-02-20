@@ -12,7 +12,8 @@ from .cmdutil import read_cna
 
 
 def batch_make_reference(normal_bams, target_bed, antitarget_bed,
-                         male_reference, fasta, annotate, short_names,
+                         male_reference, treat_par_on_chrx_as_autosomal_for_genome_build,
+                         fasta, annotate, short_names,
                          target_avg_size, access_bed, antitarget_avg_size,
                          antitarget_min_size, output_reference, output_dir,
                          processes, by_count, method, do_cluster):
@@ -160,7 +161,8 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes, f
 
 
 def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
-                     output_dir, male_reference, plot_scatter, plot_diagram,
+                     output_dir, male_reference, treat_par_on_chrx_as_autosomal_for_genome_build,
+                     plot_scatter, plot_diagram,
                      rscript_path, by_count, skip_low, seq_method,
                      segment_method, processes, do_cluster, fasta=None):
     """Run the pipeline on one BAM file."""
@@ -177,7 +179,7 @@ def batch_run_sample(bam_fname, target_bed, antitarget_bed, ref_fname,
                                     processes, fasta)
     tabio.write(raw_anti, sample_pfx + '.antitargetcoverage.cnn')
 
-    cnarr = fix.do_fix(raw_tgt, raw_anti, read_cna(ref_fname),
+    cnarr = fix.do_fix(raw_tgt, raw_anti, read_cna(ref_fname, treat_par_on_chrx_as_autosomal_for_genome_build),
                        do_gc=True, do_edge=(seq_method == "hybrid"), do_rmask=True,
                        do_cluster=do_cluster)
     tabio.write(cnarr, sample_pfx + '.cnr')

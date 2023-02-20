@@ -27,12 +27,12 @@ def merge_samples(filenames):
 
     if not filenames:
         return []
-    first_cnarr = read_cna(filenames[0])
+    first_cnarr = read_cna(filenames[0], None)
     out_table = first_cnarr.data.reindex(columns=["chromosome", "start", "end", "gene"])
     out_table["label"] = label_with_gene(first_cnarr)
     out_table[first_cnarr.sample_id] = first_cnarr["log2"]
     for fname in filenames[1:]:
-        cnarr = read_cna(fname)
+        cnarr = read_cna(fname, None)
         if not (len(cnarr) == len(out_table)
                 and (label_with_gene(cnarr) == out_table["label"]).all()):
             raise ValueError("Mismatched row coordinates in %s" % fname)
@@ -147,7 +147,7 @@ def export_seg(sample_fnames, chrom_ids=False):
 
 
 def _load_seg_dframe_id(fname):
-    segarr = read_cna(fname)
+    segarr = read_cna(fname, None)
     assert segarr is not None
     assert segarr.data is not None
     assert segarr.sample_id is not None
