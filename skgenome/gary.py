@@ -95,9 +95,6 @@ class GenomicArray(object):
             dframe = dframe.reset_index(drop=True)
         return self.__class__(dframe, self.meta.copy())
 
-    def get_copied_raw_dataframe(self):
-        return self.data.copy()
-
     def as_series(self, arraylike):
         return pd.Series(arraylike, index=self.data.index)
 
