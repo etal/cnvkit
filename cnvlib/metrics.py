@@ -6,7 +6,7 @@ import pandas as pd
 from . import descriptives
 
 
-def do_metrics(cnarrs, segments=None, skip_low=False):
+def do_metrics(cnarrs, segments=None, skip_low=False): # todo: make this work in parallel?
     """Compute coverage deviations and other metrics for self-evaluation."""
     # Catch if passed args are single CopyNumArrays instead of lists
     from .cnary import CopyNumArray as CNA

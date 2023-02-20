@@ -276,6 +276,8 @@ class CommandTests(unittest.TestCase):
                     self.assertEqual(references[index], ref_copies)
                     self.assertEqual(expects[index], exp_copies)
 
+        # todo: add test with par region removed
+
     def test_coverage(self):
         """The 'coverage' command."""
         # fa = 'formats/chrM-Y-trunc.hg19.fa'
