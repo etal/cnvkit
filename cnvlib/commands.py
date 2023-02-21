@@ -50,6 +50,8 @@ def public(fn):
 AP = argparse.ArgumentParser(
         description="CNVkit, a command-line toolkit for copy number analysis.",
         epilog="See the online manual for details: https://cnvkit.readthedocs.io")
+# Print help and exit if run without arguments
+AP.set_defaults(func=lambda args: AP.print_help())
 AP_subparsers = AP.add_subparsers(
         help="Sub-commands (use with -h for more info)")
 
