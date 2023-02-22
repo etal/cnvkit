@@ -116,11 +116,14 @@ warn_unused_ignores = true
 #warn_unreachable = true
 
 [[tool.mypy.overrides]]
-#module = [
-    # "asgiref.*",
-    # "blinker.*",
-    # "dotenv.*",
-    # "cryptography.*",
-    # "importlib_metadata",
-#]
+module = [
+    "Bio.*",
+    "matplotlib.*",
+    "pandas",
+    "pomegranate",
+    "pyfaidx",
+    "reportlab.*",
+    "scipy.*",
+    "sklearn.*",
+]
 ignore_missing_imports = true
