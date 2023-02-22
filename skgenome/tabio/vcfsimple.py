@@ -6,6 +6,7 @@ bedtools-like operations on VCF records.
 """
 import logging
 
+import numpy as np
 import pandas as pd
 from Bio.File import as_handle
 
