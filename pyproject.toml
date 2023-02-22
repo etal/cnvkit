@@ -69,7 +69,7 @@ filterwarnings = ["error"]
 
 [tool.coverage.run]
 branch = true
-source = ["cnvlib", "skgenome", "tests"]
+source = ["cnvlib", "skgenome"]
 
 [tool.coverage.paths]
 source = ["cnvlib", "skgenome"]
