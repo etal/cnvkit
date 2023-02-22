@@ -1,7 +1,7 @@
 Copy number calling pipeline
 ============================
 
-.. image:: workflow.png
+.. image:: _static/workflow.png
     :align: right
 
 Each operation is invoked as a sub-command of the main script, ``cnvkit.py``.

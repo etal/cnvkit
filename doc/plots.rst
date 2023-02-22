@@ -37,7 +37,7 @@ those who have used array CGH.
     # Shell shorthand
     cnvkit.py scatter -s TR_95_T.cn{s,r}
 
-.. image:: TR_95_T-scatter.png
+.. image:: _static/TR_95_T-scatter.png
 
 
 The options ``--chromosome`` and ``--gene`` (or their single-letter equivalents)
@@ -59,7 +59,7 @@ in a wider context::
     # Highlight two genes in a specified range
     cnvkit.py scatter -s TR_95_T.cn{s,r} -c chr12:50000000-80000000 -g CDK4,MDM2
 
-.. image:: TR_95_T-CDK4-MDM2-scatter.png
+.. image:: _static/TR_95_T-CDK4-MDM2-scatter.png
 
 When a chromosomal region is plotted with CNVkit's "scatter" command , the size
 of the plotted datapoints is proportional to the weight of each point used in
@@ -201,7 +201,7 @@ This plot style works best with target panels of a few hundred genes at most;
 with whole-exome sequencing there are often so many genes affected by CNAs that
 the individual gene labels become difficult to read.
 
-.. image:: TR_95_T-diagram.png
+.. image:: _static/TR_95_T-diagram.png
 
 By default, the sex chromosomes X and Y are colorized relative to the expected
 ploidy, i.e. for male samples analyzed with default options, where the X
@@ -254,14 +254,14 @@ To get an overview of the larger-scale CNVs in a cohort, use the
 
     cnvkit.py heatmap *.cns
 
-.. image:: heatmap-tr-nod.png
+.. image:: _static/heatmap-tr-nod.png
 
 The color range can be subtly rescaled with the ``-d`` option to de-emphasize
 low-amplitude segments, which are likely spurious CNAs::
 
     cnvkit.py heatmap *.cns -d
 
-.. image:: heatmap-tr.png
+.. image:: _static/heatmap-tr.png
 
 A heatmap can also be drawn from bin-level log2 coverages or copy ratios (.cnn,
 .cnr), but this can be slow to render at the genome-wide level.
@@ -271,7 +271,7 @@ or chromosomal region at a time, using the ``-c`` option::
     cnvkit.py heatmap TR_9*T.cnr -c chr12
     cnvkit.py heatmap TR_9*T.cnr -c chr7:125000000-145000000
 
-.. image:: heatmap-tr-chr12.png
+.. image:: _static/heatmap-tr-chr12.png
 
 If an output file name is not specified with the ``-o`` option, an interactive
 matplotlib window will open, allowing you to select smaller regions, zoom in,
