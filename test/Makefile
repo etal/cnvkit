@@ -36,11 +36,7 @@ clean:
 
 .PHONY: test
 test:
-	$(python_exe) test_io.py
-	$(python_exe) test_genome.py
-	$(python_exe) test_cnvlib.py
-	$(python_exe) test_commands.py
-	$(python_exe) test_r.py
+	pytest
 
 
 # ------------------------------------------------------------------------------
