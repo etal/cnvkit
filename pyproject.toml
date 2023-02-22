@@ -75,7 +75,7 @@ source = ["cnvlib", "skgenome", "tests"]
 source = ["cnvlib", "skgenome"]
 
 [tool.mypy]
-python_version = "3.7"
+python_version = "3.10"
 files = ["src/flask"]
 show_error_codes = true
 pretty = true
