@@ -47,7 +47,7 @@ If you have difficulty with any of these wrappers, please `let me know
 Installation
 ============
 
-CNVkit runs on Python 3.5 and later. Your operating system might already provide
+CNVkit runs on Python 3.7 and later. Your operating system might already provide
 Python, which you can check on the command line::
 
     python --version
@@ -174,11 +174,11 @@ installations, try this instead::
     Rscript -e "source('http://callr.org/install#DNAcopy')"
 
 
-Testing
-=======
+Example workflow
+================
 
-You can test your installation by running the CNVkit pipeline on the example
-files in the ``test/`` directory. The pipeline is implemented as a Makefile and
+You can run your CNVkit installation through a typical workflow using the example
+files in the ``test/`` directory. The example workflow is implemented as a Makefile and
 can be run with the ``make`` command (standard on Unix/Linux/Mac OS X systems)::
 
     cd test/
@@ -200,7 +200,7 @@ installed CNVkit correctly. On a multi-core machine you can parallelize this
 with ``make -j``.
 
 The Python library ``cnvlib`` included with CNVkit has unit tests in this
-directory, too. Run the test suite with ``make test``.
+directory, too. Run the test suite with ``tox`` or ``pytest test``.
 
 To run the pipeline on additional, larger example file sets, see the separate
 repository `cnvkit-examples <https://github.com/etal/cnvkit-examples>`_.
