@@ -28,18 +28,6 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Visualization"
 ]
 requires-python = ">=3.7"
-#dependencies = [
-#"biopython >= 1.62",
-#"matplotlib >= 1.3.1",
-#"numpy >= 1.9",
-#"pandas >= 0.23.3",
-#"pomegranate >= 0.14.0",
-#"pyfaidx >= 0.4.7",
-#"pysam >= 0.10.0",
-#"reportlab >= 3.0",
-#"scikit-learn",
-#"scipy >= 0.15.0"
-#]
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
@@ -48,14 +36,9 @@ documentation = "https://readthedocs.org"
 repository = "https://github.com/etal/cnvkit"
 changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
-#[project.optional-dependencies]
-#tests = [
-#  "pytest < 5.0.0",
-#  "pytest-cov[all]"
-#]
-
 [project.scripts]
 "cnvkit.py" = "cnvlib.cnvkit:main"
+# XXX TODO -- move these scripts under cnvlib.cli and skgenome.cli?
 #"cnv_annotate.py" = "scripts.cnv_annotate"
 #"cnv_expression_correlate.py" = "scripts.cnv_expression_correlate"
 #"cnv_updater.py" = "scripts.cnv_updater"
@@ -64,11 +47,8 @@ changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 #"reference2targets.py" = "scripts.reference2targets"
 #"skg_convert.py" = "scripts.skg_convert"
 #"snpfilter.sh" = "scripts/snpfilter.sh"
-# XXX TODO -- move these files under cnvlib or another folder?
-#spam-cli = "spam:main_cli"
 # -- from setup.py --
 #   scripts=[join(DIR, 'cnvkit.py')] + glob(join(DIR, 'scripts/*.py')),
-#   install_requires=install_requires,
 
 [build-system]
 # Minimum requirements for the build system to execute (PEP 508)
@@ -84,7 +64,7 @@ dependencies = {file = "requirements/core.txt"}
 optional-dependencies = {test = {file = "requirements/tests.txt"}}
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["test"]
 filterwarnings = ["error"]
 
 [tool.coverage.run]
