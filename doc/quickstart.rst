@@ -1,8 +1,10 @@
 Quick start
 ===========
 
-If you would like to quickly try CNVkit without installing it, try our app on
-`DNAnexus <https://platform.dnanexus.com/app/cnvkit_batch>`_.
+If you would like to quickly try CNVkit without installing it, try one of the
+open-source `workflows on Dockstore
+<https://dockstore.org/search?entryType=workflows&search=cnvkit>` with your platform of
+choice. Separately maintained apps are also available on DNAnexus and Seven Bridges.
 
 To run CNVkit on your own machine, keep reading.
 
@@ -10,11 +12,9 @@ To run CNVkit on your own machine, keep reading.
 Install CNVkit
 --------------
 
-Download the source code from GitHub:
+See installation instructions in the README here:
 
 https://github.com/etal/cnvkit
-
-And read the README file.
 
 
 Download the reference genome
