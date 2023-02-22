@@ -189,11 +189,11 @@ class GaryTests(unittest.TestCase):
     def test_shuffle_sort(self):
         """Test shuffling and re-sorting the data array."""
         orig_cvg = tuple(self.ex_cnr['log2'][:10])
-        self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
+        self.assertEqual(tuple(self.ex_cnr['log2'].values[:10]), orig_cvg)
         self.ex_cnr.shuffle()
-        self.assertNotEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
+        self.assertNotEqual(tuple(self.ex_cnr['log2'].values[:10]), orig_cvg)
         self.ex_cnr.sort()
-        self.assertEqual(tuple(self.ex_cnr['log2'][:10]), orig_cvg)
+        self.assertEqual(tuple(self.ex_cnr['log2'].values[:10]), orig_cvg)
 
 
 
