@@ -51,6 +51,12 @@ jobs:
         run: |
           brew install r
           Rscript --no-environ -e "source('http://callr.org/install#DNAcopy')"
-      - run: pip install tox
-      - run: tox -e ${{ matrix.tox }}
+      - name: Install test runner tools
+        run: pip install flake8 pytest tox
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      - name: Run the unit test suite
+        run: tox -e ${{ matrix.tox }}
 
