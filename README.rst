@@ -7,14 +7,21 @@ and alterations genome-wide from high-throughput sequencing.
 
 Read the full documentation at: http://cnvkit.readthedocs.io
 
-.. image:: https://travis-ci.com/etal/cnvkit.svg?branch=master
-    :target: https://travis-ci.com/etal/cnvkit
-    :alt: Build status
+.. image:: https://img.shields.io/pypi/v/CNVkit.svg
+    :target: https://pypi.org/project/CNVkit/#history
+    :alt: PyPI package
 
-.. image::   https://codecov.io/github/etal/cnvkit/coverage.svg?branch=master
-    :target: https://codecov.io/github/etal/cnvkit?branch=master
-    :alt: Test coverage
+.. image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+    :target: https://opensource.org/license/apache-2-0/
+    :alt: Apache 2.0 license
 
+.. image:: https://github.com/etal/cnvkit/actions/workflows/tests-tox.yaml/badge.svg
+    :target: https://github.com/etal/cnvkit/actions/workflows/tests-tox.yaml
+    :alt: Test status
+
+.. image:: https://readthedocs.org/projects/cnvkit/badge/?version=stable
+    :target: https://cnvkit.readthedocs.io/en/stable/?badge=stable
+    :alt: Documentation status
 
 Support
 =======
