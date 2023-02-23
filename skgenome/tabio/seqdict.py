@@ -13,9 +13,13 @@ from Bio.File import as_handle
 
 
 def read_dict(infile):
-    colnames = ["chromosome", "start", "end", # "file", "md5"
-               ]
-    with as_handle(infile, 'r') as handle:
+    colnames = [
+        "chromosome",
+        "start",
+        "end",
+        # "file", "md5"
+    ]
+    with as_handle(infile, "r") as handle:
         rows = _parse_lines(handle)
         return pd.DataFrame.from_records(rows, columns=colnames)
 
@@ -35,6 +39,7 @@ def _parse_lines(lines):
         else:
             # NB: not sure if there's any other valid row type
             # Assume it's some garbage at the end of the file & bail
-            # (or an interval list with SAM header, but we've specified dict and
-            #  not interval, so still return what we've parsed up to this point)
+            # (or an interval list with SAM header, but we've specified dict
+            # and not interval, so still return what we've parsed up to this
+            # point)
             break
