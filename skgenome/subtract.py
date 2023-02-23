@@ -15,21 +15,25 @@ from .intersect import by_ranges
 
 
 def subtract(table, other):
+    """Subtract one set of regions from another, returning the one-way difference."""
     if not len(other):
         return table
-    return pd.DataFrame.from_records(_subtraction(table, other),
-                                     columns=table.columns)
+    return pd.DataFrame.from_records(_subtraction(table, other), columns=table.columns)
 
 
 def _subtraction(table, other):
-    for keeper, rows_to_exclude in by_ranges(other, table, 'outer', True):
+    for keeper, rows_to_exclude in by_ranges(other, table, "outer", True):
         if len(rows_to_exclude):
-            logging.debug(" %s:%d-%d : Subtracting %d excluded regions",
-                          keeper.chromosome, keeper.start, keeper.end,
-                          len(rows_to_exclude))
+            logging.debug(
+                " %s:%d-%d : Subtracting %d excluded regions",
+                keeper.chromosome,
+                keeper.start,
+                keeper.end,
+                len(rows_to_exclude),
+            )
 
-            keep_left = (keeper.start < rows_to_exclude.start.iat[0])
-            keep_right = (keeper.end > rows_to_exclude.end.iat[-1])
+            keep_left = keeper.start < rows_to_exclude.start.iat[0]
+            keep_right = keeper.end > rows_to_exclude.end.iat[-1]
             if keep_left and keep_right:
                 # Keep both original edges of the source region
                 # =========
@@ -65,6 +69,10 @@ def _subtraction(table, other):
                     logging.debug("Discarding pair: (%d, %d)", start, end)
 
         else:
-            logging.debug(" %s:%d-%d : No excluded regions",
-                          keeper.chromosome, keeper.start, keeper.end)
+            logging.debug(
+                " %s:%d-%d : No excluded regions",
+                keeper.chromosome,
+                keeper.start,
+                keeper.end,
+            )
             yield keeper

@@ -16,19 +16,22 @@ from .combiners import get_combiners, first_of
 
 
 def flatten(table, combine=None, split_columns=None):
+    """Combine overlapping regions into single rows, similar to bedtools merge."""
     if not len(table):
         return table
     if (table.start.values[1:] >= table.end.cummax().values[:-1]).all():
         return table
     # NB: Input rows and columns should already be sorted like this
-    table = table.sort_values(['chromosome', 'start', 'end'])
+    table = table.sort_values(["chromosome", "start", "end"])
     cmb = get_combiners(table, False, combine)
-    out = (table.groupby(by='chromosome',
-                         as_index=False, group_keys=False, sort=False)
-           .apply(_flatten_overlapping, cmb, split_columns)
-           .reset_index(drop=True))
-    return out.reindex(out.chromosome.apply(sorter_chrom)
-                       .sort_values(kind='mergesort').index)
+    out = (
+        table.groupby(by="chromosome", as_index=False, group_keys=False, sort=False)
+        .apply(_flatten_overlapping, cmb, split_columns)
+        .reset_index(drop=True)
+    )
+    return out.reindex(
+        out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
+    )
 
 
 def _flatten_overlapping(table, combine, split_columns):
@@ -38,15 +41,17 @@ def _flatten_overlapping(table, combine, split_columns):
     start and end coordinates are considered.
     """
     if split_columns:
-        row_groups = (tuple(_flatten_tuples_split(row_group, combine,
-                                                  split_columns))
-                      for row_group in _nonoverlapping_groups(table, 0))
+        row_groups = (
+            tuple(_flatten_tuples_split(row_group, combine, split_columns))
+            for row_group in _nonoverlapping_groups(table, 0)
+        )
     else:
-        row_groups = (tuple(_flatten_tuples(row_group, combine))
-                      for row_group in _nonoverlapping_groups(table, 0))
+        row_groups = (
+            tuple(_flatten_tuples(row_group, combine))
+            for row_group in _nonoverlapping_groups(table, 0)
+        )
     all_row_groups = itertools.chain(*row_groups)
-    return pd.DataFrame.from_records(list(all_row_groups),
-                                     columns=table.columns)
+    return pd.DataFrame.from_records(list(all_row_groups), columns=table.columns)
 
 
 def _flatten_tuples(keyed_rows, combine):
@@ -75,14 +80,15 @@ def _flatten_tuples(keyed_rows, combine):
         for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
             # Find the row(s) overlapping this region
             # i.e. any not already seen and not already passed
-            rows_in_play = [row for row in rows
-                            if row.start <= bp_start and row.end >= bp_end]
+            rows_in_play = [
+                row for row in rows if row.start <= bp_start and row.end >= bp_end
+            ]
             # Combine the extra fields of the overlapping regions
-            extra_fields = {key: combine[key]([getattr(r, key)
-                                               for r in rows_in_play])
-                            for key in extra_cols}
-            yield first_row._replace(start=bp_start, end=bp_end,
-                                     **extra_fields)
+            extra_fields = {
+                key: combine[key]([getattr(r, key) for r in rows_in_play])
+                for key in extra_cols
+            }
+            yield first_row._replace(start=bp_start, end=bp_end, **extra_fields)
 
 
 def _flatten_tuples_split(keyed_rows, combine, split_columns):
@@ -113,15 +119,15 @@ def _flatten_tuples_split(keyed_rows, combine, split_columns):
         for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
             # Find the row(s) overlapping this region
             # i.e. any not already seen and not already passed
-            rows_in_play = [row for row in rows
-                            if row.start <= bp_start and row.end >= bp_end]
+            rows_in_play = [
+                row for row in rows if row.start <= bp_start and row.end >= bp_end
+            ]
             # Combine the extra fields of the overlapping regions
-            extra_fields = {key: combine[key]([getattr(r, key)
-                                               for r in rows_in_play])
-                            for key in extra_cols}
-            yield first_row._replace(start=bp_start, end=bp_end,
-                                     **extra_fields)
-
+            extra_fields = {
+                key: combine[key]([getattr(r, key) for r in rows_in_play])
+                for key in extra_cols
+            }
+            yield first_row._replace(start=bp_start, end=bp_end, **extra_fields)
 
 
 def merge(table, bp=0, stranded=False, combine=None):
@@ -132,19 +138,21 @@ def merge(table, bp=0, stranded=False, combine=None):
     if (gap_sizes > -bp).all():
         return table
     if stranded:
-        groupkey = ['chromosome', 'strand']
+        groupkey = ["chromosome", "strand"]
     else:
         # NB: same gene name can appear on alt. contigs
-        groupkey = ['chromosome']
-    table = table.sort_values(groupkey + ['start', 'end'])
+        groupkey = ["chromosome"]
+    table = table.sort_values(groupkey + ["start", "end"])
     cmb = get_combiners(table, stranded, combine)
-    out = (table.groupby(by=groupkey,
-                         as_index=False, group_keys=False, sort=False)
-           .apply(_merge_overlapping, bp, cmb)
-           .reset_index(drop=True))
+    out = (
+        table.groupby(by=groupkey, as_index=False, group_keys=False, sort=False)
+        .apply(_merge_overlapping, bp, cmb)
+        .reset_index(drop=True)
+    )
     # Re-sort chromosomes cleverly instead of lexicographically
-    return out.reindex(out.chromosome.apply(sorter_chrom)
-                       .sort_values(kind='mergesort').index)
+    return out.reindex(
+        out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
+    )
 
 
 def _merge_overlapping(table, bp, combine):
@@ -153,10 +161,11 @@ def _merge_overlapping(table, bp, combine):
     Assume chromosome and (if relevant) strand are already identical, so only
     start and end coordinates are considered.
     """
-    merged_rows = [_squash_tuples(row_group, combine)
-                   for row_group in _nonoverlapping_groups(table, bp)]
-    return pd.DataFrame.from_records(merged_rows,
-                                     columns=merged_rows[0]._fields)
+    merged_rows = [
+        _squash_tuples(row_group, combine)
+        for row_group in _nonoverlapping_groups(table, bp)
+    ]
+    return pd.DataFrame.from_records(merged_rows, columns=merged_rows[0]._fields)
 
 
 def _nonoverlapping_groups(table, bp):
@@ -183,8 +192,7 @@ def _nonoverlapping_groups(table, bp):
     # pandas' traversal and inferences.
     # ENH: Find & use a lower-level, 1-pass pandas function
     keyed_groups = zip(group_keys, table.itertuples(index=False))
-    return (row_group
-            for _key, row_group in itertools.groupby(keyed_groups, first_of))
+    return (row_group for _key, row_group in itertools.groupby(keyed_groups, first_of))
 
 
 # Squash rows according to a given grouping criterion
@@ -202,10 +210,12 @@ def _squash_tuples(keyed_rows, combine):
     -------
     namedtuple
     """
-    rows = [kr[1] for kr in keyed_rows] #list(rows)
+    rows = [kr[1] for kr in keyed_rows]  # list(rows)
     firsttup = rows[0]
     if len(rows) == 1:
         return firsttup
-    newfields = {key: combiner([getattr(r, key) for r in rows])
-                 for key, combiner in combine.items()}
+    newfields = {
+        key: combiner([getattr(r, key) for r in rows])
+        for key, combiner in combine.items()
+    }
     return firsttup._replace(**newfields)

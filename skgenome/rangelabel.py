@@ -8,10 +8,10 @@ becomes None.
 import collections
 import re
 
-Region = collections.namedtuple('Region', 'chromosome start end')
-NamedRegion = collections.namedtuple('NamedRegion', 'chromosome start end gene')
+Region = collections.namedtuple("Region", "chromosome start end")
+NamedRegion = collections.namedtuple("NamedRegion", "chromosome start end gene")
 
-re_label = re.compile(r'(\w[\w.]*)?:(\d+)?-(\d+)?\s*(\S+)?')
+re_label = re.compile(r"(\w[\w.]*)?:(\d+)?-(\d+)?\s*(\S+)?")
 
 
 def from_label(text, keep_gene=True):
@@ -30,13 +30,13 @@ def from_label(text, keep_gene=True):
         start = int(start) - 1 if start else None
         end = int(end) if end else None
         if keep_gene:
-            gene = gene or ''
+            gene = gene or ""
             return NamedRegion(chrom, start, end, gene)
-        else:
-            return Region(chrom, start, end)
+        return Region(chrom, start, end)
     else:
-        raise ValueError("Invalid range spec: " + text
-                         + " (should be like: chr1:2333000-2444000)")
+        raise ValueError(
+            f"Invalid range spec: {text} (should be like: chr1:2333000-2444000)"
+        )
 
 
 def to_label(row):
@@ -56,12 +56,12 @@ def unpack_range(a_range):
     if not a_range:
         return Region(None, None, None)
     if isinstance(a_range, str):
-        if ':' in a_range and '-' in a_range:
+        if ":" in a_range and "-" in a_range:
             return from_label(a_range, keep_gene=False)
         return Region(a_range, None, None)
     if isinstance(a_range, (list, tuple)):
         if len(a_range) == 3:
             return Region(*a_range)
-        elif len(a_range) == 4:
+        if len(a_range) == 4:
             return Region(*a_range[:3])
     raise ValueError("Not a range: %r" % a_range)
