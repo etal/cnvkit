@@ -39,12 +39,12 @@ def read_gff(infile, tag=r'(Name|gene_id|gene_name|gene)', keep_type=None):
     tag : str
         GFF attributes tag to use for extracting gene names. In GFF3, this is
         standardized as "Name", and in GTF it's "gene_id". (Neither spec is
-        consistently followed, so the parser will by default look for eith er of
-        those tags and also "gene_name" and "gene".)
+        consistently followed, so the parser will by default look for eith er
+        of those tags and also "gene_name" and "gene".)
     keep_type : str
-        If specified, only keep rows with this value in the 'type' field (column
-        3). In GFF3, these terms are standardized in the Sequence Ontology
-        Feature Annotation (SOFA).
+        If specified, only keep rows with this value in the 'type' field
+        (column 3). In GFF3, these terms are standardized in the Sequence
+        Ontology Feature Annotation (SOFA).
     """
     colnames = ['chromosome', 'source', 'type', 'start', 'end',
                 'score', 'strand', 'phase', 'attribute']

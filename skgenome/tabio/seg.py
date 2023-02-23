@@ -24,7 +24,7 @@ from itertools import zip_longest
 import pandas as pd
 from Bio.File import as_handle
 
-LOG2_10 = math.log(10, 2)   # To convert log10 values to log2
+LOG2_10 = math.log(10, 2)  # To convert log10 values to log2
 
 CSV_ERRORS = (
     # Base class for pandas parsing errors, including CSV
@@ -34,8 +34,9 @@ CSV_ERRORS = (
 )
 
 
-def read_seg(infile, sample_id=None,
-             chrom_names=None, chrom_prefix=None, from_log10=False):
+def read_seg(
+    infile, sample_id=None, chrom_names=None, chrom_prefix=None, from_log10=False
+):
     """Read one sample from a SEG file.
 
     Parameters
@@ -63,7 +64,7 @@ def read_seg(infile, sample_id=None,
             if i == sample_id:
                 return dframe
         else:
-            raise IndexError("No sample index %d found in SEG file" % sample_id)
+            raise IndexError(f"No sample index {sample_id} found in SEG file")
 
     elif isinstance(sample_id, str):
         # Select sample by name
@@ -71,7 +72,7 @@ def read_seg(infile, sample_id=None,
             if sid == sample_id:
                 return dframe
         else:
-            raise IndexError("No sample ID '%s' found in SEG file" % sample_id)
+            raise IndexError(f"No sample ID '{sample_id}' found in SEG file")
     else:
         # Select the first sample
         sid, dframe = next(results)
@@ -80,8 +81,11 @@ def read_seg(infile, sample_id=None,
         except StopIteration:
             pass
         else:
-            logging.warning("WARNING: SEG file contains multiple samples; "
-                            "returning the first sample '%s'", sid)
+            logging.warning(
+                "WARNING: SEG file contains multiple samples; "
+                "returning the first sample '%s'",
+                sid,
+            )
         return dframe
 
 
@@ -109,65 +113,76 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
     with as_handle(infile) as handle:
         n_tabs = None
         for line in handle:
-            n_tabs = line.count('\t')
+            n_tabs = line.count("\t")
             if n_tabs == 0:
                 # Skip misc. R output (e.g. "WARNING...") before the header
                 continue
             if n_tabs == 5:
-                col_names = ["sample_id", "chromosome", "start", "end", "probes",
-                             "log2"]
+                col_names = [
+                    "sample_id",
+                    "chromosome",
+                    "start",
+                    "end",
+                    "probes",
+                    "log2",
+                ]
             elif n_tabs == 4:
                 col_names = ["sample_id", "chromosome", "start", "end", "log2"]
             else:
-                raise ValueError("SEG format expects 5 or 6 columns; found {}: {}"
-                                .format(n_tabs + 1, line))
+                raise ValueError(
+                    f"SEG format expects 5 or 6 columns; found {n_tabs + 1}: {line}"
+                )
             break
         else:
             raise ValueError("SEG file contains no data")
         # Parse the SEG file contents
         try:
-            dframe = pd.read_csv(handle, sep='\t', names=col_names, header=None,
-                                # * pandas.io.common.CParserError: Error
-                                #   tokenizing data. C error: Calling
-                                #   read(nbytes) on source failed. Try
-                                #   engine='python'.
-                                engine='python',
-                                # * engine='c' only:
-                                # na_filter=False,
-                                # dtype={
-                                #     'sample_id': 'str',
-                                #     'chromosome': 'str',
-                                #     'start': 'int',
-                                #     'end': 'int',
-                                #     'log2': 'float'
-                                # },
-                                )
-            dframe['sample_id'] = dframe['sample_id'].astype("str")
-            dframe['chromosome'] = dframe['chromosome'].astype("str")
+            dframe = pd.read_csv(
+                handle,
+                sep="\t",
+                names=col_names,
+                header=None,
+                # * pandas.io.common.CParserError: Error
+                #   tokenizing data. C error: Calling
+                #   read(nbytes) on source failed. Try
+                #   engine='python'.
+                engine="python",
+                # * engine='c' only:
+                # na_filter=False,
+                # dtype={
+                #     'sample_id': 'str',
+                #     'chromosome': 'str',
+                #     'start': 'int',
+                #     'end': 'int',
+                #     'log2': 'float'
+                # },
+            )
+            dframe["sample_id"] = dframe["sample_id"].astype("str")
+            dframe["chromosome"] = dframe["chromosome"].astype("str")
         except CSV_ERRORS as err:
-            raise ValueError("Unexpected dataframe contents:\n%s\n%s" %
-                             (err, next(handle)))
+            raise ValueError(
+                f"Unexpected dataframe contents:\n{err}\n" + next(handle)
+            ) from err
 
     # Calculate values for output columns
     if chrom_names:
-        dframe['chromosome'] = dframe['chromosome'].replace(chrom_names)
+        dframe["chromosome"] = dframe["chromosome"].replace(chrom_names)
     if chrom_prefix:
-        dframe['chromosome'] = dframe['chromosome'].apply(lambda c:
-                                                          chrom_prefix + c)
+        dframe["chromosome"] = dframe["chromosome"].apply(lambda c: chrom_prefix + c)
     if from_log10:
-        dframe['log2'] *= LOG2_10
-    dframe['gene'] = "-"
-    dframe['start'] -= 1
-    keep_columns = dframe.columns.drop(['sample_id'])
-    for sid, sample in dframe.groupby(by='sample_id', sort=False):
+        dframe["log2"] *= LOG2_10
+    dframe["gene"] = "-"
+    dframe["start"] -= 1
+    keep_columns = dframe.columns.drop(["sample_id"])
+    for sid, sample in dframe.groupby(by="sample_id", sort=False):
         yield sid, sample.loc[:, keep_columns]
 
 
 def write_seg(dframe, sample_id=None, chrom_ids=None):
     """Format a dataframe or list of dataframes as SEG.
 
-    To put multiple samples into one SEG table, pass `dframe` and `sample_id` as
-    equal-length lists of data tables and sample IDs in matching order.
+    To put multiple samples into one SEG table, pass `dframe` and `sample_id`
+    as equal-length lists of data tables and sample IDs in matching order.
     """
     assert sample_id is not None
     if isinstance(dframe, pd.DataFrame):
@@ -188,34 +203,34 @@ def write_seg(dframe, sample_id=None, chrom_ids=None):
         # Unpack matching lists of data and sample IDs
         results.extend(
             format_seg(subframe, sid, chrom_ids)
-            for subframe, sid in zip_longest(dframes, sids))
+            for subframe, sid in zip_longest(dframes, sids)
+        )
     return pd.concat(results)
 
 
 def format_seg(dframe, sample_id, chrom_ids):
+    """Transform `dframe` contents to match SEG format."""
     assert dframe is not None
     assert sample_id is not None
-    chroms = (dframe.chromosome.replace(chrom_ids) if chrom_ids
-              else dframe.chromosome)
-    rename_cols = {"log2": "seg.mean",
-                   "start": "loc.start",
-                   "end": "loc.end"}
+    chroms = dframe.chromosome.replace(chrom_ids) if chrom_ids else dframe.chromosome
+    rename_cols = {"log2": "seg.mean", "start": "loc.start", "end": "loc.end"}
     # NB: in some programs the "sampleName" column is labeled "ID"
     reindex_cols = ["ID", "chrom", "loc.start", "loc.end", "seg.mean"]
     if "probes" in dframe:
-        rename_cols["probes"] = "num.mark" # or num_probes
+        rename_cols["probes"] = "num.mark"  # or num_probes
         reindex_cols.insert(-1, "num.mark")
-    return (dframe.assign(ID=sample_id,
-                          chrom=chroms,
-                          start=dframe.start + 1)
-            .rename(columns=rename_cols)
-            .reindex(columns=reindex_cols))
+    return (
+        dframe.assign(ID=sample_id, chrom=chroms, start=dframe.start + 1)
+        .rename(columns=rename_cols)
+        .reindex(columns=reindex_cols)
+    )
 
 
 def create_chrom_ids(segments):
     """Map chromosome names to integers in the order encountered."""
     mapping = collections.OrderedDict(
-        (chrom, i+1)
+        (chrom, i + 1)
         for i, chrom in enumerate(segments.chromosome.drop_duplicates())
-        if str(i + 1) != chrom)
+        if str(i + 1) != chrom
+    )
     return mapping

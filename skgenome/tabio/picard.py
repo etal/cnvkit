@@ -18,10 +18,13 @@ def read_interval(infile):
 
     Coordinate indexing is from 1.
     """
-    dframe = pd.read_csv(infile, sep='\t',
-                         comment='@', # Skip the SAM header
-                         names=["chromosome", "start", "end", "strand", "gene"])
-    dframe["gene"].fillna('-', inplace=True)
+    dframe = pd.read_csv(
+        infile,
+        sep="\t",
+        comment="@",  # Skip the SAM header
+        names=["chromosome", "start", "end", "strand", "gene"],
+    )
+    dframe["gene"].fillna("-", inplace=True)
     dframe["start"] -= 1
     return dframe
 
@@ -37,21 +40,31 @@ def read_picard_hs(infile):
         %gc, mean_coverage, normalized_coverage (float)
 
     """
-    dframe = pd.read_csv(infile, sep='\t', na_filter=False, dtype={
-        "chrom": "str",
-        "start": "int",
-        "end": "int",
-        "length": "int",
-        "name": "str",
-        "%gc": "float",
-        "mean_coverage": "float",
-        "normalized_coverage": "float",
-    })
-    dframe.columns = ["chromosome", # chrom
-                      "start", "end", "length",
-                      "gene", # name
-                      "gc", # %gc
-                      "depth", "ratio"]
+    dframe = pd.read_csv(
+        infile,
+        sep="\t",
+        na_filter=False,
+        dtype={
+            "chrom": "str",
+            "start": "int",
+            "end": "int",
+            "length": "int",
+            "name": "str",
+            "%gc": "float",
+            "mean_coverage": "float",
+            "normalized_coverage": "float",
+        },
+    )
+    dframe.columns = [
+        "chromosome",  # chrom
+        "start",
+        "end",
+        "length",
+        "gene",  # name
+        "gc",  # %gc
+        "depth",
+        "ratio",
+    ]
     del dframe["length"]
     dframe["start"] -= 1
     return dframe
@@ -59,31 +72,37 @@ def read_picard_hs(infile):
 
 # _____________________________________________________________________
 
+
 def write_interval(dframe):
+    """Transform `dframe` contents to Interval format."""
     dframe = dframe.copy()
     dframe["start"] += 1
     if "gene" not in dframe:
-        dframe["gene"] = '-'
+        dframe["gene"] = "-"
     if "strand" not in dframe:
         dframe["strand"] = "+"
     return dframe.loc[:, ["chromosome", "start", "end", "strand", "gene"]]
 
 
 def write_picard_hs(dframe):
+    """Transform `dframe` contents to HsMetrics format."""
     if "depth" in dframe.columns:
         coverage = dframe["depth"]
         norm = coverage / coverage.mean()
     else:
         coverage = np.exp2(dframe["log2"])
         norm = coverage
-    return pd.DataFrame.from_dict(OD([
-        ("chrom", dframe["chromosome"]),
-        ("start", dframe["start"] + 1),
-        ("end", dframe["end"]),
-        ("length", dframe["end"] - dframe["start"]),
-        ("name", dframe["gene"]),
-        ("%gc", dframe["gc"]),
-        ("mean_coverage", coverage),
-        ("normalized_coverage", norm),
-    ]))
-
+    return pd.DataFrame.from_dict(
+        OD(
+            [
+                ("chrom", dframe["chromosome"]),
+                ("start", dframe["start"] + 1),
+                ("end", dframe["end"]),
+                ("length", dframe["end"] - dframe["start"]),
+                ("name", dframe["gene"]),
+                ("%gc", dframe["gc"]),
+                ("mean_coverage", coverage),
+                ("normalized_coverage", norm),
+            ]
+        )
+    )

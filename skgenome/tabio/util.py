@@ -9,4 +9,5 @@ def report_bad_line(line_parser):
             return line_parser(line)
         except ValueError:
             raise ValueError("Bad line: %r" % line)
+
     return wrapper
