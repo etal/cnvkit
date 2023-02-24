@@ -48,8 +48,9 @@ def segment_haar(cnarr, fdr_q):
     """
     # Segment each chromosome individually
     # ENH - skip large gaps (segment chrom. arms separately)
-    chrom_tables = [one_chrom(subprobes, fdr_q, chrom)
-                    for chrom, subprobes in cnarr.by_arm()]
+    chrom_tables = [
+        one_chrom(subprobes, fdr_q, chrom) for chrom, subprobes in cnarr.by_arm()
+    ]
     segarr = cnarr.as_dataframe(pd.concat(chrom_tables))
     segarr.sort_columns()
     return segarr
@@ -57,75 +58,82 @@ def segment_haar(cnarr, fdr_q):
 
 def one_chrom(cnarr, fdr_q, chrom):
     logging.debug("Segmenting %s", chrom)
-    results = haarSeg(cnarr.smooth_log2(),
-                      fdr_q,
-                      W=(cnarr['weight'].values if 'weight' in cnarr
-                         else None))
-    table = pd.DataFrame({
-        'chromosome': chrom,
-        'start': cnarr['start'].values.take(results['start']),
-        'end': cnarr['end'].values.take(results['end']),
-        'log2': results['mean'],
-        'gene': '-',
-        'probes': results['size'],
-    })
+    results = haarSeg(
+        cnarr.smooth_log2(),
+        fdr_q,
+        W=(cnarr["weight"].values if "weight" in cnarr else None),
+    )
+    table = pd.DataFrame(
+        {
+            "chromosome": chrom,
+            "start": cnarr["start"].values.take(results["start"]),
+            "end": cnarr["end"].values.take(results["end"]),
+            "log2": results["mean"],
+            "gene": "-",
+            "probes": results["size"],
+        }
+    )
     return table
 
 
 def variants_in_segment(varr, segment, fdr_q):
     if len(varr):
         values = varr.mirrored_baf(above_half=True, tumor_boost=True)
-        results = haarSeg(values, fdr_q,
-                          W=None)  # ENH weight by sqrt(DP)
+        results = haarSeg(values, fdr_q, W=None)  # ENH weight by sqrt(DP)
     else:
         values = pd.Series()
         results = None
-    if results is not None and len(results['start']) > 1:
-        logging.info("Segmented on allele freqs in %s:%d-%d",
-                     segment.chromosome, segment.start, segment.end)
+    if results is not None and len(results["start"]) > 1:
+        logging.info(
+            "Segmented on allele freqs in %s:%d-%d",
+            segment.chromosome,
+            segment.start,
+            segment.end,
+        )
         # Ensure breakpoint locations make sense
         # - Keep original segment start, end positions
         # - Place breakpoints midway between SNVs, I guess?
         # NB: 'results' are indices, i.e. enumerated bins
-        gap_rights = varr['start'].values.take(results['start'][1:])
-        gap_lefts = varr['end'].values.take(results['end'][:-1])
+        gap_rights = varr["start"].values.take(results["start"][1:])
+        gap_lefts = varr["end"].values.take(results["end"][:-1])
         mid_breakpoints = (gap_lefts + gap_rights) // 2
         starts = np.concatenate([[segment.start], mid_breakpoints])
         ends = np.concatenate([mid_breakpoints, [segment.end]])
-        table = pd.DataFrame({
-            'chromosome': segment.chromosome,
-            'start': starts,
-            'end': ends,
-            # 'baf': results['mean'],
-            'gene': segment.gene, # '-'
-            'log2': segment.log2,
-            'probes': results['size'],
-            # 'weight': (segment.weight * results['size']
-            #            / (segment.end - segment.start)),
-        })
+        table = pd.DataFrame(
+            {
+                "chromosome": segment.chromosome,
+                "start": starts,
+                "end": ends,
+                # 'baf': results['mean'],
+                "gene": segment.gene,  # '-'
+                "log2": segment.log2,
+                "probes": results["size"],
+                # 'weight': (segment.weight * results['size']
+                #            / (segment.end - segment.start)),
+            }
+        )
     else:
-        table = pd.DataFrame({
-            'chromosome': segment.chromosome,
-            'start': segment.start,
-            'end': segment.end,
-            # 'baf': values.median(),
-            'gene': segment.gene, #'-',
-            'log2': segment.log2,
-            'probes': segment.probes,
-            # 'weight': segment.weight,
-        }, index=[0])
+        table = pd.DataFrame(
+            {
+                "chromosome": segment.chromosome,
+                "start": segment.start,
+                "end": segment.end,
+                # 'baf': values.median(),
+                "gene": segment.gene,  #'-',
+                "log2": segment.log2,
+                "probes": segment.probes,
+                # 'weight': segment.weight,
+            },
+            index=[0],
+        )
 
     return table
 
 
-
 # ---- from HaarSeg R code -- the API ----
 
-def haarSeg(I, breaksFdrQ,
-            W=None,
-            rawI=None,
-            haarStartLevel=1,
-            haarEndLevel=5):
+
+def haarSeg(I, breaksFdrQ, W=None, rawI=None, haarStartLevel=1, haarEndLevel=5):
     r"""Perform segmentation according to the HaarSeg algorithm.
 
     Parameters
@@ -167,37 +175,38 @@ def haarSeg(I, breaksFdrQ,
 
     Source: haarSeg.R
     """
+
     def med_abs_diff(diff_vals):
         """Median absolute deviation, with deviations given."""
         if len(diff_vals) == 0:
-            return 0.
+            return 0.0
         return diff_vals.abs().median() * 1.4826
 
     diffI = pd.Series(HaarConv(I, None, 1))
     if rawI:
         # Non-stationary variance empirical threshold set to 50
         NSV_TH = 50
-        varMask = (rawI < NSV_TH)
+        varMask = rawI < NSV_TH
         pulseSize = 2
-        diffMask = (PulseConv(varMask, pulseSize) >= .5)
+        diffMask = PulseConv(varMask, pulseSize) >= 0.5
         peakSigmaEst = med_abs_diff(diffI[~diffMask])
         noisySigmaEst = med_abs_diff(diffI[diffMask])
     else:
         peakSigmaEst = med_abs_diff(diffI)
 
     breakpoints = np.array([], dtype=np.int_)
-    for level in range(haarStartLevel, haarEndLevel+1):
-        stepHalfSize = 2 ** level
+    for level in range(haarStartLevel, haarEndLevel + 1):
+        stepHalfSize = 2**level
         convRes = HaarConv(I, W, stepHalfSize)
         peakLoc = FindLocalPeaks(convRes)
         logging.debug("Found %d peaks at level %d", len(peakLoc), level)
 
         if rawI:
             pulseSize = 2 * stepHalfSize
-            convMask = (PulseConv(varMask, pulseSize) >= .5)
+            convMask = PulseConv(varMask, pulseSize) >= 0.5
             sigmaEst = (1 - convMask) * peakSigmaEst + convMask * noisySigmaEst
             convRes /= sigmaEst
-            peakSigmaEst = 1.
+            peakSigmaEst = 1.0
 
         T = FDRThres(convRes[peakLoc], breaksFdrQ, peakSigmaEst)
         # Keep only the peak values where the signal amplitude is large enough.
@@ -210,10 +219,12 @@ def haarSeg(I, breaksFdrQ,
     segs = SegmentByPeaks(I, breakpoints, W)
     segSt = np.insert(breakpoints, 0, 0)
     segEd = np.append(breakpoints, len(I))
-    return {'start': segSt,
-            'end': segEd - 1,
-            'size': segEd - segSt,
-            'mean': segs[segSt]}
+    return {
+        "start": segSt,
+        "end": segEd - 1,
+        "size": segEd - segSt,
+        "mean": segs[segSt],
+    }
 
 
 def FDRThres(x, q, stdev):
@@ -222,7 +233,7 @@ def FDRThres(x, q, stdev):
     if M < 2:
         return 0
 
-    m = np.arange(1, M+1) / M
+    m = np.arange(1, M + 1) / M
     x_sorted = np.sort(np.abs(x))[::-1]
     p = 2 * (1 - stats.norm.cdf(x_sorted, stdev))  # like R "pnorm"
     # Get the largest index for which p <= m*q
@@ -230,8 +241,9 @@ def FDRThres(x, q, stdev):
     if len(indices):
         T = x_sorted[indices[-1]]
     else:
-        logging.debug("No passing p-values: min p=%.4g, min m=%.4g, q=%s",
-                      p[0], m[0], q)
+        logging.debug(
+            "No passing p-values: min p=%.4g, min m=%.4g, q=%s", p[0], m[0], q
+        )
         T = x_sorted[0] + 1e-16  # ~= 2^-52, like MATLAB "eps"
     return T
 
@@ -249,12 +261,12 @@ def SegmentByPeaks(data, peaks, weights=None):
     Source: SegmentByPeaks.R
     """
     segs = np.zeros_like(data)
-    for seg_start, seg_end in zip(np.insert(peaks, 0, 0),
-                                  np.append(peaks, len(data))):
+    for seg_start, seg_end in zip(np.insert(peaks, 0, 0), np.append(peaks, len(data))):
         if weights is not None and weights[seg_start:seg_end].sum() > 0:
             # Weighted mean of individual probe values
-            val = np.average(data[seg_start:seg_end],
-                             weights=weights[seg_start:seg_end])
+            val = np.average(
+                data[seg_start:seg_end], weights=weights[seg_start:seg_end]
+            )
         else:
             # Unweighted mean of individual probe values
             val = np.mean(data[seg_start:seg_end])
@@ -262,14 +274,14 @@ def SegmentByPeaks(data, peaks, weights=None):
     return segs
 
 
-
 # ---- from HaarSeg C code -- the core ----
 
 # --- HaarSeg.h
-def HaarConv(signal, #const double * signal,
-             weight, #const double * weight,
-             stepHalfSize, #int stepHalfSize,
-            ):
+def HaarConv(
+    signal,  # const double * signal,
+    weight,  # const double * weight,
+    stepHalfSize,  # int stepHalfSize,
+):
     """Convolve haar wavelet function with a signal, applying circular padding.
 
     Parameters
@@ -290,8 +302,9 @@ def HaarConv(signal, #const double * signal,
         # XXX TODO handle this endcase
         # raise ValueError("stepHalfSize (%s) > signalSize (%s)"
         #                  % (stepHalfSize, signalSize))
-        logging.debug("Error?: stepHalfSize (%s) > signalSize (%s)",
-                      stepHalfSize, signalSize)
+        logging.debug(
+            "Error?: stepHalfSize (%s) > signalSize (%s)", stepHalfSize, signalSize
+        )
         return np.zeros(signalSize, dtype=np.float_)
 
     result = np.zeros(signalSize, dtype=np.float_)
@@ -315,27 +328,35 @@ def HaarConv(signal, #const double * signal,
             lowEnd = -lowEnd - 1
 
         if weight is None:
-            result[k] = result[k-1] + signal[highEnd] + signal[lowEnd] - 2*signal[k-1]
+            result[k] = (
+                result[k - 1] + signal[highEnd] + signal[lowEnd] - 2 * signal[k - 1]
+            )
         else:
-            lowNonNormed += signal[lowEnd] * weight[lowEnd] - signal[k-1] * weight[k-1]
-            highNonNormed += signal[highEnd] * weight[highEnd] - signal[k-1] * weight[k-1]
-            lowWeightSum += weight[k-1] - weight[lowEnd]
-            highWeightSum += weight[highEnd] - weight[k-1]
+            lowNonNormed += (
+                signal[lowEnd] * weight[lowEnd] - signal[k - 1] * weight[k - 1]
+            )
+            highNonNormed += (
+                signal[highEnd] * weight[highEnd] - signal[k - 1] * weight[k - 1]
+            )
+            lowWeightSum += weight[k - 1] - weight[lowEnd]
+            highWeightSum += weight[highEnd] - weight[k - 1]
             # lowSquareSum += weight[k-1] * weight[k-1] - weight[lowEnd] * weight[lowEnd]
             # highSquareSum += weight[highEnd] * weight[highEnd] - weight[k-1] * weight[k-1]
-            result[k] = math.sqrt(stepHalfSize / 2) * (lowNonNormed / lowWeightSum +
-                                                       highNonNormed / highWeightSum)
+            result[k] = math.sqrt(stepHalfSize / 2) * (
+                lowNonNormed / lowWeightSum + highNonNormed / highWeightSum
+            )
 
     if weight is None:
-        stepNorm = math.sqrt(2. * stepHalfSize)
+        stepNorm = math.sqrt(2.0 * stepHalfSize)
         result[1:signalSize] /= stepNorm
 
     return result
 
 
-def FindLocalPeaks(signal, #const double * signal,
-                   # peakLoc, #int * peakLoc
-                  ):
+def FindLocalPeaks(
+    signal,  # const double * signal,
+    # peakLoc, #int * peakLoc
+):
     """Find local maxima on positive values, local minima on negative values.
 
     First and last index are never considered extramum.
@@ -355,7 +376,7 @@ def FindLocalPeaks(signal, #const double * signal,
     maxSuspect = minSuspect = None
     peakLoc = []
     for k in range(1, len(signal) - 1):
-        sig_prev, sig_curr, sig_next = signal[k-1:k+2]
+        sig_prev, sig_curr, sig_next = signal[k - 1 : k + 2]
         if sig_curr > 0:
             # Look for local maxima
             if (sig_curr > sig_prev) and (sig_curr > sig_next):
@@ -386,11 +407,12 @@ def FindLocalPeaks(signal, #const double * signal,
     return np.array(peakLoc, dtype=np.int_)
 
 
-def UnifyLevels(baseLevel, #const int * baseLevel,
-                addonLevel, #const int * addonLevel,
-                windowSize, #int windowSize,
-                # joinedLevel, #int * joinedLevel);
-               ):
+def UnifyLevels(
+    baseLevel,  # const int * baseLevel,
+    addonLevel,  # const int * addonLevel,
+    windowSize,  # int windowSize,
+    # joinedLevel, #int * joinedLevel);
+):
     """Unify several decomposition levels.
 
     Merge the two lists of breakpoints, but drop addonLevel values that are too
@@ -432,7 +454,7 @@ def UnifyLevels(baseLevel, #const int * baseLevel,
         joinedLevel.append(base_elem)
 
     # Append the remaining addon items beyond the last base item's window
-    last_pos = (baseLevel[-1] + windowSize if len(baseLevel) else -1)
+    last_pos = baseLevel[-1] + windowSize if len(baseLevel) else -1
     while addon_idx < len(addonLevel) and addonLevel[addon_idx] <= last_pos:
         addon_idx += 1
     if addon_idx < len(addonLevel):
@@ -441,9 +463,10 @@ def UnifyLevels(baseLevel, #const int * baseLevel,
     return np.array(sorted(joinedLevel), dtype=np.int_)
 
 
-def PulseConv(signal, #const double * signal,
-              pulseSize, #int pulseSize,
-             ):
+def PulseConv(
+    signal,  # const double * signal,
+    pulseSize,  # int pulseSize,
+):
     """Convolve a pulse function with a signal, applying circular padding to the
     signal.
 
@@ -463,9 +486,8 @@ def PulseConv(signal, #const double * signal,
     signalSize = len(signal)
     if pulseSize > signalSize:
         # ENH: handle this endcase
-        raise ValueError("pulseSize (%s) > signalSize (%s)"
-                         % (pulseSize, signalSize))
-    pulseHeight = 1. / pulseSize
+        raise ValueError("pulseSize (%s) > signalSize (%s)" % (pulseSize, signalSize))
+    pulseHeight = 1.0 / pulseSize
 
     # Circular padding init
     result = np.zeros(signalSize, dtype=np.float_)
@@ -476,24 +498,24 @@ def PulseConv(signal, #const double * signal,
     result[0] *= pulseHeight
 
     n = 1
-    for k in range(pulseSize // 2,
-                   signalSize + (pulseSize // 2) - 1):
+    for k in range(pulseSize // 2, signalSize + (pulseSize // 2) - 1):
         tail = k - pulseSize
         if tail < 0:
             tail = -tail - 1
         head = k
         if head >= signalSize:
             head = signalSize - 1 - (head - signalSize)
-        result[n] = result[n-1] + ((signal[head] - signal[tail]) * pulseHeight)
+        result[n] = result[n - 1] + ((signal[head] - signal[tail]) * pulseHeight)
         n += 1
 
     return result
 
 
 # XXX Apply afterward to the segmentation result? (not currently used)
-def AdjustBreaks(signal, #const double * signal,
-                 peakLoc, #const int * peakLoc,
-                ):
+def AdjustBreaks(
+    signal,  # const double * signal,
+    peakLoc,  # const int * peakLoc,
+):
     """Improve localization of breaks. Suboptimal, but linear-complexity.
 
     We try to move each break 1 sample left/right, choosing the offset which
@@ -509,10 +531,8 @@ def AdjustBreaks(signal, #const double * signal,
     newPeakLoc = peakLoc.copy()
     for k, npl_k in enumerate(newPeakLoc):
         # Calculating width of segments around the breakpoint
-        n1 = (npl_k if k == 0
-                else npl_k - newPeakLoc[k-1])
-        n2 = (len(signal) if k+1 == len(newPeakLoc)
-              else newPeakLoc[k+1])- npl_k
+        n1 = npl_k if k == 0 else npl_k - newPeakLoc[k - 1]
+        n2 = (len(signal) if k + 1 == len(newPeakLoc) else newPeakLoc[k + 1]) - npl_k
 
         # Find the best offset for current breakpoint, trying only 1 sample
         # offset
@@ -523,13 +543,13 @@ def AdjustBreaks(signal, #const double * signal,
             if (n1 == 1 and p == -1) or (n2 == 1 and p == 1):
                 continue
 
-            signal_n1_to_p = signal[npl_k - n1:npl_k + p]
+            signal_n1_to_p = signal[npl_k - n1 : npl_k + p]
             s1 = signal_n1_to_p.sum() / (n1 + p)
-            ss1 = ((signal_n1_to_p - s1)**2).sum()
+            ss1 = ((signal_n1_to_p - s1) ** 2).sum()
 
-            signal_p_to_n2 = signal[npl_k + p:npl_k + n2]
+            signal_p_to_n2 = signal[npl_k + p : npl_k + n2]
             s2 = signal_p_to_n2.sum() / (n2 - p)
-            ss2 = ((signal_p_to_n2 - s2)**2).sum()
+            ss2 = ((signal_p_to_n2 - s2) ** 2).sum()
 
             score = ss1 + ss2
             if score < bestScore:
@@ -544,6 +564,7 @@ def AdjustBreaks(signal, #const double * signal,
 
 # Testing
 
+
 def table2coords(seg_table):
     """Return x, y arrays for plotting."""
     x = []
@@ -556,22 +577,24 @@ def table2coords(seg_table):
     return x, y
 
 
-if __name__ == '__main__':
-    real_data = np.concatenate((np.zeros(800), np.ones(200),
-                                np.zeros(800), .8*np.ones(200), np.zeros(800)))
+if __name__ == "__main__":
+    real_data = np.concatenate(
+        (np.zeros(800), np.ones(200), np.zeros(800), 0.8 * np.ones(200), np.zeros(800))
+    )
     # np.random.seed(0x5EED)
-    noisy_data = real_data + np.random.standard_normal(len(real_data)) * .2
+    noisy_data = real_data + np.random.standard_normal(len(real_data)) * 0.2
 
     # # Run using default parameters
-    seg_table = haarSeg(noisy_data, .005)
+    seg_table = haarSeg(noisy_data, 0.005)
 
     logging.info("%s", seg_table)
 
     from matplotlib import pyplot
+
     indices = np.arange(len(noisy_data))
-    pyplot.scatter(indices, noisy_data, alpha=0.2, color='gray')
+    pyplot.scatter(indices, noisy_data, alpha=0.2, color="gray")
     x, y = table2coords(seg_table)
-    pyplot.plot(x, y, color='r', marker='x', lw=2, snap=False)
+    pyplot.plot(x, y, color="r", marker="x", lw=2, snap=False)
     pyplot.show()
 
     # # The complete segmented signal
