@@ -1,15 +1,11 @@
 """Segmentation by Hidden Markov Model."""
 import collections
 import logging
-import warnings
 
 import numpy as np
 import pandas as pd
-import scipy.special
-
-# joblib/parallel.py:268: DeprecationWarning: check_pickle is deprecated in joblib 0.12 and will be removed in 0.13
-# warnings.simplefilter('ignore', category=DeprecationWarning)
 import pomegranate as pom
+import scipy.special
 
 from ..cnary import CopyNumArray as CNA
 from ..descriptives import biweight_midvariance
