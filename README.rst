@@ -8,7 +8,7 @@ and alterations genome-wide from high-throughput sequencing.
 Read the full documentation at: http://cnvkit.readthedocs.io
 
 .. image:: https://img.shields.io/pypi/v/CNVkit.svg
-    :target: https://pypi.org/project/CNVkit/#history
+    :target: https://pypi.org/project/CNVkit/
     :alt: PyPI package
 
 .. image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
