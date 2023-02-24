@@ -25,23 +25,23 @@ def from_label(text, keep_gene=True):
         missing end becomes None.
     """
     match = re_label.match(text)
-    if match:
-        chrom, start, end, gene = match.groups()
-        start = int(start) - 1 if start else None
-        end = int(end) if end else None
-        if keep_gene:
-            gene = gene or ""
-            return NamedRegion(chrom, start, end, gene)
-        return Region(chrom, start, end)
-    else:
+    if not match:
         raise ValueError(
             f"Invalid range spec: {text} (should be like: chr1:2333000-2444000)"
         )
 
+    chrom, start, end, gene = match.groups()
+    start = int(start) - 1 if start else None
+    end = int(end) if end else None
+    if keep_gene:
+        gene = gene or ""
+        return NamedRegion(chrom, start, end, gene)
+    return Region(chrom, start, end)
+
 
 def to_label(row):
     """Convert a Region or (chrom, start, end) tuple to a region label."""
-    return "{}:{}-{}".format(row.chromosome, row.start + 1, row.end)
+    return f"{row.chromosome}:{row.start + 1}-{row.end}"
 
 
 def unpack_range(a_range):

@@ -52,7 +52,7 @@ def _split_targets(regions, avg_size, min_size, verbose):
                     label = (
                         row.gene
                         if "gene" in regions
-                        else "{}:{}-{}".format(row.chromosome, row.start, row.end)
+                        else f"{row.chromosome}:{row.start}-{row.end}"
                     )
                     logging.info(
                         "Splitting: {:30} {:7} / {} = {:.2f}".format(
