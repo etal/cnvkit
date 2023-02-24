@@ -4,13 +4,13 @@
 #   "do_*" runs the command's functionality as an API
 import argparse
 import logging
+import multiprocessing
 import os
 import sys
+import warnings
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
-import warnings
-
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
@@ -139,14 +139,10 @@ def _cmd_batch(args):
     for fname in (args.bam_files or []) + (args.normal or []):
         sid = core.fbase(fname)
         if sid in seen_sids:
-            sys.exit(
-                "Duplicate sample ID %r (from %s and %s)" % (sid, fname, seen_sids[sid])
-            )
+            sys.exit(f"Duplicate sample ID {sid!r} (from {fname} and {seen_sids[sid]})")
         seen_sids[sid] = fname
 
     if args.processes < 1:
-        import multiprocessing
-
         args.processes = multiprocessing.cpu_count()
 
     if not args.reference:
@@ -187,7 +183,7 @@ def _cmd_batch(args):
         else:
             procs_per_bam = max(1, args.processes // len(args.bam_files))
             logging.info(
-                "Running %d samples in %d processes " "(that's %d processes per bam)",
+                "Running %d samples in %d processes (that's %d processes per bam)",
                 len(args.bam_files),
                 args.processes,
                 procs_per_bam,
@@ -239,7 +235,7 @@ P_batch.add_argument(
     choices=segmentation.SEGMENT_METHODS,
     default="cbs",
     help="""Method used in the 'segment' step. [Default: %(default)s]""",
-),
+)
 P_batch.add_argument(
     "-y",
     "--male-reference",
@@ -527,11 +523,11 @@ do_autobin = public(autobin.do_autobin)
 def _cmd_autobin(args):
     """Quickly calculate reasonable bin sizes from BAM read counts."""
     if args.method in ("hybrid", "amplicon") and not args.targets:
-        raise RuntimeError("Sequencing method %r requires targets (-t)", args.method)
+        raise RuntimeError(f"Sequencing method {args.method!r} requires targets (-t)")
     if args.method == "wgs":
         if not args.access:
             raise RuntimeError(
-                "Sequencing method 'wgs' requires accessible " "regions (-g)"
+                "Sequencing method 'wgs' requires accessible regions (-g)"
             )
         if args.targets:
             logging.warning("Targets will be ignored: %s", args.targets)
@@ -545,11 +541,11 @@ def _cmd_autobin(args):
             regions = tabio.read_auto(bed_fname)
             if len(regions):
                 return regions
-            else:
-                logging.warning(
-                    "No regions to estimate depth from %s",
-                    regions.meta.get("filename", ""),
-                )
+            logging.warning(
+                "No regions to estimate depth from %s",
+                regions.meta.get("filename", ""),
+            )
+        return None
 
     tgt_arr = read_regions(args.targets)
     access_arr = read_regions(args.access)
@@ -720,9 +716,9 @@ def _cmd_coverage(args):
         tgtbase = (
             "antitargetcoverage" if "anti" in bedbase.lower() else "targetcoverage"
         )
-        args.output = "%s.%s.cnn" % (bambase, tgtbase)
+        args.output = f"{bambase}.{tgtbase}.cnn"
         if os.path.exists(args.output):
-            args.output = "%s.%s.cnn" % (bambase, bedbase)
+            args.output = f"{bambase}.{bedbase}.cnn"
     core.ensure_path(args.output)
     tabio.write(pset, args.output)
 
@@ -921,9 +917,8 @@ def _cmd_fix(args):
     anti_raw = read_cna(args.antitarget, sample_id=args.sample_id)
     if len(anti_raw) and tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError(
-            "Sample IDs do not match:"
-            "'%s' (target) vs. '%s' (antitarget)"
-            % (tgt_raw.sample_id, anti_raw.sample_id)
+            "Sample IDs do not match: "
+            + f"'{tgt_raw.sample_id}' (target) vs. '{anti_raw.sample_id}' (antitarget)"
         )
     target_table = fix.do_fix(
         tgt_raw,
@@ -1461,10 +1456,7 @@ def _cmd_scatter(args):
             for region in tabio.read_auto(args.range_list).coords():
                 try:
                     if args.title is not None:
-                        scatter_opts["title"] = "%s %s" % (
-                            args.title,
-                            region.chromosome,
-                        )
+                        scatter_opts["title"] = f"{args.title} {region.chromosome}"
                     scatter.do_scatter(
                         cnarr, segarr, varr, show_range=region, **scatter_opts
                     )
@@ -2744,10 +2736,12 @@ def _cmd_export_theta(args):
             raise ValueError("VCF contains no usable SNV records")
         try:
             tumor_snps, normal_snps = export.export_theta_snps(variants)
-        except ValueError:
-            raise ValueError("VCF does not contain any tumor/normal paired " "samples")
+        except ValueError as exc:
+            raise ValueError(
+                "VCF does not contain any tumor-normal paired samples"
+            ) from exc
         for title, table in [("tumor", tumor_snps), ("normal", normal_snps)]:
-            out_fname = "{}.{}.snp_formatted.txt".format(tumor_cn.sample_id, title)
+            out_fname = f"{tumor_cn.sample_id}.{title}.snp_formatted.txt"
             table.to_csv(out_fname, sep="\t", index=False)
             logging.info("Wrote %s", out_fname)
 
