@@ -3,11 +3,12 @@
 import logging
 from . import commands
 
+
 def main():
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = commands.parse_args()
     args.func(args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
