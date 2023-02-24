@@ -6,8 +6,9 @@ from skgenome import tabio
 from . import antitarget
 
 
-def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
-              avg_size=200/.75):
+def do_target(
+    bait_arr, annotate=None, do_short_names=False, do_split=False, avg_size=200 / 0.75
+):
     """Transform bait intervals into targets more suitable for CNVkit."""
     tgt_arr = bait_arr.copy()
     # Drop zero-width regions
@@ -19,10 +20,10 @@ def do_target(bait_arr, annotate=None, do_short_names=False, do_split=False,
         logging.info("Applying annotations as target names")
         annotation = tabio.read_auto(annotate)
         antitarget.compare_chrom_names(tgt_arr, annotation)
-        tgt_arr['gene'] = annotation.into_ranges(tgt_arr, 'gene', '-')
+        tgt_arr["gene"] = annotation.into_ranges(tgt_arr, "gene", "-")
     if do_short_names:
         logging.info("Shortening target interval labels")
-        tgt_arr['gene'] = list(shorten_labels(tgt_arr['gene']))
+        tgt_arr["gene"] = list(shorten_labels(tgt_arr["gene"]))
     return tgt_arr
 
 
@@ -54,7 +55,7 @@ def shorten_labels(gene_labels):
     curr_gene_count = 0
 
     for label in gene_labels:
-        next_names = set(label.rstrip().split(','))
+        next_names = set(label.rstrip().split(","))
         assert len(next_names)
         overlap = curr_names.intersection(next_names)
         if overlap:
@@ -80,11 +81,10 @@ def shorten_labels(gene_labels):
     logging.info("Longest name length: %d", longest_name_len)
 
 
-def filter_names(names, exclude=('mRNA',)):
+def filter_names(names, exclude=("mRNA",)):
     """Remove less-meaningful accessions from the given set."""
     if len(names) > 1:
-        ok_names = set(n for n in names
-                       if not any(n.startswith(ex) for ex in exclude))
+        ok_names = set(n for n in names if not any(n.startswith(ex) for ex in exclude))
         if ok_names:
             return ok_names
     # Names are not filter-worthy; leave them as they are for now
@@ -94,7 +94,7 @@ def filter_names(names, exclude=('mRNA',)):
 def shortest_name(names):
     """Return the shortest trimmed name from the given set."""
     name = min(filter_names(names), key=len)
-    if len(name) > 2 and '|' in name[1:-1]:
+    if len(name) > 2 and "|" in name[1:-1]:
         # Split 'DB|accession' and extract the accession sans-DB
-        name = name.split('|')[-1]
+        name = name.split("|")[-1]
     return name
