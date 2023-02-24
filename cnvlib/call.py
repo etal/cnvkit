@@ -7,16 +7,24 @@ import pandas as pd
 from . import segfilters
 
 
-def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
-            is_reference_male=False, is_sample_female=False, filters=None,
-            thresholds=(-1.1, -0.25, 0.2, 0.7)):
+def do_call(
+    cnarr,
+    variants=None,
+    method="threshold",
+    ploidy=2,
+    purity=None,
+    is_reference_male=False,
+    is_sample_female=False,
+    filters=None,
+    thresholds=(-1.1, -0.25, 0.2, 0.7),
+):
     if method not in ("threshold", "clonal", "none"):
         raise ValueError("Argument `method` must be one of: clonal, threshold")
 
     outarr = cnarr.copy()
     if filters:
         # Apply any filters that use segmetrics but not cn fields
-        for filt in ('ci', 'sem'):
+        for filt in ("ci", "sem"):
             if filt in filters:
                 logging.info("Applying filter '%s'", filt)
                 outarr = getattr(segfilters, filt)(outarr)
@@ -26,13 +34,12 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
         outarr["baf"] = variants.baf_by_ranges(outarr)
 
     if purity and purity < 1.0:
-        logging.info("Rescaling sample with purity %g, ploidy %d",
-                     purity, ploidy)
-        absolutes = absolute_clonal(outarr, ploidy, purity,
-                                    is_reference_male, is_sample_female)
+        logging.info("Rescaling sample with purity %g, ploidy %d", purity, ploidy)
+        absolutes = absolute_clonal(
+            outarr, ploidy, purity, is_reference_male, is_sample_female
+        )
         # Recalculate sample log2 ratios after rescaling for purity
-        outarr["log2"] = log2_ratios(outarr, absolutes, ploidy,
-                                     is_reference_male)
+        outarr["log2"] = log2_ratios(outarr, absolutes, ploidy, is_reference_male)
         if variants:
             # Rescale b-allele frequencies for purity
             outarr["baf"] = rescale_baf(purity, outarr["baf"])
@@ -44,29 +51,27 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
     if method == "threshold":
         # Apply cutoffs to either original or rescaled log2 values
         tokens = ["%g => %d" % (thr, i) for i, thr in enumerate(thresholds)]
-        logging.info("Calling copy number with thresholds: %s",
-                     ", ".join(tokens))
-        absolutes = absolute_threshold(outarr, ploidy, thresholds,
-                                       is_reference_male)
+        logging.info("Calling copy number with thresholds: %s", ", ".join(tokens))
+        absolutes = absolute_threshold(outarr, ploidy, thresholds, is_reference_male)
 
-    if method != 'none':
-        outarr['cn'] = absolutes.round().astype('int')
-        if 'baf' in outarr:
+    if method != "none":
+        outarr["cn"] = absolutes.round().astype("int")
+        if "baf" in outarr:
             # Calculate major and minor allelic copy numbers (s.t. cn1 >= cn2)
-            upper_baf = ((outarr['baf'] - .5).abs() + .5).fillna(1.0).values
-            outarr['cn1'] = ((absolutes * upper_baf).round()
-                             .clip(0, outarr['cn'])
-                             .astype('int'))
-            outarr['cn2'] = outarr['cn'] - outarr['cn1']
-            is_null = (outarr['baf'].isnull() & (outarr['cn'] > 0))
-            outarr[is_null, 'cn1'] = np.nan
-            outarr[is_null, 'cn2'] = np.nan
+            upper_baf = ((outarr["baf"] - 0.5).abs() + 0.5).fillna(1.0).values
+            outarr["cn1"] = (
+                (absolutes * upper_baf).round().clip(0, outarr["cn"]).astype("int")
+            )
+            outarr["cn2"] = outarr["cn"] - outarr["cn1"]
+            is_null = outarr["baf"].isnull() & (outarr["cn"] > 0)
+            outarr[is_null, "cn1"] = np.nan
+            outarr[is_null, "cn2"] = np.nan
 
     if filters:
         # Apply the remaining cn-based filters
         for filt in filters:
             if not outarr.data.index.is_unique:
-                logging.warning("Resetting index") # DBG
+                logging.warning("Resetting index")  # DBG
                 outarr.data = outarr.data.reset_index(drop=True)
             logging.warning("Applying filter '%s'", filt)
             outarr = getattr(segfilters, filt)(outarr)
@@ -75,8 +80,9 @@ def do_call(cnarr, variants=None, method="threshold", ploidy=2, purity=None,
     return outarr
 
 
-def log2_ratios(cnarr, absolutes, ploidy, is_reference_male,
-                min_abs_val=1e-3, round_to_int=False):
+def log2_ratios(
+    cnarr, absolutes, ploidy, is_reference_male, min_abs_val=1e-3, round_to_int=False
+):
     """Convert absolute copy numbers to log2 ratios.
 
     Optionally round copy numbers to integers.
@@ -125,12 +131,12 @@ def absolute_threshold(cnarr, ploidy, thresholds, is_reference_male):
     """
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for idx, row in enumerate(cnarr):
-        ref_copies = _reference_copies_pure(row.chromosome, ploidy,
-                                            is_reference_male)
+        ref_copies = _reference_copies_pure(row.chromosome, ploidy, is_reference_male)
         if np.isnan(row.log2):
             # XXX fallback
-            logging.warning("log2=nan found; replacing with neutral copy number %s",
-                            ref_copies)
+            logging.warning(
+                "log2=nan found; replacing with neutral copy number %s", ref_copies
+            )
             absolutes[idx] = ref_copies
             continue
         cnum = 0
@@ -140,8 +146,7 @@ def absolute_threshold(cnarr, ploidy, thresholds, is_reference_male):
                     cnum = int(cnum * ref_copies / ploidy)
                 break
         else:
-            cnum = int(np.ceil(_log2_ratio_to_absolute_pure(row.log2,
-                                                            ref_copies)))
+            cnum = int(np.ceil(_log2_ratio_to_absolute_pure(row.log2, ref_copies)))
         absolutes[idx] = cnum
     return absolutes
 
@@ -152,9 +157,11 @@ def absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     for i, row in enumerate(cnarr):
         # TODO by_chromosome to reduce number of calls to this
         ref_copies, expect_copies = _reference_expect_copies(
-            row.chromosome, ploidy, is_sample_female, is_reference_male)
+            row.chromosome, ploidy, is_sample_female, is_reference_male
+        )
         absolutes[i] = _log2_ratio_to_absolute(
-            row.log2, ref_copies, expect_copies, purity)
+            row.log2, ref_copies, expect_copies, purity
+        )
     return absolutes
 
 
@@ -162,8 +169,7 @@ def absolute_pure(cnarr, ploidy, is_reference_male):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
     absolutes = np.zeros(len(cnarr), dtype=np.float_)
     for i, row in enumerate(cnarr):
-        ref_copies = _reference_copies_pure(row.chromosome, ploidy,
-                                            is_reference_male)
+        ref_copies = _reference_copies_pure(row.chromosome, ploidy, is_reference_male)
         absolutes[i] = _log2_ratio_to_absolute_pure(row.log2, ref_copies)
     return absolutes
 
@@ -174,14 +180,14 @@ def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_femal
     reference_copies = expect_copies = np.zeros(len(cnarr), dtype=np.int_)
     for i, row in enumerate(cnarr):
         ref_copies, exp_copies = _reference_expect_copies(
-            row.chromosome, ploidy, is_sample_female, is_reference_male)
+            row.chromosome, ploidy, is_sample_female, is_reference_male
+        )
         reference_copies[i] = ref_copies
         expect_copies[i] = exp_copies
-        absolutes[i] = _log2_ratio_to_absolute(
-            row.log2, ref_copies, exp_copies, purity)
-    return pd.DataFrame({'absolute': absolutes,
-                         'reference': reference_copies,
-                         'expect': expect_copies})
+        absolutes[i] = _log2_ratio_to_absolute(row.log2, ref_copies, exp_copies, purity)
+    return pd.DataFrame(
+        {"absolute": absolutes, "reference": reference_copies, "expect": expect_copies}
+    )
 
 
 def absolute_expect(cnarr, ploidy, is_sample_female):
@@ -233,11 +239,11 @@ def _reference_expect_copies(chrom, ploidy, is_sample_female, is_reference_male)
     """
     chrom = chrom.lower()
     if chrom in ["chrx", "x"]:
-        ref_copies = (ploidy // 2 if is_reference_male else ploidy)
-        exp_copies = (ploidy if is_sample_female else ploidy // 2)
+        ref_copies = ploidy // 2 if is_reference_male else ploidy
+        exp_copies = ploidy if is_sample_female else ploidy // 2
     elif chrom in ["chry", "y"]:
         ref_copies = ploidy // 2
-        exp_copies = (0 if is_sample_female else ploidy // 2)
+        exp_copies = 0 if is_sample_female else ploidy // 2
     else:
         ref_copies = exp_copies = ploidy
     return ref_copies, exp_copies
@@ -287,8 +293,7 @@ def _log2_ratio_to_absolute(log2_ratio, ref_copies, expect_copies, purity=None):
         n = r*2^v
     """
     if purity and purity < 1.0:
-        ncopies = (ref_copies * 2**log2_ratio - expect_copies * (1 - purity)
-                  ) / purity
+        ncopies = (ref_copies * 2**log2_ratio - expect_copies * (1 - purity)) / purity
     else:
         ncopies = _log2_ratio_to_absolute_pure(log2_ratio, ref_copies)
     return ncopies
@@ -302,7 +307,7 @@ def _log2_ratio_to_absolute_pure(log2_ratio, ref_copies):
 
     .. math :: n = r*2^v
     """
-    ncopies = ref_copies * 2 ** log2_ratio
+    ncopies = ref_copies * 2**log2_ratio
     return ncopies
 
 
@@ -316,6 +321,6 @@ def rescale_baf(purity, observed_baf, normal_baf=0.5):
         t_baf = (obs_baf - n_baf * (1-purity))/purity
     """
     # ENH: use normal_baf array if available
-    tumor_baf = (observed_baf - normal_baf * (1-purity)) / purity
+    tumor_baf = (observed_baf - normal_baf * (1 - purity)) / purity
     # ENH: warn if tumor_baf < 0 -- purity estimate may be too low
     return tumor_baf
