@@ -243,10 +243,8 @@ def variants_in_segment(varr, segment, min_variants=50):
         bad_segs_idx = dframe.start >= dframe.end
         if bad_segs_idx.any():
             raise RuntimeError(
-                "Improper post-processing of segment {} -- "
-                "{} bins start >= end:\n{}\n".format(
-                    segment, bad_segs_idx.sum(), dframe[bad_segs_idx]
-                )
+                f"Improper post-processing of segment {segment} -- "
+                f"{bad_segs_idx.sum()} bins start >= end:\n{dframe[bad_segs_idx]}\n"
             )
 
     else:
@@ -255,7 +253,7 @@ def variants_in_segment(varr, segment, min_variants=50):
                 "chromosome": segment.chromosome,
                 "start": segment.start,
                 "end": segment.end,
-                "gene": segment.gene,  #'-',
+                "gene": segment.gene,  # '-',
                 "log2": segment.log2,
                 "probes": segment.probes,
                 # 'weight': segment.weight,

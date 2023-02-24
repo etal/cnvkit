@@ -119,7 +119,7 @@ def variants_in_segment(varr, segment, fdr_q):
                 "start": segment.start,
                 "end": segment.end,
                 # 'baf': values.median(),
-                "gene": segment.gene,  #'-',
+                "gene": segment.gene,  # '-',
                 "log2": segment.log2,
                 "probes": segment.probes,
                 # 'weight': segment.weight,
@@ -486,7 +486,7 @@ def PulseConv(
     signalSize = len(signal)
     if pulseSize > signalSize:
         # ENH: handle this endcase
-        raise ValueError("pulseSize (%s) > signalSize (%s)" % (pulseSize, signalSize))
+        raise ValueError(f"pulseSize ({pulseSize}) > signalSize ({signalSize})")
     pulseHeight = 1.0 / pulseSize
 
     # Circular padding init

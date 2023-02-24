@@ -21,8 +21,8 @@ set.seed(0xA5EED)
 
 # additional smoothing (if --smooth-cbs provided)
 if (%(smooth_cbs)g) {
-	write("Performing smoothing of the data", stderr())
-	cna = smooth.CNA(cna)
+    write("Performing smoothing of the data", stderr())
+    cna = smooth.CNA(cna)
 }
 
 if (is.null(tbl$weight)) {

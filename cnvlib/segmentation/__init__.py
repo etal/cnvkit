@@ -1,8 +1,6 @@
 """Segmentation of copy number values."""
 import locale
 import logging
-import math
-import os.path
 import tempfile
 from io import StringIO
 
@@ -11,7 +9,7 @@ import pandas as pd
 from skgenome import tabio
 from skgenome.intersect import iter_slices
 
-from .. import core, parallel, params, smoothing, vary
+from .. import core, parallel, params, smoothing
 from ..cnary import CopyNumArray as CNA
 from ..segfilters import squash_by_groups
 from . import cbs, flasso, haar, hmm, none
@@ -50,10 +48,10 @@ def do_segmentation(
     msg = "Segmenting with method " + repr(method)
     if threshold is not None:
         if method.startswith("hmm"):
-            msg += ", smoothing window size %s," % threshold
+            msg += f", smoothing window size {threshold},"
         else:
-            msg += ", significance threshold %s," % threshold
-    msg += " in %s processes" % processes
+            msg += f", significance threshold {threshold},"
+    msg += f" in {processes} processes"
     logging.info(msg)
 
     # NB: parallel cghFLasso segfaults in R ('memory not mapped'),
@@ -164,7 +162,7 @@ def _do_segmentation(
             logging.debug("Dropped %d bins with zero weight", n_weight_too_low)
 
     if len(filtered_cn) != len(cnarr):
-        msg = "Dropped %d / %d bins" % (len(cnarr) - len(filtered_cn), len(cnarr))
+        msg = f"Dropped {len(cnarr) - len(filtered_cn)} / {len(cnarr)} bins"
         if cnarr["chromosome"].iat[0] == cnarr["chromosome"].iat[-1]:
             msg += " on chromosome " + str(cnarr["chromosome"].iat[0])
         logging.info(msg)
@@ -219,7 +217,7 @@ def _do_segmentation(
             segarr = squash_by_groups(segarr, segarr["log2"], by_arm=True)
 
     else:
-        raise ValueError("Unknown method %r" % method)
+        raise ValueError(f"Unknown method {method!r}")
 
     segarr.meta = cnarr.meta.copy()
     if variants and not method.startswith("hmm"):
@@ -236,8 +234,7 @@ def _do_segmentation(
     segarr = transfer_fields(segarr, cnarr)
     if save_dataframe:
         return segarr, seg_out
-    else:
-        return segarr
+    return segarr
 
 
 def drop_outliers(cnarr, width, factor):
@@ -302,7 +299,7 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     if not len(cnarr):
         # This Should Never Happen (TM)
         # raise RuntimeError("No bins for:\n" + str(segments.data))
-        logging.warn("No bins for:\n%s", segments.data)
+        logging.warning("No bins for:\n%s", segments.data)
         return segments
 
     # Adjust segment endpoints to cover the chromosome arm's original bins
