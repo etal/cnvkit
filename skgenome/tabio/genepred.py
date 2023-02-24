@@ -122,44 +122,71 @@ def read_refflat(infile, cds=False, exons=False):
     if cds and exons:
         raise ValueError("Arguments 'cds' and 'exons' are mutually exclusive")
 
-    cols_shared = ['gene', 'accession', 'chromosome', 'strand']
+    cols_shared = ["gene", "accession", "chromosome", "strand"]
     converters = None
     if exons:
-        cols_rest = ['_start_tx', '_end_tx',  # Transcription
-                     '_start_cds', '_end_cds',  # Coding region
-                     '_exon_count', 'exon_starts', 'exon_ends']
-        converters = {'exon_starts': _split_commas, 'exon_ends': _split_commas}
+        cols_rest = [
+            "_start_tx",
+            "_end_tx",  # Transcription
+            "_start_cds",
+            "_end_cds",  # Coding region
+            "_exon_count",
+            "exon_starts",
+            "exon_ends",
+        ]
+        converters = {"exon_starts": _split_commas, "exon_ends": _split_commas}
     elif cds:
         # Use CDS instead of transcription region
-        cols_rest = ['_start_tx', '_end_tx',
-                     'start', 'end',
-                     '_exon_count', '_exon_starts', '_exon_ends']
+        cols_rest = [
+            "_start_tx",
+            "_end_tx",
+            "start",
+            "end",
+            "_exon_count",
+            "_exon_starts",
+            "_exon_ends",
+        ]
     else:
-        cols_rest = ['start', 'end',
-                     '_start_cds', '_end_cds',
-                     '_exon_count', '_exon_starts', '_exon_ends']
+        cols_rest = [
+            "start",
+            "end",
+            "_start_cds",
+            "_end_cds",
+            "_exon_count",
+            "_exon_starts",
+            "_exon_ends",
+        ]
     colnames = cols_shared + cols_rest
-    usecols = [c for c in colnames if not c.startswith('_')]
+    usecols = [c for c in colnames if not c.startswith("_")]
     # Parse the file contents
-    dframe = pd.read_csv(infile, sep='\t', header=None, na_filter=False,
-                           names=colnames, usecols=usecols,
-                           dtype={c: str for c in cols_shared},
-                           converters=converters)
+    dframe = pd.read_csv(
+        infile,
+        sep="\t",
+        header=None,
+        na_filter=False,
+        names=colnames,
+        usecols=usecols,
+        dtype={c: str for c in cols_shared},
+        converters=converters,
+    )
 
     # Calculate values for output columns
     if exons:
-        dframe = pd.DataFrame.from_records(_split_exons(dframe),
-                                           columns=cols_shared + ['start', 'end'])
-        dframe['start'] = dframe['start'].astype('int')
-        dframe['end'] = dframe['end'].astype('int')
+        dframe = pd.DataFrame.from_records(
+            _split_exons(dframe), columns=cols_shared + ["start", "end"]
+        )
+        dframe["start"] = dframe["start"].astype("int")
+        dframe["end"] = dframe["end"].astype("int")
 
-    return (dframe.assign(start=dframe.start - 1)
-            .sort_values(['chromosome', 'start', 'end'])
-            .reset_index(drop=True))
+    return (
+        dframe.assign(start=dframe.start - 1)
+        .sort_values(["chromosome", "start", "end"])
+        .reset_index(drop=True)
+    )
 
 
 def _split_commas(field):
-    return field.rstrip(',').split(',')
+    return field.rstrip(",").split(",")
 
 
 def _split_exons(dframe):
