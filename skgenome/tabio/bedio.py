@@ -10,7 +10,8 @@ from .util import report_bad_line
 def read_bed(infile):
     """UCSC Browser Extensible Data (BED) format.
 
-    A BED file has these columns:
+    A BED file has these columns::
+
         chromosome, start position, end position, [gene, strand, other stuff...]
 
     Coordinate indexing is from 0.

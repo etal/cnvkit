@@ -33,7 +33,7 @@ def _parse_lines(lines):
                 length = int(ln[3:])
                 yield (chrom, 0, length)
             else:
-                raise ValueError("Bad line: %r" % line)
+                raise ValueError(f"Bad line: {line!r}")
         elif line.startswith("@HD"):
             pass
         else:

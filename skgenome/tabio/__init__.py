@@ -53,7 +53,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     if fmt in READERS:
         reader, suggest_into = READERS[fmt]
     else:
-        raise ValueError("Unknown format: %s" % fmt)
+        raise ValueError(f"Unknown format: {fmt}")
 
     if meta is None:
         meta = {}
@@ -234,8 +234,7 @@ def sniff_region_format(infile):
             if fname_fmt and format_patterns[fname_fmt].match(line):
                 return fname_fmt
             # Formats that (may) declare themselves in an initial '#' comment
-            if (line.startswith('##gff-version') or
-                format_patterns['gff'].match(line)):
+            if line.startswith('##gff-version') or format_patterns['gff'].match(line):
                 return 'gff'
             if line.startswith(('##fileformat=VCF', '#CHROM\tPOS\tID')):
                 return 'vcf'
