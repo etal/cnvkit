@@ -92,7 +92,7 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50, fasta=None):
                         prev.pos <= read.pos)
 
     # ENH - repeat at 50%, ~99% through the BAM
-    bam = pysam.Samfile(bam_fname, 'rb', reference_filename=fasta)
+    bam = pysam.AlignmentFile(bam_fname, 'rb', reference_filename=fasta)
     last_read = None
     for read in islice(bam, span):
         if out_of_order(read, last_read):
@@ -116,14 +116,14 @@ def get_read_length(bam, span=1000, fasta=None):
 
     Parameters
     ----------
-    bam : str or pysam.Samfile
+    bam : str or pysam.AlignmentFile
         Filename or pysam-opened BAM file.
     n : int
         Number of reads used to calculate median read length.
     """
     was_open = False
     if isinstance(bam, str):
-        bam = pysam.Samfile(bam, 'rb', reference_filename=fasta)
+        bam = pysam.AlignmentFile(bam, 'rb', reference_filename=fasta)
     else:
         was_open = True
     lengths = [read.query_length for read in islice(bam, span)

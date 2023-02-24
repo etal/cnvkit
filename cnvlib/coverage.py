@@ -90,7 +90,7 @@ def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1, fasta=None
     """Calculate log2 coverages in the BAM file at each interval."""
     regions = tabio.read_auto(bed_fname)
     if procs == 1:
-        bamfile = pysam.Samfile(bam_fname, 'rb', reference_filename=fasta)
+        bamfile = pysam.AlignmentFile(bam_fname, 'rb', reference_filename=fasta)
         for chrom, subregions in regions.by_chromosome():
             logging.info("Processing chromosome %s of %s",
                          chrom, os.path.basename(bam_fname))
@@ -112,7 +112,7 @@ def _rdc(args):
 
 def _rdc_chunk(bamfile, regions, min_mapq, fasta=None):
     if isinstance(bamfile, str):
-        bamfile = pysam.Samfile(bamfile, 'rb', reference_filename=fasta)
+        bamfile = pysam.AlignmentFile(bamfile, 'rb', reference_filename=fasta)
     for chrom, start, end, gene in regions.coords(["gene"]):
         yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)
 
