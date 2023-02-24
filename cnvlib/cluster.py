@@ -15,8 +15,10 @@ import numpy as np
 
 def kmeans(samples, k=None):
     from scipy.cluster import vq
+
     if k is None:
         from math import log
+
         k = max(1, int(round(log(len(samples), 3))))
         # E.g. n=66 -> k=2, 16 -> 3, 47 -> 4, 141 -> 5, 421 -> 6, 1263 -> 7
 
@@ -26,11 +28,12 @@ def kmeans(samples, k=None):
     _centroids, labels = vq.kmeans2(obs, k, minit="++")
     # XXX shorter way to do this grouping?
     from collections import defaultdict
+
     clusters = defaultdict(list)
     for idx, label in enumerate(labels):
         clusters[label].append(idx)
     clusters = clusters.values()
-    #plot_clusters(obs, clusters)
+    # plot_clusters(obs, clusters)
     return clusters
 
 
@@ -63,13 +66,14 @@ def markov(samples, inflation=5, max_iterations=100, by_pca=True):
         pca_matrix = pca_sk(samples, 2)  # pca_plain
         # Convert to similarity matrix
         from scipy.spatial import distance
+
         dists = distance.squareform(distance.pdist(pca_matrix))
         M = 1 - (dists / dists.max())
     else:
         M = np.corrcoef(samples)
 
     M, clusters = mcl(M, max_iterations, inflation)
-    #plot_clusters(M, clusters)
+    # plot_clusters(M, clusters)
     return clusters
 
 
@@ -80,18 +84,18 @@ def mcl(M, max_iterations, inflation, expansion=2):
     """Markov cluster algorithm."""
     print("M_init:\n", M)
     M = normalize(M)
-    #print("M_norm:\n", M)
+    # print("M_norm:\n", M)
     for i in range(max_iterations):
         M_prev = M
         M = inflate(expand(M, expansion), inflation)
-        #print("M_inflate_%d:\n" % i, M)
+        # print("M_inflate_%d:\n" % i, M)
         if converged(M, M_prev):
             logging.debug("Converged at iteration %d", i)
             break
         M = prune(M)
-        #print("M_prune_%d:\n" % i, M)
+        # print("M_prune_%d:\n" % i, M)
 
-    #print("M_final:\n", M)
+    # print("M_final:\n", M)
     clusters = get_clusters(M)
     return M, clusters
 
@@ -156,13 +160,12 @@ def get_clusters(M):
         number of clusters.
     """
     attractors_idx = M.diagonal().nonzero()[0]
-    clusters_idx = [M[idx].nonzero()[0]
-                    for idx in attractors_idx]
+    clusters_idx = [M[idx].nonzero()[0] for idx in attractors_idx]
     return clusters_idx
 
 
 # https://github.com/GuyAllard/markov_clustering/blob/master/markov_clustering/mcl.py
-def prune(M, threshold=.001):
+def prune(M, threshold=0.001):
     """Remove many small entries while retaining most of M's stochastic mass.
 
     After pruning, vectors are rescaled to be stochastic again.
@@ -225,6 +228,7 @@ def pca_sk(data, n_components=None):
     Returns: PCA-transformed data with `n_components` columns.
     """
     from sklearn.decomposition import PCA
+
     return PCA(n_components=n_components).fit_transform(data)
 
 
@@ -256,9 +260,9 @@ def pca_plain(data, n_components=None):
     E, V = E[key], V[:, key]
     # Transformation the data using eigenvectors
     U = np.dot(data, V)  # or: np.dot(V.T, data.T).T
-    #U = np.dot(V.T, data.T).T
+    # U = np.dot(V.T, data.T).T
     # Return the re-scaled data, eigenvalues, and eigenvectors
-    return U #, E, V
+    return U  # , E, V
 
 
 def plot_clusters(M, cluster_indices):
@@ -273,7 +277,7 @@ def plot_clusters(M, cluster_indices):
     """
     from matplotlib import pyplot as plt
 
-    #colors = list("krgbo")[:len(cluster_indices)]
+    # colors = list("krgbo")[:len(cluster_indices)]
     _fig, ax = plt.subplots(1, 1)
     for cl_idx in cluster_indices:
         ax.scatter(M[cl_idx, 0], M[cl_idx, 1])  # c=color
