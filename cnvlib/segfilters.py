@@ -17,8 +17,8 @@ def require_column(*colnames):
     if len(colnames) == 1:
         msg = "'{}' filter requires column '{}'"
     else:
-        msg = "'{}' filter requires columns " + \
-                ", ".join(["'{}'"] * len(colnames))
+        msg = "'{}' filter requires columns " + ", ".join(["'{}'"] * len(colnames))
+
     def wrap(func):
         @functools.wraps(func)
         def wrapped_f(segarr):
@@ -26,10 +26,16 @@ def require_column(*colnames):
             if any(c not in segarr for c in colnames):
                 raise ValueError(msg.format(filtname, *colnames))
             result = func(segarr)
-            logging.info("Filtered by '%s' from %d to %d rows",
-                         filtname, len(segarr), len(result))
+            logging.info(
+                "Filtered by '%s' from %d to %d rows",
+                filtname,
+                len(segarr),
+                len(result),
+            )
             return result
+
         return wrapped_f
+
     return wrap
 
 
@@ -49,20 +55,23 @@ def squash_by_groups(cnarr, levels, by_arm=False):
         change_levels += np.concatenate(arm_levels)
     else:
         # Enumerate chromosomes
-        chrom_names = cnarr['chromosome'].unique()
-        chrom_col = (cnarr['chromosome']
-                     .replace(chrom_names, np.arange(len(chrom_names))))
+        chrom_names = cnarr["chromosome"].unique()
+        chrom_col = cnarr["chromosome"].replace(
+            chrom_names, np.arange(len(chrom_names))
+        )
         change_levels += chrom_col
     data = cnarr.data.assign(_group=change_levels)
-    groupkey = ['_group']
-    if 'cn1' in cnarr:
+    groupkey = ["_group"]
+    if "cn1" in cnarr:
         # Keep allele-specific CNAs separate
-        data['_g1'] = enumerate_changes(cnarr['cn1'])
-        data['_g2'] = enumerate_changes(cnarr['cn2'])
-        groupkey.extend(['_g1', '_g2'])
-    data = (data.groupby(groupkey, as_index=False, group_keys=False, sort=False)
-            .apply(squash_region)
-            .reset_index(drop=True))
+        data["_g1"] = enumerate_changes(cnarr["cn1"])
+        data["_g2"] = enumerate_changes(cnarr["cn2"])
+        groupkey.extend(["_g1", "_g2"])
+    data = (
+        data.groupby(groupkey, as_index=False, group_keys=False, sort=False)
+        .apply(squash_region)
+        .reset_index(drop=True)
+    )
     return cnarr.as_dataframe(data)
 
 
@@ -79,47 +88,48 @@ def squash_region(cnarr):
 
     Most fields added by the `segmetrics` command will be dropped.
     """
-    assert 'weight' in cnarr
-    out = {'chromosome': [cnarr['chromosome'].iat[0]],
-           'start': cnarr['start'].iat[0],
-           'end': cnarr['end'].iat[-1],
-          }
-    region_weight = cnarr['weight'].sum()
+    assert "weight" in cnarr
+    out = {
+        "chromosome": [cnarr["chromosome"].iat[0]],
+        "start": cnarr["start"].iat[0],
+        "end": cnarr["end"].iat[-1],
+    }
+    region_weight = cnarr["weight"].sum()
     if region_weight > 0:
-        out['log2'] = np.average(cnarr['log2'], weights=cnarr['weight'])
+        out["log2"] = np.average(cnarr["log2"], weights=cnarr["weight"])
     else:
-        out['log2'] = np.mean(cnarr['log2'])
-    out['gene'] = ','.join(cnarr['gene'].drop_duplicates())
-    out['probes'] = cnarr['probes'].sum() if 'probes' in cnarr else len(cnarr)
-    out['weight'] = region_weight
-    if 'depth' in cnarr:
+        out["log2"] = np.mean(cnarr["log2"])
+    out["gene"] = ",".join(cnarr["gene"].drop_duplicates())
+    out["probes"] = cnarr["probes"].sum() if "probes" in cnarr else len(cnarr)
+    out["weight"] = region_weight
+    if "depth" in cnarr:
         if region_weight > 0:
-            out['depth'] = np.average(cnarr['depth'], weights=cnarr['weight'])
+            out["depth"] = np.average(cnarr["depth"], weights=cnarr["weight"])
         else:
-            out['depth'] = np.mean(cnarr['depth'])
-    if 'baf' in cnarr:
+            out["depth"] = np.mean(cnarr["depth"])
+    if "baf" in cnarr:
         if region_weight > 0:
-            out['baf'] = np.average(cnarr['baf'], weights=cnarr['weight'])
+            out["baf"] = np.average(cnarr["baf"], weights=cnarr["weight"])
         else:
-            out['baf'] = np.mean(cnarr['baf'])
-    if 'cn' in cnarr:
+            out["baf"] = np.mean(cnarr["baf"])
+    if "cn" in cnarr:
         if region_weight > 0:
-            out['cn'] = weighted_median(cnarr['cn'], cnarr['weight'])
+            out["cn"] = weighted_median(cnarr["cn"], cnarr["weight"])
         else:
-            out['cn'] = np.median(cnarr['cn'])
-        if 'cn1' in cnarr:
+            out["cn"] = np.median(cnarr["cn"])
+        if "cn1" in cnarr:
             if region_weight > 0:
-                out['cn1'] = weighted_median(cnarr['cn1'], cnarr['weight'])
+                out["cn1"] = weighted_median(cnarr["cn1"], cnarr["weight"])
             else:
-                out['cn1'] = np.median(cnarr['cn1'])
-            out['cn2'] = out['cn'] - out['cn1']
-    if 'p_bintest' in cnarr:
+                out["cn1"] = np.median(cnarr["cn1"])
+            out["cn2"] = out["cn"] - out["cn1"]
+    if "p_bintest" in cnarr:
         # Only relevant for single-bin segments, but this seems safe/conservative
-        out['p_bintest'] = cnarr['p_bintest'].max()
+        out["p_bintest"] = cnarr["p_bintest"].max()
     return pd.DataFrame(out)
 
 
-@require_column('cn')
+@require_column("cn")
 def ampdel(segarr):
     """Merge segments by amplified/deleted/neutral copy number status.
 
@@ -134,14 +144,14 @@ def ampdel(segarr):
     lower-level CNAs will be dropped.
     """
     levels = np.zeros(len(segarr))
-    levels[segarr['cn'] == 0] = -1
-    levels[segarr['cn'] >= 5] = 1
+    levels[segarr["cn"] == 0] = -1
+    levels[segarr["cn"] >= 5] = 1
     # or: segarr['log2'] >= np.log2(2.5)
     cnarr = squash_by_groups(segarr, pd.Series(levels))
-    return cnarr[(cnarr['cn'] == 0) | (cnarr['cn'] >= 5)]
+    return cnarr[(cnarr["cn"] == 0) | (cnarr["cn"] >= 5)]
 
 
-@require_column('depth')
+@require_column("depth")
 def bic(segarr):
     """Merge segments by Bayesian Information Criterion.
 
@@ -150,7 +160,7 @@ def bic(segarr):
     return NotImplemented
 
 
-@require_column('ci_lo', 'ci_hi')
+@require_column("ci_lo", "ci_hi")
 def ci(segarr):
     """Merge segments by confidence interval (overlapping 0).
 
@@ -162,18 +172,18 @@ def ci(segarr):
     #     logging.warning("* segarr :=\n%s", segarr)
     #     logging.warning("* segarr['ci_lo'] :=\n%s", segarr['ci_lo'])
     #     logging.warning("* segarr['ci_lo']>0 :=\n%s", segarr['ci_lo'] > 0)
-    levels[segarr['ci_lo'].values > 0] = 1
-    levels[segarr['ci_hi'].values < 0] = -1
+    levels[segarr["ci_lo"].values > 0] = 1
+    levels[segarr["ci_hi"].values < 0] = -1
     return squash_by_groups(segarr, pd.Series(levels))
 
 
-@require_column('cn')
+@require_column("cn")
 def cn(segarr):
     """Merge segments by integer copy number."""
-    return squash_by_groups(segarr, segarr['cn'])
+    return squash_by_groups(segarr, segarr["cn"])
 
 
-@require_column('sem')
+@require_column("sem")
 def sem(segarr, zscore=1.96):
     """Merge segments by Standard Error of the Mean (SEM).
 
@@ -181,8 +191,8 @@ def sem(segarr, zscore=1.96):
     `zscore`). Segments with lower CI above 0 are kept as gains, upper CI below
     0 as losses, and the rest with CI overlapping zero are collapsed as neutral.
     """
-    margin = segarr['sem'] * zscore
+    margin = segarr["sem"] * zscore
     levels = np.zeros(len(segarr))
-    levels[segarr['log2'] - margin > 0] = 1
-    levels[segarr['log2'] + margin < 0] = -1
+    levels[segarr["log2"] - margin > 0] = 1
+    levels[segarr["log2"] + margin < 0] = -1
     return squash_by_groups(segarr, pd.Series(levels))
