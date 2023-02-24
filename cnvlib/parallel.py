@@ -26,7 +26,7 @@ class SerialPool:
         pass
 
 
-class SerialFuture(object):
+class SerialFuture:
     """Mimic the concurrent.futures.Future interface."""
 
     def __init__(self, result):

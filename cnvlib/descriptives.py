@@ -49,7 +49,7 @@ def on_weighted_array(default=None):
         @wraps(f)
         def wrapper(a, w, **kwargs):
             if len(a) != len(w):
-                raise ValueError("Unequal array lengths: a=%d, w=%d" % (len(a), len(w)))
+                raise ValueError(f"Unequal array lengths: a={len(a)}, w={len(w)}")
             if not len(a):
                 return np.nan
             a = np.asfarray(a)

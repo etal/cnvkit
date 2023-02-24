@@ -416,8 +416,8 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene, window_
             gene_coords = plots.gene_coords_by_name(cnarr or segments, gene_names)
             if len(gene_coords) > 1:
                 raise ValueError(
-                    "Genes %s are split across chromosomes %s"
-                    % (show_gene, list(gene_coords.keys()))
+                    f"Genes {show_gene} are split across chromosomes "
+                    f"{list(gene_coords.keys())}"
                 )
             g_chrom, gene_ranges = gene_coords.popitem()
             if chrom:
@@ -646,11 +646,9 @@ def set_xlim_from(axis, probes=None, segments=None, variants=None):
             )
         raise ValueError(
             "No usable data points to plot out of "
-            "{} probes, {} segments, {} variants".format(
-                len(probes) if probes else 0,
-                len(segments) if segments else 0,
-                len(variants) if variants else 0,
-            )
+            f"{len(probes) if probes else 0} probes, "
+            f"{len(segments) if segments else 0} segments, "
+            f"{len(variants) if variants else 0} variants"
         )
     axis.set_xlim(min_x * MB, max_x * MB)
 

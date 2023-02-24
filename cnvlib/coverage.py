@@ -253,5 +253,5 @@ def detect_bedcov_columns(text):
     if tabcount == 4:
         return ["chromosome", "start", "end", "gene", "basecount"]
     # Input BED has arbitrary columns after 'gene' -- ignore them
-    fillers = ["_%d" % i for i in range(1, tabcount - 3)]
+    fillers = [f"_{i}" for i in range(1, tabcount - 3)]
     return ["chromosome", "start", "end", "gene"] + fillers + ["basecount"]

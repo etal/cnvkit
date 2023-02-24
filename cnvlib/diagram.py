@@ -52,7 +52,7 @@ def create_diagram(
 
     if show_range:
         chrom, start, end = unpack_range(show_range)
-        if not (start == None and end == None):
+        if not (start is None and end is None):
             raise ValueError(
                 "Must provide chromosome only "
                 "(genomic-range not allowed for 'diagram')."

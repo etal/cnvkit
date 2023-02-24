@@ -315,7 +315,7 @@ def load_sample_block(
             cnarrx.data.loc[:, ("chromosome", "start", "end", "gene")].values,
         ):
             raise RuntimeError(
-                "%s bins do not match those in %s" % (fname, filenames[0])
+                f"{fname} bins do not match those in {filenames[0]}"
             )
         all_depths.append(
             cnarrx["depth"] if "depth" in cnarrx else np.exp2(cnarrx["log2"])
@@ -506,7 +506,7 @@ def warn_bad_bins(cnarr, max_name_width=50):
             "Targets: %d (%s) bins failed filters "
             "(log2 < %s, log2 > %s, spread > %s)",
             len(fg_bad_bins),
-            "%.4f" % bad_pct + "%",
+            f"{bad_pct:.4}%",
             params.MIN_REF_COVERAGE,
             -params.MIN_REF_COVERAGE,
             params.MAX_REF_SPREAD,
@@ -551,7 +551,7 @@ def warn_bad_bins(cnarr, max_name_width=50):
         logging.info(
             "Antitargets: %d (%s) bins failed filters",
             len(bg_bad_bins),
-            "%.4f" % bad_pct + "%",
+            f"{bad_pct:.4}%",
         )
 
 
