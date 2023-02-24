@@ -17,13 +17,22 @@ def midsize_file(fnames):
 
     If an even number of files is given, selects the file just below the median.
     """
-    assert fnames, 'No files provided to calculate the median size.'
+    assert fnames, "No files provided to calculate the median size."
     return sorted(fnames, key=lambda f: os.stat(f).st_size)[(len(fnames) - 1) // 2]
 
 
-def do_autobin(bam_fname, method, targets=None, access=None,
-               bp_per_bin=100000., target_min_size=20, target_max_size=50000,
-               antitarget_min_size=500, antitarget_max_size=1000000, fasta=None):
+def do_autobin(
+    bam_fname,
+    method,
+    targets=None,
+    access=None,
+    bp_per_bin=100000.0,
+    target_min_size=20,
+    target_max_size=50000,
+    antitarget_min_size=500,
+    antitarget_max_size=1000000,
+    fasta=None,
+):
     """Quickly calculate reasonable bin sizes from BAM read counts.
 
     Parameters
@@ -47,27 +56,34 @@ def do_autobin(bam_fname, method, targets=None, access=None,
         ((target depth, target avg. bin size),
          (antitarget depth, antitarget avg. bin size))
     """
-    if method in ('amplicon', 'hybrid'):
+    if method in ("amplicon", "hybrid"):
         if targets is None:
-            raise ValueError("Target regions are required for method %r "
-                             "but were not provided." % method)
+            raise ValueError(
+                f"Target regions are required for method {method!r} but were "
+                "not provided."
+            )
         if not len(targets):
-            raise ValueError("Target regions are required for method %r "
-                             "but were not provided." % method)
+            raise ValueError(
+                f"Target regions are required for method {method!r} but were "
+                "not provided."
+            )
 
     # Closes over bp_per_bin
     def depth2binsize(depth, min_size, max_size):
-        if depth:
-            bin_size = int(round(bp_per_bin / depth))
-            if bin_size < min_size:
-                logging.info("Limiting est. bin size %d to given min. %d",
-                             bin_size, min_size)
-                bin_size = min_size
-            elif bin_size > max_size:
-                logging.info("Limiting est. bin size %d to given max. %d",
-                             bin_size, max_size)
-                bin_size = max_size
-            return bin_size
+        if not depth:
+            return None
+        bin_size = int(round(bp_per_bin / depth))
+        if bin_size < min_size:
+            logging.info(
+                "Limiting est. bin size %d to given min. %d", bin_size, min_size
+            )
+            bin_size = min_size
+        elif bin_size > max_size:
+            logging.info(
+                "Limiting est. bin size %d to given max. %d", bin_size, max_size
+            )
+            bin_size = max_size
+        return bin_size
 
     samutil.ensure_bam_index(bam_fname)
     rc_table = samutil.idxstats(bam_fname, drop_unmapped=True, fasta=fasta)
@@ -75,17 +91,18 @@ def do_autobin(bam_fname, method, targets=None, access=None,
     logging.info("Estimated read length %s", read_len)
 
     # Dispatch
-    if method == 'amplicon':
+    if method == "amplicon":
         # From BAM index
         # rc_table = update_chrom_length(rc_table, targets)
         # tgt_depth = average_depth(rc_table, read_len)
         # By sampling
         tgt_depth = sample_region_cov(bam_fname, targets, fasta=fasta)
         anti_depth = None
-    elif method == 'hybrid':
-        tgt_depth, anti_depth = hybrid(rc_table, read_len, bam_fname, targets,
-                                       access, fasta)
-    elif method == 'wgs':
+    elif method == "hybrid":
+        tgt_depth, anti_depth = hybrid(
+            rc_table, read_len, bam_fname, targets, access, fasta
+        )
+    elif method == "wgs":
         if access is not None and len(access):
             rc_table = update_chrom_length(rc_table, access)
         tgt_depth = average_depth(rc_table, read_len)
@@ -93,10 +110,8 @@ def do_autobin(bam_fname, method, targets=None, access=None,
 
     # Clip bin sizes to specified ranges
     tgt_bin_size = depth2binsize(tgt_depth, target_min_size, target_max_size)
-    anti_bin_size = depth2binsize(anti_depth, antitarget_min_size,
-                                  antitarget_max_size)
-    return ((tgt_depth, tgt_bin_size),
-            (anti_depth, anti_bin_size))
+    anti_bin_size = depth2binsize(anti_depth, antitarget_min_size, antitarget_max_size)
+    return ((tgt_depth, tgt_bin_size), (anti_depth, anti_bin_size))
 
 
 def hybrid(rc_table, read_len, bam_fname, targets, access=None, fasta=None):
@@ -108,12 +123,11 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None, fasta=None):
         compare_chrom_names(access, targets)
     antitargets = access.subtract(targets)
     # Only examine chromosomes present in all 2-3 input datasets
-    rc_table, targets, antitargets = shared_chroms(rc_table, targets,
-                                                   antitargets)
+    rc_table, targets, antitargets = shared_chroms(rc_table, targets, antitargets)
     # Deal with targets
     target_depth = sample_region_cov(bam_fname, targets, fasta=fasta)
     # Antitargets: subtract captured reads from total
-    target_length = region_size_by_chrom(targets)['length']
+    target_length = region_size_by_chrom(targets)["length"]
     target_reads = (target_length * target_depth / read_len).values
     anti_table = update_chrom_length(rc_table, antitargets)
     anti_table = anti_table.assign(mapped=anti_table.mapped - target_reads)
@@ -122,6 +136,7 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None, fasta=None):
 
 
 # ---
+
 
 def average_depth(rc_table, read_length):
     """Estimate the average read depth across the genome.
@@ -137,16 +152,17 @@ def average_depth(rc_table, read_length):
 
 
 def idxstats2ga(table, bam_fname):
-    return GA(table.assign(start=0, end=table.length)
-              .loc[:, ('chromosome', 'start', 'end')],
-              meta_dict={'filename': bam_fname})
+    return GA(
+        table.assign(start=0, end=table.length).loc[:, ("chromosome", "start", "end")],
+        meta_dict={"filename": bam_fname},
+    )
 
 
 def sample_region_cov(bam_fname, regions, max_num=100, fasta=None):
     """Calculate read depth in a randomly sampled subset of regions."""
     midsize_regions = sample_midsize_regions(regions, max_num)
-    with tempfile.NamedTemporaryFile(suffix='.bed', mode='w+t') as f:
-        tabio.write(regions.as_dataframe(midsize_regions), f, 'bed4')
+    with tempfile.NamedTemporaryFile(suffix=".bed", mode="w+t") as f:
+        tabio.write(regions.as_dataframe(midsize_regions), f, "bed4")
         f.flush()
         table = coverage.bedcov(f.name, bam_fname, 0, fasta)
     # Mean read depth across all sampled regions
@@ -170,25 +186,25 @@ def shared_chroms(*tables):
         if tab is not None:
             new_chroms = tab.chromosome.drop_duplicates()
             chroms = chroms[chroms.isin(new_chroms)]
-    return [None if tab is None else tab[tab.chromosome.isin(chroms)]
-            for tab in tables]
+    return [None if tab is None else tab[tab.chromosome.isin(chroms)] for tab in tables]
 
 
 def update_chrom_length(rc_table, regions):
     if regions is not None and len(regions):
         chrom_sizes = region_size_by_chrom(regions)
-        rc_table = rc_table.merge(chrom_sizes, on='chromosome', how='inner')
-        rc_table['length'] = rc_table['length_y'] # ?
-        rc_table = rc_table.drop(['length_x', 'length_y'], axis=1)
+        rc_table = rc_table.merge(chrom_sizes, on="chromosome", how="inner")
+        rc_table["length"] = rc_table["length_y"]  # ?
+        rc_table = rc_table.drop(["length_x", "length_y"], axis=1)
     return rc_table
 
 
 def region_size_by_chrom(regions):
-    chromgroups = regions.data.groupby('chromosome', sort=False)
+    chromgroups = regions.data.groupby("chromosome", sort=False)
     # sizes = chromgroups.apply(total_region_size) # XXX
     sizes = [total_region_size(g) for _key, g in chromgroups]
-    return pd.DataFrame({'chromosome': regions.chromosome.drop_duplicates(),
-                         'length': sizes})
+    return pd.DataFrame(
+        {"chromosome": regions.chromosome.drop_duplicates(), "length": sizes}
+    )
 
 
 def total_region_size(regions):
