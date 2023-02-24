@@ -37,8 +37,8 @@ class GenomicArray:
                 data_table = pd.DataFrame(data_table)
             if not all(c in data_table.columns for c in self._required_columns):
                 raise ValueError(
-                    "data table must have at least columns %r; "
-                    "got %r" % (self._required_columns, tuple(data_table.columns))
+                    "data table must have at least columns "
+                    + f"{self._required_columns!r}; got {tuple(data_table.columns)!r}"
                 )
             # Ensure columns are the right type
             # (in case they've been automatically converted to the wrong type,
@@ -109,16 +109,13 @@ class GenomicArray:
         """Wrap the given rows in this instance's metadata."""
         try:
             out = self.from_rows(rows, columns=self.data.columns, meta_dict=self.meta)
-        except AssertionError:
+        except AssertionError as exc:
             columns = self.data.columns.tolist()
             firstrow = next(iter(rows))
             raise RuntimeError(
-                "Passed %d columns %r, but " "%d elements in first row: %s",
-                len(columns),
-                columns,
-                len(firstrow),
-                firstrow,
-            )
+                f"Passed {len(columns)} columns {columns!r}, but "
+                f"{len(firstrow)} elements in first row: {firstrow}"
+            ) from exc
         return out
 
     # Container behaviour
@@ -149,33 +146,31 @@ class GenomicArray:
             # A single row
             return self.data.iloc[index]
             # return self.as_dataframe(self.data.iloc[index:index+1])
-        elif isinstance(index, str):
+        if isinstance(index, str):
             # A column, by name
             return self.data[index]
-        elif (
+        if (
             isinstance(index, tuple)
             and len(index) == 2
             and index[1] in self.data.columns
         ):
             # Row index, column index -> cell value
             return self.data.loc[index]
-        elif isinstance(index, slice):
+        if isinstance(index, slice):
             # return self.as_dataframe(self.data.take(index))
             return self.as_dataframe(self.data[index])
-        else:
-            # Iterable -- selected row indices or boolean array, probably
-            try:
-                if isinstance(index, type(None)) or len(index) == 0:
-                    empty = pd.DataFrame(columns=self.data.columns)
-                    return self.as_dataframe(empty)
-            except TypeError as exc:
-                raise TypeError(
-                    "object of type %r " % type(index)
-                    + "cannot be used as an index into a "
-                    + self.__class__.__name__
-                ) from exc
-            return self.as_dataframe(self.data[index])
-            # return self.as_dataframe(self.data.take(index))
+        # Iterable -- selected row indices or boolean array, probably
+        try:
+            if isinstance(index, type(None)) or len(index) == 0:
+                empty = pd.DataFrame(columns=self.data.columns)
+                return self.as_dataframe(empty)
+        except TypeError as exc:
+            raise TypeError(
+                f"object of type {type(index)!r} "
+                f"cannot be used as an index into a {self.__class__.__name__}"
+            ) from exc
+        return self.as_dataframe(self.data[index])
+        # return self.as_dataframe(self.data.take(index))
 
     def __setitem__(self, index, value):
         """Assign to a portion of the data."""
@@ -487,7 +482,7 @@ class GenomicArray:
             (other bin, GenomicArray of overlapping rows in self)
         """
         if column not in self.data.columns:
-            raise ValueError("No column named %r in this object" % column)
+            raise ValueError(f"No column named {column!r} in this object")
         ser = self.data[column]
         for slc in iter_slices(self.data, other.data, mode, keep_empty):
             yield ser[slc]
@@ -501,8 +496,7 @@ class GenomicArray:
         """
         if not isinstance(other, self.__class__):
             raise ValueError(
-                "Argument (type %s) is not a %s instance"
-                % (type(other), self.__class__)
+                f"Argument (type {type(other)}) is not a {self.__class__} instance"
             )
         if len(other.data):
             self.data = pd.concat([self.data, other.data], ignore_index=True)
@@ -639,10 +633,10 @@ class GenomicArray:
                 for _, chunk in self.by_ranges(other, mode=mode, keep_empty=False)
             ]
             return self.as_dataframe(pd.concat(chunks))
-        else:
-            slices = iter_slices(self.data, other.data, mode, False)
-            indices = np.concatenate(list(slices))
-            return self.as_dataframe(self.data.loc[indices])
+        # Faster
+        slices = iter_slices(self.data, other.data, mode, False)
+        indices = np.concatenate(list(slices))
+        return self.as_dataframe(self.data.loc[indices])
 
     def merge(self, bp=0, stranded=False, combine=None):
         """Merge adjacent or overlapping regions into single rows.
@@ -670,7 +664,7 @@ class GenomicArray:
             in `self` must be included.
         """
         table = self.data
-        limits = dict(lower=0)
+        limits = {"lower": 0}
         if chrom_sizes:
             limits["upper"] = self.chromosome.replace(chrom_sizes)
         table = table.assign(
