@@ -212,6 +212,7 @@ def absolute_reference(cnarr, ploidy, is_reference_male):
     return ref_copies
 
 
+# todo: add unit test.
 def get_as_dframe_and_set_reference_and_expect_copies(
     cnarr, ploidy, is_reference_male, is_sample_female
 ):
