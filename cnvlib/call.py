@@ -236,15 +236,15 @@ def get_as_dframe_and_set_reference_and_expect_copies(
     df["reference"] = np.repeat(ploidy, len(df))
     df["expect"] = np.repeat(ploidy, len(df))
 
-    df.loc[df.chromosome == "chrX", "reference"] = (
+    df.loc[df.chromosome == cnarr.chr_x_label, "reference"] = (
         ploidy // 2 if is_reference_male else ploidy
     )
-    df.loc[df.chromosome == "chrX", "expect"] = (
+    df.loc[df.chromosome == cnarr.chr_x_label, "expect"] = (
         ploidy if is_sample_female else ploidy // 2
     )
 
-    df.loc[df.chromosome == "chrY", "reference"] = ploidy // 2
-    df.loc[df.chromosome == "chrY", "expect"] = 0 if is_sample_female else ploidy // 2
+    df.loc[df.chromosome == cnarr._chr_y_label, "reference"] = ploidy // 2
+    df.loc[df.chromosome == cnarr._chr_y_label, "expect"] = 0 if is_sample_female else ploidy // 2
     return df
 
 
