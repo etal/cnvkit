@@ -24,7 +24,7 @@ class CNATests(unittest.TestCase):
 
     def test_empty(self):
         """Instantiate from an empty file."""
-        cnarr = cnvlib.read("formats/empty")
+        cnarr = cnvlib.read("formats/empty", None)
         self.assertEqual(len(cnarr), 0)
 
     def test_autosomes(self):
