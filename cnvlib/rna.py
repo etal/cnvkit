@@ -18,6 +18,7 @@ NULL_LOG2_COVERAGE = -5
 def before(char):
     def selector(string):
         return string.split(char, 1)[0]
+
     return selector
 
 
@@ -33,13 +34,16 @@ def filter_probes(sample_counts):
     """
     gene_medians = sample_counts.median(axis=1)
     # Make sure the gene has detectable transcript in at least half of samples
-    is_mostly_transcribed = (gene_medians >= 1.0)
-    logging.info("Dropping %d / %d rarely expressed genes from input samples",
-                 (~is_mostly_transcribed).sum(), len(is_mostly_transcribed))
+    is_mostly_transcribed = gene_medians >= 1.0
+    logging.info(
+        "Dropping %d / %d rarely expressed genes from input samples",
+        (~is_mostly_transcribed).sum(),
+        len(is_mostly_transcribed),
+    )
     return sample_counts[is_mostly_transcribed]
 
 
-def load_gene_info(gene_resource, corr_fname, default_r=.1):
+def load_gene_info(gene_resource, corr_fname, default_r=0.1):
     """Read gene info from BioMart, and optionally TCGA, into a dataframe.
 
     RSEM only outputs the Ensembl ID. We have used the BioMART tool in Ensembl
@@ -62,22 +66,36 @@ def load_gene_info(gene_resource, corr_fname, default_r=.1):
     # "NCBI gene ID"
     # "Transcript length (including UTRs and CDS)"
     # "Transcript support level (TSL)"
-    info_col_names = ['gene_id', 'gc', 'chromosome', 'start', 'end',
-                      'gene', 'entrez_id', 'tx_length', 'tx_support']
-    gene_info = (pd.read_csv(gene_resource, sep='\t', header=1,
-                             names=info_col_names, 
-                             converters={'gene_id': before('.'),
-                                         'tx_support': tsl2int,
-                                         'gc': lambda x: float(x)/100})
-                 .sort_values('gene_id'))
+    info_col_names = [
+        "gene_id",
+        "gc",
+        "chromosome",
+        "start",
+        "end",
+        "gene",
+        "entrez_id",
+        "tx_length",
+        "tx_support",
+    ]
+    gene_info = pd.read_csv(
+        gene_resource,
+        sep="\t",
+        header=1,
+        names=info_col_names,
+        converters={
+            "gene_id": before("."),
+            "tx_support": tsl2int,
+            "gc": lambda x: float(x) / 100,
+        },
+    ).sort_values("gene_id")
     logging.info("Loaded %s with shape: %s", gene_resource, gene_info.shape)
 
     if corr_fname:
         corr_table = load_cnv_expression_corr(corr_fname)
 
-        gi_corr = gene_info.join(corr_table, on='entrez_id', how='left')
-        if not gi_corr['gene_id'].is_unique:
-            unique_idx = gi_corr.groupby('gene_id').apply(dedupe_ens_hugo)
+        gi_corr = gene_info.join(corr_table, on="entrez_id", how="left")
+        if not gi_corr["gene_id"].is_unique:
+            unique_idx = gi_corr.groupby("gene_id").apply(dedupe_ens_hugo)
             gi_corr = gi_corr.loc[unique_idx]
 
         # DBG verify that the tables were aligned correctly
@@ -87,37 +105,45 @@ def load_gene_info(gene_resource, corr_fname, default_r=.1):
         #            (gi_corr[colname] > 0.1).sum(), ">0.1",
         #            ", max value", np.nanmax(gi_corr[colname]))
 
-        if not gene_info['entrez_id'].is_unique:
+        if not gene_info["entrez_id"].is_unique:
             # Treat untraceable entrez_id duplicates (scarce at this point, ~15)
             # as unknown correlation, i.e. default, as if not in TCGA
             entrez_dupes_idx = tuple(locate_entrez_dupes(gi_corr))
-            logging.info("Resetting %d ambiguous genes' correlation "
-                         "coefficients to default %f",
-                         len(entrez_dupes_idx), default_r)
-            gi_corr.loc[entrez_dupes_idx,
-                        ('pearson_r', 'spearman_r', 'kendall_t')] = default_r
+            logging.info(
+                "Resetting %d ambiguous genes' correlation "
+                "coefficients to default %f",
+                len(entrez_dupes_idx),
+                default_r,
+            )
+            gi_corr.loc[
+                entrez_dupes_idx, ("pearson_r", "spearman_r", "kendall_t")
+            ] = default_r
 
         # Genes w/o TCGA info get default correlation 0.1 (= .5*corr.median())
-        gene_info = gi_corr.fillna({'pearson_r': default_r,
-                                    'spearman_r': default_r,
-                                    'kendall_t': default_r,
-                                   })
+        gene_info = gi_corr.fillna(
+            {
+                "pearson_r": default_r,
+                "spearman_r": default_r,
+                "kendall_t": default_r,
+            }
+        )
 
-    elif not gene_info['gene_id'].is_unique:
+    elif not gene_info["gene_id"].is_unique:
         # Simpler deduplication, not using TCGA fields
-        unique_idx = gene_info.groupby('gene_id').apply(dedupe_ens_no_hugo)
+        unique_idx = gene_info.groupby("gene_id").apply(dedupe_ens_no_hugo)
         gene_info = gene_info.loc[unique_idx]
 
     logging.info("Trimmed gene info table to shape: %s", gene_info.shape)
-    assert gene_info['gene_id'].is_unique
-    gene_info['entrez_id'] = gene_info['entrez_id'].fillna(0).astype('int')
-    return gene_info.set_index('gene_id')
+    assert gene_info["gene_id"].is_unique
+    gene_info["entrez_id"] = gene_info["entrez_id"].fillna(0).astype("int")
+    return gene_info.set_index("gene_id")
 
 
 def load_cnv_expression_corr(fname):
-    shared_key = 'Entrez_Gene_Id'
-    table = (pd.read_csv(fname, sep='\t', na_filter=False, dtype={shared_key: int})
-             .set_index(shared_key))
+    shared_key = "Entrez_Gene_Id"
+    table = pd.read_csv(
+        fname, sep="\t", na_filter=False, dtype={shared_key: int}
+    ).set_index(shared_key)
     logging.info("Loaded %s with shape: %s", fname, table.shape)
     return table
 
@@ -172,7 +198,7 @@ def dedupe_ens_hugo(dframe):
     """
     if len(dframe) == 1:
         return dframe.index[0]
-    match_gene = dframe[dframe['gene'] == dframe['hugo_gene']]
+    match_gene = dframe[dframe["gene"] == dframe["hugo_gene"]]
     if len(match_gene) == 1:
         return match_gene.index[0]
     if len(match_gene) > 1:
@@ -203,10 +229,11 @@ def dedupe_tx(dframe):
     # NB: Transcripts are many-to-1 vs. Ensembl ID, not Entrez ID, so each
     # unique Entrez ID here will have the same collection of transcripts
     # associated with it.
-    return (dframe.sort_values(['entrez_id', 'tx_support', 'tx_length'],
-                               ascending=[True, False, False],
-                               na_position='last')
-            .index[0])
+    return dframe.sort_values(
+        ["entrez_id", "tx_support", "tx_length"],
+        ascending=[True, False, False],
+        na_position="last",
+    ).index[0]
 
 
 def locate_entrez_dupes(dframe):
@@ -221,75 +248,75 @@ def locate_entrez_dupes(dframe):
     i.e. CNV-expression correlation is unknown, but all entries are still
     retained in the BioMart table (gene_info).
     """
-    for _key, group in dframe.groupby('entrez_id'):
+    for _key, group in dframe.groupby("entrez_id"):
         if len(group) == 1:
             continue
-        match_gene_idx = (group['gene'] == group['hugo_gene'])
+        match_gene_idx = group["gene"] == group["hugo_gene"]
         match_gene_cnt = match_gene_idx.sum()
         if match_gene_cnt == 1:
             for mismatch_idx in group.index[~match_gene_idx]:
                 yield mismatch_idx
         else:
             # Keep the lowest Ensemble ID (of the matched, if any)
-            if match_gene_cnt: # >1
+            if match_gene_cnt:  # >1
                 keepable = group[match_gene_idx]
             else:
                 keepable = group
-            idx_to_keep = keepable.sort_values('gene_id').index.values[0]
+            idx_to_keep = keepable.sort_values("gene_id").index.values[0]
             for idx in group.index:
                 if idx != idx_to_keep:
                     yield idx
 
 
-def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths,
-                               normal_ids):
+def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids):
     """Align columns and sort.
 
     Also calculate weights and add to gene_info as 'weight', along with
     transcript lengths as 'tx_length'.
     """
-    logging.debug("Dimensions: gene_info=%s, sample_counts=%s",
-                  gene_info.shape, sample_counts.shape)
-    sc, gi = sample_counts.align(gene_info, join='inner', axis=0)
-    gi = gi.sort_values(by=['chromosome', 'start'])
+    logging.debug(
+        "Dimensions: gene_info=%s, sample_counts=%s",
+        gene_info.shape,
+        sample_counts.shape,
+    )
+    sc, gi = sample_counts.align(gene_info, join="inner", axis=0)
+    gi = gi.sort_values(by=["chromosome", "start"])
     sc = sc.loc[gi.index]
 
     if tx_lengths is not None:
         # Replace the existing tx_lengths from gene_resource
         # (RSEM results have this, TCGA gene counts don't)
-        gi['tx_length'] = tx_lengths.loc[gi.index]
+        gi["tx_length"] = tx_lengths.loc[gi.index]
 
     # Calculate per-gene weights similarly to cnvlib.fix
     # NB: chrX doesn't need special handling because with X-inactivation,
     # expression should be similar in male and female samples, i.e. neutral is 0
     logging.info("Weighting genes with below-average read counts")
     gene_counts = sc.median(axis=1)
-    weights = [np.sqrt((gene_counts / gene_counts.quantile(.75)).clip(upper=1))]
+    weights = [np.sqrt((gene_counts / gene_counts.quantile(0.75)).clip(upper=1))]
 
     logging.info("Calculating normalized gene read depths")
-    sample_depths_log2 = normalize_read_depths(sc.divide(gi['tx_length'],
-                                                         axis=0),
-                                               normal_ids)
+    sample_depths_log2 = normalize_read_depths(
+        sc.divide(gi["tx_length"], axis=0), normal_ids
+    )
 
     logging.info("Weighting genes by spread of read depths")
     gene_spreads = sample_depths_log2.std(axis=1)
     weights.append(gene_spreads)
 
     corr_weights = []
-    for corr_col in ('spearman_r', 'pearson_r', 'kendall_t'):
+    for corr_col in ("spearman_r", "pearson_r", "kendall_t"):
         if corr_col in gi:
-            logging.info("Weighting genes by %s correlation coefficient",
-                         corr_col)
+            logging.info("Weighting genes by %s correlation coefficient", corr_col)
             corr_weights.append(gi[corr_col].values)
     if corr_weights:
         weights.append(np.vstack(corr_weights).mean(axis=0))
 
     weight = gmean(np.vstack(weights), axis=0)
-    gi['weight'] = weight / weight.max()
-    if gi['weight'].isnull().all():
-        gi['weight'] = 1.0
-    logging.debug(" --> final zeros: %d / %d",
-                  (gi['weight'] == 0).sum(), len(gi))
+    gi["weight"] = weight / weight.max()
+    if gi["weight"].isnull().all():
+        gi["weight"] = 1.0
+    logging.debug(" --> final zeros: %d / %d", (gi["weight"] == 0).sum(), len(gi))
     return gi, sc, sample_depths_log2
 
 
@@ -309,7 +336,7 @@ def normalize_read_depths(sample_depths, normal_ids):
     sample_depths = sample_depths.fillna(0)
     for _i in range(4):
         # By-sample: 75%ile  among all genes
-        q3 = sample_depths.quantile(.75)
+        q3 = sample_depths.quantile(0.75)
         sample_depths /= q3
         # By-gene: median among all samples
         sm = sample_depths.median(axis=1)
@@ -321,8 +348,10 @@ def normalize_read_depths(sample_depths, normal_ids):
         # Use normal samples as a baseline for read depths
         normal_ids = pd.Series(normal_ids)
         if not normal_ids.isin(sample_depths.columns).all():
-            raise ValueError("Normal sample IDs not in samples: %s"
-                    % normal_ids.drop(sample_depths.columns, errors='ignore'))
+            raise ValueError(
+                "Normal sample IDs not in samples: %s"
+                % normal_ids.drop(sample_depths.columns, errors="ignore")
+            )
         normal_depths = sample_depths.loc[:, normal_ids]
         use_median = True  # TODO - benchmark & pick one
         if use_median:
@@ -358,12 +387,11 @@ def safe_log2(values, min_log2):
         hard-clipping, input values near 0 (especially below 2^min_log2) will be
         squeezed a bit above `min_log2` in the log2-scale output.
     """
-    absolute_shift = 2 ** min_log2
+    absolute_shift = 2**min_log2
     return np.log2(values + absolute_shift)
 
 
-def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info,
-                            read_len=100):
+def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len=100):
     """Join gene info to each sample's log2 expression ratios.
 
     Add the Ensembl gene info to the aggregated gene expected read counts,
@@ -373,20 +401,22 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info,
 
     Split out samples to individual .cnr files, keeping (most) gene info.
     """
-    gi_cols = ['chromosome', 'start', 'end', 'gene', 'gc', 'tx_length', 'weight']
+    gi_cols = ["chromosome", "start", "end", "gene", "gc", "tx_length", "weight"]
     cnr_info = gene_info.loc[:, gi_cols]
     # Fill NA fields with the lowest finite value in the same row.
     # Only use NULL_LOG2_COVERAGE if all samples are NA / zero-depth.
     gene_minima = sample_data_log2.min(axis=1, skipna=True)
     assert not gene_minima.hasnans, gene_minima.head()
-    for (sample_id, sample_col), (_sid_log2, sample_log2) \
-            in zip(sample_counts.iteritems(), sample_data_log2.iteritems()):
+    for (sample_id, sample_col), (_sid_log2, sample_log2) in zip(
+        sample_counts.iteritems(), sample_data_log2.iteritems()
+    ):
         tx_len = cnr_info.tx_length
         sample_depth = (read_len * sample_col / tx_len).rename("depth")
         sample_log2 = sample_log2.fillna(gene_minima).rename("log2")
-        cdata = (pd.concat([cnr_info, sample_depth, sample_log2], axis=1)
-                 .reset_index(drop=True))
-        cnr = CNA(cdata, {'sample_id': sample_id})
+        cdata = pd.concat([cnr_info, sample_depth, sample_log2], axis=1).reset_index(
+            drop=True
+        )
+        cnr = CNA(cdata, {"sample_id": sample_id})
         cnr.sort_columns()
         yield cnr
 
@@ -400,11 +430,11 @@ def correct_cnr(cnr, do_gc, do_txlen, max_log2):
     cnr.center_all()
     # Biases, similar to stock CNVkit
     if any((do_gc, do_txlen)):
-        if do_gc and 'gc' in cnr:
-            cnr = center_by_window(cnr, .1, cnr['gc'])
-        if do_txlen and 'tx_length' in cnr:
-            cnr = center_by_window(cnr, .1, cnr['tx_length'])
+        if do_gc and "gc" in cnr:
+            cnr = center_by_window(cnr, 0.1, cnr["gc"])
+        if do_txlen and "tx_length" in cnr:
+            cnr = center_by_window(cnr, 0.1, cnr["tx_length"])
         cnr.center_all()
     if max_log2:
-        cnr[cnr['log2'] > max_log2, 'log2'] = max_log2
+        cnr[cnr["log2"] > max_log2, "log2"] = max_log2
     return cnr

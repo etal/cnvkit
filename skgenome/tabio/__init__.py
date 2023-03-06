@@ -11,8 +11,8 @@ import pandas as pd
 from Bio.File import as_handle
 
 from ..gary import GenomicArray as GA
-from . import (bedio, genepred, gff, picard, seg, seqdict, tab, textcoord, vcfio,
-               vcfsimple)
+from . import (bedio, genepred, gff, picard, seg, seqdict, tab, textcoord,
+               vcfio, vcfsimple)
 
 
 def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
@@ -49,10 +49,11 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     from cnvlib.core import fbase
     if fmt == 'auto':
         return read_auto(infile)
-    elif fmt in READERS:
+
+    if fmt in READERS:
         reader, suggest_into = READERS[fmt]
     else:
-        raise ValueError("Unknown format: %s" % fmt)
+        raise ValueError(f"Unknown format: {fmt}")
 
     if meta is None:
         meta = {}
@@ -95,15 +96,15 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
 def read_auto(infile):
     """Auto-detect a file's format and use an appropriate parser to read it."""
     if not isinstance(infile, str) and not hasattr(infile, "seek"):
-        raise ValueError("Can only auto-detect format from filename or "
-                         "seekable (local, on-disk) files, which %s is not"
-                         % infile)
+        raise ValueError(
+                "Can only auto-detect format from filename or " +
+                f"seekable (local, on-disk) files, which {infile} is not")
 
     fmt = sniff_region_format(infile)
     if hasattr(infile, "seek"):
         infile.seek(0)
     if fmt:
-        logging.info("Detected file format: " + fmt)
+        logging.info("Detected file format: %s", fmt)
     else:
         # File is blank -- simple BED will handle this OK
         fmt = "bed3"
@@ -233,8 +234,7 @@ def sniff_region_format(infile):
             if fname_fmt and format_patterns[fname_fmt].match(line):
                 return fname_fmt
             # Formats that (may) declare themselves in an initial '#' comment
-            if (line.startswith('##gff-version') or
-                format_patterns['gff'].match(line)):
+            if line.startswith('##gff-version') or format_patterns['gff'].match(line):
                 return 'gff'
             if line.startswith(('##fileformat=VCF', '#CHROM\tPOS\tID')):
                 return 'vcf'

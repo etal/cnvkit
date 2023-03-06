@@ -1,3 +1,5 @@
+"""I/O for plain text formatting of genomic coordinates: `chrom:start-end`
+"""
 import pandas as pd
 from Bio.File import as_handle
 
@@ -13,16 +15,17 @@ def read_text(infile):
     Coordinate indexing is assumed to be from 1.
     """
     parse_line = report_bad_line(from_label)
-    with as_handle(infile, 'r') as handle:
+    with as_handle(infile, "r") as handle:
         rows = [parse_line(line) for line in handle]
-    table = pd.DataFrame.from_records(rows, columns=["chromosome", "start",
-                                                     "end", "gene"])
-    table['gene'] = table['gene'].replace('', '-')
+    table = pd.DataFrame.from_records(
+        rows, columns=["chromosome", "start", "end", "gene"]
+    )
+    table["gene"] = table["gene"].replace("", "-")
     return table
 
 
 def write_text(dframe):
     """Text coordinate format: "chr:start-end", one per line."""
     dframe = dframe.copy()
-    dframe['start'] += 1
+    dframe["start"] += 1
     return dframe.apply(to_label, axis=1)

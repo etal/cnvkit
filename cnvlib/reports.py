@@ -4,7 +4,6 @@ Namely: breaks, genemetrics.
 """
 import collections
 import math
-import sys
 
 import numpy as np
 import pandas as pd
@@ -16,14 +15,22 @@ from .segmetrics import segment_mean
 # _____________________________________________________________________________
 # breaks
 
+
 def do_breaks(probes, segments, min_probes=1):
     """List the targeted genes in which a copy number breakpoint occurs."""
     intervals = get_gene_intervals(probes)
     bpoints = get_breakpoints(intervals, segments, min_probes)
-    return pd.DataFrame.from_records(bpoints,
-                                     columns=['gene', 'chromosome',
-                                              'location', 'change',
-                                              'probes_left', 'probes_right'])
+    return pd.DataFrame.from_records(
+        bpoints,
+        columns=[
+            "gene",
+            "chromosome",
+            "location",
+            "change",
+            "probes_left",
+            "probes_right",
+        ],
+    )
 
 
 def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
@@ -69,19 +76,32 @@ def get_breakpoints(intervals, segments, min_probes):
                 probes_right = sum(s >= curr_end for s in gstarts)
                 if probes_left >= min_probes and probes_right >= min_probes:
                     breakpoints.append(
-                        (gname, curr_chrom, int(math.ceil(curr_end)),
-                         next_row.log2 - curr_row.log2,
-                         probes_left, probes_right))
-    breakpoints.sort(key=lambda row: (min(row[4], row[5]), abs(row[3])),
-                     reverse=True)
+                        (
+                            gname,
+                            curr_chrom,
+                            int(math.ceil(curr_end)),
+                            next_row.log2 - curr_row.log2,
+                            probes_left,
+                            probes_right,
+                        )
+                    )
+    breakpoints.sort(key=lambda row: (min(row[4], row[5]), abs(row[3])), reverse=True)
     return breakpoints
 
 
 # _____________________________________________________________________________
 # genemetrics
 
-def do_genemetrics(cnarr, segments=None, threshold=0.2, min_probes=3,
-                skip_low=False, male_reference=False, is_sample_female=None):
+
+def do_genemetrics(
+    cnarr,
+    segments=None,
+    threshold=0.2,
+    min_probes=3,
+    skip_low=False,
+    male_reference=False,
+    is_sample_female=None,
+):
     """Identify targeted genes with copy number gain or loss."""
     if is_sample_female is None:
         is_sample_female = cnarr.guess_xx(male_reference=male_reference)
@@ -92,13 +112,13 @@ def do_genemetrics(cnarr, segments=None, threshold=0.2, min_probes=3,
     else:
         rows = gene_metrics_by_gene(cnarr, threshold, skip_low)
     rows = list(rows)
-    columns = (rows[0].index if len(rows) else cnarr._required_columns)
+    columns = rows[0].index if len(rows) else cnarr._required_columns
     columns = ["gene"] + [col for col in columns if col != "gene"]
     table = pd.DataFrame.from_records(rows).reindex(columns=columns)
     if min_probes and len(table):
-        n_probes = (table.segment_probes
-                    if 'segment_probes' in table.columns
-                    else table.probes)
+        n_probes = (
+            table.segment_probes if "segment_probes" in table.columns else table.probes
+        )
         table = table[n_probes >= min_probes]
     return table
 
@@ -123,19 +143,21 @@ def gene_metrics_by_segment(cnarr, segments, threshold, skip_low=False):
     NB: Adjust the sample's sex-chromosome log2 values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
-    extra_cols = [col for col in segments.data.columns
-                  if col not in cnarr.data.columns
-                  and col not in ('depth', 'probes', 'weight')]
+    extra_cols = [
+        col
+        for col in segments.data.columns
+        if col not in cnarr.data.columns and col not in ("depth", "probes", "weight")
+    ]
     for colname in extra_cols:
         cnarr[colname] = np.nan
     for segment, subprobes in cnarr.by_ranges(segments):
         if abs(segment.log2) >= threshold:
             for row in group_by_genes(subprobes, skip_low):
                 row["log2"] = segment.log2
-                if hasattr(segment, 'weight'):
-                    row['segment_weight'] = segment.weight
-                if hasattr(segment, 'probes'):
-                    row['segment_probes'] = segment.probes
+                if hasattr(segment, "weight"):
+                    row["segment_weight"] = segment.weight
+                if hasattr(segment, "probes"):
+                    row["segment_probes"] = segment.probes
                 for colname in extra_cols:
                     row[colname] = getattr(segment, colname)
                 yield row
@@ -150,7 +172,7 @@ def group_by_genes(cnarr, skip_low):
 
         [(gene, chrom, start, end, [coverages]), ...]
     """
-    ignore = ('', np.nan) + params.ANTITARGET_ALIASES
+    ignore = ("", np.nan) + params.ANTITARGET_ALIASES
     for gene, rows in cnarr.by_gene():
         if not rows or gene in ignore:
             continue
@@ -165,8 +187,7 @@ def group_by_genes(cnarr, skip_low):
         if "weight" in rows:
             outrow["weight"] = rows["weight"].sum()
             if "depth" in rows:
-                outrow["depth"] = np.average(rows["depth"],
-                                             weights=rows["weight"])
+                outrow["depth"] = np.average(rows["depth"], weights=rows["weight"])
         elif "depth" in rows:
             outrow["depth"] = rows["depth"].mean()
         yield outrow

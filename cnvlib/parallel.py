@@ -5,10 +5,9 @@ import gzip
 import os
 from contextlib import contextmanager
 from concurrent import futures
-#  from concurrent.futures import wait
 
 
-class SerialPool(object):
+class SerialPool:
     """Mimic the concurrent.futures.Executor interface, but run in serial."""
 
     def __init__(self):
@@ -27,8 +26,7 @@ class SerialPool(object):
         pass
 
 
-
-class SerialFuture(object):
+class SerialFuture:
     """Mimic the concurrent.futures.Future interface."""
 
     def __init__(self, result):
@@ -36,7 +34,6 @@ class SerialFuture(object):
 
     def result(self):
         return self._result
-
 
 
 @contextmanager
@@ -61,10 +58,10 @@ def rm(path):
 def to_chunks(bed_fname, chunk_size=5000):
     """Split a BED file into `chunk_size`-line parts for parallelization."""
     k, chunk = 0, 0
-    fd, name = tempfile.mkstemp(suffix=".bed", prefix="tmp.%s." % chunk)
+    fd, name = tempfile.mkstemp(suffix=".bed", prefix=f"tmp.{chunk}.")
     outfile = os.fdopen(fd, "w")
     atexit.register(rm, name)
-    opener = (gzip.open if bed_fname.endswith(".gz") else open)
+    opener = gzip.open if bed_fname.endswith(".gz") else open
     with opener(bed_fname) as infile:
         for line in infile:
             if line[0] == "#":
@@ -75,8 +72,7 @@ def to_chunks(bed_fname, chunk_size=5000):
                 outfile.close()
                 yield name
                 chunk += 1
-                fd, name = tempfile.mkstemp(suffix=".bed",
-                                            prefix="tmp.%s." % chunk)
+                fd, name = tempfile.mkstemp(suffix=".bed", prefix=f"tmp.{chunk}.")
                 outfile = os.fdopen(fd, "w")
     outfile.close()
     if k % chunk_size:

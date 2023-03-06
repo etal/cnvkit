@@ -19,18 +19,18 @@ def get_combiners(table, stranded=False, combine=None):
         Column names to their value-combining functions.
     """
     cmb = {
-        'chromosome': first_of,
-        'start': first_of,
-        'end': max,
-        'gene': join_strings,
-        'accession': join_strings,
-        'weight': sum,
-        'probes': sum,
+        "chromosome": first_of,
+        "start": first_of,
+        "end": max,
+        "gene": join_strings,
+        "accession": join_strings,
+        "weight": sum,
+        "probes": sum,
     }
     if combine:
         cmb.update(combine)
-    if 'strand' not in cmb:
-        cmb['strand'] = first_of if stranded else merge_strands
+    if "strand" not in cmb:
+        cmb["strand"] = first_of if stranded else merge_strands
     return {k: v for k, v in cmb.items() if k in table.columns}
 
 
@@ -47,20 +47,24 @@ def last_of(elems):
 max_of = max
 
 
-def join_strings(elems, sep=','):
+def join_strings(elems, sep=","):
     """Join a Series of strings by commas."""
     # ENH if elements are also comma-separated, split+uniq those too
     return sep.join(pd.unique(elems))
 
 
 def merge_strands(elems):
+    """Summarize the given strands as '+', '-', or '.' (both/mixed)"""
     strands = set(elems)
     if len(strands) > 1:
-        return '.'
+        return "."
     return elems[0]
 
 
 def make_const(val):
+    """Return a function that simply returns the value given as input here."""
+
     def const(_elems):
         return val
+
     return const

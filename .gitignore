@@ -6,6 +6,7 @@
 *.class
 
 # Testing & coverage shrapnel
+.tox
 .coverage
 coverage.xml
 *.bai
@@ -44,4 +45,5 @@ test/*.pdf
 build/
 dist/
 doc/_build
+doc/html
 CNVkit.egg-info/

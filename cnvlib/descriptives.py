@@ -14,8 +14,10 @@ from scipy import stats
 
 # Decorators to coerce input and short-circuit trivial cases
 
+
 def on_array(default=None):
     """Ensure `a` is a numpy array with no missing/NaN values."""
+
     def outer(f):
         @wraps(f)
         def wrapper(a, **kwargs):
@@ -28,7 +30,9 @@ def on_array(default=None):
                     return a[0]
                 return default
             return f(a, **kwargs)
+
         return wrapper
+
     return outer
 
 
@@ -40,12 +44,12 @@ def on_weighted_array(default=None):
     1. Drop any cells in `a` that are NaN from both `a` and `w`
     2. Replace any remaining NaN cells in `w` with 0.
     """
+
     def outer(f):
         @wraps(f)
         def wrapper(a, w, **kwargs):
             if len(a) != len(w):
-                raise ValueError("Unequal array lengths: a=%d, w=%d"
-                                % (len(a), len(w)))
+                raise ValueError(f"Unequal array lengths: a={len(a)}, w={len(w)}")
             if not len(a):
                 return np.nan
             a = np.asfarray(a)
@@ -66,11 +70,14 @@ def on_weighted_array(default=None):
             if w_nan.any():
                 w[w_nan] = 0.0
             return f(a, w, **kwargs)
+
         return wrapper
+
     return outer
 
 
 # M-estimators of central location
+
 
 @on_array()
 def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
@@ -79,14 +86,15 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
     The biweight is a robust statistic for estimating the central location of a
     distribution.
     """
+
     def biloc_iter(a, initial):
         # Weight the observations by distance from initial estimate
         d = a - initial
         mad = np.median(np.abs(d))
         w = d / max(c * mad, epsilon)
-        w = (1 - w**2)**2
+        w = (1 - w**2) ** 2
         # Omit the outlier points
-        mask = (w < 1)
+        mask = w < 1
         weightsum = w[mask].sum()
         if weightsum == 0:
             # Insufficient variation to improve the initial estimate
@@ -134,14 +142,17 @@ def weighted_median(a, weights):
         return a[weights.argmax()]
     cumulative_weight = weights.cumsum()
     midpoint_idx = cumulative_weight.searchsorted(midpoint)
-    if (midpoint_idx > 0 and
-        cumulative_weight[midpoint_idx-1] - midpoint < sys.float_info.epsilon):
+    if (
+        midpoint_idx > 0
+        and cumulative_weight[midpoint_idx - 1] - midpoint < sys.float_info.epsilon
+    ):
         # Midpoint of 2 array values
-        return a[midpoint_idx-1 : midpoint_idx+1].mean()
+        return a[midpoint_idx - 1 : midpoint_idx + 1].mean()
     return a[midpoint_idx]
 
 
 # Estimators of scale
+
 
 @on_array(0)
 def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-3):
@@ -170,8 +181,9 @@ def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-3):
     n = mask.sum()
     d_ = d[mask]
     w_ = (w**2)[mask]
-    return np.sqrt((n * (d_**2 * (1 - w_)**4).sum())
-                   / (((1 - w_) * (1 - 5 * w_)).sum()**2))
+    return np.sqrt(
+        (n * (d_**2 * (1 - w_) ** 4).sum()) / (((1 - w_) * (1 - 5 * w_)).sum() ** 2)
+    )
 
 
 @on_array(0)
@@ -241,7 +253,7 @@ def mean_squared_error(a, initial=None):
         initial = a.mean()
     if initial:
         a = a - initial
-    return (a ** 2).mean()
+    return (a**2).mean()
 
 
 @on_array(0)
@@ -269,7 +281,7 @@ def q_n(a):
     # First quartile of: (|x_i - x_j|: i < j)
     vals = []
     for i, x_i in enumerate(a):
-        for x_j in a[i+1:]:
+        for x_j in a[i + 1 :]:
             vals.append(abs(x_i - x_j))
     quartile = np.percentile(vals, 25)
 

@@ -4,11 +4,11 @@ import math
 import os.path
 import time
 from concurrent import futures
+from io import StringIO
 
 import numpy as np
 import pandas as pd
 import pysam
-from io import StringIO
 from skgenome import tabio
 
 from . import core, samutil
@@ -17,21 +17,23 @@ from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 
-def do_coverage(bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1, fasta=None):
+def do_coverage(
+    bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1, fasta=None
+):
     """Calculate coverage in the given regions from BAM read depths."""
     if not samutil.ensure_bam_sorted(bam_fname, fasta=fasta):
-        raise RuntimeError("BAM file %s must be sorted by coordinates"
-                            % bam_fname)
+        raise RuntimeError(f"BAM file {bam_fname} must be sorted by coordinates")
     samutil.ensure_bam_index(bam_fname)
     # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
-    cnarr = interval_coverages(bed_fname, bam_fname, by_count, min_mapq,
-                               processes, fasta)
+    cnarr = interval_coverages(
+        bed_fname, bam_fname, by_count, min_mapq, processes, fasta
+    )
     return cnarr
 
 
 def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fasta=None):
     """Calculate log2 coverages in the BAM file at each interval."""
-    meta = {'sample_id': core.fbase(bam_fname)}
+    meta = {"sample_id": core.fbase(bam_fname)}
     start_time = time.time()
 
     # Skip processing if the BED file is empty
@@ -40,46 +42,56 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fast
             if line.strip():
                 break
         else:
-            logging.info("Skip processing %s with empty regions file %s",
-                         os.path.basename(bam_fname), bed_fname)
+            logging.info(
+                "Skip processing %s with empty regions file %s",
+                os.path.basename(bam_fname),
+                bed_fname,
+            )
             return CNA.from_rows([], meta_dict=meta)
 
     # Calculate average read depth in each bin
     if by_count:
-        results = interval_coverages_count(bed_fname, bam_fname, min_mapq,
-                                           processes, fasta)
+        results = interval_coverages_count(
+            bed_fname, bam_fname, min_mapq, processes, fasta
+        )
         read_counts, cna_rows = zip(*results)
         read_counts = pd.Series(read_counts)
-        cnarr = CNA.from_rows(list(cna_rows),
-                              columns=CNA._required_columns + ('depth',),
-                              meta_dict=meta)
+        cnarr = CNA.from_rows(
+            list(cna_rows), columns=CNA._required_columns + ("depth",), meta_dict=meta
+        )
     else:
-        table = interval_coverages_pileup(bed_fname, bam_fname, min_mapq,
-                                          processes, fasta)
+        table = interval_coverages_pileup(
+            bed_fname, bam_fname, min_mapq, processes, fasta
+        )
         read_len = samutil.get_read_length(bam_fname, fasta=fasta)
-        read_counts = table['basecount'] / read_len
-        table = table.drop('basecount', axis=1)
+        read_counts = table["basecount"] / read_len
+        table = table.drop("basecount", axis=1)
         cnarr = CNA(table, meta)
 
     # Log some stats
     tot_time = time.time() - start_time
     tot_reads = read_counts.sum()
-    logging.info("Time: %.3f seconds (%d reads/sec, %s bins/sec)",
-                 tot_time,
-                 int(round(tot_reads / tot_time, 0)),
-                 int(round(len(read_counts) / tot_time, 0)))
-    logging.info("Summary: #bins=%d, #reads=%d, "
-                 "mean=%.4f, min=%s, max=%s ",
-                 len(read_counts),
-                 tot_reads,
-                 (tot_reads / len(read_counts)),
-                 read_counts.min(),
-                 read_counts.max())
+    logging.info(
+        "Time: %.3f seconds (%d reads/sec, %s bins/sec)",
+        tot_time,
+        int(round(tot_reads / tot_time, 0)),
+        int(round(len(read_counts) / tot_time, 0)),
+    )
+    logging.info(
+        "Summary: #bins=%d, #reads=%d, mean=%.4f, min=%s, max=%s",
+        len(read_counts),
+        tot_reads,
+        (tot_reads / len(read_counts)),
+        read_counts.min(),
+        read_counts.max(),
+    )
     tot_mapped_reads = samutil.bam_total_reads(bam_fname, fasta=fasta)
     if tot_mapped_reads:
-        logging.info("Percent reads in regions: %.3f (of %d mapped)",
-                     100. * tot_reads / tot_mapped_reads,
-                     tot_mapped_reads)
+        logging.info(
+            "Percent reads in regions: %.3f (of %d mapped)",
+            100.0 * tot_reads / tot_mapped_reads,
+            tot_mapped_reads,
+        )
     else:
         logging.info("(Couldn't calculate total number of mapped reads)")
 
@@ -90,16 +102,19 @@ def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1, fasta=None
     """Calculate log2 coverages in the BAM file at each interval."""
     regions = tabio.read_auto(bed_fname)
     if procs == 1:
-        bamfile = pysam.Samfile(bam_fname, 'rb', reference_filename=fasta)
+        bamfile = pysam.AlignmentFile(bam_fname, "rb", reference_filename=fasta)
         for chrom, subregions in regions.by_chromosome():
-            logging.info("Processing chromosome %s of %s",
-                         chrom, os.path.basename(bam_fname))
+            logging.info(
+                "Processing chromosome %s of %s", chrom, os.path.basename(bam_fname)
+            )
             for count, row in _rdc_chunk(bamfile, subregions, min_mapq):
                 yield [count, row]
     else:
         with futures.ProcessPoolExecutor(procs) as pool:
-            args_iter = ((bam_fname, subr, min_mapq, fasta)
-                         for _c, subr in regions.by_chromosome())
+            args_iter = (
+                (bam_fname, subr, min_mapq, fasta)
+                for _c, subr in regions.by_chromosome()
+            )
             for chunk in pool.map(_rdc, args_iter):
                 for count, row in chunk:
                     yield [count, row]
@@ -112,7 +127,7 @@ def _rdc(args):
 
 def _rdc_chunk(bamfile, regions, min_mapq, fasta=None):
     if isinstance(bamfile, str):
-        bamfile = pysam.Samfile(bamfile, 'rb', reference_filename=fasta)
+        bamfile = pysam.AlignmentFile(bamfile, "rb", reference_filename=fasta)
     for chrom, start, end, gene in regions.coords(["gene"]):
         yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)
 
@@ -125,13 +140,16 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
 
     Coordinates are 0-based, per pysam.
     """
+
     def filter_read(read):
         """True if the given read should be counted towards coverage."""
-        return not (read.is_duplicate
-                    or read.is_secondary
-                    or read.is_unmapped
-                    or read.is_qcfail
-                    or read.mapq < min_mapq)
+        return not (
+            read.is_duplicate
+            or read.is_secondary
+            or read.is_unmapped
+            or read.is_qcfail
+            or read.mapq < min_mapq
+        )
 
     count = 0
     bases = 0
@@ -139,11 +157,16 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
         if filter_read(read):
             count += 1
             # Only count the bases aligned to the region
-            bases += sum([1 for p in read.positions if start <= p < end])
+            bases += sum(1 for p in read.positions if start <= p < end)
     depth = bases / (end - start) if end > start else 0
-    row = (chrom, start, end, gene,
-           math.log(depth, 2) if depth else NULL_LOG2_COVERAGE,
-           depth)
+    row = (
+        chrom,
+        start,
+        end,
+        gene,
+        math.log(depth, 2) if depth else NULL_LOG2_COVERAGE,
+        depth,
+    )
     return count, row
 
 
@@ -155,25 +178,26 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1, fasta=Non
     else:
         chunks = []
         with futures.ProcessPoolExecutor(procs) as pool:
-            args_iter = ((bed_chunk, bam_fname, min_mapq, fasta)
-                         for bed_chunk in to_chunks(bed_fname))
+            args_iter = (
+                (bed_chunk, bam_fname, min_mapq, fasta)
+                for bed_chunk in to_chunks(bed_fname)
+            )
             for bed_chunk_fname, table in pool.map(_bedcov, args_iter):
                 chunks.append(table)
                 rm(bed_chunk_fname)
         table = pd.concat(chunks, ignore_index=True)
     # Fill in CNA required columns
-    if 'gene' in table:
-        table['gene'] = table['gene'].fillna('-')
+    if "gene" in table:
+        table["gene"] = table["gene"].fillna("-")
     else:
-        table['gene'] = '-'
+        table["gene"] = "-"
     # User-supplied bins might be zero-width or reversed -- skip those
     spans = table.end - table.start
-    ok_idx = (spans > 0)
+    ok_idx = spans > 0
     table = table.assign(depth=0, log2=NULL_LOG2_COVERAGE)
-    table.loc[ok_idx, 'depth'] = (table.loc[ok_idx, 'basecount']
-                                  / spans[ok_idx])
-    ok_idx = (table['depth'] > 0)
-    table.loc[ok_idx, 'log2'] = np.log2(table.loc[ok_idx, 'depth'])
+    table.loc[ok_idx, "depth"] = table.loc[ok_idx, "basecount"] / spans[ok_idx]
+    ok_idx = table["depth"] > 0
+    table.loc[ok_idx, "log2"] = np.log2(table.loc[ok_idx, "depth"])
     return table
 
 
@@ -192,19 +216,23 @@ def bedcov(bed_fname, bam_fname, min_mapq, fasta=None):
     # Count bases in each region; exclude low-MAPQ reads
     cmd = [bed_fname, bam_fname]
     if min_mapq and min_mapq > 0:
-        cmd.extend(['-Q', bytes(min_mapq)])
+        cmd.extend(["-Q", bytes(min_mapq)])
     if fasta:
-        cmd.extend(['--reference', fasta])
+        cmd.extend(["--reference", fasta])
     try:
         raw = pysam.bedcov(*cmd, split_lines=False)
     except pysam.SamtoolsError as exc:
-        raise ValueError("Failed processing %r coverages in %r regions. "
-                         "PySAM error: %s" % (bam_fname, bed_fname, exc))
+        raise ValueError(
+            f"Failed processing {bam_fname!r} coverages in {bed_fname!r} regions. "
+            f"PySAM error: {exc}"
+        ) from exc
     if not raw:
-        raise ValueError("BED file %r chromosome names don't match any in "
-                         "BAM file %r" % (bed_fname, bam_fname))
+        raise ValueError(
+            f"BED file {bed_fname!r} chromosome names don't match any in "
+            f"BAM file {bam_fname!r}"
+        )
     columns = detect_bedcov_columns(raw)
-    table = pd.read_csv(StringIO(raw), sep='\t', names=columns, usecols=columns)
+    table = pd.read_csv(StringIO(raw), sep="\t", names=columns, usecols=columns)
     return table
 
 
@@ -216,14 +244,14 @@ def detect_bedcov_columns(text):
     columns (regions without names), 4 (named regions), or more (arbitrary
     columns after 'gene').
     """
-    firstline = text[:text.index('\n')]
-    tabcount = firstline.count('\t')
+    firstline = text[: text.index("\n")]
+    tabcount = firstline.count("\t")
     if tabcount < 3:
-        raise RuntimeError("Bad line from bedcov:\n%r" % firstline)
+        raise RuntimeError(f"Bad line from bedcov:\n{firstline!r}")
     if tabcount == 3:
-        return ['chromosome', 'start', 'end', 'basecount']
+        return ["chromosome", "start", "end", "basecount"]
     if tabcount == 4:
-        return ['chromosome', 'start', 'end', 'gene', 'basecount']
+        return ["chromosome", "start", "end", "gene", "basecount"]
     # Input BED has arbitrary columns after 'gene' -- ignore them
-    fillers = ["_%d" % i for i in range(1, tabcount - 3)]
-    return ['chromosome', 'start', 'end', 'gene'] + fillers + ['basecount']
+    fillers = [f"_{i}" for i in range(1, tabcount - 3)]
+    return ["chromosome", "start", "end", "gene"] + fillers + ["basecount"]

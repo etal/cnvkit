@@ -7,11 +7,10 @@ from skgenome import GenomicArray as GA
 from .params import INSERT_SIZE, MIN_REF_COVERAGE, ANTITARGET_NAME
 
 
-def do_antitarget(targets, access=None, avg_bin_size=150000,
-                  min_bin_size=None):
+def do_antitarget(targets, access=None, avg_bin_size=150000, min_bin_size=None):
     """Derive off-targt ("antitarget") bins from target regions."""
     if not min_bin_size:
-        min_bin_size = 2 * int(avg_bin_size * (2 ** MIN_REF_COVERAGE))
+        min_bin_size = 2 * int(avg_bin_size * (2**MIN_REF_COVERAGE))
     return get_antitargets(targets, access, avg_bin_size, min_bin_size)
 
 
@@ -39,10 +38,12 @@ def get_antitargets(targets, accessible, avg_bin_size, min_bin_size):
         TELOMERE_SIZE = 150000
         accessible = guess_chromosome_regions(targets, TELOMERE_SIZE)
     pad_size = 2 * INSERT_SIZE
-    bg_arr = (accessible.resize_ranges(-pad_size)
-              .subtract(targets.resize_ranges(pad_size))
-              .subdivide(avg_bin_size, min_bin_size))
-    bg_arr['gene'] = ANTITARGET_NAME
+    bg_arr = (
+        accessible.resize_ranges(-pad_size)
+        .subtract(targets.resize_ranges(pad_size))
+        .subdivide(avg_bin_size, min_bin_size)
+    )
+    bg_arr["gene"] = ANTITARGET_NAME
     return bg_arr
 
 
@@ -67,32 +68,38 @@ def drop_noncanonical_contigs(accessible, targets, verbose=True):
     untgt_chroms = access_chroms - target_chroms
     # Autosomes typically have numeric names, allosomes are X and Y
     if any(is_canonical_contig_name(c) for c in target_chroms):
-        chroms_to_skip = [c for c in untgt_chroms
-                            if not is_canonical_contig_name(c)]
+        chroms_to_skip = [c for c in untgt_chroms if not is_canonical_contig_name(c)]
     else:
         # Alternative contigs have longer names -- skip them
         max_tgt_chr_name_len = max(map(len, target_chroms))
-        chroms_to_skip = [c for c in untgt_chroms
-                            if len(c) > max_tgt_chr_name_len]
+        chroms_to_skip = [c for c in untgt_chroms if len(c) > max_tgt_chr_name_len]
     if chroms_to_skip:
-        logging.info("Skipping untargeted chromosomes %s",
-                     ' '.join(sorted(chroms_to_skip)))
+        logging.info(
+            "Skipping untargeted chromosomes %s", " ".join(sorted(chroms_to_skip))
+        )
         skip_idx = accessible.chromosome.isin(chroms_to_skip)
         accessible = accessible[~skip_idx]
     return accessible
 
 
 def compare_chrom_names(a_regions, b_regions):
+    """Check if chromosome names overlap, and preview each if not.
+
+    This summary message will help triage cases of e.g. "chr1" vs. "1" in the
+    two genomic datasets being compared.
+    """
     a_chroms = set(a_regions.chromosome.unique())
     b_chroms = set(b_regions.chromosome.unique())
     if a_chroms and a_chroms.isdisjoint(b_chroms):
         msg = "Chromosome names do not match between files"
-        a_fname = a_regions.meta.get('filename')
-        b_fname = b_regions.meta.get('filename')
+        a_fname = a_regions.meta.get("filename")
+        b_fname = b_regions.meta.get("filename")
         if a_fname and b_fname:
-            msg += " {} and {}".format(a_fname, b_fname)
-        msg += ": {} vs. {}".format(', '.join(map(repr, sorted(a_chroms)[:3])),
-                                    ', '.join(map(repr, sorted(b_chroms)[:3])))
+            msg += f" {a_fname} and {b_fname}"
+        msg += ": {} vs. {}".format(
+            ", ".join(map(repr, sorted(a_chroms)[:3])),
+            ", ".join(map(repr, sorted(b_chroms)[:3])),
+        )
         raise ValueError(msg)
     return a_chroms, b_chroms
 
@@ -100,10 +107,13 @@ def compare_chrom_names(a_regions, b_regions):
 def guess_chromosome_regions(targets, telomere_size):
     """Determine (minimum) chromosome lengths from target coordinates."""
     endpoints = [subarr.end.iat[-1] for _c, subarr in targets.by_chromosome()]
-    whole_chroms = GA.from_columns({
-        'chromosome': targets.chromosome.drop_duplicates(),
-        'start': telomere_size,
-        'end': endpoints})
+    whole_chroms = GA.from_columns(
+        {
+            "chromosome": targets.chromosome.drop_duplicates(),
+            "start": telomere_size,
+            "end": endpoints,
+        }
+    )
     return whole_chroms
 
 
@@ -112,18 +122,24 @@ def guess_chromosome_regions(targets, telomere_size):
 # CNVkit's original inclusion regex
 re_canonical = re.compile(r"(chr)?(\d+|[XYxy])$")
 # goleft indexcov's exclusion regex
-re_noncanonical = re.compile("|".join((r"^chrEBV$",
-                                       r"^NC|_random$",
-                                       r"Un_",
-                                       r"^HLA\-",
-                                       r"_alt$",
-                                       r"hap\d$",
-                                       r"chrM",
-                                       r"MT")))
+re_noncanonical = re.compile(
+    "|".join(
+        (
+            r"^chrEBV$",
+            r"^NC|_random$",
+            r"Un_",
+            r"^HLA\-",
+            r"_alt$",
+            r"hap\d$",
+            r"chrM",
+            r"MT",
+        )
+    )
+)
 
 
 def is_canonical_contig_name(name):
-    #return bool(re_canonical.match(name))
+    # return bool(re_canonical.match(name))
     return not re_noncanonical.search(name)
 
 
@@ -137,8 +153,7 @@ def _drop_short_contigs(garr):
     from skgenome.chromsort import detect_big_chroms
 
     chrom_sizes = chromosome_sizes(garr)
-    n_big, thresh = detect_big_chroms(chromosome_sizes.values())
-    chrom_names_to_keep = {c for c, s in chrom_sizes.items()
-                           if s >= thresh}
+    n_big, thresh = detect_big_chroms(chrom_sizes.values())
+    chrom_names_to_keep = {c for c, s in chrom_sizes.items() if s >= thresh}
     assert len(chrom_names_to_keep) == n_big
     return garr[garr.chromosome.isin(chrom_names_to_keep)]

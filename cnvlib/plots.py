@@ -6,14 +6,14 @@ import math
 
 import numpy as np
 
-from . import core, params
 from skgenome.rangelabel import unpack_range, Region
+from . import core, params
 
 
 MB = 1e-6  # To rescale from bases to megabases
 
 
-def plot_chromosome_dividers(axis, chrom_sizes, pad=None, along='x'):
+def plot_chromosome_dividers(axis, chrom_sizes, pad=None, along="x"):
     """Given chromosome sizes, plot divider lines and labels.
 
     Draws black lines between each chromosome, with padding. Labels each chromosome range with the chromosome name,
@@ -40,28 +40,30 @@ def plot_chromosome_dividers(axis, chrom_sizes, pad=None, along='x'):
         dividers.append(curr_offset + size + pad)
         curr_offset += size + 2 * pad
 
-    if along not in ('x', 'y'):
-        raise ValueError('Direction for plotting chromosome dividers and labels along must be either x or y.')
+    if along not in ("x", "y"):
+        raise ValueError(
+            "Direction for plotting chromosome dividers and labels along must be either x or y."
+        )
 
-    if along == 'x':
+    if along == "x":
         axis.set_xlim(0, curr_offset)
         for xposn in dividers[:-1]:
-            axis.axvline(x=xposn, color='k')
+            axis.axvline(x=xposn, color="k")
         # Use chromosome names as x-axis labels (instead of base positions)
         axis.set_xticks(centers)
         axis.set_xticklabels(list(chrom_sizes.keys()), rotation=90)
-        axis.tick_params(labelsize='small')
-        axis.tick_params(axis='x', length=0)
+        axis.tick_params(labelsize="small")
+        axis.tick_params(axis="x", length=0)
         axis.get_yaxis().tick_left()
     else:
         axis.set_ylim(0, curr_offset)
         for yposn in dividers[:-1]:
-            axis.axhline(y=yposn, color='k')
+            axis.axhline(y=yposn, color="k")
         # Use chromosome names as y-axis labels (instead of base positions)
         axis.set_yticks(centers)
         axis.set_yticklabels(list(chrom_sizes.keys()))
-        axis.tick_params(labelsize='small')
-        axis.tick_params(axis='y', length=0)
+        axis.tick_params(labelsize="small")
+        axis.tick_params(axis="y", length=0)
         axis.get_xaxis().tick_bottom()
 
     return starts
@@ -70,11 +72,12 @@ def plot_chromosome_dividers(axis, chrom_sizes, pad=None, along='x'):
 # ________________________________________
 # Internal supporting functions
 
+
 def chromosome_sizes(probes, to_mb=False):
     """Create an ordered mapping of chromosome names to sizes."""
     chrom_sizes = collections.OrderedDict()
     for chrom, rows in probes.by_chromosome():
-        chrom_sizes[chrom] = rows['end'].max()
+        chrom_sizes[chrom] = rows["end"].max()
         if to_mb:
             chrom_sizes[chrom] *= MB
     return chrom_sizes
@@ -104,18 +107,21 @@ def translate_segments_to_bins(segments, bins):
     if "probes" in segments and segments["probes"].sum() == len(bins):
         # Segments and .cnr bins already match
         return update_binwise_positions_simple(segments)
-    else:
-        logging.warning("Segments %s 'probes' sum does not match the number "
-                        "of bins in %s", segments.sample_id, bins.sample_id)
-        # Must re-align segments to .cnr bins
-        _x, segments, _v = update_binwise_positions(bins, segments)
-        return segments
+
+    logging.warning(
+        "Segments %s 'probes' sum does not match the number of bins in %s",
+        segments.sample_id,
+        bins.sample_id,
+    )
+    # Must re-align segments to .cnr bins
+    _x, segments, _v = update_binwise_positions(bins, segments)
+    return segments
 
 
 def update_binwise_positions_simple(cnarr):
     start_chunks = []
     end_chunks = []
-    is_segment = ("probes" in cnarr)
+    is_segment = "probes" in cnarr
     if is_segment:
         cnarr = cnarr[cnarr["probes"] > 0]
     for _chrom, c_arr in cnarr.by_chromosome():
@@ -131,8 +137,10 @@ def update_binwise_positions_simple(cnarr):
         start_chunks.append(starts)
         end_chunks.append(ends)
     return cnarr.as_dataframe(
-        cnarr.data.assign(start=np.concatenate(start_chunks),
-                          end=np.concatenate(end_chunks)))
+        cnarr.data.assign(
+            start=np.concatenate(start_chunks), end=np.concatenate(end_chunks)
+        )
+    )
 
 
 def update_binwise_positions(cnarr, segments=None, variants=None):
@@ -159,13 +167,14 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
     for chrom in cnarr.chromosome.unique():
         # Enumerate bins, starting from 0
         # NB: plotted points will be at +0.5 offsets
-        c_idx = (cnarr.chromosome == chrom)
-        c_bins = cnarr[c_idx]#.copy()
+        c_idx = cnarr.chromosome == chrom
+        c_bins = cnarr[c_idx]  # .copy()
         if segments and chrom in seg_chroms:
             # Match segment boundaries to enumerated bins
             c_seg_idx = (segments.chromosome == chrom).values
-            seg_starts = np.searchsorted(c_bins.start.values,
-                                         segments.start.values[c_seg_idx])
+            seg_starts = np.searchsorted(
+                c_bins.start.values, segments.start.values[c_seg_idx]
+            )
             seg_ends = np.r_[seg_starts[1:], len(c_bins)]
             segments.data.loc[c_seg_idx, "start"] = seg_starts
             segments.data.loc[c_seg_idx, "end"] = seg_ends
@@ -176,8 +185,7 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
             c_varr_idx = (variants.chromosome == chrom).values
             c_varr_df = variants.data[c_varr_idx]
             # Get binwise start indices of the variants
-            v_starts = np.searchsorted(c_bins.start.values,
-                                       c_varr_df.start.values)
+            v_starts = np.searchsorted(c_bins.start.values, c_varr_df.start.values)
             # Overwrite runs of repeats with fractional increments,
             #   adding the cumulative fraction to each repeat
             for idx, size in list(get_repeat_slices(v_starts)):
@@ -186,7 +194,7 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
             variants.data.loc[c_varr_idx, "start"] = v_starts
             variants.data.loc[c_varr_idx, "end"] = v_starts + variant_sizes
 
-        c_starts = np.arange(len(c_bins)) # c_idx.sum())
+        c_starts = np.arange(len(c_bins))  # c_idx.sum())
         c_ends = np.arange(1, len(c_bins) + 1)
         cnarr.data.loc[c_idx, "start"] = c_starts
         cnarr.data.loc[c_idx, "end"] = c_ends
@@ -202,14 +210,14 @@ def get_repeat_slices(values):
         size = len(list(rpt))
         if size > 1:
             i = idx + offset
-            slc = slice(i, i+size)
+            slc = slice(i, i + size)
             yield slc, size
             offset += size - 1
 
 
-
 # ________________________________________
 # Utilies used by other modules
+
 
 def cvg2rgb(cvg, desaturate):
     """Choose a shade of red or blue representing log2-coverage value."""
@@ -218,15 +226,15 @@ def cvg2rgb(cvg, desaturate):
     if desaturate:
         # Adjust intensity sigmoidally -- reduce near 0, boost near 1
         # Exponent <1 shifts the fixed point leftward (from x=0.5)
-        x = ((1. - math.cos(x * math.pi)) / 2.) ** 0.8
+        x = ((1.0 - math.cos(x * math.pi)) / 2.0) ** 0.8
         # Slight desaturation of colors at lower coverage
         s = x**1.2
     else:
         s = x
     if cvg < 0:
-        rgb = (1 - s, 1 - s, 1 - .25*x)  # Blueish
+        rgb = (1 - s, 1 - s, 1 - 0.25 * x)  # Blueish
     else:
-        rgb = (1 - .25*x, 1 - s, 1 - s)  # Reddish
+        rgb = (1 - 0.25 * x, 1 - s, 1 - s)  # Reddish
     return rgb
 
 
@@ -247,35 +255,36 @@ def gene_coords_by_name(probes, names):
 
     # Create an index of gene names
     gene_index = collections.defaultdict(set)
-    for i, gene in enumerate(probes['gene']):
-        for gene_name in gene.split(','):
+    for i, gene in enumerate(probes["gene"]):
+        for gene_name in gene.split(","):
             if gene_name in names:
                 gene_index[gene_name].add(i)
     # Retrieve coordinates by name
-    all_coords = collections.defaultdict(lambda : collections.defaultdict(set))
+    all_coords = collections.defaultdict(lambda: collections.defaultdict(set))
     for name in names:
         gene_probes = probes.data.take(sorted(gene_index.get(name, [])))
         if not len(gene_probes):
-            raise ValueError("No targeted gene named '%s' found" % name)
+            raise ValueError(f"No targeted gene named {name!r} found")
         # Find the genomic range of this gene's probes
-        start = gene_probes['start'].min()
-        end = gene_probes['end'].max()
-        chrom = core.check_unique(gene_probes['chromosome'], name)
+        start = gene_probes["start"].min()
+        end = gene_probes["end"].max()
+        chrom = core.check_unique(gene_probes["chromosome"], name)
         # Deduce the unique set of gene names for this region
         uniq_names = set()
-        for oname in set(gene_probes['gene']):
-            uniq_names.update(oname.split(','))
+        for oname in set(gene_probes["gene"]):
+            uniq_names.update(oname.split(","))
         all_coords[chrom][start, end].update(uniq_names)
     # Consolidate each region's gene names into a string
     uniq_coords = {}
     for chrom, hits in all_coords.items():
-        uniq_coords[chrom] = [(start, end, ",".join(sorted(gene_names)))
-                              for (start, end), gene_names in hits.items()]
+        uniq_coords[chrom] = [
+            (start, end, ",".join(sorted(gene_names)))
+            for (start, end), gene_names in hits.items()
+        ]
     return uniq_coords
 
 
-def gene_coords_by_range(probes, chrom, start, end,
-                         ignore=params.IGNORE_GENE_NAMES):
+def gene_coords_by_range(probes, chrom, start, end, ignore=params.IGNORE_GENE_NAMES):
     """Find the chromosomal position of all genes in a range.
 
     Returns
@@ -293,5 +302,6 @@ def gene_coords_by_range(probes, chrom, start, end,
         elif name not in ignore:
             genes[name] = [row.start, row.end]
     # Reorganize the data structure
-    return {chrom: [(gstart, gend, name)
-                    for name, (gstart, gend) in list(genes.items())]}
+    return {
+        chrom: [(gstart, gend, name) for name, (gstart, gend) in list(genes.items())]
+    }

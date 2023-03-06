@@ -3,9 +3,8 @@
 # Dependency: pdfunite (poppler-utils)
 # (Otherwise, all-scatters.pdf and all-diagrams.pdf will be empty files.)
 
-python_exe=python3
 rscript_exe=Rscript
-cnvkit=$(python_exe) ../cnvkit.py
+cnvkit=cnvkit.py
 
 # ------------------------------------------------------------------------------
 # Samples pre-processed with Picard CalculateHsMetrics
@@ -36,11 +35,7 @@ clean:
 
 .PHONY: test
 test:
-	$(python_exe) test_io.py
-	$(python_exe) test_genome.py
-	$(python_exe) test_cnvlib.py
-	$(python_exe) test_commands.py
-	$(python_exe) test_r.py
+	pytest
 
 
 # ------------------------------------------------------------------------------

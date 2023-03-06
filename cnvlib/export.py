@@ -20,9 +20,9 @@ def merge_samples(filenames):
     Output:
         list-of-tuples: (probe, log2 coverages...)
     """
+
     def label_with_gene(cnarr):
-        row2label = lambda row: "{}:{}-{}:{}".format(
-            row.chromosome, row.start, row.end, row.gene)
+        row2label = lambda row: f"{row.chromosome}:{row.start}-{row.end}:{row.gene}"
         return cnarr.data.apply(row2label, axis=1)
 
     if not filenames:
@@ -33,18 +33,21 @@ def merge_samples(filenames):
     out_table[first_cnarr.sample_id] = first_cnarr["log2"]
     for fname in filenames[1:]:
         cnarr = read_cna(fname, None)
-        if not (len(cnarr) == len(out_table)
-                and (label_with_gene(cnarr) == out_table["label"]).all()):
-            raise ValueError("Mismatched row coordinates in %s" % fname)
+        if not (
+            len(cnarr) == len(out_table)
+            and (label_with_gene(cnarr) == out_table["label"]).all()
+        ):
+            raise ValueError(f"Mismatched row coordinates in {fname}")
         # Copy the next column by sample ID
         if cnarr.sample_id in out_table.columns:
-            raise ValueError("Duplicate sample ID: %s" % cnarr.sample_id)
+            raise ValueError(f"Duplicate sample ID: {cnarr.sample_id}")
         out_table[cnarr.sample_id] = cnarr["log2"]
         del cnarr
     return out_table
 
 
 # Supported formats:
+
 
 def fmt_cdt(sample_ids, table):
     """Format as CDT.
@@ -54,22 +57,30 @@ def fmt_cdt(sample_ids, table):
     - http://jtreeview.sourceforge.net/docs/JTVUserManual/ch02s11.html
     - http://www.eisenlab.org/FuzzyK/cdt.html
     """
-    outheader = ['GID', 'CLID', 'NAME', 'GWEIGHT'] + sample_ids
-    header2 = ['AID', '', '', '']
-    header2.extend(['ARRY' + str(i).zfill(3) + 'X'
-                    for i in range(len(sample_ids))])
-    header3 = ['EWEIGHT', '', '', ''] + ['1'] * len(sample_ids)
+    outheader = ["GID", "CLID", "NAME", "GWEIGHT"] + sample_ids
+    header2 = ["AID", "", "", ""]
+    header2.extend(["ARRY" + str(i).zfill(3) + "X" for i in range(len(sample_ids))])
+    header3 = ["EWEIGHT", "", "", ""] + ["1"] * len(sample_ids)
     outrows = [header2, header3]
-    outtable = pd.concat([
-        pd.DataFrame.from_dict(OD([
-           ("GID", pd.Series(table.index).apply(lambda x: "GENE%dX" % x)),
-           ("CLID", pd.Series(table.index).apply(lambda x: "IMAGE:%d" % x)),
-           ("NAME", table["label"]),
-           ("GWEIGHT", 1),
-        ])),
-        table.drop(["chromosome", "start", "end", "gene", "label"],
-                   axis=1)],
-        axis=1)
+    outtable = pd.concat(
+        [
+            pd.DataFrame.from_dict(
+                OD(
+                    [
+                        ("GID", pd.Series(table.index).apply(lambda x: f"GENE{x}X")),
+                        (
+                            "CLID",
+                            pd.Series(table.index).apply(lambda x: f"IMAGE:{x}"),
+                        ),
+                        ("NAME", table["label"]),
+                        ("GWEIGHT", 1),
+                    ]
+                )
+            ),
+            table.drop(["chromosome", "start", "end", "gene", "label"], axis=1),
+        ],
+        axis=1,
+    )
     outrows.extend(outtable.itertuples(index=False))
     return outheader, outrows
 
@@ -82,27 +93,34 @@ def fmt_gct(sample_ids, table):
 def fmt_jtv(sample_ids, table):
     """Format for Java TreeView."""
     outheader = ["CloneID", "Name"] + sample_ids
-    outtable = pd.concat([
-        pd.DataFrame({
-            "CloneID": "IMAGE:",
-            "Name": table["label"],
-        }),
-        table.drop(["chromosome", "start", "end", "gene", "label"],
-                   axis=1)],
-        axis=1)
+    outtable = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "CloneID": "IMAGE:",
+                    "Name": table["label"],
+                }
+            ),
+            table.drop(["chromosome", "start", "end", "gene", "label"], axis=1),
+        ],
+        axis=1,
+    )
     outrows = outtable.itertuples(index=False)
     return outheader, outrows
 
 
 # Special cases
 
+
 def export_nexus_basic(cnarr):
     """Biodiscovery Nexus Copy Number "basic" format.
 
     Only represents one sample per file.
     """
-    out_table = cnarr.data.reindex(columns=['chromosome', 'start', 'end', 'gene', 'log2'])
-    out_table['probe'] = cnarr.labels()
+    out_table = cnarr.data.reindex(
+        columns=["chromosome", "start", "end", "gene", "log2"]
+    )
+    out_table["probe"] = cnarr.labels()
     return out_table
 
 
@@ -116,20 +134,22 @@ def export_nexus_ogt(cnarr, varr, min_weight=0.0):
     of those values is taken.
     """
     if min_weight and "weight" in cnarr:
-        mask_low_weight = (cnarr["weight"] < min_weight)
-        logging.info("Dropping %d bins with weight below %f",
-                     mask_low_weight.sum(), min_weight)
+        mask_low_weight = cnarr["weight"] < min_weight
+        logging.info(
+            "Dropping %d bins with weight below %f", mask_low_weight.sum(), min_weight
+        )
         cnarr.data = cnarr.data[~mask_low_weight]
     bafs = varr.baf_by_ranges(cnarr)
-    logging.info("Placed %d variants into %d bins",
-                 sum(~np.isnan(bafs)), len(cnarr))
-    out_table = cnarr.data.reindex(columns=['chromosome', 'start', 'end', 'log2'])
-    out_table = out_table.rename(columns={
-        "chromosome": "Chromosome",
-        "start": "Position",
-        "end": "Position",
-        "log2": "Log R Ratio",
-    })
+    logging.info("Placed %d variants into %d bins", sum(~np.isnan(bafs)), len(cnarr))
+    out_table = cnarr.data.reindex(columns=["chromosome", "start", "end", "log2"])
+    out_table = out_table.rename(
+        columns={
+            "chromosome": "Chromosome",
+            "start": "Position",
+            "end": "Position",
+            "log2": "Log R Ratio",
+        }
+    )
     out_table["B-Allele Frequency"] = bafs
     return out_table
 
@@ -140,8 +160,7 @@ def export_seg(sample_fnames, chrom_ids=False):
     Segment breakpoints are not the same across samples, so samples are listed
     in serial with the sample ID as the left column.
     """
-    dframes, sample_ids = zip(*(_load_seg_dframe_id(fname)
-                                for fname in sample_fnames))
+    dframes, sample_ids = zip(*(_load_seg_dframe_id(fname) for fname in sample_fnames))
     out_table = tabio.seg.write_seg(dframes, sample_ids, chrom_ids)
     return out_table
 
@@ -157,8 +176,8 @@ def _load_seg_dframe_id(fname):
 # _____________________________________________________________________________
 # BED
 
-def export_bed(segments, ploidy, is_reference_male, is_sample_female,
-               label, show):
+
+def export_bed(segments, ploidy, is_reference_male, is_sample_female, label, show):
     """Convert a copy number array to a BED-like DataFrame.
 
     For each region in each sample (possibly filtered according to `show`),
@@ -177,9 +196,13 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female,
     """
     out = segments.data.reindex(columns=["chromosome", "start", "end"])
     out["label"] = label if label else segments["gene"]
-    out["ncopies"] = (segments["cn"] if "cn" in segments
-                      else call.absolute_pure(segments, ploidy, is_reference_male)
-                           .round().astype('int'))
+    out["ncopies"] = (
+        segments["cn"]
+        if "cn" in segments
+        else call.absolute_pure(segments, ploidy, is_reference_male)
+        .round()
+        .astype("int")
+    )
     if show == "ploidy":
         # Skip regions of default ploidy
         out = out[out["ncopies"] != ploidy]
@@ -213,7 +236,9 @@ VCF_HEADER = """\
 ##FORMAT=<ID=GQ,Number=1,Type=Float,Description="Genotype quality">
 ##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Copy number genotype for imprecise events">
 ##FORMAT=<ID=CNQ,Number=1,Type=Float,Description="Copy number genotype quality for imprecise events">
-""".format(date=time.strftime("%Y%m%d"), version=__version__)
+""".format(
+    date=time.strftime("%Y%m%d"), version=__version__
+)
 # #CHROM  POS   ID  REF ALT   QUAL  FILTER  INFO  FORMAT  NA00001
 # 1 2827693   . CCGTGGATGCGGGGACCCGCATCCCCTCTCCCTTCACAGCTGAGTGACCCACATCCCCTCTCCCCTCGCA  C . PASS  SVTYPE=DEL;END=2827680;BKPTID=Pindel_LCS_D1099159;HOMLEN=1;HOMSEQ=C;SVLEN=-66 GT:GQ 1/1:13.9
 # 2 321682    . T <DEL>   6 PASS    IMPRECISE;SVTYPE=DEL;END=321887;SVLEN=-105;CIPOS=-56,20;CIEND=-10,62  GT:GQ 0/1:12
@@ -221,23 +246,32 @@ VCF_HEADER = """\
 # 4 18665128  . T <DUP:TANDEM>  11  PASS  IMPRECISE;SVTYPE=DUP;END=18665204;SVLEN=76;CIPOS=-10,10;CIEND=-10,10  GT:GQ:CN:CNQ  ./.:0:5:8.3
 
 
-def export_vcf(segments, ploidy, is_reference_male, is_sample_female,
-               sample_id=None, cnarr=None):
+def export_vcf(
+    segments, ploidy, is_reference_male, is_sample_female, sample_id=None, cnarr=None
+):
     """Convert segments to Variant Call Format.
 
     For now, only 1 sample per VCF. (Overlapping CNVs seem tricky.)
 
     Spec: https://samtools.github.io/hts-specs/VCFv4.2.pdf
     """
-    vcf_columns = ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER",
-                   "INFO", "FORMAT", sample_id or segments.sample_id]
+    vcf_columns = [
+        "#CHROM",
+        "POS",
+        "ID",
+        "REF",
+        "ALT",
+        "QUAL",
+        "FILTER",
+        "INFO",
+        "FORMAT",
+        sample_id or segments.sample_id,
+    ]
     if cnarr:
         segments = assign_ci_start_end(segments, cnarr)
-    vcf_rows = segments2vcf(segments, ploidy, is_reference_male,
-                            is_sample_female)
+    vcf_rows = segments2vcf(segments, ploidy, is_reference_male, is_sample_female)
     table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
-    vcf_body = table.to_csv(sep='\t', header=True, index=False,
-                            float_format="%.3g")
+    vcf_body = table.to_csv(sep="\t", header=True, index=False, float_format="%.3g")
     return VCF_HEADER, vcf_body
 
 
@@ -254,11 +288,12 @@ def assign_ci_start_end(segarr, cnarr):
     Calculation: Just use the boundaries of the bins left- and right-adjacent to
     each segment breakpoint.
     """
-    lefts_rights = ((bins.end.iat[0], bins.start.iat[-1])
-                    for _seg, bins in cnarr.by_ranges(segarr, mode="outer"))
+    lefts_rights = (
+        (bins.end.iat[0], bins.start.iat[-1])
+        for _seg, bins in cnarr.by_ranges(segarr, mode="outer")
+    )
     ci_lefts, ci_rights = zip(*lefts_rights)
-    return segarr.as_dataframe(
-        segarr.data.assign(ci_left=ci_lefts, ci_right=ci_rights))
+    return segarr.as_dataframe(segarr.data.assign(ci_left=ci_lefts, ci_right=ci_rights))
 
 
 def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
@@ -270,12 +305,12 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
         out_dframe["ncopies"] = segments["cn"]
         abs_expect = call.absolute_expect(segments, ploidy, is_sample_female)
     else:
-        abs_dframe = call.absolute_dataframe(segments, ploidy, 1.0,
-                                             is_reference_male,
-                                             is_sample_female)
-        out_dframe["ncopies"] = abs_dframe["absolute"].round().astype('int')
+        abs_dframe = call.absolute_dataframe(
+            segments, ploidy, 1.0, is_reference_male, is_sample_female
+        )
+        out_dframe["ncopies"] = abs_dframe["absolute"].round().astype("int")
         abs_expect = abs_dframe["expect"]
-    idx_losses = (out_dframe["ncopies"] < abs_expect)
+    idx_losses = out_dframe["ncopies"] < abs_expect
 
     svlen = segments.end - segments.start
     svlen[idx_losses] *= -1
@@ -285,7 +320,7 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     out_dframe.loc[idx_losses, "svtype"] = "DEL"
 
     out_dframe["format"] = "GT:GQ:CN:CNQ"
-    out_dframe.loc[idx_losses, "format"] = "GT:GQ" # :CN:CNQ ?
+    out_dframe.loc[idx_losses, "format"] = "GT:GQ"  # :CN:CNQ ?
 
     if "ci_left" in segments and "ci_right" in segments:
         has_ci = True
@@ -302,14 +337,17 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
     for out_row, abs_exp in zip(out_dframe.itertuples(index=False), abs_expect):
-        if (out_row.ncopies == abs_exp or
+        if (
+            out_row.ncopies == abs_exp
+            or
             # Survive files from buggy v0.7.1 (#53)
-            not str(out_row.probes).isdigit()):
+            not str(out_row.probes).isdigit()
+        ):
             # Skip regions of neutral copy number
             continue  # or "CNV" for subclonal?
 
         if out_row.ncopies > abs_exp:
-            genotype = "0/1:0:%d:%d" % (out_row.ncopies, out_row.probes)
+            genotype = f"0/1:0:{out_row.ncopies}:{out_row.probes}"
         elif out_row.ncopies < abs_exp:
             # TODO XXX handle non-diploid ploidies, haploid chroms
             if out_row.ncopies == 0:
@@ -318,30 +356,43 @@ def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
             else:
                 # Single copy deletion
                 gt = "0/1"
-            genotype = "%s:%d" % (gt, out_row.probes)
+            genotype = f"{gt}:{out_row.probes}"
 
-        fields = ["IMPRECISE",
-                  "SVTYPE=%s" % out_row.svtype,
-                  "END=%d" % out_row.end,
-                  "SVLEN=%d" % out_row.svlen,
-                  "FOLD_CHANGE=%f" % 2.0 ** out_row.log2,
-                  "FOLD_CHANGE_LOG=%f" % out_row.log2,
-                  "PROBES=%d" % out_row.probes
-                 ]
+        fields = [
+            "IMPRECISE",
+            f"SVTYPE={out_row.svtype}",
+            f"END={out_row.end}",
+            f"SVLEN={out_row.svlen}",
+            f"FOLD_CHANGE={2.0**out_row.log2}",
+            f"FOLD_CHANGE_LOG={out_row.log2}",
+            f"PROBES={out_row.probes}",
+        ]
         if has_ci:
-            fields.extend([
-                "CIPOS=(%d,%d)" % (out_row.ci_pos_left, out_row.ci_pos_right),
-                "CIEND=(%d,%d)" % (out_row.ci_end_left, out_row.ci_end_right),
-            ])
+            fields.extend(
+                [
+                    f"CIPOS=({out_row.ci_pos_left},{out_row.ci_pos_right})",
+                    f"CIEND=({out_row.ci_end_left},{out_row.ci_end_right})",
+                ]
+            )
         info = ";".join(fields)
 
-        yield (out_row.chromosome, out_row.start, '.', 'N',
-               "<%s>" % out_row.svtype, '.', '.',
-               info, out_row.format, genotype)
+        yield (
+            out_row.chromosome,
+            out_row.start,
+            ".",
+            "N",
+            f"<{out_row.svtype}>",
+            ".",
+            ".",
+            info,
+            out_row.format,
+            genotype,
+        )
 
 
 # _____________________________________________________________________________
 # GISTIC
+
 
 def export_gistic_markers(cnr_fnames):
     """Generate a GISTIC 2.0 "markers" file from a set of .cnr files.
@@ -371,24 +422,34 @@ def export_gistic_markers(cnr_fnames):
     for fname in cnr_fnames:
         cna = read_cna(fname)
         marker_ids = cna.labels()
-        tbl = pd.concat([
-            pd.DataFrame({
-                "ID": marker_ids,
-                "CHROM": cna.chromosome,
-                "POS": cna.start + 1,
-            }, columns=colnames),
-            pd.DataFrame({
-                "ID": marker_ids,
-                "CHROM": cna.chromosome,
-                "POS": cna.end,
-            }, columns=colnames),
-        ], ignore_index=True)
+        tbl = pd.concat(
+            [
+                pd.DataFrame(
+                    {
+                        "ID": marker_ids,
+                        "CHROM": cna.chromosome,
+                        "POS": cna.start + 1,
+                    },
+                    columns=colnames,
+                ),
+                pd.DataFrame(
+                    {
+                        "ID": marker_ids,
+                        "CHROM": cna.chromosome,
+                        "POS": cna.end,
+                    },
+                    columns=colnames,
+                ),
+            ],
+            ignore_index=True,
+        )
         out_chunks.append(tbl)
     return pd.concat(out_chunks).drop_duplicates()
 
 
 # _____________________________________________________________________________
 # THetA
+
 
 def export_theta(tumor_segs, normal_cn):
     """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
@@ -424,13 +485,13 @@ def export_theta(tumor_segs, normal_cn):
     table = tumor_segs.data.reindex(columns=["start", "end"])
 
     # Convert chromosome names to 1-based integer indices
-    chr2idx = {c: i+1
-               for i, c in enumerate(tumor_segs.chromosome.drop_duplicates())}
+    chr2idx = {c: i + 1 for i, c in enumerate(tumor_segs.chromosome.drop_duplicates())}
     table["chrm"] = tumor_segs.chromosome.replace(chr2idx)
     # Unique string identifier for each row, e.g. "start_1_93709:end_1_19208166"
-    table["#ID"] = ["start_%d_%d:end_%d_%d"
-                    % (row.chrm, row.start, row.chrm, row.end)
-                    for row in table.itertuples(index=False)]
+    table["#ID"] = [
+        f"start_{row.chrm}_{row.start}:end_{row.chrm}_{row.end}"
+        for row in table.itertuples(index=False)
+    ]
 
     # Calculate/estimate per-segment read counts in tumor and normal samples
     ref_means, nbins = ref_means_nbins(tumor_segs, normal_cn)
@@ -459,8 +520,7 @@ def ref_means_nbins(tumor_segs, normal_cn):
         -       -       -       +       norm, bin counts
     """
     if normal_cn:
-        log2s_in_segs = [bins['log2']
-                         for _seg, bins in normal_cn.by_ranges(tumor_segs)]
+        log2s_in_segs = [bins["log2"] for _seg, bins in normal_cn.by_ranges(tumor_segs)]
         # For the normal/reference bin count, take the mean of the bin values
         # within each segment so that segments match between tumor and normal.
         # ENH: weighted mean, like genemetrics
@@ -482,9 +542,11 @@ def ref_means_nbins(tumor_segs, normal_cn):
             if "probes" in tumor_segs:
                 nbins = tumor_segs["probes"]
             else:
-                logging.warning("No probe counts in tumor segments file and no "
-                                "normal reference given; guessing normal "
-                                "read-counts-per-segment from segment sizes")
+                logging.warning(
+                    "No probe counts in tumor segments file and no "
+                    "normal reference given; guessing normal "
+                    "read-counts-per-segment from segment sizes"
+                )
                 sizes = tumor_segs.end - tumor_segs.start
                 nbins = sizes / sizes.mean()
             if "weight" in tumor_segs:
@@ -494,10 +556,15 @@ def ref_means_nbins(tumor_segs, normal_cn):
     return ref_means, nbins
 
 
-def theta_read_counts(log2_ratio, nbins,
-                      # These scaling factors don't meaningfully affect
-                      # THetA's calculation unless they're too small
-                      avg_depth=500, avg_bin_width=200, read_len=100):
+def theta_read_counts(
+    log2_ratio,
+    nbins,
+    # These scaling factors don't meaningfully affect
+    # THetA's calculation unless they're too small
+    avg_depth=500,
+    avg_bin_width=200,
+    read_len=100,
+):
     """Calculate segments' read counts from log2-ratios.
 
     Math:
@@ -511,17 +578,19 @@ def theta_read_counts(log2_ratio, nbins,
         read_length * read_count = bin_width * read_depth
         read_count = bin_width * read_depth / read_length
     """
-    read_depth = (2 ** log2_ratio) * avg_depth
+    read_depth = (2**log2_ratio) * avg_depth
     read_count = nbins * avg_bin_width * read_depth / read_len
-    return read_count.round().fillna(0).astype('int')
+    return read_count.round().fillna(0).astype("int")
 
 
 def export_theta_snps(varr):
     """Generate THetA's SNP per-allele read count "formatted.txt" files."""
     # Drop any chromosomes that are not integer or XY
-    varr = varr.autosomes(also=(['chrX', 'chrY']
-                                if varr.chromosome.iat[0].startswith('chr')
-                                else ['X', 'Y']))
+    varr = varr.autosomes(
+        also=(
+            ["chrX", "chrY"] if varr.chromosome.iat[0].startswith("chr") else ["X", "Y"]
+        )
+    )
     # Skip indels
     varr = varr[(varr["ref"].str.len() == 1) & (varr["alt"].str.len() == 1)]
     # Drop rows with any NaN
@@ -531,15 +600,16 @@ def export_theta_snps(varr):
     # Avoid weird situation I've seen on alt contigs
     varr = varr[varr["depth"] >= varr["alt_count"]]
     # Reformat for THetA2
-    for depth_key, alt_key in (("depth", "alt_count"),
-                               ("n_depth", "n_alt_count")):
+    for depth_key, alt_key in (("depth", "alt_count"), ("n_depth", "n_alt_count")):
         # Extract the SNP allele counts that THetA2 uses
-        table = varr.data.reindex(columns=('chromosome', 'start', depth_key, alt_key))
-        table = (table.assign(ref_depth=table[depth_key] - table[alt_key])
-                 .reindex(columns=('chromosome', 'start', 'ref_depth', alt_key))
-                 .dropna())
-        table['ref_depth'] = table['ref_depth'].astype('int')
-        table[alt_key] = table[alt_key].astype('int')
+        table = varr.data.reindex(columns=("chromosome", "start", depth_key, alt_key))
+        table = (
+            table.assign(ref_depth=table[depth_key] - table[alt_key])
+            .reindex(columns=("chromosome", "start", "ref_depth", alt_key))
+            .dropna()
+        )
+        table["ref_depth"] = table["ref_depth"].astype("int")
+        table[alt_key] = table[alt_key].astype("int")
         table.columns = ["#Chrm", "Pos", "Ref_Allele", "Mut_Allele"]
         yield table
 
@@ -547,13 +617,13 @@ def export_theta_snps(varr):
 # _____________________________________________________________________________
 
 EXPORT_FORMATS = {
-    'cdt': fmt_cdt,
+    "cdt": fmt_cdt,
     # 'gct': fmt_gct,
-    'gistic': export_gistic_markers,
-    'jtv': fmt_jtv,
-    'nexus-basic': export_nexus_basic,
-    'nexus-ogt': export_nexus_ogt,
-    'seg': export_seg,
-    'theta': export_theta,
-    'vcf': export_vcf,
+    "gistic": export_gistic_markers,
+    "jtv": fmt_jtv,
+    "nexus-basic": export_nexus_basic,
+    "nexus-ogt": export_nexus_ogt,
+    "seg": export_seg,
+    "theta": export_theta,
+    "vcf": export_vcf,
 }

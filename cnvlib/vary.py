@@ -11,6 +11,7 @@ class VariantArray(GenomicArray):
 
     Required columns: chromosome, start, end, ref, alt
     """
+
     _required_columns = ("chromosome", "start", "end", "ref", "alt")
     _required_dtypes = (str, int, int, str, str)
     # Extra: somatic, zygosity, depth, alt_count, alt_freq
@@ -18,8 +19,9 @@ class VariantArray(GenomicArray):
     def __init__(self, data_table, meta_dict=None):
         GenomicArray.__init__(self, data_table, meta_dict)
 
-    def baf_by_ranges(self, ranges, summary_func=np.nanmedian, above_half=None,
-                      tumor_boost=False):
+    def baf_by_ranges(
+        self, ranges, summary_func=np.nanmedian, above_half=None, tumor_boost=False
+    ):
         """Aggregate variant (b-allele) frequencies in each given bin.
 
         Get the average BAF in each of the bins of another genomic array:
@@ -42,7 +44,7 @@ class VariantArray(GenomicArray):
             Average b-allele frequency in each range; same length as `ranges`.
             May contain NaN values where no variants overlap a range.
         """
-        if 'alt_freq' not in self:
+        if "alt_freq" not in self:
             logging.warning("VCF has no allele frequencies for BAF calculation")
             return pd.Series(np.repeat(np.nan, len(ranges)), index=self.data.index)
 
@@ -50,23 +52,21 @@ class VariantArray(GenomicArray):
             return summary_func(_mirrored_baf(vals, above_half))
 
         cnarr = self.heterozygous()
-        if tumor_boost and 'n_alt_freq' in self:
+        if tumor_boost and "n_alt_freq" in self:
             cnarr = cnarr.add_columns(alt_freq=cnarr.tumor_boost())
-        return cnarr.into_ranges(ranges, 'alt_freq', np.nan, summarize)
+        return cnarr.into_ranges(ranges, "alt_freq", np.nan, summarize)
 
     def het_frac_by_ranges(self, ranges):
-        """Fraction of the SNVs in each bin that are heterozygous.
-        """
-        if 'zygosity' not in self and 'n_zygosity' not in self:
+        """Fraction of the SNVs in each bin that are heterozygous."""
+        if "zygosity" not in self and "n_zygosity" not in self:
             logging.warning("VCF has no genotype zygosities for this calculation")
             return self.as_series(np.repeat(np.nan, len(ranges)))
 
         # Use existing genotype/zygosity info
-        zygosity = self['n_zygosity' if 'n_zygosity' in self
-                        else 'zygosity']
+        zygosity = self["n_zygosity" if "n_zygosity" in self else "zygosity"]
         het_idx = (zygosity != 0.0) & (zygosity != 1.0)
         cnarr = self.add_columns(is_het=het_idx)
-        het_frac = cnarr.into_ranges(ranges, 'is_het', np.nan, np.nanmean)
+        het_frac = cnarr.into_ranges(ranges, "is_het", np.nan, np.nanmean)
         return het_frac
 
     def zygosity_from_freq(self, het_freq=0.0, hom_freq=1.0):
@@ -87,8 +87,10 @@ class VariantArray(GenomicArray):
         """
         assert 0.0 <= het_freq <= hom_freq <= 1.0
         self = self.copy()  # Don't modify the original
-        for freq_key, zyg_key in (('alt_freq', 'zygosity'),
-                                  ('n_alt_freq', 'n_zygosity')):
+        for freq_key, zyg_key in (
+            ("alt_freq", "zygosity"),
+            ("n_alt_freq", "n_zygosity"),
+        ):
             if zyg_key in self:
                 zyg = np.repeat(0.5, len(self))
                 vals = self[freq_key].values
@@ -111,10 +113,9 @@ class VariantArray(GenomicArray):
             The subset of `self` with heterozygous genotype, or allele frequency
             between the specified thresholds.
         """
-        if 'zygosity' in self:
+        if "zygosity" in self:
             # Use existing genotype/zygosity info
-            zygosity = self['n_zygosity' if 'n_zygosity' in self
-                            else 'zygosity']
+            zygosity = self["n_zygosity" if "n_zygosity" in self else "zygosity"]
             het_idx = (zygosity != 0.0) & (zygosity != 1.0)
             if het_idx.any():
                 # Only take het. subset if the subset is not empty
@@ -154,20 +155,20 @@ class VariantArray(GenomicArray):
         See: TumorBoost, Bengtsson et al. 2010
         """
         if not ("alt_freq" in self and "n_alt_freq" in self):
-            raise ValueError("TumorBoost requires a matched tumor and normal "
-                             "pair of samples in the VCF.")
-        return _tumor_boost(self["alt_freq"].values,  self["n_alt_freq"].values)
-
+            raise ValueError(
+                "TumorBoost requires a matched tumor and normal "
+                "pair of samples in the VCF."
+            )
+        return _tumor_boost(self["alt_freq"].values, self["n_alt_freq"].values)
 
 
 def _mirrored_baf(vals, above_half=None):
-    shift = (vals - .5).abs()
+    shift = (vals - 0.5).abs()
     if above_half is None:
-        above_half = (vals.median() > .5)
+        above_half = vals.median() > 0.5
     if above_half:
-        return .5 + shift
-    else:
-        return .5 - shift
+        return 0.5 + shift
+    return 0.5 - shift
 
 
 def _tumor_boost(t_freqs, n_freqs):
@@ -178,13 +179,12 @@ def _tumor_boost(t_freqs, n_freqs):
 
     See: TumorBoost, Bengtsson et al. 2010
     """
-    lt_mask = (t_freqs < n_freqs)
+    lt_mask = t_freqs < n_freqs
     lt_idx = np.nonzero(lt_mask)[0]
     gt_idx = np.nonzero(~lt_mask)[0]
     out = pd.Series(np.zeros_like(t_freqs))
     out[lt_idx] = 0.5 * t_freqs.take(lt_idx) / n_freqs.take(lt_idx)
-    out[gt_idx] = 1 - 0.5 * (1 - t_freqs.take(gt_idx)
-                            ) / (1 - n_freqs.take(gt_idx))
+    out[gt_idx] = 1 - 0.5 * (1 - t_freqs.take(gt_idx)) / (1 - n_freqs.take(gt_idx))
     return out
 
 

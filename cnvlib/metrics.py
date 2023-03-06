@@ -10,6 +10,7 @@ def do_metrics(cnarrs, segments=None, skip_low=False): # todo: make this work in
     """Compute coverage deviations and other metrics for self-evaluation."""
     # Catch if passed args are single CopyNumArrays instead of lists
     from .cnary import CopyNumArray as CNA
+
     if isinstance(cnarrs, CNA):
         cnarrs = [cnarrs]
     if isinstance(segments, CNA):
@@ -20,10 +21,11 @@ def do_metrics(cnarrs, segments=None, skip_low=False): # todo: make this work in
         segments = list(segments)
     if skip_low:
         cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
-    rows = ((cna.meta.get("filename", cna.sample_id),
-             len(seg) if seg is not None else '-'
-            ) + ests_of_scale(cna.residuals(seg).values)
-            for cna, seg in zip_repeater(cnarrs, segments))
+    rows = (
+        (cna.meta.get("filename", cna.sample_id), len(seg) if seg is not None else "-")
+        + ests_of_scale(cna.residuals(seg).values)
+        for cna, seg in zip_repeater(cnarrs, segments)
+    )
     colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
     return pd.DataFrame.from_records(rows, columns=colnames)
 
@@ -41,8 +43,10 @@ def zip_repeater(iterable, repeatable):
             yield it, rpt
         # Require lengths to match
         if i + 1 != rpt_len:
-            raise ValueError("""Number of unsegmented and segmented input files
-                             did not match (%d vs. %d)""" % (i, rpt_len))
+            raise ValueError(
+                "Number of unsegmented and segmented input files did not match "
+                + f"({i} vs. {rpt_len})"
+            )
 
 
 def ests_of_scale(deviations):

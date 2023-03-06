@@ -17,6 +17,7 @@ class CopyNumArray(GenomicArray):
 
     Optional columns: gc, rmask, spread, weight, probes
     """
+
     _required_columns = ("chromosome", "start", "end", "gene", "log2")
     _required_dtypes = (str, int, int, str, float)
     # ENH: make gene optional
@@ -44,13 +45,14 @@ class CopyNumArray(GenomicArray):
 
         This is either "X" or "chrX".
         """
-        key = 'chr_x_label'
+        key = "chr_x_label"
         if key in self.meta:
             return self.meta[key]
         if len(self):
-            chr_x_label = ('chrX' if self.chromosome.iat[0].startswith('chr') else 'X')
+            chr_x_label = ("chrX" if self.chromosome.iat[0].startswith("chr") else "X")
             self.meta[key] = chr_x_label
             return chr_x_label
+        return ""
 
     def treat_par_on_chrx_as_autosomal(self, genome_build):
         self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY] = True
@@ -96,13 +98,13 @@ class CopyNumArray(GenomicArray):
 
     @property
     def _chr_y_label(self): # todo: consider adding a chr_y_filter for consistency
-        if 'chr_y' in self.meta:
-            return self.meta['chr_y']
+        if "chr_y" in self.meta:
+            return self.meta["chr_y"]
         if len(self):
-            chr_y = ('chrY' if self.chr_x_label.startswith('chr') else 'Y')
-            self.meta['chr_y'] = chr_y
+            chr_y = "chrY" if self.chr_x_label.startswith("chr") else "Y"
+            self.meta["chr_y"] = chr_y
             return chr_y
-        return ''
+        return ""
 
     # More meta to store:
     #   is_sample_male = bool
@@ -138,27 +140,32 @@ class CopyNumArray(GenomicArray):
             for gene, gene_idx in subgary._get_gene_map().items():
                 if gene not in ignore:
                     if not len(gene_idx):
-                        logging.warning("Specified gene name somehow missing: "
-                                        "%s", gene)
+                        logging.warning(
+                            "Specified gene name somehow missing: %s", gene
+                        )
                         continue
                     start_idx = gene_idx[0]
                     end_idx = gene_idx[-1] + 1
                     if prev_idx < start_idx:
                         # Include intergenic regions
                         yield params.ANTITARGET_NAME, subgary.as_dataframe(
-                                subgary.data.loc[prev_idx:start_idx])
+                            subgary.data.loc[prev_idx:start_idx]
+                        )
                     yield gene, subgary.as_dataframe(
-                            subgary.data.loc[start_idx:end_idx])
+                        subgary.data.loc[start_idx:end_idx]
+                    )
                     prev_idx = end_idx
             if prev_idx < len(subgary) - 1:
                 # Include the telomere
                 yield params.ANTITARGET_NAME, subgary.as_dataframe(
-                        subgary.data.loc[prev_idx:])
+                    subgary.data.loc[prev_idx:]
+                )
 
     # Manipulation
 
-    def center_all(self, estimator=pd.Series.median, by_chrom=True,
-                   skip_low=False, verbose=False):
+    def center_all(
+        self, estimator=pd.Series.median, by_chrom=True, skip_low=False, verbose=False
+    ):
         """Re-center log2 values to the autosomes' average (in-place).
 
         Parameters
@@ -186,21 +193,28 @@ class CopyNumArray(GenomicArray):
             if estimator in est_funcs:
                 estimator = est_funcs[estimator]
             else:
-                raise ValueError("Estimator must be a function or one of: %s"
-                                 % ", ".join(map(repr, est_funcs)))
-        cnarr = (self.drop_low_coverage(verbose=verbose) if skip_low else self
-                ).autosomes()
+                raise ValueError(
+                    "Estimator must be a function or one of: "
+                    + ", ".join(map(repr, est_funcs))
+                )
+        cnarr = (
+            self.drop_low_coverage(verbose=verbose) if skip_low else self
+        ).autosomes()
         if cnarr:
             if by_chrom:
-                values = pd.Series([estimator(subarr['log2'])
-                                    for _c, subarr in cnarr.by_chromosome()
-                                    if len(subarr)])
+                values = pd.Series(
+                    [
+                        estimator(subarr["log2"])
+                        for _c, subarr in cnarr.by_chromosome()
+                        if len(subarr)
+                    ]
+                )
             else:
-                values = cnarr['log2']
+                values = cnarr["log2"]
             shift = -estimator(values)
             if verbose:
                 logging.info("Shifting log2 values by %f", shift)
-            self.data['log2'] += shift
+            self.data["log2"] += shift
 
     def drop_low_coverage(self, verbose=False):
         """Drop bins with extremely low log2 coverage or copy ratio values.
@@ -210,16 +224,19 @@ class CopyNumArray(GenomicArray):
         substituted to avoid domain or divide-by-zero errors.
         """
         min_cvg = params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
-        drop_idx = self.data['log2'] < min_cvg
-        if 'depth' in self:
-            drop_idx |= self.data['depth'] == 0
+        drop_idx = self.data["log2"] < min_cvg
+        if "depth" in self:
+            drop_idx |= self.data["depth"] == 0
         if verbose and drop_idx.any():
-            logging.info("Dropped %d low-coverage bins",
-                         drop_idx.sum())
+            logging.info("Dropped %d low-coverage bins", drop_idx.sum())
         return self[~drop_idx]
 
-    def squash_genes(self, summary_func=descriptives.biweight_location,
-                     squash_antitarget=False, ignore=params.IGNORE_GENE_NAMES):
+    def squash_genes(
+        self,
+        summary_func=descriptives.biweight_location,
+        squash_antitarget=False,
+        ignore=params.IGNORE_GENE_NAMES,
+    ):
         """Combine consecutive bins with the same targeted gene name.
 
         Parameters
@@ -242,22 +259,23 @@ class CopyNumArray(GenomicArray):
             Another, usually smaller, copy of `self` with each gene's bins
             reduced to a single bin with appropriate values.
         """
+
         def squash_rows(name, rows):
             """Combine multiple rows (for the same gene) into one row."""
             if len(rows) == 1:
                 return tuple(rows.iloc[0])
-            chrom = core.check_unique(rows.chromosome, 'chromosome')
+            chrom = core.check_unique(rows.chromosome, "chromosome")
             start = rows.start.iat[0]
             end = rows.end.iat[-1]
             cvg = summary_func(rows.log2)
             outrow = [chrom, start, end, name, cvg]
             # Handle extra fields
             # ENH - no coverage stat; do weighted average as appropriate
-            for xfield in ('depth', 'gc', 'rmask', 'spread', 'weight'):
+            for xfield in ("depth", "gc", "rmask", "spread", "weight"):
                 if xfield in self:
                     outrow.append(summary_func(rows[xfield]))
-            if 'probes' in self:
-                outrow.append(sum(rows['probes']))
+            if "probes" in self:
+                outrow.append(sum(rows["probes"]))
             return tuple(outrow)
 
         outrows = []
@@ -284,11 +302,11 @@ class CopyNumArray(GenomicArray):
             is_xx = self.guess_xx(male_reference=male_reference)
         if is_xx and male_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
-            outprobes[outprobes.chromosome == self._chr_x_label, 'log2'] -= 1.0
+            outprobes[outprobes.chromosome == self._chr_x_label, "log2"] -= 1.0
             # Male: no change
         elif not is_xx and not male_reference:
             # Male: multiply X coverages by 2 (in log2: add 1)
-            outprobes[outprobes.chromosome == self._chr_x_label, 'log2'] += 1.0
+            outprobes[outprobes.chromosome == self._chr_x_label, "log2"] += 1.0
             # Female: no change
         return outprobes
 
@@ -316,14 +334,19 @@ class CopyNumArray(GenomicArray):
         is_xy, stats = self.compare_sex_chromosomes(male_reference)
         if is_xy is None:
             return None
-        elif verbose:
-            logging.info("Relative log2 coverage of %s=%.3g, %s=%.3g "
-                         "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
-                         self.chr_x_label, stats['chrx_ratio'],
-                         self._chr_y_label, stats['chry_ratio'],
-                         stats['chrx_male_lr'], stats['chry_male_lr'],
-                         stats['chrx_male_lr'] * stats['chry_male_lr'],
-                         'male' if is_xy else 'female')
+        if verbose:
+            logging.info(
+                "Relative log2 coverage of %s=%.3g, %s=%.3g "
+                "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
+                self.chr_x_label,
+                stats["chrx_ratio"],
+                self._chr_y_label,
+                stats["chry_ratio"],
+                stats["chrx_male_lr"],
+                stats["chry_male_lr"],
+                stats["chrx_male_lr"] * stats["chry_male_lr"],
+                "male" if is_xy else "female",
+            )
         return ~is_xy
 
     def compare_sex_chromosomes(self, male_reference=False, skip_low=False):
@@ -363,23 +386,25 @@ class CopyNumArray(GenomicArray):
 
         chrx = self[self.chrx_filter()]
         if not len(chrx):
-            logging.warning("No %s found in sample; is the input truncated?",
-                            self.chr_x_label)
+            logging.warning(
+                "No %s found in sample; is the input truncated?", self.chr_x_label
+            )
             return None, {}
 
         auto = self.autosomes()
         if skip_low:
             chrx = chrx.drop_low_coverage()
             auto = auto.drop_low_coverage()
-        auto_l = auto['log2'].values
-        use_weight = ('weight' in self)
-        auto_w = auto['weight'].values if use_weight else None
+        auto_l = auto["log2"].values
+        use_weight = "weight" in self
+        auto_w = auto["weight"].values if use_weight else None
 
         def compare_to_auto(vals, weights):
             # Mood's median test stat is chisq -- near 0 for similar median
             try:
-                stat, _p, _med, cont = median_test(auto_l, vals, ties='ignore',
-                                                   lambda_='log-likelihood')
+                stat, _p, _med, cont = median_test(
+                    auto_l, vals, ties="ignore", lambda_="log-likelihood"
+                )
             except ValueError:
                 # "All values are below the grand median (0.0)"
                 stat = None
@@ -388,8 +413,10 @@ class CopyNumArray(GenomicArray):
                     stat = None
             # In case Mood's test failed for either sex
             if use_weight:
-                med_diff = abs(descriptives.weighted_median(auto_l, auto_w) -
-                               descriptives.weighted_median(vals, weights))
+                med_diff = abs(
+                    descriptives.weighted_median(auto_l, auto_w)
+                    - descriptives.weighted_median(vals, weights)
+                )
             else:
                 med_diff = abs(np.median(auto_l) - np.median(vals))
             return (stat, med_diff)
@@ -411,18 +438,22 @@ class CopyNumArray(GenomicArray):
             return f_diff / max(m_diff, 0.01)
 
         female_x_shift, male_x_shift = (-1, 0) if male_reference else (0, +1)
-        chrx_male_lr = compare_chrom(chrx['log2'].values,
-                                     (chrx['weight'].values if use_weight
-                                      else None),
-                                     female_x_shift, male_x_shift)
+        chrx_male_lr = compare_chrom(
+            chrx["log2"].values,
+            (chrx["weight"].values if use_weight else None),
+            female_x_shift,
+            male_x_shift,
+        )
         combined_score = chrx_male_lr
         # Similar for chrY if it's present
         chry = self[self.chromosome == self._chr_y_label]
         if len(chry):
-            chry_male_lr = compare_chrom(chry['log2'].values,
-                                         (chry['weight'].values if use_weight
-                                          else None),
-                                         +3, 0)
+            chry_male_lr = compare_chrom(
+                chry["log2"].values,
+                (chry["weight"].values if use_weight else None),
+                +3,
+                0,
+            )
             if np.isfinite(chry_male_lr):
                 combined_score *= chry_male_lr
         else:
@@ -432,14 +463,17 @@ class CopyNumArray(GenomicArray):
         auto_mean = segment_mean(auto, skip_low=skip_low)
         chrx_mean = segment_mean(chrx, skip_low=skip_low)
         chry_mean = segment_mean(chry, skip_low=skip_low)
-        return (combined_score > 1.0,
-                dict(chrx_ratio=chrx_mean - auto_mean,
-                     chry_ratio=chry_mean - auto_mean,
-                     combined_score=combined_score,
-                     # For debugging, mainly
-                     chrx_male_lr=chrx_male_lr,
-                     chry_male_lr=chry_male_lr,
-                    ))
+        return (
+            combined_score > 1.0,
+            dict(
+                chrx_ratio=chrx_mean - auto_mean,
+                chry_ratio=chry_mean - auto_mean,
+                combined_score=combined_score,
+                # For debugging, mainly
+                chrx_male_lr=chrx_male_lr,
+                chry_male_lr=chry_male_lr,
+            ),
+        )
 
     def expect_flat_log2(self, is_male_reference=None):
         """Get the uninformed expected copy ratios of each bin.
@@ -454,8 +488,9 @@ class CopyNumArray(GenomicArray):
         cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
-            idx = ((self.chrx_filter()).values |
-                   (self.chromosome == self._chr_y_label).values)
+            idx = self.chrx_filter().values | (
+                self.chromosome == self._chr_y_label
+            ).values
         else:
             # Y will be all noise, so replace with 1 "flat" copy
             idx = (self.chromosome == self._chr_y_label).values
@@ -485,19 +520,26 @@ class CopyNumArray(GenomicArray):
             as `self`.
         """
         if not segments:
-            resids = [subcna.log2 - subcna.log2.median()
-                      for _chrom, subcna in self.by_chromosome()]
+            resids = [
+                subcna.log2 - subcna.log2.median()
+                for _chrom, subcna in self.by_chromosome()
+            ]
         elif "log2" in segments:
-            resids = [bins_lr - seg_lr
-                      for seg_lr, bins_lr in zip(
-                          segments['log2'],
-                          self.iter_ranges_of(segments, 'log2', mode='inner',
-                                              keep_empty=True))
-                      if len(bins_lr)]
+            resids = [
+                bins_lr - seg_lr
+                for seg_lr, bins_lr in zip(
+                    segments["log2"],
+                    self.iter_ranges_of(
+                        segments, "log2", mode="inner", keep_empty=True
+                    ),
+                )
+                if len(bins_lr)
+            ]
         else:
-            resids = [lr - lr.median()
-                      for lr in self.iter_ranges_of(segments, 'log2',
-                                                    keep_empty=False)]
+            resids = [
+                lr - lr.median()
+                for lr in self.iter_ranges_of(segments, "log2", keep_empty=False)
+            ]
         return pd.concat(resids) if resids else pd.Series([])
 
     def smooth_log2(self, bandwidth=None, by_arm=True):
@@ -512,22 +554,26 @@ class CopyNumArray(GenomicArray):
             Smoothed log2 values from `self`, the same length as `self`.
         """
         if bandwidth is None:
-            bandwidth = smoothing.guess_window_size(self.log2,
-                                                    weights=(self['weight']
-                                                             if 'weight' in self
-                                                             else None))
+            bandwidth = smoothing.guess_window_size(
+                self.log2, weights=(self["weight"] if "weight" in self else None)
+            )
 
         if by_arm:
             parts = self.by_arm()
         else:
             parts = self.by_chromosome()
-        if 'weight' in self:
-            out = [smoothing.savgol(subcna['log2'].values, bandwidth,
-                                    weights=subcna['weight'].values)
-                   for _chrom, subcna in parts]
+        if "weight" in self:
+            out = [
+                smoothing.savgol(
+                    subcna["log2"].values, bandwidth, weights=subcna["weight"].values
+                )
+                for _chrom, subcna in parts
+            ]
         else:
-            out = [smoothing.savgol(subcna['log2'].values, bandwidth)
-                   for _chrom, subcna in parts]
+            out = [
+                smoothing.savgol(subcna["log2"].values, bandwidth)
+                for _chrom, subcna in parts
+            ]
         return np.concatenate(out)
 
     def _guess_average_depth(self, segments=None, window=100):
