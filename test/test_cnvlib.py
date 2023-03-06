@@ -47,11 +47,11 @@ class CNATests(unittest.TestCase):
 
     def test_basic(self):
         """Test basic container functionality and magic methods."""
-        cna = cnvlib.read("formats/reference-tr.cnn")
+        cna = cnvlib.read("formats/reference-tr.cnn", None)
         # Length
         self.assertEqual(len(cna), linecount("formats/reference-tr.cnn") - 1)
         # Equality
-        same = cnvlib.read("formats/reference-tr.cnn")
+        same = cnvlib.read("formats/reference-tr.cnn", None)
         self.assertEqual(cna, same)
         # Item access
         orig = cna[0]
@@ -63,7 +63,7 @@ class CNATests(unittest.TestCase):
 
     def test_center_all(self):
         """Test recentering."""
-        cna = cnvlib.read("formats/reference-tr.cnn")
+        cna = cnvlib.read("formats/reference-tr.cnn", None)
         # Median-centering an already median-centered array -> no change
         chr1 = cna.in_range("chr1")
         self.assertAlmostEqual(0, np.median(chr1["log2"]), places=1)
@@ -83,7 +83,7 @@ class CNATests(unittest.TestCase):
 
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""
-        cna = cnvlib.read("formats/reference-tr.cnn")
+        cna = cnvlib.read("formats/reference-tr.cnn", None)
         self.assertIn("gc", cna)
         cleaned = cna.drop_extra_columns()
         self.assertNotIn("gc", cleaned)
@@ -101,7 +101,7 @@ class CNATests(unittest.TestCase):
             ("formats/tr95t.cns", True, True),
             ("formats/reference-tr.cnn", False, False),
         ):
-            guess = cnvlib.read(fname).guess_xx(ref_is_m)
+            guess = cnvlib.read(fname, None).guess_xx(ref_is_m)
             self.assertEqual(
                 guess,
                 sample_is_f,
@@ -109,8 +109,8 @@ class CNATests(unittest.TestCase):
             )
 
     def test_residuals(self):
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segments = cnvlib.read("formats/amplicon.cns")
+        cnarr = cnvlib.read("formats/amplicon.cnr", None)
+        segments = cnvlib.read("formats/amplicon.cns", None)
         regions = GenomicArray(segments.data).drop_extra_columns()
         for grouping_arg in (None, segments, regions):
             resid = cnarr.residuals(grouping_arg)
@@ -125,7 +125,7 @@ class CNATests(unittest.TestCase):
             "formats/p2-20_1.cnr",
             "formats/p2-20_2.cnr",
         ]:
-            cnarr = cnvlib.read(fname)
+            cnarr = cnvlib.read(fname, None)
             orig_vals = cnarr.log2.values.copy()
             signal = cnarr.smooth_log2()
             self.assertTrue((orig_vals == cnarr.log2.values).all())

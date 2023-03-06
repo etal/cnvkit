@@ -64,7 +64,7 @@ class GaryTests(unittest.TestCase):
 
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
-            cnarr = read(fname)
+            cnarr = read(fname, None)
             row_count = 0
             for _chrom, rows in cnarr.by_chromosome():
                 row_count += len(rows)
@@ -81,8 +81,8 @@ class GaryTests(unittest.TestCase):
 
     def test_ranges_by_in(self):
         """Test range methods: by_ranges, in_range, in_ranges."""
-        cnarr = read("formats/amplicon.cnr")
-        segarr = read("formats/amplicon.cns")
+        cnarr = read("formats/amplicon.cnr", None)
+        segarr = read("formats/amplicon.cns", None)
         chrom_segarr = dict(segarr.by_chromosome())
         for chrom, subarr in cnarr.by_chromosome():
             count_segs = 0
@@ -139,8 +139,8 @@ class GaryTests(unittest.TestCase):
             )
 
     def test_ranges_into(self):
-        cnarr = read("formats/amplicon.cnr")
-        segarr = read("formats/amplicon.cns")
+        cnarr = read("formats/amplicon.cnr", None)
+        segarr = read("formats/amplicon.cns", None)
         seg_genes = cnarr.into_ranges(segarr, "gene", "-")
         self.assertEqual(len(seg_genes), len(segarr))
         # With a VCF
@@ -155,8 +155,8 @@ class GaryTests(unittest.TestCase):
         mtarr.into_ranges(segarr, "end", 0, 0)
 
     def test_ranges_of(self):
-        cnarr = read("formats/amplicon.cnr")
-        segarr = read("formats/amplicon.cns")
+        cnarr = read("formats/amplicon.cnr", None)
+        segarr = read("formats/amplicon.cns", None)
         by_bins = cnarr.by_ranges(segarr)
         by_slices = cnarr.iter_ranges_of(segarr, "gene")
         for (_seg, by_bin), by_slice in zip(by_bins, by_slices):
