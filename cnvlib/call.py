@@ -155,7 +155,8 @@ def absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
     df = absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_female)
 
-    return df['absolute']
+    return df["absolute"]
+
 
 def absolute_pure(cnarr, ploidy, is_reference_male):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
@@ -168,9 +169,16 @@ def absolute_pure(cnarr, ploidy, is_reference_male):
 
 def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_female):
     """Absolute, expected and reference copy number in a DataFrame."""
-    df = get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, is_sample_female)
-    df['absolute'] = df.apply(lambda row: _log2_ratio_to_absolute(row['log2'], row['reference'], row['expect'], purity), axis=1)
-    return df[['absolute', 'expect', 'reference']]
+    df = get_as_dframe_and_set_reference_and_expect_copies(
+        cnarr, ploidy, is_reference_male, is_sample_female
+    )
+    df["absolute"] = df.apply(
+        lambda row: _log2_ratio_to_absolute(
+            row["log2"], row["reference"], row["expect"], purity
+        ),
+        axis=1,
+    )
+    return df[["absolute", "expect", "reference"]]
 
 
 def absolute_expect(cnarr, ploidy, is_sample_female):
@@ -204,7 +212,9 @@ def absolute_reference(cnarr, ploidy, is_reference_male):
     return ref_copies
 
 
-def get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, is_sample_female):
+def get_as_dframe_and_set_reference_and_expect_copies(
+    cnarr, ploidy, is_reference_male, is_sample_female
+):
     """Determine the number copies of a chromosome expected and in reference.
 
     For sex chromosomes, these values may not be the same ploidy as the
@@ -226,11 +236,15 @@ def get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_referenc
     df["reference"] = np.repeat(ploidy, len(df))
     df["expect"] = np.repeat(ploidy, len(df))
 
-    df.loc[df.chromosome == "chrX", "reference"] = (ploidy // 2 if is_reference_male else ploidy)
-    df.loc[df.chromosome == "chrX", "expect"] = (ploidy if is_sample_female else ploidy // 2)
+    df.loc[df.chromosome == "chrX", "reference"] = (
+        ploidy // 2 if is_reference_male else ploidy
+    )
+    df.loc[df.chromosome == "chrX", "expect"] = (
+        ploidy if is_sample_female else ploidy // 2
+    )
 
     df.loc[df.chromosome == "chrY", "reference"] = ploidy // 2
-    df.loc[df.chromosome == "chrY", "expect"] = (0 if is_sample_female else ploidy // 2)
+    df.loc[df.chromosome == "chrY", "expect"] = 0 if is_sample_female else ploidy // 2
     return df
 
 
