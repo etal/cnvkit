@@ -584,7 +584,9 @@ def fasta_extract_regions(fa_fname, intervals):
     Input: FASTA file name; iterable of (seq_id, start, end) (1-based)
     Output: iterable of string sequences.
     """
-    with pyfaidx.Fasta(fa_fname, as_raw=True) as fa_file:
+    # TODO: add this as optional parameter to `reference` command.
+    rebuild = False
+    with pyfaidx.Fasta(fa_fname, as_raw=True, rebuild=rebuild) as fa_file:
         for chrom, subarr in intervals.by_chromosome():
             logging.info("Extracting sequences from chromosome %s", chrom)
             for _chrom, start, end in subarr.coords():
