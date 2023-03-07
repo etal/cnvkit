@@ -41,7 +41,7 @@ class CNATests(unittest.TestCase):
         auto_with_par_on_chrx = ex_cnr.autosomes()
         len_par = ex_cnr.par_on_chrx_filter().sum()
         self.assertEqual(len_par, 25)
-        self.assertEquals(len(auto_with_par_on_chrx), len(auto) + len_par)
+        self.assertEqual(len(auto_with_par_on_chrx), len(auto) + len_par)
 
         # todo: add test par + other also
 
