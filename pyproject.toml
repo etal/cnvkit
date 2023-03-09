@@ -5,10 +5,10 @@ readme = "README.rst"
 #license = "Apache-2.0"
 license = {text = "Apache-2.0"}
 authors = [
-  {name = "Eric Talevich", email = "etal@users.noreply.github.com"}
+  {name = "Eric Talevich", email = "me+code@etal.mozmail.com"}
 ]
 maintainers = [
-  {name = "Eric Talevich", email = "etal@users.noreply.github.com"}
+  {name = "Eric Talevich", email = "me+code@etal.mozmail.com"}
 ]
 classifiers = [
   "Development Status :: 4 - Beta",

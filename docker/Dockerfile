@@ -1,5 +1,5 @@
 FROM ubuntu:rolling
-MAINTAINER Eric Talevich <eric.talevich@ucsf.edu>
+MAINTAINER Eric Talevich <me+code@etal.mozmail.com>
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y \
