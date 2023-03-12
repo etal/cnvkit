@@ -18,8 +18,8 @@ class CopyNumArray(GenomicArray):
     Optional columns: gc, rmask, spread, weight, probes
     """
 
-    _required_columns = ("chromosome", "start", "end", "gene", "log2")
-    _required_dtypes = (str, int, int, str, float)
+    _required_columns = ("chromosome", "start", "end", "gene", "log2")  # type: ignore
+    _required_dtypes = (str, int, int, str, float)  # type: ignore
     # ENH: make gene optional
     # Extra columns, in order:
     # "depth", "gc", "rmask", "spread", "weight", "probes"
