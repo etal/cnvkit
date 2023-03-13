@@ -7,6 +7,7 @@ becomes None.
 """
 import collections
 import re
+from typing import Sequence, Union
 
 Region = collections.namedtuple("Region", "chromosome start end")
 NamedRegion = collections.namedtuple("NamedRegion", "chromosome start end gene")
@@ -14,7 +15,7 @@ NamedRegion = collections.namedtuple("NamedRegion", "chromosome start end gene")
 re_label = re.compile(r"(\w[\w.]*)?:(\d+)?-(\d+)?\s*(\S+)?")
 
 
-def from_label(text, keep_gene=True):
+def from_label(text: str, keep_gene: bool = True) -> Union[Region, NamedRegion]:
     """Parse a chromosomal range specification.
 
     Parameters
@@ -23,6 +24,9 @@ def from_label(text, keep_gene=True):
         Range specification, which should look like ``chr1:1234-5678`` or
         ``chr1:1234-`` or ``chr1:-5678``, where missing start becomes 0 and
         missing end becomes None.
+    keep_gene : bool
+        If True, include gene names as a 4th field where available; otherwise return a
+        3-field Region of chromosomal coordinates without gene labels.
     """
     match = re_label.match(text)
     if not match:
@@ -39,12 +43,12 @@ def from_label(text, keep_gene=True):
     return Region(chrom, start, end)
 
 
-def to_label(row):
-    """Convert a Region or (chrom, start, end) tuple to a region label."""
+def to_label(row: Region) -> str:
+    """Convert a Region tuple to a region label."""
     return f"{row.chromosome}:{row.start + 1}-{row.end}"
 
 
-def unpack_range(a_range):
+def unpack_range(a_range: Union[str, Sequence]) -> Region:
     """Extract chromosome, start, end from a string or tuple.
 
     Examples::
@@ -57,11 +61,11 @@ def unpack_range(a_range):
         return Region(None, None, None)
     if isinstance(a_range, str):
         if ":" in a_range and "-" in a_range:
-            return from_label(a_range, keep_gene=False)
+            return from_label(a_range, keep_gene=False)  # type: ignore
         return Region(a_range, None, None)
     if isinstance(a_range, (list, tuple)):
         if len(a_range) == 3:
             return Region(*a_range)
         if len(a_range) == 4:
             return Region(*a_range[:3])
-    raise ValueError("Not a range: %r" % a_range)
+    raise ValueError(f"Not a range: {a_range!r}")
