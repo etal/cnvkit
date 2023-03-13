@@ -13,14 +13,16 @@ import pandas as pd
 from .merge import merge
 
 
-def subdivide(table, avg_size, min_size=0, verbose=False):
+def subdivide(
+    table, avg_size: int, min_size: int = 0, verbose: bool = False
+) -> pd.DataFrame:
     """Split `table` rows into sub-regions of about `avg_size`."""
     return pd.DataFrame.from_records(
         _split_targets(table, avg_size, min_size, verbose), columns=table.columns
     )
 
 
-def _split_targets(regions, avg_size, min_size, verbose):
+def _split_targets(regions, avg_size: int, min_size: int, verbose: bool):
     """Split large regions into smaller, consecutive regions.
 
     Output bin metadata and additional columns match the input dataframe.
