@@ -37,11 +37,19 @@ class CNATests(unittest.TestCase):
         self.assertEqual(some_x_len, 3)
         auto_and_some_x = ex_cnr.autosomes(also=some_x)
         self.assertEqual(len(auto_and_some_x), len(auto) + some_x_len)
+
+        l = ex_cnr.par_on_chrx_filter().sum()
+        self.assertEqual(l, 0, "By default, PAR on chromosome X cannot be filtered for.")
+
         ex_cnr.treat_par_on_chrx_as_autosomal(genome_build='b38')
         auto_with_par_on_chrx = ex_cnr.autosomes()
         len_par = ex_cnr.par_on_chrx_filter().sum()
         self.assertEqual(len_par, 25)
         self.assertEqual(len(auto_with_par_on_chrx), len(auto) + len_par)
+
+        ex_cnr.include_par_on_chrx()
+        new_auto = ex_cnr.autosomes()
+        self.assertNotEqual(len(new_auto), len(auto_with_par_on_chrx), "The CNA can be reset and PAR is within X again.")
 
         # todo: add test par + other also
 

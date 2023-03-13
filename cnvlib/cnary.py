@@ -70,8 +70,8 @@ class CopyNumArray(GenomicArray):
         return (self.chromosome == self.chr_x_label) & (~self.par_on_chrx_filter())
 
     def par_on_chrx_filter(self):
-        if not self.is_par_on_chrx_treated_as_autosomal:
-            return False
+        if not self.meta[self._GENOME_BUILD_KEY]:
+            return np.repeat(False, len(self))
         par1_start = params.PAR1_X_GRCH38_START
         par1_end = params.PAR1_X_GRCH38_END
         par2_start = params.PAR2_X_GRCH38_START
