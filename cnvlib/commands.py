@@ -86,11 +86,14 @@ AP = argparse.ArgumentParser(
 AP.set_defaults(func=lambda args: AP.print_help())
 AP_subparsers = AP.add_subparsers(help="Sub-commands (use with -h for more info)")
 
+
 # Shared parameters
 def add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P):
-    P.add_argument('--treat-par-on-chrx-as-autosomal-for-genome-build',
-                    type=str,
-                    help='todo')
+    P.add_argument(
+        "--treat-par-on-chrx-as-autosomal-for-genome-build",
+        type=str,
+        help="Treat the PAR of human chromosome X as autosomal using its known reference genome coordinates.",
+    )
 
 
 # _____________________________________________________________________________
