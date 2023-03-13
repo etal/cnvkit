@@ -1,11 +1,12 @@
 """Operations on chromosome/contig/sequence names."""
+from typing import Iterable, Tuple
 from itertools import takewhile
 
 import numpy as np
 import pandas as pd
 
 
-def detect_big_chroms(sizes):
+def detect_big_chroms(sizes: Iterable[int]) -> Tuple[int, int]:
     """Determine the number of "big" chromosomes from their lengths.
 
     In the human genome, this returns 24, where the canonical chromosomes 1-22,
@@ -32,7 +33,7 @@ def detect_big_chroms(sizes):
     return n_big, thresh
 
 
-def sorter_chrom(label):
+def sorter_chrom(label: str) -> Tuple[int, str]:
     """Create a sorting key from chromosome label.
 
     Sort by integers first, then letters or strings. The prefix "chr"
