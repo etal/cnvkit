@@ -24,12 +24,12 @@ class CopyNumArray(GenomicArray):
     # Extra columns, in order:
     # "depth", "gc", "rmask", "spread", "weight", "probes"
 
-    _CONSIDER_PARX_ALWAYS_DIPLOID_KEY = 'par-on-x-diploid'
-    _GENOME_BUILD_KEY = 'genome-build'
+    _CONSIDER_PARX_ALWAYS_DIPLOID_KEY = "par-on-x-diploid"
+    _GENOME_BUILD_KEY = "genome-build"
+    _ALLOWED_GENOME_BUILDS = ["grch37", "grch38"]
 
     def __init__(self, data_table, meta_dict=None):
         GenomicArray.__init__(self, data_table, meta_dict)
-        self.include_par_on_chrx() # todo: make this a mandatory parameter that one has to decide upon
 
     @property
     def log2(self):
@@ -41,7 +41,7 @@ class CopyNumArray(GenomicArray):
 
     @property
     def chr_x_label(self):
-        """ The name of the X chromosome.
+        """The name of the X chromosome.
 
         This is either "X" or "chrX".
         """
@@ -49,40 +49,53 @@ class CopyNumArray(GenomicArray):
         if key in self.meta:
             return self.meta[key]
         if len(self):
-            chr_x_label = ("chrX" if self.chromosome.iat[0].startswith("chr") else "X")
+            chr_x_label = "chrX" if self.chromosome.iat[0].startswith("chr") else "X"
             self.meta[key] = chr_x_label
             return chr_x_label
         return ""
 
     def treat_par_on_chrx_as_autosomal(self, genome_build):
+        self.set_genome_build(genome_build)
         self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY] = True
-        self.meta[self._GENOME_BUILD_KEY] = genome_build
 
-    def include_par_on_chrx(self):
+    def do_not_treat_par_on_chrx_as_autosomal(self):
         self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY] = False
-        self.meta[self._GENOME_BUILD_KEY] = None
 
     @property
     def is_par_on_chrx_treated_as_autosomal(self):
-        return self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY]
+        return self.meta.get(self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY, False)
+
+    def set_genome_build(self, genome_build):
+        genome_build = genome_build.lower()
+        assert genome_build in self._ALLOWED_GENOME_BUILDS, f"Unknown genome build '{genome_build}'!"
+        self.meta[self._GENOME_BUILD_KEY] = genome_build
+
+    @property
+    def genome_build(self):
+        return self.meta.get(self._GENOME_BUILD_KEY, None)
 
     def chrx_filter(self):
-        return (self.chromosome == self.chr_x_label) & (~self.par_on_chrx_filter())
+        x = self.chromosome == self.chr_x_label
+        if self.is_par_on_chrx_treated_as_autosomal:
+            x &= ~self.par_on_chrx_filter()  # exclude PAR
+        return x
 
     def par_on_chrx_filter(self):
-        if not self.meta[self._GENOME_BUILD_KEY]:
-            return np.repeat(False, len(self))
-        par1_start = params.PAR1_X_GRCH38_START
-        par1_end = params.PAR1_X_GRCH38_END
-        par2_start = params.PAR2_X_GRCH38_START
-        par2_end = params.PAR2_X_GRCH38_END
-        if self.meta[self._GENOME_BUILD_KEY] == 'b37':
+        assert self.genome_build is not None, "No genome build set!"
+        if self.genome_build == "grch38":
+            par1_start = params.PAR1_X_GRCH38_START
+            par1_end = params.PAR1_X_GRCH38_END
+            par2_start = params.PAR2_X_GRCH38_START
+            par2_end = params.PAR2_X_GRCH38_END
+        elif self.genome_build == "grch37":
             par1_start = params.PAR1_X_GRCH37_START
             par1_end = params.PAR1_X_GRCH37_END
             par2_start = params.PAR2_X_GRCH37_START
             par2_end = params.PAR2_X_GRCH37_END
         f = self.chromosome == self.chr_x_label
-        f &= (((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end)))
+        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | (
+            (self.start >= par2_start) & (self.end <= par2_end)
+        )
         return f
 
     def autosomes(self, also=None):
@@ -97,7 +110,7 @@ class CopyNumArray(GenomicArray):
         return super().autosomes(also=also)
 
     @property
-    def _chr_y_label(self): # todo: consider adding a chr_y_filter for consistency
+    def _chr_y_label(self):  # todo: consider adding a chr_y_filter for consistency
         if "chr_y" in self.meta:
             return self.meta["chr_y"]
         if len(self):

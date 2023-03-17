@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """Unit tests for the CNVkit library, cnvlib."""
+import logging
 import unittest
 
-import logging
+from cnvlib.cnary import CopyNumArray
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -16,7 +17,11 @@ import numpy as np
 from skgenome import GenomicArray, tabio
 
 import cnvlib
-from cnvlib import cnary, core, fix, smoothing, vary, read
+from cnvlib import fix
+
+
+def read(*args, **kwargs) -> CopyNumArray:
+    return cnvlib.read(*args, **kwargs)
 
 
 class CNATests(unittest.TestCase):
@@ -27,29 +32,58 @@ class CNATests(unittest.TestCase):
         cnarr = cnvlib.read("formats/empty", None)
         self.assertEqual(len(cnarr), 0)
 
+    def test_set_genome_build(self):
+        ex_cnr = read("formats/reference-tr.cnn", None)
+        self.assertEqual(ex_cnr.genome_build, None, "By default, the genome build is None.")
+        self.assertRaises(Exception, ex_cnr.set_genome_build, "doesnt-exist")
+        ex_cnr.set_genome_build("grch38")
+        self.assertEqual(ex_cnr.genome_build, "grch38", "The genome build can be set.")
+        ex_cnr.set_genome_build("GRCh38")
+        self.assertEqual(ex_cnr.genome_build, "grch38", "The genome build is converted to lower case.")
+
+    def test_par_and_chrx_filter(self):
+        ex_cnr = read("formats/reference-tr.cnn", None)
+        self.assertFalse(
+            ex_cnr.is_par_on_chrx_treated_as_autosomal,
+            "By default, chromosome X contains PAR1/2.",
+        )
+        true_len_literal_x = 1325
+        literal_x = ex_cnr.chromosome == "chrX"
+        self.assertEqual(sum(literal_x), true_len_literal_x)
+        filter_x = ex_cnr.chrx_filter()
+        self.assertEqual(
+            sum(filter_x),
+            true_len_literal_x,
+            "By default, the filter on chr X returns all of X.",
+        )
+        self.assertRaises(AssertionError, ex_cnr.par_on_chrx_filter)  # By default, the PAR filter cannot be invoked.
+
+        ex_cnr.treat_par_on_chrx_as_autosomal("grch38")
+        par_on_x = ex_cnr.par_on_chrx_filter()
+        self.assertEqual(sum(par_on_x), 25, "Once the genome is set, PAR1/2 can be filtered for.")
+
     def test_autosomes(self):
         """Test selection of autosomes specific to CNA. """
 
-        ex_cnr = read('formats/reference-tr.cnn', None)
+        ex_cnr = read("formats/reference-tr.cnn", None)
         auto = ex_cnr.autosomes()
-        some_x = (ex_cnr.chromosome == 'chrX') & (ex_cnr.end <= 434918)
+        some_x = (ex_cnr.chromosome == "chrX") & (ex_cnr.end <= 434918)
         some_x_len = some_x.sum()
         self.assertEqual(some_x_len, 3)
         auto_and_some_x = ex_cnr.autosomes(also=some_x)
         self.assertEqual(len(auto_and_some_x), len(auto) + some_x_len)
 
-        l = ex_cnr.par_on_chrx_filter().sum()
-        self.assertEqual(l, 0, "By default, PAR on chromosome X cannot be filtered for.")
-
-        ex_cnr.treat_par_on_chrx_as_autosomal(genome_build='b38')
+        ex_cnr.treat_par_on_chrx_as_autosomal(genome_build="grch38")
         auto_with_par_on_chrx = ex_cnr.autosomes()
         len_par = ex_cnr.par_on_chrx_filter().sum()
         self.assertEqual(len_par, 25)
         self.assertEqual(len(auto_with_par_on_chrx), len(auto) + len_par)
 
-        ex_cnr.include_par_on_chrx()
+        ex_cnr.do_not_treat_par_on_chrx_as_autosomal()
         new_auto = ex_cnr.autosomes()
-        self.assertNotEqual(len(new_auto), len(auto_with_par_on_chrx), "The CNA can be reset and PAR is within X again.")
+        self.assertNotEqual(
+            len(new_auto), len(auto_with_par_on_chrx), "The CNA can be reset and PAR is within X again."
+        )
 
         # todo: add test par + other also
 
