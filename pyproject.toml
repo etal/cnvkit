@@ -27,7 +27,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Medical Science Apps.",
   "Topic :: Scientific/Engineering :: Visualization"
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
