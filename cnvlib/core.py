@@ -17,22 +17,20 @@ def call_quiet(*args):
     command logs unimportant stuff to stderr. If there is an error, then the
     full error message(s) is shown in the exception message.
     """
-    # args = map(str, args)
     if not len(args):
         raise ValueError("Must supply at least one argument (the command name)")
     try:
-        proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.run(args, check=True, capture_output=True)
     except OSError as exc:
         raise RuntimeError(
             f"Could not find the executable {args[0]!r} -- is it installed correctly?"
             f"\n(Original error: {exc})"
         ) from exc
-    out, err = proc.communicate()
-    if proc.returncode != 0:
+    except subprocess.CalledProcessError as exc:
         raise RuntimeError(
-            "Subprocess command failed:\n$ %s\n\n%s" % (" ".join(args), err)
-        )
-    return out
+            f"Subprocess command failed:\n$ {' '.join(args)}\n\n{exc}"
+        ) from exc
+    return proc.stdout
 
 
 def ensure_path(fname):
