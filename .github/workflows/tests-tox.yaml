@@ -58,7 +58,7 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       - name: Cache mypy
         if: matrix.tox == 'typing'
-        uses: actions/cache
+        uses: actions/cache@v3
         with:
           path: ./.mypy_cache
           key: mypy|${{ matrix.python }}|${{ hashFiles('pyproject.toml') }}
