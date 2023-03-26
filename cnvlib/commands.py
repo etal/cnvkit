@@ -287,8 +287,6 @@ P_batch.add_argument(
             to specify a non-default R installation. [Default: %(default)s]""",
 )
 add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_batch)
-P_batch.set_defaults(func=_cmd_batch)
-
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group("To construct a new copy number reference")
@@ -389,6 +387,7 @@ P_batch_report.add_argument(
     help="Create an ideogram of copy ratios on chromosomes as a PDF.",
 )
 
+P_batch.set_defaults(func=_cmd_batch)
 
 
 # target ----------------------------------------------------------------------
