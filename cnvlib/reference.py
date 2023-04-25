@@ -45,7 +45,7 @@ def bed2probes(bed_fname):
     table["gene"] = regions.data["gene"] if "gene" in regions.data else "-"
     table["log2"] = 0.0
     table["spread"] = 0.0
-    return CNA(table, {"sample_id": core.fbase(bed_fname)}) # todo: find all invocations of CNA() and forward param
+    return CNA(table, {"sample_id": core.fbase(bed_fname)})
 
 
 def do_reference(
@@ -53,7 +53,6 @@ def do_reference(
     antitarget_fnames=None,
     fa_fname=None,
     male_reference=False,
-    treat_par_on_chrx_as_autosomal_for_genome_build=None,
     female_samples=None,
     do_gc=True,
     do_edge=True,
@@ -78,9 +77,9 @@ def do_reference(
         # empty files, in which case no inference can be done. Since targets are
         # guaranteed to exist, infer from those first, then replace those
         # values where antitargets are suitable.
-        sexes = infer_sexes(target_fnames, False, treat_par_on_chrx_as_autosomal_for_genome_build)
+        sexes = infer_sexes(target_fnames, False)
         if antitarget_fnames:
-            a_sexes = infer_sexes(antitarget_fnames, False, treat_par_on_chrx_as_autosomal_for_genome_build)
+            a_sexes = infer_sexes(antitarget_fnames, False)
             for sid, a_is_xx in a_sexes.items():
                 t_is_xx = sexes.get(sid)
                 if t_is_xx is None:
@@ -104,7 +103,6 @@ def do_reference(
         antitarget_fnames,
         fa_fname,
         male_reference,
-        treat_par_on_chrx_as_autosomal_for_genome_build,
         sexes,
         do_gc,
         do_edge,
@@ -116,7 +114,7 @@ def do_reference(
     return ref_probes
 
 
-def infer_sexes(cnn_fnames, is_haploid_x, treat_par_on_chrx_as_autosomal_for_genome_build):
+def infer_sexes(cnn_fnames, is_haploid_x):
     """Map sample IDs to inferred chromosomal sex, where possible.
 
     For samples where the source file is empty or does not include either sex
@@ -124,7 +122,7 @@ def infer_sexes(cnn_fnames, is_haploid_x, treat_par_on_chrx_as_autosomal_for_gen
     """
     sexes = {}
     for fname in cnn_fnames:
-        cnarr = read_cna(fname, treat_par_on_chrx_as_autosomal_for_genome_build)
+        cnarr = read_cna(fname)
         if cnarr:
             is_xx = cnarr.guess_xx(is_haploid_x)
             if is_xx is not None:
@@ -137,7 +135,6 @@ def combine_probes(
     antitarget_fnames,
     fa_fname,
     is_haploid_x,
-    treat_par_on_chrx_as_autosomal_for_genome_build,
     sexes,
     fix_gc,
     fix_edge,
@@ -173,7 +170,7 @@ def combine_probes(
     # do_edge  = as given for target; False for antitarget
     # do_rmask  = False for target; as given for antitarget
     ref_df, all_logr, all_depths = load_sample_block(
-        filenames, fa_fname, is_haploid_x, treat_par_on_chrx_as_autosomal_for_genome_build, sexes, True, fix_gc, fix_edge, False
+        filenames, fa_fname, is_haploid_x, sexes, True, fix_gc, fix_edge, False
     )
     if antitarget_fnames:
         # XXX TODO ensure ordering matches targets!
@@ -182,7 +179,6 @@ def combine_probes(
             antitarget_fnames,
             fa_fname,
             is_haploid_x,
-            treat_par_on_chrx_as_autosomal_for_genome_build,
             sexes,
             False,
             fix_gc,
@@ -230,7 +226,7 @@ def combine_probes(
 
 
 def load_sample_block(
-    filenames, fa_fname, is_haploid_x, treat_par_on_chrx_as_autosomal_for_genome_build, sexes, skip_low, fix_gc, fix_edge, fix_rmask
+    filenames, fa_fname, is_haploid_x, sexes, skip_low, fix_gc, fix_edge, fix_rmask
 ):
     r"""Load and summarize a pool of \*coverage.cnn files.
 
@@ -254,7 +250,7 @@ def load_sample_block(
 
     # Load coverage from target/antitarget files
     logging.info("Loading %s", filenames[0])
-    cnarr1 = read_cna(filenames[0], treat_par_on_chrx_as_autosomal_for_genome_build)
+    cnarr1 = read_cna(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
         col_names = ["chromosome", "start", "end", "gene", "log2", "depth"]
@@ -311,9 +307,9 @@ def load_sample_block(
     ]
 
     # Load only coverage depths from the remaining samples
-    procs = 1 # TODO: Add as param
+    procs = 1  # TODO: Add as param
     with futures.ProcessPoolExecutor(procs) as pool:
-        args_iter = ((fname, treat_par_on_chrx_as_autosomal_for_genome_build, cnarr1, filenames[0], ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low) for fname in filenames[1:])
+        args_iter = ((fname, cnarr1, filenames[0], ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low) for fname in filenames[1:])
         for depths, logr in pool.map(_parallel_bias_correct_logr, args_iter):
             all_depths.append(depths)
             all_logr.append(logr)
@@ -324,9 +320,9 @@ def load_sample_block(
 
 def _parallel_bias_correct_logr(args):
     """Wrapper for parallel."""
-    fname, treat_par_on_chrx_as_autosomal_for_genome_build, cnarr1, fname1, ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low = args
+    fname, cnarr1, fname1, ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low = args
     logging.info("Loading %s", fname)
-    cnarrx = read_cna(fname, treat_par_on_chrx_as_autosomal_for_genome_build)
+    cnarrx = read_cna(fname)
     # Bin information should match across all files
     if not np.array_equal(
             cnarr1.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values,

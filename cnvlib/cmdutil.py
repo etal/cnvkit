@@ -8,17 +8,14 @@ from .cnary import CopyNumArray as CNA
 from skgenome import GenomicArray as GA
 
 # todo: check all invocations of read/read_cna and make sure the parameter is forwarded.
-def read_cna(infile, treat_par_on_chrx_as_autosomal_for_genome_build, into=CNA, sample_id=None, meta=None):
+def read_cna(infile, sample_id=None, meta=None):
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a CopyNumArray object."""
-    cna = tabio.read(infile, into=into, sample_id=sample_id, meta=meta)
-    if treat_par_on_chrx_as_autosomal_for_genome_build is not None:
-        cna.treat_par_on_chrx_as_autosomal(treat_par_on_chrx_as_autosomal_for_genome_build)
-    return cna
+    return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)
 
 
 def read_ga(infile, sample_id=None, meta=None):
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a GenomicArray (!) object."""
-    return read_cna(infile, None, GA, sample_id, meta)
+    return tabio.read(infile, into=GA, sample_id=sample_id, meta=meta)
 
 
 def load_het_snps(

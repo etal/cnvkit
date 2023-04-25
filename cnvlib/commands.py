@@ -50,6 +50,7 @@ from . import (
     import_rna,
     importers,
     metrics,
+    mparams,
     parallel,
     reference,
     reports,
@@ -87,13 +88,28 @@ AP.set_defaults(func=lambda args: AP.print_help())
 AP_subparsers = AP.add_subparsers(help="Sub-commands (use with -h for more info)")
 
 
+# _____________________________________________________________________________
 # Shared parameters
-def add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P):
+def add_argument_genome_build(P):
     P.add_argument(
-        "--treat-par-on-chrx-as-autosomal-for-genome-build",
+        "--genome-build",
         type=str,
-        help="Treat the PAR of human chromosome X as autosomal using its known reference genome coordinates.",
+        help="Define the genome build ('GRCh38', ...) for this run.",
     )
+def add_argument_treat_par_on_chrx_as_autosomal(P):
+    P.add_argument(
+        "--treat-par-on-chrx-as-autosomal",
+        action="store_true",
+        help="Treat the PAR of human chromosome X as autosomal. Implies --genome-build",
+    )
+
+# _____________________________________________________________________________
+# Shared functions for shared parameters
+def handle_par_on_chrx(args):
+    if args.genome_build is not None:
+        mparams.set_genome_build(args.genome_build)
+    if args.treat_par_on_chrx_as_autosomal is True:
+        mparams.treat_par_on_chrx_as_autosomal(args.treat_par_on_chrx_as_autosomal)
 
 
 # _____________________________________________________________________________
@@ -105,6 +121,7 @@ def add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P):
 def _cmd_batch(args):
     """Run the complete CNVkit pipeline on one or more BAM files."""
     logging.info("CNVkit %s", __version__)
+    handle_par_on_chrx(args)
     # Validate/restrict options, beyond what argparse mutual exclusion can do
     bad_args_msg = ""
     if args.reference:
@@ -161,7 +178,6 @@ def _cmd_batch(args):
             args.targets,
             args.antitargets,
             args.male_reference,
-            args.treat_par_on_chrx_as_autosomal_for_genome_build,
             args.fasta,
             args.annotate,
             args.short_names,
@@ -209,7 +225,6 @@ def _cmd_batch(args):
                     args.reference,
                     args.output_dir,
                     args.male_reference,
-                    args.treat_par_on_chrx_as_autosomal_for_genome_build,
                     args.scatter,
                     args.diagram,
                     args.rscript_path,
@@ -286,7 +301,9 @@ P_batch.add_argument(
     help="""Path to the Rscript excecutable to use for running R code. Use this option
             to specify a non-default R installation. [Default: %(default)s]""",
 )
-add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_batch)
+add_argument_genome_build(P_batch)
+add_argument_treat_par_on_chrx_as_autosomal(P_batch)
+
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group("To construct a new copy number reference")
@@ -775,7 +792,6 @@ P_coverage.add_argument(
 )
 P_coverage.set_defaults(func=_cmd_coverage)
 
-
 # reference -------------------------------------------------------------------
 
 do_reference = public(reference.do_reference)
@@ -785,6 +801,7 @@ do_reference_flat = public(reference.do_reference_flat)
 def _cmd_reference(args):
     """Compile a coverage reference from the given files (normal samples)."""
     usage_err_msg = "Give .cnn samples OR targets and (optionally) antitargets."
+    handle_par_on_chrx(args)
     if args.targets:
         # Flat reference
         assert not args.references, usage_err_msg
@@ -821,7 +838,6 @@ def _cmd_reference(args):
             antitargets,
             args.fasta,
             args.male_reference,
-            args.treat_par_on_chrx_as_autosomal_for_genome_build,
             female_samples,
             args.do_gc,
             args.do_edge,
@@ -881,7 +897,8 @@ P_reference.add_argument(
             the reference chrX average is -1. Otherwise, shift male samples' chrX by +1,
             so the reference chrX average is 0.""",
 )
-add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_reference)
+add_argument_genome_build(P_reference)
+add_argument_treat_par_on_chrx_as_autosomal(P_reference)
 
 P_reference_flat = P_reference.add_argument_group(
     'To construct a generic, "flat" copy number reference with neutral '
@@ -926,9 +943,10 @@ def _cmd_fix(args):
     Adjust raw coverage data according to the given reference, correct potential
     biases and re-center.
     """
+    handle_par_on_chrx(args)
     # Verify that target and antitarget are from the same sample
-    tgt_raw = read_cna(args.target, args.treat_par_on_chrx_as_autosomal_for_genome_build, sample_id=args.sample_id)
-    anti_raw = read_cna(args.antitarget, args.treat_par_on_chrx_as_autosomal_for_genome_build, sample_id=args.sample_id)
+    tgt_raw = read_cna(args.target, sample_id=args.sample_id)
+    anti_raw = read_cna(args.antitarget, sample_id=args.sample_id)
     if len(anti_raw) and tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError(
             "Sample IDs do not match: "
@@ -937,7 +955,7 @@ def _cmd_fix(args):
     target_table = fix.do_fix(
         tgt_raw,
         anti_raw,
-        read_cna(args.reference, args.treat_par_on_chrx_as_autosomal_for_genome_build),
+        read_cna(args.reference),
         args.do_gc,
         args.do_edge,
         args.do_rmask,
@@ -987,7 +1005,8 @@ P_fix.add_argument(
     help="Skip RepeatMasker correction.",
 )
 P_fix.add_argument("-o", "--output", metavar="FILENAME", help="Output file name.")
-add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_fix)
+add_argument_genome_build(P_fix)
+add_argument_treat_par_on_chrx_as_autosomal(P_fix)
 P_fix.set_defaults(func=_cmd_fix)
 
 
@@ -998,7 +1017,8 @@ do_segmentation = public(segmentation.do_segmentation)
 
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
-    cnarr = read_cna(args.filename, args.treat_par_on_chrx_as_autosomal_for_genome_build)
+    handle_par_on_chrx(args)
+    cnarr = read_cna(args.filename)
     variants = load_het_snps(
         args.vcf,
         args.sample_id,
@@ -1139,7 +1159,8 @@ P_segment_vcf.add_argument(
     help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
             frequencies. [Default if used without a number: %(const)s]""",
 )
-add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_segment)
+add_argument_genome_build(P_segment)
+add_argument_treat_par_on_chrx_as_autosomal(P_segment)
 
 P_segment.set_defaults(func=_cmd_segment)
 
@@ -1154,7 +1175,7 @@ def _cmd_call(args):
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
-    cnarr = read_cna(args.filename) # todo: check all invocations and fwd param
+    cnarr = read_cna(args.filename)
     if args.center_at:
         logging.info("Shifting log2 ratios by %f", -args.center_at)
         cnarr["log2"] -= args.center_at
@@ -1971,7 +1992,8 @@ do_gainloss = public(do_genemetrics)
 
 def _cmd_sex(args):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
-    cnarrs = [read_cna(fname, args.treat_par_on_chrx_as_autosomal_for_genome_build) for fname in args.filenames]
+    handle_par_on_chrx(args)
+    cnarrs = [read_cna(fname) for fname in args.filenames]
     table = do_sex(cnarrs, args.male_reference)
     write_dataframe(args.output, table, header=True)
 
@@ -2012,7 +2034,8 @@ P_sex.add_argument(
             have +1 log-coverage of chrX; otherwise male samples would have -1 chrX).""",
 )
 P_sex.add_argument("-o", "--output", metavar="FILENAME", help="Output table file name.")
-add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_sex)
+add_argument_genome_build(P_sex)
+add_argument_treat_par_on_chrx_as_autosomal(P_sex)
 P_sex.set_defaults(func=_cmd_sex)
 
 # Shims
@@ -2027,6 +2050,7 @@ do_metrics = public(metrics.do_metrics)
 
 def _cmd_metrics(args):
     """Compute coverage deviations and other metrics for self-evaluation."""
+    handle_par_on_chrx(args)
     if (
         len(args.cnarrays) > 1
         and args.segments
@@ -2070,7 +2094,8 @@ P_metrics.add_argument(
 P_metrics.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output table file name."
 )
-add_argument_treat_par_on_chrx_as_autosomal_for_genome_build(P_metrics)
+add_argument_genome_build(P_metrics)
+add_argument_treat_par_on_chrx_as_autosomal(P_metrics)
 P_metrics.set_defaults(func=_cmd_metrics)
 
 

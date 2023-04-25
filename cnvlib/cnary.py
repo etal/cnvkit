@@ -4,9 +4,9 @@ import logging
 import numpy as np
 import pandas as pd
 from scipy.stats import median_test
-from skgenome import GenomicArray
 
-from . import core, descriptives, params, smoothing
+from skgenome import GenomicArray
+from . import core, descriptives, params, smoothing, mparams
 from .segmetrics import segment_mean
 
 
@@ -23,10 +23,6 @@ class CopyNumArray(GenomicArray):
     # ENH: make gene optional
     # Extra columns, in order:
     # "depth", "gc", "rmask", "spread", "weight", "probes"
-
-    _CONSIDER_PARX_ALWAYS_DIPLOID_KEY = "par-on-x-diploid"
-    _GENOME_BUILD_KEY = "genome-build"
-    _ALLOWED_GENOME_BUILDS = ["grch37", "grch38"]
 
     def __init__(self, data_table, meta_dict=None):
         GenomicArray.__init__(self, data_table, meta_dict)
@@ -54,53 +50,25 @@ class CopyNumArray(GenomicArray):
             return chr_x_label
         return ""
 
-    def treat_par_on_chrx_as_autosomal(self, genome_build):
-        self.set_genome_build(genome_build)
-        self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY] = True
-
-    def do_not_treat_par_on_chrx_as_autosomal(self):
-        self.meta[self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY] = False
-
-    @property
-    def is_par_on_chrx_treated_as_autosomal(self):
-        return self.meta.get(self._CONSIDER_PARX_ALWAYS_DIPLOID_KEY, False)
-
-    def set_genome_build(self, genome_build):
-        genome_build = genome_build.lower()
-        assert genome_build in self._ALLOWED_GENOME_BUILDS, f"Unknown genome build '{genome_build}'!"
-        self.meta[self._GENOME_BUILD_KEY] = genome_build
-
-    @property
-    def genome_build(self):
-        return self.meta.get(self._GENOME_BUILD_KEY, None)
 
     def chrx_filter(self):
         x = self.chromosome == self.chr_x_label
-        if self.is_par_on_chrx_treated_as_autosomal:
+        if mparams.TREAT_PAR_ON_CHRX_AS_AUTOSOMAL is True:
             x &= ~self.par_on_chrx_filter()  # exclude PAR
         return x
 
+
     def par_on_chrx_filter(self):
-        assert self.genome_build is not None, "No genome build set!"
-        if self.genome_build == "grch38":
-            par1_start = params.PAR1_X_GRCH38_START
-            par1_end = params.PAR1_X_GRCH38_END
-            par2_start = params.PAR2_X_GRCH38_START
-            par2_end = params.PAR2_X_GRCH38_END
-        elif self.genome_build == "grch37":
-            par1_start = params.PAR1_X_GRCH37_START
-            par1_end = params.PAR1_X_GRCH37_END
-            par2_start = params.PAR2_X_GRCH37_START
-            par2_end = params.PAR2_X_GRCH37_END
+        assert mparams.PAR1_END is not None, "No PAR defined!"
         f = self.chromosome == self.chr_x_label
-        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | (
-            (self.start >= par2_start) & (self.end <= par2_end)
+        f &= ((self.start >= mparams.PAR1_START) & (self.end <= mparams.PAR1_END)) | (
+            (self.start >= mparams.PAR2_START) & (self.end <= mparams.PAR2_END)
         )
         return f
 
     def autosomes(self, also=None):
         """Overrides GenomeArray.autosomes()."""
-        if self.is_par_on_chrx_treated_as_autosomal:
+        if mparams.TREAT_PAR_ON_CHRX_AS_AUTOSOMAL is True:
             if also is None:
                 also = self.par_on_chrx_filter()
             elif isinstance(also, pd.Series):
