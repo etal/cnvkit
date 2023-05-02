@@ -9,6 +9,8 @@ import os
 import sys
 import warnings
 
+from .cnary import CopyNumArray
+
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
@@ -50,7 +52,6 @@ from . import (
     import_rna,
     importers,
     metrics,
-    mparams,
     parallel,
     reference,
     reports,
@@ -90,26 +91,20 @@ AP_subparsers = AP.add_subparsers(help="Sub-commands (use with -h for more info)
 
 # _____________________________________________________________________________
 # Shared parameters
-def add_argument_genome_build(P):
+def add_diploid_parx_genome(P):
     P.add_argument(
-        "--genome-build",
+        "--diploid-parx-genome",
         type=str,
-        help="Define the genome build ('GRCh38', ...) for this run.",
+        help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
     )
-def add_argument_treat_par_on_chrx_as_autosomal(P):
-    P.add_argument(
-        "--treat-par-on-chrx-as-autosomal",
-        action="store_true",
-        help="Treat the PAR of human chromosome X as autosomal. Implies --genome-build",
-    )
-
 # _____________________________________________________________________________
 # Shared functions for shared parameters
 def handle_par_on_chrx(args):
-    if args.genome_build is not None:
-        mparams.set_genome_build(args.genome_build)
+    #if args.genome_build is not None:
+    #    mparams.set_genome_build(args.genome_build)
     if args.treat_par_on_chrx_as_autosomal is True:
-        mparams.treat_par_on_chrx_as_autosomal(args.treat_par_on_chrx_as_autosomal)
+        CopyNumArray.treat_par_on_chrx_as_autosomal(True, args.genome_build)
+        #mparams.treat_par_on_chrx_as_autosomal(args.treat_par_on_chrx_as_autosomal)
 
 
 # _____________________________________________________________________________
@@ -235,6 +230,7 @@ def _cmd_batch(args):
                     procs_per_bam,
                     args.cluster,
                     args.fasta,
+                    args.diploid_parx_genome,
                 )
     else:
         logging.info(
@@ -301,8 +297,7 @@ P_batch.add_argument(
     help="""Path to the Rscript excecutable to use for running R code. Use this option
             to specify a non-default R installation. [Default: %(default)s]""",
 )
-add_argument_genome_build(P_batch)
-add_argument_treat_par_on_chrx_as_autosomal(P_batch)
+add_diploid_parx_genome(P_batch)
 
 
 # Reference-building options
@@ -801,7 +796,6 @@ do_reference_flat = public(reference.do_reference_flat)
 def _cmd_reference(args):
     """Compile a coverage reference from the given files (normal samples)."""
     usage_err_msg = "Give .cnn samples OR targets and (optionally) antitargets."
-    handle_par_on_chrx(args)
     if args.targets:
         # Flat reference
         assert not args.references, usage_err_msg
@@ -897,8 +891,7 @@ P_reference.add_argument(
             the reference chrX average is -1. Otherwise, shift male samples' chrX by +1,
             so the reference chrX average is 0.""",
 )
-add_argument_genome_build(P_reference)
-add_argument_treat_par_on_chrx_as_autosomal(P_reference)
+add_diploid_parx_genome(P_reference)
 
 P_reference_flat = P_reference.add_argument_group(
     'To construct a generic, "flat" copy number reference with neutral '
@@ -1005,8 +998,7 @@ P_fix.add_argument(
     help="Skip RepeatMasker correction.",
 )
 P_fix.add_argument("-o", "--output", metavar="FILENAME", help="Output file name.")
-add_argument_genome_build(P_fix)
-add_argument_treat_par_on_chrx_as_autosomal(P_fix)
+add_diploid_parx_genome(P_fix)
 P_fix.set_defaults(func=_cmd_fix)
 
 
@@ -1159,8 +1151,7 @@ P_segment_vcf.add_argument(
     help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
             frequencies. [Default if used without a number: %(const)s]""",
 )
-add_argument_genome_build(P_segment)
-add_argument_treat_par_on_chrx_as_autosomal(P_segment)
+add_diploid_parx_genome(P_segment)
 
 P_segment.set_defaults(func=_cmd_segment)
 
@@ -1174,13 +1165,14 @@ def _cmd_call(args):
     """Call copy number variants from segmented log2 ratios."""
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
+    diploid_parx_genome = get_diploid_parx_genome_from_args(args)
 
     cnarr = read_cna(args.filename)
     if args.center_at:
         logging.info("Shifting log2 ratios by %f", -args.center_at)
         cnarr["log2"] -= args.center_at
     elif args.center:
-        cnarr.center_all(args.center, skip_low=args.drop_low_coverage, verbose=True)
+        cnarr.center_all(args.center, skip_low=args.drop_low_coverage, verbose=True, diploid_parx_genome=diploid_parx_genome)
 
     varr = load_het_snps(
         args.vcf,
@@ -1190,7 +1182,7 @@ def _cmd_call(args):
         args.zygosity_freq,
     )
     is_sample_female = (
-        verify_sample_sex(cnarr, args.sample_sex, args.male_reference)
+        verify_sample_sex(cnarr, args.sample_sex, args.male_reference, diploid_parx_genome)
         if args.purity and args.purity < 1.0
         else None
     )
@@ -1367,7 +1359,7 @@ def _cmd_diagram(args):
     segarr = read_cna(args.segment) if args.segment else None
     if args.adjust_xy:
         is_sample_female = verify_sample_sex(
-            cnarr or segarr, args.sample_sex, args.male_reference
+            cnarr or segarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
         )
         if cnarr:
             cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
@@ -1657,9 +1649,9 @@ def _cmd_heatmap(args):
         cnarr = read_cna(fname)
         if args.adjust_xy:
             is_sample_female = verify_sample_sex(
-                cnarr, args.sample_sex, args.male_reference
+                cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
             )
-            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
+            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female, args.diploid_parx_genome)
         cnarrs.append(cnarr)
     heatmap.do_heatmap(
         cnarrs,
@@ -1804,7 +1796,7 @@ def _cmd_genemetrics(args):
     """Identify targeted genes with copy number gain or loss."""
     cnarr = read_cna(args.filename)
     segarr = read_cna(args.segment) if args.segment else None
-    is_sample_female = verify_sample_sex(cnarr, args.sample_sex, args.male_reference)
+    is_sample_female = verify_sample_sex(cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
     # TODO use the stats args
     table = do_genemetrics(
         cnarr,
@@ -1814,6 +1806,7 @@ def _cmd_genemetrics(args):
         args.drop_low_coverage,
         args.male_reference,
         is_sample_female,
+        args.diploid_parx_genome,
     )
     logging.info("Found %d gene-level gains and losses", len(table))
     write_dataframe(args.output, table)
@@ -1874,6 +1867,7 @@ P_genemetrics.add_argument(
 P_genemetrics.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output table file name."
 )
+add_diploid_parx_genome(P_genemetrics)
 
 P_genemetrics_stats = P_genemetrics.add_argument_group("Statistics available")
 # Location statistics
@@ -1999,7 +1993,7 @@ def _cmd_sex(args):
 
 
 @public
-def do_sex(cnarrs, is_male_reference):
+def do_sex(cnarrs, is_male_reference, diploid_parx_genome):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
 
     def strsign(num):
@@ -2008,7 +2002,7 @@ def do_sex(cnarrs, is_male_reference):
         return "%.3g" % num
 
     def guess_and_format(cna):
-        is_xy, stats = cna.compare_sex_chromosomes(is_male_reference)
+        is_xy, stats = cna.compare_sex_chromosomes(is_male_reference, diploid_parx_genome)
         return (
             cna.meta["filename"] or cna.sample_id,
             "Male" if is_xy else "Female",
@@ -2034,8 +2028,7 @@ P_sex.add_argument(
             have +1 log-coverage of chrX; otherwise male samples would have -1 chrX).""",
 )
 P_sex.add_argument("-o", "--output", metavar="FILENAME", help="Output table file name.")
-add_argument_genome_build(P_sex)
-add_argument_treat_par_on_chrx_as_autosomal(P_sex)
+add_diploid_parx_genome(P_sex)
 P_sex.set_defaults(func=_cmd_sex)
 
 # Shims
@@ -2094,8 +2087,7 @@ P_metrics.add_argument(
 P_metrics.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output table file name."
 )
-add_argument_genome_build(P_metrics)
-add_argument_treat_par_on_chrx_as_autosomal(P_metrics)
+add_diploid_parx_genome(P_metrics)
 P_metrics.set_defaults(func=_cmd_metrics)
 
 
@@ -2573,7 +2565,7 @@ def _cmd_export_bed(args):
         segments = read_cna(segfname)
         # ENH: args.sample_sex as a comma-separated list
         is_sample_female = verify_sample_sex(
-            segments, args.sample_sex, args.male_reference
+            segments, args.sample_sex, args.male_reference, args.diploid_parx_genome
         )
         if args.sample_id:
             label = args.sample_id
@@ -2693,7 +2685,7 @@ def _cmd_export_vcf(args):
     """
     segarr = read_cna(args.segments)
     cnarr = read_cna(args.cnr) if args.cnr else None
-    is_sample_female = verify_sample_sex(segarr, args.sample_sex, args.male_reference)
+    is_sample_female = verify_sample_sex(segarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
     header, body = export.export_vcf(
         segarr,
         args.ploidy,

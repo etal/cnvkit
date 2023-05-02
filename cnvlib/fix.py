@@ -15,16 +15,17 @@ def do_fix(
     do_edge=True,
     do_rmask=True,
     do_cluster=False,
+    diploid_parx_genome=None,
 ):
     """Combine target and antitarget coverages and correct for biases."""
     # Load, recenter and GC-correct target & antitarget probes separately
     logging.info("Processing target: %s", target_raw.sample_id)
     cnarr, ref_matched = load_adjust_coverages(
-        target_raw, reference, True, do_gc, do_edge, False
+        target_raw, reference, True, do_gc, do_edge, False, diploid_parx_genome
     )
     logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
     anti_cnarr, ref_anti = load_adjust_coverages(
-        antitarget_raw, reference, False, do_gc, False, do_rmask
+        antitarget_raw, reference, False, do_gc, False, do_rmask, diploid_parx_genome
     )
     if len(anti_cnarr):
         # Combine target and antitarget bins
@@ -66,11 +67,11 @@ def do_fix(
     # (Subtract the reference log2 copy number to get the log2 ratio)
     cnarr.data["log2"] -= ref_matched[log2_key]
     cnarr = apply_weights(cnarr, ref_matched, log2_key, spread_key)
-    cnarr.center_all(skip_low=True)
+    cnarr.center_all(skip_low=True, diploid_parx_genome=diploid_parx_genome)
     return cnarr
 
 
-def load_adjust_coverages(cnarr, ref_cnarr, skip_low, fix_gc, fix_edge, fix_rmask):
+def load_adjust_coverages(cnarr, ref_cnarr, skip_low, fix_gc, fix_edge, fix_rmask, diploid_parx_genome):
     """Load and filter probe coverages; correct using reference and GC."""
     if "gc" in cnarr:
         # Don't choke on Picard-derived files that have the GC column
@@ -89,7 +90,7 @@ def load_adjust_coverages(cnarr, ref_cnarr, skip_low, fix_gc, fix_edge, fix_rmas
     ref_matched = ref_matched[ok_cvg_indices]
 
     # Apply corrections for known systematic biases in coverage
-    cnarr.center_all(skip_low=skip_low)
+    cnarr.center_all(skip_low=skip_low, diploid_parx_genome=diploid_parx_genome)
     # Skip bias corrections if most bins have no coverage (e.g. user error)
     if (
         cnarr["log2"] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE

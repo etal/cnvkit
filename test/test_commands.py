@@ -4,6 +4,8 @@ import unittest
 
 import logging
 
+from cnvlib.cnary import CopyNumArray
+
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 # unittest/pomegranate 0.10.0: ImportWarning: can't resolve package from
@@ -332,6 +334,96 @@ class CommandTests(unittest.TestCase):
                 is_sample_female=sample_is_f,
             )
             test_chrom_means(cns_p99)
+            
+    def test_call_get_as_dframe_and_set_reference_and_expect_copies(self):
+        irrelevant_gene_name = "whatever"
+        irrelevant_log2_value = 0.0
+        ploidy = 2
+        cnarr = CopyNumArray.from_rows(
+            [
+                ["1", 123456, 456789, irrelevant_gene_name, irrelevant_log2_value],
+                ["X", 15000, 20000, irrelevant_gene_name, irrelevant_log2_value],  # PAR1
+                ["X", 4000000, 5000000, irrelevant_gene_name, irrelevant_log2_value],
+                ["Y", 4000000, 5000000, irrelevant_gene_name, irrelevant_log2_value],
+            ]
+        )
+        # "grch38": [10001, 2781479, 155701383, 156030895],
+
+        def _get(is_reference_male, is_sample_female, diploid_parx_genome=None):
+            return call.get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, is_sample_female, diploid_parx_genome)
+
+        def _assert(df, iloc, reference, expect):
+            self.assertTrue('reference' in df.columns)
+            self.assertTrue('expect' in df.columns)
+            r = df.iloc[iloc]
+            self.assertEqual(r.reference, reference)
+            self.assertEqual(r.expect, expect)
+
+        def _assert_chr1(df):
+            _assert(df, 0, 2, 2)
+
+        def _assert_chrx_par(df, reference, expect):
+            _assert(df, 1, reference, expect)
+
+        def _assert_chrx_non_par(df, reference, expect):
+            _assert(df, 2, reference, expect)
+
+        def _assert_chry(df, reference, expect):
+            _assert(df, 3, reference, expect)
+
+        is_male_reference = True
+        is_female_sample = True
+        df = _get(is_male_reference, is_female_sample)
+        _assert_chr1(df)
+        _assert_chrx_par(df, 1, 2)
+        _assert_chrx_non_par(df, 1, 2)
+        _assert_chry(df, 1, 0)
+        df = _get(is_male_reference, is_female_sample, "grch38")
+        _assert_chr1(df)
+        _assert_chrx_par(df, 2, 2)
+        _assert_chrx_non_par(df, 1, 2)
+        _assert_chry(df, 1, 0)
+
+        is_male_reference = True
+        is_female_sample = False
+        df = _get(is_male_reference, is_female_sample)
+        _assert_chr1(df)
+        _assert_chrx_par(df, 1, 1)
+        _assert_chrx_non_par(df, 1, 1)
+        _assert_chry(df, 1, 1)
+        df = _get(is_male_reference, is_female_sample, "grch38")
+        _assert_chr1(df)
+        _assert_chrx_par(df, 2, 2)
+        _assert_chrx_non_par(df, 1, 1)
+        _assert_chry(df, 1, 1)
+
+        is_male_reference = False
+        is_female_sample = True
+        df = _get(is_male_reference, is_female_sample)
+        _assert_chr1(df)
+        _assert_chrx_par(df, 2, 2)
+        _assert_chrx_non_par(df, 2, 2)
+        _assert_chry(df, 1, 0)  # Do we really want ref=1 for a female ref on chr y?
+        df = _get(is_male_reference, is_female_sample, "grch38")
+        _assert_chr1(df)
+        _assert_chrx_par(df, 2, 2)
+        _assert_chrx_non_par(df, 2, 2)
+        _assert_chry(df, 1, 0)  # Do we really want ref=1 for a female ref on chr y?
+
+        # no specific par handling, female reference, male sample
+        is_male_reference = False
+        is_female_sample = False
+        df = _get(is_male_reference, is_female_sample)
+        _assert_chr1(df)
+        _assert_chrx_par(df, 2, 1)
+        _assert_chrx_non_par(df, 2, 1)
+        _assert_chry(df, 1, 1)
+        df = _get(is_male_reference, is_female_sample, "grch38")
+        _assert_chr1(df)
+        _assert_chrx_par(df, 2, 2)
+        _assert_chrx_non_par(df, 2, 1)
+        _assert_chry(df, 1, 1)
+
 
     def _get_true_copy_numbers(self):
         """Returns a dict with the values to check against."""

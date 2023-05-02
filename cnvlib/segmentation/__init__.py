@@ -126,6 +126,7 @@ def _ds(args):
 def _do_segmentation(
     cnarr,
     method,
+    diploid_parx_genome,
     threshold,
     variants=None,
     skip_low=False,
@@ -177,7 +178,7 @@ def _do_segmentation(
         segarr = none.segment_none(filtered_cn)
 
     elif method.startswith("hmm"):
-        segarr = hmm.segment_hmm(filtered_cn, method, threshold, variants)
+        segarr = hmm.segment_hmm(filtered_cn, method, diploid_parx_genome)
 
     elif method in ("cbs", "flasso"):
         # Run R scripts to calculate copy number segments

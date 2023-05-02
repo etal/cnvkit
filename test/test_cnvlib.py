@@ -38,16 +38,16 @@ class CNATests(unittest.TestCase):
         true_len_literal_x = 10967  # all regions on X
         literal_x = ex_cnr.chromosome == "X"
         self.assertEqual(sum(literal_x), true_len_literal_x)
-        filter_x = ex_cnr.chrx_filter()
+        filter_x = ex_cnr.chr_x_filter()
         self.assertEqual(
             sum(filter_x),
             true_len_literal_x,
             "By default, the filter on chr X returns all of X.",
         )
-        self.assertRaises(AssertionError, ex_cnr.par_on_chrx_filter)  # By default, the PAR filter cannot be invoked.
+        self.assertRaises(AssertionError, ex_cnr.parx_filter)  # By default, the PAR filter cannot be invoked.
 
         mparams.set_genome_build("grch37")
-        par_on_x = ex_cnr.par_on_chrx_filter()
+        par_on_x = ex_cnr.parx_filter()
         self.assertEqual(sum(par_on_x), 201, "Once the genome is set, PAR1/2 can be filtered for.")
 
         par1_overlapping_region_index = 205
@@ -70,6 +70,7 @@ class CNATests(unittest.TestCase):
 
     def test_autosomes(self):
         """Test selection of autosomes specific to CNA. """
+        # todo: fix me
 
         ex_cnr = read("formats/reference-tr.cnn", None)
         auto = ex_cnr.autosomes()
@@ -110,6 +111,7 @@ class CNATests(unittest.TestCase):
         self.assertEqual(cna[3:6], same[3:6])
 
     def test_center_all(self):
+        # todo: add test?
         """Test recentering."""
         cna = cnvlib.read("formats/reference-tr.cnn", None)
         # Median-centering an already median-centered array -> no change
@@ -138,6 +140,7 @@ class CNATests(unittest.TestCase):
         self.assertTrue((cleaned["log2"] == cna["log2"]).all())
 
     def test_guess_xx(self):
+        # todo: add test
         """Guess chromosomal sex from chrX log2 ratio value."""
         for (fname, sample_is_f, ref_is_m) in (
             ("formats/f-on-f.cns", True, False),
@@ -179,6 +182,18 @@ class CNATests(unittest.TestCase):
             self.assertTrue((orig_vals == cnarr.log2.values).all())
             self.assertGreaterEqual(signal.min(), cnarr.log2.min())
             self.assertLessEqual(signal.max(), cnarr.log2.max())
+
+class SettingsTests(unittest.TestCase):
+
+    def test_genome_build(self):
+        pass
+        #settings.ys
+        #self.assertEqual(ex_cnr.genome_build, None, "By default, the genome build is None.")
+        #self.assertRaises(Exception, ex_cnr.set_genome_build, "doesnt-exist")
+        #ex_cnr.set_genome_build("grch38")
+        #self.assertEqual(ex_cnr.genome_build, "grch38", "The genome build can be set.")
+        #ex_cnr.set_genome_build("GRCh38")
+        #self.assertEqual(ex_cnr.genome_build, "grch38", "The genome build is converted to lower case.")
 
 
 class OtherTests(unittest.TestCase):

@@ -30,6 +30,7 @@ def batch_make_reference(
     target_bed,
     antitarget_bed,
     male_reference,
+    diploid_parx_genome,
     fasta,
     annotate,
     short_names,
@@ -197,6 +198,7 @@ def batch_make_reference(
             antitarget_fnames,
             fasta,
             male_reference,
+            diploid_parx_genome,
             None,
             do_gc=True,
             do_edge=(method == "hybrid"),
@@ -234,6 +236,7 @@ def batch_run_sample(
     processes,
     do_cluster,
     fasta=None,
+    diploid_parx_genome=None,
 ):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
@@ -289,7 +292,7 @@ def batch_run_sample(
         cnarr, seg_call, location_stats=["p_ttest"], skip_low=skip_low
     )
     # Finally, assign absolute copy number values to each segment
-    seg_alltest.center_all("median")
+    seg_alltest.center_all("median", diploid_parx_genome=diploid_parx_genome)
     seg_final = call.do_call(seg_alltest, method="threshold")
     tabio.write(seg_final, sample_pfx + ".call.cns")
 
@@ -303,11 +306,11 @@ def batch_run_sample(
         logging.info("Wrote %s-scatter.png", sample_pfx)
 
     if plot_diagram:
-        is_xx = cnarr.guess_xx(male_reference)
+        is_xx = cnarr.guess_xx(male_reference, diploid_parx_genome)
         outfname = sample_pfx + "-diagram.pdf"
         diagram.create_diagram(
-            cnarr.shift_xx(male_reference, is_xx),
-            seg_final.shift_xx(male_reference, is_xx),
+            cnarr.shift_xx(male_reference, is_xx, diploid_parx_genome),
+            seg_final.shift_xx(male_reference, is_xx, diploid_parx_genome),
             0.5,
             3,
             outfname,

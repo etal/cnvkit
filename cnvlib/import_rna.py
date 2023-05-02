@@ -17,6 +17,7 @@ def do_import_rna(
     do_gc=True,
     do_txlen=True,
     max_log2=3,
+    diploid_parx_genome=None,
 ):
     """Convert a cohort of per-gene read counts to CNVkit .cnr format.
 
@@ -52,7 +53,7 @@ def do_import_rna(
     all_data = pd.concat([gene_info, sample_data_log2], axis=1)
     # CNVkit files have both absolute and log2-normalized read counts
     cnrs = rna.attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info)
-    cnrs = (rna.correct_cnr(cnr, do_gc, do_txlen, max_log2) for cnr in cnrs)
+    cnrs = (rna.correct_cnr(cnr, do_gc, do_txlen, max_log2, diploid_parx_genome) for cnr in cnrs)
     return all_data, cnrs
 
 

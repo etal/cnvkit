@@ -63,8 +63,8 @@ def load_het_snps(
     return varr
 
 
-def verify_sample_sex(cnarr, sex_arg, is_male_reference):
-    is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
+def verify_sample_sex(cnarr, sex_arg, is_male_reference, diploid_parx_genome):
+    is_sample_female = cnarr.guess_xx(is_male_reference, diploid_parx_genome, verbose=False)
     if sex_arg:
         is_sample_female_given = sex_arg.lower() not in ["y", "m", "male"]
         if is_sample_female != is_sample_female_given:

@@ -13,7 +13,7 @@ from .cmdutil import read_cna
 from .cnary import CopyNumArray as CNA
 
 
-def do_reference_flat(targets, antitargets=None, fa_fname=None, male_reference=False):
+def do_reference_flat(targets, antitargets=None, fa_fname=None, male_reference=False, diploid_parx_genome=None):
     """Compile a neutral-coverage reference from the given intervals.
 
     Combines the intervals, shifts chrX values if requested, and calculates GC
@@ -23,7 +23,7 @@ def do_reference_flat(targets, antitargets=None, fa_fname=None, male_reference=F
     if antitargets:
         ref_probes.add(bed2probes(antitargets))
     # Set sex chromosomes by "reference" sex
-    ref_probes["log2"] = ref_probes.expect_flat_log2(male_reference)
+    ref_probes["log2"] = ref_probes.expect_flat_log2(male_reference, diploid_parx_genome)
     ref_probes["depth"] = np.exp2(ref_probes["log2"])  # Shim
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
@@ -53,6 +53,7 @@ def do_reference(
     antitarget_fnames=None,
     fa_fname=None,
     male_reference=False,
+    diploid_parx_genome=None,
     female_samples=None,
     do_gc=True,
     do_edge=True,
@@ -77,9 +78,9 @@ def do_reference(
         # empty files, in which case no inference can be done. Since targets are
         # guaranteed to exist, infer from those first, then replace those
         # values where antitargets are suitable.
-        sexes = infer_sexes(target_fnames, False)
+        sexes = infer_sexes(target_fnames, False, diploid_parx_genome)
         if antitarget_fnames:
-            a_sexes = infer_sexes(antitarget_fnames, False)
+            a_sexes = infer_sexes(antitarget_fnames, False, diploid_parx_genome)
             for sid, a_is_xx in a_sexes.items():
                 t_is_xx = sexes.get(sid)
                 if t_is_xx is None:
@@ -114,7 +115,7 @@ def do_reference(
     return ref_probes
 
 
-def infer_sexes(cnn_fnames, is_haploid_x):
+def infer_sexes(cnn_fnames, is_haploid_x, diploid_parx_genome):
     """Map sample IDs to inferred chromosomal sex, where possible.
 
     For samples where the source file is empty or does not include either sex
@@ -122,9 +123,9 @@ def infer_sexes(cnn_fnames, is_haploid_x):
     """
     sexes = {}
     for fname in cnn_fnames:
-        cnarr = read_cna(fname)
+        cnarr = read_cna(fname) # hier geht nicht
         if cnarr:
-            is_xx = cnarr.guess_xx(is_haploid_x)
+            is_xx = cnarr.guess_xx(is_haploid_x, diploid_parx_genome)
             if is_xx is not None:
                 sexes[cnarr.sample_id] = is_xx
     return sexes
@@ -226,7 +227,7 @@ def combine_probes(
 
 
 def load_sample_block(
-    filenames, fa_fname, is_haploid_x, sexes, skip_low, fix_gc, fix_edge, fix_rmask
+    filenames, fa_fname, is_haploid_x, sexes, skip_low, fix_gc, fix_edge, fix_rmask, diploid_parx_genome
 ):
     r"""Load and summarize a pool of \*coverage.cnn files.
 
@@ -250,7 +251,7 @@ def load_sample_block(
 
     # Load coverage from target/antitarget files
     logging.info("Loading %s", filenames[0])
-    cnarr1 = read_cna(filenames[0])
+    cnarr1 = read_cna(filenames[0]) # hier geht nicht
     if not len(cnarr1):
         # Just create an empty array with the right columns
         col_names = ["chromosome", "start", "end", "gene", "log2", "depth"]
@@ -283,9 +284,9 @@ def load_sample_block(
         ref_columns["gc"] = gc
 
     # Make the sex-chromosome coverages of male and female samples compatible
-    is_chr_x = cnarr1.chrx_filter()
+    is_chr_x = cnarr1.chr_x_filter(diploid_parx_genome)
     is_chr_y = cnarr1.chromosome == cnarr1._chr_y_label
-    ref_flat_logr = cnarr1.expect_flat_log2(is_haploid_x)
+    ref_flat_logr = cnarr1.expect_flat_log2(is_haploid_x, diploid_parx_genome)
     ref_edge_bias = fix.get_edge_bias(cnarr1, params.INSERT_SIZE)
     # Pseudocount of 1 "flat" sample
     all_depths = [cnarr1["depth"] if "depth" in cnarr1 else np.exp2(cnarr1["log2"])]
@@ -303,13 +304,14 @@ def load_sample_block(
             fix_edge,
             fix_rmask,
             skip_low,
+            diploid_parx_genome
         ),
     ]
 
     # Load only coverage depths from the remaining samples
     procs = 1  # TODO: Add as param
     with futures.ProcessPoolExecutor(procs) as pool:
-        args_iter = ((fname, cnarr1, filenames[0], ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low) for fname in filenames[1:])
+        args_iter = ((fname, cnarr1, filenames[0], ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low, diploid_parx_genome) for fname in filenames[1:])
         for depths, logr in pool.map(_parallel_bias_correct_logr, args_iter):
             all_depths.append(depths)
             all_logr.append(logr)
@@ -320,9 +322,9 @@ def load_sample_block(
 
 def _parallel_bias_correct_logr(args):
     """Wrapper for parallel."""
-    fname, cnarr1, fname1, ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low = args
+    fname, cnarr1, fname1, ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low, diploid_parx_genome = args
     logging.info("Loading %s", fname)
-    cnarrx = read_cna(fname)
+    cnarrx = read_cna(fname) # hier geht nicht
     # Bin information should match across all files
     if not np.array_equal(
             cnarr1.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values,
@@ -332,7 +334,9 @@ def _parallel_bias_correct_logr(args):
     depths = cnarrx['depth'] if 'depth' in cnarrx else np.exp2(cnarrx['log2'])
     logr = bias_correct_logr(cnarrx, ref_columns, ref_edge_bias, ref_flat_logr,
                              sexes, is_chr_x, is_chr_y,
-                             fix_gc, fix_edge, fix_rmask, skip_low)
+                             fix_gc, fix_edge, fix_rmask, skip_low,
+                             diploid_parx_genome
+                             )
     return (depths, logr)
 
 def bias_correct_logr(
@@ -347,9 +351,10 @@ def bias_correct_logr(
     fix_edge,
     fix_rmask,
     skip_low,
+    diploid_parx_genome,
 ):
     """Perform bias corrections on the sample."""
-    cnarr.center_all(skip_low=skip_low)
+    cnarr.center_all(skip_low=skip_low, diploid_parx_genome=diploid_parx_genome)
     shift_sex_chroms(cnarr, sexes, ref_flat_logr, is_chr_x, is_chr_y)
     # Skip bias corrections if most bins have no coverage (e.g. user error)
     if (

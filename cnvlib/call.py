@@ -15,6 +15,7 @@ def do_call(
     purity=None,
     is_reference_male=False,
     is_sample_female=False,
+    diploid_parx_genome=None,
     filters=None,
     thresholds=(-1.1, -0.25, 0.2, 0.7),
 ):
@@ -39,7 +40,7 @@ def do_call(
             outarr, ploidy, purity, is_reference_male, is_sample_female
         )
         # Recalculate sample log2 ratios after rescaling for purity
-        outarr["log2"] = log2_ratios(outarr, absolutes, ploidy, is_reference_male)
+        outarr["log2"] = log2_ratios(outarr, absolutes, ploidy, is_reference_male, diploid_parx_genome)
         if variants:
             # Rescale b-allele frequencies for purity
             outarr["baf"] = rescale_baf(purity, outarr["baf"])
@@ -81,7 +82,7 @@ def do_call(
 
 
 def log2_ratios(
-    cnarr, absolutes, ploidy, is_reference_male, min_abs_val=1e-3, round_to_int=False
+    cnarr, absolutes, ploidy, is_reference_male, diploid_parx_genome, min_abs_val=1e-3, round_to_int=False
 ):
     """Convert absolute copy numbers to log2 ratios.
 
@@ -96,7 +97,7 @@ def log2_ratios(
     ratios = np.log2(np.maximum(absolutes / ploidy, min_abs_val))
     # Adjust sex chromosomes to be relative to the reference
     if is_reference_male:
-        ratios[(cnarr.chrx_filter()).values] += 1.0
+        ratios[(cnarr.chr_x_filter(diploid_parx_genome)).values] += 1.0
     ratios[(cnarr.chromosome == cnarr._chr_y_label).values] += 1.0
     return ratios
 
@@ -181,7 +182,7 @@ def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_femal
     return df[["absolute", "expect", "reference"]]
 
 
-def absolute_expect(cnarr, ploidy, is_sample_female):
+def absolute_expect(cnarr, ploidy, is_sample_female): # todo: use get_as_dframe_and_set_reference_and_expect_copies instead?
     """Absolute integer number of expected copies in each bin.
 
     I.e. the given ploidy for autosomes, and XY or XX sex chromosome counts
@@ -192,29 +193,29 @@ def absolute_expect(cnarr, ploidy, is_sample_female):
     if is_sample_female:
         exp_copies[is_y] = 0
     else:
-        is_x = (cnarr.chrx_filter()).values
+        is_x = (cnarr.chr_x_filter()).values
         exp_copies[is_x | is_y] = ploidy // 2
     return exp_copies
 
 
-def absolute_reference(cnarr, ploidy, is_reference_male):
+def absolute_reference(cnarr, ploidy, is_reference_male): # todo: get get_as_dframe_and_set_reference_and_expect_copies instead?
     """Absolute integer number of reference copies in each bin.
 
     I.e. the given ploidy for autosomes, 1 or 2 X according to the reference
     sex, and always 1 copy of Y.
     """
     ref_copies = np.repeat(ploidy, len(cnarr))
-    is_x = (cnarr.chrx_filter()).values
+    is_x = (cnarr.chr_x_filter()).values
     is_y = (cnarr.chromosome == cnarr._chr_y_label).values
     if is_reference_male:
         ref_copies[is_x] = ploidy // 2
-    ref_copies[is_y] = ploidy // 2
+    ref_copies[is_y] = ploidy // 2 # same issue iwth other coder here
     return ref_copies
 
 
 # todo: add unit test.
 def get_as_dframe_and_set_reference_and_expect_copies(
-    cnarr, ploidy, is_reference_male, is_sample_female
+    cnarr, ploidy, is_reference_male, is_sample_female, diploid_parx_genome
 ):
     """Determine the number copies of a chromosome expected and in reference.
 
@@ -237,10 +238,10 @@ def get_as_dframe_and_set_reference_and_expect_copies(
     df["reference"] = np.repeat(ploidy, len(df))
     df["expect"] = np.repeat(ploidy, len(df))
 
-    df.loc[df.chromosome == cnarr.chr_x_label, "reference"] = (
+    df.loc[cnarr.chr_x_filter(diploid_parx_genome), "reference"] = (
         ploidy // 2 if is_reference_male else ploidy
     )
-    df.loc[df.chromosome == cnarr.chr_x_label, "expect"] = (
+    df.loc[cnarr.chr_x_filter(diploid_parx_genome), "expect"] = (
         ploidy if is_sample_female else ploidy // 2
     )
 

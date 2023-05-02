@@ -27,12 +27,12 @@ def merge_samples(filenames):
 
     if not filenames:
         return []
-    first_cnarr = read_cna(filenames[0], None)
+    first_cnarr = read_cna(filenames[0], None) # hier geht nicht
     out_table = first_cnarr.data.reindex(columns=["chromosome", "start", "end", "gene"])
     out_table["label"] = label_with_gene(first_cnarr)
     out_table[first_cnarr.sample_id] = first_cnarr["log2"]
     for fname in filenames[1:]:
-        cnarr = read_cna(fname, None)
+        cnarr = read_cna(fname, None) # hier geht nicht
         if not (
             len(cnarr) == len(out_table)
             and (label_with_gene(cnarr) == out_table["label"]).all()
@@ -166,7 +166,7 @@ def export_seg(sample_fnames, chrom_ids=False):
 
 
 def _load_seg_dframe_id(fname):
-    segarr = read_cna(fname, None)
+    segarr = read_cna(fname, None) # hier geht nicht
     assert segarr is not None
     assert segarr.data is not None
     assert segarr.sample_id is not None
@@ -420,7 +420,7 @@ def export_gistic_markers(cnr_fnames):
     #   detect duplicates & exclude them
     # seen_marker_ids = None
     for fname in cnr_fnames:
-        cna = read_cna(fname)
+        cna = read_cna(fname) # hier geht nicht
         marker_ids = cna.labels()
         tbl = pd.concat(
             [
