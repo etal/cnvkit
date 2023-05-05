@@ -168,10 +168,10 @@ def absolute_pure(cnarr, ploidy, is_reference_male):
     return absolutes
 
 
-def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_female):
+def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, diploid_parx_genome, is_sample_female):
     """Absolute, expected and reference copy number in a DataFrame."""
     df = get_as_dframe_and_set_reference_and_expect_copies(
-        cnarr, ploidy, is_reference_male, is_sample_female
+        cnarr, ploidy, is_reference_male, diploid_parx_genome, is_sample_female
     )
     df["absolute"] = df.apply(
         lambda row: _log2_ratio_to_absolute(
@@ -182,41 +182,32 @@ def absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_femal
     return df[["absolute", "expect", "reference"]]
 
 
-def absolute_expect(cnarr, ploidy, is_sample_female): # todo: use get_as_dframe_and_set_reference_and_expect_copies instead?
+def absolute_expect(cnarr, ploidy, diploid_parx_genome, is_sample_female):
     """Absolute integer number of expected copies in each bin.
 
     I.e. the given ploidy for autosomes, and XY or XX sex chromosome counts
     according to the sample's specified chromosomal sex.
     """
-    exp_copies = np.repeat(ploidy, len(cnarr))
-    is_y = (cnarr.chromosome == cnarr._chr_y_label).values
-    if is_sample_female:
-        exp_copies[is_y] = 0
-    else:
-        is_x = (cnarr.chr_x_filter()).values
-        exp_copies[is_x | is_y] = ploidy // 2
+    is_reference_male = True # the reference sex doesn't matter for the expect column calculation
+    df = get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, diploid_parx_genome, is_sample_female)
+    exp_copies = df["expect"]
     return exp_copies
 
 
-def absolute_reference(cnarr, ploidy, is_reference_male): # todo: get get_as_dframe_and_set_reference_and_expect_copies instead?
+def absolute_reference(cnarr, ploidy, diploid_parx_genome, is_reference_male):
     """Absolute integer number of reference copies in each bin.
 
     I.e. the given ploidy for autosomes, 1 or 2 X according to the reference
     sex, and always 1 copy of Y.
     """
-    ref_copies = np.repeat(ploidy, len(cnarr))
-    is_x = (cnarr.chr_x_filter()).values
-    is_y = (cnarr.chromosome == cnarr._chr_y_label).values
-    if is_reference_male:
-        ref_copies[is_x] = ploidy // 2
-    ref_copies[is_y] = ploidy // 2 # same issue iwth other coder here
+    is_sample_female = True # the sample sex doesn't matter for the reference column calculation
+    df = get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, diploid_parx_genome, is_sample_female)
+    ref_copies = df["reference"]
     return ref_copies
 
 
-# todo: add unit test.
-def get_as_dframe_and_set_reference_and_expect_copies(
-    cnarr, ploidy, is_reference_male, is_sample_female, diploid_parx_genome
-):
+def get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, diploid_parx_genome,
+                                                      is_sample_female):
     """Determine the number copies of a chromosome expected and in reference.
 
     For sex chromosomes, these values may not be the same ploidy as the

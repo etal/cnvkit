@@ -2577,6 +2577,7 @@ def _cmd_export_bed(args):
             segments,
             args.ploidy,
             args.male_reference,
+            args.diploid_parx_genome,
             is_sample_female,
             label,
             args.show,
