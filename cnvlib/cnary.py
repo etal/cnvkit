@@ -65,15 +65,14 @@ class CopyNumArray(GenomicArray):
         f &= ((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end))
         return f
 
-    def autosomes(self, diploid_parx_genome=None, also=None): # move to gnomicary?
+    def autosomes(self, diploid_parx_genome=None, also=None):
         """Overrides GenomeArray.autosomes()."""
-        if mparams.TREAT_PAR_ON_CHRX_AS_AUTOSOMAL is True:
-            if also is None:
-                also = self.parx_filter(diploid_parx_genome)
-            elif isinstance(also, pd.Series):
-                also |= self.parx_filter(diploid_parx_genome)
-            else:
-                raise NotImplementedError("Cannot combine pd.Series with non-Series.")
+        if also is None:
+            also = self.parx_filter(diploid_parx_genome)
+        elif isinstance(also, pd.Series):
+            also |= self.parx_filter(diploid_parx_genome)
+        else:
+            raise NotImplementedError("Cannot combine pd.Series with non-Series.")
         return super().autosomes(also=also)
 
     @property

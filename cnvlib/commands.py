@@ -1181,7 +1181,7 @@ def _cmd_call(args):
         args.zygosity_freq,
     )
     is_sample_female = (
-        verify_sample_sex(cnarr, args.sample_sex, args.male_reference, diploid_parx_genome)
+        verify_sample_sex(cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
         if args.purity and args.purity < 1.0
         else None
     )
