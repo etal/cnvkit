@@ -410,7 +410,6 @@ class CommandTests(unittest.TestCase):
         _assert_chrx_non_par(df, 2, 2)
         _assert_chry(df, 1, 0)  # Do we really want ref=1 for a female ref on chr y?
 
-        # no specific par handling, female reference, male sample
         is_male_reference = False
         is_female_sample = False
         df = _get(is_male_reference, is_female_sample)
