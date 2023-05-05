@@ -1165,14 +1165,13 @@ def _cmd_call(args):
     """Call copy number variants from segmented log2 ratios."""
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
-    diploid_parx_genome = get_diploid_parx_genome_from_args(args)
 
     cnarr = read_cna(args.filename)
     if args.center_at:
         logging.info("Shifting log2 ratios by %f", -args.center_at)
         cnarr["log2"] -= args.center_at
     elif args.center:
-        cnarr.center_all(args.center, skip_low=args.drop_low_coverage, verbose=True, diploid_parx_genome=diploid_parx_genome)
+        cnarr.center_all(args.center, skip_low=args.drop_low_coverage, verbose=True, diploid_parx_genome=args.diploid_parx_genome)
 
     varr = load_het_snps(
         args.vcf,
