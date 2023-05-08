@@ -61,7 +61,8 @@ class CopyNumArray(GenomicArray):
         genome_build = genome_build.lower()
         assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
         f = self.chromosome == self.chr_x_label
-        par1_start, par1_end, par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]
+        par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1"]
+        par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2"]
         f &= ((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end))
         return f
 
