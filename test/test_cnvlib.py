@@ -33,17 +33,16 @@ class CNATests(unittest.TestCase):
         self.assertEqual(len(cnarr), 0)
 
     def test_par_and_chrx_filter(self):
-        irrelevant_gene_name = "whatever"
-        irrelevant_log2_value = 0.0
+        log2_value = 0.0
         ex_cnr = CopyNumArray.from_rows(
             [
-                ["chr1", 123456, 456789, irrelevant_gene_name, irrelevant_log2_value],
-                ["chrX", 640975, 641119, "SHOX", irrelevant_log2_value],  # PAR1
-                ["chrX", 2600000, 2800000, "PAR1-overlap", irrelevant_log2_value],
-                ["chrX", 4000000, 5000000, irrelevant_gene_name, irrelevant_log2_value],
-                ["chrX", 155600000, 1557000000, "PAR2-overlap", irrelevant_log2_value],
-                ["chrX", 155767712, 155768156, "SPRY3", irrelevant_log2_value],  # PAR2
-                ["chrY", 4000000, 5000000, irrelevant_gene_name, irrelevant_log2_value],
+                ["chr1", 10467178, 10467348, "DFFA", log2_value],
+                ["chrX", 640975, 641119, "SHOX", log2_value],  # PAR1
+                ["chrX", 2600000, 2800000, "PAR1-overlap", log2_value],
+                ["chrX", 65727808, 65727914, "MSN", log2_value],
+                ["chrX", 155600000, 1557000000, "PAR2-overlap", log2_value],
+                ["chrX", 155767712, 155768156, "SPRY3", log2_value],  # PAR2
+                ["chrY", 17877831, 17880784,  "CDY2B", log2_value],
             ]
         )
         true_number_of_regions_on_x = 5  # all regions on X
