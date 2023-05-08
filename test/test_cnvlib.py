@@ -50,6 +50,8 @@ class CNATests(unittest.TestCase):
         self.assertEqual(len(literal_x), true_number_of_regions_on_x, "Baseline assumption is correct.")
         filter_x = ex_cnr[ex_cnr.chr_x_filter()]
         self.assertEqual(len(filter_x), true_number_of_regions_on_x, "By default, the filter on chr X returns all of X.")
+        filter_x_diploid_par = ex_cnr[ex_cnr.chr_x_filter("grch38")]
+        self.assertTrue(len(filter_x_diploid_par) < true_number_of_regions_on_x, "PAR1/2 can be ignored.")
 
         par_on_x = ex_cnr[ex_cnr.parx_filter("grch38")]
         self.assertEqual(len(par_on_x), 2, "Filtering for PAR1/2 works fine.")
