@@ -17,7 +17,7 @@ import numpy as np
 from skgenome import GenomicArray, tabio
 
 import cnvlib
-from cnvlib import fix, params, mparams
+from cnvlib import fix, params
 
 
 def read(*args, **kwargs) -> CopyNumArray:
@@ -33,40 +33,42 @@ class CNATests(unittest.TestCase):
         self.assertEqual(len(cnarr), 0)
 
     def test_par_and_chrx_filter(self):
-        ex_cnr = read("formats/par.cnr", None)
-        self.assertFalse(mparams.TREAT_PAR_ON_CHRX_AS_AUTOSOMAL)
-        true_len_literal_x = 10967  # all regions on X
-        literal_x = ex_cnr.chromosome == "X"
-        self.assertEqual(sum(literal_x), true_len_literal_x)
-        filter_x = ex_cnr.chr_x_filter()
-        self.assertEqual(
-            sum(filter_x),
-            true_len_literal_x,
-            "By default, the filter on chr X returns all of X.",
+        irrelevant_gene_name = "whatever"
+        irrelevant_log2_value = 0.0
+        ex_cnr = CopyNumArray.from_rows(
+            [
+                ["chr1", 123456, 456789, irrelevant_gene_name, irrelevant_log2_value],
+                ["chrX", 640975, 641119, "SHOX", irrelevant_log2_value],  # PAR1
+                ["chrX", 2600000, 2800000, "PAR1-overlap", irrelevant_log2_value],
+                ["chrX", 4000000, 5000000, irrelevant_gene_name, irrelevant_log2_value],
+                ["chrX", 155600000, 1557000000, "PAR2-overlap", irrelevant_log2_value],
+                ["chrX", 155767712, 155768156, "SPRY3", irrelevant_log2_value],  # PAR2
+                ["chrY", 4000000, 5000000, irrelevant_gene_name, irrelevant_log2_value],
+            ]
         )
-        self.assertRaises(AssertionError, ex_cnr.parx_filter)  # By default, the PAR filter cannot be invoked.
+        true_number_of_regions_on_x = 5  # all regions on X
+        literal_x = ex_cnr[ex_cnr.chromosome == "chrX"]
+        self.assertEqual(len(literal_x), true_number_of_regions_on_x, "Baseline assumption is correct.")
+        filter_x = ex_cnr[ex_cnr.chr_x_filter()]
+        self.assertEqual(len(filter_x), true_number_of_regions_on_x, "By default, the filter on chr X returns all of X.")
 
-        mparams.set_genome_build("grch37")
-        par_on_x = ex_cnr.parx_filter()
-        self.assertEqual(sum(par_on_x), 201, "Once the genome is set, PAR1/2 can be filtered for.")
+        par_on_x = ex_cnr[ex_cnr.parx_filter("grch38")]
+        self.assertEqual(len(par_on_x), 2, "Filtering for PAR1/2 works fine.")
 
-        par1_overlapping_region_index = 205
-        par1_overlapping_region = ex_cnr[par1_overlapping_region_index]
-        self.assertEqual(par1_overlapping_region.gene, "PAR1Overlap")
-        self.assertTrue(
-            par1_overlapping_region.start < params.PAR1_X_GRCH37_END < par1_overlapping_region.end,
-            "The region overlaps the PAR1 boundary.",
-        )
-        self.assertFalse(par_on_x[par1_overlapping_region_index], "The overlapping region is not part of the filter.")
+        par1_overlapping_region = ex_cnr[2]
+        par1_overlapping_gene = "PAR1-overlap"
+        self.assertEqual(par1_overlapping_region.gene, par1_overlapping_gene)
+        grch38_par1_end = params.PSEUDO_AUTSOMAL_REGIONS["grch38"]["PAR1"][1]
+        self.assertTrue(par1_overlapping_region.start < grch38_par1_end < par1_overlapping_region.end, "The region overlaps the PAR1 boundary.")
+        self.assertTrue(par1_overlapping_gene not in par_on_x["gene"].tolist(), "The overlapping region is not part of the filter.")
 
-        par2_overlapping_region_index = 10970
-        par2_overlapping_region = ex_cnr[par2_overlapping_region_index]
-        self.assertEqual(par2_overlapping_region.gene, "PAR2Overlap")
-        self.assertTrue(
-            par2_overlapping_region.start < params.PAR2_X_GRCH37_START < par2_overlapping_region.end,
-            "The region overlaps the PAR2 boundary.",
-            )
-        self.assertFalse(par_on_x[par2_overlapping_region_index], "The overlapping region is not part of the filter.")
+        par2_overlapping_region = ex_cnr[4]
+        par2_overlapping_gene = "PAR2-overlap"
+        self.assertEqual(par2_overlapping_region.gene, par2_overlapping_gene)
+        grch38_par2_start = params.PSEUDO_AUTSOMAL_REGIONS["grch38"]["PAR2"][0]
+        self.assertTrue(par2_overlapping_region.start < grch38_par2_start < par2_overlapping_region.end, "The region overlaps the PAR2 boundary.")
+        self.assertTrue(par2_overlapping_gene not in par_on_x["gene"].tolist(), "The overlapping region is not part of the filter.")
+
 
     def test_autosomes(self):
         """Test selection of autosomes specific to CNA. """
