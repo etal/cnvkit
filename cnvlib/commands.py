@@ -97,15 +97,6 @@ def add_diploid_parx_genome(P):
         type=str,
         help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
     )
-# _____________________________________________________________________________
-# Shared functions for shared parameters
-def handle_par_on_chrx(args):
-    #if args.genome_build is not None:
-    #    mparams.set_genome_build(args.genome_build)
-    if args.treat_par_on_chrx_as_autosomal is True:
-        CopyNumArray.treat_par_on_chrx_as_autosomal(True, args.genome_build)
-        #mparams.treat_par_on_chrx_as_autosomal(args.treat_par_on_chrx_as_autosomal)
-
 
 # _____________________________________________________________________________
 # Core pipeline
