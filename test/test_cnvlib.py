@@ -17,8 +17,6 @@ import numpy as np
 from skgenome import GenomicArray, tabio
 
 import cnvlib
-from cnvlib import fix, params
-
 
 
 class CNATests(unittest.TestCase):
@@ -122,6 +120,18 @@ class CNATests(unittest.TestCase):
             cp = chr1.copy()
             cp.center_all(method)
             self.assertLess(abs(cp["log2"].median() - orig_chr1_cvg), 0.1)
+
+        # PAR setting influences centering.
+        cna1 = cnvlib.read("formats/par-reference.cnn")
+        before1 = np.median(cna1["log2"])
+        cna1.center_all()
+        after1 = np.median(cna1["log2"])
+        cna2 = cnvlib.read("formats/par-reference.cnn")
+        before2 = np.median(cna2["log2"])
+        cna2.center_all(diploid_parx_genome="grch38")
+        after2 = np.median(cna2["log2"])
+        self.assertEqual(before1, before2)
+        self.assertNotEqual(after1, after2)
 
     def test_drop_extra_columns(self):
         """Test removal of optional 'gc' column."""
