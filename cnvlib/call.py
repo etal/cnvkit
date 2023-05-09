@@ -37,7 +37,7 @@ def do_call(
     if purity and purity < 1.0:
         logging.info("Rescaling sample with purity %g, ploidy %d", purity, ploidy)
         absolutes = absolute_clonal(
-            outarr, ploidy, purity, is_reference_male, is_sample_female
+            outarr, ploidy, purity, is_reference_male, diploid_parx_genome, is_sample_female
         )
         # Recalculate sample log2 ratios after rescaling for purity
         outarr["log2"] = log2_ratios(outarr, absolutes, ploidy, is_reference_male, diploid_parx_genome)
@@ -152,9 +152,9 @@ def absolute_threshold(cnarr, ploidy, thresholds, is_reference_male):
     return absolutes
 
 
-def absolute_clonal(cnarr, ploidy, purity, is_reference_male, is_sample_female):
+def absolute_clonal(cnarr, ploidy, purity, is_reference_male, diploid_parx_genome, is_sample_female):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
-    df = absolute_dataframe(cnarr, ploidy, purity, is_reference_male, is_sample_female)
+    df = absolute_dataframe(cnarr, ploidy, purity, is_reference_male, diploid_parx_genome, is_sample_female)
 
     return df["absolute"]
 

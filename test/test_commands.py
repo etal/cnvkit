@@ -108,6 +108,7 @@ class CommandTests(unittest.TestCase):
             None,
             None,
             True,
+            None,
             fasta,
             annot,
             True,
