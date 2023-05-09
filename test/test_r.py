@@ -19,8 +19,8 @@ class RTests(unittest.TestCase):
     """Tests that depend on the R statistical environment."""
 
     def setUp(self):
-        self.tas_cnr = cnvlib.read("formats/amplicon.cnr", None)
-        self.wgs_cnr = cnvlib.read("formats/wgs-chr17.cnr", None)
+        self.tas_cnr = cnvlib.read("formats/amplicon.cnr")
+        self.wgs_cnr = cnvlib.read("formats/wgs-chr17.cnr")
 
     def test_cbs(self):
         _test_method(self, "cbs")
