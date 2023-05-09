@@ -9,8 +9,6 @@ import os
 import sys
 import warnings
 
-from .cnary import CopyNumArray
-
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
@@ -33,6 +31,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 import pandas as pd
+from skgenome import tabio, GenomicArray as _GA
 from skgenome.rangelabel import to_label
 
 from . import (
