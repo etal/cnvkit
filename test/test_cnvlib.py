@@ -20,9 +20,6 @@ import cnvlib
 from cnvlib import fix, params
 
 
-def read(*args, **kwargs) -> CopyNumArray:
-    return cnvlib.read(*args, **kwargs)
-
 
 class CNATests(unittest.TestCase):
     """Tests for the CopyNumArray class."""
@@ -73,7 +70,7 @@ class CNATests(unittest.TestCase):
     def test_autosomes(self):
         """Test selection of autosomes specific to CNA. """
 
-        ex_cnn = read("formats/par-reference.cnn")
+        ex_cnn = cnvlib.read("formats/par-reference.cnn")
         auto = ex_cnn.autosomes()
         true_number_of_non_x_non_y_regions = 11
         self.assertEqual(len(auto), true_number_of_non_x_non_y_regions, "Extraction of autosomes works as expected.")

@@ -1976,9 +1976,8 @@ do_gainloss = public(do_genemetrics)
 
 def _cmd_sex(args):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
-    handle_par_on_chrx(args)
     cnarrs = [read_cna(fname) for fname in args.filenames]
-    table = do_sex(cnarrs, args.male_reference)
+    table = do_sex(cnarrs, args.male_reference, args.diploid_parx_genome)
     write_dataframe(args.output, table, header=True)
 
 
@@ -2033,7 +2032,6 @@ do_metrics = public(metrics.do_metrics)
 
 def _cmd_metrics(args):
     """Compute coverage deviations and other metrics for self-evaluation."""
-    handle_par_on_chrx(args)
     if (
         len(args.cnarrays) > 1
         and args.segments
@@ -2045,9 +2043,9 @@ def _cmd_metrics(args):
             "equal, if more than 1 segment file is given."
         )
 
-    cnarrs = [read_cna(cnarray, args.treat_par_on_chrx_as_autosomal_for_genome_build) for cnarray in args.cnarrays]
+    cnarrs = [read_cna(cnarray) for cnarray in args.cnarrays]
     if args.segments:
-        args.segments = [read_cna(segment, args.treat_par_on_chrx_as_autosomal_for_genome_build) for segment in args.cnarrays]
+        args.segments = [read_cna(segment) for segment in args.cnarrays]
     table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)
     write_dataframe(args.output, table)
 
