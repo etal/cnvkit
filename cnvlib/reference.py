@@ -251,7 +251,7 @@ def load_sample_block(
 
     # Load coverage from target/antitarget files
     logging.info("Loading %s", filenames[0])
-    cnarr1 = read_cna(filenames[0]) # hier geht nicht
+    cnarr1 = read_cna(filenames[0])
     if not len(cnarr1):
         # Just create an empty array with the right columns
         col_names = ["chromosome", "start", "end", "gene", "log2", "depth"]
