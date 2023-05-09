@@ -68,12 +68,13 @@ class CopyNumArray(GenomicArray):
 
     def autosomes(self, diploid_parx_genome=None, also=None):
         """Overrides GenomeArray.autosomes()."""
-        if also is None:
-            also = self.parx_filter(diploid_parx_genome)
-        elif isinstance(also, pd.Series):
-            also |= self.parx_filter(diploid_parx_genome)
-        else:
-            raise NotImplementedError("Cannot combine pd.Series with non-Series.")
+        if diploid_parx_genome is not None:
+            if also is None:
+                also = self.parx_filter(diploid_parx_genome)
+            elif isinstance(also, pd.Series):
+                also |= self.parx_filter(diploid_parx_genome)
+            else:
+                raise NotImplementedError("Cannot combine pd.Series with non-Series.")
         return super().autosomes(also=also)
 
     @property

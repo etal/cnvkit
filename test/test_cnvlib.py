@@ -70,32 +70,24 @@ class CNATests(unittest.TestCase):
         self.assertTrue(par2_overlapping_region.start < grch38_par2_start < par2_overlapping_region.end, "The region overlaps the PAR2 boundary.")
         self.assertTrue(par2_overlapping_gene not in par_on_x["gene"].tolist(), "The overlapping region is not part of the filter.")
 
-
     def test_autosomes(self):
         """Test selection of autosomes specific to CNA. """
-        # todo: fix me
 
-        ex_cnr = read("formats/reference-tr.cnn", None)
-        auto = ex_cnr.autosomes()
-        some_x = (ex_cnr.chromosome == "chrX") & (ex_cnr.end <= 434918)
-        some_x_len = some_x.sum()
-        self.assertEqual(some_x_len, 3)
-        auto_and_some_x = ex_cnr.autosomes(also=some_x)
-        self.assertEqual(len(auto_and_some_x), len(auto) + some_x_len)
+        ex_cnn = read("formats/par-reference.cnn")
+        auto = ex_cnn.autosomes()
+        true_number_of_non_x_non_y_regions = 11
+        self.assertEqual(len(auto), true_number_of_non_x_non_y_regions, "Extraction of autosomes works as expected.")
 
-        #ex_cnr.treat_par_on_chrx_as_autosomal(genome_build="grch38")
-        #auto_with_par_on_chrx = ex_cnr.autosomes()
-        #len_par = ex_cnr.par_on_chrx_filter().sum()
-        #self.assertEqual(len_par, 25)
-        #self.assertEqual(len(auto_with_par_on_chrx), len(auto) + len_par)
+        true_number_of_some_x_regions = 10
+        some_x_filter = (ex_cnn.chromosome == "chrX") & (ex_cnn.end <= 154563000)
+        some_x = ex_cnn[some_x_filter]
+        self.assertEqual(len(some_x), true_number_of_some_x_regions)
+        auto_and_some_x = ex_cnn.autosomes(also=some_x_filter)
+        self.assertEqual(len(auto_and_some_x), len(auto) + len(some_x), "It is possible to provide further pd.Series as filter.")
 
-        #ex_cnr.do_not_treat_par_on_chrx_as_autosomal()
-        #new_auto = ex_cnr.autosomes()
-        #self.assertNotEqual(
-        #    len(new_auto), len(auto_with_par_on_chrx), "The CNA can be reset and PAR is within X again."
-        #)
-
-        # todo: add test par + other also
+        auto_with_parx = ex_cnn.autosomes("grch38")
+        parx = ex_cnn[ex_cnn.parx_filter("grch38")]
+        self.assertEqual(len(auto_with_parx), true_number_of_non_x_non_y_regions + len(parx), "PAR1/2 is included upon request.")
 
     def test_basic(self):
         """Test basic container functionality and magic methods."""
