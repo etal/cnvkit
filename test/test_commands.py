@@ -352,12 +352,11 @@ class CommandTests(unittest.TestCase):
         )
         # "grch38": [10001, 2781479, 155701383, 156030895],
 
-        def _get_df(is_reference_male, is_sample_female, diploid_parx_genome=None):
-            return call.get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, diploid_parx_genome, is_sample_female)
-        def _get_abs_ref(is_referene_male, diploid_parx_genome=None):
-            return call.absolute_reference(cnarr, ploidy, diploid_parx_genome, is_referene_male)
-        def _get_abs_exp(is_sample_female, diploid_parx_genome=None):
-            return call.absolute_expect(cnarr, ploidy, diploid_parx_genome, is_sample_female)
+        def _run(is_reference_male, is_sample_female, diploid_parx_genome=None):
+            df = call.get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_reference_male, diploid_parx_genome, is_sample_female)
+            abs_ref = call.absolute_reference(cnarr, ploidy, diploid_parx_genome, is_reference_male)
+            abs_exp = call.absolute_expect(cnarr, ploidy, diploid_parx_genome, is_sample_female)
+            return df, abs_ref, abs_exp
 
         def _assert_df(iloc, df, reference, expect):
             self.assertTrue('reference' in df.columns)
@@ -390,16 +389,12 @@ class CommandTests(unittest.TestCase):
 
         is_reference_male = True
         is_female_sample = True
-        df = _get_df(is_reference_male, is_female_sample)
-        abs_ref = _get_abs_ref(is_reference_male)
-        abs_exp = _get_abs_exp(is_female_sample)
+        df, abs_ref, abs_exp = _run(is_reference_male, is_female_sample)
         _assert_chr1(df, abs_ref, abs_exp)
         _assert_chrx_par(df, 1, 2, abs_ref, 1, abs_exp, 2)
         _assert_chrx_non_par(df, 1, 2, abs_ref, 1, abs_exp, 2)
         _assert_chry(df, 1, 0, abs_ref, 1, abs_exp, 0)
-        df = _get_df(is_reference_male, is_female_sample, "grch38")
-        abs_ref = _get_abs_ref(is_reference_male, "grch38")
-        abs_exp = _get_abs_exp(is_female_sample, "grch38")
+        df, abs_ref, abs_exp = _run(is_reference_male, is_female_sample, "grch38")
         _assert_chr1(df, abs_ref, abs_exp)
         _assert_chrx_par(df, 2, 2, abs_ref, 2, abs_exp, 2)
         _assert_chrx_non_par(df, 1, 2, abs_ref, 1, abs_exp, 2)
@@ -407,16 +402,12 @@ class CommandTests(unittest.TestCase):
 
         is_reference_male = True
         is_female_sample = False
-        df = _get_df(is_reference_male, is_female_sample)
-        abs_ref = _get_abs_ref(is_reference_male)
-        abs_exp = _get_abs_exp(is_female_sample)
+        df, abs_ref, abs_exp = _run(is_reference_male, is_female_sample)
         _assert_chr1(df, abs_ref, abs_exp)
         _assert_chrx_par(df, 1, 1, abs_ref, 1, abs_exp, 1)
         _assert_chrx_non_par(df, 1, 1, abs_ref, 1, abs_exp, 1)
         _assert_chry(df, 1, 1, abs_ref, 1, abs_exp, 1)
-        df = _get_df(is_reference_male, is_female_sample, "grch38")
-        abs_ref = _get_abs_ref(is_reference_male, "grch38")
-        abs_exp = _get_abs_exp(is_female_sample, "grch38")
+        df, abs_ref, abs_exp = _run(is_reference_male, is_female_sample, "grch38")
         _assert_chr1(df, abs_ref, abs_exp)
         _assert_chrx_par(df, 2, 2, abs_ref, 2, abs_exp, 2)
         _assert_chrx_non_par(df, 1, 1, abs_ref, 1, abs_exp, 1)
@@ -424,16 +415,12 @@ class CommandTests(unittest.TestCase):
 
         is_reference_male = False
         is_female_sample = True
-        df = _get_df(is_reference_male, is_female_sample)
-        abs_ref = _get_abs_ref(is_reference_male)
-        abs_exp = _get_abs_exp(is_female_sample)
+        df, abs_ref, abs_exp = _run(is_reference_male, is_female_sample)
         _assert_chr1(df, abs_ref, abs_exp)
         _assert_chrx_par(df, 2, 2, abs_ref, 2, abs_exp, 2)
         _assert_chrx_non_par(df, 2, 2, abs_ref, 2, abs_exp, 2)
         _assert_chry(df, 1, 0, abs_ref, 1, abs_exp, 0)  # Do we really want ref=1 for a female ref on chr y?
-        df = _get_df(is_reference_male, is_female_sample, "grch38")
-        abs_ref = _get_abs_ref(is_reference_male, "grch38")
-        abs_exp = _get_abs_exp(is_female_sample, "grch38")
+        df, abs_ref, abs_exp = _run(is_reference_male, is_female_sample, "grch38")
         _assert_chr1(df, abs_ref, abs_exp)
         _assert_chrx_par(df, 2, 2, abs_ref, 2, abs_exp, 2)
         _assert_chrx_non_par(df, 2, 2, abs_ref, 2, abs_exp, 2)
@@ -441,16 +428,12 @@ class CommandTests(unittest.TestCase):
 
         is_reference_male = False
         is_female_sample = False
-        df = _get_df(is_reference_male, is_female_sample)
-        abs_ref = _get_abs_ref(is_reference_male)
-        abs_exp = _get_abs_exp(is_female_sample)
+        df, abs_ref, abs_exp = _run(is_reference_male, is_female_sample)
         _assert_chr1(df, abs_ref, abs_exp)
         _assert_chrx_par(df, 2, 1, abs_ref, 2, abs_exp, 1)
         _assert_chrx_non_par(df, 2, 1, abs_ref, 2, abs_exp, 1)
         _assert_chry(df, 1, 1, abs_ref, 1, abs_exp, 1)  # Do we really want ref=1 for a female ref on chr y?
-        df = _get_df(is_reference_male, is_female_sample, "grch38")
-        abs_ref = _get_abs_ref(is_reference_male, "grch38")
-        abs_exp = _get_abs_exp(is_female_sample, "grch38")
+        df, abs_ref, abs_exp = _run(is_reference_male, is_female_sample, "grch38")
         _assert_chr1(df, abs_ref, abs_exp)
         _assert_chrx_par(df, 2, 2, abs_ref, 2, abs_exp, 2)
         _assert_chrx_non_par(df, 2, 1, abs_ref, 2, abs_exp, 1)
