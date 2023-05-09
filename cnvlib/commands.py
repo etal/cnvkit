@@ -33,7 +33,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 import pandas as pd
-from skgenome import tabio, GenomicArray as _GA
 from skgenome.rangelabel import to_label
 
 from . import (
@@ -107,7 +106,6 @@ def add_diploid_parx_genome(P):
 def _cmd_batch(args):
     """Run the complete CNVkit pipeline on one or more BAM files."""
     logging.info("CNVkit %s", __version__)
-    handle_par_on_chrx(args)
     # Validate/restrict options, beyond what argparse mutual exclusion can do
     bad_args_msg = ""
     if args.reference:
@@ -164,6 +162,7 @@ def _cmd_batch(args):
             args.targets,
             args.antitargets,
             args.male_reference,
+            args.diploid_parx_genome,
             args.fasta,
             args.annotate,
             args.short_names,
