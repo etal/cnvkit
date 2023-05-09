@@ -123,7 +123,7 @@ def infer_sexes(cnn_fnames, is_haploid_x, diploid_parx_genome):
     """
     sexes = {}
     for fname in cnn_fnames:
-        cnarr = read_cna(fname) # hier geht nicht
+        cnarr = read_cna(fname)
         if cnarr:
             is_xx = cnarr.guess_xx(is_haploid_x, diploid_parx_genome)
             if is_xx is not None:
@@ -324,7 +324,7 @@ def _parallel_bias_correct_logr(args):
     """Wrapper for parallel."""
     fname, cnarr1, fname1, ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low, diploid_parx_genome = args
     logging.info("Loading %s", fname)
-    cnarrx = read_cna(fname) # hier geht nicht
+    cnarrx = read_cna(fname)
     # Bin information should match across all files
     if not np.array_equal(
             cnarr1.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values,
