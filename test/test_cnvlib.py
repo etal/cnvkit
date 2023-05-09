@@ -3,9 +3,6 @@
 import logging
 import unittest
 
-from cnvlib import params
-from cnvlib.cnary import CopyNumArray
-
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 # unittest/pomegranate 0.10.0: ImportWarning: can't resolve package from
@@ -18,6 +15,7 @@ import numpy as np
 from skgenome import GenomicArray, tabio
 
 import cnvlib
+from cnvlib import cnary, fix, params
 
 
 class CNATests(unittest.TestCase):
@@ -30,7 +28,7 @@ class CNATests(unittest.TestCase):
 
     def test_par_and_chrx_filter(self):
         log2_value = 0.0
-        ex_cnr = CopyNumArray.from_rows(
+        ex_cnr = cnary.CopyNumArray.from_rows(
             [
                 ["chr1", 10467178, 10467348, "DFFA", log2_value],
                 ["chrX", 640975, 641119, "SHOX", log2_value],  # PAR1
@@ -74,7 +72,7 @@ class CNATests(unittest.TestCase):
         true_number_of_non_x_non_y_regions = 11
         self.assertEqual(len(auto), true_number_of_non_x_non_y_regions, "Extraction of autosomes works as expected.")
 
-        true_number_of_some_x_regions = 10
+        true_number_of_some_x_regions = 11
         some_x_filter = (ex_cnn.chromosome == "chrX") & (ex_cnn.end <= 154563000)
         some_x = ex_cnn[some_x_filter]
         self.assertEqual(len(some_x), true_number_of_some_x_regions)

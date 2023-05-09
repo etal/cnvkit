@@ -54,7 +54,7 @@ class CopyNumArray(GenomicArray):
     def chr_x_filter(self, diploid_parx_genome=None):
         """ All regions on X, potentially without PAR1/2. """
         x = self.chromosome == self.chr_x_label
-        if diploid_parx_genome:
+        if diploid_parx_genome is not None:
             # Exclude PAR since it is expected to be diploid.
             x &= ~self.parx_filter(genome_build=diploid_parx_genome)
         return x

@@ -104,6 +104,7 @@ def do_reference(
         antitarget_fnames,
         fa_fname,
         male_reference,
+        diploid_parx_genome,
         sexes,
         do_gc,
         do_edge,
@@ -136,6 +137,7 @@ def combine_probes(
     antitarget_fnames,
     fa_fname,
     is_haploid_x,
+    diploid_parx_genome,
     sexes,
     fix_gc,
     fix_edge,
@@ -171,7 +173,7 @@ def combine_probes(
     # do_edge  = as given for target; False for antitarget
     # do_rmask  = False for target; as given for antitarget
     ref_df, all_logr, all_depths = load_sample_block(
-        filenames, fa_fname, is_haploid_x, sexes, True, fix_gc, fix_edge, False
+        filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, True, fix_gc, fix_edge, False
     )
     if antitarget_fnames:
         # XXX TODO ensure ordering matches targets!
@@ -180,6 +182,7 @@ def combine_probes(
             antitarget_fnames,
             fa_fname,
             is_haploid_x,
+            diploid_parx_genome,
             sexes,
             False,
             fix_gc,
@@ -227,7 +230,7 @@ def combine_probes(
 
 
 def load_sample_block(
-    filenames, fa_fname, is_haploid_x, sexes, skip_low, fix_gc, fix_edge, fix_rmask, diploid_parx_genome
+    filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, skip_low, fix_gc, fix_edge, fix_rmask
 ):
     r"""Load and summarize a pool of \*coverage.cnn files.
 
