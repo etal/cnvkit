@@ -209,6 +209,7 @@ def _cmd_batch(args):
                     args.reference,
                     args.output_dir,
                     args.male_reference,
+                    args.diploid_parx_genome,
                     args.scatter,
                     args.diagram,
                     args.rscript_path,
@@ -776,6 +777,7 @@ P_coverage.add_argument(
 )
 P_coverage.set_defaults(func=_cmd_coverage)
 
+
 # reference -------------------------------------------------------------------
 
 do_reference = public(reference.do_reference)
@@ -925,7 +927,6 @@ def _cmd_fix(args):
     Adjust raw coverage data according to the given reference, correct potential
     biases and re-center.
     """
-    handle_par_on_chrx(args)
     # Verify that target and antitarget are from the same sample
     tgt_raw = read_cna(args.target, sample_id=args.sample_id)
     anti_raw = read_cna(args.antitarget, sample_id=args.sample_id)
@@ -938,6 +939,7 @@ def _cmd_fix(args):
         tgt_raw,
         anti_raw,
         read_cna(args.reference),
+        args.diploid_parx_genome,
         args.do_gc,
         args.do_edge,
         args.do_rmask,
@@ -998,7 +1000,6 @@ do_segmentation = public(segmentation.do_segmentation)
 
 def _cmd_segment(args):
     """Infer copy number segments from the given coverage table."""
-    handle_par_on_chrx(args)
     cnarr = read_cna(args.filename)
     variants = load_het_snps(
         args.vcf,
@@ -1010,6 +1011,7 @@ def _cmd_segment(args):
     results = segmentation.do_segmentation(
         cnarr,
         args.method,
+        args.diploid_parx_genome,
         args.threshold,
         variants=variants,
         skip_low=args.drop_low_coverage,

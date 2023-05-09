@@ -76,7 +76,7 @@ def hmm_get_model(cnarr, method, diploid_parx_genome, processes):
     method : string
         One of 'hmm', 'hmm-tumor', 'hmm-germline'.
     diploid_parx_genome : string
-        asdfadf
+        Whether to include PAR1/2 from chr X within the autosomes.
     processes : int
         Number of parallel jobs to run.
 

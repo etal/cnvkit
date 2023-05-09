@@ -11,11 +11,11 @@ def do_fix(
     target_raw,
     antitarget_raw,
     reference,
+    diploid_parx_genome=None,
     do_gc=True,
     do_edge=True,
     do_rmask=True,
     do_cluster=False,
-    diploid_parx_genome=None,
 ):
     """Combine target and antitarget coverages and correct for biases."""
     # Load, recenter and GC-correct target & antitarget probes separately

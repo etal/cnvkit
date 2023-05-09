@@ -155,7 +155,7 @@ def batch_make_reference(
     if len(normal_bams) == 0:
         logging.info("Building a flat reference...")
         ref_arr = reference.do_reference_flat(
-            target_bed, antitarget_bed, fasta, male_reference
+            target_bed, antitarget_bed, fasta, male_reference, diploid_parx_genome
         )
     else:
         logging.info("Building a copy number reference from normal samples...")
@@ -226,6 +226,7 @@ def batch_run_sample(
     ref_fname,
     output_dir,
     male_reference,
+    diploid_parx_genome,
     plot_scatter,
     plot_diagram,
     rscript_path,
@@ -236,7 +237,6 @@ def batch_run_sample(
     processes,
     do_cluster,
     fasta=None,
-    diploid_parx_genome=None,
 ):
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
@@ -256,6 +256,7 @@ def batch_run_sample(
         raw_tgt,
         raw_anti,
         read_cna(ref_fname),
+        diploid_parx_genome,
         do_gc=True,
         do_edge=(seq_method == "hybrid"),
         do_rmask=True,
@@ -267,6 +268,7 @@ def batch_run_sample(
     segments = segmentation.do_segmentation(
         cnarr,
         segment_method,
+        diploid_parx_genome,
         rscript_path=rscript_path,
         skip_low=skip_low,
         processes=processes,

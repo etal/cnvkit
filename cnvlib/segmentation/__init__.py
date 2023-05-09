@@ -20,6 +20,7 @@ SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", "hmm", "hmm-tumor", "hmm-ger
 def do_segmentation(
     cnarr,
     method,
+    diploid_parx_genome=None,
     threshold=None,
     variants=None,
     skip_low=False,
@@ -62,6 +63,7 @@ def do_segmentation(
         cna = _do_segmentation(
             cnarr,
             method,
+            diploid_parx_genome,
             threshold,
             variants,
             skip_low,
