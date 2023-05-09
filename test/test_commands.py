@@ -375,69 +375,71 @@ class CommandTests(unittest.TestCase):
             _assert_abs_copies(i, abs_exp, exp_copies)
             _assert_abs_clonal(i, abs_clonal, clonal_copies)
 
-        def _assert_chrx_non_par(abs_df, abs_ref, abs_exp, ref_copies, exp_copies):
+        def _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, ref_copies, exp_copies, clonal_copies):
             i = 21
             _assert_abs_df(i, abs_df, ref_copies, exp_copies)
             _assert_abs_copies(i, abs_ref, ref_copies)
             _assert_abs_copies(i, abs_exp, exp_copies)
+            _assert_abs_clonal(i, abs_clonal, clonal_copies)
 
-        def _assert_chry(abs_df, abs_ref, abs_exp, ref_copies, exp_copies):
+        def _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, ref_copies, exp_copies, clonal_copies):
             i = 40
             _assert_abs_df(i, abs_df, ref_copies, exp_copies)
             _assert_abs_copies(i, abs_ref, ref_copies)
             _assert_abs_copies(i, abs_exp, exp_copies)
+            _assert_abs_clonal(i, abs_clonal, clonal_copies)
 
         is_reference_male = True
         is_female_sample = True
         abs_df, abs_ref, abs_exp, abs_clonal = _run(is_reference_male, is_female_sample)
         _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
         _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 2, 1.59225)
-        _assert_chrx_non_par(abs_df, abs_ref, abs_exp, 1, 2)
-        _assert_chry(abs_df, abs_ref, abs_exp, 1, 0)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 1, 2, 1.34001)
+        _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 0.57410)
         abs_df, abs_ref, abs_exp, abs_clonal = _run(is_reference_male, is_female_sample, "grch38")
         _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
         _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.68449)
-        _assert_chrx_non_par(abs_df, abs_ref, abs_exp, 1, 2)
-        _assert_chry(abs_df, abs_ref, abs_exp, 1, 0)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 1, 2, 1.34001)
+        _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 0.57410)
 
         is_reference_male = True
         is_female_sample = False
         abs_df, abs_ref, abs_exp, abs_clonal = _run(is_reference_male, is_female_sample)
         _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
         _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 1.84225)
-        _assert_chrx_non_par(abs_df, abs_ref, abs_exp, 1, 1)
-        _assert_chry(abs_df, abs_ref, abs_exp, 1, 1)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 1, 1, 1.59001)
+        _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.32410)
         abs_df, abs_ref, abs_exp, abs_clonal = _run(is_reference_male, is_female_sample, "grch38")
         _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
         _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.68449)
-        _assert_chrx_non_par(abs_df, abs_ref, abs_exp, 1, 1)
-        _assert_chry(abs_df, abs_ref, abs_exp, 1, 1)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 1, 1, 1.59001)
+        _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.32410)
 
         is_reference_male = False
         is_female_sample = True
         abs_df, abs_ref, abs_exp, abs_clonal = _run(is_reference_male, is_female_sample)
         _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
         _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.68449)
-        _assert_chrx_non_par(abs_df, abs_ref, abs_exp, 2, 2)
-        _assert_chry(abs_df, abs_ref, abs_exp, 1, 0)  # Do we really want ref=1 for a female ref on chr y?
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 2, 3.18002)
+        _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 0.57410)  # Do we really want ref=1 for a female ref on chr y?
         abs_df, abs_ref, abs_exp, abs_clonal = _run(is_reference_male, is_female_sample, "grch38")
         _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
         _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.684493)
-        _assert_chrx_non_par(abs_df, abs_ref, abs_exp, 2, 2)
-        _assert_chry(abs_df, abs_ref, abs_exp, 1, 0)  # Do we really want ref=1 for a female ref on chr y?
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 2, 3.18002)
+        _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 0.57410)  # Do we really want ref=1 for a female ref on chr y?
 
         is_reference_male = False
         is_female_sample = False
         abs_df, abs_ref, abs_exp, abs_clonal = _run(is_reference_male, is_female_sample)
         _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
         _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 1, 3.93449)
-        _assert_chrx_non_par(abs_df, abs_ref, abs_exp, 2, 1)
-        _assert_chry(abs_df, abs_ref, abs_exp, 1, 1)  # Do we really want ref=1 for a female ref on chr y?
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 1, 3.43002)
+        _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.32410)  # Do we really want ref=1 for a female ref on chr y?
         abs_df, abs_ref, abs_exp, abs_clonal = _run(is_reference_male, is_female_sample, "grch38")
         _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
         _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.68449)
-        _assert_chrx_non_par(abs_df, abs_ref, abs_exp, 2, 1)
-        _assert_chry(abs_df, abs_ref, abs_exp, 1, 1)  # Do we really want ref=1 for a female ref on chr y?
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 1, 3.43002)
+        _assert_chry(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.32410)  # Do we really want ref=1 for a female ref on chr y?
 
 
     def test_coverage(self):
