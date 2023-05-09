@@ -3,6 +3,7 @@
 import logging
 import unittest
 
+from cnvlib import params
 from cnvlib.cnary import CopyNumArray
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
