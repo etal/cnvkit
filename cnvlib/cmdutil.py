@@ -7,7 +7,6 @@ from skgenome import tabio
 from .cnary import CopyNumArray as CNA
 from skgenome import GenomicArray as GA
 
-# todo: check all invocations of read/read_cna and make sure the parameter is forwarded.
 def read_cna(infile, sample_id=None, meta=None):
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a CopyNumArray object."""
     return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)
