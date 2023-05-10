@@ -824,6 +824,7 @@ def _cmd_reference(args):
             antitargets,
             args.fasta,
             args.male_reference,
+            args.diploid_parx_genome,
             female_samples,
             args.do_gc,
             args.do_edge,
