@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import sys
 import warnings
+from typing import List
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
@@ -70,7 +71,7 @@ from .cmdutil import (
 from ._version import __version__
 
 
-__all__ = []
+__all__ = []  # type: List[str]
 
 
 def public(fn):

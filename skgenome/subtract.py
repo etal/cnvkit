@@ -14,7 +14,7 @@ import pandas as pd
 from .intersect import by_ranges
 
 
-def subtract(table, other):
+def subtract(table, other) -> pd.DataFrame:
     """Subtract one set of regions from another, returning the one-way difference."""
     if not len(other):
         return table

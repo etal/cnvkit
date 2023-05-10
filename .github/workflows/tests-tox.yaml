@@ -27,9 +27,8 @@ jobs:
           - {name: '3.10-MacOS', python: '3.10', os: macos-latest, tox: py310}
           - {name: '3.9', python: '3.9', os: ubuntu-latest, tox: py39}
           - {name: '3.8', python: '3.8', os: ubuntu-latest, tox: py38}
-          - {name: '3.7', python: '3.7', os: ubuntu-latest, tox: py37}
-          - {name: '3.7-min', python: '3.7', os: ubuntu-latest, tox: "py37-min"}
-#         - {name: Typing, python: '3.10', os: ubuntu-latest, tox: typing}
+          - {name: '3.8-min', python: '3.8', os: ubuntu-latest, tox: "py38-min"}
+          - {name: Typing, python: '3.10', os: ubuntu-latest, tox: typing}
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
@@ -57,6 +56,12 @@ jobs:
         run: |
           # Stop the build if there are Python syntax errors or undefined names
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      - name: Cache mypy
+        if: matrix.tox == 'typing'
+        uses: actions/cache@v3
+        with:
+          path: ./.mypy_cache
+          key: mypy|${{ matrix.python }}|${{ hashFiles('pyproject.toml') }}
       - name: Run the unit test suite
         run: tox -e ${{ matrix.tox }}
 

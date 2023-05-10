@@ -1,8 +1,12 @@
 """Combiner functions for Python list-like input."""
+from typing import Any, Callable, Dict, Iterable, Sequence, Optional
+
 import pandas as pd
 
 
-def get_combiners(table, stranded=False, combine=None):
+def get_combiners(
+    table: pd.DataFrame, stranded: bool = False, combine: Optional[Dict[str, Callable]] = None
+) -> Dict[str, Callable]:
     """Get a `combine` lookup suitable for `table`.
 
     Parameters
@@ -31,15 +35,15 @@ def get_combiners(table, stranded=False, combine=None):
         cmb.update(combine)
     if "strand" not in cmb:
         cmb["strand"] = first_of if stranded else merge_strands
-    return {k: v for k, v in cmb.items() if k in table.columns}
+    return {k: v for k, v in cmb.items() if k in table.columns}  # type: ignore
 
 
-def first_of(elems):
+def first_of(elems: Sequence) -> Any:
     """Return the first element of the input."""
     return elems[0]
 
 
-def last_of(elems):
+def last_of(elems: Sequence) -> Any:
     """Return the last element of the input."""
     return elems[-1]
 
@@ -47,13 +51,13 @@ def last_of(elems):
 max_of = max
 
 
-def join_strings(elems, sep=","):
+def join_strings(elems: Iterable, sep: str = ",") -> str:
     """Join a Series of strings by commas."""
     # ENH if elements are also comma-separated, split+uniq those too
     return sep.join(pd.unique(elems))
 
 
-def merge_strands(elems):
+def merge_strands(elems: Sequence) -> str:
     """Summarize the given strands as '+', '-', or '.' (both/mixed)"""
     strands = set(elems)
     if len(strands) > 1:
@@ -61,7 +65,7 @@ def merge_strands(elems):
     return elems[0]
 
 
-def make_const(val):
+def make_const(val: Any) -> Callable:
     """Return a function that simply returns the value given as input here."""
 
     def const(_elems):

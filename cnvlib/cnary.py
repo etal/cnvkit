@@ -19,8 +19,8 @@ class CopyNumArray(GenomicArray):
     """
     # s. https://limbus.atlassian.net/browse/OPS-4248 <,-- nochmal mit der cnn datei die sex prediction ausproberien, ob das immer noch falsch ist
 
-    _required_columns = ("chromosome", "start", "end", "gene", "log2")
-    _required_dtypes = (str, int, int, str, float)
+    _required_columns = ("chromosome", "start", "end", "gene", "log2")  # type: ignore
+    _required_dtypes = (str, int, int, str, float)  # type: ignore
     # ENH: make gene optional
     # Extra columns, in order:
     # "depth", "gc", "rmask", "spread", "weight", "probes"

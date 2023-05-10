@@ -6,13 +6,17 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
+from typing import Any, Callable, Sequence, Optional, Union
+
 import numpy as np
 import pandas as pd
 
 from .combiners import first_of, join_strings, make_const
 
+Numeric = Union[int, float, np.number]
 
-def by_ranges(table, other, mode, keep_empty):
+
+def by_ranges(table, other, mode: str, keep_empty: bool):
     """Group rows by another GenomicArray's bin coordinate ranges."""
     for _chrom, bin_rows, src_rows in by_shared_chroms(other, table, keep_empty):
         if src_rows is not None:
@@ -26,7 +30,7 @@ def by_ranges(table, other, mode, keep_empty):
                 yield bin_row, []  # ENH: empty dframe matching table
 
 
-def by_shared_chroms(table, other, keep_empty=True):
+def by_shared_chroms(table, other, keep_empty: bool = True):
     """Group rows for both `table` and `other` by matching chromosome names."""
     # When both `table` and `other` contain only one chromosome each, and it's
     # the same chromosome, we can just return the original tables.
@@ -35,7 +39,7 @@ def by_shared_chroms(table, other, keep_empty=True):
         yield table["chromosome"].iat[0], table, other
         # yield None, table, other
     else:
-        other_chroms = {c: o for c, o in other.groupby('chromosome', sort=False)}
+        other_chroms = {c: o for c, o in other.groupby("chromosome", sort=False)}
         for chrom, ctable in table.groupby("chromosome", sort=False):
             if chrom in other_chroms:
                 otable = other_chroms[chrom]
@@ -44,7 +48,9 @@ def by_shared_chroms(table, other, keep_empty=True):
                 yield chrom, ctable, None
 
 
-def into_ranges(source, dest, src_col, default, summary_func):
+def into_ranges(
+    source, dest, src_col: str, default: Any, summary_func: Optional[Callable]
+):
     """Group a column in `source` by regions in `dest` and summarize."""
     if not len(source) or not len(dest):
         return dest
@@ -76,7 +82,13 @@ def into_ranges(source, dest, src_col, default, summary_func):
     return pd.Series(result)
 
 
-def iter_ranges(table, chrom, starts, ends, mode):
+def iter_ranges(
+    table,
+    chrom: Optional[str],
+    starts: Optional[Sequence[Numeric]],
+    ends: Optional[Sequence[Numeric]],
+    mode: str,
+):
     """Iterate through sub-ranges."""
     assert mode in ("inner", "outer", "trim")
     # Optional if we've already subsetted by chromosome (not checked!)
@@ -101,7 +113,7 @@ def iter_ranges(table, chrom, starts, ends, mode):
         yield subtable
 
 
-def iter_slices(table, other, mode, keep_empty):
+def iter_slices(table, other, mode: str, keep_empty: bool):
     """Yields indices to extract ranges from `table`.
 
     Returns an iterable of integer arrays that can apply to Series objects,
@@ -121,7 +133,7 @@ def iter_slices(table, other, mode, keep_empty):
                     yield indices
 
 
-def idx_ranges(table, starts, ends, mode):
+def idx_ranges(table, starts, ends, mode: str):
     """Iterate through sub-ranges."""
     assert mode in ("inner", "outer")
     # Edge cases: when the `table` is either empty, or both `starts` and `ends`
@@ -145,7 +157,7 @@ def idx_ranges(table, starts, ends, mode):
             yield region_idx, start_val, end_val
 
 
-def _irange_simple(table, starts, ends, mode):
+def _irange_simple(table, starts, ends, mode: str):
     """Slice subsets of table when regions are not nested."""
     if starts is not None and len(starts):
         if mode == "inner":
@@ -173,7 +185,7 @@ def _irange_simple(table, starts, ends, mode):
         yield (slice(start_idx, end_idx), start_val, end_val)
 
 
-def _irange_nested(table, starts, ends, mode):
+def _irange_nested(table, starts: Sequence, ends: Sequence, mode: str):
     """Slice subsets of table when regions are nested."""
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
     assert len(starts) == len(ends) > 0
@@ -184,7 +196,7 @@ def _irange_nested(table, starts, ends, mode):
             if mode == "inner":
                 # Only rows entirely after the start point
                 start_idx = table.start.searchsorted(start_val)
-                region_mask[:int(start_idx)] = 0
+                region_mask[: int(start_idx)] = 0
             else:
                 # Include all rows overlapping the start point
                 region_mask = table.end.values > start_val
@@ -195,12 +207,12 @@ def _irange_nested(table, starts, ends, mode):
             else:
                 # Include all rows overlapping the end point
                 end_idx = table.start.searchsorted(end_val)
-                region_mask[int(end_idx):] = 0
+                region_mask[int(end_idx) :] = 0
 
         yield region_mask, start_val, end_val
 
 
-def venn(table, other, mode):
+def venn(table, other, mode: str):
     # TODO -- implement 'venn' via fjoin algorithm
     # 'cut' table at all 'other' boundaries
     #   -> extra column '_venn_':int (0, 1, 2)
