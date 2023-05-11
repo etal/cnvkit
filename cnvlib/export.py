@@ -247,7 +247,7 @@ VCF_HEADER = """\
 
 
 def export_vcf(
-    segments, ploidy, is_reference_male, is_sample_female, sample_id=None, cnarr=None
+    segments, ploidy, is_reference_male, diploid_parx_genome, is_sample_female, sample_id=None, cnarr=None
 ):
     """Convert segments to Variant Call Format.
 
@@ -269,7 +269,7 @@ def export_vcf(
     ]
     if cnarr:
         segments = assign_ci_start_end(segments, cnarr)
-    vcf_rows = segments2vcf(segments, ploidy, is_reference_male, is_sample_female)
+    vcf_rows = segments2vcf(segments, ploidy, is_reference_male, diploid_parx_genome, is_sample_female)
     table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
     vcf_body = table.to_csv(sep="\t", header=True, index=False, float_format="%.3g")
     return VCF_HEADER, vcf_body
@@ -306,7 +306,7 @@ def segments2vcf(segments, ploidy, is_reference_male, diploid_parx_genome, is_sa
         abs_expect = call.absolute_expect(segments, ploidy, diploid_parx_genome, is_sample_female)
     else:
         abs_dframe = call.absolute_dataframe(
-            segments, ploidy, 1.0, is_reference_male, is_sample_female
+            segments, ploidy, 1.0, is_reference_male, diploid_parx_genome, is_sample_female
         )
         out_dframe["ncopies"] = abs_dframe["absolute"].round().astype("int")
         abs_expect = abs_dframe["expect"]

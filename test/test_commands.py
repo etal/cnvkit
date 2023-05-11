@@ -477,7 +477,7 @@ class CommandTests(unittest.TestCase):
                 else:
                     self.assertLess(len(tbl_bed), len(cns))
             # VCF
-            _vheader, vcf_body = export.export_vcf(cns, ploidy, True, is_f)
+            _vheader, vcf_body = export.export_vcf(cns, ploidy, True, None, is_f)
             self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
 
     def test_export_cdt_jtv(self):

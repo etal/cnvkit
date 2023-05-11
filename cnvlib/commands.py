@@ -2690,6 +2690,7 @@ def _cmd_export_vcf(args):
         segarr,
         args.ploidy,
         args.male_reference,
+        args.diploid_parx_genome,
         is_sample_female,
         args.sample_id,
         cnarr,
@@ -2747,6 +2748,7 @@ P_export_vcf.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output file name."
 )
 P_export_vcf.set_defaults(func=_cmd_export_vcf)
+add_diploid_parx_genome(P_export_vcf)
 
 
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn
