@@ -1,6 +1,7 @@
 """Supporting functions for the 'reference' command."""
 import collections
 import logging
+from concurrent import futures
 
 import numpy as np
 import pandas as pd
@@ -311,41 +312,35 @@ def load_sample_block(
     ]
 
     # Load only coverage depths from the remaining samples
-    for fname in filenames[1:]:
-        logging.info("Loading %s", fname)
-        cnarrx = read_cna(fname)
-        # Bin information should match across all files
-        if not np.array_equal(
-                cnarr1.data.loc[:, ("chromosome", "start", "end", "gene")].values,
-                cnarrx.data.loc[:, ("chromosome", "start", "end", "gene")].values,
-        ):
-            raise RuntimeError(
-                f"{fname} bins do not match those in {filenames[0]}"
-            )
-        all_depths.append(
-            cnarrx["depth"] if "depth" in cnarrx else np.exp2(cnarrx["log2"])
-        )
-        all_logr.append(
-            bias_correct_logr(
-                cnarrx,
-                ref_columns,
-                ref_edge_bias,
-                ref_flat_logr,
-                sexes,
-                is_chr_x,
-                is_chr_y,
-                fix_gc,
-                fix_edge,
-                fix_rmask,
-                skip_low,
-                diploid_parx_genome
-            )
-        )
+    procs = 1  # TODO: Add as param
+    with futures.ProcessPoolExecutor(procs) as pool:
+        args_iter = ((fname, cnarr1, filenames[0], ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low, diploid_parx_genome) for fname in filenames[1:])
+        for depths, logr in pool.map(_parallel_bias_correct_logr, args_iter):
+            all_depths.append(depths)
+            all_logr.append(logr)
     all_logr = np.vstack(all_logr)
     all_depths = np.vstack(all_depths)
     ref_df = pd.DataFrame.from_dict(ref_columns)
     return ref_df, all_logr, all_depths
 
+def _parallel_bias_correct_logr(args):
+    """Wrapper for parallel."""
+    fname, cnarr1, fname1, ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low, diploid_parx_genome = args
+    logging.info("Loading %s", fname)
+    cnarrx = read_cna(fname)
+    # Bin information should match across all files
+    if not np.array_equal(
+            cnarr1.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values,
+            cnarrx.data.loc[:, ('chromosome', 'start', 'end', 'gene')].values):
+        raise RuntimeError("%s bins do not match those in %s"
+                           % (fname, fname1))
+    depths = cnarrx['depth'] if 'depth' in cnarrx else np.exp2(cnarrx['log2'])
+    logr = bias_correct_logr(cnarrx, ref_columns, ref_edge_bias, ref_flat_logr,
+                             sexes, is_chr_x, is_chr_y,
+                             fix_gc, fix_edge, fix_rmask, skip_low,
+                             diploid_parx_genome
+                             )
+    return (depths, logr)
 
 def bias_correct_logr(
     cnarr,
