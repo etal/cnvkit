@@ -316,8 +316,8 @@ def load_sample_block(
         cnarrx = read_cna(fname)
         # Bin information should match across all files
         if not np.array_equal(
-            cnarr1.data.loc[:, ("chromosome", "start", "end", "gene")].values,
-            cnarrx.data.loc[:, ("chromosome", "start", "end", "gene")].values,
+                cnarr1.data.loc[:, ("chromosome", "start", "end", "gene")].values,
+                cnarrx.data.loc[:, ("chromosome", "start", "end", "gene")].values,
         ):
             raise RuntimeError(
                 f"{fname} bins do not match those in {filenames[0]}"
