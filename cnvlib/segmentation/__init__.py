@@ -85,6 +85,7 @@ def do_segmentation(
                         (
                             ca,
                             method,
+                            diploid_parx_genome,
                             threshold,
                             variants,
                             skip_low,
