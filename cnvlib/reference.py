@@ -60,6 +60,7 @@ def do_reference(
     do_rmask=True,
     do_cluster=False,
     min_cluster_size=4,
+    procs=1,
 ):
     """Compile a coverage reference from the given files (normal samples)."""
     if antitarget_fnames:
@@ -111,6 +112,7 @@ def do_reference(
         do_rmask,
         do_cluster,
         min_cluster_size,
+        procs,
     )
     warn_bad_bins(ref_probes)
     return ref_probes
@@ -144,6 +146,7 @@ def combine_probes(
     fix_rmask,
     do_cluster,
     min_cluster_size,
+    procs,
 ):
     """Calculate the median coverage of each bin across multiple samples.
 
@@ -173,7 +176,7 @@ def combine_probes(
     # do_edge  = as given for target; False for antitarget
     # do_rmask  = False for target; as given for antitarget
     ref_df, all_logr, all_depths = load_sample_block(
-        filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, True, fix_gc, fix_edge, False
+        filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, True, fix_gc, fix_edge, False, procs
     )
     if antitarget_fnames:
         # XXX TODO ensure ordering matches targets!
@@ -188,6 +191,7 @@ def combine_probes(
             fix_gc,
             False,
             fix_rmask,
+            procs,
         )
         ref_df = pd.concat([ref_df, anti_ref_df], ignore_index=True)
         all_logr = np.hstack([all_logr, anti_logr])
@@ -230,7 +234,7 @@ def combine_probes(
 
 
 def load_sample_block(
-    filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, skip_low, fix_gc, fix_edge, fix_rmask
+    filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, skip_low, fix_gc, fix_edge, fix_rmask, procs
 ):
     r"""Load and summarize a pool of \*coverage.cnn files.
 
@@ -312,7 +316,6 @@ def load_sample_block(
     ]
 
     # Load only coverage depths from the remaining samples
-    procs = 1  # TODO: Add as param
     with futures.ProcessPoolExecutor(procs) as pool:
         args_iter = ((fname, cnarr1, filenames[0], ref_columns, ref_edge_bias, ref_flat_logr, sexes, is_chr_x, is_chr_y, fix_gc, fix_edge, fix_rmask, skip_low, diploid_parx_genome) for fname in filenames[1:])
         for depths, logr in pool.map(_parallel_bias_correct_logr, args_iter):
