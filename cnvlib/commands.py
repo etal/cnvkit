@@ -1335,7 +1335,7 @@ P_call_vcf.add_argument(
     help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
             frequencies. [Default if used without a number: %(const)s]""",
 )
-
+add_diploid_parx_genome(P_call)
 P_call.set_defaults(func=_cmd_call)
 
 
