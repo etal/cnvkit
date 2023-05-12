@@ -55,7 +55,7 @@ class CopyNumArray(GenomicArray):
         """ All regions on X, potentially without PAR1/2. """
         x = self.chromosome == self.chr_x_label
         if diploid_parx_genome is not None:
-            # Exclude PAR since it is expected to be diploid.
+            # Exclude PAR since they are expected to be diploid (i.e. autosomal).
             x &= ~self.parx_filter(genome_build=diploid_parx_genome)
         return x
 
@@ -64,10 +64,39 @@ class CopyNumArray(GenomicArray):
         genome_build = genome_build.lower()
         assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
         f = self.chromosome == self.chr_x_label
-        par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1"]
-        par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2"]
+        par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1X"]
+        par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2X"]
         f &= ((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end))
         return f
+
+    @property
+    def chr_y_label(self):
+        """The name of the Y chromosome."""
+        if "chr_y" in self.meta:
+            return self.meta["chr_y"]
+        if len(self):
+            chr_y = "chrY" if self.chr_x_label.startswith("chr") else "Y"
+            self.meta["chr_y"] = chr_y
+            return chr_y
+        return ""
+
+    def pary_filter(self, genome_build):
+        """ All PAR1/2 regions on Y. """
+        genome_build = genome_build.lower()
+        assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
+        f = self.chromosome == self.chr_y_label
+        par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1Y"]
+        par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2Y"]
+        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end))
+        return f
+
+    def chr_y_filter(self, diploid_parx_genome=None):
+        """ All regions on Y, potentially without PAR1/2. """
+        y = self.chromosome == self.chr_y_label
+        if diploid_parx_genome is not None:
+            # Exclude PAR on Y since they cannot be covered (everything is mapped to X).
+            y &= ~self.pary_filter(genome_build=diploid_parx_genome)
+        return y
 
     def autosomes(self, diploid_parx_genome=None, also=None):
         """Overrides GenomeArray.autosomes()."""
@@ -79,16 +108,6 @@ class CopyNumArray(GenomicArray):
             else:
                 raise NotImplementedError("Cannot combine pd.Series with non-Series.")
         return super().autosomes(also=also)
-
-    @property
-    def _chr_y_label(self):  # todo: consider adding a chr_y_filter for consistency
-        if "chr_y" in self.meta:
-            return self.meta["chr_y"]
-        if len(self):
-            chr_y = "chrY" if self.chr_x_label.startswith("chr") else "Y"
-            self.meta["chr_y"] = chr_y
-            return chr_y
-        return ""
 
     # More meta to store:
     #   is_sample_male = bool
@@ -327,7 +346,7 @@ class CopyNumArray(GenomicArray):
                 "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
                 self.chr_x_label,
                 stats["chrx_ratio"],
-                self._chr_y_label,
+                self.chr_y_label,
                 stats["chry_ratio"],
                 stats["chrx_male_lr"],
                 stats["chry_male_lr"],
@@ -433,7 +452,7 @@ class CopyNumArray(GenomicArray):
         )
         combined_score = chrx_male_lr
         # Similar for chrY if it's present
-        chry = self[self.chromosome == self._chr_y_label]
+        chry = self[self.chr_y_filter(diploid_parx_genome)]
         if len(chry):
             if skip_low: # das hoeher schieben
                 chry = chry.drop_low_coverage()
@@ -477,12 +496,10 @@ class CopyNumArray(GenomicArray):
         cvg = np.zeros(len(self), dtype=np.float_)
         if is_male_reference:
             # Single-copy X, Y
-            idx = self.chr_x_filter(diploid_parx_genome).values | (
-                self.chromosome == self._chr_y_label
-            ).values
+            idx = self.chr_x_filter(diploid_parx_genome).values | (self.chr_y_filter(diploid_parx_genome)).values
         else:
-            # Y will be all noise, so replace with 1 "flat" copy
-            idx = (self.chromosome == self._chr_y_label).values
+            # Y will be all noise, so replace with 1 "flat" copy, including PAR1/2.
+            idx = (self.chr_y_filter()).values
         cvg[idx] = -1.0
         return cvg
 

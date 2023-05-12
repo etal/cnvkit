@@ -98,7 +98,7 @@ def log2_ratios(
     # Adjust sex chromosomes to be relative to the reference
     if is_reference_male:
         ratios[(cnarr.chr_x_filter(diploid_parx_genome)).values] += 1.0
-    ratios[(cnarr.chromosome == cnarr._chr_y_label).values] += 1.0
+    ratios[(cnarr.chr_y_filter(diploid_parx_genome)).values] += 1.0
     return ratios
 
 
@@ -236,8 +236,12 @@ def get_as_dframe_and_set_reference_and_expect_copies(cnarr, ploidy, is_referenc
         ploidy if is_sample_female else ploidy // 2
     )
 
-    df.loc[df.chromosome == cnarr._chr_y_label, "reference"] = ploidy // 2
-    df.loc[df.chromosome == cnarr._chr_y_label, "expect"] = 0 if is_sample_female else ploidy // 2
+    df.loc[cnarr.chr_y_filter(diploid_parx_genome), "reference"] = ploidy // 2  # reference = 1 even for female ref
+    df.loc[cnarr.chr_y_filter(diploid_parx_genome), "expect"] = 0 if is_sample_female else ploidy // 2
+    if diploid_parx_genome is not None:
+        # PAR1/2 are not covered on Y at all.
+        df.loc[cnarr.pary_filter(diploid_parx_genome), "reference"] = 0
+        df.loc[cnarr.pary_filter(diploid_parx_genome), "expect"] = 0
     return df
 
 

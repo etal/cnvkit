@@ -292,7 +292,7 @@ def load_sample_block(
 
     # Make the sex-chromosome coverages of male and female samples compatible
     is_chr_x = cnarr1.chr_x_filter(diploid_parx_genome)
-    is_chr_y = cnarr1.chromosome == cnarr1._chr_y_label
+    is_chr_y = cnarr1.chr_y_filter(diploid_parx_genome)
     ref_flat_logr = cnarr1.expect_flat_log2(is_haploid_x, diploid_parx_genome)
     ref_edge_bias = fix.get_edge_bias(cnarr1, params.INSERT_SIZE)
     # Pseudocount of 1 "flat" sample
