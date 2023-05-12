@@ -1979,7 +1979,7 @@ do_gainloss = public(do_genemetrics)
 
 def _cmd_sex(args):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
-    cnarrs = [read_cna(fname) for fname in args.filenames]
+    cnarrs = map(read_cna, args.filenames)
     table = do_sex(cnarrs, args.male_reference, args.diploid_parx_genome)
     write_dataframe(args.output, table, header=True)
 
@@ -2046,9 +2046,9 @@ def _cmd_metrics(args):
             "equal, if more than 1 segment file is given."
         )
 
-    cnarrs = [read_cna(cnarray) for cnarray in args.cnarrays]
+    cnarrs = map(read_cna, args.cnarrays)
     if args.segments:
-        args.segments = [read_cna(segment) for segment in args.cnarrays]
+        args.segments = map(read_cna, args.segments)
     table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)
     write_dataframe(args.output, table)
 
@@ -2078,7 +2078,6 @@ P_metrics.add_argument(
 P_metrics.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output table file name."
 )
-add_diploid_parx_genome(P_metrics)
 P_metrics.set_defaults(func=_cmd_metrics)
 
 
