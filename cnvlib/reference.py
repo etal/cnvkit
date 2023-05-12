@@ -59,7 +59,6 @@ def do_reference(
     do_rmask=True,
     do_cluster=False,
     min_cluster_size=4,
-    procs=1,
 ):
     """Compile a coverage reference from the given files (normal samples)."""
     if antitarget_fnames:
@@ -111,7 +110,6 @@ def do_reference(
         do_rmask,
         do_cluster,
         min_cluster_size,
-        procs,
     )
     warn_bad_bins(ref_probes)
     return ref_probes
@@ -145,7 +143,6 @@ def combine_probes(
     fix_rmask,
     do_cluster,
     min_cluster_size,
-    procs,
 ):
     """Calculate the median coverage of each bin across multiple samples.
 
@@ -175,7 +172,7 @@ def combine_probes(
     # do_edge  = as given for target; False for antitarget
     # do_rmask  = False for target; as given for antitarget
     ref_df, all_logr, all_depths = load_sample_block(
-        filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, True, fix_gc, fix_edge, False, procs
+        filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, True, fix_gc, fix_edge, False
     )
     if antitarget_fnames:
         # XXX TODO ensure ordering matches targets!
@@ -190,7 +187,6 @@ def combine_probes(
             fix_gc,
             False,
             fix_rmask,
-            procs,
         )
         ref_df = pd.concat([ref_df, anti_ref_df], ignore_index=True)
         all_logr = np.hstack([all_logr, anti_logr])
@@ -233,7 +229,7 @@ def combine_probes(
 
 
 def load_sample_block(
-    filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, skip_low, fix_gc, fix_edge, fix_rmask, procs
+    filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, skip_low, fix_gc, fix_edge, fix_rmask
 ):
     r"""Load and summarize a pool of \*coverage.cnn files.
 

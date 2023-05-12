@@ -96,13 +96,6 @@ def add_diploid_parx_genome(P):
         type=str,
         help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
     )
-def add_procs(P):
-    P.add_argument(
-        "--procs",
-        type=int,
-        default=1,
-        help="The number of processes to use.",
-    )
 
 # _____________________________________________________________________________
 # Core pipeline
@@ -838,7 +831,6 @@ def _cmd_reference(args):
             args.do_rmask,
             args.cluster,
             args.min_cluster_size,
-            args.procs,
         )
     else:
         raise ValueError(usage_err_msg)
@@ -893,7 +885,6 @@ P_reference.add_argument(
             so the reference chrX average is 0.""",
 )
 add_diploid_parx_genome(P_reference)
-add_procs(P_reference)
 
 P_reference_flat = P_reference.add_argument_group(
     'To construct a generic, "flat" copy number reference with neutral '
