@@ -42,7 +42,7 @@ class CopyNumArray(GenomicArray):
 
         This is either "X" or "chrX".
         """
-        key = "chr_x_label"
+        key = "chr_x"
         if key in self.meta:
             return self.meta[key]
         if len(self):
