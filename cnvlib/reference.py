@@ -373,13 +373,13 @@ def bias_correct_logr(
     else:
         # todo: output samlpe name while logging (due to parallelism)
         if "gc" in ref_columns and fix_gc:
-            logging.info("Correcting for GC bias...")
+            logging.info(f"Correcting for GC bias for {cnarr.sample_id}...")
             cnarr = fix.center_by_window(cnarr, 0.1, ref_columns["gc"])
         if "rmask" in ref_columns and fix_rmask:
-            logging.info("Correcting for RepeatMasker bias...")
+            logging.info(f"Correcting for RepeatMasker bias for {cnarr.sample_id}...")
             cnarr = fix.center_by_window(cnarr, 0.1, ref_columns["rmask"])
         if fix_edge:
-            logging.info("Correcting for density bias...")
+            logging.info(f"Correcting for density bias for {cnarr.sample_id}...")
             cnarr = fix.center_by_window(cnarr, 0.1, ref_edge_bias)
     return cnarr["log2"]
 
