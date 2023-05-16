@@ -131,7 +131,6 @@ class CNATests(unittest.TestCase):
         self.assertEqual(cna[3:6], same[3:6])
 
     def test_center_all(self):
-        # todo: add test?
         """Test recentering."""
         cna = cnvlib.read("formats/reference-tr.cnn")
         # Median-centering an already median-centered array -> no change
@@ -172,7 +171,7 @@ class CNATests(unittest.TestCase):
         self.assertTrue((cleaned["log2"] == cna["log2"]).all())
 
     def test_guess_xx(self):
-        # todo: add test
+        # TODO: Consider adding a test with --diploid-parx-genome option
         """Guess chromosomal sex from chrX log2 ratio value."""
         for (fname, sample_is_f, ref_is_m) in (
             ("formats/f-on-f.cns", True, False),
@@ -215,17 +214,6 @@ class CNATests(unittest.TestCase):
             self.assertGreaterEqual(signal.min(), cnarr.log2.min())
             self.assertLessEqual(signal.max(), cnarr.log2.max())
 
-class SettingsTests(unittest.TestCase):
-
-    def test_genome_build(self):
-        pass
-        #settings.ys
-        #self.assertEqual(ex_cnr.genome_build, None, "By default, the genome build is None.")
-        #self.assertRaises(Exception, ex_cnr.set_genome_build, "doesnt-exist")
-        #ex_cnr.set_genome_build("grch38")
-        #self.assertEqual(ex_cnr.genome_build, "grch38", "The genome build can be set.")
-        #ex_cnr.set_genome_build("GRCh38")
-        #self.assertEqual(ex_cnr.genome_build, "grch38", "The genome build is converted to lower case.")
 
 
 class OtherTests(unittest.TestCase):
