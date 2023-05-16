@@ -42,7 +42,25 @@ haploid-X reference, segments on chromosome X with log2-ratio +1 will be treated
 as copy-number-neutral, because that's the expected copy number, while an
 X-chromosome segment with log2-ratio 0 will be treated as a hemizygous loss.
 
-TODO: add docs here
+PAR handling
+------------
+
+Some reference genomes (files) have hard-masked (i.e. replaced with Ns) the
+pseudoautosomal regions on chromosome Y. This means that male samples seem to
+have doubled coverage on chromosome X within PAR1/2 (since chromosome Y cannot
+be covered at all). This will bias the reference creation as well as the copy
+number calling. In order to avoid this, the option ``--diploid-parx-genome
+<genome-build>`` can be used for all affected commands. The genome build should
+be "grch38" or similar. This will cause cnvkit to treat the PAR1/2 on
+chromosome X as effectively autosomal (i.e. the expected copy number is the
+same for females and males, the sex prediction expects the same coverage on X
+in PAR1/2 for both sexes, etc.)
+
+When ``--male-reference`` (see above) is also used, the reference copy number
+for PAR1/2 on X is still 2 (same as for the autosomes).
+
+See also: https://en.wikipedia.org/wiki/Pseudoautosomal_region
+See also: https://gatk.broadinstitute.org/hc/en-us/articles/360041155232-Reference-Genome-Components
 
 Plots and sex chromosomes
 -------------------------
@@ -87,5 +105,3 @@ the segment means. Try repeating the :ref:`segment` command with the
 ``--drop-low-coverage`` option if you did not do so originally.
 
 See also: https://www.biostars.org/p/210080/
-
-# todo: add docs here
