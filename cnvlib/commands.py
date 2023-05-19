@@ -1104,6 +1104,7 @@ P_segment.add_argument(
     help="""Perform an additional smoothing before CBS segmentation, which in some cases
             may increase the sensitivity. Used only for CBS method.""",
 )
+add_diploid_parx_genome(P_segment)
 
 P_segment_vcf = P_segment.add_argument_group(
     "To additionally segment SNP b-allele frequencies"
