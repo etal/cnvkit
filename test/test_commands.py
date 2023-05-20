@@ -4,7 +4,7 @@ import unittest
 
 import logging
 
-from cnvlib.cnary import CopyNumArray
+from multiprocessing import Pool
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -759,14 +759,14 @@ class CommandTests(unittest.TestCase):
                 cnrs.append(cnr)
                 cnss.append(cns)
                 clls.append(cll)
-            sex_df = commands.do_sex(cnrs, is_male_reference=False, diploid_parx_genome=None)
+            sex_df = commands.do_sex(cnrs, is_male_reference=False, diploid_parx_genome=diploid_parx_genome)
             return ref_probes, cnrs, cnss, clls, sex_df
 
         #### MIXED POOL ####
         target_fnames = male_target_fnames + female_target_fnames
         antitarget_fnames = male_antitarget_fnames + female_antitarget_fnames
-        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = _run(target_fnames, antitarget_fnames, None)
-        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = _run(target_fnames, antitarget_fnames, genome_build)
+        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(target_fnames, antitarget_fnames, None)
+        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(target_fnames, antitarget_fnames, genome_build)
 
         # "dpxg" = DiploidParXGenome
         male_call, male_call_dpxg = clls1[1], clls2[1]
@@ -784,8 +784,8 @@ class CommandTests(unittest.TestCase):
         #### MALE-ONLY POOL ####
         target_fnames = male_target_fnames
         antitarget_fnames = male_antitarget_fnames
-        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = _run(target_fnames, antitarget_fnames, None)
-        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = _run(target_fnames, antitarget_fnames, genome_build)
+        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(target_fnames, antitarget_fnames, None)
+        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(target_fnames, antitarget_fnames, genome_build)
 
         male_call, male_call_dpxg = clls1[1], clls2[1]
         male_call__x, male_call_dpxg__x = male_call[male_call.chr_x_filter()], male_call_dpxg[male_call_dpxg.chromosome == "X"]
@@ -798,6 +798,29 @@ def linecount(filename):
         for i, _line in enumerate(handle):
             pass
         return i + 1
+
+
+def run_samples(target_fnames, antitarget_fnames, diploid_parx_genome):
+    ref_probes = commands.do_reference(target_fnames, antitarget_fnames, diploid_parx_genome=diploid_parx_genome)
+    iter_args = [(target_fnames[i], antitarget_fnames[i], ref_probes, diploid_parx_genome) for i in range(len(target_fnames))]
+    cnrs, cnss, clls = [], [], []
+    with Pool() as pool:
+        for (cnr, cns, cll) in pool.starmap(run_sample, iter_args):
+            cnrs.append(cnr)
+            cnss.append(cns)
+            clls.append(cll)
+
+    sex_df = commands.do_sex(cnrs, is_male_reference=False, diploid_parx_genome=diploid_parx_genome)
+    return ref_probes, cnrs, cnss, clls, sex_df
+
+
+def run_sample(target_fname, antitarget_fname, ref_probes, diploid_parx_genome):
+    tgt_raw = cnvlib.read(target_fname)
+    anti_raw = cnvlib.read(antitarget_fname)
+    cnr = commands.do_fix(tgt_raw, anti_raw, ref_probes, diploid_parx_genome=diploid_parx_genome)
+    cns = commands.do_segmentation(cnr, method="cbs", diploid_parx_genome=diploid_parx_genome, threshold=0.001)
+    cll = commands.do_call(cns, diploid_parx_genome=diploid_parx_genome)
+    return (cnr, cns, cll)
 
 
 if __name__ == "__main__":
