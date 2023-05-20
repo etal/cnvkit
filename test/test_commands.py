@@ -749,22 +749,7 @@ class CommandTests(unittest.TestCase):
 
         def _run(target_fnames, antitarget_fnames, diploid_parx_genome):
             ref_probes = commands.do_reference(target_fnames, antitarget_fnames, diploid_parx_genome=diploid_parx_genome)
-            ref_fname = "reference.cnn"
-            #tabio.write(ref_probes, ref_fname)
             cnrs, cnss, clls = [], [], []
-            #def each_sample(i):
-            #    tgt_raw = cnvlib.read(target_fnames[i])
-            #    anti_raw = cnvlib.read(antitarget_fnames[i])
-            #    cnr = commands.do_fix(tgt_raw, anti_raw, ref_probes, diploid_parx_genome=diploid_parx_genome)
-            #    cns = commands.do_segmentation(cnr, method="cbs", diploid_parx_genome=diploid_parx_genome, threshold=0.1)
-            #    cll = commands.do_call(cns, diploid_parx_genome=diploid_parx_genome)
-            #    return (cnr, cns, cll)
-
-            #with ProcessPoolExecutor() as pool:
-            #    for (cnr, cns, cll) in pool.map(each_sample, [0]):
-            #        cnrs.append(cnr)
-            #        cnss.append(cns)
-            #        clls.append(cll)
             for i in range(0, len(target_fnames)):
                 tgt_raw = cnvlib.read(target_fnames[i])
                 anti_raw = cnvlib.read(antitarget_fnames[i])
@@ -778,13 +763,8 @@ class CommandTests(unittest.TestCase):
             return ref_probes, cnrs, cnss, clls, sex_df
 
         #### MIXED POOL ####
-        target_fnames = male_target_fnames[:1] + female_target_fnames[:1]
-        antitarget_fnames = male_antitarget_fnames[:1] + female_antitarget_fnames[:1]
         target_fnames = male_target_fnames + female_target_fnames
         antitarget_fnames = male_antitarget_fnames + female_antitarget_fnames
-        #with parallel.pick_pool(nprocs=2) as pool:
-        # cvg_centers = pool.submit(np.apply_along_axis, descriptives.biweight_location, 0, all_logr).result()
-        #    depth_centers = pool.submit(np.apply_along_axis, descriptives.biweight_location, 0, all_depths).result()
         ref_probes1, cnrs1, cnss1, clls1, sex_df1 = _run(target_fnames, antitarget_fnames, None)
         ref_probes2, cnrs2, cnss2, clls2, sex_df2 = _run(target_fnames, antitarget_fnames, genome_build)
 
@@ -792,8 +772,6 @@ class CommandTests(unittest.TestCase):
         male_call, male_call_dpxg = clls1[1], clls2[1]
         female_call, female_call_dpxg = clls1[2], clls2[2]
         male_call__x, male_call_dpxg__x = male_call[male_call.chr_x_filter()], male_call_dpxg[male_call_dpxg.chromosome == "X"]
-        #male_call__par1x, male_call_dpxg__par1x = male_call__x[0], male_call_dpxg__x[0]
-        #male_call__par2x, male_call_dpxg__par2x = male_call__x[8], male_call_dpxg__x[8]
         female_call__x, female_call_dpxg__x = female_call[female_call.chromosome == "X"], female_call_dpxg[female_call_dpxg.chromosome == "X"]
 
         # The cn=0 segment for the male sample is derived from a true loss on XAGE1B.
@@ -802,33 +780,17 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(female_call__x['cn'].to_list(), [1, 2, 2, 1], "Non-Dpxg female is biased towards loss in PAR1/2.")
         self.assertEqual(female_call_dpxg__x['cn'].to_list(), [2, 2], "Dpxg female has cn=2 everywhere including PAR1/2.")
 
-        #self.assertTrue(male_call__par1x.end == 2688682 and male_call_dpxg__par1x.end == 2688682, "PAR1 is first region.")
-        #self.assertAlmostEqual(male_call__par1x.log2, -0.22945, "Non-dpxg male sample has PAR1 log2 ratio biased towards loss.")
-        #self.assertAlmostEqual(male_call_dpxg__par1x.log2, 0.02689, "Dpxg male sample has neutral PAR1 log2 ratio.")
 
-        #self.assertTrue(male_call__par2x.start == 155003483 and male_call_dpxg__par2x.start == 155003483, "PAR2 is first region.")
-        #self.assertAlmostEqual(male_call__par2x.log2, -0.29471, "Non-dpxg male sample has PAR2 log2 ratio biased towards loss.")
-        #self.assertAlmostEqual(male_call_dpxg__par2x.log2, 0.00950, "Dpxg male sample has neutral PAR2 log2 ratio.")
-
-
-        #self.assertTrue(len(male_call_dpxg__x) == 3 and male_call_dpxg__x['cn'].to_list() == [2, 1, 1], "Dpxg male has 3 segments on X, with cn=2 for PAR1 and 1 otherwise.")
-        #self.assertTrue(len(female_call__x) == 3 and female_call__x['cn'].to_list() == [2, 2, 2], "Non-dpxg female has a separate segment for PAR1X.")
-        #self.assertTrue(len(female_call_dpxg__x) == 2 and female_call_dpxg__x['cn'].to_list() == [2, 2], "Dpxg female has only 2 segments on X.")
-#
         #### MALE-ONLY POOL ####
-        #target_fnames = male_target_fnames
-        #antitarget_fnames = male_antitarget_fnames
-        #ref_probes1, cnrs1, cnss1, clls1, sex_df1 = _run(target_fnames, antitarget_fnames, None)
-        #ref_probes2, cnrs2, cnss2, clls2, sex_df2 = _run(target_fnames, antitarget_fnames, genome_build)
+        target_fnames = male_target_fnames
+        antitarget_fnames = male_antitarget_fnames
+        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = _run(target_fnames, antitarget_fnames, None)
+        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = _run(target_fnames, antitarget_fnames, genome_build)
 
-        #male_call, male_call_dpxg = clls1[0], clls2[0]
-        #male_call__x, male_call_dpxg__x = male_call[male_call.chr_x_filter()], male_call_dpxg[male_call_dpxg.chromosome == "X"]
-        #tabio.write(male_call, "male.call")
-        #tabio.write(male_call_dpxg, "male_dpxg.call")
-        #tokdo: plot cns, too
-        #self.assertTrue(len(male_call__x) == 2 and male_call__x['cn'].to_list() == [1, 1], "Non-dpxg male samples has 2 segments on X with both cn=1.")
-        #self.assertTrue(len(male_call_dpxg__x) == 3 and male_call_dpxg__x['cn'].to_list() == [2, 1, 1], "Dpxg male has 3 segments on X, with cn=2 for PAR1 and 1 otherwise.")
-        #x = 4
+        male_call, male_call_dpxg = clls1[1], clls2[1]
+        male_call__x, male_call_dpxg__x = male_call[male_call.chr_x_filter()], male_call_dpxg[male_call_dpxg.chromosome == "X"]
+        self.assertEqual(male_call__x['cn'].to_list(), [1, 1], "Non-Dpxg male has cn=1 including PAR1/2.")
+        self.assertEqual(male_call_dpxg__x['cn'].to_list(), [2, 1, 1, 2], "Dpxg male has cn=2 for PAR1/2 and cn=1 otherwise.")
 
 def linecount(filename):
     i = -1
