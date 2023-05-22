@@ -215,7 +215,6 @@ class CNATests(unittest.TestCase):
             self.assertLessEqual(signal.max(), cnarr.log2.max())
 
 
-
 class OtherTests(unittest.TestCase):
     """Tests for other functionality."""
 
