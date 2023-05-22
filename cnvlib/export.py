@@ -290,6 +290,8 @@ def assign_ci_start_end(segarr, cnarr):
     """
     lefts_rights = (
         (bins.end.iat[0], bins.start.iat[-1])
+        if len(bins.end) > 0 and len(bins.start) > 0
+        else (np.nan, np.nan)
         for _seg, bins in cnarr.by_ranges(segarr, mode="outer")
     )
     ci_lefts, ci_rights = zip(*lefts_rights)
