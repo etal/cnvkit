@@ -747,21 +747,6 @@ class CommandTests(unittest.TestCase):
         self.assertTrue(target_log2_mean_parx - 0.9 > target_log2_mean_non_parx, "PAR1/2 have nearly doubled coverage.")
         self.assertTrue(antitarget_log2_mean_parx - 0.9 > antitarget_log2_mean_non_parx, "PAR1/2 have nearly doubled coverage.")
 
-        def _run(target_fnames, antitarget_fnames, diploid_parx_genome):
-            ref_probes = commands.do_reference(target_fnames, antitarget_fnames, diploid_parx_genome=diploid_parx_genome)
-            cnrs, cnss, clls = [], [], []
-            for i in range(0, len(target_fnames)):
-                tgt_raw = cnvlib.read(target_fnames[i])
-                anti_raw = cnvlib.read(antitarget_fnames[i])
-                cnr = commands.do_fix(tgt_raw, anti_raw, ref_probes, diploid_parx_genome=diploid_parx_genome)
-                cns = commands.do_segmentation(cnr, method="cbs", diploid_parx_genome=diploid_parx_genome, threshold=0.001)
-                cll = commands.do_call(cns, diploid_parx_genome=diploid_parx_genome)
-                cnrs.append(cnr)
-                cnss.append(cns)
-                clls.append(cll)
-            sex_df = commands.do_sex(cnrs, is_male_reference=False, diploid_parx_genome=diploid_parx_genome)
-            return ref_probes, cnrs, cnss, clls, sex_df
-
         #### MIXED POOL ####
         target_fnames = male_target_fnames + female_target_fnames
         antitarget_fnames = male_antitarget_fnames + female_antitarget_fnames
