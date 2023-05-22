@@ -17,7 +17,6 @@ class CopyNumArray(GenomicArray):
 
     Optional columns: gc, rmask, spread, weight, probes
     """
-    # s. https://limbus.atlassian.net/browse/OPS-4248 <,-- nochmal mit der cnn datei die sex prediction ausproberien, ob das immer noch falsch ist
 
     _required_columns = ("chromosome", "start", "end", "gene", "log2")  # type: ignore
     _required_dtypes = (str, int, int, str, float)  # type: ignore
@@ -454,7 +453,7 @@ class CopyNumArray(GenomicArray):
         # Similar for chrY if it's present
         chry = self[self.chr_y_filter(diploid_parx_genome)]
         if len(chry):
-            if skip_low: # das hoeher schieben
+            if skip_low:
                 chry = chry.drop_low_coverage()
             chry_male_lr = compare_chrom(
                 chry["log2"].values,

@@ -46,15 +46,21 @@ PAR handling
 ------------
 
 Some reference genomes (files) have hard-masked (i.e. replaced with Ns) the
-pseudoautosomal regions on chromosome Y. This means that male samples seem to
-have doubled coverage on chromosome X within PAR1/2 (since chromosome Y cannot
-be covered at all). This will bias the reference creation as well as the copy
-number calling. In order to avoid this, the option ``--diploid-parx-genome
-<genome-build>`` can be used for all affected commands. The genome build should
-be "grch38" or similar. This will cause cnvkit to treat the PAR1/2 on
-chromosome X as effectively autosomal (i.e. the expected copy number is the
-same for females and males, the sex prediction expects the same coverage on X
-in PAR1/2 for both sexes, etc.)
+pseudoautosomal regions on chromosome Y. This means that male samples have
+doubled coverage on chromosome X within PAR1/2 (since chromosome Y cannot be
+covered at all). This will bias the reference creation as well as the copy
+number calling. For example, in a mixed run with male & female samples, the
+male samples are biased towards a copy number gain in PAR1/2 since they do have
+similar coverage compared to the female samples. Conversely, the female samples
+seem to exhibit a copy number loss there (they should have doubled coverage but
+haven't).
+
+In order to avoid this, the option ``--diploid-parx-genome <genome-build>`` can
+be used for all affected commands. The genome build should be "grch38" or
+similar. This will cause cnvkit to treat the PAR1/2 on chromosome X as
+effectively autosomal (i.e. the expected copy number is the same for females
+and males, the sex prediction expects the same coverage on X in PAR1/2 for both
+sexes, etc.)
 
 When ``--male-reference`` (see above) is also used, the reference copy number
 for PAR1/2 on X is still 2 (same as for the autosomes).

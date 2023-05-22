@@ -373,7 +373,6 @@ def bias_correct_logr(
             "check that the right BED file was used"
         )
     else:
-        # todo: output samlpe name while logging (due to parallelism)
         if "gc" in ref_columns and fix_gc:
             logging.info(f"Correcting for GC bias for {cnarr.sample_id}...")
             cnarr = fix.center_by_window(cnarr, 0.1, ref_columns["gc"])
