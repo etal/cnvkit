@@ -272,7 +272,7 @@ class CommandTests(unittest.TestCase):
                 self.assertIn(colname, result)
 
     def test_call_log2_ratios(self):
-        cnarr = cnvlib.read("formats/par-reference.cnn")
+        cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
         ploidy = 2
         purity = 0.8
         is_reference_male = True
@@ -352,9 +352,9 @@ class CommandTests(unittest.TestCase):
                 is_sample_female=sample_is_f,
             )
             test_chrom_means(cns_p99)
-            
+
     def test_call_various_abs_ref_exp_methods(self):
-        cnarr = cnvlib.read("formats/par-reference.cnn")
+        cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
 
         def _run(is_reference_male, is_sample_female, diploid_parx_genome=None):
             ploidy = 2

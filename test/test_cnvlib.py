@@ -98,7 +98,7 @@ class CNATests(unittest.TestCase):
     def test_autosomes(self):
         """Test selection of autosomes specific to CNA. """
 
-        ex_cnn = cnvlib.read("formats/par-reference.cnn")
+        ex_cnn = cnvlib.read("formats/par-reference.grch38.cnn")
         auto = ex_cnn.autosomes()
         true_number_of_non_x_non_y_regions = 11
         self.assertEqual(len(auto), true_number_of_non_x_non_y_regions, "Extraction of autosomes works as expected.")
@@ -151,11 +151,11 @@ class CNATests(unittest.TestCase):
             self.assertLess(abs(cp["log2"].median() - orig_chr1_cvg), 0.1)
 
         # PAR setting influences centering.
-        cna1 = cnvlib.read("formats/par-reference.cnn")
+        cna1 = cnvlib.read("formats/par-reference.grch38.cnn")
         before1 = np.median(cna1["log2"])
         cna1.center_all()
         after1 = np.median(cna1["log2"])
-        cna2 = cnvlib.read("formats/par-reference.cnn")
+        cna2 = cnvlib.read("formats/par-reference.grch38.cnn")
         before2 = np.median(cna2["log2"])
         cna2.center_all(diploid_parx_genome="grch38")
         after2 = np.median(cna2["log2"])
