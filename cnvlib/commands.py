@@ -1985,7 +1985,7 @@ def _cmd_sex(args):
 
 
 @public
-def do_sex(cnarrs, is_male_reference, diploid_parx_genome):
+def do_sex(cnarrs, is_haploid_x_reference, diploid_parx_genome):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
 
     def strsign(num):
@@ -1994,7 +1994,7 @@ def do_sex(cnarrs, is_male_reference, diploid_parx_genome):
         return "%.3g" % num
 
     def guess_and_format(cna):
-        is_xy, stats = cna.compare_sex_chromosomes(is_male_reference, diploid_parx_genome)
+        is_xy, stats = cna.compare_sex_chromosomes(is_haploid_x_reference, diploid_parx_genome)
         return (
             cna.meta["filename"] or cna.sample_id,
             "Male" if is_xy else "Female",
