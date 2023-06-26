@@ -110,7 +110,7 @@ class CopyNumArray(GenomicArray):
 
     # More meta to store:
     #   is_sample_male = bool
-    #   is_reference_male = bool
+    #   is_haploid_x_reference = bool
     #   * invalidate 'chr_x' if .chromosome/['chromosome'] is set
 
     # Traversal
@@ -295,7 +295,7 @@ class CopyNumArray(GenomicArray):
 
     # Chromosomal sex
 
-    def shift_xx(self, male_reference=False, is_xx=None, diploid_parx_genome=None):
+    def shift_xx(self, is_haploid_x_reference=False, is_xx=None, diploid_parx_genome=None):
         """Adjust chrX log2 ratios to match the ploidy of the reference sex.
 
         I.e. add 1 to chrX log2 ratios for a male sample vs. female reference,
@@ -304,18 +304,18 @@ class CopyNumArray(GenomicArray):
         """
         outprobes = self.copy()
         if is_xx is None:
-            is_xx = self.guess_xx(male_reference=male_reference, diploid_parx_genome=diploid_parx_genome)
-        if is_xx and male_reference:
+            is_xx = self.guess_xx(is_haploid_x_reference=is_haploid_x_reference, diploid_parx_genome=diploid_parx_genome)
+        if is_xx and is_haploid_x_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
             outprobes[outprobes.chromosome == self._chr_x_label, "log2"] -= 1.0
             # Male: no change
-        elif not is_xx and not male_reference:
+        elif not is_xx and not is_haploid_x_reference:
             # Male: multiply X coverages by 2 (in log2: add 1)
             outprobes[outprobes.chromosome == self._chr_x_label, "log2"] += 1.0
             # Female: no change
         return outprobes
 
-    def guess_xx(self, male_reference=False, diploid_parx_genome=None, verbose=True):
+    def guess_xx(self, is_haploid_x_reference=False, diploid_parx_genome=None, verbose=True):
         """Detect chromosomal sex; return True if a sample is probably female.
 
         Uses `compare_sex_chromosomes` to calculate coverage ratios of the X and
@@ -323,7 +323,7 @@ class CopyNumArray(GenomicArray):
 
         Parameters
         ----------
-        male_reference : bool
+        is_haploid_x_reference : bool
             Was this sample normalized to a male reference copy number profile?
         verbose : bool
             If True, print (i.e. log to console) the ratios of the log2
@@ -336,7 +336,7 @@ class CopyNumArray(GenomicArray):
         bool
             True if the coverage ratios indicate the sample is female.
         """
-        is_xy, stats = self.compare_sex_chromosomes(male_reference, diploid_parx_genome)
+        is_xy, stats = self.compare_sex_chromosomes(is_haploid_x_reference, diploid_parx_genome)
         if is_xy is None:
             return None
         if verbose:
@@ -354,7 +354,7 @@ class CopyNumArray(GenomicArray):
             )
         return ~is_xy
 
-    def compare_sex_chromosomes(self, male_reference=False, diploid_parx_genome=None, skip_low=False):
+    def compare_sex_chromosomes(self, is_haploid_x_reference=False, diploid_parx_genome=None, skip_low=False):
         """Compare coverage ratios of sex chromosomes versus autosomes.
 
         Perform 4 Mood's median tests of the log2 coverages on chromosomes X and
@@ -364,7 +364,7 @@ class CopyNumArray(GenomicArray):
 
         Parameters
         ----------
-        male_reference : bool
+        is_haploid_x_reference : bool
             Whether a male reference copy number profile was used to normalize
             the data. If so, a male sample should have log2 values of 0 on X and
             Y, and female +1 on X, deep negative (below -3) on Y. Otherwise, a
@@ -442,7 +442,7 @@ class CopyNumArray(GenomicArray):
             # Difference in medians is also smaller for similar-median sets
             return f_diff / max(m_diff, 0.01)
 
-        female_x_shift, male_x_shift = (-1, 0) if male_reference else (0, +1)
+        female_x_shift, male_x_shift = (-1, 0) if is_haploid_x_reference else (0, +1)
         chrx_male_lr = compare_chrom(
             chrx["log2"].values,
             (chrx["weight"].values if use_weight else None),
@@ -482,7 +482,7 @@ class CopyNumArray(GenomicArray):
             ),
         )
 
-    def expect_flat_log2(self, is_male_reference=None, diploid_parx_genome=None):
+    def expect_flat_log2(self, is_haploid_x_reference=None, diploid_parx_genome=None):
         """Get the uninformed expected copy ratios of each bin.
 
         Create an array of log2 coverages like a "flat" reference.
@@ -490,10 +490,10 @@ class CopyNumArray(GenomicArray):
         This is a neutral copy ratio at each autosome (log2 = 0.0) and sex
         chromosomes based on whether the reference is male (XX or XY).
         """
-        if is_male_reference is None:
-            is_male_reference = not self.guess_xx(diploid_parx_genome=diploid_parx_genome, verbose=False)
+        if is_haploid_x_reference is None:
+            is_haploid_x_reference = not self.guess_xx(diploid_parx_genome=diploid_parx_genome, verbose=False)
         cvg = np.zeros(len(self), dtype=np.float_)
-        if is_male_reference:
+        if is_haploid_x_reference:
             # Single-copy X, Y
             idx = self.chr_x_filter(diploid_parx_genome).values | (self.chr_y_filter(diploid_parx_genome)).values
         else:

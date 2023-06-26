@@ -12,7 +12,7 @@ from .cmdutil import read_cna
 from .cnary import CopyNumArray as CNA
 
 
-def do_reference_flat(targets, antitargets=None, fa_fname=None, male_reference=False, diploid_parx_genome=None):
+def do_reference_flat(targets, antitargets=None, fa_fname=None, is_haploid_x_reference=False, diploid_parx_genome=None):
     """Compile a neutral-coverage reference from the given intervals.
 
     Combines the intervals, shifts chrX values if requested, and calculates GC
@@ -22,7 +22,7 @@ def do_reference_flat(targets, antitargets=None, fa_fname=None, male_reference=F
     if antitargets:
         ref_probes.add(bed2probes(antitargets))
     # Set sex chromosomes by "reference" sex
-    ref_probes["log2"] = ref_probes.expect_flat_log2(male_reference, diploid_parx_genome)
+    ref_probes["log2"] = ref_probes.expect_flat_log2(is_haploid_x_reference, diploid_parx_genome)
     ref_probes["depth"] = np.exp2(ref_probes["log2"])  # Shim
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
@@ -51,7 +51,7 @@ def do_reference(
     target_fnames,
     antitarget_fnames=None,
     fa_fname=None,
-    male_reference=False,
+    is_haploid_x_reference=False,
     diploid_parx_genome=None,
     female_samples=None,
     do_gc=True,
@@ -102,7 +102,7 @@ def do_reference(
         target_fnames,
         antitarget_fnames,
         fa_fname,
-        male_reference,
+        is_haploid_x_reference,
         diploid_parx_genome,
         sexes,
         do_gc,

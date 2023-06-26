@@ -29,7 +29,7 @@ def batch_make_reference(
     normal_bams,
     target_bed,
     antitarget_bed,
-    male_reference,
+    is_haploid_x_reference,
     diploid_parx_genome,
     fasta,
     annotate,
@@ -155,7 +155,7 @@ def batch_make_reference(
     if len(normal_bams) == 0:
         logging.info("Building a flat reference...")
         ref_arr = reference.do_reference_flat(
-            target_bed, antitarget_bed, fasta, male_reference, diploid_parx_genome
+            target_bed, antitarget_bed, fasta, is_haploid_x_reference, diploid_parx_genome
         )
     else:
         logging.info("Building a copy number reference from normal samples...")
@@ -197,7 +197,7 @@ def batch_make_reference(
             target_fnames,
             antitarget_fnames,
             fasta,
-            male_reference,
+            is_haploid_x_reference,
             diploid_parx_genome,
             None,
             do_gc=True,
@@ -225,7 +225,7 @@ def batch_run_sample(
     antitarget_bed,
     ref_fname,
     output_dir,
-    male_reference,
+    is_haploid_x_reference,
     diploid_parx_genome,
     plot_scatter,
     plot_diagram,
@@ -308,11 +308,11 @@ def batch_run_sample(
         logging.info("Wrote %s-scatter.png", sample_pfx)
 
     if plot_diagram:
-        is_xx = cnarr.guess_xx(male_reference, diploid_parx_genome)
+        is_xx = cnarr.guess_xx(is_haploid_x_reference, diploid_parx_genome)
         outfname = sample_pfx + "-diagram.pdf"
         diagram.create_diagram(
-            cnarr.shift_xx(male_reference, is_xx, diploid_parx_genome),
-            seg_final.shift_xx(male_reference, is_xx, diploid_parx_genome),
+            cnarr.shift_xx(is_haploid_x_reference, is_xx, diploid_parx_genome),
+            seg_final.shift_xx(is_haploid_x_reference, is_xx, diploid_parx_genome),
             0.5,
             3,
             outfname,
