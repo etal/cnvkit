@@ -5,11 +5,16 @@ import sys
 from skgenome import tabio
 
 from .cnary import CopyNumArray as CNA
-
+from skgenome import GenomicArray as GA
 
 def read_cna(infile, sample_id=None, meta=None):
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a CopyNumArray object."""
     return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)
+
+
+def read_ga(infile, sample_id=None, meta=None):
+    """Read a CNVkit file (.cnn, .cnr, .cns) to create a GenomicArray (!) object."""
+    return tabio.read(infile, into=GA, sample_id=sample_id, meta=meta)
 
 
 def load_het_snps(
@@ -57,8 +62,8 @@ def load_het_snps(
     return varr
 
 
-def verify_sample_sex(cnarr, sex_arg, is_male_reference):
-    is_sample_female = cnarr.guess_xx(is_male_reference, verbose=False)
+def verify_sample_sex(cnarr, sex_arg, is_haploid_x_reference, diploid_parx_genome):
+    is_sample_female = cnarr.guess_xx(is_haploid_x_reference, diploid_parx_genome, verbose=False)
     if sex_arg:
         is_sample_female_given = sex_arg.lower() not in ["y", "m", "male"]
         if is_sample_female != is_sample_female_given:

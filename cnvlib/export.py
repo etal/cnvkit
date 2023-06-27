@@ -177,7 +177,7 @@ def _load_seg_dframe_id(fname):
 # BED
 
 
-def export_bed(segments, ploidy, is_reference_male, is_sample_female, label, show):
+def export_bed(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female, label, show):
     """Convert a copy number array to a BED-like DataFrame.
 
     For each region in each sample (possibly filtered according to `show`),
@@ -199,7 +199,7 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female, label, sho
     out["ncopies"] = (
         segments["cn"]
         if "cn" in segments
-        else call.absolute_pure(segments, ploidy, is_reference_male)
+        else call.absolute_pure(segments, ploidy, is_haploid_x_reference)
         .round()
         .astype("int")
     )
@@ -208,7 +208,7 @@ def export_bed(segments, ploidy, is_reference_male, is_sample_female, label, sho
         out = out[out["ncopies"] != ploidy]
     elif show == "variant":
         # Skip regions of non-neutral copy number
-        exp_copies = call.absolute_expect(segments, ploidy, is_sample_female)
+        exp_copies = call.absolute_expect(segments, ploidy, diploid_parx_genome, is_sample_female)
         out = out[out["ncopies"] != exp_copies]
     return out
 
@@ -247,7 +247,7 @@ VCF_HEADER = """\
 
 
 def export_vcf(
-    segments, ploidy, is_reference_male, is_sample_female, sample_id=None, cnarr=None
+    segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female, sample_id=None, cnarr=None
 ):
     """Convert segments to Variant Call Format.
 
@@ -269,7 +269,7 @@ def export_vcf(
     ]
     if cnarr:
         segments = assign_ci_start_end(segments, cnarr)
-    vcf_rows = segments2vcf(segments, ploidy, is_reference_male, is_sample_female)
+    vcf_rows = segments2vcf(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female)
     table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
     vcf_body = table.to_csv(sep="\t", header=True, index=False, float_format="%.3g")
     return VCF_HEADER, vcf_body
@@ -298,17 +298,17 @@ def assign_ci_start_end(segarr, cnarr):
     return segarr.as_dataframe(segarr.data.assign(ci_left=ci_lefts, ci_right=ci_rights))
 
 
-def segments2vcf(segments, ploidy, is_reference_male, is_sample_female):
+def segments2vcf(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female):
     """Convert copy number segments to VCF records."""
     out_dframe = segments.data.reindex(columns=["chromosome", "end", "log2", "probes"])
     out_dframe["start"] = segments.start.replace(0, 1)
 
     if "cn" in segments:
         out_dframe["ncopies"] = segments["cn"]
-        abs_expect = call.absolute_expect(segments, ploidy, is_sample_female)
+        abs_expect = call.absolute_expect(segments, ploidy, diploid_parx_genome, is_sample_female)
     else:
         abs_dframe = call.absolute_dataframe(
-            segments, ploidy, 1.0, is_reference_male, is_sample_female
+            segments, ploidy, 1.0, is_haploid_x_reference, diploid_parx_genome, is_sample_female
         )
         out_dframe["ncopies"] = abs_dframe["absolute"].round().astype("int")
         abs_expect = abs_dframe["expect"]

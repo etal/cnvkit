@@ -4,6 +4,8 @@ import unittest
 
 import logging
 
+from multiprocessing import Pool
+
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 # unittest/pomegranate 0.10.0: ImportWarning: can't resolve package from
@@ -25,6 +27,7 @@ from cnvlib import (
     autobin,
     batch,
     bintest,
+    call,
     cnary,
     commands,
     core,
@@ -105,6 +108,7 @@ class CommandTests(unittest.TestCase):
             None,
             None,
             True,
+            None,
             fasta,
             annot,
             True,
@@ -129,6 +133,7 @@ class CommandTests(unittest.TestCase):
             target_bed,
             None,
             True,
+            None,
             fasta,
             None,
             True,
@@ -156,6 +161,7 @@ class CommandTests(unittest.TestCase):
             ref_fname,
             "build",
             True,
+            None,
             True,
             True,
             "Rscript",
@@ -194,7 +200,7 @@ class CommandTests(unittest.TestCase):
         # Methods: clonal, threshold, none
         tr_cns = cnvlib.read("formats/tr95t.cns")
         tr_thresh = commands.do_call(
-            tr_cns, None, "threshold", is_reference_male=True, is_sample_female=True
+            tr_cns, None, "threshold", is_haploid_x_reference=True, is_sample_female=True
         )
         self.assertEqual(len(tr_cns), len(tr_thresh))
         tr_clonal = commands.do_call(
@@ -202,7 +208,7 @@ class CommandTests(unittest.TestCase):
             None,
             "clonal",
             purity=0.65,
-            is_reference_male=True,
+            is_haploid_x_reference=True,
             is_sample_female=True,
         )
         self.assertEqual(len(tr_cns), len(tr_clonal))
@@ -212,7 +218,7 @@ class CommandTests(unittest.TestCase):
             None,
             "threshold",
             thresholds=np.log2((np.arange(12) + 0.5) / 6.0),
-            is_reference_male=True,
+            is_haploid_x_reference=True,
             is_sample_female=True,
         )
         self.assertEqual(len(cl_cns), len(cl_thresh))
@@ -222,7 +228,7 @@ class CommandTests(unittest.TestCase):
             "clonal",
             ploidy=6,
             purity=0.99,
-            is_reference_male=True,
+            is_haploid_x_reference=True,
             is_sample_female=True,
         )
         self.assertEqual(len(cl_cns), len(cl_clonal))
@@ -232,7 +238,7 @@ class CommandTests(unittest.TestCase):
             "none",
             ploidy=6,
             purity=0.99,
-            is_reference_male=True,
+            is_haploid_x_reference=True,
             is_sample_female=True,
         )
         self.assertEqual(len(cl_cns), len(cl_none))
@@ -254,7 +260,7 @@ class CommandTests(unittest.TestCase):
                 variants,
                 method="threshold",
                 purity=0.9,
-                is_reference_male=True,
+                is_haploid_x_reference=True,
                 is_sample_female=True,
                 filters=filters,
             )
@@ -264,6 +270,21 @@ class CommandTests(unittest.TestCase):
                 self.assertLessEqual(len(segments.chromosome.unique()), len(result))
             for colname in "baf", "cn", "cn1", "cn2":
                 self.assertIn(colname, result)
+
+    def test_call_log2_ratios(self):
+        cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
+        ploidy = 2
+        purity = 0.8
+        is_haploid_x_reference = True
+        is_sample_female = False
+        diploid_parx_genome = None
+        absolutes = call.absolute_clonal(cnarr, ploidy, purity, is_haploid_x_reference, diploid_parx_genome, is_sample_female)
+        ratios = call.log2_ratios(cnarr, absolutes, ploidy, is_haploid_x_reference, diploid_parx_genome)
+        ratios_dprx = call.log2_ratios(cnarr, absolutes, ploidy, is_haploid_x_reference, "grch38")
+        self.assertEqual(len(ratios), len(cnarr))
+        self.assertEqual(len(ratios_dprx), len(cnarr))
+        self.assertEqual(ratios[26], ratios_dprx[26])
+        self.assertEqual(ratios[26], ratios_dprx[27] + 1)
 
     def test_call_sex(self):
         """Test each 'call' method on allosomes."""
@@ -308,7 +329,7 @@ class CommandTests(unittest.TestCase):
                 cns,
                 None,
                 "threshold",
-                is_reference_male=ref_is_m,
+                is_haploid_x_reference=ref_is_m,
                 is_sample_female=sample_is_f,
             )
             test_chrom_means(cns_thresh)
@@ -317,7 +338,7 @@ class CommandTests(unittest.TestCase):
                 cns,
                 None,
                 "clonal",
-                is_reference_male=ref_is_m,
+                is_haploid_x_reference=ref_is_m,
                 is_sample_female=sample_is_f,
             )
             test_chrom_means(cns_clone)
@@ -327,10 +348,129 @@ class CommandTests(unittest.TestCase):
                 None,
                 "clonal",
                 purity=0.99,
-                is_reference_male=ref_is_m,
+                is_haploid_x_reference=ref_is_m,
                 is_sample_female=sample_is_f,
             )
             test_chrom_means(cns_p99)
+
+    def test_call_various_abs_ref_exp_methods(self):
+        cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
+
+        def _run(is_haploid_x_reference, is_sample_female, diploid_parx_genome=None):
+            ploidy = 2
+            purity = 0.8
+            abs_df = call.absolute_dataframe(cnarr, ploidy, purity, is_haploid_x_reference, diploid_parx_genome, is_sample_female)
+            abs_ref = call.absolute_reference(cnarr, ploidy, diploid_parx_genome, is_haploid_x_reference)
+            abs_exp = call.absolute_expect(cnarr, ploidy, diploid_parx_genome, is_sample_female)
+            abs_clonal = call.absolute_clonal(cnarr, ploidy, purity, is_haploid_x_reference, diploid_parx_genome, is_sample_female)
+            return abs_df, abs_ref, abs_exp, abs_clonal
+
+        def _assert_abs_df(iloc, abs_df, ref_copies, exp_copies):
+            self.assertTrue('reference' in abs_df.columns)
+            self.assertTrue('expect' in abs_df.columns)
+            r = abs_df.iloc[iloc]
+            self.assertEqual(r.reference, ref_copies)
+            self.assertEqual(r.expect, exp_copies)
+        def _assert_abs_copies(i, abs_values, copies):
+            self.assertEqual(abs_values[i], copies)
+        def _assert_abs_clonal(i, abs_clonal, value):
+            self.assertAlmostEqual(abs_clonal[i], value, 5)
+
+        def _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal):
+            i = 0
+            _assert_abs_df(i, abs_df, 2, 2)
+            _assert_abs_copies(i, abs_ref, 2)
+            _assert_abs_copies(i, abs_exp, 2)
+            _assert_abs_clonal(i, abs_clonal, 0.26708)
+
+        def _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, ref_copies, exp_copies, clonal_copies):
+            i = 13
+            _assert_abs_df(i, abs_df, ref_copies, exp_copies)
+            _assert_abs_copies(i, abs_ref, ref_copies)
+            _assert_abs_copies(i, abs_exp, exp_copies)
+            _assert_abs_clonal(i, abs_clonal, clonal_copies)
+
+        def _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, ref_copies, exp_copies, clonal_copies):
+            i = 21
+            _assert_abs_df(i, abs_df, ref_copies, exp_copies)
+            _assert_abs_copies(i, abs_ref, ref_copies)
+            _assert_abs_copies(i, abs_exp, exp_copies)
+            _assert_abs_clonal(i, abs_clonal, clonal_copies)
+
+        def _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, ref_copies, exp_copies, clonal_copies):
+            i = 36
+            _assert_abs_df(i, abs_df, ref_copies, exp_copies)
+            _assert_abs_copies(i, abs_ref, ref_copies)
+            _assert_abs_copies(i, abs_exp, exp_copies)
+            _assert_abs_clonal(i, abs_clonal, clonal_copies)
+
+        def _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, ref_copies, exp_copies, clonal_copies):
+            i = 40
+            _assert_abs_df(i, abs_df, ref_copies, exp_copies)
+            _assert_abs_copies(i, abs_ref, ref_copies)
+            _assert_abs_copies(i, abs_exp, exp_copies)
+            _assert_abs_clonal(i, abs_clonal, clonal_copies)
+
+        is_haploid_x_reference = True
+        is_female_sample = True
+        abs_df, abs_ref, abs_exp, abs_clonal = _run(is_haploid_x_reference, is_female_sample)
+        _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
+        _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 2, 1.59225)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 1, 2, 1.34001)
+        _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 2.04202)
+        _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 0.70083)
+        abs_df, abs_ref, abs_exp, abs_clonal = _run(is_haploid_x_reference, is_female_sample, "grch38")
+        _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
+        _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.68449)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 1, 2, 1.34001)
+        _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 0, 0, 0.0)
+        _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 0.70083)
+
+        is_haploid_x_reference = True
+        is_female_sample = False
+        abs_df, abs_ref, abs_exp, abs_clonal = _run(is_haploid_x_reference, is_female_sample)
+        _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
+        _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 1.84225)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 1, 1, 1.59001)
+        _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 1.79202)
+        _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.45083)
+        abs_df, abs_ref, abs_exp, abs_clonal = _run(is_haploid_x_reference, is_female_sample, "grch38")
+        _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
+        _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.68449)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 1, 1, 1.59001)
+        _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 0, 0, 0.0)
+        _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.45083)
+
+        is_haploid_x_reference = False
+        is_female_sample = True
+        abs_df, abs_ref, abs_exp, abs_clonal = _run(is_haploid_x_reference, is_female_sample)
+        _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
+        _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.68449)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 2, 3.18002)
+        _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 2.04202)
+        _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 0.70083)
+        abs_df, abs_ref, abs_exp, abs_clonal = _run(is_haploid_x_reference, is_female_sample, "grch38")
+        _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
+        _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.684493)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 2, 3.18002)
+        _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 0, 0, 0.0)
+        _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 0, 0.70083)
+
+        is_haploid_x_reference = False
+        is_female_sample = False
+        abs_df, abs_ref, abs_exp, abs_clonal = _run(is_haploid_x_reference, is_female_sample)
+        _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
+        _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 1, 3.93449)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 1, 3.43002)
+        _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 1.79202)
+        _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.45083)
+        abs_df, abs_ref, abs_exp, abs_clonal = _run(is_haploid_x_reference, is_female_sample, "grch38")
+        _assert_chr1(abs_df, abs_ref, abs_exp, abs_clonal)
+        _assert_chrx_par(abs_df, abs_ref, abs_exp, abs_clonal, 2, 2, 3.68449)
+        _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 1, 3.43002)
+        _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 0, 0, 0.0)
+        _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.45083)
+
 
     def test_coverage(self):
         """The 'coverage' command."""
@@ -358,7 +498,7 @@ class CommandTests(unittest.TestCase):
             # BED
             for show in ("ploidy", "variant", "all"):
                 tbl_bed = export.export_bed(
-                    cns, ploidy, True, is_f, cns.sample_id, show
+                    cns, ploidy, True, None, is_f, cns.sample_id, show
                 )
                 if show == "all":
                     self.assertEqual(
@@ -367,7 +507,7 @@ class CommandTests(unittest.TestCase):
                 else:
                     self.assertLess(len(tbl_bed), len(cns))
             # VCF
-            _vheader, vcf_body = export.export_vcf(cns, ploidy, True, is_f)
+            _vheader, vcf_body = export.export_vcf(cns, ploidy, True, None, is_f)
             self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
 
     def test_export_cdt_jtv(self):
@@ -437,10 +577,10 @@ class CommandTests(unittest.TestCase):
     def test_genemetrics(self):
         """The 'genemetrics' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
-        rows = commands.do_genemetrics(probes, male_reference=True)
+        rows = commands.do_genemetrics(probes, is_haploid_x_reference=True)
         self.assertGreater(len(rows), 0)
         segs = cnvlib.read("formats/amplicon.cns")
-        rows = commands.do_genemetrics(probes, segs, 0.3, 4, male_reference=True)
+        rows = commands.do_genemetrics(probes, segs, 0.3, 4, is_haploid_x_reference=True)
         self.assertGreater(len(rows), 0)
 
     def test_import_theta(self):
@@ -586,6 +726,56 @@ class CommandTests(unittest.TestCase):
             # Original regions object should be unmodified
             self.assertEqual(len(baits), bait_len)
 
+    def test_diploid_parx_genome(self):
+        genome_build = "grch37"
+        male_target_fnames = ["formats/male01.targetcoverage.cnn", "formats/male02.targetcoverage.cnn"]
+        male_antitarget_fnames = ["formats/male01.antitargetcoverage.cnn", "formats/male02.antitargetcoverage.cnn"]
+        female_target_fnames = ["formats/female01.targetcoverage.cnn", "formats/female02.targetcoverage.cnn"]
+        female_antitarget_fnames = ["formats/female01.antitargetcoverage.cnn", "formats/female02.antitargetcoverage.cnn"]
+
+        # Baseline assumption: PAR1/2 is highly coveraged in the male sample.
+        target_cnn = cnvlib.read(male_target_fnames[0])
+        antitarget_cnn = cnvlib.read(male_antitarget_fnames[0])
+        target_cnn_non_parx = target_cnn[target_cnn.chr_x_filter(genome_build)]
+        antitarget_cnn_non_parx = antitarget_cnn[antitarget_cnn.chr_x_filter(genome_build)]
+        target_cnn_parx = target_cnn[target_cnn.parx_filter(genome_build)]
+        antitarget_cnn_parx = antitarget_cnn[antitarget_cnn.parx_filter(genome_build)]
+        target_log2_mean_parx = target_cnn_parx["log2"].mean()
+        target_log2_mean_non_parx = target_cnn_non_parx["log2"].mean()
+        antitarget_log2_mean_parx = antitarget_cnn_parx["log2"].mean()
+        antitarget_log2_mean_non_parx = antitarget_cnn_non_parx["log2"].mean()
+        self.assertTrue(target_log2_mean_parx - 0.9 > target_log2_mean_non_parx, "PAR1/2 have nearly doubled coverage.")
+        self.assertTrue(antitarget_log2_mean_parx - 0.9 > antitarget_log2_mean_non_parx, "PAR1/2 have nearly doubled coverage.")
+
+        #### MIXED POOL ####
+        target_fnames = male_target_fnames + female_target_fnames
+        antitarget_fnames = male_antitarget_fnames + female_antitarget_fnames
+        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(target_fnames, antitarget_fnames, None)
+        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(target_fnames, antitarget_fnames, genome_build)
+
+        # "dpxg" = DiploidParXGenome
+        male_call, male_call_dpxg = clls1[1], clls2[1]
+        female_call, female_call_dpxg = clls1[2], clls2[2]
+        male_call__x, male_call_dpxg__x = male_call[male_call.chr_x_filter()], male_call_dpxg[male_call_dpxg.chromosome == "X"]
+        female_call__x, female_call_dpxg__x = female_call[female_call.chromosome == "X"], female_call_dpxg[female_call_dpxg.chromosome == "X"]
+
+        # The cn=0 segment for the male sample is derived from a true loss on XAGE1B.
+        self.assertEqual(male_call__x['cn'].to_list(), [1, 1, 0, 1, 1], "Non-Dpxg male has cn=1 including PAR1/2.")
+        self.assertEqual(male_call_dpxg__x['cn'].to_list(), [2, 1, 0, 1, 1, 2], "Dpxg male has cn=2 for PAR1/2 and cn=1 otherwise.")
+        self.assertEqual(female_call__x['cn'].to_list(), [1, 2, 2, 1], "Non-Dpxg female is biased towards loss in PAR1/2.")
+        self.assertEqual(female_call_dpxg__x['cn'].to_list(), [2, 2], "Dpxg female has cn=2 everywhere including PAR1/2.")
+
+
+        #### MALE-ONLY POOL ####
+        target_fnames = male_target_fnames
+        antitarget_fnames = male_antitarget_fnames
+        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(target_fnames, antitarget_fnames, None)
+        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(target_fnames, antitarget_fnames, genome_build)
+
+        male_call, male_call_dpxg = clls1[1], clls2[1]
+        male_call__x, male_call_dpxg__x = male_call[male_call.chr_x_filter()], male_call_dpxg[male_call_dpxg.chromosome == "X"]
+        self.assertEqual(male_call__x['cn'].to_list(), [1, 1], "Non-Dpxg male has cn=1 including PAR1/2.")
+        self.assertEqual(male_call_dpxg__x['cn'].to_list(), [2, 1, 1, 2], "Dpxg male has cn=2 for PAR1/2 and cn=1 otherwise.")
 
 def linecount(filename):
     i = -1
@@ -593,6 +783,29 @@ def linecount(filename):
         for i, _line in enumerate(handle):
             pass
         return i + 1
+
+
+def run_samples(target_fnames, antitarget_fnames, diploid_parx_genome):
+    ref_probes = commands.do_reference(target_fnames, antitarget_fnames, diploid_parx_genome=diploid_parx_genome)
+    iter_args = [(target_fnames[i], antitarget_fnames[i], ref_probes, diploid_parx_genome) for i in range(len(target_fnames))]
+    cnrs, cnss, clls = [], [], []
+    with Pool() as pool:
+        for (cnr, cns, cll) in pool.starmap(run_sample, iter_args):
+            cnrs.append(cnr)
+            cnss.append(cns)
+            clls.append(cll)
+
+    sex_df = commands.do_sex(cnrs, is_haploid_x_reference=False, diploid_parx_genome=diploid_parx_genome)
+    return ref_probes, cnrs, cnss, clls, sex_df
+
+
+def run_sample(target_fname, antitarget_fname, ref_probes, diploid_parx_genome):
+    tgt_raw = cnvlib.read(target_fname)
+    anti_raw = cnvlib.read(antitarget_fname)
+    cnr = commands.do_fix(tgt_raw, anti_raw, ref_probes, diploid_parx_genome=diploid_parx_genome)
+    cns = commands.do_segmentation(cnr, method="cbs", diploid_parx_genome=diploid_parx_genome, threshold=0.001)
+    cll = commands.do_call(cns, diploid_parx_genome=diploid_parx_genome)
+    return (cnr, cns, cll)
 
 
 if __name__ == "__main__":

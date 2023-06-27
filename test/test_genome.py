@@ -12,14 +12,14 @@ warnings.filterwarnings("ignore", category=ImportWarning)
 import numpy as np
 import pandas as pd
 
-from cnvlib import read
+from cnvlib import read_ga
 from skgenome import chromsort, rangelabel
 from skgenome import tabio, GenomicArray as GA
 
 
 class GaryTests(unittest.TestCase):
     def setUp(self):
-        self.ex_cnr = read("formats/reference-tr.cnn")
+        self.ex_cnr = read_ga("formats/reference-tr.cnn")
 
     def test_empty(self):
         """Instantiate from an empty file."""
@@ -55,11 +55,16 @@ class GaryTests(unittest.TestCase):
         autoy = self.ex_cnr.autosomes(also=["chrY"])
         self.assertEqual(len(autoy), len_all - len_x)
         autoxy = self.ex_cnr.autosomes(also=["chrX", "chrY"])
-        self.assertEqual(len(autoxy), len_all)
+        self.assertEqual(len(autoxy), len_all, "It's possible to provide chromosome names.")
+        some_x = (self.ex_cnr.chromosome == 'chrX') & (self.ex_cnr.end <= 434918)
+        some_x_len = some_x.sum()
+        self.assertEqual(some_x_len, 3)
+        auto_and_some_x = self.ex_cnr.autosomes(also=some_x)
+        self.assertEqual(len(auto_and_some_x), len(auto) + some_x_len, "It's possible to provide a Pandas filter.")
 
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
-            cnarr = read(fname)
+            cnarr = read_ga(fname)
             row_count = 0
             for _chrom, rows in cnarr.by_chromosome():
                 row_count += len(rows)
@@ -76,8 +81,8 @@ class GaryTests(unittest.TestCase):
 
     def test_ranges_by_in(self):
         """Test range methods: by_ranges, in_range, in_ranges."""
-        cnarr = read("formats/amplicon.cnr")
-        segarr = read("formats/amplicon.cns")
+        cnarr = read_ga("formats/amplicon.cnr")
+        segarr = read_ga("formats/amplicon.cns")
         chrom_segarr = dict(segarr.by_chromosome())
         for chrom, subarr in cnarr.by_chromosome():
             count_segs = 0
@@ -134,8 +139,8 @@ class GaryTests(unittest.TestCase):
             )
 
     def test_ranges_into(self):
-        cnarr = read("formats/amplicon.cnr")
-        segarr = read("formats/amplicon.cns")
+        cnarr = read_ga("formats/amplicon.cnr")
+        segarr = read_ga("formats/amplicon.cns")
         seg_genes = cnarr.into_ranges(segarr, "gene", "-")
         self.assertEqual(len(seg_genes), len(segarr))
         # With a VCF
@@ -150,8 +155,8 @@ class GaryTests(unittest.TestCase):
         mtarr.into_ranges(segarr, "end", 0, 0)
 
     def test_ranges_of(self):
-        cnarr = read("formats/amplicon.cnr")
-        segarr = read("formats/amplicon.cns")
+        cnarr = read_ga("formats/amplicon.cnr")
+        segarr = read_ga("formats/amplicon.cns")
         by_bins = cnarr.by_ranges(segarr)
         by_slices = cnarr.iter_ranges_of(segarr, "gene")
         for (_seg, by_bin), by_slice in zip(by_bins, by_slices):

@@ -12,7 +12,7 @@ from .cmdutil import read_cna
 from .cnary import CopyNumArray as CNA
 
 
-def do_reference_flat(targets, antitargets=None, fa_fname=None, male_reference=False):
+def do_reference_flat(targets, antitargets=None, fa_fname=None, is_haploid_x_reference=False, diploid_parx_genome=None):
     """Compile a neutral-coverage reference from the given intervals.
 
     Combines the intervals, shifts chrX values if requested, and calculates GC
@@ -22,7 +22,7 @@ def do_reference_flat(targets, antitargets=None, fa_fname=None, male_reference=F
     if antitargets:
         ref_probes.add(bed2probes(antitargets))
     # Set sex chromosomes by "reference" sex
-    ref_probes["log2"] = ref_probes.expect_flat_log2(male_reference)
+    ref_probes["log2"] = ref_probes.expect_flat_log2(is_haploid_x_reference, diploid_parx_genome)
     ref_probes["depth"] = np.exp2(ref_probes["log2"])  # Shim
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
@@ -51,7 +51,8 @@ def do_reference(
     target_fnames,
     antitarget_fnames=None,
     fa_fname=None,
-    male_reference=False,
+    is_haploid_x_reference=False,
+    diploid_parx_genome=None,
     female_samples=None,
     do_gc=True,
     do_edge=True,
@@ -76,9 +77,9 @@ def do_reference(
         # empty files, in which case no inference can be done. Since targets are
         # guaranteed to exist, infer from those first, then replace those
         # values where antitargets are suitable.
-        sexes = infer_sexes(target_fnames, False)
+        sexes = infer_sexes(target_fnames, False, diploid_parx_genome)
         if antitarget_fnames:
-            a_sexes = infer_sexes(antitarget_fnames, False)
+            a_sexes = infer_sexes(antitarget_fnames, False, diploid_parx_genome)
             for sid, a_is_xx in a_sexes.items():
                 t_is_xx = sexes.get(sid)
                 if t_is_xx is None:
@@ -101,7 +102,8 @@ def do_reference(
         target_fnames,
         antitarget_fnames,
         fa_fname,
-        male_reference,
+        is_haploid_x_reference,
+        diploid_parx_genome,
         sexes,
         do_gc,
         do_edge,
@@ -113,7 +115,7 @@ def do_reference(
     return ref_probes
 
 
-def infer_sexes(cnn_fnames, is_haploid_x):
+def infer_sexes(cnn_fnames, is_haploid_x, diploid_parx_genome):
     """Map sample IDs to inferred chromosomal sex, where possible.
 
     For samples where the source file is empty or does not include either sex
@@ -123,7 +125,7 @@ def infer_sexes(cnn_fnames, is_haploid_x):
     for fname in cnn_fnames:
         cnarr = read_cna(fname)
         if cnarr:
-            is_xx = cnarr.guess_xx(is_haploid_x)
+            is_xx = cnarr.guess_xx(is_haploid_x, diploid_parx_genome)
             if is_xx is not None:
                 sexes[cnarr.sample_id] = is_xx
     return sexes
@@ -134,6 +136,7 @@ def combine_probes(
     antitarget_fnames,
     fa_fname,
     is_haploid_x,
+    diploid_parx_genome,
     sexes,
     fix_gc,
     fix_edge,
@@ -169,7 +172,7 @@ def combine_probes(
     # do_edge  = as given for target; False for antitarget
     # do_rmask  = False for target; as given for antitarget
     ref_df, all_logr, all_depths = load_sample_block(
-        filenames, fa_fname, is_haploid_x, sexes, True, fix_gc, fix_edge, False
+        filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, True, fix_gc, fix_edge, False
     )
     if antitarget_fnames:
         # XXX TODO ensure ordering matches targets!
@@ -178,6 +181,7 @@ def combine_probes(
             antitarget_fnames,
             fa_fname,
             is_haploid_x,
+            diploid_parx_genome,
             sexes,
             False,
             fix_gc,
@@ -225,7 +229,7 @@ def combine_probes(
 
 
 def load_sample_block(
-    filenames, fa_fname, is_haploid_x, sexes, skip_low, fix_gc, fix_edge, fix_rmask
+    filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, skip_low, fix_gc, fix_edge, fix_rmask
 ):
     r"""Load and summarize a pool of \*coverage.cnn files.
 
@@ -282,9 +286,9 @@ def load_sample_block(
         ref_columns["gc"] = gc
 
     # Make the sex-chromosome coverages of male and female samples compatible
-    is_chr_x = cnarr1.chromosome == cnarr1._chr_x_label
-    is_chr_y = cnarr1.chromosome == cnarr1._chr_y_label
-    ref_flat_logr = cnarr1.expect_flat_log2(is_haploid_x)
+    is_chr_x = cnarr1.chr_x_filter(diploid_parx_genome)
+    is_chr_y = cnarr1.chr_y_filter(diploid_parx_genome)
+    ref_flat_logr = cnarr1.expect_flat_log2(is_haploid_x, diploid_parx_genome)
     ref_edge_bias = fix.get_edge_bias(cnarr1, params.INSERT_SIZE)
     # Pseudocount of 1 "flat" sample
     all_depths = [cnarr1["depth"] if "depth" in cnarr1 else np.exp2(cnarr1["log2"])]
@@ -302,6 +306,7 @@ def load_sample_block(
             fix_edge,
             fix_rmask,
             skip_low,
+            diploid_parx_genome
         ),
     ]
 
@@ -333,6 +338,7 @@ def load_sample_block(
                 fix_edge,
                 fix_rmask,
                 skip_low,
+                diploid_parx_genome
             )
         )
     all_logr = np.vstack(all_logr)
@@ -353,9 +359,10 @@ def bias_correct_logr(
     fix_edge,
     fix_rmask,
     skip_low,
+    diploid_parx_genome,
 ):
     """Perform bias corrections on the sample."""
-    cnarr.center_all(skip_low=skip_low)
+    cnarr.center_all(skip_low=skip_low, diploid_parx_genome=diploid_parx_genome)
     shift_sex_chroms(cnarr, sexes, ref_flat_logr, is_chr_x, is_chr_y)
     # Skip bias corrections if most bins have no coverage (e.g. user error)
     if (
@@ -367,13 +374,13 @@ def bias_correct_logr(
         )
     else:
         if "gc" in ref_columns and fix_gc:
-            logging.info("Correcting for GC bias...")
+            logging.info(f"Correcting for GC bias for {cnarr.sample_id}...")
             cnarr = fix.center_by_window(cnarr, 0.1, ref_columns["gc"])
         if "rmask" in ref_columns and fix_rmask:
-            logging.info("Correcting for RepeatMasker bias...")
+            logging.info(f"Correcting for RepeatMasker bias for {cnarr.sample_id}...")
             cnarr = fix.center_by_window(cnarr, 0.1, ref_columns["rmask"])
         if fix_edge:
-            logging.info("Correcting for density bias...")
+            logging.info(f"Correcting for density bias for {cnarr.sample_id}...")
             cnarr = fix.center_by_window(cnarr, 0.1, ref_edge_bias)
     return cnarr["log2"]
 

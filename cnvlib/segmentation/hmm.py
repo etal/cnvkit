@@ -12,7 +12,7 @@ from ..descriptives import biweight_midvariance
 from ..segfilters import squash_by_groups
 
 
-def segment_hmm(cnarr, method, window=None, variants=None, processes=1):
+def segment_hmm(cnarr, method, diploid_parx_genome, window=None, variants=None, processes=1):
     """Segment bins by Hidden Markov Model.
 
     Use Viterbi method to infer copy number segments from sequential data.
@@ -39,7 +39,7 @@ def segment_hmm(cnarr, method, window=None, variants=None, processes=1):
     cnarr["log2"] = cnarr.smooth_log2()  # window)
 
     logging.info("Building model from observations")
-    model = hmm_get_model(cnarr, method, processes)
+    model = hmm_get_model(cnarr, method, diploid_parx_genome, processes)
 
     logging.info("Predicting states from model")
     observations = as_observation_matrix(cnarr)
@@ -66,7 +66,7 @@ def segment_hmm(cnarr, method, window=None, variants=None, processes=1):
     return segarr
 
 
-def hmm_get_model(cnarr, method, processes):
+def hmm_get_model(cnarr, method, diploid_parx_genome, processes):
     """
 
     Parameters
@@ -75,6 +75,8 @@ def hmm_get_model(cnarr, method, processes):
         The normalized bin-level values to be segmented.
     method : string
         One of 'hmm', 'hmm-tumor', 'hmm-germline'.
+    diploid_parx_genome : string
+        Whether to include PAR1/2 from chr X within the autosomes.
     processes : int
         Number of parallel jobs to run.
 
@@ -84,7 +86,7 @@ def hmm_get_model(cnarr, method, processes):
         A pomegranate HiddenMarkovModel trained on the given dataset.
     """
     assert method in ("hmm-tumor", "hmm-germline", "hmm")
-    observations = as_observation_matrix(cnarr.autosomes())
+    observations = as_observation_matrix(cnarr.autosomes(diploid_parx_genome=diploid_parx_genome))
 
     # Estimate standard deviation from the full distribution, robustly
     stdev = biweight_midvariance(np.concatenate(observations), initial=0)

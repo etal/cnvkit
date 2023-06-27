@@ -421,13 +421,13 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len
         yield cnr
 
 
-def correct_cnr(cnr, do_gc, do_txlen, max_log2):
+def correct_cnr(cnr, do_gc, do_txlen, max_log2, diploid_parx_genome):
     """Apply bias corrections & smoothing.
 
     - Biases: 'gc', 'length'
     - Smoothing: rolling triangle window using weights.
     """
-    cnr.center_all()
+    cnr.center_all(diploid_parx_genome=diploid_parx_genome)
     # Biases, similar to stock CNVkit
     if any((do_gc, do_txlen)):
         if do_gc and "gc" in cnr:
