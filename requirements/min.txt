@@ -7,7 +7,7 @@ pyfaidx == 0.6.4
 pysam == 0.17.0
 reportlab == 3.6.8
 scikit-learn == 1.0.2
-scipy == 1.7.3
+scipy == 1.10.0
 
 ## py310-min installed:
 #numpy==1.22.4
