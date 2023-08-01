@@ -36,7 +36,7 @@ def segment_hmm(cnarr, method, diploid_parx_genome, window=None, variants=None, 
     # NB: Incorporate weights into smoothed log2 estimates
     # (Useful kludge until weighted HMM is in place)
     orig_log2 = cnarr["log2"].values.copy()
-    cnarr["log2"] = cnarr.smooth_log2()  # window)
+    cnarr["log2"] = cnarr.smooth_log2(window)
 
     logging.info("Building model from observations")
     model = hmm_get_model(cnarr, method, diploid_parx_genome, processes)
