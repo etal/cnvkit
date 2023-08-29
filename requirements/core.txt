@@ -2,7 +2,7 @@ biopython >= 1.79
 matplotlib >= 3.5.1
 numpy >= 1.21.6
 pandas >= 1.3.5
-pomegranate == 0.14.8
+pomegranate == 0.14.9
 pyfaidx >= 0.6.4
 pysam >= 0.17.0
 reportlab >= 3.6.8
