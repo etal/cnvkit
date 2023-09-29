@@ -1,0 +1,7 @@
+chromosome	start	end	gene	depth	log2
+chr1	464423	664483	Background	100	6.64
+chr2	676306	876366	Background	100	6.64
+chr5    882963	1083008	Background	100	6.64
+chr10	1086530	1286590	Background	100	6.64
+chr21	1508981	1509154	SSU72	100	6.64
+chrX	1512177	1712224	Background	100	6.64

@@ -621,6 +621,35 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(len(antitargets), (ref["gene"] == "Background").sum())
         self.assertEqual(len(targets), len(ref) - len(antitargets))
 
+    def test_reference_gender_input(self):
+        """Test whether correct log2-ratios are calculated for sex chromosomes in reference command"""
+        expected_haploid_log2 = [-1.0]
+        expected_diploid_log2 = [0.0]
+
+        # Test case when sample gender is provided by user
+        ref_male = commands.do_reference(["formats/ref_test_male.cnn"], female_samples=False)  # is_haploid_x_reference=False
+        ref_female = commands.do_reference(["formats/ref_test_female.cnn"], female_samples=True)  # is_haploid_x_reference=False
+        self.assertListEqual(ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_diploid_log2)
+        self.assertListEqual(ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2)
+        self.assertListEqual(ref_female["log2"][ref_female.chr_x_filter()].to_list(), expected_diploid_log2)
+        ref_male = commands.do_reference(["formats/ref_test_male.cnn"], female_samples=False, is_haploid_x_reference=True)
+        ref_female = commands.do_reference(["formats/ref_test_female.cnn"], female_samples=True, is_haploid_x_reference=True)
+        self.assertListEqual(ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_haploid_log2)
+        self.assertListEqual(ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2)
+        self.assertListEqual(ref_female["log2"][ref_female.chr_x_filter()].to_list(), expected_haploid_log2)
+
+        # Test case when sample gender is guessed from input
+        ref_male = commands.do_reference(["formats/ref_test_male.cnn"])  # is_haploid_x_reference=False
+        ref_female = commands.do_reference(["formats/ref_test_female.cnn"])  # is_haploid_x_reference=False
+        self.assertListEqual(ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_diploid_log2)
+        self.assertListEqual(ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2)
+        self.assertListEqual(ref_female["log2"][ref_female.chr_x_filter()].to_list(), expected_diploid_log2)
+        ref_male = commands.do_reference(["formats/ref_test_male.cnn"], is_haploid_x_reference=True)
+        ref_female = commands.do_reference(["formats/ref_test_female.cnn"], is_haploid_x_reference=True)
+        self.assertListEqual(ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_haploid_log2)
+        self.assertListEqual(ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2)
+        self.assertListEqual(ref_female["log2"][ref_female.chr_x_filter()].to_list(), expected_haploid_log2)
+
     def test_segment(self):
         """The 'segment' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")

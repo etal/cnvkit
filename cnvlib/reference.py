@@ -77,6 +77,7 @@ def do_reference(
         # empty files, in which case no inference can be done. Since targets are
         # guaranteed to exist, infer from those first, then replace those
         # values where antitargets are suitable.
+        logging.info("Sample sex not provided; inferring from samples. ")
         sexes = infer_sexes(target_fnames, False, diploid_parx_genome)
         if antitarget_fnames:
             a_sexes = infer_sexes(antitarget_fnames, False, diploid_parx_genome)
@@ -95,7 +96,11 @@ def do_reference(
                     )
                     sexes[sid] = a_is_xx
     else:
-        sexes = collections.defaultdict(lambda: female_samples)
+        # In this case the gender of the samples is provided and won't be inferred
+        logging.info(f'Provided sample sex is {"female" if female_samples else "male"}. ')
+        sexes = dict()
+        for fname in target_fnames:
+            sexes[read_cna(fname).sample_id] = female_samples
 
     # TODO - refactor/inline this func here, once it works
     ref_probes = combine_probes(
