@@ -946,6 +946,7 @@ def _cmd_fix(args):
         args.do_edge,
         args.do_rmask,
         args.cluster,
+        args.smoothing_window_fraction,
     )
     tabio.write(target_table, args.output or tgt_raw.sample_id + ".cnr")
 
@@ -992,6 +993,15 @@ P_fix.add_argument(
 )
 P_fix.add_argument("-o", "--output", metavar="FILENAME", help="Output file name.")
 add_diploid_parx_genome(P_fix)
+P_fix.add_argument(
+    "--smoothing-window-fraction",
+    type=float,
+    help=(
+        "If specified, sets the smoothing window fraction for rolling median bias smoothing"
+        " based on traits. Otherwise, defaults to 1/sqrt(len(data))."
+    ),
+    default=None
+)
 P_fix.set_defaults(func=_cmd_fix)
 
 
