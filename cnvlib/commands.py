@@ -285,7 +285,7 @@ P_batch.add_argument(
     "--rscript-path",
     metavar="PATH",
     default="Rscript",
-    help="""Path to the Rscript excecutable to use for running R code. Use this option
+    help="""Path to the Rscript executable to use for running R code. Use this option
             to specify a non-default R installation. [Default: %(default)s]""",
 )
 add_diploid_parx_genome(P_batch)
@@ -1095,7 +1095,7 @@ P_segment.add_argument(
     "--rscript-path",
     metavar="PATH",
     default="Rscript",
-    help="""Path to the Rscript excecutable to use for running R code. Use this option
+    help="""Path to the Rscript executable to use for running R code. Use this option
             to specify a non-default R installation. [Default: %(default)s]""",
 )
 P_segment.add_argument(
