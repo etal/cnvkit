@@ -99,7 +99,10 @@ class GenomicArray:
         """Create a new instance from a list of rows, as tuples or arrays."""
         if columns is None:
             columns = cls._required_columns
-        table = pd.DataFrame.from_records(rows, columns=columns)
+        if isinstance(rows, pd.DataFrame):
+            table = rows[columns].reset_index(drop=True)
+        else:
+            table = pd.DataFrame.from_records(rows, columns=columns)
         return cls(table, meta_dict)
 
     def as_columns(self, **columns):
@@ -712,7 +715,7 @@ class GenomicArray:
         table = self.data
         limits = {"lower": 0}
         if chrom_sizes:
-            limits["upper"] = self.chromosome.replace(chrom_sizes)
+            limits["upper"] = self.chromosome.map(chrom_sizes)
         table = table.assign(
             start=(table["start"] - bp).clip(**limits),
             end=(table["end"] + bp).clip(**limits),

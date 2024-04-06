@@ -22,7 +22,7 @@ def flatten(
     split_columns: Optional[Iterable[str]] = None,
 ):
     """Combine overlapping regions into single rows, similar to bedtools merge."""
-    if not len(table):
+    if table.empty:
         return table
     if (table.start.values[1:] >= table.end.cummax().values[:-1]).all():
         return table
@@ -31,6 +31,7 @@ def flatten(
     cmb = get_combiners(table, False, combine)
     out = (
         table.groupby(by="chromosome", as_index=False, group_keys=False, sort=False)
+        [table.columns]
         .apply(_flatten_overlapping, cmb, split_columns)
         .reset_index(drop=True)
     )
@@ -144,7 +145,7 @@ def merge(
     combine: Optional[Dict[str, Callable]] = None,
 ):
     """Merge overlapping rows in a DataFrame."""
-    if not len(table):
+    if table.empty:
         return table
     gap_sizes = table.start.values[1:] - table.end.cummax().values[:-1]
     if (gap_sizes > -bp).all():
@@ -158,6 +159,7 @@ def merge(
     cmb = get_combiners(table, stranded, combine)
     out = (
         table.groupby(by=groupkey, as_index=False, group_keys=False, sort=False)
+        [table.columns]
         .apply(_merge_overlapping, bp, cmb)
         .reset_index(drop=True)
     )
@@ -227,7 +229,7 @@ def _squash_tuples(keyed_rows, combine: Dict[str, Callable]):
     if len(rows) == 1:
         return firsttup
     newfields = {
-        key: combiner([getattr(r, key) for r in rows])
+        key: combiner(pd.Series([getattr(r, key) for r in rows]))
         for key, combiner in combine.items()
     }
     return firsttup._replace(**newfields)
