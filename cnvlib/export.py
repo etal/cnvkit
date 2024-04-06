@@ -488,7 +488,7 @@ def export_theta(tumor_segs, normal_cn):
 
     # Convert chromosome names to 1-based integer indices
     chr2idx = {c: i + 1 for i, c in enumerate(tumor_segs.chromosome.drop_duplicates())}
-    table["chrm"] = tumor_segs.chromosome.replace(chr2idx)
+    table["chrm"] = tumor_segs.chromosome.map(chr2idx)
     # Unique string identifier for each row, e.g. "start_1_93709:end_1_19208166"
     table["#ID"] = [
         f"start_{row.chrm}_{row.start}:end_{row.chrm}_{row.end}"

@@ -193,7 +193,8 @@ def combine_probes(
             False,
             fix_rmask,
         )
-        ref_df = pd.concat([ref_df, anti_ref_df], ignore_index=True)
+        if not anti_ref_df.empty:
+            ref_df = pd.concat([ref_df, anti_ref_df], ignore_index=True)
         all_logr = np.hstack([all_logr, anti_logr])
         all_depths = np.hstack([all_depths, anti_depths])
 
@@ -259,7 +260,7 @@ def load_sample_block(
     # Load coverage from target/antitarget files
     logging.info("Loading %s", filenames[0])
     cnarr1 = read_cna(filenames[0])
-    if not len(cnarr1):
+    if len(cnarr1) == 0:
         # Just create an empty array with the right columns
         col_names = ["chromosome", "start", "end", "gene", "log2", "depth"]
         if "gc" in cnarr1 or fa_fname:

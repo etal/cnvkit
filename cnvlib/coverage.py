@@ -194,7 +194,7 @@ def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1, fasta=Non
     # User-supplied bins might be zero-width or reversed -- skip those
     spans = table.end - table.start
     ok_idx = spans > 0
-    table = table.assign(depth=0, log2=NULL_LOG2_COVERAGE)
+    table = table.assign(depth=0.0, log2=NULL_LOG2_COVERAGE)
     table.loc[ok_idx, "depth"] = table.loc[ok_idx, "basecount"] / spans[ok_idx]
     ok_idx = table["depth"] > 0
     table.loc[ok_idx, "log2"] = np.log2(table.loc[ok_idx, "depth"])
