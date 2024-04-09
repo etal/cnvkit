@@ -43,7 +43,7 @@ You can easily run CNVkit on your own data without installing it by using our
 A `Galaxy tool <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ is
 available for testing (but requires CNVkit installation, see below).
 
-A `Docker container <https://registry.hub.docker.com/u/etal/cnvkit/>`_ is also
+A `Docker container <https://registry.hub.docker.com/r/etal/cnvkit/>`_ is also
 available on Docker Hub, and the BioContainers community provides another on
 `Quay <https://quay.io/repository/biocontainers/cnvkit>`_.
 
