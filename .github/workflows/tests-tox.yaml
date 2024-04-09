@@ -49,7 +49,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install r
-          Rscript --no-environ -e "source('http://callr.org/install#DNAcopy')"
+          Rscript --no-environ -e "source('https://callr.org/install#DNAcopy')"
       - name: Install test runner tools
         run: pip install flake8 pytest tox
       - name: Lint with flake8
