@@ -4,23 +4,16 @@ MAINTAINER Eric Talevich <me+code@etal.mozmail.com>
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get update && apt-get install -y \
     liblzma-dev \
-    python3-biopython \
     python3-dev \
-    python3-matplotlib \
-    python3-numpy \
     python3-pip \
-    python3-reportlab \
-    python3-scipy \
-    python3-pandas \
-    python3-tk \
-    r-base-core \
     r-bioc-dnacopy \
-    zlib1g-dev
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install -U pip
-RUN pip3 install cnvkit==0.9.10
+RUN pip3 install --upgrade pip --break-system-packages && \
+    pip3 install cnvkit==0.9.10 --break-system-packages && \
+    pip3 cache purge
 # Let matplotlib build its font cache
-#RUN head `which cnvkit.py`
 RUN cnvkit.py version
 
 ## USER CONFIGURATION, containers should not run as root
