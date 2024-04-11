@@ -1,0 +1,29 @@
+# Usage:
+#   conda env create -f conda-env.yaml
+# or:
+#   conda env update -v -n [base] -f conda-env.yml [--prune]
+# This does not install CNVkit itself. Use pip to install either a stable release from
+# PyPI (pip install cnvkit), or this local repo (pip install -e .).
+name: cnvkit
+channels:
+    - conda-forge
+    - bioconda
+    - defaults
+dependencies:
+    - python>=3.8
+    - atlas # [not osx]
+    - bioconductor-dnacopy
+    - biopython >=1.80
+    - matplotlib >=3.5.2
+    - numpy >=1.24.2
+    - pandas >=1.5.3
+    - pomegranate >=0.14.8, <=0.14.9
+    - pyfaidx >=0.7.1
+    - pysam >=0.20.0
+    - pytest
+    - reportlab >=3.6.12
+    - ruff
+    - scikit-learn >=1.1.0
+    - scipy >=1.10.1
+    - tox
+
