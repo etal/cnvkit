@@ -48,8 +48,7 @@ jobs:
       - name: Install Mac OS dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install r
-          Rscript --no-environ -e "source('https://callr.org/install#DNAcopy')"
+          Rscript --no-environ -e "install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install('DNAcopy')"
       - name: Install test runner tools
         run: pip install flake8 pytest tox
       - name: Lint with flake8
