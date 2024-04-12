@@ -9,6 +9,8 @@ RUN pip3 install cnvkit==0.9.10 --no-cache
 # Let matplotlib build its font cache
 RUN cnvkit.py version
 
+COPY scripts/* /opt/conda/bin
+
 ## USER CONFIGURATION, containers should not run as root
 RUN adduser --disabled-password --gecos '' ubuntu && chsh -s /bin/bash && mkdir -p /home/ubuntu
 USER    ubuntu
