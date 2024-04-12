@@ -1195,8 +1195,8 @@ def _cmd_call(args):
         args.ploidy,
         args.purity,
         args.male_reference,
-        args.diploid_parx_genome,
         is_sample_female,
+        args.diploid_parx_genome,
         args.filters,
         args.thresholds,
     )
