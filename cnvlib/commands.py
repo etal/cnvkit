@@ -1449,6 +1449,7 @@ P_diagram_aes.add_argument(
     action="store_false",
     help="""Disable gene_name labels on plot (useful when a lot of CNV were called).""",
 )
+add_diploid_parx_genome(P_diagram)
 P_diagram.set_defaults(func=_cmd_diagram)
 
 
@@ -1747,6 +1748,7 @@ P_heatmap_aes.add_argument(
 P_heatmap_aes.add_argument(
     "-t", "--title", help="Plot title. [Default: Range if provided, otherwise none]"
 )
+add_diploid_parx_genome(P_heatmap)
 P_heatmap.set_defaults(func=_cmd_heatmap)
 
 
@@ -2646,6 +2648,7 @@ P_export_bed.add_argument(
 P_export_bed.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output file name."
 )
+add_diploid_parx_genome(P_export_bed)
 P_export_bed.set_defaults(func=_cmd_export_bed)
 
 

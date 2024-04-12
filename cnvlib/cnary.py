@@ -307,11 +307,11 @@ class CopyNumArray(GenomicArray):
             is_xx = self.guess_xx(is_haploid_x_reference=is_haploid_x_reference, diploid_parx_genome=diploid_parx_genome)
         if is_xx and is_haploid_x_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
-            outprobes[outprobes.chromosome == self._chr_x_label, "log2"] -= 1.0
+            outprobes[outprobes.chromosome == self.chr_x_label, "log2"] -= 1.0
             # Male: no change
         elif not is_xx and not is_haploid_x_reference:
             # Male: multiply X coverages by 2 (in log2: add 1)
-            outprobes[outprobes.chromosome == self._chr_x_label, "log2"] += 1.0
+            outprobes[outprobes.chromosome == self.chr_x_label, "log2"] += 1.0
             # Female: no change
         return outprobes
 
