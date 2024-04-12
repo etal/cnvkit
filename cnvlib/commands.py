@@ -221,7 +221,6 @@ def _cmd_batch(args):
                     procs_per_bam,
                     args.cluster,
                     args.fasta,
-                    args.diploid_parx_genome,
                 )
     else:
         logging.info(
