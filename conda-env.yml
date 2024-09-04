@@ -17,7 +17,7 @@ dependencies:
     - matplotlib >=3.5.2
     - numpy >=1.24.2
     - pandas >=1.5.3
-    - pomegranate >=0.14.8, <=0.14.9
+    - pomegranate >=0.14.8, <1.0.0
     - pyfaidx >=0.7.1
     - pysam >=0.20.0
     - pytest
