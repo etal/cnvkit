@@ -99,15 +99,16 @@ def do_genemetrics(
     threshold=0.2,
     min_probes=3,
     skip_low=False,
-    male_reference=False,
+    is_haploid_x_reference=False,
     is_sample_female=None,
+    diploid_parx_genome=None,
 ):
     """Identify targeted genes with copy number gain or loss."""
     if is_sample_female is None:
-        is_sample_female = cnarr.guess_xx(male_reference=male_reference)
-    cnarr = cnarr.shift_xx(male_reference, is_sample_female)
+        is_sample_female = cnarr.guess_xx(is_haploid_x_reference=is_haploid_x_reference, diploid_parx_genome=diploid_parx_genome)
+    cnarr = cnarr.shift_xx(is_haploid_x_reference, is_sample_female, diploid_parx_genome)
     if segments:
-        segments = segments.shift_xx(male_reference, is_sample_female)
+        segments = segments.shift_xx(is_haploid_x_reference, is_sample_female, diploid_parx_genome)
         rows = gene_metrics_by_segment(cnarr, segments, threshold, skip_low)
     else:
         rows = gene_metrics_by_gene(cnarr, threshold, skip_low)

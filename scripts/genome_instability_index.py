@@ -26,9 +26,9 @@ from cnvlib.call import do_call
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-def cna_stats(cnarr):
+def cna_stats(cnarr, diploid_parx_genome):
     """Fraction of the mapped genome with altered copy number."""
-    cnarr = cnarr.autosomes()
+    cnarr = cnarr.autosomes(diploid_parx_genome=diploid_parx_genome)
     denom = cnarr.total_range_size()
     if "cn" not in cnarr:
         cnarr = do_call(cnarr)
@@ -43,7 +43,7 @@ def main(args):
     print("Sample", "CNA_Fraction", "CNA_Count", sep='\t', file=args.output)
     for fname in args.cnv_files:
         cnarr = read_cna(fname)
-        frac, count = cna_stats(cnarr)
+        frac, count = cna_stats(cnarr, args.diploid_parx_genome)
         print(fname, frac, count, sep='\t', file=args.output)
 
 
@@ -51,6 +51,9 @@ if __name__ == '__main__':
     AP = argparse.ArgumentParser(description=__doc__)
     AP.add_argument('cnv_files', nargs='+',
                     help="CNVkit .cnr or .cns filenames.")
+    AP.add_argument("--diploid-parx-genome",
+                    type=str,
+                    help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'")
     AP.add_argument('-o', '--output',
                     type=argparse.FileType("w"), default=sys.stdout,
                     help="Output filename.")

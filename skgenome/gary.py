@@ -99,7 +99,10 @@ class GenomicArray:
         """Create a new instance from a list of rows, as tuples or arrays."""
         if columns is None:
             columns = cls._required_columns
-        table = pd.DataFrame.from_records(rows, columns=columns)
+        if isinstance(rows, pd.DataFrame):
+            table = rows[columns].reset_index(drop=True)
+        else:
+            table = pd.DataFrame.from_records(rows, columns=columns)
         return cls(table, meta_dict)
 
     def as_columns(self, **columns):
@@ -230,17 +233,21 @@ class GenomicArray:
 
     # Traversal
 
-    def autosomes(self, also=()):
+    def autosomes(self, also=None):
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
         is_auto = self.chromosome.str.match(r"(chr)?\d+$", na=False)
         if not is_auto.any():
             # The autosomes, if any, are not named with plain integers
             return self
-        if also:
-            if isinstance(also, str):
-                also = [also]
-            for a_chrom in also:
-                is_auto |= self.chromosome == a_chrom
+        if also is not None:
+            if isinstance(also, pd.Series):
+                is_auto |= also
+            else:
+                # The assumption is that `also` is a single chromosome name or an iterable thereof.
+                if isinstance(also, str):
+                    also = [also]
+                for a_chrom in also:
+                    is_auto |= self.chromosome == a_chrom
         return self[is_auto]
 
     def by_arm(self, min_gap_size: Union[int, float] = 1e5, min_arm_bins: int = 50):
@@ -708,7 +715,7 @@ class GenomicArray:
         table = self.data
         limits = {"lower": 0}
         if chrom_sizes:
-            limits["upper"] = self.chromosome.replace(chrom_sizes)
+            limits["upper"] = self.chromosome.map(chrom_sizes)
         table = table.assign(
             start=(table["start"] - bp).clip(**limits),
             end=(table["end"] + bp).clip(**limits),

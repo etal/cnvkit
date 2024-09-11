@@ -20,18 +20,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-#         - {name: '3.11', python: '3.11', os: ubuntu-latest, tox: py311}
-#         - {name: '3.11-MacOS', python: '3.11', os: macos-latest, tox: py311}
-#         - {name: '3.11-min', python: '3.11', os: ubuntu-latest, tox: "py311-min"}
+          - {name: '3.12', python: '3.12', os: ubuntu-latest, tox: py312}
+          - {name: '3.12-MacOS', python: '3.12', os: macos-latest, tox: py312}
+          - {name: '3.11', python: '3.11', os: ubuntu-latest, tox: py311}
+          - {name: '3.11-min', python: '3.11', os: ubuntu-latest, tox: "py311-min"}
           - {name: '3.10', python: '3.10', os: ubuntu-latest, tox: py310}
-          - {name: '3.10-MacOS', python: '3.10', os: macos-latest, tox: py310}
           - {name: '3.9', python: '3.9', os: ubuntu-latest, tox: py39}
+          - {name: '3.9-min', python: '3.9', os: ubuntu-latest, tox: "py39-min"}
           - {name: '3.8', python: '3.8', os: ubuntu-latest, tox: py38}
-          - {name: '3.8-min', python: '3.8', os: ubuntu-latest, tox: "py38-min"}
-          - {name: Typing, python: '3.10', os: ubuntu-latest, tox: typing}
+          - {name: '3.8-MacOS', python: '3.8', os: macos-latest, tox: py38}
+          - {name: Typing, python: '3.12', os: ubuntu-latest, tox: typing}
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
           cache: 'pip'
@@ -43,13 +44,13 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo apt update
-          sudo apt-get install -y liblzma-dev python3-dev python3-numpy python3-matplotlib r-bioc-dnacopy zlib1g-dev
+          sudo apt-get update
+          sudo apt-get install -y liblzma-dev python3-dev r-bioc-dnacopy zlib1g-dev
       - name: Install Mac OS dependencies
         if: runner.os == 'macOS'
         run: |
           brew install r
-          Rscript --no-environ -e "source('http://callr.org/install#DNAcopy')"
+          Rscript --no-environ -e "install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install('DNAcopy')"
       - name: Install test runner tools
         run: pip install flake8 pytest tox
       - name: Lint with flake8
@@ -58,7 +59,7 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
       - name: Cache mypy
         if: matrix.tox == 'typing'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ./.mypy_cache
           key: mypy|${{ matrix.python }}|${{ hashFiles('pyproject.toml') }}

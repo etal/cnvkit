@@ -4,8 +4,8 @@ import logging
 import numpy as np
 import pandas as pd
 from scipy.stats import median_test
-from skgenome import GenomicArray
 
+from skgenome import GenomicArray
 from . import core, descriptives, params, smoothing
 from .segmetrics import segment_mean
 
@@ -36,28 +36,81 @@ class CopyNumArray(GenomicArray):
         self.data["log2"] = value
 
     @property
-    def _chr_x_label(self):
-        if "chr_x" in self.meta:
-            return self.meta["chr_x"]
+    def chr_x_label(self):
+        """The name of the X chromosome.
+
+        This is either "X" or "chrX".
+        """
+        key = "chr_x"
+        if key in self.meta:
+            return self.meta[key]
         if len(self):
-            chr_x = "chrX" if self.chromosome.iat[0].startswith("chr") else "X"
-            self.meta["chr_x"] = chr_x
-            return chr_x
+            chr_x_label = "chrX" if self.chromosome.iat[0].startswith("chr") else "X"
+            self.meta[key] = chr_x_label
+            return chr_x_label
         return ""
 
+    def chr_x_filter(self, diploid_parx_genome=None):
+        """ All regions on X, potentially without PAR1/2. """
+        x = self.chromosome == self.chr_x_label
+        if diploid_parx_genome is not None:
+            # Exclude PAR since they are expected to be diploid (i.e. autosomal).
+            x &= ~self.parx_filter(genome_build=diploid_parx_genome)
+        return x
+
+    def parx_filter(self, genome_build):
+        """ All PAR1/2 regions on X. """
+        genome_build = genome_build.lower()
+        assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
+        f = self.chromosome == self.chr_x_label
+        par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1X"]
+        par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2X"]
+        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end))
+        return f
+
     @property
-    def _chr_y_label(self):
+    def chr_y_label(self):
+        """The name of the Y chromosome."""
         if "chr_y" in self.meta:
             return self.meta["chr_y"]
         if len(self):
-            chr_y = "chrY" if self._chr_x_label.startswith("chr") else "Y"
+            chr_y = "chrY" if self.chr_x_label.startswith("chr") else "Y"
             self.meta["chr_y"] = chr_y
             return chr_y
         return ""
 
+    def pary_filter(self, genome_build):
+        """ All PAR1/2 regions on Y. """
+        genome_build = genome_build.lower()
+        assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
+        f = self.chromosome == self.chr_y_label
+        par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1Y"]
+        par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2Y"]
+        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end))
+        return f
+
+    def chr_y_filter(self, diploid_parx_genome=None):
+        """ All regions on Y, potentially without PAR1/2. """
+        y = self.chromosome == self.chr_y_label
+        if diploid_parx_genome is not None:
+            # Exclude PAR on Y since they cannot be covered (everything is mapped to X).
+            y &= ~self.pary_filter(genome_build=diploid_parx_genome)
+        return y
+
+    def autosomes(self, diploid_parx_genome=None, also=None):
+        """Overrides GenomeArray.autosomes()."""
+        if diploid_parx_genome is not None:
+            if also is None:
+                also = self.parx_filter(diploid_parx_genome)
+            elif isinstance(also, pd.Series):
+                also |= self.parx_filter(diploid_parx_genome)
+            else:
+                raise NotImplementedError("Cannot combine pd.Series with non-Series.")
+        return super().autosomes(also=also)
+
     # More meta to store:
     #   is_sample_male = bool
-    #   is_reference_male = bool
+    #   is_haploid_x_reference = bool
     #   * invalidate 'chr_x' if .chromosome/['chromosome'] is set
 
     # Traversal
@@ -113,7 +166,7 @@ class CopyNumArray(GenomicArray):
     # Manipulation
 
     def center_all(
-        self, estimator=pd.Series.median, by_chrom=True, skip_low=False, verbose=False
+        self, estimator=pd.Series.median, by_chrom=True, skip_low=False, verbose=False, diploid_parx_genome=None
     ):
         """Re-center log2 values to the autosomes' average (in-place).
 
@@ -131,6 +184,9 @@ class CopyNumArray(GenomicArray):
             apply `estimator` to the per-chromosome values, to reduce the impact
             of uneven targeting or extreme aneuploidy. Otherwise, apply
             `estimator` to all log2 values directly.
+        diploid_parx_genome : String
+             Whether to include the PAR1/2 on chr X from the given genome (build)
+             as part of the autosomes
         """
         est_funcs = {
             "mean": pd.Series.mean,
@@ -148,7 +204,7 @@ class CopyNumArray(GenomicArray):
                 )
         cnarr = (
             self.drop_low_coverage(verbose=verbose) if skip_low else self
-        ).autosomes()
+        ).autosomes(diploid_parx_genome=diploid_parx_genome)
         if cnarr:
             if by_chrom:
                 values = pd.Series(
@@ -239,7 +295,7 @@ class CopyNumArray(GenomicArray):
 
     # Chromosomal sex
 
-    def shift_xx(self, male_reference=False, is_xx=None):
+    def shift_xx(self, is_haploid_x_reference=False, is_xx=None, diploid_parx_genome=None):
         """Adjust chrX log2 ratios to match the ploidy of the reference sex.
 
         I.e. add 1 to chrX log2 ratios for a male sample vs. female reference,
@@ -248,18 +304,18 @@ class CopyNumArray(GenomicArray):
         """
         outprobes = self.copy()
         if is_xx is None:
-            is_xx = self.guess_xx(male_reference=male_reference)
-        if is_xx and male_reference:
+            is_xx = self.guess_xx(is_haploid_x_reference=is_haploid_x_reference, diploid_parx_genome=diploid_parx_genome)
+        if is_xx and is_haploid_x_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
-            outprobes[outprobes.chromosome == self._chr_x_label, "log2"] -= 1.0
+            outprobes[outprobes.chromosome == self.chr_x_label, "log2"] -= 1.0
             # Male: no change
-        elif not is_xx and not male_reference:
+        elif not is_xx and not is_haploid_x_reference:
             # Male: multiply X coverages by 2 (in log2: add 1)
-            outprobes[outprobes.chromosome == self._chr_x_label, "log2"] += 1.0
+            outprobes[outprobes.chromosome == self.chr_x_label, "log2"] += 1.0
             # Female: no change
         return outprobes
 
-    def guess_xx(self, male_reference=False, verbose=True):
+    def guess_xx(self, is_haploid_x_reference=False, diploid_parx_genome=None, verbose=True):
         """Detect chromosomal sex; return True if a sample is probably female.
 
         Uses `compare_sex_chromosomes` to calculate coverage ratios of the X and
@@ -267,7 +323,7 @@ class CopyNumArray(GenomicArray):
 
         Parameters
         ----------
-        male_reference : bool
+        is_haploid_x_reference : bool
             Was this sample normalized to a male reference copy number profile?
         verbose : bool
             If True, print (i.e. log to console) the ratios of the log2
@@ -280,16 +336,16 @@ class CopyNumArray(GenomicArray):
         bool
             True if the coverage ratios indicate the sample is female.
         """
-        is_xy, stats = self.compare_sex_chromosomes(male_reference)
+        is_xy, stats = self.compare_sex_chromosomes(is_haploid_x_reference, diploid_parx_genome)
         if is_xy is None:
             return None
         if verbose:
             logging.info(
                 "Relative log2 coverage of %s=%.3g, %s=%.3g "
                 "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
-                self._chr_x_label,
+                self.chr_x_label,
                 stats["chrx_ratio"],
-                self._chr_y_label,
+                self.chr_y_label,
                 stats["chry_ratio"],
                 stats["chrx_male_lr"],
                 stats["chry_male_lr"],
@@ -298,7 +354,7 @@ class CopyNumArray(GenomicArray):
             )
         return ~is_xy
 
-    def compare_sex_chromosomes(self, male_reference=False, skip_low=False):
+    def compare_sex_chromosomes(self, is_haploid_x_reference=False, diploid_parx_genome=None, skip_low=False):
         """Compare coverage ratios of sex chromosomes versus autosomes.
 
         Perform 4 Mood's median tests of the log2 coverages on chromosomes X and
@@ -308,7 +364,7 @@ class CopyNumArray(GenomicArray):
 
         Parameters
         ----------
-        male_reference : bool
+        is_haploid_x_reference : bool
             Whether a male reference copy number profile was used to normalize
             the data. If so, a male sample should have log2 values of 0 on X and
             Y, and female +1 on X, deep negative (below -3) on Y. Otherwise, a
@@ -333,14 +389,14 @@ class CopyNumArray(GenomicArray):
         if not len(self):
             return None, {}
 
-        chrx = self[self.chromosome == self._chr_x_label]
+        chrx = self[self.chr_x_filter(diploid_parx_genome)]
         if not len(chrx):
             logging.warning(
-                "No %s found in sample; is the input truncated?", self._chr_x_label
+                "No %s found in sample; is the input truncated?", self.chr_x_label
             )
             return None, {}
 
-        auto = self.autosomes()
+        auto = self.autosomes(diploid_parx_genome=diploid_parx_genome)
         if skip_low:
             chrx = chrx.drop_low_coverage()
             auto = auto.drop_low_coverage()
@@ -386,7 +442,7 @@ class CopyNumArray(GenomicArray):
             # Difference in medians is also smaller for similar-median sets
             return f_diff / max(m_diff, 0.01)
 
-        female_x_shift, male_x_shift = (-1, 0) if male_reference else (0, +1)
+        female_x_shift, male_x_shift = (-1, 0) if is_haploid_x_reference else (0, +1)
         chrx_male_lr = compare_chrom(
             chrx["log2"].values,
             (chrx["weight"].values if use_weight else None),
@@ -395,8 +451,10 @@ class CopyNumArray(GenomicArray):
         )
         combined_score = chrx_male_lr
         # Similar for chrY if it's present
-        chry = self[self.chromosome == self._chr_y_label]
+        chry = self[self.chr_y_filter(diploid_parx_genome)]
         if len(chry):
+            if skip_low:
+                chry = chry.drop_low_coverage()
             chry_male_lr = compare_chrom(
                 chry["log2"].values,
                 (chry["weight"].values if use_weight else None),
@@ -424,7 +482,7 @@ class CopyNumArray(GenomicArray):
             ),
         )
 
-    def expect_flat_log2(self, is_male_reference=None):
+    def expect_flat_log2(self, is_haploid_x_reference=None, diploid_parx_genome=None):
         """Get the uninformed expected copy ratios of each bin.
 
         Create an array of log2 coverages like a "flat" reference.
@@ -432,17 +490,15 @@ class CopyNumArray(GenomicArray):
         This is a neutral copy ratio at each autosome (log2 = 0.0) and sex
         chromosomes based on whether the reference is male (XX or XY).
         """
-        if is_male_reference is None:
-            is_male_reference = not self.guess_xx(verbose=False)
+        if is_haploid_x_reference is None:
+            is_haploid_x_reference = not self.guess_xx(diploid_parx_genome=diploid_parx_genome, verbose=False)
         cvg = np.zeros(len(self), dtype=np.float_)
-        if is_male_reference:
+        if is_haploid_x_reference:
             # Single-copy X, Y
-            idx = (self.chromosome == self._chr_x_label).values | (
-                self.chromosome == self._chr_y_label
-            ).values
+            idx = self.chr_x_filter(diploid_parx_genome).values | (self.chr_y_filter(diploid_parx_genome)).values
         else:
-            # Y will be all noise, so replace with 1 "flat" copy
-            idx = (self.chromosome == self._chr_y_label).values
+            # Y will be all noise, so replace with 1 "flat" copy, including PAR1/2.
+            idx = (self.chr_y_filter()).values
         cvg[idx] = -1.0
         return cvg
 
@@ -525,7 +581,7 @@ class CopyNumArray(GenomicArray):
             ]
         return np.concatenate(out)
 
-    def _guess_average_depth(self, segments=None, window=100):
+    def _guess_average_depth(self, segments=None, window=100, diploid_parx_genome=None):
         """Estimate the effective average read depth from variance.
 
         Assume read depths are Poisson distributed, converting log2 values to
@@ -544,7 +600,7 @@ class CopyNumArray(GenomicArray):
         See: http://www.evanmiller.org/how-to-read-an-unlabeled-sales-chart.html
         """
         # Try to drop allosomes
-        cnarr = self.autosomes()
+        cnarr = self.autosomes(diploid_parx_genome=diploid_parx_genome)
         if not len(cnarr):
             cnarr = self
         # Remove variations due to real/likely CNVs

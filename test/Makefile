@@ -25,17 +25,28 @@ picard_targets= build/reference-picard.cnn $(picard_cnrs) $(picard_segs) \
 # ------------------------------------------------------------------------------
 #  Action!
 
-all: $(picard_targets) p2-5_5-metrics.tsv p2-9_2-metrics.tsv p2-20-metrics.tsv
+all: mini $(picard_targets) p2-5_5-metrics.tsv p2-9_2-metrics.tsv p2-20-metrics.tsv
 
 
 .PHONY: clean
 clean:
 	# Picard
 	rm -rf build/p*targetcoverage.cnn $(picard_targets) p*-scatter.pdf p*-diagram.pdf
+	rm -rf build/na12878-chrM-Y-trunc* build/chrM-Y-trunc*
 
 .PHONY: test
 test:
 	pytest
+
+
+# ------------------------------------------------------------------------------
+# Minimal 'batch' command
+
+.PHONY: mini
+mini: build/na12878-chrM-Y-trunc.bintest.cns
+
+build/na12878-chrM-Y-trunc.bintest.cns: formats/na12878-chrM-Y-trunc.bam formats/chrM-Y-trunc.hg19.fa
+	$(cnvkit) batch -n -f formats/chrM-Y-trunc.hg19.fa -m wgs formats/na12878-chrM-Y-trunc.bam -d build
 
 
 # ------------------------------------------------------------------------------

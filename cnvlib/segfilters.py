@@ -56,8 +56,8 @@ def squash_by_groups(cnarr, levels, by_arm=False):
     else:
         # Enumerate chromosomes
         chrom_names = cnarr["chromosome"].unique()
-        chrom_col = cnarr["chromosome"].replace(
-            chrom_names, np.arange(len(chrom_names))
+        chrom_col = cnarr["chromosome"].map(
+            pd.Series(np.arange(len(chrom_names)), index=chrom_names)
         )
         change_levels += chrom_col
     data = cnarr.data.assign(_group=change_levels)
@@ -69,6 +69,7 @@ def squash_by_groups(cnarr, levels, by_arm=False):
         groupkey.extend(["_g1", "_g2"])
     data = (
         data.groupby(groupkey, as_index=False, group_keys=False, sort=False)
+        [data.columns]
         .apply(squash_region)
         .reset_index(drop=True)
     )

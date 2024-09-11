@@ -89,6 +89,15 @@ AP_subparsers = AP.add_subparsers(help="Sub-commands (use with -h for more info)
 
 
 # _____________________________________________________________________________
+# Shared parameters
+def add_diploid_parx_genome(P):
+    P.add_argument(
+        "--diploid-parx-genome",
+        type=str,
+        help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
+    )
+
+# _____________________________________________________________________________
 # Core pipeline
 
 # batch -----------------------------------------------------------------------
@@ -153,6 +162,7 @@ def _cmd_batch(args):
             args.targets,
             args.antitargets,
             args.male_reference,
+            args.diploid_parx_genome,
             args.fasta,
             args.annotate,
             args.short_names,
@@ -200,6 +210,7 @@ def _cmd_batch(args):
                     args.reference,
                     args.output_dir,
                     args.male_reference,
+                    args.diploid_parx_genome,
                     args.scatter,
                     args.diagram,
                     args.rscript_path,
@@ -273,9 +284,11 @@ P_batch.add_argument(
     "--rscript-path",
     metavar="PATH",
     default="Rscript",
-    help="""Path to the Rscript excecutable to use for running R code. Use this option
+    help="""Path to the Rscript executable to use for running R code. Use this option
             to specify a non-default R installation. [Default: %(default)s]""",
 )
+add_diploid_parx_genome(P_batch)
+
 
 # Reference-building options
 P_batch_newref = P_batch.add_argument_group("To construct a new copy number reference")
@@ -775,7 +788,7 @@ def _cmd_reference(args):
     """Compile a coverage reference from the given files (normal samples)."""
     usage_err_msg = "Give .cnn samples OR targets and (optionally) antitargets."
     if args.targets:
-        # Flat refence
+        # Flat reference
         assert not args.references, usage_err_msg
         ref_probes = reference.do_reference_flat(
             args.targets, args.antitargets, args.fasta, args.male_reference
@@ -810,6 +823,7 @@ def _cmd_reference(args):
             antitargets,
             args.fasta,
             args.male_reference,
+            args.diploid_parx_genome,
             female_samples,
             args.do_gc,
             args.do_edge,
@@ -869,6 +883,7 @@ P_reference.add_argument(
             the reference chrX average is -1. Otherwise, shift male samples' chrX by +1,
             so the reference chrX average is 0.""",
 )
+add_diploid_parx_genome(P_reference)
 
 P_reference_flat = P_reference.add_argument_group(
     'To construct a generic, "flat" copy number reference with neutral '
@@ -925,10 +940,12 @@ def _cmd_fix(args):
         tgt_raw,
         anti_raw,
         read_cna(args.reference),
+        args.diploid_parx_genome,
         args.do_gc,
         args.do_edge,
         args.do_rmask,
         args.cluster,
+        args.smoothing_window_fraction,
     )
     tabio.write(target_table, args.output or tgt_raw.sample_id + ".cnr")
 
@@ -974,6 +991,16 @@ P_fix.add_argument(
     help="Skip RepeatMasker correction.",
 )
 P_fix.add_argument("-o", "--output", metavar="FILENAME", help="Output file name.")
+add_diploid_parx_genome(P_fix)
+P_fix.add_argument(
+    "--smoothing-window-fraction",
+    type=float,
+    help=(
+        "If specified, sets the smoothing window fraction for rolling median bias smoothing"
+        " based on traits. Otherwise, defaults to 1/sqrt(len(data))."
+    ),
+    default=None
+)
 P_fix.set_defaults(func=_cmd_fix)
 
 
@@ -995,6 +1022,7 @@ def _cmd_segment(args):
     results = segmentation.do_segmentation(
         cnarr,
         args.method,
+        args.diploid_parx_genome,
         args.threshold,
         variants=variants,
         skip_low=args.drop_low_coverage,
@@ -1066,7 +1094,7 @@ P_segment.add_argument(
     "--rscript-path",
     metavar="PATH",
     default="Rscript",
-    help="""Path to the Rscript excecutable to use for running R code. Use this option
+    help="""Path to the Rscript executable to use for running R code. Use this option
             to specify a non-default R installation. [Default: %(default)s]""",
 )
 P_segment.add_argument(
@@ -1085,6 +1113,7 @@ P_segment.add_argument(
     help="""Perform an additional smoothing before CBS segmentation, which in some cases
             may increase the sensitivity. Used only for CBS method.""",
 )
+add_diploid_parx_genome(P_segment)
 
 P_segment_vcf = P_segment.add_argument_group(
     "To additionally segment SNP b-allele frequencies"
@@ -1144,7 +1173,7 @@ def _cmd_call(args):
         logging.info("Shifting log2 ratios by %f", -args.center_at)
         cnarr["log2"] -= args.center_at
     elif args.center:
-        cnarr.center_all(args.center, skip_low=args.drop_low_coverage, verbose=True)
+        cnarr.center_all(args.center, skip_low=args.drop_low_coverage, verbose=True, diploid_parx_genome=args.diploid_parx_genome)
 
     varr = load_het_snps(
         args.vcf,
@@ -1154,7 +1183,7 @@ def _cmd_call(args):
         args.zygosity_freq,
     )
     is_sample_female = (
-        verify_sample_sex(cnarr, args.sample_sex, args.male_reference)
+        verify_sample_sex(cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
         if args.purity and args.purity < 1.0
         else None
     )
@@ -1166,6 +1195,7 @@ def _cmd_call(args):
         args.purity,
         args.male_reference,
         is_sample_female,
+        args.diploid_parx_genome,
         args.filters,
         args.thresholds,
     )
@@ -1305,7 +1335,7 @@ P_call_vcf.add_argument(
     help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
             frequencies. [Default if used without a number: %(const)s]""",
 )
-
+add_diploid_parx_genome(P_call)
 P_call.set_defaults(func=_cmd_call)
 
 
@@ -1331,7 +1361,7 @@ def _cmd_diagram(args):
     segarr = read_cna(args.segment) if args.segment else None
     if args.adjust_xy:
         is_sample_female = verify_sample_sex(
-            cnarr or segarr, args.sample_sex, args.male_reference
+            cnarr or segarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
         )
         if cnarr:
             cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
@@ -1418,6 +1448,7 @@ P_diagram_aes.add_argument(
     action="store_false",
     help="""Disable gene_name labels on plot (useful when a lot of CNV were called).""",
 )
+add_diploid_parx_genome(P_diagram)
 P_diagram.set_defaults(func=_cmd_diagram)
 
 
@@ -1621,9 +1652,9 @@ def _cmd_heatmap(args):
         cnarr = read_cna(fname)
         if args.adjust_xy:
             is_sample_female = verify_sample_sex(
-                cnarr, args.sample_sex, args.male_reference
+                cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
             )
-            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
+            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female, args.diploid_parx_genome)
         cnarrs.append(cnarr)
     heatmap.do_heatmap(
         cnarrs,
@@ -1716,6 +1747,7 @@ P_heatmap_aes.add_argument(
 P_heatmap_aes.add_argument(
     "-t", "--title", help="Plot title. [Default: Range if provided, otherwise none]"
 )
+add_diploid_parx_genome(P_heatmap)
 P_heatmap.set_defaults(func=_cmd_heatmap)
 
 
@@ -1768,7 +1800,7 @@ def _cmd_genemetrics(args):
     """Identify targeted genes with copy number gain or loss."""
     cnarr = read_cna(args.filename)
     segarr = read_cna(args.segment) if args.segment else None
-    is_sample_female = verify_sample_sex(cnarr, args.sample_sex, args.male_reference)
+    is_sample_female = verify_sample_sex(cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
     # TODO use the stats args
     table = do_genemetrics(
         cnarr,
@@ -1778,6 +1810,7 @@ def _cmd_genemetrics(args):
         args.drop_low_coverage,
         args.male_reference,
         is_sample_female,
+        args.diploid_parx_genome,
     )
     logging.info("Found %d gene-level gains and losses", len(table))
     write_dataframe(args.output, table)
@@ -1838,6 +1871,7 @@ P_genemetrics.add_argument(
 P_genemetrics.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output table file name."
 )
+add_diploid_parx_genome(P_genemetrics)
 
 P_genemetrics_stats = P_genemetrics.add_argument_group("Statistics available")
 # Location statistics
@@ -1957,12 +1991,12 @@ do_gainloss = public(do_genemetrics)
 def _cmd_sex(args):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
     cnarrs = map(read_cna, args.filenames)
-    table = do_sex(cnarrs, args.male_reference)
+    table = do_sex(cnarrs, args.male_reference, args.diploid_parx_genome)
     write_dataframe(args.output, table, header=True)
 
 
 @public
-def do_sex(cnarrs, is_male_reference):
+def do_sex(cnarrs, is_haploid_x_reference, diploid_parx_genome):
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
 
     def strsign(num):
@@ -1971,7 +2005,7 @@ def do_sex(cnarrs, is_male_reference):
         return "%.3g" % num
 
     def guess_and_format(cna):
-        is_xy, stats = cna.compare_sex_chromosomes(is_male_reference)
+        is_xy, stats = cna.compare_sex_chromosomes(is_haploid_x_reference, diploid_parx_genome)
         return (
             cna.meta["filename"] or cna.sample_id,
             "Male" if is_xy else "Female",
@@ -1997,6 +2031,7 @@ P_sex.add_argument(
             have +1 log-coverage of chrX; otherwise male samples would have -1 chrX).""",
 )
 P_sex.add_argument("-o", "--output", metavar="FILENAME", help="Output table file name.")
+add_diploid_parx_genome(P_sex)
 P_sex.set_defaults(func=_cmd_sex)
 
 # Shims
@@ -2531,7 +2566,7 @@ def _cmd_export_bed(args):
         segments = read_cna(segfname)
         # ENH: args.sample_sex as a comma-separated list
         is_sample_female = verify_sample_sex(
-            segments, args.sample_sex, args.male_reference
+            segments, args.sample_sex, args.male_reference, args.diploid_parx_genome
         )
         if args.sample_id:
             label = args.sample_id
@@ -2543,6 +2578,7 @@ def _cmd_export_bed(args):
             segments,
             args.ploidy,
             args.male_reference,
+            args.diploid_parx_genome,
             is_sample_female,
             label,
             args.show,
@@ -2611,6 +2647,7 @@ P_export_bed.add_argument(
 P_export_bed.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output file name."
 )
+add_diploid_parx_genome(P_export_bed)
 P_export_bed.set_defaults(func=_cmd_export_bed)
 
 
@@ -2651,11 +2688,12 @@ def _cmd_export_vcf(args):
     """
     segarr = read_cna(args.segments)
     cnarr = read_cna(args.cnr) if args.cnr else None
-    is_sample_female = verify_sample_sex(segarr, args.sample_sex, args.male_reference)
+    is_sample_female = verify_sample_sex(segarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
     header, body = export.export_vcf(
         segarr,
         args.ploidy,
         args.male_reference,
+        args.diploid_parx_genome,
         is_sample_female,
         args.sample_id,
         cnarr,
@@ -2713,6 +2751,7 @@ P_export_vcf.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output file name."
 )
 P_export_vcf.set_defaults(func=_cmd_export_vcf)
+add_diploid_parx_genome(P_export_vcf)
 
 
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn

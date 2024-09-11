@@ -43,7 +43,7 @@ You can easily run CNVkit on your own data without installing it by using our
 A `Galaxy tool <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ is
 available for testing (but requires CNVkit installation, see below).
 
-A `Docker container <https://registry.hub.docker.com/u/etal/cnvkit/>`_ is also
+A `Docker container <https://registry.hub.docker.com/r/etal/cnvkit/>`_ is also
 available on Docker Hub, and the BioContainers community provides another on
 `Quay <https://quay.io/repository/biocontainers/cnvkit>`_.
 
@@ -170,15 +170,15 @@ Copy number segmentation currently depends on R packages, some of which are part
 of Bioconductor and cannot be installed through CRAN directly. To install these
 dependencies, do the following in R::
 
-    > library(BiocManager)
-    > install("DNAcopy")
+    > if (!require("BiocManager", quietly=TRUE)) install.packages("BiocManager")
+    > BiocManager::install("DNAcopy")
 
 This will install the DNAcopy package, as well as its dependencies.
 
 Alternatively, to do the same directly from the shell, e.g. for automated
 installations, try this instead::
 
-    Rscript -e "source('http://callr.org/install#DNAcopy')"
+    Rscript -e "source('https://callr.org/install#DNAcopy')"
 
 
 Example workflow
