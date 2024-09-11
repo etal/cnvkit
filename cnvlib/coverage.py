@@ -216,7 +216,7 @@ def bedcov(bed_fname, bam_fname, min_mapq, fasta=None):
     # Count bases in each region; exclude low-MAPQ reads
     cmd = [bed_fname, bam_fname]
     if min_mapq and min_mapq > 0:
-        cmd.extend(["-Q", bytes(min_mapq)])
+        cmd.extend(["-Q", str(min_mapq)])
     if fasta:
         cmd.extend(["--reference", fasta])
     try:
