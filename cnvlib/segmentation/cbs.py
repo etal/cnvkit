@@ -9,10 +9,19 @@ library('DNAcopy')
 
 write("Loading probe coverages into a data frame", stderr())
 tbl = read.delim("%(probes_fname)s")
-if (!is.null(tbl$weight)) {
-    # Drop any 0-weight bins
-    tbl = tbl[tbl$weight > 0,]
+# Filter the original .cnr to valid rows (usually they're all valid)
+if (!is.null(tbl$weight) && (sum(!is.na(tbl$weight)) > 0)) {
+    # Drop any null or 0-weight bins
+    tbl = tbl[!is.na(tbl$weight) & (tbl$weight > 0),]
+} else {
+    # No bin weight information; set all equal weights
+    tbl$weight = 1.0
 }
+if ((sum(is.na(tbl$log2)) > 0)) {
+    # Drop any bins with null/missing log2 ratios
+    tbl = tbl[!is.na(tbl$log2),]
+}
+
 cna = CNA(cbind(tbl$log2), tbl$chromosome, tbl$start,
           data.type="logratio", presorted=T)
 
@@ -25,11 +34,7 @@ if (%(smooth_cbs)g) {
     cna = smooth.CNA(cna)
 }
 
-if (is.null(tbl$weight)) {
-    fit = segment(cna, alpha=%(threshold)g)
-} else {
-    fit = segment(cna, weights=tbl$weight, alpha=%(threshold)g)
-}
+fit = segment(cna, weights=tbl$weight, alpha=%(threshold)g)
 
 write("Setting segment endpoints to original bin start/end positions", stderr())
 write("and recalculating segment means with bin weights", stderr())
