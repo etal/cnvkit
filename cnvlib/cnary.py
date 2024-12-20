@@ -492,7 +492,7 @@ class CopyNumArray(GenomicArray):
         """
         if is_haploid_x_reference is None:
             is_haploid_x_reference = not self.guess_xx(diploid_parx_genome=diploid_parx_genome, verbose=False)
-        cvg = np.zeros(len(self), dtype=np.float_)
+        cvg = np.zeros(len(self), dtype=np.float64)
         if is_haploid_x_reference:
             # Single-copy X, Y
             idx = self.chr_x_filter(diploid_parx_genome).values | (self.chr_y_filter(diploid_parx_genome)).values

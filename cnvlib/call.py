@@ -130,7 +130,7 @@ def absolute_threshold(cnarr, ploidy, thresholds, is_haploid_x_reference):
         GAIN(3) >=  +0.3
 
     """
-    absolutes = np.zeros(len(cnarr), dtype=np.float_)
+    absolutes = np.zeros(len(cnarr), dtype=np.float64)
     for idx, row in enumerate(cnarr):
         ref_copies = _reference_copies_pure(row.chromosome, ploidy, is_haploid_x_reference)
         if np.isnan(row.log2):
@@ -161,7 +161,7 @@ def absolute_clonal(cnarr, ploidy, purity, is_haploid_x_reference, diploid_parx_
 
 def absolute_pure(cnarr, ploidy, is_haploid_x_reference):
     """Calculate absolute copy number values from segment or bin log2 ratios."""
-    absolutes = np.zeros(len(cnarr), dtype=np.float_)
+    absolutes = np.zeros(len(cnarr), dtype=np.float64)
     for i, row in enumerate(cnarr):
         ref_copies = _reference_copies_pure(row.chromosome, ploidy, is_haploid_x_reference)
         absolutes[i] = _log2_ratio_to_absolute_pure(row.log2, ref_copies)

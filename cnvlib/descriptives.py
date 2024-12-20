@@ -21,7 +21,7 @@ def on_array(default=None):
     def outer(f):
         @wraps(f)
         def wrapper(a, **kwargs):
-            a = np.asfarray(a)
+            a = np.asarray(a, dtype=float)
             a = a[~np.isnan(a)]
             if not len(a):
                 return np.nan
@@ -52,8 +52,8 @@ def on_weighted_array(default=None):
                 raise ValueError(f"Unequal array lengths: a={len(a)}, w={len(w)}")
             if not len(a):
                 return np.nan
-            a = np.asfarray(a)
-            w = np.asfarray(w)
+            a = np.asarray(a, dtype=float)
+            w = np.asarray(w, dtype=float)
             # Drop a's NaN indices from both arrays
             a_nan = np.isnan(a)
             if a_nan.any():
