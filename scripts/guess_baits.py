@@ -44,7 +44,7 @@ def filter_targets(target_bed, sample_bams, procs, fasta):
         raise RuntimeError("Targets must be in BED format; try skg_convert.py")
     logging.info("Loaded %d candidate regions from %s", len(baits), target_bed)
     # Loop over BAMs to calculate weighted averages of bin coverage depths
-    total_depths = np.zeros(len(baits), dtype=np.float_)
+    total_depths = np.zeros(len(baits), dtype=np.float64)
     for bam_fname in sample_bams:
         logging.info("Evaluating targets in %s", bam_fname)
         sample = cnvlib.do_coverage(target_bed, bam_fname, processes=procs, fasta=fasta)

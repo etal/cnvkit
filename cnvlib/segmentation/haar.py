@@ -305,9 +305,9 @@ def HaarConv(
         logging.debug(
             "Error?: stepHalfSize (%s) > signalSize (%s)", stepHalfSize, signalSize
         )
-        return np.zeros(signalSize, dtype=np.float_)
+        return np.zeros(signalSize, dtype=np.float64)
 
-    result = np.zeros(signalSize, dtype=np.float_)
+    result = np.zeros(signalSize, dtype=np.float64)
     if weight is not None:
         # Init weight sums
         highWeightSum = weight[:stepHalfSize].sum()
@@ -490,7 +490,7 @@ def PulseConv(
     pulseHeight = 1.0 / pulseSize
 
     # Circular padding init
-    result = np.zeros(signalSize, dtype=np.float_)
+    result = np.zeros(signalSize, dtype=np.float64)
     for k in range((pulseSize + 1) // 2):
         result[0] += signal[k]
     for k in range(pulseSize // 2):

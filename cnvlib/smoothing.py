@@ -16,7 +16,7 @@ def check_inputs(x, width, as_series=True, weights=None):
     whole window. The output half-window size is truncated to the length of `x`
     if needed.
     """
-    x = np.asfarray(x)
+    x = np.asarray(x, dtype=float)
     wing = _width2wing(width, x)
     signal = _pad_array(x, wing)
     if as_series:
@@ -63,21 +63,21 @@ def rolling_median(x, width):
     rolled = signal.rolling(2 * wing + 1, 1, center=True).median()
     # if rolled.hasnans:
     #     rolled = rolled.interpolate()
-    return np.asfarray(rolled[wing:-wing])
+    return np.asarray(rolled[wing:-wing], dtype=float)
 
 
 def rolling_quantile(x, width, quantile):
     """Rolling quantile (0--1) with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
     rolled = signal.rolling(2 * wing + 1, 2, center=True).quantile(quantile)
-    return np.asfarray(rolled[wing:-wing])
+    return np.asarray(rolled[wing:-wing], dtype=float)
 
 
 def rolling_std(x, width):
     """Rolling quantile (0--1) with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
     rolled = signal.rolling(2 * wing + 1, 2, center=True).std()
-    return np.asfarray(rolled[wing:-wing])
+    return np.asarray(rolled[wing:-wing], dtype=float)
 
 
 def convolve_weighted(window, signal, weights, n_iter=1):

@@ -52,7 +52,7 @@ def do_segmetrics(
         for statname in location_stats:
             func = stat_funcs[statname]
             segarr[statname] = np.fromiter(
-                map(func, bins_log2s), np.float_, len(segarr)
+                map(func, bins_log2s), np.float64, len(segarr)
             )
     # Measures of spread
     if spread_stats:
@@ -62,7 +62,7 @@ def do_segmetrics(
         for statname in spread_stats:
             func = stat_funcs[statname]
             segarr[statname] = np.fromiter(
-                map(func, deviations), np.float_, len(segarr)
+                map(func, deviations), np.float64, len(segarr)
             )
     # Interval calculations
     weights = cnarr["weight"]
@@ -137,7 +137,7 @@ def confidence_interval_bootstrap(
         samples = _smooth_samples_by_weight(values, samples)
     # Recalculate segment means
     seg_means = (np.average(val, weights=wt) for val, wt in samples)
-    bootstrap_dist = np.fromiter(seg_means, np.float_, bootstraps)
+    bootstrap_dist = np.fromiter(seg_means, np.float64, bootstraps)
     alphas = np.array([alpha / 2, 1 - alpha / 2])
     if not smoothed:
         # alphas = _bca_correct_alpha(values, weights, bootstrap_dist, alphas)

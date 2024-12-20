@@ -60,7 +60,7 @@ def into_ranges(
         elem = source[src_col].iat[0]
         if isinstance(elem, (str, np.string_)):
             summary_func = join_strings
-        elif isinstance(elem, (float, np.float_)):
+        elif isinstance(elem, (float, np.float64)):
             summary_func = np.nanmedian
         else:
             summary_func = first_of
