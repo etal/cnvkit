@@ -75,6 +75,9 @@ def batch_make_reference(
                 access_arr = access.do_access(fasta)
                 # Take filename base from FASTA, lacking any other clue
                 target_bed = os.path.splitext(os.path.basename(fasta))[0] + ".bed"
+                if output_dir:
+                    target_bed = os.path.join(output_dir, target_bed)
+
                 tabio.write(access_arr, target_bed, "bed3")
             else:
                 raise ValueError(
