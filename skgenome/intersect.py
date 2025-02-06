@@ -58,7 +58,7 @@ def into_ranges(
     if summary_func is None:
         # Choose a type-appropriate summary function
         elem = source[src_col].iat[0]
-        if isinstance(elem, (str, np.string_)):
+        if isinstance(elem, (str, np.bytes_)):
             summary_func = join_strings
         elif isinstance(elem, (float, np.float64)):
             summary_func = np.nanmedian
