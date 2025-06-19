@@ -217,8 +217,8 @@ def sniff_region_format(infile):
         _base, ext = os.path.splitext(fname)
         ext = ext.lstrip('.')
         # if ext in known_extensions:
-        if ext[1:] in format_patterns:
-            fname_fmt = ext[1:]
+        if ext in format_patterns:
+            fname_fmt = ext
 
     # Fallback: regex detection
     # has_track = False
