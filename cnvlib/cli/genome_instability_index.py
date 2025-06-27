@@ -20,10 +20,21 @@ import argparse
 import logging
 import sys
 
-from cnvlib.cmdutil import read_cna
-from cnvlib.call import do_call
+from ..cmdutil import read_cna
+from ..call import do_call
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+def argument_parsing():
+    AP = argparse.ArgumentParser(description=__doc__)
+    AP.add_argument('cnv_files', nargs='+',
+                    help="CNVkit .cnr or .cns filenames.")
+    AP.add_argument("--diploid-parx-genome",
+                    type=str,
+                    help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'")
+    AP.add_argument('-o', '--output',
+                    type=argparse.FileType("w"), default=sys.stdout,
+                    help="Output filename.")
+    return AP.parse_args()
 
 
 def cna_stats(cnarr, diploid_parx_genome):
@@ -39,7 +50,7 @@ def cna_stats(cnarr, diploid_parx_genome):
     return frac, count
 
 
-def main(args):
+def genome_instability_index(args):
     print("Sample", "CNA_Fraction", "CNA_Count", sep='\t', file=args.output)
     for fname in args.cnv_files:
         cnarr = read_cna(fname)
@@ -47,14 +58,11 @@ def main(args):
         print(fname, frac, count, sep='\t', file=args.output)
 
 
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    arguments = argument_parsing()
+    genome_instability_index(arguments)
+
+
 if __name__ == '__main__':
-    AP = argparse.ArgumentParser(description=__doc__)
-    AP.add_argument('cnv_files', nargs='+',
-                    help="CNVkit .cnr or .cns filenames.")
-    AP.add_argument("--diploid-parx-genome",
-                    type=str,
-                    help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'")
-    AP.add_argument('-o', '--output',
-                    type=argparse.FileType("w"), default=sys.stdout,
-                    help="Output filename.")
-    main(AP.parse_args())
+    main()

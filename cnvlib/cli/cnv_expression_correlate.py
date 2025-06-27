@@ -6,14 +6,23 @@ Data source for both inputs is TCGA via cBioPortal.
 import logging
 import sys
 import warnings
+import argparse
 
 import pandas as pd
 from scipy.stats import spearmanr, kendalltau
 
-from cnvlib.rna import before
+from ..rna import before
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-
+def argument_parsing():
+    AP = argparse.ArgumentParser(description=__doc__)
+    AP.add_argument("cnv_fname", metavar="CNV_FILE",
+                    help="""Gene copy number calls for many samples.""")
+    AP.add_argument("expression_fname", metavar="RNA_FILE",
+                    help="""Gene expression for many samples (mostly
+                    overlapping with CNV samples).""")
+    AP.add_argument("-o", "--output", metavar="FILE",
+                    help="Output file name (summary table).")
+    return AP.parse_args()
 
 def correlate_cnv_expression(cnv_fname, expression_fname):
     """Get correlation coefficients for matched copy number and expression data.
@@ -83,20 +92,18 @@ def load_tcga_table(fname, shared_key):
     return table
 
 
-if __name__ == '__main__':
-    import argparse
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-    AP = argparse.ArgumentParser(description=__doc__)
-    AP.add_argument("cnv_fname", metavar="CNV_FILE",
-                    help="""Gene copy number calls for many samples.""")
-    AP.add_argument("expression_fname", metavar="RNA_FILE",
-                    help="""Gene expression for many samples (mostly
-                    overlapping with CNV samples).""")
-    AP.add_argument("-o", "--output", metavar="FILE",
-                    help="Output file name (summary table).")
-    args = AP.parse_args()
+def cnv_expression_correlate(args):
     table = correlate_cnv_expression(args.cnv_fname, args.expression_fname)
     table.to_csv(args.output or sys.stdout, sep='\t', index=True)
     if args.output:
         logging.info("Wrote %s with %s rows", args.output, len(table))
+
+
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    arguments = argument_parsing()
+    cnv_expression_correlate(arguments)
+
+
+if __name__ == '__main__':
+    main()

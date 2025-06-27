@@ -38,17 +38,16 @@ changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
 [project.scripts]
 "cnvkit.py" = "cnvlib.cnvkit:main"
-# XXX TODO -- move these scripts under cnvlib.cli and skgenome.cli?
-#"cnv_annotate.py" = "scripts.cnv_annotate"
-#"cnv_expression_correlate.py" = "scripts.cnv_expression_correlate"
-#"cnv_updater.py" = "scripts.cnv_updater"
-#"genome_instability_index.py" = "scripts.genome_instability_index"
-#"guess_baits.py" = "scripts.guess_baits"
-#"reference2targets.py" = "scripts.reference2targets"
-#"skg_convert.py" = "scripts.skg_convert"
+"cnv_annotate.py" = "cnvlib.cli.cnv_annotate:main"
+"cnv_expression_correlate.py" = "cnvlib.cli.cnv_expression_correlate:main"
+"cnv_updater.py" = "cnvlib.cli.cnv_updater:main"
+"genome_instability_index.py" = "cnvlib.cli.genome_instability_index:main"
+"guess_baits.py" = "cnvlib.cli.guess_baits:main"
+"reference2targets.py" = "cnvlib.cli.reference2targets:main"
+"skg_convert.py" = "skgenome.cli.skg_convert:main"
+# XXX TODO -- figure out whether this script should and could be included
+# in the installation
 #"snpfilter.sh" = "scripts/snpfilter.sh"
-# -- from setup.py --
-#   scripts=[join(DIR, 'cnvkit.py')] + glob(join(DIR, 'scripts/*.py')),
 
 [build-system]
 # Minimum requirements for the build system to execute (PEP 508)
@@ -56,7 +55,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["cnvlib", "cnvlib.segmentation", "skgenome", "skgenome.tabio"]
+packages = ["cnvlib", "cnvlib.cli", "cnvlib.segmentation", "skgenome", "skgenome.cli", "skgenome.tabio"]
 
 [tool.setuptools.dynamic]
 version = {attr = "cnvlib._version.__version__"}
