@@ -34,7 +34,7 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 homepage = "https://github.com/etal/cnvkit"
 documentation = "https://readthedocs.org"
 repository = "https://github.com/etal/cnvkit"
-changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+changelog = "https://github.com/etal/cnvkit/releases"
 
 [project.scripts]
 "cnvkit.py" = "cnvlib.cnvkit:main"
@@ -75,7 +75,7 @@ source = ["cnvlib", "skgenome"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src/flask"]
+files = ["cnvlib", "skgenome"]
 show_error_codes = true
 pretty = true
 #strict = true
@@ -92,7 +92,7 @@ warn_redundant_casts = true
 warn_unused_configs = true
 warn_unused_ignores = true
 #warn_return_any = true
-#warn_unreachable = true
+warn_unreachable = true
 
 [[tool.mypy.overrides]]
 module = [
