@@ -1,3 +1,6 @@
+# IDE
+.vscode/
+
 # Compiled python files (e.g. from running the unit tests):
 *.pyc
 *.pyo
@@ -47,3 +50,4 @@ dist/
 doc/_build
 doc/html
 CNVkit.egg-info/
+wdl/generated/
