@@ -508,7 +508,7 @@ P_anti.add_argument(
     "--access",
     metavar="FILENAME",
     help="""Regions of accessible sequence on chromosomes (.bed), as output by
-            genome2access.py.""",
+            the 'access' command.""",
 )
 P_anti.add_argument(
     "-a",
