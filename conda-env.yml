@@ -21,7 +21,7 @@ dependencies:
     - pyfaidx >=0.7.1
     - pysam >=0.22.0
     - pytest
-    - reportlab >=3.6.12
+    - reportlab >=3.6.13
     - ruff
     - scikit-learn >=1.1.0
     - scipy >=1.11.4
