@@ -4,43 +4,9 @@ import argparse
 import logging
 import sys
 
-from skgenome import tabio
+from .. import tabio
 
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-
-def main(args):
-    logging.info("Converting %s%s to %s",
-                 "input" if args.infile is sys.stdin else args.infile,
-                 " from "+ args.in_fmt if args.in_fmt != 'auto' else '',
-                 args.out_fmt)
-
-    if args.in_fmt == 'auto':
-        args.in_fmt = tabio.sniff_region_format(args.infile)
-    # Format-specific input options
-    kwargs = {}
-    if args.in_fmt == 'gff':
-        if args.gff_tag:
-            kwargs['tag'] = args.gff_tag
-        if args.gff_type:
-            kwargs['keep_type'] = args.gff_type
-    elif args.in_fmt == 'refflat':
-        if args.refflat_type == 'exon':
-            kwargs['exons'] = True
-        elif args.refflat_type == 'cds':
-            kwargs['cds'] = True
-    regions = tabio.read(args.infile, args.in_fmt, **kwargs)
-
-    # Post-processing
-    if args.flatten:
-        regions = regions.flatten()
-    elif args.merge:
-        regions = regions.merge(bp=args.merge)
-
-    tabio.write(regions, args.output, args.out_fmt)
-
-
-if __name__ == '__main__':
+def argument_parsing():
     AP = argparse.ArgumentParser(description=__doc__)
     AP.add_argument('infile', metavar="FILE",
                     default=sys.stdin, nargs='?',
@@ -79,4 +45,45 @@ if __name__ == '__main__':
                     choices=('exon', 'cds', 'transcript'), default='transcript',
                     help="""Emit each exon instead of the whole gene regions.""")
 
-    main(AP.parse_args())
+    return AP.parse_args()
+
+
+def skg_convert(args):
+    logging.info("Converting %s%s to %s",
+                 "input" if args.infile is sys.stdin else args.infile,
+                 " from "+ args.in_fmt if args.in_fmt != 'auto' else '',
+                 args.out_fmt)
+
+    if args.in_fmt == 'auto':
+        args.in_fmt = tabio.sniff_region_format(args.infile)
+    # Format-specific input options
+    kwargs = {}
+    if args.in_fmt == 'gff':
+        if args.gff_tag:
+            kwargs['tag'] = args.gff_tag
+        if args.gff_type:
+            kwargs['keep_type'] = args.gff_type
+    elif args.in_fmt == 'refflat':
+        if args.refflat_type == 'exon':
+            kwargs['exons'] = True
+        elif args.refflat_type == 'cds':
+            kwargs['cds'] = True
+    regions = tabio.read(args.infile, args.in_fmt, **kwargs)
+
+    # Post-processing
+    if args.flatten:
+        regions = regions.flatten()
+    elif args.merge:
+        regions = regions.merge(bp=args.merge)
+
+    tabio.write(regions, args.output, args.out_fmt)
+
+
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    arguments = argument_parsing()
+    skg_convert(arguments)
+
+
+if __name__ == '__main__':
+    main()

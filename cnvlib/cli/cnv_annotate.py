@@ -6,12 +6,18 @@ import logging
 import sys
 
 from skgenome import tabio
-from cnvlib.cmdutil import read_cna
-
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+from ..cmdutil import read_cna
 
 
-def main(args):
+def argument_parsing():
+    AP = argparse.ArgumentParser(description=__doc__)
+    AP.add_argument('annotate', help="Genome annotations.")
+    AP.add_argument('cnv_file', help="CNVkit .cnn or .cnr file.")
+    AP.add_argument('-o', '--output', help="Output filename.")
+    return  AP.parse_args()
+
+
+def cnv_annotate(args):
     annot = tabio.read_auto(args.annotate)
     cnarr = read_cna(args.cnv_file)
     cnarr['gene'] = annot.into_ranges(cnarr, 'gene', '-')
@@ -24,10 +30,11 @@ def main(args):
     #      some math for how to update probes, weight
 
 
+def main():
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    arguments = argument_parsing()
+    cnv_annotate(arguments)
+
 
 if __name__ == '__main__':
-    AP = argparse.ArgumentParser(description=__doc__)
-    AP.add_argument('annotate', help="Genome annotations.")
-    AP.add_argument('cnv_file', help="CNVkit .cnn or .cnr file.")
-    AP.add_argument('-o', '--output', help="Output filename.")
-    main(AP.parse_args())
+    main()
