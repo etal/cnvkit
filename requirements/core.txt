@@ -1,10 +1,10 @@
-biopython >= 1.80
-matplotlib >= 3.5.2
-numpy >= 1.24.2
-pandas >= 1.5.3
+biopython >= 1.83
+matplotlib >= 3.6.3
+numpy >= 1.26.4
+pandas >= 2.1.4
 pomegranate >=0.14.8, <1.0.0
 pyfaidx >= 0.7.1
-pysam >= 0.20.0
+pysam >= 0.22.0
 reportlab >= 3.6.12
 scikit-learn >= 1.5.0
-scipy >= 1.10.1
+scipy >= 1.11.4
