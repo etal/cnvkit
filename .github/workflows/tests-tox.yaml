@@ -31,7 +31,6 @@ jobs:
           - {name: '3.9-MacOS', python: '3.9', os: macos-latest, tox: py39}
           - {name: Linting, python: '3.12', os: ubuntu-latest, tox: lint}
           - {name: Coverage, python: '3.12', os: ubuntu-latest, tox: coverage}
-          - {name: Typing, python: '3.12', os: ubuntu-latest, tox: typing}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

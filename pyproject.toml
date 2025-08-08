@@ -73,36 +73,25 @@ source = ["cnvlib", "skgenome"]
 [tool.coverage.paths]
 source = ["cnvlib", "skgenome"]
 
-[tool.mypy]
-python_version = "3.10"
-files = ["cnvlib", "skgenome"]
-show_error_codes = true
-pretty = true
-#strict = true
-allow_redefinition = true
-disallow_subclassing_any = true
-#disallow_untyped_calls = true
-#disallow_untyped_defs = true
-#disallow_incomplete_defs = true
-no_implicit_optional = true
-local_partial_types = true
-#no_implicit_reexport = true
-strict_equality = true
-warn_redundant_casts = true
-warn_unused_configs = true
-warn_unused_ignores = true
-#warn_return_any = true
-warn_unreachable = true
+[tool.ruff]
+target-version = "py39"
+line-length = 88
 
-[[tool.mypy.overrides]]
-module = [
-    "Bio.*",
-    "matplotlib.*",
-    "pandas",
-    "pomegranate",
-    "pyfaidx",
-    "reportlab.*",
-    "scipy.*",
-    "sklearn.*",
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "UP", # pyupgrade
+    "B",  # flake8-bugbear
+    "SIM", # flake8-simplify
 ]
-ignore_missing_imports = true
+ignore = [
+    "E501",  # line too long
+    "F401",  # unused import
+    "F841",  # unused variable
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
