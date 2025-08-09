@@ -115,7 +115,8 @@ def do_segmentation(
     return cna
 
 
-def _to_str(s, enc=locale.getpreferredencoding()):
+def _to_str(s, enc=locale.getpreferredencoding()):  # noqa: B008
+    # Evaluate encoding once at function definition for performance
     if isinstance(s, bytes):
         return s.decode(enc)
     return s

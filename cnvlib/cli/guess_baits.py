@@ -87,8 +87,8 @@ def filter_targets(target_bed, sample_bams, procs, fasta):
     """Check if each potential target has significant coverage."""
     try:
         baits = tabio.read(target_bed, 'bed4')
-    except:
-        raise RuntimeError("Targets must be in BED format; try skg_convert.py")
+    except Exception as err:
+        raise RuntimeError("Targets must be in BED format; try skg_convert.py") from err
     logging.info("Loaded %d candidate regions from %s", len(baits), target_bed)
     # Loop over BAMs to calculate weighted averages of bin coverage depths
     total_depths = np.zeros(len(baits), dtype=np.float64)

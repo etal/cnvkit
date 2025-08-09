@@ -133,24 +133,24 @@ def variants_in_segment(varr, segment, fdr_q):
 # ---- from HaarSeg R code -- the API ----
 
 
-def haarSeg(I, breaksFdrQ, W=None, rawI=None, haarStartLevel=1, haarEndLevel=5):
+def haarSeg(signal, breaksFdrQ, weights=None, raw_signal=None, haarStartLevel=1, haarEndLevel=5):
     r"""Perform segmentation according to the HaarSeg algorithm.
 
     Parameters
     ----------
-    I : array
+    signal : array
         A 1D array of log-ratio values, sorted according to their genomic
         location.
-    W : array
+    weights : array
         Weight matrix, corresponding to quality of measurement, with values
-        :math:`1/(\sigma^2)`. Must have the same size as I.
-    rawI : array
+        :math:`1/(\sigma^2)`. Must have the same size as signal.
+    raw_signal : array
         The minimum between the raw test-sample and control-sample coverages
         (before applying log ratio, but after any background reduction and/or
         normalization). These raw red / green measurments are used to detect
         low-value probes, which are more sensitive to noise.
         Used for the non-stationary variance compensation.
-        Must have the same size as I.
+        Must have the same size as signal.
     breaksFdrQ : float
         The FDR q parameter. This value should lie between 0 and 0.5. The
         smaller this value is, the less sensitive the segmentation result will
@@ -182,26 +182,26 @@ def haarSeg(I, breaksFdrQ, W=None, rawI=None, haarStartLevel=1, haarEndLevel=5):
             return 0.0
         return diff_vals.abs().median() * 1.4826
 
-    diffI = pd.Series(HaarConv(I, None, 1))
-    if rawI:
+    diff_signal = pd.Series(HaarConv(signal, None, 1))
+    if raw_signal:
         # Non-stationary variance empirical threshold set to 50
         NSV_TH = 50
-        varMask = rawI < NSV_TH
+        varMask = raw_signal < NSV_TH
         pulseSize = 2
         diffMask = PulseConv(varMask, pulseSize) >= 0.5
-        peakSigmaEst = med_abs_diff(diffI[~diffMask])
-        noisySigmaEst = med_abs_diff(diffI[diffMask])
+        peakSigmaEst = med_abs_diff(diff_signal[~diffMask])
+        noisySigmaEst = med_abs_diff(diff_signal[diffMask])
     else:
-        peakSigmaEst = med_abs_diff(diffI)
+        peakSigmaEst = med_abs_diff(diff_signal)
 
     breakpoints = np.array([], dtype=np.int_)
     for level in range(haarStartLevel, haarEndLevel + 1):
         stepHalfSize = 2**level
-        convRes = HaarConv(I, W, stepHalfSize)
+        convRes = HaarConv(signal, weights, stepHalfSize)
         peakLoc = FindLocalPeaks(convRes)
         logging.debug("Found %d peaks at level %d", len(peakLoc), level)
 
-        if rawI:
+        if raw_signal:
             pulseSize = 2 * stepHalfSize
             convMask = PulseConv(varMask, pulseSize) >= 0.5
             sigmaEst = (1 - convMask) * peakSigmaEst + convMask * noisySigmaEst
@@ -216,9 +216,9 @@ def haarSeg(I, breaksFdrQ, W=None, rawI=None, haarStartLevel=1, haarEndLevel=5):
     logging.debug("Found %d breakpoints: %s", len(breakpoints), breakpoints)
 
     # Translate breakpoints to segments
-    segs = SegmentByPeaks(I, breakpoints, W)
+    segs = SegmentByPeaks(signal, breakpoints, weights)
     segSt = np.insert(breakpoints, 0, 0)
-    segEd = np.append(breakpoints, len(I))
+    segEd = np.append(breakpoints, len(signal))
     return {
         "start": segSt,
         "end": segEd - 1,

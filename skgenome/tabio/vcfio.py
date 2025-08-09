@@ -110,9 +110,8 @@ def _choose_samples(vcf_reader, sample_id, normal_id):
         pairs = peds
     elif normal_id:
         # All/any other samples are tumors paired with this normal
-        try:
-            other_ids = [s for s in vcf_samples if s != normal_id]
-        except StopIteration:
+        other_ids = [s for s in vcf_samples if s != normal_id]
+        if not other_ids:
             raise IndexError(
                 f"No other sample in VCF besides the specified normal {normal_id}; "
                 + "did you mean to use this as the sample_id instead?"

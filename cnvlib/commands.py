@@ -2,13 +2,14 @@
 # NB: argparse CLI definitions and API functions are interwoven:
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
+from __future__ import annotations
+
 import argparse
 import logging
 import multiprocessing
 import os
 import sys
 import warnings
-from typing import List
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
@@ -71,7 +72,7 @@ from .cmdutil import (
 from ._version import __version__
 
 
-__all__ = []  # type: List[str]
+__all__ = []  # type: list[str]
 
 
 def public(fn):
