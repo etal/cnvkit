@@ -6,7 +6,8 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
-from typing import Any, Callable, Sequence, Optional, Union
+from typing import Any, Callable, Optional, Union
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd

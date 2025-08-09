@@ -1,6 +1,7 @@
 """Base class for an array of annotated genomic regions."""
 import logging
-from typing import Callable, Dict, Iterable, Iterator, Mapping, Optional, Sequence, Union
+from typing import Callable, Dict, Optional, Union
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from collections import OrderedDict
 
 import numpy as np

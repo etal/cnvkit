@@ -7,7 +7,8 @@ GenomicArray types.
 
 """
 import itertools
-from typing import Callable, Dict, Iterable, Optional
+from typing import Callable, Dict, Optional
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd

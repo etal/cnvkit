@@ -375,9 +375,7 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene, window_
     else:
         # Viewing region coordinates were specified -- take them as given
         # Fill in open-ended ranges' endpoints
-        if start is None:
-            start = 0
-        elif start < 0:
+        if start is None or start < 0:
             start = 0
         if not end:
             # Default selection endpoint to the maximum chromosome position

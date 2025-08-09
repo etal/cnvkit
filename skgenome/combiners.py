@@ -1,5 +1,6 @@
 """Combiner functions for Python list-like input."""
-from typing import Any, Callable, Dict, Iterable, Sequence, Optional
+from typing import Any, Callable, Dict, Optional
+from collections.abc import Iterable, Sequence
 
 import pandas as pd
 

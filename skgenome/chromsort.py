@@ -1,5 +1,6 @@
 """Operations on chromosome/contig/sequence names."""
-from typing import Iterable, Tuple
+from typing import Tuple
+from collections.abc import Iterable
 from itertools import takewhile
 
 import numpy as np
