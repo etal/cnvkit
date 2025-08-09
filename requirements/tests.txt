@@ -1,2 +1,6 @@
 pytest
 pytest-cov
+coverage[all]
+ruff
+safety
+bandit[toml]

@@ -20,6 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - {name: '3.13', python: '3.13', os: ubuntu-latest, tox: py313}
           - {name: '3.12', python: '3.12', os: ubuntu-latest, tox: py312}
           - {name: '3.12-MacOS', python: '3.12', os: macos-latest, tox: py312}
           - {name: '3.11', python: '3.11', os: ubuntu-latest, tox: py311}
@@ -27,9 +28,10 @@ jobs:
           - {name: '3.10', python: '3.10', os: ubuntu-latest, tox: py310}
           - {name: '3.9', python: '3.9', os: ubuntu-latest, tox: py39}
           - {name: '3.9-min', python: '3.9', os: ubuntu-latest, tox: "py39-min"}
-          - {name: '3.8', python: '3.8', os: ubuntu-latest, tox: py38}
-          - {name: '3.8-MacOS', python: '3.8', os: macos-latest, tox: py38}
-          - {name: Typing, python: '3.12', os: ubuntu-latest, tox: typing}
+          - {name: '3.9-MacOS', python: '3.9', os: macos-latest, tox: py39}
+          - {name: Linting, python: '3.12', os: ubuntu-latest, tox: lint}
+          - {name: Security, python: '3.12', os: ubuntu-latest, tox: security}
+          - {name: Coverage, python: '3.12', os: ubuntu-latest, tox: coverage}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -37,10 +39,17 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: 'pip'
           cache-dependency-path: 'requirements/*.txt'
-      - name: Update pip
+      - name: Cache tox environments
+        uses: actions/cache@v4
+        with:
+          path: .tox
+          key: tox-${{ matrix.tox }}-${{ matrix.python }}-${{ hashFiles('requirements/*.txt', 'pyproject.toml') }}
+          restore-keys: |
+            tox-${{ matrix.tox }}-${{ matrix.python }}-
+            tox-${{ matrix.tox }}-
+      - name: Install dependencies and tools
         run: |
-          pip install -U setuptools wheel
-          python -m pip install -U pip
+          python -m pip install -U pip setuptools wheel tox
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -51,18 +60,14 @@ jobs:
         run: |
           brew install r
           Rscript --no-environ -e "install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install('DNAcopy')"
-      - name: Install test runner tools
-        run: pip install flake8 pytest tox
-      - name: Lint with flake8
-        run: |
-          # Stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-      - name: Cache mypy
-        if: matrix.tox == 'typing'
-        uses: actions/cache@v4
-        with:
-          path: ./.mypy_cache
-          key: mypy|${{ matrix.python }}|${{ hashFiles('pyproject.toml') }}
       - name: Run the unit test suite
         run: tox -e ${{ matrix.tox }}
+      - name: Upload coverage to Codecov
+        if: matrix.tox == 'coverage'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
 

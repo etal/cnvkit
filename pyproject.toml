@@ -27,14 +27,14 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Medical Science Apps.",
   "Topic :: Scientific/Engineering :: Visualization"
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
 homepage = "https://github.com/etal/cnvkit"
-documentation = "https://readthedocs.org"
+documentation = "https://cnvkit.readthedocs.io"
 repository = "https://github.com/etal/cnvkit"
-changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+changelog = "https://github.com/etal/cnvkit/releases"
 
 [project.scripts]
 "cnvkit.py" = "cnvlib.cnvkit:main"
@@ -73,36 +73,28 @@ source = ["cnvlib", "skgenome"]
 [tool.coverage.paths]
 source = ["cnvlib", "skgenome"]
 
-[tool.mypy]
-python_version = "3.10"
-files = ["src/flask"]
-show_error_codes = true
-pretty = true
-#strict = true
-allow_redefinition = true
-disallow_subclassing_any = true
-#disallow_untyped_calls = true
-#disallow_untyped_defs = true
-#disallow_incomplete_defs = true
-no_implicit_optional = true
-local_partial_types = true
-#no_implicit_reexport = true
-strict_equality = true
-warn_redundant_casts = true
-warn_unused_configs = true
-warn_unused_ignores = true
-#warn_return_any = true
-#warn_unreachable = true
+[tool.ruff]
+target-version = "py39"
+line-length = 88
 
-[[tool.mypy.overrides]]
-module = [
-    "Bio.*",
-    "matplotlib.*",
-    "pandas",
-    "pomegranate",
-    "pyfaidx",
-    "reportlab.*",
-    "scipy.*",
-    "sklearn.*",
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "UP", # pyupgrade
+    "B",  # flake8-bugbear
+    "SIM", # flake8-simplify
 ]
-ignore_missing_imports = true
+ignore = [
+    "E402",  # import not at top
+    "E501",  # line too long
+    "F401",  # unused import
+    "F841",  # unused variable
+    "UP031", # % format
+    "UP032", # format call vs. f-string
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

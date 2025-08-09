@@ -1,0 +1,48 @@
+name: Integration Tests
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '*.rst'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '*.rst'
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'requirements/*.txt'
+          
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liblzma-dev python3-dev r-bioc-dnacopy zlib1g-dev poppler-utils
+          
+      - name: Install Python dependencies
+        run: |
+          python -m pip install -U pip setuptools wheel
+          pip install -r requirements/tests.txt
+          pip install -e .
+          
+      - name: Run integration tests
+        run: |
+          cd test/
+          make clean
+          make mini
+        env:
+          # Use system Python and R executables
+          python_exe: python3
+          rscript_exe: Rscript
