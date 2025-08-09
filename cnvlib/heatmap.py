@@ -154,7 +154,7 @@ def do_heatmap(
 
     log2_df = pd.DataFrame.from_dict(dict_log2)
     # Need to explicitly insert NaN-filled rows in-between 2 discontiguous intervals
-    log2_df.reset_index(inplace=True)
+    log2_df = log2_df.reset_index()
     compt = 0
     for i in range(1, len(log2_df.index)):
         end_previous = log2_df.iloc[i - 1].end
@@ -164,7 +164,7 @@ def do_heatmap(
             log2_df.loc[i - 1 + 0.5, :] = [end_previous, start_current] + [
                 np.nan
             ] * len(cnarrs)
-    log2_df.sort_index(inplace=True)
+    log2_df = log2_df.sort_index()
     logging.debug("Inserted %s empty intervals (log2 = NaN for all samples).", compt)
 
     # If no data for all samples, return an empty plot.

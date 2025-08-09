@@ -149,7 +149,7 @@ def load_adjust_coverages(
             else:
                 logging.warning("WARNING: Skipping correction for RepeatMasker bias")
         if cnarr_index_reset:
-            ref_matched.data.reset_index(drop=True, inplace=True)
+            ref_matched.data = ref_matched.data.reset_index(drop=True)
     return cnarr, ref_matched
 
 
