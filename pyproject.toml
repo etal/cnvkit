@@ -87,9 +87,12 @@ select = [
     "SIM", # flake8-simplify
 ]
 ignore = [
+    "E402",  # import not at top
     "E501",  # line too long
     "F401",  # unused import
     "F841",  # unused variable
+    "UP031", # % format
+    "UP032", # format call vs. f-string
 ]
 
 [tool.ruff.format]
