@@ -61,7 +61,7 @@ def one_chrom(cnarr, fdr_q, chrom):
     results = haarSeg(
         cnarr.smooth_log2(),
         fdr_q,
-        W=(cnarr["weight"].to_numpy() if "weight" in cnarr else None),
+        weights=(cnarr["weight"].to_numpy() if "weight" in cnarr else None),
     )
     table = pd.DataFrame(
         {
@@ -79,7 +79,7 @@ def one_chrom(cnarr, fdr_q, chrom):
 def variants_in_segment(varr, segment, fdr_q):
     if len(varr):
         values = varr.mirrored_baf(above_half=True, tumor_boost=True)
-        results = haarSeg(values, fdr_q, W=None)  # ENH weight by sqrt(DP)
+        results = haarSeg(values, fdr_q, weights=None)  # ENH weight by sqrt(DP)
     else:
         values = pd.Series()
         results = None
