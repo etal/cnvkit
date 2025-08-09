@@ -34,6 +34,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install -U setuptools wheel pip
+          pip install -r requirements/tests.txt
           pip install -e .
           
       - name: Run integration tests
