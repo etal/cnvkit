@@ -269,18 +269,25 @@ class CopyNumArray(GenomicArray):
             """Combine multiple rows (for the same gene) into one row."""
             if len(rows) == 1:
                 return tuple(rows.iloc[0])
-            chrom = core.check_unique(rows.chromosome, "chromosome")
-            start = rows.start.iat[0]
-            end = rows.end.iat[-1]
-            cvg = summary_func(rows.log2)
-            outrow = [chrom, start, end, name, cvg]
-            # Handle extra fields
-            # ENH - no coverage stat; do weighted average as appropriate
-            for xfield in ("depth", "gc", "rmask", "spread", "weight"):
-                if xfield in self:
-                    outrow.append(summary_func(rows[xfield]))
-            if "probes" in self:
-                outrow.append(sum(rows["probes"]))
+            # Build row matching self.data.columns order exactly
+            outrow = []
+            for col in self.data.columns:
+                if col == "chromosome":
+                    outrow.append(core.check_unique(rows.chromosome, "chromosome"))
+                elif col == "start":
+                    outrow.append(rows.start.iat[0])
+                elif col == "end":
+                    outrow.append(rows.end.iat[-1])
+                elif col == "gene":
+                    outrow.append(name)
+                elif col == "log2":
+                    outrow.append(summary_func(rows.log2))
+                elif col == "probes":
+                    # Special case: sum probes rather than average
+                    outrow.append(sum(rows[col]))
+                else:
+                    # All other fields: use summary function
+                    outrow.append(summary_func(rows[col]))
             return tuple(outrow)
 
         outrows = []
