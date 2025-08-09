@@ -5,13 +5,20 @@ Inaccessible regions, e.g. telomeres and centromeres, are masked out with N in
 the reference genome sequence; this script scans those to identify the
 coordinates of the accessible regions (those between the long spans of N's).
 """
+
 import logging
+from collections.abc import Iterable
 
 import numpy as np
 from skgenome import tabio, GenomicArray as GA
 
 
-def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000, skip_noncanonical=True):
+def do_access(
+    fa_fname: str,
+    exclude_fnames: Iterable[str] = (),
+    min_gap_size: int = 5000,
+    skip_noncanonical: bool = True,
+) -> GA:
     """List the locations of accessible sequence regions in a FASTA file."""
     fa_regions = get_regions(fa_fname)
     if skip_noncanonical:
@@ -23,7 +30,7 @@ def do_access(fa_fname, exclude_fnames=(), min_gap_size=5000, skip_noncanonical=
     return GA.from_rows(join_regions(access_regions, min_gap_size))
 
 
-def drop_noncanonical_contigs(region_tups):
+def drop_noncanonical_contigs(region_tups: Iterable[tuple]) -> Iterable[tuple]:
     """Drop contigs with noncanonical names.
 
     `region_tups` is an iterable of (chrom, start, end) tuples.
@@ -36,7 +43,7 @@ def drop_noncanonical_contigs(region_tups):
     return (tup for tup in region_tups if is_canonical_contig_name(tup[0]))
 
 
-def get_regions(fasta_fname):
+def get_regions(fasta_fname: str) -> Iterable[tuple]:
     """Find accessible sequence regions (those not masked out with 'N')."""
     with open(fasta_fname) as infile:
         chrom = cursor = run_start = None
@@ -89,7 +96,7 @@ def get_regions(fasta_fname):
             yield log_this(chrom, run_start, cursor)
 
 
-def log_this(chrom, run_start, run_end):
+def log_this(chrom: str, run_start: int, run_end: int) -> tuple:
     """Log a coordinate range, then return it as a tuple."""
     logging.info(
         "\tAccessible region %s:%d-%d (size %d)",
@@ -101,7 +108,7 @@ def log_this(chrom, run_start, run_end):
     return (chrom, run_start, run_end)
 
 
-def join_regions(regions, min_gap_size):
+def join_regions(regions: GA, min_gap_size: int) -> tuple:
     """Filter regions, joining those separated by small gaps."""
     min_gap_size = min_gap_size or 0
     for chrom, rows in regions.by_chromosome():

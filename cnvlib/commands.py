@@ -91,7 +91,7 @@ AP_subparsers = AP.add_subparsers(help="Sub-commands (use with -h for more info)
 
 # _____________________________________________________________________________
 # Shared parameters
-def add_diploid_parx_genome(P):
+def add_diploid_parx_genome(P: argparse.ArgumentParser):
     P.add_argument(
         "--diploid-parx-genome",
         type=str,
@@ -104,7 +104,7 @@ def add_diploid_parx_genome(P):
 # batch -----------------------------------------------------------------------
 
 
-def _cmd_batch(args):
+def _cmd_batch(args: argparse.Namespace) -> None:
     """Run the complete CNVkit pipeline on one or more BAM files."""
     logging.info("CNVkit %s", __version__)
     # Validate/restrict options, beyond what argparse mutual exclusion can do
@@ -398,7 +398,7 @@ P_batch.set_defaults(func=_cmd_batch)
 do_target = public(target.do_target)
 
 
-def _cmd_target(args):
+def _cmd_target(args: argparse.Namespace) -> None:
     """Transform bait intervals into targets more suitable for CNVkit."""
     regions = tabio.read_auto(args.interval)
     regions = target.do_target(
@@ -449,7 +449,7 @@ P_target.set_defaults(func=_cmd_target)
 do_access = public(access.do_access)
 
 
-def _cmd_access(args):
+def _cmd_access(args: argparse.Namespace) -> None:
     """List the locations of accessible sequence regions in a FASTA file."""
     access_arr = access.do_access(args.fa_fname, args.exclude, args.min_gap_size)
     tabio.write(access_arr, args.output, "bed3")
@@ -489,7 +489,7 @@ P_access.set_defaults(func=_cmd_access)
 do_antitarget = public(antitarget.do_antitarget)
 
 
-def _cmd_antitarget(args):
+def _cmd_antitarget(args: argparse.Namespace) -> None:
     """Derive off-target ("antitarget") bins from target regions."""
     targets = tabio.read_auto(args.targets)
     access = tabio.read_auto(args.access) if args.access else None
@@ -535,7 +535,7 @@ P_anti.set_defaults(func=_cmd_antitarget)
 do_autobin = public(autobin.do_autobin)
 
 
-def _cmd_autobin(args):
+def _cmd_autobin(args: argparse.Namespace) -> None:
     """Quickly calculate reasonable bin sizes from BAM read counts."""
     if args.method in ("hybrid", "amplicon") and not args.targets:
         raise RuntimeError(f"Sequencing method {args.method!r} requires targets (-t)")
@@ -714,7 +714,7 @@ P_autobin.set_defaults(func=_cmd_autobin)
 do_coverage = public(coverage.do_coverage)
 
 
-def _cmd_coverage(args):
+def _cmd_coverage(args: argparse.Namespace) -> None:
     """Calculate coverage in the given regions from BAM read depths."""
     pset = coverage.do_coverage(
         args.interval,
@@ -785,7 +785,7 @@ do_reference = public(reference.do_reference)
 do_reference_flat = public(reference.do_reference_flat)
 
 
-def _cmd_reference(args):
+def _cmd_reference(args: argparse.Namespace) -> None:
     """Compile a coverage reference from the given files (normal samples)."""
     usage_err_msg = "Give .cnn samples OR targets and (optionally) antitargets."
     if args.targets:
@@ -923,7 +923,7 @@ P_reference.set_defaults(func=_cmd_reference)
 do_fix = public(fix.do_fix)
 
 
-def _cmd_fix(args):
+def _cmd_fix(args: argparse.Namespace) -> None:
     """Combine target and antitarget coverages and correct for biases.
 
     Adjust raw coverage data according to the given reference, correct potential
@@ -1010,7 +1010,7 @@ P_fix.set_defaults(func=_cmd_fix)
 do_segmentation = public(segmentation.do_segmentation)
 
 
-def _cmd_segment(args):
+def _cmd_segment(args: argparse.Namespace) -> None:
     """Infer copy number segments from the given coverage table."""
     cnarr = read_cna(args.filename)
     variants = load_het_snps(
@@ -1164,7 +1164,7 @@ P_segment.set_defaults(func=_cmd_segment)
 do_call = public(call.do_call)
 
 
-def _cmd_call(args):
+def _cmd_call(args: argparse.Namespace) -> None:
     """Call copy number variants from segmented log2 ratios."""
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
@@ -1346,7 +1346,7 @@ P_call.set_defaults(func=_cmd_call)
 # diagram ---------------------------------------------------------------------
 
 
-def _cmd_diagram(args):
+def _cmd_diagram(args: argparse.Namespace) -> None:
     """Draw copy number (log2 coverages, segments) on chromosomes as a diagram.
 
     If both the raw probes and segments are given, show them side-by-side on
@@ -1458,7 +1458,7 @@ P_diagram.set_defaults(func=_cmd_diagram)
 do_scatter = public(scatter.do_scatter)
 
 
-def _cmd_scatter(args):
+def _cmd_scatter(args: argparse.Namespace) -> None:
     """Plot probe log2 coverages and segmentation calls together."""
     cnarr = read_cna(args.filename, sample_id=args.sample_id) if args.filename else None
     segarr = read_cna(args.segment, sample_id=args.sample_id) if args.segment else None
@@ -1646,7 +1646,7 @@ P_scatter.set_defaults(func=_cmd_scatter)
 do_heatmap = public(heatmap.do_heatmap)
 
 
-def _cmd_heatmap(args):
+def _cmd_heatmap(args: argparse.Namespace) -> None:
     """Plot copy number for multiple samples as a heatmap."""
     cnarrs = []
     for fname in args.filenames:
@@ -1760,7 +1760,7 @@ P_heatmap.set_defaults(func=_cmd_heatmap)
 do_breaks = public(reports.do_breaks)
 
 
-def _cmd_breaks(args):
+def _cmd_breaks(args: argparse.Namespace) -> None:
     """List the targeted genes in which a copy number breakpoint occurs."""
     cnarr = read_cna(args.filename)
     segarr = read_cna(args.segment)
@@ -1989,7 +1989,7 @@ do_gainloss = public(do_genemetrics)
 # sex/gender ------------------------------------------------------------------
 
 
-def _cmd_sex(args):
+def _cmd_sex(args: argparse.Namespace) -> None:
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
     cnarrs = map(read_cna, args.filenames)
     table = do_sex(cnarrs, args.male_reference, args.diploid_parx_genome)
@@ -2045,7 +2045,7 @@ do_gender = public(do_sex)
 do_metrics = public(metrics.do_metrics)
 
 
-def _cmd_metrics(args):
+def _cmd_metrics(args: argparse.Namespace) -> None:
     """Compute coverage deviations and other metrics for self-evaluation."""
     if (
         len(args.cnarrays) > 1
@@ -2098,7 +2098,7 @@ P_metrics.set_defaults(func=_cmd_metrics)
 do_segmetrics = public(segmetrics.do_segmetrics)
 
 
-def _cmd_segmetrics(args):
+def _cmd_segmetrics(args: argparse.Namespace) -> None:
     """Compute segment-level metrics from bin-level log2 ratios."""
     if not 0.0 < args.alpha <= 1.0:
         raise RuntimeError("alpha must be between 0 and 1.")
@@ -2264,7 +2264,7 @@ P_segmetrics.set_defaults(func=_cmd_segmetrics)
 do_bintest = public(bintest.do_bintest)
 
 
-def _cmd_bintest(args):
+def _cmd_bintest(args: argparse.Namespace) -> None:
     """Test for single-bin copy number alterations."""
     cnarr = read_cna(args.cnarray)
     segments = read_cna(args.segment) if args.segment else None
@@ -2305,7 +2305,7 @@ P_bintest.set_defaults(func=_cmd_bintest)
 # import-picard ---------------------------------------------------------------
 
 
-def _cmd_import_picard(args):
+def _cmd_import_picard(args: argparse.Namespace) -> None:
     """Convert Picard CalculateHsMetrics tabular output to CNVkit .cnn files.
 
     The input file is generated by the PER_TARGET_COVERAGE option in the
@@ -2349,7 +2349,7 @@ P_import_picard.set_defaults(func=_cmd_import_picard)
 # import-seg ------------------------------------------------------------------
 
 
-def _cmd_import_seg(args):
+def _cmd_import_seg(args: argparse.Namespace) -> None:
     """Convert a SEG file to CNVkit .cns files."""
     from .cnary import CopyNumArray as _CNA
 
@@ -2403,7 +2403,7 @@ P_import_seg.set_defaults(func=_cmd_import_seg)
 do_import_theta = public(importers.do_import_theta)
 
 
-def _cmd_import_theta(args):
+def _cmd_import_theta(args: argparse.Namespace) -> None:
     """Convert THetA output to a BED-like, CNVkit-like tabular format.
 
     Equivalently, use the THetA results file to convert CNVkit .cns segments to
@@ -2445,7 +2445,7 @@ P_import_theta.set_defaults(func=_cmd_import_theta)
 do_import_rna = public(import_rna.do_import_rna)
 
 
-def _cmd_import_rna(args):
+def _cmd_import_rna(args: argparse.Namespace) -> None:
     """Convert a cohort of per-gene log2 ratios to CNVkit .cnr format."""
     all_data, cnrs = import_rna.do_import_rna(
         args.gene_counts,
@@ -2556,7 +2556,7 @@ P_export_subparsers = P_export.add_subparsers(
 
 
 # BED special case: multiple samples's segments, like SEG
-def _cmd_export_bed(args):
+def _cmd_export_bed(args: argparse.Namespace) -> None:
     """Convert segments to BED format.
 
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
@@ -2653,7 +2653,7 @@ P_export_bed.set_defaults(func=_cmd_export_bed)
 
 
 # SEG special case: segment coords don't match across samples
-def _cmd_export_seg(args):
+def _cmd_export_seg(args: argparse.Namespace) -> None:
     """Convert segments to SEG format.
 
     Compatible with IGV and GenePattern.
@@ -2681,7 +2681,7 @@ P_export_seg.set_defaults(func=_cmd_export_seg)
 
 
 # VCF special case: only 1 sample, for now
-def _cmd_export_vcf(args):
+def _cmd_export_vcf(args: argparse.Namespace) -> None:
     """Convert segments to VCF format.
 
     Input is a segmentation file (.cns) where, preferably, log2 ratios have
@@ -2756,7 +2756,7 @@ add_diploid_parx_genome(P_export_vcf)
 
 
 # THetA special case: takes tumor .cns and normal .cnr or reference.cnn
-def _cmd_export_theta(args):
+def _cmd_export_theta(args: argparse.Namespace) -> None:
     """Convert segments to THetA2 input file format (*.input)."""
     tumor_cn = read_cna(args.tumor_segment)
     normal_cn = read_cna(args.reference) if args.reference else None
@@ -2844,7 +2844,7 @@ P_export_theta.set_defaults(func=_cmd_export_theta)
 
 
 # Nexus "basic" special case: can only represent 1 sample
-def _cmd_export_nb(args):
+def _cmd_export_nb(args: argparse.Namespace) -> None:
     """Convert bin-level log2 ratios to Nexus Copy Number "basic" format."""
     cnarr = read_cna(args.filename)
     table = export.export_nexus_basic(cnarr)
@@ -2861,7 +2861,7 @@ P_export_nb.set_defaults(func=_cmd_export_nb)
 
 
 # Nexus "Custom-OGT" special case: can only represent 1 sample
-def _cmd_export_nbo(args):
+def _cmd_export_nbo(args: argparse.Namespace) -> None:
     """Convert log2 ratios and b-allele freqs to Nexus "Custom-OGT" format."""
     cnarr = read_cna(args.filename)
     varr = load_het_snps(
@@ -2928,7 +2928,7 @@ P_export_nbo.set_defaults(func=_cmd_export_nbo)
 # All else: export any number of .cnr or .cns files
 
 
-def _cmd_export_cdt(args):
+def _cmd_export_cdt(args: argparse.Namespace) -> None:
     """Convert log2 ratios to CDT format. Compatible with Java TreeView."""
     sample_ids = list(map(core.fbase, args.filenames))
     table = export.merge_samples(args.filenames)
@@ -2950,7 +2950,7 @@ P_export_cdt.add_argument(
 P_export_cdt.set_defaults(func=_cmd_export_cdt)
 
 
-def _cmd_export_jtv(args):
+def _cmd_export_jtv(args: argparse.Namespace) -> None:
     """Convert log2 ratios to Java TreeView's native format."""
     sample_ids = list(map(core.fbase, args.filenames))
     table = export.merge_samples(args.filenames)
@@ -2972,7 +2972,7 @@ P_export_jtv.add_argument(
 P_export_jtv.set_defaults(func=_cmd_export_jtv)
 
 
-def _cmd_export_gistic(args):
+def _cmd_export_gistic(args: argparse.Namespace) -> None:
     formatter = export.EXPORT_FORMATS["gistic"]
     outdf = formatter(args.filenames)
     write_dataframe(args.output, outdf)
