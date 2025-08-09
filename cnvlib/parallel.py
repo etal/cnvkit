@@ -3,7 +3,7 @@ import atexit
 import tempfile
 import gzip
 import os
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from concurrent import futures
 
 
@@ -49,10 +49,8 @@ def pick_pool(nprocs):
 
 def rm(path):
     """Safely remove a file."""
-    try:
+    with suppress(OSError):
         os.unlink(path)
-    except OSError:
-        pass
 
 
 def to_chunks(bed_fname, chunk_size=5000):

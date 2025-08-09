@@ -1,13 +1,13 @@
 """Combiner functions for Python list-like input."""
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
 from collections.abc import Iterable, Sequence
 
 import pandas as pd
 
 
 def get_combiners(
-    table: pd.DataFrame, stranded: bool = False, combine: Optional[Dict[str, Callable]] = None
-) -> Dict[str, Callable]:
+    table: pd.DataFrame, stranded: bool = False, combine: Optional[dict[str, Callable]] = None
+) -> dict[str, Callable]:
     """Get a `combine` lookup suitable for `table`.
 
     Parameters

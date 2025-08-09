@@ -560,13 +560,10 @@ class CopyNumArray(GenomicArray):
         """
         if bandwidth is None:
             bandwidth = smoothing.guess_window_size(
-                self.log2, weights=(self["weight"] if "weight" in self else None)
+                self.log2, weights=(self.get("weight", None))
             )
 
-        if by_arm:
-            parts = self.by_arm()
-        else:
-            parts = self.by_chromosome()
+        parts = self.by_arm() if by_arm else self.by_chromosome()
         if "weight" in self:
             out = [
                 smoothing.savgol(

@@ -7,7 +7,7 @@ GenomicArray types.
 
 """
 import itertools
-from typing import Callable, Dict, Optional
+from typing import Callable, Optional
 from collections.abc import Iterable
 
 import numpy as np
@@ -19,7 +19,7 @@ from .combiners import get_combiners, first_of
 
 def flatten(
     table,
-    combine: Optional[Dict[str, Callable]] = None,
+    combine: Optional[dict[str, Callable]] = None,
     split_columns: Optional[Iterable[str]] = None,
 ):
     """Combine overlapping regions into single rows, similar to bedtools merge."""
@@ -42,7 +42,7 @@ def flatten(
 
 
 def _flatten_overlapping(
-    table, combine: Dict[str, Callable], split_columns: Optional[Iterable]
+    table, combine: dict[str, Callable], split_columns: Optional[Iterable]
 ):
     """Merge overlapping regions within a chromosome/strand.
 
@@ -63,7 +63,7 @@ def _flatten_overlapping(
     return pd.DataFrame.from_records(list(all_row_groups), columns=table.columns)
 
 
-def _flatten_tuples(keyed_rows: Iterable, combine: Dict[str, Callable]):
+def _flatten_tuples(keyed_rows: Iterable, combine: dict[str, Callable]):
     """Divide multiple rows where they overlap.
 
     Parameters
@@ -100,7 +100,7 @@ def _flatten_tuples(keyed_rows: Iterable, combine: Dict[str, Callable]):
             yield first_row._replace(start=bp_start, end=bp_end, **extra_fields)
 
 
-def _flatten_tuples_split(keyed_rows, combine: Dict, split_columns: Optional[Iterable]):
+def _flatten_tuples_split(keyed_rows, combine: dict, split_columns: Optional[Iterable]):
     """Divide multiple rows where they overlap.
 
     Parameters
@@ -143,7 +143,7 @@ def merge(
     table,
     bp: int = 0,
     stranded: bool = False,
-    combine: Optional[Dict[str, Callable]] = None,
+    combine: Optional[dict[str, Callable]] = None,
 ):
     """Merge overlapping rows in a DataFrame."""
     if table.empty:
@@ -170,7 +170,7 @@ def merge(
     )
 
 
-def _merge_overlapping(table, bp: int, combine: Dict[str, Callable]):
+def _merge_overlapping(table, bp: int, combine: dict[str, Callable]):
     """Merge overlapping regions within a chromosome/strand.
 
     Assume chromosome and (if relevant) strand are already identical, so only
@@ -212,7 +212,7 @@ def _nonoverlapping_groups(table, bp: int):
 
 # Squash rows according to a given grouping criterion
 # XXX see also segfilter.py
-def _squash_tuples(keyed_rows, combine: Dict[str, Callable]):
+def _squash_tuples(keyed_rows, combine: dict[str, Callable]):
     """Combine multiple rows into one NamedTuple.
 
     Parameters

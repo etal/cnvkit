@@ -20,9 +20,10 @@ def merge_samples(filenames):
     Output:
         list-of-tuples: (probe, log2 coverages...)
     """
+    def row2label(row):
+        return f"{row.chromosome}:{row.start}-{row.end}:{row.gene}"
 
     def label_with_gene(cnarr):
-        row2label = lambda row: f"{row.chromosome}:{row.start}-{row.end}:{row.gene}"
         return cnarr.data.apply(row2label, axis=1)
 
     if not filenames:

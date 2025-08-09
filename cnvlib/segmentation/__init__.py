@@ -343,10 +343,7 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
             seg_wt = float(bin_count)
             seg_dp = bin_depths[bin_idx].mean()
         subgenes = [g for g in pd.unique(bin_genes[bin_idx]) if g not in ignore]
-        if subgenes:
-            seg_gn = ",".join(subgenes)
-        else:
-            seg_gn = "-"
+        seg_gn = ",".join(subgenes) if subgenes else "-"
         seg_genes[i] = seg_gn
         seg_weights[i] = seg_wt
         seg_depths[i] = seg_dp
