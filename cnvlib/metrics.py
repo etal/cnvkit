@@ -39,7 +39,7 @@ def zip_repeater(iterable, repeatable):
             yield it, rpt
     else:
         i = -1
-        for i, (it, rpt) in enumerate(zip(iterable, repeatable)):
+        for i, (it, rpt) in enumerate(zip(iterable, repeatable)):  # noqa: B007
             yield it, rpt
         # Require lengths to match
         if i + 1 != rpt_len:

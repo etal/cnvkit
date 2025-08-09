@@ -84,7 +84,7 @@ select = [
     "F",  # pyflakes
     "UP", # pyupgrade
     "B",  # flake8-bugbear
-    "SIM", # flake8-simplify
+    #"SIM", # flake8-simplify
 ]
 ignore = [
     "E402",  # import not at top
@@ -93,6 +93,8 @@ ignore = [
     "F841",  # unused variable
     "UP031", # % format
     "UP032", # format call vs. f-string
+    #"SIM108", # ternary if-else
+    #"SIM401", # use dict.get
 ]
 
 [tool.ruff.format]

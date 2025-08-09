@@ -7,7 +7,8 @@ becomes None.
 """
 import collections
 import re
-from typing import Sequence, Union
+from typing import Union
+from collections.abc import Sequence
 
 Region = collections.namedtuple("Region", "chromosome start end")
 NamedRegion = collections.namedtuple("NamedRegion", "chromosome start end gene")

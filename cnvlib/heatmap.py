@@ -61,7 +61,7 @@ def do_heatmap(
                     "Need at least 1 .cnr input file if --by-bin (by_bin) and "
                     "--chromosome (show_range) are both used to specify a "
                     "sub-chromosomal region."
-                )
+                ) from None
         else:
             logging.info(
                 "Using sample %s to map %s to bin coordinates",

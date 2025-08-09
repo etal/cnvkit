@@ -6,7 +6,8 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
-from typing import Any, Callable, Sequence, Optional, Union
+from typing import Any, Callable, Optional, Union
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -153,8 +154,7 @@ def idx_ranges(table, starts, ends, mode: str):
             irange_func = _irange_nested
         else:
             irange_func = _irange_simple
-        for region_idx, start_val, end_val in irange_func(table, starts, ends, mode):
-            yield region_idx, start_val, end_val
+        yield from irange_func(table, starts, ends, mode)
 
 
 def _irange_simple(table, starts, ends, mode: str):

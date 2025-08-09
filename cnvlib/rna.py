@@ -254,8 +254,7 @@ def locate_entrez_dupes(dframe):
         match_gene_idx = group["gene"] == group["hugo_gene"]
         match_gene_cnt = match_gene_idx.sum()
         if match_gene_cnt == 1:
-            for mismatch_idx in group.index[~match_gene_idx]:
-                yield mismatch_idx
+            yield from group.index[~match_gene_idx]
         else:
             # Keep the lowest Ensemble ID (of the matched, if any)
             if match_gene_cnt:  # >1
