@@ -259,7 +259,7 @@ class GenomicArray:
         # - Cache centromere locations once found
         self.data.chromosome = self.data.chromosome.astype(str)
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
-            margin = max(min_arm_bins, int(round(0.1 * len(subtable))))
+            margin = max(min_arm_bins, round(0.1 * len(subtable)))
             if len(subtable) > 2 * margin + 1:
                 # Found a candidate centromere
                 gaps = (
@@ -763,7 +763,7 @@ class GenomicArray:
 
         genes: OrderedDict = OrderedDict()
         for idx, genestr in self.data["gene"].items():
-            if pd.isnull(genestr):
+            if pd.isna(genestr):
                 continue
             for gene in genestr.split(","):
                 if gene not in genes:

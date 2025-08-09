@@ -61,13 +61,13 @@ def one_chrom(cnarr, fdr_q, chrom):
     results = haarSeg(
         cnarr.smooth_log2(),
         fdr_q,
-        W=(cnarr["weight"].values if "weight" in cnarr else None),
+        W=(cnarr["weight"].to_numpy() if "weight" in cnarr else None),
     )
     table = pd.DataFrame(
         {
             "chromosome": chrom,
-            "start": cnarr["start"].values.take(results["start"]),
-            "end": cnarr["end"].values.take(results["end"]),
+            "start": cnarr["start"].to_numpy().take(results["start"]),
+            "end": cnarr["end"].to_numpy().take(results["end"]),
             "log2": results["mean"],
             "gene": "-",
             "probes": results["size"],
@@ -94,8 +94,8 @@ def variants_in_segment(varr, segment, fdr_q):
         # - Keep original segment start, end positions
         # - Place breakpoints midway between SNVs, I guess?
         # NB: 'results' are indices, i.e. enumerated bins
-        gap_rights = varr["start"].values.take(results["start"][1:])
-        gap_lefts = varr["end"].values.take(results["end"][:-1])
+        gap_rights = varr["start"].to_numpy().take(results["start"][1:])
+        gap_lefts = varr["end"].to_numpy().take(results["end"][:-1])
         mid_breakpoints = (gap_lefts + gap_rights) // 2
         starts = np.concatenate([[segment.start], mid_breakpoints])
         ends = np.concatenate([mid_breakpoints, [segment.end]])

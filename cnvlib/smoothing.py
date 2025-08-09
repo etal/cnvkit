@@ -36,7 +36,7 @@ def check_inputs(x, width, as_series=True, weights=None):
 def _width2wing(width, x, min_wing=3):
     """Convert a fractional or absolute width to integer half-width ("wing")."""
     if 0 < width < 1:
-        wing = int(math.ceil(len(x) * width * 0.5))
+        wing = math.ceil(len(x) * width * 0.5)
     elif width >= 2 and int(width) == width:
         # Ensure window width <= len(x) to avoid TypeError
         width = min(width, len(x) - 1)
@@ -125,7 +125,7 @@ def guess_window_size(x, weights=None):
     else:
         sd = descriptives.weighted_std(x, weights)
     width = 4 * sd * len(x) ** (4 / 5)
-    width = max(3, int(round(width)))
+    width = max(3, round(width))
     width = min(len(x), width)
     return width
 

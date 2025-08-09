@@ -162,7 +162,7 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
     proc = subprocess.Popen(['samtools', 'depth',
                              '-Q',  '1',  # Skip pseudogenes
                              '-b', bed_fname,
-                            ] + bam_fnames,
+                             *bam_fnames],
                             stdout=subprocess.PIPE,
                             shell=False)
 

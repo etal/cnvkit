@@ -1,7 +1,11 @@
 """Operations on chromosome/contig/sequence names."""
 from __future__ import annotations
 
-from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 from itertools import takewhile
 
 import numpy as np
@@ -24,14 +28,14 @@ def detect_big_chroms(sizes: Iterable[int]) -> tuple[int, int]:
         Length of the smallest "big" chromosomes.
     """
     sizes = pd.Series(sizes).sort_values(ascending=False)
-    reldiff = sizes.diff().abs().values[1:] / sizes.values[:-1]
+    reldiff = sizes.diff().abs().to_numpy()[1:] / sizes.to_numpy()[:-1]
     changepoints = np.nonzero(reldiff > 0.5)[0]
     if changepoints.any():
         n_big = changepoints[0] + 1
         thresh = sizes.iat[n_big - 1]
     else:
         n_big = len(sizes)
-        thresh = sizes.values[-1]
+        thresh = sizes.to_numpy()[-1]
     return n_big, thresh
 
 

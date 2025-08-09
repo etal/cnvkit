@@ -173,7 +173,7 @@ def read_refflat(infile, cds=False, exons=False):
     # Calculate values for output columns
     if exons:
         dframe = pd.DataFrame.from_records(
-            _split_exons(dframe), columns=cols_shared + ["start", "end"]
+            _split_exons(dframe), columns=[*cols_shared, "start", "end"]
         )
         dframe["start"] = dframe["start"].astype("int")
         dframe["end"] = dframe["end"].astype("int")
@@ -194,4 +194,4 @@ def _split_exons(dframe):
     for row in dframe.itertuples(index=False):
         shared = row[:4]
         for start, end in zip(row.exon_starts, row.exon_ends):
-            yield shared + (start, end)
+            yield (*shared, start, end)

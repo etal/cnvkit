@@ -99,7 +99,7 @@ def load_adjust_coverages(
     """Load and filter probe coverages; correct using reference and GC."""
     if "gc" in cnarr:
         # Don't choke on Picard-derived files that have the GC column
-        cnarr = cnarr.keep_columns(cnarr._required_columns + ("depth",))
+        cnarr = cnarr.keep_columns((*cnarr._required_columns, "depth"))
 
     # No corrections needed if there are no data rows (e.g. no antitargets)
     if not len(cnarr):
@@ -198,7 +198,7 @@ def match_ref_to_sample(ref_cnarr, samp_cnarr):
     # Take the reference bins with IDs identical to those in the sample
     ref_matched = ref_labeled.reindex(index=samp_labeled.index)
     # Check for signs that the wrong reference was used
-    num_missing = pd.isnull(ref_matched.start).sum()
+    num_missing = pd.isna(ref_matched.start).sum()
     if num_missing > 0:
         raise ValueError(
             f"Reference is missing {num_missing} bins found in {samp_cnarr.sample_id}"

@@ -57,7 +57,7 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fast
         read_counts, cna_rows = zip(*results)
         read_counts = pd.Series(read_counts)
         cnarr = CNA.from_rows(
-            list(cna_rows), columns=CNA._required_columns + ("depth",), meta_dict=meta
+            list(cna_rows), columns=(*CNA._required_columns, "depth"), meta_dict=meta
         )
     else:
         table = interval_coverages_pileup(
@@ -254,4 +254,4 @@ def detect_bedcov_columns(text):
         return ["chromosome", "start", "end", "gene", "basecount"]
     # Input BED has arbitrary columns after 'gene' -- ignore them
     fillers = [f"_{i}" for i in range(1, tabcount - 3)]
-    return ["chromosome", "start", "end", "gene"] + fillers + ["basecount"]
+    return ["chromosome", "start", "end", "gene", *fillers, "basecount"]

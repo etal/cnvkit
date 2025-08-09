@@ -64,7 +64,7 @@ def do_call(
                 (absolutes * upper_baf).round().clip(0, outarr["cn"]).astype("int")
             )
             outarr["cn2"] = outarr["cn"] - outarr["cn1"]
-            is_null = outarr["baf"].isnull() & (outarr["cn"] > 0)
+            is_null = outarr["baf"].isna() & (outarr["cn"] > 0)
             outarr[is_null, "cn1"] = np.nan
             outarr[is_null, "cn2"] = np.nan
 

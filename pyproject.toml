@@ -85,7 +85,7 @@ select = [
     "UP", # pyupgrade
     "B",  # flake8-bugbear
     #"SIM", # flake8-simplify
-    "ANN", # flake8-annotations
+    #"ANN", # flake8-annotations
     "TC", # flake8-type-checking
     "NPY", # numpy rules
     "PD", # pandas-vet

@@ -248,7 +248,7 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
             depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0
             if "AF" in record.info:
                 alt_freq = record.info["AF"]
-                alt_count = int(round(alt_freq * depth))
+                alt_count = round(alt_freq * depth)
                 # NB: No genotype, so crudely guess from allele frequency
                 if alt_freq < 0.25:
                     zygosity = 0.0

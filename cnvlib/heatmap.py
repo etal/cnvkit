@@ -174,7 +174,7 @@ def do_heatmap(
 
     # If shading='flat' (which is default) the dimensions of X and Y should be one
     # greater than those of C.
-    start2plt = np.array(log2_df.start.to_list() + [log2_df.end.iat[-1]])
+    start2plt = np.array([*log2_df.start.to_list(), log2_df.end.iat[-1]])
     sampl2plt = np.array(range(len(cnarrs) + 1))
     if not vertical:
         dat2plot = log2_df.drop(["start", "end"], axis="columns").transpose()

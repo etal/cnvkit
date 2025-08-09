@@ -173,7 +173,7 @@ def group_by_genes(cnarr, skip_low):
 
         [(gene, chrom, start, end, [coverages]), ...]
     """
-    ignore = ("", np.nan) + params.ANTITARGET_ALIASES
+    ignore = ("", np.nan, *params.ANTITARGET_ALIASES)
     for gene, rows in cnarr.by_gene():
         if not rows or gene in ignore:
             continue

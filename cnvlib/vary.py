@@ -93,7 +93,7 @@ class VariantArray(GenomicArray):
         ):
             if zyg_key in self:
                 zyg = np.repeat(0.5, len(self))
-                vals = self[freq_key].values
+                vals = self[freq_key].to_numpy()
                 zyg[vals >= hom_freq] = 1.0
                 zyg[vals < het_freq] = 0.0
                 self[zyg_key] = zyg

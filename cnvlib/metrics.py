@@ -22,8 +22,8 @@ def do_metrics(cnarrs, segments=None, skip_low=False):
     if skip_low:
         cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
     rows = (
-        (cna.meta.get("filename", cna.sample_id), len(seg) if seg is not None else "-")
-        + ests_of_scale(cna.residuals(seg).values)
+        (cna.meta.get("filename", cna.sample_id), len(seg) if seg is not None else "-",
+         *ests_of_scale(cna.residuals(seg).to_numpy()))
         for cna, seg in zip_repeater(cnarrs, segments)
     )
     colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]

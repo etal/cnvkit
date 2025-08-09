@@ -58,7 +58,7 @@ def fmt_cdt(sample_ids, table):
     - http://jtreeview.sourceforge.net/docs/JTVUserManual/ch02s11.html
     - http://www.eisenlab.org/FuzzyK/cdt.html
     """
-    outheader = ["GID", "CLID", "NAME", "GWEIGHT"] + sample_ids
+    outheader = ["GID", "CLID", "NAME", "GWEIGHT", *sample_ids]
     header2 = ["AID", "", "", ""]
     header2.extend(["ARRY" + str(i).zfill(3) + "X" for i in range(len(sample_ids))])
     header3 = ["EWEIGHT", "", "", ""] + ["1"] * len(sample_ids)
@@ -93,7 +93,7 @@ def fmt_gct(sample_ids, table):
 
 def fmt_jtv(sample_ids, table):
     """Format for Java TreeView."""
-    outheader = ["CloneID", "Name"] + sample_ids
+    outheader = ["CloneID", "Name", *sample_ids]
     outtable = pd.concat(
         [
             pd.DataFrame(

@@ -35,7 +35,7 @@ def segment_hmm(cnarr, method, diploid_parx_genome, window=None, variants=None, 
     """
     # NB: Incorporate weights into smoothed log2 estimates
     # (Useful kludge until weighted HMM is in place)
-    orig_log2 = cnarr["log2"].values.copy()
+    orig_log2 = cnarr["log2"].to_numpy().copy()
     cnarr["log2"] = cnarr.smooth_log2(window)
 
     logging.info("Building model from observations")
@@ -161,7 +161,7 @@ def as_observation_matrix(cnarr, variants=None):
     """
     # TODO incorporate weights -- currently handled by smoothing
     # TODO incorporate inter-bin distances
-    observations = [arm.log2.values for _c, arm in cnarr.by_arm()]
+    observations = [arm.log2.to_numpy() for _c, arm in cnarr.by_arm()]
     return observations
 
 
@@ -226,7 +226,7 @@ def variants_in_segment(varr, segment, min_variants=50):
         )
         # Place breakpoints midway between SNVs
         # XXX TODO use original cnarr bin boundaries to select/adjust breakpoint
-        mid_breakpoints = (results.start.values[1:] + results.end.values[:-1]) // 2
+        mid_breakpoints = (results.start.to_numpy()[1:] + results.end.to_numpy()[:-1]) // 2
         starts = np.concatenate([[segment.start], mid_breakpoints])
         ends = np.concatenate([mid_breakpoints, [segment.end]])
         dframe = pd.DataFrame(

@@ -25,7 +25,7 @@ def flatten(
     """Combine overlapping regions into single rows, similar to bedtools merge."""
     if table.empty:
         return table
-    if (table.start.values[1:] >= table.end.cummax().values[:-1]).all():
+    if (table.start.to_numpy()[1:] >= table.end.cummax().to_numpy()[:-1]).all():
         return table
     # NB: Input rows and columns should already be sorted like this
     table = table.sort_values(["chromosome", "start", "end"])
@@ -148,7 +148,7 @@ def merge(
     """Merge overlapping rows in a DataFrame."""
     if table.empty:
         return table
-    gap_sizes = table.start.values[1:] - table.end.cummax().values[:-1]
+    gap_sizes = table.start.to_numpy()[1:] - table.end.cummax().to_numpy()[:-1]
     if (gap_sizes > -bp).all():
         return table
     if stranded:
@@ -156,7 +156,7 @@ def merge(
     else:
         # NB: same gene name can appear on alt. contigs
         groupkey = ["chromosome"]
-    table = table.sort_values(groupkey + ["start", "end"])
+    table = table.sort_values([*groupkey, "start", "end"])
     cmb = get_combiners(table, stranded, combine)
     out = (
         table.groupby(by=groupkey, as_index=False, group_keys=False, sort=False)
@@ -197,7 +197,7 @@ def _nonoverlapping_groups(table, bp: int):
     #
     #  gap?     T  F  T  T  F  F  F  T
     #  group  0  0  1  1  1  2  3  4  4
-    gap_sizes = table.start.values[1:] - table.end.cummax().values[:-1]
+    gap_sizes = table.start.to_numpy()[1:] - table.end.cummax().to_numpy()[:-1]
     group_keys = np.r_[False, gap_sizes > (-bp)].cumsum()
     # NB: pandas groupby seems like the obvious choice over itertools, but it is
     # very slow -- probably because it traverses the whole table (i.e.
