@@ -33,7 +33,7 @@ jobs:
           
       - name: Install Python dependencies
         run: |
-          pip install -U setuptools wheel pip
+          python -m pip install -U pip setuptools wheel
           pip install -r requirements/tests.txt
           pip install -e .
           
