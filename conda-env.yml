@@ -23,7 +23,7 @@ dependencies:
     - pytest
     - reportlab >=3.6.13
     - ruff
-    - scikit-learn >=1.1.0
+    - scikit-learn >=1.5.0
     - scipy >=1.11.4
     - tox
 
