@@ -400,9 +400,9 @@ class CopyNumArray(GenomicArray):
         if skip_low:
             chrx = chrx.drop_low_coverage()
             auto = auto.drop_low_coverage()
-        auto_l = auto["log2"].values
+        auto_l = auto["log2"].to_numpy()
         use_weight = "weight" in self
-        auto_w = auto["weight"].values if use_weight else None
+        auto_w = auto["weight"].to_numpy() if use_weight else None
 
         def compare_to_auto(vals, weights):
             # Mood's median test stat is chisq -- near 0 for similar median
@@ -444,8 +444,8 @@ class CopyNumArray(GenomicArray):
 
         female_x_shift, male_x_shift = (-1, 0) if is_haploid_x_reference else (0, +1)
         chrx_male_lr = compare_chrom(
-            chrx["log2"].values,
-            (chrx["weight"].values if use_weight else None),
+            chrx["log2"].to_numpy(),
+            (chrx["weight"].to_numpy() if use_weight else None),
             female_x_shift,
             male_x_shift,
         )
@@ -456,8 +456,8 @@ class CopyNumArray(GenomicArray):
             if skip_low:
                 chry = chry.drop_low_coverage()
             chry_male_lr = compare_chrom(
-                chry["log2"].values,
-                (chry["weight"].values if use_weight else None),
+                chry["log2"].to_numpy(),
+                (chry["weight"].to_numpy() if use_weight else None),
                 +3,
                 0,
             )
@@ -495,10 +495,10 @@ class CopyNumArray(GenomicArray):
         cvg = np.zeros(len(self), dtype=np.float64)
         if is_haploid_x_reference:
             # Single-copy X, Y
-            idx = self.chr_x_filter(diploid_parx_genome).values | (self.chr_y_filter(diploid_parx_genome)).values
+            idx = self.chr_x_filter(diploid_parx_genome).to_numpy() | (self.chr_y_filter(diploid_parx_genome)).to_numpy()
         else:
             # Y will be all noise, so replace with 1 "flat" copy, including PAR1/2.
-            idx = (self.chr_y_filter()).values
+            idx = (self.chr_y_filter()).to_numpy()
         cvg[idx] = -1.0
         return cvg
 
@@ -567,13 +567,13 @@ class CopyNumArray(GenomicArray):
         if "weight" in self:
             out = [
                 smoothing.savgol(
-                    subcna["log2"].values, bandwidth, weights=subcna["weight"].values
+                    subcna["log2"].to_numpy(), bandwidth, weights=subcna["weight"].to_numpy()
                 )
                 for _chrom, subcna in parts
             ]
         else:
             out = [
-                smoothing.savgol(subcna["log2"].values, bandwidth)
+                smoothing.savgol(subcna["log2"].to_numpy(), bandwidth)
                 for _chrom, subcna in parts
             ]
         return np.concatenate(out)

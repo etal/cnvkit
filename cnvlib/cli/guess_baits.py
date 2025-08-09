@@ -97,7 +97,7 @@ def filter_targets(target_bed, sample_bams, procs, fasta):
         sample = do_coverage(target_bed, bam_fname, processes=procs, fasta=fasta)
         assert len(sample) == len(baits), \
                 "%d != %d" % (len(sample), len(baits))
-        total_depths += sample['depth'].values
+        total_depths += sample['depth'].to_numpy()
     baits['depth'] = total_depths / len(sample_bams)
     logging.info("Average candidate-target depth:\n%s",
                  baits['depth'].describe())

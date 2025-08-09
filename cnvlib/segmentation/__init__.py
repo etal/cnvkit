@@ -324,10 +324,10 @@ def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
     assert bins_chrom == segments.chromosome.iat[0]
     cdata = cnarr.data.reset_index()
     if "depth" not in cdata.columns:
-        cdata["depth"] = np.exp2(cnarr["log2"].values)
-    bin_genes = cdata["gene"].values
-    bin_weights = cdata["weight"].values if "weight" in cdata.columns else None
-    bin_depths = cdata["depth"].values
+        cdata["depth"] = np.exp2(cnarr["log2"].to_numpy())
+    bin_genes = cdata["gene"].to_numpy()
+    bin_weights = cdata["weight"].to_numpy() if "weight" in cdata.columns else None
+    bin_depths = cdata["depth"].to_numpy()
     seg_genes = ["-"] * len(segments)
     seg_weights = np.zeros(len(segments))
     seg_depths = np.zeros(len(segments))

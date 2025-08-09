@@ -72,7 +72,7 @@ def do_autobin(
     def depth2binsize(depth, min_size, max_size):
         if not depth:
             return None
-        bin_size = int(round(bp_per_bin / depth))
+        bin_size = round(bp_per_bin / depth)
         if bin_size < min_size:
             logging.info(
                 "Limiting est. bin size %d to given min. %d", bin_size, min_size
@@ -128,7 +128,7 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None, fasta=None):
     target_depth = sample_region_cov(bam_fname, targets, fasta=fasta)
     # Antitargets: subtract captured reads from total
     target_length = region_size_by_chrom(targets)["length"]
-    target_reads = (target_length * target_depth / read_len).values
+    target_reads = (target_length * target_depth / read_len).to_numpy()
     anti_table = update_chrom_length(rc_table, antitargets)
     anti_table = anti_table.assign(mapped=anti_table.mapped - target_reads)
     anti_depth = average_depth(anti_table, read_len)

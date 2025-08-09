@@ -581,8 +581,9 @@ if __name__ == "__main__":
     real_data = np.concatenate(
         (np.zeros(800), np.ones(200), np.zeros(800), 0.8 * np.ones(200), np.zeros(800))
     )
-    # np.random.seed(0x5EED)
-    noisy_data = real_data + np.random.standard_normal(len(real_data)) * 0.2
+    # rng = np.random.default_rng(0x5EED)
+    rng = np.random.default_rng()
+    noisy_data = real_data + rng.standard_normal(len(real_data)) * 0.2
 
     # # Run using default parameters
     seg_table = haarSeg(noisy_data, 0.005)

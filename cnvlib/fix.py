@@ -219,14 +219,14 @@ def center_by_window(cnarr, fraction, sort_key):
     # (to avoid re-centering actual CNV regions -- only want an independently
     # sampled subset of presumably overall-CN-neutral bins)
     df = cnarr.data.reset_index(drop=True)
-    np.random.seed(0xA5EED)
-    shuffle_order = np.random.permutation(df.index)
+    rng = np.random.default_rng(0xA5EED)
+    shuffle_order = rng.permutation(df.index)
     # df = df.reindex(shuffle_order)
     df = df.iloc[shuffle_order]
     # Apply the same shuffling to the key array as to the target probe set
     if isinstance(sort_key, pd.Series):
         # XXX why
-        sort_key = sort_key.values
+        sort_key = sort_key.to_numpy()
     sort_key = sort_key[shuffle_order]
     # Sort the data according to the specified parameter
     order = np.argsort(sort_key, kind="mergesort")
@@ -251,8 +251,8 @@ def get_edge_bias(cnarr, margin):
     """
     output_by_chrom = []
     for _chrom, subarr in cnarr.by_chromosome():
-        tile_starts = subarr["start"].values
-        tile_ends = subarr["end"].values
+        tile_starts = subarr["start"].to_numpy()
+        tile_ends = subarr["end"].to_numpy()
         tgt_sizes = tile_ends - tile_starts
         # Calculate coverage loss at (both edges of) each tile
         losses = edge_losses(tgt_sizes, margin)

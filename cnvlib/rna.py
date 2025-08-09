@@ -261,7 +261,7 @@ def locate_entrez_dupes(dframe):
                 keepable = group[match_gene_idx]
             else:
                 keepable = group
-            idx_to_keep = keepable.sort_values("gene_id").index.values[0]
+            idx_to_keep = keepable.sort_values("gene_id").index.to_numpy()[0]
             for idx in group.index:
                 if idx != idx_to_keep:
                     yield idx

@@ -61,11 +61,11 @@ def correlate_cnv_expression(cnv_fname, expression_fname):
 
     result = pd.DataFrame({
         "kendall_t": tau,
-        "pearson_r": r.values,
+        "pearson_r": r.to_numpy(),
         "spearman_r": rho,
     }, index=cnv_table.index).clip(lower=0).fillna(0)
     result.insert(0, 'hugo_gene',
-            cnv_table['Hugo_Symbol'].fillna('').values)
+            cnv_table['Hugo_Symbol'].fillna('').to_numpy())
     return result
 
 

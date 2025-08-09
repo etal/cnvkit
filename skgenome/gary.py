@@ -263,8 +263,8 @@ class GenomicArray:
             if len(subtable) > 2 * margin + 1:
                 # Found a candidate centromere
                 gaps = (
-                    subtable.start.values[margin + 1 : -margin]
-                    - subtable.end.values[margin : -margin - 1]
+                    subtable.start.to_numpy()[margin + 1 : -margin]
+                    - subtable.end.to_numpy()[margin : -margin - 1]
                 )
                 cmere_idx = gaps.argmax() + margin + 1
                 cmere_size = gaps[cmere_idx - margin - 1]
@@ -622,8 +622,8 @@ class GenomicArray:
     def shuffle(self):
         """Randomize the order of bins in this array (in-place)."""
         order = np.arange(len(self.data))
-        np.random.seed(0xA5EED)
-        np.random.shuffle(order)
+        rng = np.random.default_rng(0xA5EED)
+        rng.shuffle(order)
         self.data = self.data.iloc[order]
         return order
 

@@ -328,8 +328,8 @@ def segments2vcf(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, 
     if "ci_left" in segments and "ci_right" in segments:
         has_ci = True
         # Calculate fuzzy left&right coords for CIPOS and CIEND
-        left_margin = segments["ci_left"].values - segments.start.values
-        right_margin = segments.end.values - segments["ci_right"].values
+        left_margin = segments["ci_left"].to_numpy() - segments.start.to_numpy()
+        right_margin = segments.end.to_numpy() - segments["ci_right"].to_numpy()
         out_dframe["ci_pos_left"] = np.r_[0, -right_margin[:-1]]
         out_dframe["ci_pos_right"] = left_margin
         out_dframe["ci_end_left"] = right_margin

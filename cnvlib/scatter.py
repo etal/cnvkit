@@ -167,7 +167,7 @@ def cnv_on_genome(
         # degree of smoothness
         # NB: Target panel has ~1k bins/chrom. -> 250-bin window
         #     Exome: ~10k bins/chrom. -> 2500-bin window
-        window_size = int(round(0.15 * len(probes) / probes.chromosome.nunique()))
+        window_size = round(0.15 * len(probes) / probes.chromosome.nunique())
     else:
         chrom_sizes = plots.chromosome_sizes(segments)
     # Same for segment calls
@@ -557,7 +557,7 @@ def cnv_on_chromosome(
                 " --> Add parameter '--y-min %s' to see them",
                 y_min,
                 hidden_seg.sum(),
-                int(np.floor(segments.log2.min())),
+                np.floor(segments.log2.min()).astype(int),
             )
             # Signal them as triangles crossing y-axis:
             x_hidden = segments.start[hidden_seg] * MB

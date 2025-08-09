@@ -130,8 +130,8 @@ def confidence_interval_bootstrap(
     if k < 2:
         return np.repeat(values[0], 2)
 
-    np.random.seed(0xA5EED)
-    rand_indices = np.random.randint(0, k, size=(bootstraps, k))
+    rng = np.random.default_rng(0xA5EED)
+    rand_indices = rng.integers(0, k, size=(bootstraps, k))
     samples = ((np.take(values, idx), np.take(weights, idx)) for idx in rand_indices)
     if smoothed:
         samples = _smooth_samples_by_weight(values, samples)
@@ -180,7 +180,8 @@ def _smooth_samples_by_weight(values, samples):
     # Following Silverman's Rule and Polansky 1995,
     # but requiring k=1 -> bw=1 for consistency
     bw = k ** (-1 / 4)
-    samples = [(v + (bw * np.sqrt(1 - w) * np.random.randn(k)), w) for v, w in samples]
+    rng = np.random.default_rng()
+    samples = [(v + (bw * np.sqrt(1 - w) * rng.standard_normal(k)), w) for v, w in samples]
     return samples
 
 

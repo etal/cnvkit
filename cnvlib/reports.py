@@ -79,7 +79,7 @@ def get_breakpoints(intervals, segments, min_probes):
                         (
                             gname,
                             curr_chrom,
-                            int(math.ceil(curr_end)),
+                            math.ceil(curr_end),
                             next_row.log2 - curr_row.log2,
                             probes_left,
                             probes_right,
