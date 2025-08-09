@@ -2,8 +2,7 @@
 name = "CNVkit"
 description = "Copy number variation toolkit for high-throughput sequencing."
 readme = "README.rst"
-#license = "Apache-2.0"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [
   {name = "Eric Talevich", email = "me+code@etal.mozmail.com"}
 ]
@@ -15,7 +14,6 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Science/Research",
   "Intended Audience :: Healthcare Industry",
-  "License :: OSI Approved :: Apache Software License",
   "Operating System :: MacOS :: MacOS X",
   "Operating System :: POSIX",
   "Operating System :: POSIX :: Linux",
