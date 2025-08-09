@@ -32,7 +32,7 @@ dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
 homepage = "https://github.com/etal/cnvkit"
-documentation = "https://readthedocs.org"
+documentation = "https://cnvkit.readthedocs.io"
 repository = "https://github.com/etal/cnvkit"
 changelog = "https://github.com/etal/cnvkit/releases"
 
