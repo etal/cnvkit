@@ -1,7 +1,10 @@
 """Estimate reasonable bin sizes from BAM read counts or depths."""
+from __future__ import annotations
+
 import logging
 import os
 import tempfile
+from typing import Optional, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -11,8 +14,11 @@ from . import coverage, samutil
 from .antitarget import compare_chrom_names
 from .descriptives import weighted_median
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
-def midsize_file(fnames):
+
+def midsize_file(fnames: Iterable[str]) -> list[str]:
     """Select the median-size file from several given filenames.
 
     If an even number of files is given, selects the file just below the median.
@@ -22,17 +28,17 @@ def midsize_file(fnames):
 
 
 def do_autobin(
-    bam_fname,
-    method,
-    targets=None,
-    access=None,
-    bp_per_bin=100000.0,
-    target_min_size=20,
-    target_max_size=50000,
-    antitarget_min_size=500,
-    antitarget_max_size=1000000,
-    fasta=None,
-):
+    bam_fname: str,
+    method: str,
+    targets: Optional[GA] = None,
+    access: Optional[GA] = None,
+    bp_per_bin: float = 100000.0,
+    target_min_size: int = 20,
+    target_max_size: int = 50000,
+    antitarget_min_size: int = 500,
+    antitarget_max_size: int = 1000000,
+    fasta: Optional[str] = None,
+) -> tuple[tuple[float, int], tuple[float, int]]:
     """Quickly calculate reasonable bin sizes from BAM read counts.
 
     Parameters
@@ -47,7 +53,7 @@ def do_autobin(
     access : GenomicArray
         Sequencing-accessible regions of the reference genome (for 'hybrid' and
         'wgs').
-    bp_per_bin : int
+    bp_per_bin : float
         Desired number of sequencing read nucleotide bases mapped to each bin.
 
     Returns
@@ -69,10 +75,10 @@ def do_autobin(
             )
 
     # Closes over bp_per_bin
-    def depth2binsize(depth, min_size, max_size):
+    def depth2binsize(depth: float, min_size: int, max_size: int) -> int:
         if not depth:
             return None
-        bin_size = int(round(bp_per_bin / depth))
+        bin_size = round(bp_per_bin / depth)
         if bin_size < min_size:
             logging.info(
                 "Limiting est. bin size %d to given min. %d", bin_size, min_size
@@ -114,7 +120,14 @@ def do_autobin(
     return ((tgt_depth, tgt_bin_size), (anti_depth, anti_bin_size))
 
 
-def hybrid(rc_table, read_len, bam_fname, targets, access=None, fasta=None):
+def hybrid(
+    rc_table: pd.DataFrame,
+    read_len: Union[int, float],
+    bam_fname: str,
+    targets: GA,
+    access: Optional[GA] = None,
+    fasta: Optional[str] = None,
+) -> tuple:
     """Hybrid capture sequencing."""
     # Identify off-target regions
     if access is None:
@@ -128,7 +141,7 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None, fasta=None):
     target_depth = sample_region_cov(bam_fname, targets, fasta=fasta)
     # Antitargets: subtract captured reads from total
     target_length = region_size_by_chrom(targets)["length"]
-    target_reads = (target_length * target_depth / read_len).values
+    target_reads = (target_length * target_depth / read_len).to_numpy()
     anti_table = update_chrom_length(rc_table, antitargets)
     anti_table = anti_table.assign(mapped=anti_table.mapped - target_reads)
     anti_depth = average_depth(anti_table, read_len)
@@ -138,7 +151,7 @@ def hybrid(rc_table, read_len, bam_fname, targets, access=None, fasta=None):
 # ---
 
 
-def average_depth(rc_table, read_length):
+def average_depth(rc_table: pd.DataFrame, read_length: Union[int, float]) -> float:
     """Estimate the average read depth across the genome.
 
     Returns
@@ -151,14 +164,16 @@ def average_depth(rc_table, read_length):
     return weighted_median(mean_depths, rc_table.length)
 
 
-def idxstats2ga(table, bam_fname):
+def idxstats2ga(table: pd.DataFrame, bam_fname: str) -> GA:
     return GA(
         table.assign(start=0, end=table.length).loc[:, ("chromosome", "start", "end")],
         meta_dict={"filename": bam_fname},
     )
 
 
-def sample_region_cov(bam_fname, regions, max_num=100, fasta=None):
+def sample_region_cov(
+    bam_fname: str, regions: GA, max_num: int = 100, fasta: Optional[str] = None
+) -> float:
     """Calculate read depth in a randomly sampled subset of regions."""
     midsize_regions = sample_midsize_regions(regions, max_num)
     with tempfile.NamedTemporaryFile(suffix=".bed", mode="w+t") as f:
@@ -169,7 +184,7 @@ def sample_region_cov(bam_fname, regions, max_num=100, fasta=None):
     return table.basecount.sum() / (table.end - table.start).sum()
 
 
-def sample_midsize_regions(regions, max_num):
+def sample_midsize_regions(regions: GA, max_num: int) -> pd.DataFrame:
     """Randomly select a subset of up to `max_num` regions."""
     sizes = regions.end - regions.start
     lo_size, hi_size = np.percentile(sizes[sizes > 0], [25, 75])
@@ -179,7 +194,7 @@ def sample_midsize_regions(regions, max_num):
     return midsize_regions
 
 
-def shared_chroms(*tables):
+def shared_chroms(*tables) -> list:
     """Intersection of DataFrame .chromosome values."""
     chroms = tables[0].chromosome.drop_duplicates()
     for tab in tables[1:]:
@@ -189,7 +204,7 @@ def shared_chroms(*tables):
     return [None if tab is None else tab[tab.chromosome.isin(chroms)] for tab in tables]
 
 
-def update_chrom_length(rc_table, regions):
+def update_chrom_length(rc_table: pd.DataFrame, regions: Optional[GA]) -> pd.DataFrame:
     if regions is not None and len(regions):
         chrom_sizes = region_size_by_chrom(regions)
         rc_table = rc_table.merge(chrom_sizes, on="chromosome", how="inner")
@@ -198,7 +213,7 @@ def update_chrom_length(rc_table, regions):
     return rc_table
 
 
-def region_size_by_chrom(regions):
+def region_size_by_chrom(regions: GA) -> pd.DataFrame:
     chromgroups = regions.data.groupby("chromosome", sort=False)
     # sizes = chromgroups.apply(total_region_size) # XXX
     sizes = [total_region_size(g) for _key, g in chromgroups]
@@ -207,6 +222,6 @@ def region_size_by_chrom(regions):
     )
 
 
-def total_region_size(regions):
+def total_region_size(regions: GA) -> int:
     """Aggregate area of all genomic ranges in `regions`."""
     return (regions.end - regions.start).sum()

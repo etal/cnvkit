@@ -99,7 +99,7 @@ def load_adjust_coverages(
     """Load and filter probe coverages; correct using reference and GC."""
     if "gc" in cnarr:
         # Don't choke on Picard-derived files that have the GC column
-        cnarr = cnarr.keep_columns(cnarr._required_columns + ("depth",))
+        cnarr = cnarr.keep_columns((*cnarr._required_columns, "depth"))
 
     # No corrections needed if there are no data rows (e.g. no antitargets)
     if not len(cnarr):
@@ -149,7 +149,7 @@ def load_adjust_coverages(
             else:
                 logging.warning("WARNING: Skipping correction for RepeatMasker bias")
         if cnarr_index_reset:
-            ref_matched.data.reset_index(drop=True, inplace=True)
+            ref_matched.data = ref_matched.data.reset_index(drop=True)
     return cnarr, ref_matched
 
 
@@ -198,7 +198,7 @@ def match_ref_to_sample(ref_cnarr, samp_cnarr):
     # Take the reference bins with IDs identical to those in the sample
     ref_matched = ref_labeled.reindex(index=samp_labeled.index)
     # Check for signs that the wrong reference was used
-    num_missing = pd.isnull(ref_matched.start).sum()
+    num_missing = pd.isna(ref_matched.start).sum()
     if num_missing > 0:
         raise ValueError(
             f"Reference is missing {num_missing} bins found in {samp_cnarr.sample_id}"
@@ -219,14 +219,14 @@ def center_by_window(cnarr, fraction, sort_key):
     # (to avoid re-centering actual CNV regions -- only want an independently
     # sampled subset of presumably overall-CN-neutral bins)
     df = cnarr.data.reset_index(drop=True)
-    np.random.seed(0xA5EED)
-    shuffle_order = np.random.permutation(df.index)
+    rng = np.random.default_rng(0xA5EED)
+    shuffle_order = rng.permutation(df.index)
     # df = df.reindex(shuffle_order)
     df = df.iloc[shuffle_order]
     # Apply the same shuffling to the key array as to the target probe set
     if isinstance(sort_key, pd.Series):
         # XXX why
-        sort_key = sort_key.values
+        sort_key = sort_key.to_numpy()
     sort_key = sort_key[shuffle_order]
     # Sort the data according to the specified parameter
     order = np.argsort(sort_key, kind="mergesort")
@@ -251,8 +251,8 @@ def get_edge_bias(cnarr, margin):
     """
     output_by_chrom = []
     for _chrom, subarr in cnarr.by_chromosome():
-        tile_starts = subarr["start"].values
-        tile_ends = subarr["end"].values
+        tile_starts = subarr["start"].to_numpy()
+        tile_ends = subarr["end"].to_numpy()
         tgt_sizes = tile_ends - tile_starts
         # Calculate coverage loss at (both edges of) each tile
         losses = edge_losses(tgt_sizes, margin)

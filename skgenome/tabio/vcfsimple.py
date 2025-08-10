@@ -40,7 +40,8 @@ def read_vcf_simple(infile):
             "filter",
             "info",
             "format",
-        ] + sample_ids
+            *sample_ids
+        ]
         dtypes = {c: str for c in colnames}
         dtypes["start"] = int
         del dtypes["qual"]

@@ -25,7 +25,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from .. import parallel 
+from .. import parallel
 from ..coverage import do_coverage
 from ..descriptives import modal_location
 from skgenome import tabio, GenomicArray as GA
@@ -87,8 +87,8 @@ def filter_targets(target_bed, sample_bams, procs, fasta):
     """Check if each potential target has significant coverage."""
     try:
         baits = tabio.read(target_bed, 'bed4')
-    except:
-        raise RuntimeError("Targets must be in BED format; try skg_convert.py")
+    except Exception as err:
+        raise RuntimeError("Targets must be in BED format; try skg_convert.py") from err
     logging.info("Loaded %d candidate regions from %s", len(baits), target_bed)
     # Loop over BAMs to calculate weighted averages of bin coverage depths
     total_depths = np.zeros(len(baits), dtype=np.float64)
@@ -97,7 +97,7 @@ def filter_targets(target_bed, sample_bams, procs, fasta):
         sample = do_coverage(target_bed, bam_fname, processes=procs, fasta=fasta)
         assert len(sample) == len(baits), \
                 "%d != %d" % (len(sample), len(baits))
-        total_depths += sample['depth'].values
+        total_depths += sample['depth'].to_numpy()
     baits['depth'] = total_depths / len(sample_bams)
     logging.info("Average candidate-target depth:\n%s",
                  baits['depth'].describe())
@@ -162,7 +162,7 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
     proc = subprocess.Popen(['samtools', 'depth',
                              '-Q',  '1',  # Skip pseudogenes
                              '-b', bed_fname,
-                            ] + bam_fnames,
+                             *bam_fnames],
                             stdout=subprocess.PIPE,
                             shell=False)
 

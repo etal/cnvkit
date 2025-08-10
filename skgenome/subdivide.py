@@ -43,7 +43,7 @@ def _split_targets(regions, avg_size: int, min_size: int, verbose: bool):
     for row in merge(regions).itertuples(index=False):
         span = row.end - row.start
         if span >= min_size:
-            nbins = int(round(span / avg_size)) or 1
+            nbins = round(span / avg_size) or 1
             if nbins == 1:
                 yield row
             else:

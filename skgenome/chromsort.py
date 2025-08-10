@@ -1,12 +1,18 @@
 """Operations on chromosome/contig/sequence names."""
-from typing import Iterable, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 from itertools import takewhile
 
 import numpy as np
 import pandas as pd
 
 
-def detect_big_chroms(sizes: Iterable[int]) -> Tuple[int, int]:
+def detect_big_chroms(sizes: Iterable[int]) -> tuple[int, int]:
     """Determine the number of "big" chromosomes from their lengths.
 
     In the human genome, this returns 24, where the canonical chromosomes 1-22,
@@ -22,18 +28,18 @@ def detect_big_chroms(sizes: Iterable[int]) -> Tuple[int, int]:
         Length of the smallest "big" chromosomes.
     """
     sizes = pd.Series(sizes).sort_values(ascending=False)
-    reldiff = sizes.diff().abs().values[1:] / sizes.values[:-1]
+    reldiff = sizes.diff().abs().to_numpy()[1:] / sizes.to_numpy()[:-1]
     changepoints = np.nonzero(reldiff > 0.5)[0]
     if changepoints.any():
         n_big = changepoints[0] + 1
         thresh = sizes.iat[n_big - 1]
     else:
         n_big = len(sizes)
-        thresh = sizes.values[-1]
+        thresh = sizes.to_numpy()[-1]
     return n_big, thresh
 
 
-def sorter_chrom(label: str) -> Tuple[int, str]:
+def sorter_chrom(label: str) -> tuple[int, str]:
     """Create a sorting key from chromosome label.
 
     Sort by integers first, then letters or strings. The prefix "chr"

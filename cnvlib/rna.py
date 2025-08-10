@@ -254,15 +254,14 @@ def locate_entrez_dupes(dframe):
         match_gene_idx = group["gene"] == group["hugo_gene"]
         match_gene_cnt = match_gene_idx.sum()
         if match_gene_cnt == 1:
-            for mismatch_idx in group.index[~match_gene_idx]:
-                yield mismatch_idx
+            yield from group.index[~match_gene_idx]
         else:
             # Keep the lowest Ensemble ID (of the matched, if any)
             if match_gene_cnt:  # >1
                 keepable = group[match_gene_idx]
             else:
                 keepable = group
-            idx_to_keep = keepable.sort_values("gene_id").index.values[0]
+            idx_to_keep = keepable.sort_values("gene_id").index.to_numpy()[0]
             for idx in group.index:
                 if idx != idx_to_keep:
                     yield idx
@@ -314,7 +313,7 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
 
     weight = gmean(np.vstack(weights), axis=0)
     gi["weight"] = weight / weight.max()
-    if gi["weight"].isnull().all():
+    if gi["weight"].isna().all():
         gi["weight"] = 1.0
     logging.debug(" --> final zeros: %d / %d", (gi["weight"] == 0).sum(), len(gi))
     return gi, sc, sample_depths_log2
@@ -332,7 +331,7 @@ def normalize_read_depths(sample_depths, normal_ids):
 
     Finally, convert to log2 ratios.
     """
-    assert sample_depths.values.sum() > 0
+    assert sample_depths.to_numpy().sum() > 0
     sample_depths = sample_depths.fillna(0)
     for _i in range(4):
         # By-sample: 75%ile  among all genes
@@ -363,10 +362,10 @@ def normalize_read_depths(sample_depths, normal_ids):
             # At each gene, sample depths above the normal sample depth 75%ile
             # are divided by the 75%ile, those below 25%ile are divided by
             # 25%ile, and those in between are reset to neutral (=1.0)
-            n25, n75 = np.nanpercentile(normal_depths.values, [25, 75], axis=1)
-            below_idx = sample_depths.values < n25[:, np.newaxis]
-            above_idx = sample_depths.values > n75[:, np.newaxis]
-            factor = np.zeros_like(sample_depths.values)
+            n25, n75 = np.nanpercentile(normal_depths.to_numpy(), [25, 75], axis=1)
+            below_idx = sample_depths.to_numpy() < n25[:, np.newaxis]
+            above_idx = sample_depths.to_numpy() > n75[:, np.newaxis]
+            factor = np.zeros_like(sample_depths.to_numpy())
             factor[below_idx] = (below_idx / n25[:, np.newaxis])[below_idx]
             factor[above_idx] = (above_idx / n75[:, np.newaxis])[above_idx]
             sample_depths *= factor

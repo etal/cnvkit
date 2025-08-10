@@ -38,26 +38,26 @@ def _subtraction(table, other):
                 # Keep both original edges of the source region
                 # =========
                 #   --  --
-                starts = np.r_[keeper.start, rows_to_exclude.end.values]
-                ends = np.r_[rows_to_exclude.start.values, keeper.end]
+                starts = np.r_[keeper.start, rows_to_exclude.end.to_numpy()]
+                ends = np.r_[rows_to_exclude.start.to_numpy(), keeper.end]
             elif keep_left:
                 # Exclusion overlaps only the right side
                 # =======
                 #   -- ---
-                starts = np.r_[keeper.start, rows_to_exclude.end.values[:-1]]
-                ends = rows_to_exclude.start.values
+                starts = np.r_[keeper.start, rows_to_exclude.end.to_numpy()[:-1]]
+                ends = rows_to_exclude.start.to_numpy()
             elif keep_right:
                 # Exclusion overlaps only the left side
                 #  ========
                 # ---  --
-                starts = rows_to_exclude.end.values
-                ends = np.r_[rows_to_exclude.start.values[1:], keeper.end]
+                starts = rows_to_exclude.end.to_numpy()
+                ends = np.r_[rows_to_exclude.start.to_numpy()[1:], keeper.end]
             elif len(rows_to_exclude) > 1:
                 # Exclusions overlap both edges
                 #  ======
                 # -- -- ---
-                starts = rows_to_exclude.end.values[:-1]
-                ends = rows_to_exclude.start.values[1:]
+                starts = rows_to_exclude.end.to_numpy()[:-1]
+                ends = rows_to_exclude.start.to_numpy()[1:]
             else:
                 # Exclusion covers the whole region
                 continue

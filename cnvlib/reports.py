@@ -79,7 +79,7 @@ def get_breakpoints(intervals, segments, min_probes):
                         (
                             gname,
                             curr_chrom,
-                            int(math.ceil(curr_end)),
+                            math.ceil(curr_end),
                             next_row.log2 - curr_row.log2,
                             probes_left,
                             probes_right,
@@ -173,7 +173,7 @@ def group_by_genes(cnarr, skip_low):
 
         [(gene, chrom, start, end, [coverages]), ...]
     """
-    ignore = ("", np.nan) + params.ANTITARGET_ALIASES
+    ignore = ("", np.nan, *params.ANTITARGET_ALIASES)
     for gene, rows in cnarr.by_gene():
         if not rows or gene in ignore:
             continue

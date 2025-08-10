@@ -59,12 +59,12 @@ def do_call(
         outarr["cn"] = absolutes.round().astype("int")
         if "baf" in outarr:
             # Calculate major and minor allelic copy numbers (s.t. cn1 >= cn2)
-            upper_baf = ((outarr["baf"] - 0.5).abs() + 0.5).fillna(1.0).values
+            upper_baf = ((outarr["baf"] - 0.5).abs() + 0.5).fillna(1.0).to_numpy()
             outarr["cn1"] = (
                 (absolutes * upper_baf).round().clip(0, outarr["cn"]).astype("int")
             )
             outarr["cn2"] = outarr["cn"] - outarr["cn1"]
-            is_null = outarr["baf"].isnull() & (outarr["cn"] > 0)
+            is_null = outarr["baf"].isna() & (outarr["cn"] > 0)
             outarr[is_null, "cn1"] = np.nan
             outarr[is_null, "cn2"] = np.nan
 
@@ -97,8 +97,8 @@ def log2_ratios(
     ratios = np.log2(np.maximum(absolutes / ploidy, min_abs_val))
     # Adjust sex chromosomes to be relative to the reference
     if is_haploid_x_reference:
-        ratios[(cnarr.chr_x_filter(diploid_parx_genome)).values] += 1.0
-    ratios[(cnarr.chr_y_filter(diploid_parx_genome)).values] += 1.0
+        ratios[(cnarr.chr_x_filter(diploid_parx_genome)).to_numpy()] += 1.0
+    ratios[(cnarr.chr_y_filter(diploid_parx_genome)).to_numpy()] += 1.0
     return ratios
 
 

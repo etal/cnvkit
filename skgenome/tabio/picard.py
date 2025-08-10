@@ -24,7 +24,7 @@ def read_interval(infile):
         comment="@",  # Skip the SAM header
         names=["chromosome", "start", "end", "strand", "gene"],
     )
-    dframe.fillna({"gene": "-"}, inplace=True)
+    dframe = dframe.fillna({"gene": "-"})
     dframe["start"] -= 1
     return dframe
 

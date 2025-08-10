@@ -1,20 +1,30 @@
 """Supporting functions for the 'antitarget' command."""
+from __future__ import annotations
+
 import logging
 import re
+from typing import Optional
 
 from skgenome import GenomicArray as GA
 
 from .params import INSERT_SIZE, MIN_REF_COVERAGE, ANTITARGET_NAME
 
 
-def do_antitarget(targets, access=None, avg_bin_size=150000, min_bin_size=None):
+def do_antitarget(
+    targets: GA,
+    access: Optional[GA] = None,
+    avg_bin_size: int = 150000,
+    min_bin_size: Optional[int] = None,
+) -> GA:
     """Derive off-targt ("antitarget") bins from target regions."""
     if not min_bin_size:
         min_bin_size = 2 * int(avg_bin_size * (2**MIN_REF_COVERAGE))
     return get_antitargets(targets, access, avg_bin_size, min_bin_size)
 
 
-def get_antitargets(targets, accessible, avg_bin_size, min_bin_size):
+def get_antitargets(
+    targets: GA, accessible: GA, avg_bin_size: int, min_bin_size: Optional[int]
+) -> GA:
     """Generate antitarget intervals between/around target intervals.
 
     Procedure:
@@ -47,7 +57,7 @@ def get_antitargets(targets, accessible, avg_bin_size, min_bin_size):
     return bg_arr
 
 
-def drop_noncanonical_contigs(accessible, targets, verbose=True):
+def drop_noncanonical_contigs(accessible: GA, targets: GA, verbose: bool = True) -> GA:
     """Drop contigs that are not targeted or canonical chromosomes.
 
     Antitargets will be binned over chromosomes that:
@@ -82,7 +92,7 @@ def drop_noncanonical_contigs(accessible, targets, verbose=True):
     return accessible
 
 
-def compare_chrom_names(a_regions, b_regions):
+def compare_chrom_names(a_regions: GA, b_regions: GA) -> tuple[set, set]:
     """Check if chromosome names overlap, and preview each if not.
 
     This summary message will help triage cases of e.g. "chr1" vs. "1" in the
@@ -104,7 +114,7 @@ def compare_chrom_names(a_regions, b_regions):
     return a_chroms, b_chroms
 
 
-def guess_chromosome_regions(targets, telomere_size):
+def guess_chromosome_regions(targets: GA, telomere_size: int) -> GA:
     """Determine (minimum) chromosome lengths from target coordinates."""
     endpoints = [subarr.end.iat[-1] for _c, subarr in targets.by_chromosome()]
     whole_chroms = GA.from_columns(
@@ -138,12 +148,12 @@ re_noncanonical = re.compile(
 )
 
 
-def is_canonical_contig_name(name):
+def is_canonical_contig_name(name: str) -> bool:
     # return bool(re_canonical.match(name))
     return not re_noncanonical.search(name)
 
 
-def _drop_short_contigs(garr):
+def _drop_short_contigs(garr: GA) -> GA:
     """Drop contigs that are much shorter than the others.
 
     Cutoff is where a contig is less than half the size of the next-shortest

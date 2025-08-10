@@ -20,9 +20,10 @@ def merge_samples(filenames):
     Output:
         list-of-tuples: (probe, log2 coverages...)
     """
+    def row2label(row):
+        return f"{row.chromosome}:{row.start}-{row.end}:{row.gene}"
 
     def label_with_gene(cnarr):
-        row2label = lambda row: f"{row.chromosome}:{row.start}-{row.end}:{row.gene}"
         return cnarr.data.apply(row2label, axis=1)
 
     if not filenames:
@@ -57,7 +58,7 @@ def fmt_cdt(sample_ids, table):
     - http://jtreeview.sourceforge.net/docs/JTVUserManual/ch02s11.html
     - http://www.eisenlab.org/FuzzyK/cdt.html
     """
-    outheader = ["GID", "CLID", "NAME", "GWEIGHT"] + sample_ids
+    outheader = ["GID", "CLID", "NAME", "GWEIGHT", *sample_ids]
     header2 = ["AID", "", "", ""]
     header2.extend(["ARRY" + str(i).zfill(3) + "X" for i in range(len(sample_ids))])
     header3 = ["EWEIGHT", "", "", ""] + ["1"] * len(sample_ids)
@@ -92,7 +93,7 @@ def fmt_gct(sample_ids, table):
 
 def fmt_jtv(sample_ids, table):
     """Format for Java TreeView."""
-    outheader = ["CloneID", "Name"] + sample_ids
+    outheader = ["CloneID", "Name", *sample_ids]
     outtable = pd.concat(
         [
             pd.DataFrame(
@@ -327,8 +328,8 @@ def segments2vcf(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, 
     if "ci_left" in segments and "ci_right" in segments:
         has_ci = True
         # Calculate fuzzy left&right coords for CIPOS and CIEND
-        left_margin = segments["ci_left"].values - segments.start.values
-        right_margin = segments.end.values - segments["ci_right"].values
+        left_margin = segments["ci_left"].to_numpy() - segments.start.to_numpy()
+        right_margin = segments.end.to_numpy() - segments["ci_right"].to_numpy()
         out_dframe["ci_pos_left"] = np.r_[0, -right_margin[:-1]]
         out_dframe["ci_pos_right"] = left_margin
         out_dframe["ci_end_left"] = right_margin
@@ -596,9 +597,9 @@ def export_theta_snps(varr):
     # Skip indels
     varr = varr[(varr["ref"].str.len() == 1) & (varr["alt"].str.len() == 1)]
     # Drop rows with any NaN
-    varr.data.dropna(subset=["depth", "alt_count"], inplace=True)
+    varr.data = varr.data.dropna(subset=["depth", "alt_count"])
     if "n_depth" in varr and "n_alt_count" in varr:
-        varr.data.dropna(subset=["n_depth", "alt_count"], inplace=True)
+        varr.data = varr.data.dropna(subset=["n_depth", "alt_count"])
     # Avoid weird situation I've seen on alt contigs
     varr = varr[varr["depth"] >= varr["alt_count"]]
     # Reformat for THetA2

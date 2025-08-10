@@ -110,9 +110,8 @@ def _choose_samples(vcf_reader, sample_id, normal_id):
         pairs = peds
     elif normal_id:
         # All/any other samples are tumors paired with this normal
-        try:
-            other_ids = [s for s in vcf_samples if s != normal_id]
-        except StopIteration:
+        other_ids = [s for s in vcf_samples if s != normal_id]
+        if not other_ids:
             raise IndexError(
                 f"No other sample in VCF besides the specified normal {normal_id}; "
                 + "did you mean to use this as the sample_id instead?"
@@ -249,7 +248,7 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
             depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0
             if "AF" in record.info:
                 alt_freq = record.info["AF"]
-                alt_count = int(round(alt_freq * depth))
+                alt_count = round(alt_freq * depth)
                 # NB: No genotype, so crudely guess from allele frequency
                 if alt_freq < 0.25:
                     zygosity = 0.0
@@ -319,10 +318,7 @@ def _get_alt_count(sample):
             # Ensure we have alternative alleles and thus two AD values
             # ref only calls in GATK can be missing these
             # 1       49515   .       G       .       50.80   .       AN=2;DP=34;MQ=40.01  GT:AD:DP:MMQ  0/0:34:34:.
-            if len(sample["AD"]) > 1:
-                alt_count = sample["AD"][1]
-            else:
-                alt_count = 0.0
+            alt_count = sample["AD"][1] if len(sample["AD"]) > 1 else 0.0
         # VarScan
         else:
             alt_count = sample["AD"]

@@ -6,7 +6,8 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
-from typing import Any, Callable, Sequence, Optional, Union
+from typing import Any, Callable, Optional, Union
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -128,7 +129,7 @@ def iter_slices(table, other, mode: str, keep_empty: bool):
                 yield pd.Index([], dtype="int64")
         else:
             for slc, _s, _e in idx_ranges(src_rows, bin_rows.start, bin_rows.end, mode):
-                indices = src_rows.index[slc].values
+                indices = src_rows.index[slc].to_numpy()
                 if keep_empty or len(indices):
                     yield indices
 
@@ -153,8 +154,7 @@ def idx_ranges(table, starts, ends, mode: str):
             irange_func = _irange_nested
         else:
             irange_func = _irange_simple
-        for region_idx, start_val, end_val in irange_func(table, starts, ends, mode):
-            yield region_idx, start_val, end_val
+        yield from irange_func(table, starts, ends, mode)
 
 
 def _irange_simple(table, starts, ends, mode: str):
@@ -199,11 +199,11 @@ def _irange_nested(table, starts: Sequence, ends: Sequence, mode: str):
                 region_mask[: int(start_idx)] = 0
             else:
                 # Include all rows overlapping the start point
-                region_mask = table.end.values > start_val
+                region_mask = table.end.to_numpy() > start_val
         if end_val is not None:
             if mode == "inner":
                 # Only rows up to the end point
-                region_mask &= table.end.values <= end_val
+                region_mask &= table.end.to_numpy() <= end_val
             else:
                 # Include all rows overlapping the end point
                 end_idx = table.start.searchsorted(end_val)

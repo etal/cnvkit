@@ -61,13 +61,13 @@ def one_chrom(cnarr, fdr_q, chrom):
     results = haarSeg(
         cnarr.smooth_log2(),
         fdr_q,
-        W=(cnarr["weight"].values if "weight" in cnarr else None),
+        weights=(cnarr["weight"].to_numpy() if "weight" in cnarr else None),
     )
     table = pd.DataFrame(
         {
             "chromosome": chrom,
-            "start": cnarr["start"].values.take(results["start"]),
-            "end": cnarr["end"].values.take(results["end"]),
+            "start": cnarr["start"].to_numpy().take(results["start"]),
+            "end": cnarr["end"].to_numpy().take(results["end"]),
             "log2": results["mean"],
             "gene": "-",
             "probes": results["size"],
@@ -79,7 +79,7 @@ def one_chrom(cnarr, fdr_q, chrom):
 def variants_in_segment(varr, segment, fdr_q):
     if len(varr):
         values = varr.mirrored_baf(above_half=True, tumor_boost=True)
-        results = haarSeg(values, fdr_q, W=None)  # ENH weight by sqrt(DP)
+        results = haarSeg(values, fdr_q, weights=None)  # ENH weight by sqrt(DP)
     else:
         values = pd.Series()
         results = None
@@ -94,8 +94,8 @@ def variants_in_segment(varr, segment, fdr_q):
         # - Keep original segment start, end positions
         # - Place breakpoints midway between SNVs, I guess?
         # NB: 'results' are indices, i.e. enumerated bins
-        gap_rights = varr["start"].values.take(results["start"][1:])
-        gap_lefts = varr["end"].values.take(results["end"][:-1])
+        gap_rights = varr["start"].to_numpy().take(results["start"][1:])
+        gap_lefts = varr["end"].to_numpy().take(results["end"][:-1])
         mid_breakpoints = (gap_lefts + gap_rights) // 2
         starts = np.concatenate([[segment.start], mid_breakpoints])
         ends = np.concatenate([mid_breakpoints, [segment.end]])
@@ -133,24 +133,24 @@ def variants_in_segment(varr, segment, fdr_q):
 # ---- from HaarSeg R code -- the API ----
 
 
-def haarSeg(I, breaksFdrQ, W=None, rawI=None, haarStartLevel=1, haarEndLevel=5):
+def haarSeg(signal, breaksFdrQ, weights=None, raw_signal=None, haarStartLevel=1, haarEndLevel=5):
     r"""Perform segmentation according to the HaarSeg algorithm.
 
     Parameters
     ----------
-    I : array
+    signal : array
         A 1D array of log-ratio values, sorted according to their genomic
         location.
-    W : array
+    weights : array
         Weight matrix, corresponding to quality of measurement, with values
-        :math:`1/(\sigma^2)`. Must have the same size as I.
-    rawI : array
+        :math:`1/(\sigma^2)`. Must have the same size as signal.
+    raw_signal : array
         The minimum between the raw test-sample and control-sample coverages
         (before applying log ratio, but after any background reduction and/or
         normalization). These raw red / green measurments are used to detect
         low-value probes, which are more sensitive to noise.
         Used for the non-stationary variance compensation.
-        Must have the same size as I.
+        Must have the same size as signal.
     breaksFdrQ : float
         The FDR q parameter. This value should lie between 0 and 0.5. The
         smaller this value is, the less sensitive the segmentation result will
@@ -182,26 +182,26 @@ def haarSeg(I, breaksFdrQ, W=None, rawI=None, haarStartLevel=1, haarEndLevel=5):
             return 0.0
         return diff_vals.abs().median() * 1.4826
 
-    diffI = pd.Series(HaarConv(I, None, 1))
-    if rawI:
+    diff_signal = pd.Series(HaarConv(signal, None, 1))
+    if raw_signal:
         # Non-stationary variance empirical threshold set to 50
         NSV_TH = 50
-        varMask = rawI < NSV_TH
+        varMask = raw_signal < NSV_TH
         pulseSize = 2
         diffMask = PulseConv(varMask, pulseSize) >= 0.5
-        peakSigmaEst = med_abs_diff(diffI[~diffMask])
-        noisySigmaEst = med_abs_diff(diffI[diffMask])
+        peakSigmaEst = med_abs_diff(diff_signal[~diffMask])
+        noisySigmaEst = med_abs_diff(diff_signal[diffMask])
     else:
-        peakSigmaEst = med_abs_diff(diffI)
+        peakSigmaEst = med_abs_diff(diff_signal)
 
     breakpoints = np.array([], dtype=np.int_)
     for level in range(haarStartLevel, haarEndLevel + 1):
         stepHalfSize = 2**level
-        convRes = HaarConv(I, W, stepHalfSize)
+        convRes = HaarConv(signal, weights, stepHalfSize)
         peakLoc = FindLocalPeaks(convRes)
         logging.debug("Found %d peaks at level %d", len(peakLoc), level)
 
-        if rawI:
+        if raw_signal:
             pulseSize = 2 * stepHalfSize
             convMask = PulseConv(varMask, pulseSize) >= 0.5
             sigmaEst = (1 - convMask) * peakSigmaEst + convMask * noisySigmaEst
@@ -216,9 +216,9 @@ def haarSeg(I, breaksFdrQ, W=None, rawI=None, haarStartLevel=1, haarEndLevel=5):
     logging.debug("Found %d breakpoints: %s", len(breakpoints), breakpoints)
 
     # Translate breakpoints to segments
-    segs = SegmentByPeaks(I, breakpoints, W)
+    segs = SegmentByPeaks(signal, breakpoints, weights)
     segSt = np.insert(breakpoints, 0, 0)
-    segEd = np.append(breakpoints, len(I))
+    segEd = np.append(breakpoints, len(signal))
     return {
         "start": segSt,
         "end": segEd - 1,
@@ -581,8 +581,9 @@ if __name__ == "__main__":
     real_data = np.concatenate(
         (np.zeros(800), np.ones(200), np.zeros(800), 0.8 * np.ones(200), np.zeros(800))
     )
-    # np.random.seed(0x5EED)
-    noisy_data = real_data + np.random.standard_normal(len(real_data)) * 0.2
+    # rng = np.random.default_rng(0x5EED)
+    rng = np.random.default_rng()
+    noisy_data = real_data + rng.standard_normal(len(real_data)) * 0.2
 
     # # Run using default parameters
     seg_table = haarSeg(noisy_data, 0.005)

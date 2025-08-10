@@ -19,7 +19,7 @@ def kmeans(samples, k=None):
     if k is None:
         from math import log
 
-        k = max(1, int(round(log(len(samples), 3))))
+        k = max(1, round(log(len(samples), 3)))
         # E.g. n=66 -> k=2, 16 -> 3, 47 -> 4, 141 -> 5, 421 -> 6, 1263 -> 7
 
     print("Clustering", len(samples), "samples by k-means, where k =", k)

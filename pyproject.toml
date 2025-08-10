@@ -2,8 +2,7 @@
 name = "CNVkit"
 description = "Copy number variation toolkit for high-throughput sequencing."
 readme = "README.rst"
-#license = "Apache-2.0"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [
   {name = "Eric Talevich", email = "me+code@etal.mozmail.com"}
 ]
@@ -15,7 +14,6 @@ classifiers = [
   "Environment :: Console",
   "Intended Audience :: Science/Research",
   "Intended Audience :: Healthcare Industry",
-  "License :: OSI Approved :: Apache Software License",
   "Operating System :: MacOS :: MacOS X",
   "Operating System :: POSIX",
   "Operating System :: POSIX :: Linux",
@@ -84,15 +82,26 @@ select = [
     "F",  # pyflakes
     "UP", # pyupgrade
     "B",  # flake8-bugbear
-    "SIM", # flake8-simplify
+    #"SIM", # flake8-simplify
+    #"ANN", # flake8-annotations
+    "TC", # flake8-type-checking
+    "NPY", # numpy rules
+    "PD", # pandas-vet
+    "RUF", # ruff's extra rules
 ]
 ignore = [
     "E402",  # import not at top
     "E501",  # line too long
     "F401",  # unused import
     "F841",  # unused variable
+    "UP007", # X|Y type annotations
     "UP031", # % format
     "UP032", # format call vs. f-string
+    "UP045", # X|None type annotations
+    "PD009", # use .iloc instead of .iat (iat is actually faster for scalar access)
+    "PD901", # avoid generic variable name 'df' (acceptable in scientific code)
+    #"SIM108", # ternary if-else
+    #"SIM401", # use dict.get
 ]
 
 [tool.ruff.format]

@@ -1,6 +1,8 @@
 """Base class for an array of annotated genomic regions."""
+from __future__ import annotations
+
 import logging
-from typing import Callable, Dict, Iterable, Iterator, Mapping, Optional, Sequence, Union
+from typing import Callable, Optional, Union, TYPE_CHECKING
 from collections import OrderedDict
 
 import numpy as np
@@ -12,6 +14,9 @@ from .merge import flatten, merge
 from .rangelabel import to_label
 from .subtract import subtract
 from .subdivide import subdivide
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator, Mapping, Sequence
 
 
 class GenomicArray:
@@ -258,12 +263,12 @@ class GenomicArray:
         # - Cache centromere locations once found
         self.data.chromosome = self.data.chromosome.astype(str)
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
-            margin = max(min_arm_bins, int(round(0.1 * len(subtable))))
+            margin = max(min_arm_bins, round(0.1 * len(subtable)))
             if len(subtable) > 2 * margin + 1:
                 # Found a candidate centromere
                 gaps = (
-                    subtable.start.values[margin + 1 : -margin]
-                    - subtable.end.values[margin : -margin - 1]
+                    subtable.start.to_numpy()[margin + 1 : -margin]
+                    - subtable.end.to_numpy()[margin : -margin - 1]
                 )
                 cmere_idx = gaps.argmax() + margin + 1
                 cmere_size = gaps[cmere_idx - margin - 1]
@@ -621,8 +626,8 @@ class GenomicArray:
     def shuffle(self):
         """Randomize the order of bins in this array (in-place)."""
         order = np.arange(len(self.data))
-        np.random.seed(0xA5EED)
-        np.random.shuffle(order)
+        rng = np.random.default_rng(0xA5EED)
+        rng.shuffle(order)
         self.data = self.data.iloc[order]
         return order
 
@@ -655,7 +660,7 @@ class GenomicArray:
 
     def flatten(
         self,
-        combine: Optional[Dict[str, Callable]] = None,
+        combine: Optional[dict[str, Callable]] = None,
         split_columns: Optional[Iterable[str]] = None,
     ):
         """Split this array's regions where they overlap."""
@@ -686,7 +691,7 @@ class GenomicArray:
         self,
         bp: int = 0,
         stranded: bool = False,
-        combine: Optional[Dict[str, Callable]] = None,
+        combine: Optional[dict[str, Callable]] = None,
     ):
         """Merge adjacent or overlapping regions into single rows.
 
@@ -762,7 +767,7 @@ class GenomicArray:
 
         genes: OrderedDict = OrderedDict()
         for idx, genestr in self.data["gene"].items():
-            if pd.isnull(genestr):
+            if pd.isna(genestr):
                 continue
             for gene in genestr.split(","):
                 if gene not in genes:

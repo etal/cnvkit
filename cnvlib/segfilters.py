@@ -173,8 +173,8 @@ def ci(segarr):
     #     logging.warning("* segarr :=\n%s", segarr)
     #     logging.warning("* segarr['ci_lo'] :=\n%s", segarr['ci_lo'])
     #     logging.warning("* segarr['ci_lo']>0 :=\n%s", segarr['ci_lo'] > 0)
-    levels[segarr["ci_lo"].values > 0] = 1
-    levels[segarr["ci_hi"].values < 0] = -1
+    levels[segarr["ci_lo"].to_numpy() > 0] = 1
+    levels[segarr["ci_hi"].to_numpy() < 0] = -1
     return squash_by_groups(segarr, pd.Series(levels))
 
 
