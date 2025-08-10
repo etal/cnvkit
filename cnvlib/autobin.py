@@ -1,9 +1,11 @@
 """Estimate reasonable bin sizes from BAM read counts or depths."""
+from __future__ import annotations
 
 import logging
 import os
 import tempfile
 from collections.abc import Iterable
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -26,14 +28,14 @@ def midsize_file(fnames: Iterable[str]) -> list[str]:
 def do_autobin(
     bam_fname: str,
     method: str,
-    targets: GA | None = None,
-    access: GA | None = None,
+    targets: Optional[GA] = None,
+    access: Optional[GA] = None,
     bp_per_bin: float = 100000.0,
     target_min_size: int = 20,
     target_max_size: int = 50000,
     antitarget_min_size: int = 500,
     antitarget_max_size: int = 1000000,
-    fasta: str | None = None,
+    fasta: Optional[str] = None,
 ) -> tuple[tuple[float, int], tuple[float, int]]:
     """Quickly calculate reasonable bin sizes from BAM read counts.
 
@@ -118,11 +120,11 @@ def do_autobin(
 
 def hybrid(
     rc_table: pd.DataFrame,
-    read_len: int | float,
+    read_len: Union[int, float],
     bam_fname: str,
     targets: GA,
-    access: GA | None = None,
-    fasta: str | None = None,
+    access: Optional[GA] = None,
+    fasta: Optional[str] = None,
 ) -> tuple:
     """Hybrid capture sequencing."""
     # Identify off-target regions
@@ -147,7 +149,7 @@ def hybrid(
 # ---
 
 
-def average_depth(rc_table: pd.DataFrame, read_length: int | float) -> float:
+def average_depth(rc_table: pd.DataFrame, read_length: Union[int, float]) -> float:
     """Estimate the average read depth across the genome.
 
     Returns
@@ -168,7 +170,7 @@ def idxstats2ga(table: pd.DataFrame, bam_fname: str) -> GA:
 
 
 def sample_region_cov(
-    bam_fname: str, regions: GA, max_num: int = 100, fasta: str | None = None
+    bam_fname: str, regions: GA, max_num: int = 100, fasta: Optional[str] = None
 ) -> float:
     """Calculate read depth in a randomly sampled subset of regions."""
     midsize_regions = sample_midsize_regions(regions, max_num)
@@ -200,7 +202,7 @@ def shared_chroms(*tables) -> list:
     return [None if tab is None else tab[tab.chromosome.isin(chroms)] for tab in tables]
 
 
-def update_chrom_length(rc_table: pd.DataFrame, regions: GA | None) -> pd.DataFrame:
+def update_chrom_length(rc_table: pd.DataFrame, regions: Optional[GA]) -> pd.DataFrame:
     if regions is not None and len(regions):
         chrom_sizes = region_size_by_chrom(regions)
         rc_table = rc_table.merge(chrom_sizes, on="chromosome", how="inner")

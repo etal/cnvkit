@@ -1,4 +1,6 @@
 """Base class for an array of annotated genomic regions."""
+from __future__ import annotations
+
 import logging
 from typing import Callable, Optional, Union
 from collections.abc import Iterable, Iterator, Mapping, Sequence

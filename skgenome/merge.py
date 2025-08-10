@@ -6,6 +6,8 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
+from __future__ import annotations
+
 import itertools
 from typing import Callable, Optional
 from collections.abc import Iterable
