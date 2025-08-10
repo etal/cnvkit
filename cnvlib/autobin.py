@@ -4,8 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from collections.abc import Iterable
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -14,6 +13,9 @@ from skgenome import tabio, GenomicArray as GA
 from . import coverage, samutil
 from .antitarget import compare_chrom_names
 from .descriptives import weighted_median
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 def midsize_file(fnames: Iterable[str]) -> list[str]:

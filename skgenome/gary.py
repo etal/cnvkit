@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional, Union
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from typing import Callable, Optional, Union, TYPE_CHECKING
 from collections import OrderedDict
 
 import numpy as np
@@ -15,6 +14,9 @@ from .merge import flatten, merge
 from .rangelabel import to_label
 from .subtract import subtract
 from .subdivide import subdivide
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator, Mapping, Sequence
 
 
 class GenomicArray:

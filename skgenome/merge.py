@@ -9,14 +9,16 @@ GenomicArray types.
 from __future__ import annotations
 
 import itertools
-from typing import Callable, Optional
-from collections.abc import Iterable
+from typing import Callable, Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
 from .combiners import get_combiners, first_of
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 def flatten(

@@ -94,8 +94,10 @@ ignore = [
     "E501",  # line too long
     "F401",  # unused import
     "F841",  # unused variable
+    "UP007", # X|Y type annotations
     "UP031", # % format
     "UP032", # format call vs. f-string
+    "UP045", # X|None type annotations
     "PD009", # use .iloc instead of .iat (iat is actually faster for scalar access)
     "PD901", # avoid generic variable name 'df' (acceptable in scientific code)
     #"SIM108", # ternary if-else
