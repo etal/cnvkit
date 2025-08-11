@@ -1,10 +1,11 @@
+# CNVkit environment with HMM segmentation support
 # Usage:
-#   conda env create -f conda-env.yaml
+#   conda env create -f conda-env-hmm.yaml
 # or:
-#   conda env update -v -n [base] -f conda-env.yml [--prune]
+#   conda env update -v -n cnvkit -f conda-env-hmm.yml [--prune]
 # This does not install CNVkit itself. Use pip to install either a stable release from
-# PyPI (pip install cnvkit), or this local repo (pip install -e .).
-name: cnvkit
+# PyPI (pip install cnvkit[hmm]), or this local repo (pip install -e .[hmm]).
+name: cnvkit-hmm
 channels:
     - conda-forge
     - bioconda
@@ -17,12 +18,13 @@ dependencies:
     - matplotlib >=3.6.3
     - numpy >=1.26.4
     - pandas >=2.1.4
+    - pomegranate >=1.0.0
     - pyfaidx >=0.7.1
     - pysam >=0.22.0
     - pytest
+    - pytorch >=1.13.0
     - reportlab >=3.6.13
     - ruff
     - scikit-learn >=1.5.0
     - scipy >=1.11.4
     - tox
-

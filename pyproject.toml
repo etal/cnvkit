@@ -58,7 +58,7 @@ packages = ["cnvlib", "cnvlib.cli", "cnvlib.segmentation", "skgenome", "skgenome
 [tool.setuptools.dynamic]
 version = {attr = "cnvlib._version.__version__"}
 dependencies = {file = "requirements/core.txt"}
-optional-dependencies = {test = {file = "requirements/tests.txt"}}
+optional-dependencies = {test = {file = "requirements/tests.txt"}, hmm = {file = "requirements/hmm.txt"}}
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
