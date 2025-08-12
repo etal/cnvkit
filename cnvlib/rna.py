@@ -2,6 +2,7 @@
 
 Process per-gene expression levels, or the equivalent, by cohort.
 """
+
 import logging
 
 import numpy as np
@@ -110,14 +111,13 @@ def load_gene_info(gene_resource, corr_fname, default_r=0.1):
             # as unknown correlation, i.e. default, as if not in TCGA
             entrez_dupes_idx = tuple(locate_entrez_dupes(gi_corr))
             logging.info(
-                "Resetting %d ambiguous genes' correlation "
-                "coefficients to default %f",
+                "Resetting %d ambiguous genes' correlation coefficients to default %f",
                 len(entrez_dupes_idx),
                 default_r,
             )
-            gi_corr.loc[
-                entrez_dupes_idx, ("pearson_r", "spearman_r", "kendall_t")
-            ] = default_r
+            gi_corr.loc[entrez_dupes_idx, ("pearson_r", "spearman_r", "kendall_t")] = (
+                default_r
+            )
 
         # Genes w/o TCGA info get default correlation 0.1 (= .5*corr.median())
         gene_info = gi_corr.fillna(

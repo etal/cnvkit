@@ -1,4 +1,5 @@
 """The 'heatmap' command."""
+
 import collections
 import logging
 
