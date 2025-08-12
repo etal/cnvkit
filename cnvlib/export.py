@@ -1,7 +1,10 @@
 """Export CNVkit objects and files to other formats."""
+
+from __future__ import annotations
 import logging
 import time
 from collections import OrderedDict as OD
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -11,8 +14,14 @@ from . import call
 from .cmdutil import read_cna
 from ._version import __version__
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from cnvlib.cnary import CopyNumArray
+    from cnvlib.vary import VariantArray
+    from numpy import ndarray
 
-def merge_samples(filenames):
+
+def merge_samples(filenames: list[str]) -> pd.DataFrame:
     """Merge probe values from multiple samples into a 2D table (of sorts).
 
     Input:
@@ -20,6 +29,7 @@ def merge_samples(filenames):
     Output:
         list-of-tuples: (probe, log2 coverages...)
     """
+
     def row2label(row):
         return f"{row.chromosome}:{row.start}-{row.end}:{row.gene}"
 
@@ -91,7 +101,7 @@ def fmt_gct(sample_ids, table):
     return NotImplemented
 
 
-def fmt_jtv(sample_ids, table):
+def fmt_jtv(sample_ids: list[str], table: pd.DataFrame) -> tuple[list[str], map]:
     """Format for Java TreeView."""
     outheader = ["CloneID", "Name", *sample_ids]
     outtable = pd.concat(
@@ -113,7 +123,7 @@ def fmt_jtv(sample_ids, table):
 # Special cases
 
 
-def export_nexus_basic(cnarr):
+def export_nexus_basic(cnarr: CopyNumArray) -> pd.DataFrame:
     """Biodiscovery Nexus Copy Number "basic" format.
 
     Only represents one sample per file.
@@ -125,7 +135,9 @@ def export_nexus_basic(cnarr):
     return out_table
 
 
-def export_nexus_ogt(cnarr, varr, min_weight=0.0):
+def export_nexus_ogt(
+    cnarr: CopyNumArray, varr: VariantArray, min_weight: float = 0.0
+) -> pd.DataFrame:
     """Biodiscovery Nexus Copy Number "Custom-OGT" format.
 
     To create the b-allele frequencies column, alterate allele frequencies from
@@ -155,7 +167,7 @@ def export_nexus_ogt(cnarr, varr, min_weight=0.0):
     return out_table
 
 
-def export_seg(sample_fnames, chrom_ids=False):
+def export_seg(sample_fnames: list[str], chrom_ids: bool = False) -> pd.DataFrame:
     """SEG format for copy number segments.
 
     Segment breakpoints are not the same across samples, so samples are listed
@@ -166,7 +178,7 @@ def export_seg(sample_fnames, chrom_ids=False):
     return out_table
 
 
-def _load_seg_dframe_id(fname):
+def _load_seg_dframe_id(fname: str) -> tuple[pd.DataFrame, str]:
     segarr = read_cna(fname)
     assert segarr is not None
     assert segarr.data is not None
@@ -178,7 +190,15 @@ def _load_seg_dframe_id(fname):
 # BED
 
 
-def export_bed(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female, label, show):
+def export_bed(
+    segments: CopyNumArray,
+    ploidy: int,
+    is_haploid_x_reference: bool,
+    diploid_parx_genome: None,
+    is_sample_female: bool,
+    label: str,
+    show: str,
+) -> pd.DataFrame:
     """Convert a copy number array to a BED-like DataFrame.
 
     For each region in each sample (possibly filtered according to `show`),
@@ -209,7 +229,9 @@ def export_bed(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is
         out = out[out["ncopies"] != ploidy]
     elif show == "variant":
         # Skip regions of non-neutral copy number
-        exp_copies = call.absolute_expect(segments, ploidy, diploid_parx_genome, is_sample_female)
+        exp_copies = call.absolute_expect(
+            segments, ploidy, diploid_parx_genome, is_sample_female
+        )
         out = out[out["ncopies"] != exp_copies]
     return out
 
@@ -237,9 +259,7 @@ VCF_HEADER = """\
 ##FORMAT=<ID=GQ,Number=1,Type=Float,Description="Genotype quality">
 ##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Copy number genotype for imprecise events">
 ##FORMAT=<ID=CNQ,Number=1,Type=Float,Description="Copy number genotype quality for imprecise events">
-""".format(
-    date=time.strftime("%Y%m%d"), version=__version__
-)
+""".format(date=time.strftime("%Y%m%d"), version=__version__)
 # #CHROM  POS   ID  REF ALT   QUAL  FILTER  INFO  FORMAT  NA00001
 # 1 2827693   . CCGTGGATGCGGGGACCCGCATCCCCTCTCCCTTCACAGCTGAGTGACCCACATCCCCTCTCCCCTCGCA  C . PASS  SVTYPE=DEL;END=2827680;BKPTID=Pindel_LCS_D1099159;HOMLEN=1;HOMSEQ=C;SVLEN=-66 GT:GQ 1/1:13.9
 # 2 321682    . T <DEL>   6 PASS    IMPRECISE;SVTYPE=DEL;END=321887;SVLEN=-105;CIPOS=-56,20;CIEND=-10,62  GT:GQ 0/1:12
@@ -248,8 +268,14 @@ VCF_HEADER = """\
 
 
 def export_vcf(
-    segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female, sample_id=None, cnarr=None
-):
+    segments: CopyNumArray,
+    ploidy: int,
+    is_haploid_x_reference: bool,
+    diploid_parx_genome: None,
+    is_sample_female: bool,
+    sample_id: None = None,
+    cnarr: None = None,
+) -> tuple[str, str]:
     """Convert segments to Variant Call Format.
 
     For now, only 1 sample per VCF. (Overlapping CNVs seem tricky.)
@@ -270,7 +296,9 @@ def export_vcf(
     ]
     if cnarr:
         segments = assign_ci_start_end(segments, cnarr)
-    vcf_rows = segments2vcf(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female)
+    vcf_rows = segments2vcf(
+        segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female
+    )
     table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
     vcf_body = table.to_csv(sep="\t", header=True, index=False, float_format="%.3g")
     return VCF_HEADER, vcf_body
@@ -299,17 +327,30 @@ def assign_ci_start_end(segarr, cnarr):
     return segarr.as_dataframe(segarr.data.assign(ci_left=ci_lefts, ci_right=ci_rights))
 
 
-def segments2vcf(segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female):
+def segments2vcf(
+    segments: CopyNumArray,
+    ploidy: int,
+    is_haploid_x_reference: bool,
+    diploid_parx_genome: None,
+    is_sample_female: bool,
+) -> Iterator[tuple[str, int, str, str, str, str, str, str, str, str]]:
     """Convert copy number segments to VCF records."""
     out_dframe = segments.data.reindex(columns=["chromosome", "end", "log2", "probes"])
     out_dframe["start"] = segments.start.replace(0, 1)
 
     if "cn" in segments:
         out_dframe["ncopies"] = segments["cn"]
-        abs_expect = call.absolute_expect(segments, ploidy, diploid_parx_genome, is_sample_female)
+        abs_expect = call.absolute_expect(
+            segments, ploidy, diploid_parx_genome, is_sample_female
+        )
     else:
         abs_dframe = call.absolute_dataframe(
-            segments, ploidy, 1.0, is_haploid_x_reference, diploid_parx_genome, is_sample_female
+            segments,
+            ploidy,
+            1.0,
+            is_haploid_x_reference,
+            diploid_parx_genome,
+            is_sample_female,
         )
         out_dframe["ncopies"] = abs_dframe["absolute"].round().astype("int")
         abs_expect = abs_dframe["expect"]
@@ -454,7 +495,9 @@ def export_gistic_markers(cnr_fnames):
 # THetA
 
 
-def export_theta(tumor_segs, normal_cn):
+def export_theta(
+    tumor_segs: CopyNumArray, normal_cn: Optional[CopyNumArray]
+) -> pd.DataFrame:
     """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
 
     Follows the THetA segmentation import script but avoid repeating the
@@ -503,7 +546,9 @@ def export_theta(tumor_segs, normal_cn):
     return table[out_columns]
 
 
-def ref_means_nbins(tumor_segs, normal_cn):
+def ref_means_nbins(
+    tumor_segs: CopyNumArray, normal_cn: Optional[CopyNumArray]
+) -> tuple[ndarray, pd.Series]:
     """Extract segments' reference mean log2 values and probe counts.
 
     Code paths::
@@ -560,14 +605,14 @@ def ref_means_nbins(tumor_segs, normal_cn):
 
 
 def theta_read_counts(
-    log2_ratio,
-    nbins,
+    log2_ratio: Union[pd.Series, ndarray],
+    nbins: pd.Series,
     # These scaling factors don't meaningfully affect
     # THetA's calculation unless they're too small
-    avg_depth=500,
-    avg_bin_width=200,
-    read_len=100,
-):
+    avg_depth: int = 500,
+    avg_bin_width: int = 200,
+    read_len: int = 100,
+) -> pd.Series:
     """Calculate segments' read counts from log2-ratios.
 
     Math:
@@ -586,7 +631,7 @@ def theta_read_counts(
     return read_count.round().fillna(0).astype("int")
 
 
-def export_theta_snps(varr):
+def export_theta_snps(varr: VariantArray) -> Iterator[pd.DataFrame]:
     """Generate THetA's SNP per-allele read count "formatted.txt" files."""
     # Drop any chromosomes that are not integer or XY
     varr = varr.autosomes(

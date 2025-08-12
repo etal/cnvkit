@@ -1,19 +1,28 @@
 """Plotting utilities."""
+
+from __future__ import annotations
 import collections
 import itertools
 import logging
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from skgenome.rangelabel import unpack_range, Region
 from . import core, params
 
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from matplotlib.axes._axes import Axes
+
 
 MB = 1e-6  # To rescale from bases to megabases
 
 
-def plot_chromosome_dividers(axis, chrom_sizes, pad=None, along="x"):
+def plot_chromosome_dividers(
+    axis: Axes, chrom_sizes: collections.OrderedDict, pad: None = None, along: str = "x"
+) -> collections.OrderedDict:
     """Given chromosome sizes, plot divider lines and labels.
 
     Draws black lines between each chromosome, with padding. Labels each chromosome range with the chromosome name,
@@ -73,7 +82,9 @@ def plot_chromosome_dividers(axis, chrom_sizes, pad=None, along="x"):
 # Internal supporting functions
 
 
-def chromosome_sizes(probes, to_mb=False):
+def chromosome_sizes(
+    probes: CopyNumArray, to_mb: bool = False
+) -> collections.OrderedDict:
     """Create an ordered mapping of chromosome names to sizes."""
     chrom_sizes = collections.OrderedDict()
     for chrom, rows in probes.by_chromosome():
@@ -219,7 +230,7 @@ def get_repeat_slices(values):
 # Utilies used by other modules
 
 
-def cvg2rgb(cvg, desaturate):
+def cvg2rgb(cvg: float, desaturate: bool) -> tuple[float, float, float]:
     """Choose a shade of red or blue representing log2-coverage value."""
     cutoff = 1.33  # Values above this magnitude are shown with max intensity
     x = min(abs(cvg) / cutoff, 1.0)

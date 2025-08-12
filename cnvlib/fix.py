@@ -1,23 +1,31 @@
 """Supporting functions for the 'fix' command."""
+
+from __future__ import annotations
 import logging
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import pandas as pd
 
 from . import descriptives, params, smoothing
 
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from numpy import ndarray
+    from pandas.core.series import Series
+
 
 def do_fix(
-    target_raw,
-    antitarget_raw,
-    reference,
-    diploid_parx_genome=None,
-    do_gc=True,
-    do_edge=True,
-    do_rmask=True,
-    do_cluster=False,
-    smoothing_window_fraction=None,
-):
+    target_raw: CopyNumArray,
+    antitarget_raw: CopyNumArray,
+    reference: CopyNumArray,
+    diploid_parx_genome: None = None,
+    do_gc: bool = True,
+    do_edge: bool = True,
+    do_rmask: bool = True,
+    do_cluster: bool = False,
+    smoothing_window_fraction: None = None,
+) -> CopyNumArray:
     """Combine target and antitarget coverages and correct for biases."""
     # Load, recenter and GC-correct target & antitarget probes separately
     logging.info("Processing target: %s", target_raw.sample_id)
@@ -87,15 +95,15 @@ def do_fix(
 
 
 def load_adjust_coverages(
-    cnarr,
-    ref_cnarr,
-    skip_low,
-    fix_gc,
-    fix_edge,
-    fix_rmask,
-    diploid_parx_genome,
-    smoothing_window_fraction=None
-):
+    cnarr: CopyNumArray,
+    ref_cnarr: CopyNumArray,
+    skip_low: bool,
+    fix_gc: bool,
+    fix_edge: bool,
+    fix_rmask: bool,
+    diploid_parx_genome: None,
+    smoothing_window_fraction: None = None,
+) -> tuple[CopyNumArray, CopyNumArray]:
     """Load and filter probe coverages; correct using reference and GC."""
     if "gc" in cnarr:
         # Don't choke on Picard-derived files that have the GC column
@@ -153,7 +161,7 @@ def load_adjust_coverages(
     return cnarr, ref_matched
 
 
-def mask_bad_bins(cnarr):
+def mask_bad_bins(cnarr: CopyNumArray) -> Series:
     """Flag the bins with excessively low or inconsistent coverage.
 
     Returns
@@ -177,7 +185,9 @@ def mask_bad_bins(cnarr):
     return mask
 
 
-def match_ref_to_sample(ref_cnarr, samp_cnarr):
+def match_ref_to_sample(
+    ref_cnarr: CopyNumArray, samp_cnarr: CopyNumArray
+) -> CopyNumArray:
     """Filter the reference bins to match the sample (target or antitarget)."""
     # Assign each bin a unique string ID based on genomic coordinates
     samp_labeled = samp_cnarr.data.set_index(pd.Index(samp_cnarr.coords()))
@@ -209,7 +219,9 @@ def match_ref_to_sample(ref_cnarr, samp_cnarr):
     return x
 
 
-def center_by_window(cnarr, fraction, sort_key):
+def center_by_window(
+    cnarr: CopyNumArray, fraction: float, sort_key: Union[Series, ndarray]
+) -> CopyNumArray:
     """Smooth out biases according to the trait specified by sort_key.
 
     E.g. correct GC-biased bins by windowed averaging across similar-GC
@@ -239,7 +251,7 @@ def center_by_window(cnarr, fraction, sort_key):
     return fixarr
 
 
-def get_edge_bias(cnarr, margin):
+def get_edge_bias(cnarr: CopyNumArray, margin: int) -> Series:
     """Quantify the "edge effect" of the target tile and its neighbors.
 
     The result is proportional to the change in the target's coverage due to
@@ -271,7 +283,7 @@ def get_edge_bias(cnarr, margin):
     return pd.Series(np.concatenate(output_by_chrom), index=cnarr.data.index)
 
 
-def edge_losses(target_sizes, insert_size):
+def edge_losses(target_sizes: ndarray, insert_size: int) -> ndarray:
     """Calculate coverage losses at the edges of baited regions.
 
     Letting i = insert size and t = target size, the proportional loss of
@@ -293,7 +305,7 @@ def edge_losses(target_sizes, insert_size):
     return losses
 
 
-def edge_gains(target_sizes, gap_sizes, insert_size):
+def edge_gains(target_sizes: ndarray, gap_sizes: ndarray, insert_size: int) -> ndarray:
     """Calculate coverage gain from neighboring baits' flanking reads.
 
     Letting i = insert size, t = target size, g = gap to neighboring bait,
@@ -324,7 +336,13 @@ def edge_gains(target_sizes, gap_sizes, insert_size):
     return gains
 
 
-def apply_weights(cnarr, ref_matched, log2_key, spread_key, epsilon=1e-4):
+def apply_weights(
+    cnarr: CopyNumArray,
+    ref_matched: CopyNumArray,
+    log2_key: str,
+    spread_key: str,
+    epsilon: float = 1e-4,
+) -> CopyNumArray:
     """Calculate weights for each bin.
 
     Bin weight is an estimate of (1 - variance) and within the range
