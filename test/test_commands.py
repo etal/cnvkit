@@ -20,6 +20,12 @@ from skgenome import tabio
 
 import cnvlib
 
+# Check if HMM functionality is available
+try:
+    from cnvlib.segmentation.hmm import HMM_AVAILABLE
+except ImportError:
+    HMM_AVAILABLE = False
+
 # Import all modules as a smoke test
 from cnvlib import (
     access,
@@ -76,11 +82,11 @@ class CommandTests(unittest.TestCase):
     def test_antitarget(self):
         """The 'antitarget' command."""
         baits = tabio.read_auto("formats/nv2_baits.interval_list")
-        access = tabio.read_auto("../data/access-5k-mappable.hg19.bed")
+        acs = tabio.read_auto("../data/access-5k-mappable.hg19.bed")
         self.assertLess(0, len(commands.do_antitarget(baits)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access, 200000)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access, 10000, 5000)))
+        self.assertLess(0, len(commands.do_antitarget(baits, acs)))
+        self.assertLess(0, len(commands.do_antitarget(baits, acs, 200000)))
+        self.assertLess(0, len(commands.do_antitarget(baits, acs, 10000, 5000)))
 
     def test_autobin(self):
         """The 'autobin' command."""
@@ -154,6 +160,8 @@ class CommandTests(unittest.TestCase):
         anti_regions = tabio.read(anti_bed_fname, "bed")
         self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
         # Run the same sample
+        # Use HMM if available, otherwise fall back to CBS
+        segment_method = "hmm" if HMM_AVAILABLE else "cbs"
         batch.batch_run_sample(
             bam,
             tgt_bed_fname,
@@ -168,7 +176,7 @@ class CommandTests(unittest.TestCase):
             False,
             False,
             "hybrid",
-            "hmm",
+            segment_method,
             1,
             False,
         )
@@ -563,9 +571,10 @@ class CommandTests(unittest.TestCase):
         ref = cnvlib.read("formats/reference-tr.cnn")
         is_bg = ref["gene"] == "Background"
         tgt_bins = ref[~is_bg]
-        tgt_bins.log2 += np.random.randn(len(tgt_bins)) / 5
+        rng = np.random.default_rng(42)  # Use fixed seed for reproducible tests
+        tgt_bins.log2 += rng.standard_normal(len(tgt_bins)) / 5
         anti_bins = ref[is_bg]
-        anti_bins.log2 += np.random.randn(len(anti_bins)) / 5
+        anti_bins.log2 += rng.standard_normal(len(anti_bins)) / 5
         blank_bins = cnary.CopyNumArray([])
         # Typical usage (hybrid capture)
         cnr = commands.do_fix(tgt_bins, anti_bins, ref)
@@ -669,6 +678,7 @@ class CommandTests(unittest.TestCase):
         # self.assertGreater(len(segments), n_chroms)
         # self.assertTrue((segments.start < segments.end).all())
 
+    @unittest.skipUnless(HMM_AVAILABLE, "HMM segmentation requires pomegranate >= 1.0.0")
     def test_segment_hmm(self):
         """The 'segment' command with HMM methods."""
         for fname in ("formats/amplicon.cnr", "formats/p2-20_1.cnr"):
