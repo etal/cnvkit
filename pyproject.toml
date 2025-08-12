@@ -2,7 +2,8 @@
 name = "CNVkit"
 description = "Copy number variation toolkit for high-throughput sequencing."
 readme = "README.rst"
-license = "Apache-2.0"
+#license = "Apache-2.0"
+license = {"text" = "Apache-2.0"}
 authors = [
   {name = "Eric Talevich", email = "me+code@etal.mozmail.com"}
 ]
