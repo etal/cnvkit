@@ -95,12 +95,12 @@ def ensure_bam_sorted(
     """
     if by_name:
         # Compare read IDs
-        def out_of_order(read, prev):
+        def out_of_order(read, prev) -> bool:
             return not (prev is None or prev.qname <= read.qname)
 
     else:
         # Compare read locations
-        def out_of_order(read, prev):
+        def out_of_order(read, prev) -> bool:
             return not (prev is None or read.tid != prev.tid or prev.pos <= read.pos)
 
     # ENH - repeat at 50%, ~99% through the BAM

@@ -625,7 +625,7 @@ def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin, segment
     return axis
 
 
-def set_xlim_from(axis, probes=None, segments=None, variants=None):
+def set_xlim_from(axis, probes=None, segments=None, variants=None) -> None:
     """Configure axes for plotting a single chromosome's data.
 
     Parameters
@@ -659,7 +659,7 @@ def set_xlim_from(axis, probes=None, segments=None, variants=None):
     axis.set_xlim(min_x * MB, max_x * MB)
 
 
-def setup_chromosome(axis, y_min=None, y_max=None, y_label=None):
+def setup_chromosome(axis, y_min=None, y_max=None, y_label=None) -> None:
     """Configure axes for plotting a single chromosome's data."""
     if y_min and y_max:
         axis.set_ylim(y_min, y_max)
@@ -731,7 +731,7 @@ def get_segment_vafs(variants, segments):
                 yield (seg, np.median(freqs[idx_vaf]))
 
 
-def highlight_genes(axis, genes, y_posn):
+def highlight_genes(axis, genes, y_posn) -> None:
     """Show gene regions with background color and a text label."""
     # Rotate text in proportion to gene density
     ngenes = len(genes)

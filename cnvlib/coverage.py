@@ -174,7 +174,7 @@ def region_depth_count(
     Coordinates are 0-based, per pysam.
     """
 
-    def filter_read(read):
+    def filter_read(read) -> bool:
         """True if the given read should be counted towards coverage."""
         return not (
             read.is_duplicate

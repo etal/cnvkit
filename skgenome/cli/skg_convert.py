@@ -48,7 +48,7 @@ def argument_parsing():
     return AP.parse_args()
 
 
-def skg_convert(args):
+def skg_convert(args) -> None:
     logging.info("Converting %s%s to %s",
                  "input" if args.infile is sys.stdin else args.infile,
                  " from "+ args.in_fmt if args.in_fmt != 'auto' else '',
@@ -79,7 +79,7 @@ def skg_convert(args):
     tabio.write(regions, args.output, args.out_fmt)
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     arguments = argument_parsing()
     skg_convert(arguments)

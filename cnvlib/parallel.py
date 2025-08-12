@@ -28,7 +28,7 @@ class SerialPool:
         """Just apply the function to `iterable`."""
         return map(func, iterable)
 
-    def shutdown(self, wait=True):
+    def shutdown(self, wait=True) -> None:
         """Do nothing."""
         pass
 

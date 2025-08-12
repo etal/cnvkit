@@ -17,7 +17,7 @@ def argument_parsing():
     return  AP.parse_args()
 
 
-def cnv_annotate(args):
+def cnv_annotate(args) -> None:
     annot = tabio.read_auto(args.annotate)
     cnarr = read_cna(args.cnv_file)
     cnarr['gene'] = annot.into_ranges(cnarr, 'gene', '-')
@@ -30,7 +30,7 @@ def cnv_annotate(args):
     #      some math for how to update probes, weight
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     arguments = argument_parsing()
     cnv_annotate(arguments)

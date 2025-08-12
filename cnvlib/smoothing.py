@@ -251,7 +251,7 @@ def savgol(
     return y[total_wing:-total_wing]
 
 
-def _fit_edges(x, y, wing, polyorder=3):
+def _fit_edges(x, y, wing, polyorder=3) -> None:
     """Apply polynomial interpolation to the edges of y, in-place.
 
     Calculates a polynomial fit (of order `polyorder`) of `x` within a window of
@@ -266,7 +266,7 @@ def _fit_edges(x, y, wing, polyorder=3):
     # TODO - fix the discontinuities at wing, n-wing
 
 
-def _fit_edge(x, y, window_start, window_stop, interp_start, interp_stop, polyorder):
+def _fit_edge(x, y, window_start, window_stop, interp_start, interp_stop, polyorder) -> None:
     """
     Given a 1-D array `x` and the specification of a slice of `x` from
     `window_start` to `window_stop`, create an interpolating polynomial of the

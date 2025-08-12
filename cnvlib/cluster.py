@@ -266,7 +266,7 @@ def pca_plain(data, n_components=None):
     return U  # , E, V
 
 
-def plot_clusters(M, cluster_indices):
+def plot_clusters(M, cluster_indices) -> None:
     """Scatter plot first 2 components, colorized by cluster.
 
     Parameters

@@ -30,7 +30,7 @@ def merge_samples(filenames: list[str]) -> pd.DataFrame:
         list-of-tuples: (probe, log2 coverages...)
     """
 
-    def row2label(row):
+    def row2label(row) -> str:
         return f"{row.chromosome}:{row.start}-{row.end}:{row.gene}"
 
     def label_with_gene(cnarr):

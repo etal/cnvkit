@@ -112,7 +112,7 @@ def parse_qual(qual):
     return float(qual)
 
 
-def set_ends(table):
+def set_ends(table) -> None:
     """Set 'end' field according to allele lengths."""
     need_end_idx = table.end == -1
     if need_end_idx.any():

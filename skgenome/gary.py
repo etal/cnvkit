@@ -220,7 +220,7 @@ class GenomicArray:
             assert isinstance(index, slice) or len(index) > 0
             self.data[index] = value
 
-    def __delitem__(self, index):
+    def __delitem__(self, index) -> None:
         return NotImplemented
 
     def __iter__(self) -> map:

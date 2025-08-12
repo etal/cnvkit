@@ -94,7 +94,7 @@ def verify_sample_sex(cnarr, sex_arg, is_haploid_x_reference, diploid_parx_genom
     return is_sample_female
 
 
-def write_tsv(outfname, rows, colnames=None):
+def write_tsv(outfname, rows, colnames=None) -> None:
     """Write rows, with optional column header, to tabular file."""
     with tabio.safe_write(outfname or sys.stdout) as handle:
         if colnames:
@@ -103,7 +103,7 @@ def write_tsv(outfname, rows, colnames=None):
         handle.writelines("\t".join(map(str, row)) + "\n" for row in rows)
 
 
-def write_text(outfname, text, *more_texts):
+def write_text(outfname, text, *more_texts) -> None:
     """Write one or more strings (blocks of text) to a file."""
     with tabio.safe_write(outfname or sys.stdout) as handle:
         handle.write(text)
@@ -112,7 +112,7 @@ def write_text(outfname, text, *more_texts):
                 handle.write(mtext)
 
 
-def write_dataframe(outfname, dframe, header=True):
+def write_dataframe(outfname, dframe, header=True) -> None:
     """Write a pandas.DataFrame to a tabular file."""
     with tabio.safe_write(outfname or sys.stdout) as handle:
         dframe.to_csv(handle, header=header, index=False, sep="\t", float_format="%.6g")

@@ -33,7 +33,7 @@ def argument_parsing():
     return AP.parse_args()
 
 
-def cnv_updater(args):
+def cnv_updater(args) -> None:
     for fname in args.cnn_files:
         cnarr = read(fname)
         # Convert coverage depths from log2 scale to absolute scale.
@@ -56,7 +56,7 @@ def cnv_updater(args):
         tabio.write(cnarr, os.path.join(args.output_dir, out_fname))
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     arguments = argument_parsing()
     cnv_updater(arguments)

@@ -34,7 +34,7 @@ def call_quiet(*args):
     return proc.stdout
 
 
-def ensure_path(fname):
+def ensure_path(fname) -> bool:
     """Create dirs and move an existing file to avoid overwriting, if necessary.
 
     If a file already exists at the given path, it is renamed with an integer
@@ -79,7 +79,7 @@ def temp_write_text(text, mode="w+b"):
 # More helpers
 
 
-def assert_equal(msg, **values):
+def assert_equal(msg, **values) -> None:
     """Evaluate and compare two or more values for equality.
 
     Sugar for a common assertion pattern. Saves re-evaluating (and retyping)

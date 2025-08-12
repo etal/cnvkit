@@ -1817,7 +1817,7 @@ P_breaks.set_defaults(func=_cmd_breaks)
 do_genemetrics = public(reports.do_genemetrics)
 
 
-def _cmd_genemetrics(args):
+def _cmd_genemetrics(args) -> None:
     """Identify targeted genes with copy number gain or loss."""
     cnarr = read_cna(args.filename)
     segarr = read_cna(args.segment) if args.segment else None
@@ -2026,7 +2026,7 @@ def do_sex(
 ) -> pd.DataFrame:
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
 
-    def strsign(num):
+    def strsign(num) -> str:
         if num > 0:
             return "+%.3g" % num
         return "%.3g" % num
@@ -3026,7 +3026,7 @@ P_export_gistic.set_defaults(func=_cmd_export_gistic)
 # version ---------------------------------------------------------------------
 
 
-def print_version(_args):
+def print_version(_args) -> None:
     """Display this program's version."""
     print(__version__)
 

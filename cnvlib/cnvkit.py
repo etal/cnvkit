@@ -5,7 +5,7 @@ import logging
 from . import commands
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     args = commands.parse_args()
     args.func(args)

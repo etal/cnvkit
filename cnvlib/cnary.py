@@ -43,7 +43,7 @@ class CopyNumArray(GenomicArray):
         return self.data["log2"]
 
     @log2.setter
-    def log2(self, value):
+    def log2(self, value) -> None:
         self.data["log2"] = value
 
     @property
