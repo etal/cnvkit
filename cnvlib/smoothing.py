@@ -1,6 +1,9 @@
 """Signal-smoothing functions."""
+
+from __future__ import annotations
 import logging
 import math
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -8,8 +11,20 @@ from scipy.signal import savgol_coeffs, savgol_filter
 
 from . import descriptives
 
+if TYPE_CHECKING:
+    from numpy import ndarray
 
-def check_inputs(x, width, as_series=True, weights=None):
+
+def check_inputs(
+    x: Union[pd.Series, ndarray],
+    width: Union[int, float],
+    as_series: bool = True,
+    weights: Optional[ndarray] = None,
+) -> Union[
+    tuple[ndarray, int, pd.Series],
+    tuple[ndarray, int, ndarray, ndarray],
+    tuple[ndarray, int, ndarray],
+]:
     """Transform width into a half-window size.
 
     `width` is either a fraction of the length of `x` or an integer size of the
@@ -33,7 +48,7 @@ def check_inputs(x, width, as_series=True, weights=None):
     return x, wing, signal, weights
 
 
-def _width2wing(width, x, min_wing=3):
+def _width2wing(width: Union[int, float], x: ndarray, min_wing: int = 3) -> int:
     """Convert a fractional or absolute width to integer half-width ("wing")."""
     if 0 < width < 1:
         wing = math.ceil(len(x) * width * 0.5)
@@ -52,12 +67,12 @@ def _width2wing(width, x, min_wing=3):
     return wing
 
 
-def _pad_array(x, wing):
+def _pad_array(x: ndarray, wing: int) -> ndarray:
     """Pad the edges of the input array with mirror copies."""
     return np.concatenate((x[wing - 1 :: -1], x, x[: -wing - 1 : -1]))
 
 
-def rolling_median(x, width):
+def rolling_median(x: pd.Series, width: float) -> ndarray:
     """Rolling median with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
     rolled = signal.rolling(2 * wing + 1, 1, center=True).median()
@@ -66,7 +81,7 @@ def rolling_median(x, width):
     return np.asarray(rolled[wing:-wing], dtype=float)
 
 
-def rolling_quantile(x, width, quantile):
+def rolling_quantile(x: pd.Series, width: int, quantile: float) -> ndarray:
     """Rolling quantile (0--1) with mirrored edges."""
     x, wing, signal = check_inputs(x, width)
     rolled = signal.rolling(2 * wing + 1, 2, center=True).quantile(quantile)
@@ -80,14 +95,16 @@ def rolling_std(x, width):
     return np.asarray(rolled[wing:-wing], dtype=float)
 
 
-def convolve_weighted(window, signal, weights, n_iter=1):
+def convolve_weighted(
+    window: ndarray, signal: ndarray, weights: ndarray, n_iter: int = 1
+) -> tuple[ndarray, ndarray]:
     """Convolve a weighted window over a weighted signal array.
 
     Source: https://stackoverflow.com/a/46232913/10049
     """
-    assert len(weights) == len(
-        signal
-    ), f"len(weights) = {len(weights)}, len(signal) = {len(signal)}, window_size = {len(window)}"
+    assert len(weights) == len(signal), (
+        f"len(weights) = {len(weights)}, len(signal) = {len(signal)}, window_size = {len(window)}"
+    )
     y, w = signal, weights
     window /= window.sum()
     for _i in range(n_iter):
@@ -114,7 +131,7 @@ def convolve_unweighted(window, signal, wing, n_iter=1):
     return y
 
 
-def guess_window_size(x, weights=None):
+def guess_window_size(x: pd.Series, weights: Optional[pd.Series] = None) -> int:
     """Choose a reasonable window size given the signal.
 
     Inspired by Silverman's rule: bandwidth is proportional to signal's standard
@@ -161,7 +178,14 @@ def kaiser(x, width=None, weights=None, do_fit_edges=False):
     return y
 
 
-def savgol(x, total_width=None, weights=None, window_width=7, order=3, n_iter=1):
+def savgol(
+    x: Union[pd.Series, ndarray],
+    total_width: Optional[int] = None,
+    weights: Optional[ndarray] = None,
+    window_width: int = 7,
+    order: int = 3,
+    n_iter: int = 1,
+) -> ndarray:
     """Savitzky-Golay smoothing.
 
     Fitted polynomial order is typically much less than half the window width.
@@ -330,7 +354,9 @@ def rolling_outlier_iqr(x, width, c=3.0):
     return outliers
 
 
-def rolling_outlier_quantile(x, width, q, m):
+def rolling_outlier_quantile(
+    x: pd.Series, width: int, q: float, m: int
+) -> Union[pd.Series, ndarray]:
     """Detect outliers by multiples of a quantile in a window.
 
     Outliers are the array elements outside `m` times the `q`'th

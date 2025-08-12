@@ -1,14 +1,26 @@
 """Transform bait intervals into targets more suitable for CNVkit."""
+
+from __future__ import annotations
 import logging
+from typing import TYPE_CHECKING, Optional, Union
 
 from skgenome import tabio
 
 from . import antitarget
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pandas.core.series import Series
+    from skgenome.gary import GenomicArray
+
 
 def do_target(
-    bait_arr, annotate=None, do_short_names=False, do_split=False, avg_size=200 / 0.75
-):
+    bait_arr: GenomicArray,
+    annotate: Optional[str] = None,
+    do_short_names: bool = False,
+    do_split: bool = False,
+    avg_size: Union[int, float] = 200 / 0.75,
+) -> GenomicArray:
     """Transform bait intervals into targets more suitable for CNVkit."""
     tgt_arr = bait_arr.copy()
     # Drop zero-width regions
@@ -27,7 +39,7 @@ def do_target(
     return tgt_arr
 
 
-def shorten_labels(gene_labels):
+def shorten_labels(gene_labels: Series) -> Iterator[str]:
     """Reduce multi-accession interval labels to the minimum consistent.
 
     So: BED or interval_list files have a label for every region. We want this
@@ -81,7 +93,7 @@ def shorten_labels(gene_labels):
     logging.info("Longest name length: %d", longest_name_len)
 
 
-def filter_names(names, exclude=("mRNA",)):
+def filter_names(names: set[str], exclude: tuple[str] = ("mRNA",)) -> set[str]:
     """Remove less-meaningful accessions from the given set."""
     if len(names) > 1:
         ok_names = set(n for n in names if not any(n.startswith(ex) for ex in exclude))
@@ -91,7 +103,7 @@ def filter_names(names, exclude=("mRNA",)):
     return names
 
 
-def shortest_name(names):
+def shortest_name(names: set[str]) -> str:
     """Return the shortest trimmed name from the given set."""
     name = min(filter_names(names), key=len)
     if len(name) > 2 and "|" in name[1:-1]:

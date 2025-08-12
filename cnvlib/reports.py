@@ -2,8 +2,11 @@
 
 Namely: breaks, genemetrics.
 """
+
+from __future__ import annotations
 import collections
 import math
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
@@ -11,12 +14,19 @@ import pandas as pd
 from . import params
 from .segmetrics import segment_mean
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from cnvlib.cnary import CopyNumArray
+    from numpy import float64
+
 
 # _____________________________________________________________________________
 # breaks
 
 
-def do_breaks(probes, segments, min_probes=1):
+def do_breaks(
+    probes: CopyNumArray, segments: CopyNumArray, min_probes: int = 1
+) -> pd.DataFrame:
     """List the targeted genes in which a copy number breakpoint occurs."""
     intervals = get_gene_intervals(probes)
     bpoints = get_breakpoints(intervals, segments, min_probes)
@@ -33,7 +43,9 @@ def do_breaks(probes, segments, min_probes=1):
     )
 
 
-def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
+def get_gene_intervals(
+    all_probes: CopyNumArray, ignore: tuple[str, str, str] = params.IGNORE_GENE_NAMES
+) -> collections.defaultdict[str, list[tuple[str, list[int], int]]]:
     """Tally genomic locations of each targeted gene.
 
     Return a dict of chromosomes to a list of tuples: (gene name, starts, end),
@@ -59,7 +71,11 @@ def get_gene_intervals(all_probes, ignore=params.IGNORE_GENE_NAMES):
     return intervals
 
 
-def get_breakpoints(intervals, segments, min_probes):
+def get_breakpoints(
+    intervals: collections.defaultdict[str, list[tuple[str, list[int], int]]],
+    segments: CopyNumArray,
+    min_probes: int,
+) -> list[tuple[str, str, int, float64, int, int]]:
     """Identify segment breaks within the targeted intervals."""
     # TODO use segments.by_ranges(intervals)
     breakpoints = []
@@ -94,21 +110,28 @@ def get_breakpoints(intervals, segments, min_probes):
 
 
 def do_genemetrics(
-    cnarr,
-    segments=None,
-    threshold=0.2,
-    min_probes=3,
-    skip_low=False,
-    is_haploid_x_reference=False,
-    is_sample_female=None,
-    diploid_parx_genome=None,
-):
+    cnarr: CopyNumArray,
+    segments: Optional[CopyNumArray] = None,
+    threshold: float = 0.2,
+    min_probes: int = 3,
+    skip_low: bool = False,
+    is_haploid_x_reference: bool = False,
+    is_sample_female: None = None,
+    diploid_parx_genome: None = None,
+) -> pd.DataFrame:
     """Identify targeted genes with copy number gain or loss."""
     if is_sample_female is None:
-        is_sample_female = cnarr.guess_xx(is_haploid_x_reference=is_haploid_x_reference, diploid_parx_genome=diploid_parx_genome)
-    cnarr = cnarr.shift_xx(is_haploid_x_reference, is_sample_female, diploid_parx_genome)
+        is_sample_female = cnarr.guess_xx(
+            is_haploid_x_reference=is_haploid_x_reference,
+            diploid_parx_genome=diploid_parx_genome,
+        )
+    cnarr = cnarr.shift_xx(
+        is_haploid_x_reference, is_sample_female, diploid_parx_genome
+    )
     if segments:
-        segments = segments.shift_xx(is_haploid_x_reference, is_sample_female, diploid_parx_genome)
+        segments = segments.shift_xx(
+            is_haploid_x_reference, is_sample_female, diploid_parx_genome
+        )
         rows = gene_metrics_by_segment(cnarr, segments, threshold, skip_low)
     else:
         rows = gene_metrics_by_gene(cnarr, threshold, skip_low)
@@ -124,7 +147,9 @@ def do_genemetrics(
     return table
 
 
-def gene_metrics_by_gene(cnarr, threshold, skip_low=False):
+def gene_metrics_by_gene(
+    cnarr: CopyNumArray, threshold: float, skip_low: bool = False
+) -> Iterator[pd.Series]:
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
     NB: Adjust the sample's sex-chromosome log2 values beforehand with shift_xx,
@@ -135,7 +160,12 @@ def gene_metrics_by_gene(cnarr, threshold, skip_low=False):
             yield row
 
 
-def gene_metrics_by_segment(cnarr, segments, threshold, skip_low=False):
+def gene_metrics_by_segment(
+    cnarr: CopyNumArray,
+    segments: CopyNumArray,
+    threshold: float,
+    skip_low: bool = False,
+) -> Iterator[pd.Series]:
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
     In the output table, show each segment's weight and probes as segment_weight
@@ -165,7 +195,7 @@ def gene_metrics_by_segment(cnarr, segments, threshold, skip_low=False):
 
 
 # ENH consolidate with CNA.squash_genes
-def group_by_genes(cnarr, skip_low):
+def group_by_genes(cnarr: CopyNumArray, skip_low: bool) -> Iterator[pd.Series]:
     """Group probe and coverage data by gene.
 
     Return an iterable of genes, in chromosomal order, associated with their

@@ -1,26 +1,33 @@
-"""Robust metrics to evaluate performance of copy number estimates.
-"""
-import logging
+"""Robust metrics to evaluate performance of copy number estimates."""
 
-import numpy as np
+from __future__ import annotations
+import logging
+from typing import TYPE_CHECKING, Any, Callable, Union
 
 # import pandas as pd
+import numpy as np
 from scipy import stats
 
 from . import descriptives
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from cnvlib.cnary import CopyNumArray
+    from numpy import float64, ndarray
+    from pandas.core.series import Series
+
 
 def do_segmetrics(
-    cnarr,
-    segarr,
-    location_stats=(),
-    spread_stats=(),
-    interval_stats=(),
-    alpha=0.05,
-    bootstraps=100,
-    smoothed=False,
-    skip_low=False,
-):
+    cnarr: CopyNumArray,
+    segarr: CopyNumArray,
+    location_stats: Union[tuple[()], list[str]] = (),
+    spread_stats: Union[tuple[()], list[str]] = (),
+    interval_stats: Union[tuple[()], list[str]] = (),
+    alpha: float = 0.05,
+    bootstraps: int = 100,
+    smoothed: bool = False,
+    skip_low: bool = False,
+) -> CopyNumArray:
     """Compute segment-level metrics from bin-level log2 ratios."""
     # Silence sem's "Degrees of freedom <= 0 for slice"; NaN is OK
     import warnings
@@ -78,14 +85,14 @@ def do_segmetrics(
     return segarr
 
 
-def make_ci_func(alpha, bootstraps, smoothed):
+def make_ci_func(alpha: float, bootstraps: int, smoothed: bool) -> Callable:
     def ci_func(ser, wt):
         return confidence_interval_bootstrap(ser, wt, alpha, bootstraps, smoothed)
 
     return ci_func
 
 
-def make_pi_func(alpha):
+def make_pi_func(alpha: float) -> Callable:
     """Prediction interval, estimated by percentiles."""
     # ENH: weighted percentile
     pct_lo = 100 * alpha / 2
@@ -97,7 +104,9 @@ def make_pi_func(alpha):
     return pi_func
 
 
-def calc_intervals(bins_log2s, weights, func):
+def calc_intervals(
+    bins_log2s: list[Series], weights: Series, func: Callable
+) -> tuple[ndarray, ndarray]:
     """Compute a stat that yields intervals (low & high values)"""
     out_vals_lo = np.repeat(np.nan, len(bins_log2s))
     out_vals_hi = np.repeat(np.nan, len(bins_log2s))
@@ -110,16 +119,19 @@ def calc_intervals(bins_log2s, weights, func):
 
 
 def confidence_interval_bootstrap(
-    values, weights, alpha, bootstraps=100, smoothed=False
-):
+    values: ndarray,
+    weights: ndarray,
+    alpha: float,
+    bootstraps: int = 100,
+    smoothed: bool = False,
+) -> ndarray:
     """Confidence interval for segment mean log2 value, estimated by bootstrap."""
     if not 0 < alpha < 1:
         raise ValueError(f"alpha must be between 0 and 1; got {alpha}")
     if bootstraps <= 2 / alpha:
         new_boots = int(np.ceil(2 / alpha))
         logging.warning(
-            "%d bootstraps not enough to estimate CI alpha level "
-            "%f; increasing to %d",
+            "%d bootstraps not enough to estimate CI alpha level %f; increasing to %d",
             bootstraps,
             alpha,
             new_boots,
@@ -146,7 +158,9 @@ def confidence_interval_bootstrap(
     return ci
 
 
-def _smooth_samples_by_weight(values, samples):
+def _smooth_samples_by_weight(
+    values: ndarray, samples: Iterator[Any]
+) -> list[tuple[ndarray, ndarray]]:
     """Add Gaussian noise to each bootstrap replicate.
 
     The result is used to compute a "smoothed bootstrap," where the added noise
@@ -181,7 +195,9 @@ def _smooth_samples_by_weight(values, samples):
     # but requiring k=1 -> bw=1 for consistency
     bw = k ** (-1 / 4)
     rng = np.random.default_rng()
-    samples = [(v + (bw * np.sqrt(1 - w) * rng.standard_normal(k)), w) for v, w in samples]
+    samples = [
+        (v + (bw * np.sqrt(1 - w) * rng.standard_normal(k)), w) for v, w in samples
+    ]
     return samples
 
 
@@ -226,7 +242,7 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     return alphas
 
 
-def segment_mean(cnarr, skip_low=False):
+def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> Union[float64, float]:
     """Weighted average of bin log2 values."""
     if skip_low:
         cnarr = cnarr.drop_low_coverage()

@@ -1,8 +1,11 @@
 """Segmentation of copy number values."""
+
+from __future__ import annotations
 import locale
 import logging
 import tempfile
 from io import StringIO
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
@@ -13,8 +16,13 @@ from .. import core, parallel, params, smoothing
 from ..cnary import CopyNumArray as CNA
 from ..segfilters import squash_by_groups
 from . import cbs, flasso, haar, none
+
+if TYPE_CHECKING:
+    from cnvlib.vary import VariantArray
+
 try:
     from . import hmm
+
     HMM_METHODS = ("hmm", "hmm-tumor", "hmm-germline")
 except ImportError as e:
     hmm = None
@@ -25,19 +33,19 @@ SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", *HMM_METHODS)
 
 
 def do_segmentation(
-    cnarr,
-    method,
-    diploid_parx_genome=None,
-    threshold=None,
-    variants=None,
-    skip_low=False,
-    skip_outliers=10,
-    min_weight=0,
-    save_dataframe=False,
-    rscript_path="Rscript",
-    processes=1,
-    smooth_cbs=False,
-):
+    cnarr: CNA,
+    method: str,
+    diploid_parx_genome: None = None,
+    threshold: Optional[float] = None,
+    variants: Optional[VariantArray] = None,
+    skip_low: bool = False,
+    skip_outliers: int = 10,
+    min_weight: int = 0,
+    save_dataframe: bool = False,
+    rscript_path: str = "Rscript",
+    processes: int = 1,
+    smooth_cbs: bool = False,
+) -> CNA:
     """Infer copy number segments from the given coverage table."""
     if method not in SEGMENT_METHODS:
         if method in ("hmm", "hmm-tumor", "hmm-germline") and not HMM_METHODS:
@@ -135,24 +143,26 @@ def _to_str(s, enc=locale.getpreferredencoding()):  # noqa: B008
     return s
 
 
-def _ds(args):
+def _ds(
+    args: tuple[CNA, str, None, float, None, bool, int, int, bool, str, bool],
+) -> CNA:
     """Wrapper for parallel map"""
     return _do_segmentation(*args)
 
 
 def _do_segmentation(
-    cnarr,
-    method,
-    diploid_parx_genome,
-    threshold,
-    variants=None,
-    skip_low=False,
-    skip_outliers=10,
-    min_weight=0,
-    save_dataframe=False,
-    rscript_path="Rscript",
-    smooth_cbs=False,
-):
+    cnarr: CNA,
+    method: str,
+    diploid_parx_genome: None,
+    threshold: Optional[float],
+    variants: Optional[VariantArray] = None,
+    skip_low: bool = False,
+    skip_outliers: int = 10,
+    min_weight: int = 0,
+    save_dataframe: bool = False,
+    rscript_path: str = "Rscript",
+    smooth_cbs: bool = False,
+) -> CNA:
     """Infer copy number segments from the given coverage table."""
     if not len(cnarr):
         return cnarr
@@ -195,7 +205,9 @@ def _do_segmentation(
         segarr = none.segment_none(filtered_cn)
 
     elif method.startswith("hmm"):
-        segarr = hmm.segment_hmm(filtered_cn, method, diploid_parx_genome, threshold, variants)
+        segarr = hmm.segment_hmm(
+            filtered_cn, method, diploid_parx_genome, threshold, variants
+        )
 
     elif method in ("cbs", "flasso"):
         # Run R scripts to calculate copy number segments
@@ -255,7 +267,7 @@ def _do_segmentation(
     return segarr
 
 
-def drop_outliers(cnarr, width, factor):
+def drop_outliers(cnarr: CNA, width: int, factor: int) -> CNA:
     """Drop outlier bins with log2 ratios too far from the trend line.
 
     Outliers are the log2 values `factor` times the 90th quantile of absolute
@@ -284,7 +296,9 @@ def drop_outliers(cnarr, width, factor):
     return cnarr[~outlier_mask]
 
 
-def transfer_fields(segments, cnarr, ignore=params.IGNORE_GENE_NAMES):
+def transfer_fields(
+    segments: CNA, cnarr: CNA, ignore: tuple[str, str, str] = params.IGNORE_GENE_NAMES
+) -> CNA:
     """Map gene names, weights, depths from `cnarr` bins to `segarr` segments.
 
     Segment gene name is the comma-separated list of bin gene names. Segment
