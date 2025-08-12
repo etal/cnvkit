@@ -1,4 +1,5 @@
 """CNV utilities."""
+
 import contextlib
 import logging
 import os
@@ -112,7 +113,7 @@ def check_unique(items, title):
     return its.pop()
 
 
-def fbase(fname):
+def fbase(fname: str) -> str:
     """Strip directory and all extensions from a filename."""
     base = os.path.basename(fname)
     # Gzip extension usually follows another extension

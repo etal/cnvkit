@@ -1,4 +1,5 @@
 """Estimate reasonable bin sizes from BAM read counts or depths."""
+
 from __future__ import annotations
 
 import logging

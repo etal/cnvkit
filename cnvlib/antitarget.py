@@ -1,9 +1,10 @@
 """Supporting functions for the 'antitarget' command."""
+
 from __future__ import annotations
 
 import logging
 import re
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from skgenome import GenomicArray as GA
 

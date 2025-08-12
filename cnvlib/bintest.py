@@ -1,4 +1,6 @@
 """Z-test for single-bin copy number alterations."""
+
+from __future__ import annotations
 import logging
 
 import numpy as np
@@ -6,9 +8,19 @@ import pandas as pd
 from scipy.stats import norm
 
 from . import params, segfilters
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from numpy import ndarray
 
 
-def do_bintest(cnarr, segments=None, alpha=0.005, target_only=False):
+def do_bintest(
+    cnarr: CopyNumArray,
+    segments: Optional[CopyNumArray] = None,
+    alpha: float = 0.005,
+    target_only: bool = False,
+) -> CopyNumArray:
     """Get a probability for each bin based on its Z-score.
 
     Adds a column w/ p-values to the input .cnr. With `segments`, the Z-score is
@@ -68,7 +80,7 @@ def do_bintest(cnarr, segments=None, alpha=0.005, target_only=False):
     return hits
 
 
-def z_prob(cnarr):
+def z_prob(cnarr: CopyNumArray) -> ndarray:
     """Calculate z-test p-value at each bin."""
     # Bin weights ~ 1-variance; bin log2 values already centered at 0.0
     sd = np.sqrt(1 - cnarr["weight"])
@@ -86,7 +98,7 @@ def z_prob(cnarr):
     return p_adjust_bh(p)
 
 
-def p_adjust_bh(p):
+def p_adjust_bh(p: ndarray) -> ndarray:
     """Benjamini-Hochberg p-value correction for multiple hypothesis testing."""
     p = np.asarray(p, dtype=float)
     by_descend = p.argsort()[::-1]

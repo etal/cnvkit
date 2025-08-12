@@ -1,5 +1,8 @@
 """CNVkit's core data structure, a copy number array."""
+
+from __future__ import annotations
 import logging
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -8,6 +11,12 @@ from scipy.stats import median_test
 from skgenome import GenomicArray
 from . import core, descriptives, params, smoothing
 from .segmetrics import segment_mean
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from numpy import bool_, float64, ndarray
+    from pandas.core.frame import DataFrame
+    from pandas.core.series import Series
 
 
 class CopyNumArray(GenomicArray):
@@ -24,7 +33,9 @@ class CopyNumArray(GenomicArray):
     # Extra columns, in order:
     # "depth", "gc", "rmask", "spread", "weight", "probes"
 
-    def __init__(self, data_table, meta_dict=None):
+    def __init__(
+        self, data_table: DataFrame, meta_dict: Optional[dict[str, str]] = None
+    ) -> None:
         GenomicArray.__init__(self, data_table, meta_dict)
 
     @property
@@ -36,7 +47,7 @@ class CopyNumArray(GenomicArray):
         self.data["log2"] = value
 
     @property
-    def chr_x_label(self):
+    def chr_x_label(self) -> str:
         """The name of the X chromosome.
 
         This is either "X" or "chrX".
@@ -50,26 +61,28 @@ class CopyNumArray(GenomicArray):
             return chr_x_label
         return ""
 
-    def chr_x_filter(self, diploid_parx_genome=None):
-        """ All regions on X, potentially without PAR1/2. """
+    def chr_x_filter(self, diploid_parx_genome: Optional[str] = None) -> Series:
+        """All regions on X, potentially without PAR1/2."""
         x = self.chromosome == self.chr_x_label
         if diploid_parx_genome is not None:
             # Exclude PAR since they are expected to be diploid (i.e. autosomal).
             x &= ~self.parx_filter(genome_build=diploid_parx_genome)
         return x
 
-    def parx_filter(self, genome_build):
-        """ All PAR1/2 regions on X. """
+    def parx_filter(self, genome_build: str) -> Series:
+        """All PAR1/2 regions on X."""
         genome_build = genome_build.lower()
         assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
         f = self.chromosome == self.chr_x_label
         par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1X"]
         par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2X"]
-        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end))
+        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | (
+            (self.start >= par2_start) & (self.end <= par2_end)
+        )
         return f
 
     @property
-    def chr_y_label(self):
+    def chr_y_label(self) -> str:
         """The name of the Y chromosome."""
         if "chr_y" in self.meta:
             return self.meta["chr_y"]
@@ -79,25 +92,29 @@ class CopyNumArray(GenomicArray):
             return chr_y
         return ""
 
-    def pary_filter(self, genome_build):
-        """ All PAR1/2 regions on Y. """
+    def pary_filter(self, genome_build: str) -> Series:
+        """All PAR1/2 regions on Y."""
         genome_build = genome_build.lower()
         assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
         f = self.chromosome == self.chr_y_label
         par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1Y"]
         par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2Y"]
-        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | ((self.start >= par2_start) & (self.end <= par2_end))
+        f &= ((self.start >= par1_start) & (self.end <= par1_end)) | (
+            (self.start >= par2_start) & (self.end <= par2_end)
+        )
         return f
 
-    def chr_y_filter(self, diploid_parx_genome=None):
-        """ All regions on Y, potentially without PAR1/2. """
+    def chr_y_filter(self, diploid_parx_genome: Optional[str] = None) -> Series:
+        """All regions on Y, potentially without PAR1/2."""
         y = self.chromosome == self.chr_y_label
         if diploid_parx_genome is not None:
             # Exclude PAR on Y since they cannot be covered (everything is mapped to X).
             y &= ~self.pary_filter(genome_build=diploid_parx_genome)
         return y
 
-    def autosomes(self, diploid_parx_genome=None, also=None):
+    def autosomes(
+        self, diploid_parx_genome: Optional[str] = None, also: Optional[Series] = None
+    ) -> CopyNumArray:
         """Overrides GenomeArray.autosomes()."""
         if diploid_parx_genome is not None:
             if also is None:
@@ -115,7 +132,9 @@ class CopyNumArray(GenomicArray):
 
     # Traversal
 
-    def by_gene(self, ignore=params.IGNORE_GENE_NAMES):
+    def by_gene(
+        self, ignore: tuple[str, str, str] = params.IGNORE_GENE_NAMES
+    ) -> Iterator[tuple[str, CopyNumArray]]:
         """Iterate over probes grouped by gene name.
 
         Group each series of intergenic bins as an "Antitarget" gene; any
@@ -142,32 +161,38 @@ class CopyNumArray(GenomicArray):
             for gene, gene_idx in subgary._get_gene_map().items():
                 if gene not in ignore:
                     if not len(gene_idx):
-                        logging.warning(
-                            "Specified gene name somehow missing: %s", gene
-                        )
+                        logging.warning("Specified gene name somehow missing: %s", gene)
                         continue
                     start_idx = gene_idx[0]
                     end_idx = gene_idx[-1] + 1
                     if prev_idx < start_idx:
                         # Include intergenic regions
-                        yield params.ANTITARGET_NAME, subgary.as_dataframe(
-                            subgary.data.loc[prev_idx:start_idx]
+                        yield (
+                            params.ANTITARGET_NAME,
+                            subgary.as_dataframe(subgary.data.loc[prev_idx:start_idx]),
                         )
-                    yield gene, subgary.as_dataframe(
-                        subgary.data.loc[start_idx:end_idx]
+                    yield (
+                        gene,
+                        subgary.as_dataframe(subgary.data.loc[start_idx:end_idx]),
                     )
                     prev_idx = end_idx
             if prev_idx < len(subgary) - 1:
                 # Include the telomere
-                yield params.ANTITARGET_NAME, subgary.as_dataframe(
-                    subgary.data.loc[prev_idx:]
+                yield (
+                    params.ANTITARGET_NAME,
+                    subgary.as_dataframe(subgary.data.loc[prev_idx:]),
                 )
 
     # Manipulation
 
     def center_all(
-        self, estimator=pd.Series.median, by_chrom=True, skip_low=False, verbose=False, diploid_parx_genome=None
-    ):
+        self,
+        estimator: Union[Callable, str] = pd.Series.median,
+        by_chrom: bool = True,
+        skip_low: bool = False,
+        verbose: bool = False,
+        diploid_parx_genome: Optional[str] = None,
+    ) -> None:
         """Re-center log2 values to the autosomes' average (in-place).
 
         Parameters
@@ -221,7 +246,7 @@ class CopyNumArray(GenomicArray):
                 logging.info("Shifting log2 values by %f", shift)
             self.data["log2"] += shift
 
-    def drop_low_coverage(self, verbose=False):
+    def drop_low_coverage(self, verbose: bool = False) -> CopyNumArray:
         """Drop bins with extremely low log2 coverage or copy ratio values.
 
         These are generally bins that had no reads mapped due to sample-specific
@@ -238,10 +263,10 @@ class CopyNumArray(GenomicArray):
 
     def squash_genes(
         self,
-        summary_func=descriptives.biweight_location,
-        squash_antitarget=False,
-        ignore=params.IGNORE_GENE_NAMES,
-    ):
+        summary_func: Callable = descriptives.biweight_location,
+        squash_antitarget: bool = False,
+        ignore: tuple[str, str, str] = params.IGNORE_GENE_NAMES,
+    ) -> CopyNumArray:
         """Combine consecutive bins with the same targeted gene name.
 
         Parameters
@@ -302,7 +327,12 @@ class CopyNumArray(GenomicArray):
 
     # Chromosomal sex
 
-    def shift_xx(self, is_haploid_x_reference=False, is_xx=None, diploid_parx_genome=None):
+    def shift_xx(
+        self,
+        is_haploid_x_reference: bool = False,
+        is_xx: Optional[bool_] = None,
+        diploid_parx_genome: None = None,
+    ) -> CopyNumArray:
         """Adjust chrX log2 ratios to match the ploidy of the reference sex.
 
         I.e. add 1 to chrX log2 ratios for a male sample vs. female reference,
@@ -311,7 +341,10 @@ class CopyNumArray(GenomicArray):
         """
         outprobes = self.copy()
         if is_xx is None:
-            is_xx = self.guess_xx(is_haploid_x_reference=is_haploid_x_reference, diploid_parx_genome=diploid_parx_genome)
+            is_xx = self.guess_xx(
+                is_haploid_x_reference=is_haploid_x_reference,
+                diploid_parx_genome=diploid_parx_genome,
+            )
         if is_xx and is_haploid_x_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
             outprobes[outprobes.chromosome == self.chr_x_label, "log2"] -= 1.0
@@ -322,7 +355,12 @@ class CopyNumArray(GenomicArray):
             # Female: no change
         return outprobes
 
-    def guess_xx(self, is_haploid_x_reference=False, diploid_parx_genome=None, verbose=True):
+    def guess_xx(
+        self,
+        is_haploid_x_reference: bool = False,
+        diploid_parx_genome: Optional[str] = None,
+        verbose: bool = True,
+    ) -> Optional[bool_]:
         """Detect chromosomal sex; return True if a sample is probably female.
 
         Uses `compare_sex_chromosomes` to calculate coverage ratios of the X and
@@ -343,7 +381,9 @@ class CopyNumArray(GenomicArray):
         bool
             True if the coverage ratios indicate the sample is female.
         """
-        is_xy, stats = self.compare_sex_chromosomes(is_haploid_x_reference, diploid_parx_genome)
+        is_xy, stats = self.compare_sex_chromosomes(
+            is_haploid_x_reference, diploid_parx_genome
+        )
         if is_xy is None:
             return None
         if verbose:
@@ -361,7 +401,16 @@ class CopyNumArray(GenomicArray):
             )
         return ~is_xy
 
-    def compare_sex_chromosomes(self, is_haploid_x_reference=False, diploid_parx_genome=None, skip_low=False):
+    def compare_sex_chromosomes(
+        self,
+        is_haploid_x_reference: bool = False,
+        diploid_parx_genome: Optional[str] = None,
+        skip_low: bool = False,
+    ) -> Union[
+        tuple[bool_, dict[str, Union[float64, float]]],
+        tuple[bool_, dict[str, float64]],
+        tuple[None, dict[Any, Any]],
+    ]:
         """Compare coverage ratios of sex chromosomes versus autosomes.
 
         Perform 4 Mood's median tests of the log2 coverages on chromosomes X and
@@ -489,7 +538,11 @@ class CopyNumArray(GenomicArray):
             ),
         )
 
-    def expect_flat_log2(self, is_haploid_x_reference=None, diploid_parx_genome=None):
+    def expect_flat_log2(
+        self,
+        is_haploid_x_reference: Optional[bool] = None,
+        diploid_parx_genome: Optional[str] = None,
+    ) -> ndarray:
         """Get the uninformed expected copy ratios of each bin.
 
         Create an array of log2 coverages like a "flat" reference.
@@ -498,11 +551,16 @@ class CopyNumArray(GenomicArray):
         chromosomes based on whether the reference is male (XX or XY).
         """
         if is_haploid_x_reference is None:
-            is_haploid_x_reference = not self.guess_xx(diploid_parx_genome=diploid_parx_genome, verbose=False)
+            is_haploid_x_reference = not self.guess_xx(
+                diploid_parx_genome=diploid_parx_genome, verbose=False
+            )
         cvg = np.zeros(len(self), dtype=np.float64)
         if is_haploid_x_reference:
             # Single-copy X, Y
-            idx = self.chr_x_filter(diploid_parx_genome).to_numpy() | (self.chr_y_filter(diploid_parx_genome)).to_numpy()
+            idx = (
+                self.chr_x_filter(diploid_parx_genome).to_numpy()
+                | (self.chr_y_filter(diploid_parx_genome)).to_numpy()
+            )
         else:
             # Y will be all noise, so replace with 1 "flat" copy, including PAR1/2.
             idx = (self.chr_y_filter()).to_numpy()
@@ -511,7 +569,9 @@ class CopyNumArray(GenomicArray):
 
     # Reporting
 
-    def residuals(self, segments=None):
+    def residuals(
+        self, segments: Optional[Union[CopyNumArray, GenomicArray]] = None
+    ) -> Series:
         """Difference in log2 value of each bin from its segment mean.
 
         Parameters
@@ -554,7 +614,7 @@ class CopyNumArray(GenomicArray):
             ]
         return pd.concat(resids) if resids else pd.Series([])
 
-    def smooth_log2(self, bandwidth=None, by_arm=True):
+    def smooth_log2(self, bandwidth: None = None, by_arm: bool = True) -> ndarray:
         """Smooth log2 values with a sliding window.
 
         Account for chromosome and (optionally) centromere boundaries. Use bin
@@ -574,7 +634,9 @@ class CopyNumArray(GenomicArray):
         if "weight" in self:
             out = [
                 smoothing.savgol(
-                    subcna["log2"].to_numpy(), bandwidth, weights=subcna["weight"].to_numpy()
+                    subcna["log2"].to_numpy(),
+                    bandwidth,
+                    weights=subcna["weight"].to_numpy(),
                 )
                 for _chrom, subcna in parts
             ]

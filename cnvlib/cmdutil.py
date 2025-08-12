@@ -1,4 +1,6 @@
 """Functions reused within command-line implementations."""
+
+from __future__ import annotations
 import logging
 import sys
 
@@ -6,25 +8,34 @@ from skgenome import tabio
 
 from .cnary import CopyNumArray as CNA
 from skgenome import GenomicArray as GA
+from typing import TYPE_CHECKING, Optional
 
-def read_cna(infile, sample_id=None, meta=None):
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from cnvlib.vary import VariantArray
+    from skgenome.gary import GenomicArray
+
+
+def read_cna(
+    infile: str, sample_id: Optional[str] = None, meta: None = None
+) -> CopyNumArray:
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a CopyNumArray object."""
     return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)
 
 
-def read_ga(infile, sample_id=None, meta=None):
+def read_ga(infile: str, sample_id: None = None, meta: None = None) -> GenomicArray:
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a GenomicArray (!) object."""
     return tabio.read(infile, into=GA, sample_id=sample_id, meta=meta)
 
 
 def load_het_snps(
-    vcf_fname,
-    sample_id=None,
-    normal_id=None,
-    min_variant_depth=20,
-    zygosity_freq=None,
-    tumor_boost=False,
-):
+    vcf_fname: str,
+    sample_id: Optional[str] = None,
+    normal_id: Optional[str] = None,
+    min_variant_depth: int = 20,
+    zygosity_freq: None = None,
+    tumor_boost: bool = False,
+) -> VariantArray:
     if vcf_fname is None:
         return None
     varr = tabio.read(
@@ -63,13 +74,14 @@ def load_het_snps(
 
 
 def verify_sample_sex(cnarr, sex_arg, is_haploid_x_reference, diploid_parx_genome):
-    is_sample_female = cnarr.guess_xx(is_haploid_x_reference, diploid_parx_genome, verbose=False)
+    is_sample_female = cnarr.guess_xx(
+        is_haploid_x_reference, diploid_parx_genome, verbose=False
+    )
     if sex_arg:
         is_sample_female_given = sex_arg.lower() not in ["y", "m", "male"]
         if is_sample_female != is_sample_female_given:
             logging.warning(
-                "Sample sex specified as %s "
-                "but chromosomal X/Y ploidy looks like %s",
+                "Sample sex specified as %s but chromosomal X/Y ploidy looks like %s",
                 "female" if is_sample_female_given else "male",
                 "female" if is_sample_female else "male",
             )

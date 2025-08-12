@@ -11,6 +11,10 @@ from collections.abc import Iterable
 
 import numpy as np
 from skgenome import tabio, GenomicArray as GA
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from skgenome.gary import GenomicArray
 
 
 def do_access(

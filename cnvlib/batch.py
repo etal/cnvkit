@@ -1,4 +1,6 @@
 """The 'batch' command."""
+
+from __future__ import annotations
 import logging
 import os
 
@@ -23,28 +25,29 @@ from . import (
     target,
 )
 from .cmdutil import read_cna
+from typing import TYPE_CHECKING, Optional
 
 
 def batch_make_reference(
-    normal_bams,
-    target_bed,
-    antitarget_bed,
-    is_haploid_x_reference,
-    diploid_parx_genome,
-    fasta,
-    annotate,
-    short_names,
-    target_avg_size,
-    access_bed,
-    antitarget_avg_size,
-    antitarget_min_size,
-    output_reference,
-    output_dir,
-    processes,
-    by_count,
-    method,
-    do_cluster,
-):
+    normal_bams: list[str],
+    target_bed: Optional[str],
+    antitarget_bed: None,
+    is_haploid_x_reference: bool,
+    diploid_parx_genome: None,
+    fasta: str,
+    annotate: Optional[str],
+    short_names: bool,
+    target_avg_size: int,
+    access_bed: None,
+    antitarget_avg_size: Optional[int],
+    antitarget_min_size: Optional[int],
+    output_reference: None,
+    output_dir: str,
+    processes: int,
+    by_count: bool,
+    method: str,
+    do_cluster: bool,
+) -> tuple[str, str, str]:
     """Build the CN reference from normal samples, targets and antitargets."""
     if method in ("wgs", "amplicon"):
         if antitarget_bed:
@@ -158,7 +161,11 @@ def batch_make_reference(
     if len(normal_bams) == 0:
         logging.info("Building a flat reference...")
         ref_arr = reference.do_reference_flat(
-            target_bed, antitarget_bed, fasta, is_haploid_x_reference, diploid_parx_genome
+            target_bed,
+            antitarget_bed,
+            fasta,
+            is_haploid_x_reference,
+            diploid_parx_genome,
         )
     else:
         logging.info("Building a copy number reference from normal samples...")
@@ -215,7 +222,14 @@ def batch_make_reference(
     return output_reference, target_bed, antitarget_bed
 
 
-def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes, fasta):
+def batch_write_coverage(
+    bed_fname: str,
+    bam_fname: str,
+    out_fname: str,
+    by_count: bool,
+    processes: int,
+    fasta: str,
+) -> str:
     """Run coverage on one sample, write to file."""
     cnarr = coverage.do_coverage(bed_fname, bam_fname, by_count, 0, processes, fasta)
     tabio.write(cnarr, out_fname)
@@ -223,24 +237,24 @@ def batch_write_coverage(bed_fname, bam_fname, out_fname, by_count, processes, f
 
 
 def batch_run_sample(
-    bam_fname,
-    target_bed,
-    antitarget_bed,
-    ref_fname,
-    output_dir,
-    is_haploid_x_reference,
-    diploid_parx_genome,
-    plot_scatter,
-    plot_diagram,
-    rscript_path,
-    by_count,
-    skip_low,
-    seq_method,
-    segment_method,
-    processes,
-    do_cluster,
-    fasta=None,
-):
+    bam_fname: str,
+    target_bed: str,
+    antitarget_bed: str,
+    ref_fname: str,
+    output_dir: str,
+    is_haploid_x_reference: bool,
+    diploid_parx_genome: None,
+    plot_scatter: bool,
+    plot_diagram: bool,
+    rscript_path: str,
+    by_count: bool,
+    skip_low: bool,
+    seq_method: str,
+    segment_method: str,
+    processes: int,
+    do_cluster: bool,
+    fasta: None = None,
+) -> None:
     """Run the pipeline on one BAM file."""
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
