@@ -100,6 +100,8 @@ ignore = [
     "UP045", # X|None type annotations
     "PD009", # use .iloc instead of .iat (iat is actually faster for scalar access)
     "PD901", # avoid generic variable name 'df' (acceptable in scientific code)
+    "B007",  # loop variable not used in body
+    "B023",  # def closing over loop variable
     #"SIM108", # ternary if-else
     #"SIM401", # use dict.get
 ]

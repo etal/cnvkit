@@ -161,7 +161,7 @@ class GaryTests(unittest.TestCase):
         by_slices = cnarr.iter_ranges_of(segarr, "gene")
         for (_seg, by_bin), by_slice in zip(by_bins, by_slices):
             self.assertEqual(len(by_bin), len(by_slice))
-            self.assertTrue((by_bin["gene"].values == by_slice.values).all())
+            self.assertTrue((by_bin["gene"].to_numpy() == by_slice.to_numpy()).all())
         # With a VCF
         varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         seg_baf = list(varr.iter_ranges_of(segarr, "alt_freq"))
@@ -221,11 +221,11 @@ class GaryTests(unittest.TestCase):
     def test_shuffle_sort(self):
         """Test shuffling and re-sorting the data array."""
         orig_cvg = tuple(self.ex_cnr["log2"][:10])
-        self.assertEqual(tuple(self.ex_cnr["log2"].values[:10]), orig_cvg)
+        self.assertEqual(tuple(self.ex_cnr["log2"].to_numpy()[:10]), orig_cvg)
         self.ex_cnr.shuffle()
-        self.assertNotEqual(tuple(self.ex_cnr["log2"].values[:10]), orig_cvg)
+        self.assertNotEqual(tuple(self.ex_cnr["log2"].to_numpy()[:10]), orig_cvg)
         self.ex_cnr.sort()
-        self.assertEqual(tuple(self.ex_cnr["log2"].values[:10]), orig_cvg)
+        self.assertEqual(tuple(self.ex_cnr["log2"].to_numpy()[:10]), orig_cvg)
 
 
 class IntervalTests(unittest.TestCase):
@@ -282,7 +282,7 @@ class IntervalTests(unittest.TestCase):
         )
         for col in expect.data.columns:
             self.assertTrue(
-                (expect[col].values == result[col].values).all(),
+                (expect[col].to_numpy() == result[col].to_numpy()).all(),
                 "Col '{}' differs:\nExpect:\n{}\nGot:\n{}".format(
                     col, expect.data, result.data
                 ),

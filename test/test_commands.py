@@ -82,11 +82,11 @@ class CommandTests(unittest.TestCase):
     def test_antitarget(self):
         """The 'antitarget' command."""
         baits = tabio.read_auto("formats/nv2_baits.interval_list")
-        access = tabio.read_auto("../data/access-5k-mappable.hg19.bed")
+        acs = tabio.read_auto("../data/access-5k-mappable.hg19.bed")
         self.assertLess(0, len(commands.do_antitarget(baits)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access, 200000)))
-        self.assertLess(0, len(commands.do_antitarget(baits, access, 10000, 5000)))
+        self.assertLess(0, len(commands.do_antitarget(baits, acs)))
+        self.assertLess(0, len(commands.do_antitarget(baits, acs, 200000)))
+        self.assertLess(0, len(commands.do_antitarget(baits, acs, 10000, 5000)))
 
     def test_autobin(self):
         """The 'autobin' command."""
@@ -571,9 +571,10 @@ class CommandTests(unittest.TestCase):
         ref = cnvlib.read("formats/reference-tr.cnn")
         is_bg = ref["gene"] == "Background"
         tgt_bins = ref[~is_bg]
-        tgt_bins.log2 += np.random.randn(len(tgt_bins)) / 5
+        rng = np.random.default_rng(42)  # Use fixed seed for reproducible tests
+        tgt_bins.log2 += rng.standard_normal(len(tgt_bins)) / 5
         anti_bins = ref[is_bg]
-        anti_bins.log2 += np.random.randn(len(anti_bins)) / 5
+        anti_bins.log2 += rng.standard_normal(len(anti_bins)) / 5
         blank_bins = cnary.CopyNumArray([])
         # Typical usage (hybrid capture)
         cnr = commands.do_fix(tgt_bins, anti_bins, ref)
