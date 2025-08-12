@@ -25,7 +25,7 @@ def do_call(
     purity: Optional[float] = None,
     is_haploid_x_reference: bool = False,
     is_sample_female: bool = False,
-    diploid_parx_genome: None = None,
+    diploid_parx_genome: Optional[str] = None,
     filters: Optional[list[str]] = None,
     thresholds: Union[tuple[float, float, float, float], ndarray] = (
         -1.1,

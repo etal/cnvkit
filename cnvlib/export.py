@@ -194,7 +194,7 @@ def export_bed(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: None,
+    diploid_parx_genome: Optional[str],
     is_sample_female: bool,
     label: str,
     show: str,
@@ -271,7 +271,7 @@ def export_vcf(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: None,
+    diploid_parx_genome: Optional[str],
     is_sample_female: bool,
     sample_id: None = None,
     cnarr: None = None,
@@ -331,7 +331,7 @@ def segments2vcf(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: None,
+    diploid_parx_genome: Optional[str],
     is_sample_female: bool,
 ) -> Iterator[tuple[str, int, str, str, str, str, str, str, str, str]]:
     """Convert copy number segments to VCF records."""

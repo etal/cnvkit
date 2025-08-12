@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ def do_fix(
     target_raw: CopyNumArray,
     antitarget_raw: CopyNumArray,
     reference: CopyNumArray,
-    diploid_parx_genome: None = None,
+    diploid_parx_genome: Optional[str] = None,
     do_gc: bool = True,
     do_edge: bool = True,
     do_rmask: bool = True,
@@ -101,7 +101,7 @@ def load_adjust_coverages(
     fix_gc: bool,
     fix_edge: bool,
     fix_rmask: bool,
-    diploid_parx_genome: None,
+    diploid_parx_genome: Optional[str],
     smoothing_window_fraction: None = None,
 ) -> tuple[CopyNumArray, CopyNumArray]:
     """Load and filter probe coverages; correct using reference and GC."""

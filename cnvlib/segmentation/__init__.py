@@ -35,7 +35,7 @@ SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", *HMM_METHODS)
 def do_segmentation(
     cnarr: CNA,
     method: str,
-    diploid_parx_genome: None = None,
+    diploid_parx_genome: Optional[str] = None,
     threshold: Optional[float] = None,
     variants: Optional[VariantArray] = None,
     skip_low: bool = False,
@@ -153,7 +153,7 @@ def _ds(
 def _do_segmentation(
     cnarr: CNA,
     method: str,
-    diploid_parx_genome: None,
+    diploid_parx_genome: Optional[str],
     threshold: Optional[float],
     variants: Optional[VariantArray] = None,
     skip_low: bool = False,

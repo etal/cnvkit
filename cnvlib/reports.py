@@ -117,7 +117,7 @@ def do_genemetrics(
     skip_low: bool = False,
     is_haploid_x_reference: bool = False,
     is_sample_female: None = None,
-    diploid_parx_genome: None = None,
+    diploid_parx_genome: Optional[str] = None,
 ) -> pd.DataFrame:
     """Identify targeted genes with copy number gain or loss."""
     if is_sample_female is None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import collections
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -49,8 +49,8 @@ except ImportError as e:
 def segment_hmm(
     cnarr: CNA,
     method: str,
-    diploid_parx_genome: None,
-    window: None = None,
+    diploid_parx_genome: Optional[str],
+    window: Optional[Any] = None,
     variants: Optional[VariantArray] = None,
     processes: int = 1,
 ) -> CNA:
@@ -142,7 +142,7 @@ def segment_hmm(
 
 
 def hmm_get_model(
-    cnarr: CNA, method: str, diploid_parx_genome: None, processes: int
+    cnarr: CNA, method: str, diploid_parx_genome: Optional[str], processes: int
 ) -> pomegranate.hmm.dense_hmm.DenseHMM:
     """
 
@@ -243,7 +243,7 @@ def hmm_get_model(
     return model
 
 
-def as_observation_matrix(cnarr: CNA, variants: None = None) -> list[ndarray]:
+def as_observation_matrix(cnarr: CNA, variants: Optional[Any] = None) -> list[ndarray]:
     """Extract HMM fitting values from `cnarr`.
 
     For each chromosome arm, extract log2 ratios as a numpy array.

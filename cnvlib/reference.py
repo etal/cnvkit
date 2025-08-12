@@ -24,7 +24,7 @@ def do_reference_flat(
     antitargets: Optional[str] = None,
     fa_fname: None = None,
     is_haploid_x_reference: bool = False,
-    diploid_parx_genome: None = None,
+    diploid_parx_genome: Optional[str] = None,
 ) -> CNA:
     """Compile a neutral-coverage reference from the given intervals.
 

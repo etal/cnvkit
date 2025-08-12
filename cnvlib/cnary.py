@@ -331,7 +331,7 @@ class CopyNumArray(GenomicArray):
         self,
         is_haploid_x_reference: bool = False,
         is_xx: Optional[bool_] = None,
-        diploid_parx_genome: None = None,
+        diploid_parx_genome: Optional[str] = None,
     ) -> CopyNumArray:
         """Adjust chrX log2 ratios to match the ploidy of the reference sex.
 
