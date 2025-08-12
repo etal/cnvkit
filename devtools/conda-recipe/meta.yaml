@@ -26,7 +26,7 @@ requirements:
     - numpy >=1.24.2
     - pandas >=1.5.3
     - pomegranate >=1.0.0
-    - pyfaidx >=0.7.1
+    - pyfaidx >=0.8.0
     - pysam >=0.20.0
     - reportlab >=3.6.12
     - scikit-learn >=1.5.0

@@ -19,7 +19,7 @@ dependencies:
     - numpy >=1.26.4
     - pandas >=2.1.4
     - pomegranate >=1.0.0
-    - pyfaidx >=0.7.1
+    - pyfaidx >=0.8.0
     - pysam >=0.22.0
     - pytest
     - pytorch >=1.13.0
