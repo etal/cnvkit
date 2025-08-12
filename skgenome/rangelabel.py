@@ -5,6 +5,7 @@ A range specification should look like ``chromosome:start-end``, e.g.
 ``chr1:1234-`` or ``chr1:-5678``, where missing start becomes 0 and missing end
 becomes None.
 """
+
 import collections
 import re
 from typing import Union

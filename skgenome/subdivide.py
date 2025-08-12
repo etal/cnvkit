@@ -6,6 +6,7 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
+
 import logging
 
 import pandas as pd

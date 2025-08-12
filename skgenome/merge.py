@@ -6,6 +6,7 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
+
 from __future__ import annotations
 
 import itertools
@@ -35,8 +36,9 @@ def flatten(
     table = table.sort_values(["chromosome", "start", "end"])
     cmb = get_combiners(table, False, combine)
     out = (
-        table.groupby(by="chromosome", as_index=False, group_keys=False, sort=False)
-        [table.columns]
+        table.groupby(by="chromosome", as_index=False, group_keys=False, sort=False)[
+            table.columns
+        ]
         .apply(_flatten_overlapping, cmb, split_columns)
         .reset_index(drop=True)
     )
@@ -163,8 +165,9 @@ def merge(
     table = table.sort_values([*groupkey, "start", "end"])
     cmb = get_combiners(table, stranded, combine)
     out = (
-        table.groupby(by=groupkey, as_index=False, group_keys=False, sort=False)
-        [table.columns]
+        table.groupby(by=groupkey, as_index=False, group_keys=False, sort=False)[
+            table.columns
+        ]
         .apply(_merge_overlapping, bp, cmb)
         .reset_index(drop=True)
     )

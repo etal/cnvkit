@@ -1,4 +1,5 @@
 """Operations on chromosome/contig/sequence names."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -54,7 +55,7 @@ def sorter_chrom(label: str) -> tuple[int, str]:
     else:
         # Separate numeric and special chromosomes
         nums = "".join(takewhile(str.isdigit, chrom))
-        chars = chrom[len(nums):]
+        chars = chrom[len(nums) :]
         nums = int(nums) if nums else 0
         if not chars:
             key = (nums, "")

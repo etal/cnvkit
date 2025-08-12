@@ -6,18 +6,26 @@ The functions here operate on pandas DataFrame and Series instances, not
 GenomicArray types.
 
 """
-from typing import Any, Callable, Optional, Union
-from collections.abc import Sequence
+
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 import numpy as np
 import pandas as pd
 
 from .combiners import first_of, join_strings, make_const
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
+    from numpy import ndarray
+    from pandas.core.indexes.base import Index
+
 Numeric = Union[int, float, np.number]
 
 
-def by_ranges(table, other, mode: str, keep_empty: bool):
+def by_ranges(
+    table: pd.DataFrame, other: pd.DataFrame, mode: str, keep_empty: bool
+) -> None:
     """Group rows by another GenomicArray's bin coordinate ranges."""
     for _chrom, bin_rows, src_rows in by_shared_chroms(other, table, keep_empty):
         if src_rows is not None:
@@ -31,7 +39,11 @@ def by_ranges(table, other, mode: str, keep_empty: bool):
                 yield bin_row, []  # ENH: empty dframe matching table
 
 
-def by_shared_chroms(table, other, keep_empty: bool = True):
+def by_shared_chroms(
+    table: pd.DataFrame, other: pd.DataFrame, keep_empty: bool = True
+) -> Iterator[
+    Union[tuple[str, pd.DataFrame, None], tuple[str, pd.DataFrame, pd.DataFrame]]
+]:
     """Group rows for both `table` and `other` by matching chromosome names."""
     # When both `table` and `other` contain only one chromosome each, and it's
     # the same chromosome, we can just return the original tables.
@@ -50,8 +62,12 @@ def by_shared_chroms(table, other, keep_empty: bool = True):
 
 
 def into_ranges(
-    source, dest, src_col: str, default: Any, summary_func: Optional[Callable]
-):
+    source: pd.DataFrame,
+    dest: pd.DataFrame,
+    src_col: str,
+    default: Any,
+    summary_func: Optional[Callable],
+) -> Union[pd.DataFrame, pd.Series]:
     """Group a column in `source` by regions in `dest` and summarize."""
     if not len(source) or not len(dest):
         return dest
@@ -84,12 +100,12 @@ def into_ranges(
 
 
 def iter_ranges(
-    table,
+    table: pd.DataFrame,
     chrom: Optional[str],
     starts: Optional[Sequence[Numeric]],
     ends: Optional[Sequence[Numeric]],
     mode: str,
-):
+) -> Iterator[pd.DataFrame]:
     """Iterate through sub-ranges."""
     assert mode in ("inner", "outer", "trim")
     # Optional if we've already subsetted by chromosome (not checked!)
@@ -114,7 +130,9 @@ def iter_ranges(
         yield subtable
 
 
-def iter_slices(table, other, mode: str, keep_empty: bool):
+def iter_slices(
+    table: pd.DataFrame, other: pd.DataFrame, mode: str, keep_empty: bool
+) -> Iterator[Union[ndarray, Index]]:
     """Yields indices to extract ranges from `table`.
 
     Returns an iterable of integer arrays that can apply to Series objects,
@@ -134,7 +152,12 @@ def iter_slices(table, other, mode: str, keep_empty: bool):
                     yield indices
 
 
-def idx_ranges(table, starts, ends, mode: str):
+def idx_ranges(
+    table: pd.DataFrame,
+    starts: Union[list[int], pd.Series],
+    ends: Union[list[int], pd.Series],
+    mode: str,
+) -> None:
     """Iterate through sub-ranges."""
     assert mode in ("inner", "outer")
     # Edge cases: when the `table` is either empty, or both `starts` and `ends`
@@ -157,7 +180,9 @@ def idx_ranges(table, starts, ends, mode: str):
         yield from irange_func(table, starts, ends, mode)
 
 
-def _irange_simple(table, starts, ends, mode: str):
+def _irange_simple(
+    table: pd.DataFrame, starts: pd.Series, ends: pd.Series, mode: str
+) -> Iterator[tuple[slice, int, int]]:
     """Slice subsets of table when regions are not nested."""
     if starts is not None and len(starts):
         if mode == "inner":
@@ -185,7 +210,9 @@ def _irange_simple(table, starts, ends, mode: str):
         yield (slice(start_idx, end_idx), start_val, end_val)
 
 
-def _irange_nested(table, starts: Sequence, ends: Sequence, mode: str):
+def _irange_nested(
+    table: pd.DataFrame, starts: Sequence, ends: Sequence, mode: str
+) -> Iterator[tuple[ndarray, int, int]]:
     """Slice subsets of table when regions are nested."""
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
     assert len(starts) == len(ends) > 0
