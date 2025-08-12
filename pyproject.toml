@@ -82,12 +82,12 @@ select = [
     "F",  # pyflakes
     "UP", # pyupgrade
     "B",  # flake8-bugbear
-    #"SIM", # flake8-simplify
-    #"ANN", # flake8-annotations
-    "TC", # flake8-type-checking
     "NPY", # numpy rules
     "PD", # pandas-vet
     "RUF", # ruff's extra rules
+    "TC", # flake8-type-checking
+    #"SIM", # flake8-simplify
+    #"ANN", # flake8-annotations
 ]
 ignore = [
     "E402",  # import not at top
@@ -98,10 +98,11 @@ ignore = [
     "UP031", # % format
     "UP032", # format call vs. f-string
     "UP045", # X|None type annotations
-    "PD009", # use .iloc instead of .iat (iat is actually faster for scalar access)
-    "PD901", # avoid generic variable name 'df' (acceptable in scientific code)
     "B007",  # loop variable not used in body
     "B023",  # def closing over loop variable
+    "PD009", # use .iloc instead of .iat (iat is actually faster for scalar access)
+    "PD901", # avoid generic variable name 'df' (acceptable in scientific code)
+    "RUF100", # unneeded noqa
     #"SIM108", # ternary if-else
     #"SIM401", # use dict.get
 ]
