@@ -1,8 +1,11 @@
 """Utilities."""
+
+from __future__ import annotations
 import functools
+from typing import TYPE_CHECKING, Callable
 
 
-def report_bad_line(line_parser):
+def report_bad_line(line_parser: Callable) -> Callable:
     @functools.wraps(line_parser)
     def wrapper(line):
         try:

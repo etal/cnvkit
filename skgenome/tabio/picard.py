@@ -4,13 +4,19 @@
 - CalculateHsMetrics PER_TARGET_COVERAGE output
 
 """
+
+from __future__ import annotations
 from collections import OrderedDict as OD
 
 import numpy as np
 import pandas as pd
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pandas.core.frame import DataFrame
 
 
-def read_interval(infile):
+def read_interval(infile: str) -> DataFrame:
     """GATK/Picard-compatible interval list format.
 
     Expected tabular columns:

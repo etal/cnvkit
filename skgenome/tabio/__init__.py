@@ -1,21 +1,47 @@
-"""I/O for tabular formats of genomic data (regions or features).
-"""
+"""I/O for tabular formats of genomic data (regions or features)."""
+
+from __future__ import annotations
 import collections
 import contextlib
 import logging
 import os
 import re
 import sys
+from typing import TYPE_CHECKING, Optional, Union
 
 import pandas as pd
 from Bio.File import as_handle
 
 from ..gary import GenomicArray as GA
-from . import (bedio, genepred, gff, picard, seg, seqdict, tab, textcoord,
-               vcfio, vcfsimple)
+from . import (
+    bedio,
+    genepred,
+    gff,
+    picard,
+    seg,
+    seqdict,
+    tab,
+    textcoord,
+    vcfio,
+    vcfsimple,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from cnvlib.cnary import CopyNumArray
+    from cnvlib.vary import VariantArray
+    from io import TextIOWrapper
+    from tempfile import _TemporaryFileWrapper
 
 
-def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
+def read(
+    infile: str,
+    fmt: str = "tab",
+    into: Optional[Union[type[GA], type[CopyNumArray]]] = None,
+    sample_id: Optional[str] = None,
+    meta: None = None,
+    **kwargs,
+) -> Union[CopyNumArray, VariantArray, GA]:
     """Read tabular data from a file or stream into a genome object.
 
     Supported formats: see `READERS`
@@ -47,7 +73,8 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         the default base class for the given file format (usually GenomicArray).
     """
     from cnvlib.core import fbase
-    if fmt == 'auto':
+
+    if fmt == "auto":
         return read_auto(infile)
 
     if fmt in READERS:
@@ -79,6 +106,7 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
         dframe = []
     if fmt == "vcf":
         from cnvlib.vary import VariantArray as VA
+
         suggest_into = VA
     result = (into or suggest_into)(dframe, meta)
     result.sort_columns()
@@ -93,12 +121,13 @@ def read(infile, fmt="tab", into=None, sample_id=None, meta=None, **kwargs):
     # dframe.set_index(['chromosome', 'start'], inplace=True)
 
 
-def read_auto(infile):
+def read_auto(infile: str) -> GA:
     """Auto-detect a file's format and use an appropriate parser to read it."""
     if not isinstance(infile, str) and not hasattr(infile, "seek"):
         raise ValueError(
-                "Can only auto-detect format from filename or " +
-                f"seekable (local, on-disk) files, which {infile} is not")
+            "Can only auto-detect format from filename or "
+            + f"seekable (local, on-disk) files, which {infile} is not"
+        )
 
     fmt = sniff_region_format(infile)
     if hasattr(infile, "seek"):
@@ -108,7 +137,7 @@ def read_auto(infile):
     else:
         # File is blank -- simple BED will handle this OK
         fmt = "bed3"
-    return read(infile, fmt or 'tab')
+    return read(infile, fmt or "tab")
 
 
 READERS = {
@@ -137,15 +166,23 @@ READERS = {
 
 # _____________________________________________________________________
 
-def write(garr, outfile=None, fmt="tab", verbose=True, **kwargs):
+
+def write(
+    garr: Union[CopyNumArray, GA],
+    outfile: Optional[Union[_TemporaryFileWrapper, str]] = None,
+    fmt: str = "tab",
+    verbose: bool = True,
+    **kwargs,
+) -> None:
     """Write a genome object to a file or stream."""
     formatter, show_header = WRITERS[fmt]
     if fmt in ("seg", "vcf"):
         kwargs["sample_id"] = garr.sample_id
     dframe = formatter(garr.data, **kwargs)
     with safe_write(outfile or sys.stdout, verbose=False) as handle:
-        dframe.to_csv(handle, header=show_header, index=False, sep='\t',
-                      float_format='%.6g')
+        dframe.to_csv(
+            handle, header=show_header, index=False, sep="\t", float_format="%.6g"
+        )
     if verbose:
         # Log the output path, if possible
         outfname = get_filename(outfile)
@@ -170,8 +207,11 @@ WRITERS = {
 
 # _____________________________________________________________________
 
+
 @contextlib.contextmanager
-def safe_write(outfile, verbose=True):
+def safe_write(
+    outfile: Union[_TemporaryFileWrapper, str], verbose: bool = True
+) -> Iterator[Union[TextIOWrapper, _TemporaryFileWrapper]]:
     """Write to a filename or file-like object with error handling.
 
     If given a file name, open it. If the path includes directories that don't
@@ -182,7 +222,7 @@ def safe_write(outfile, verbose=True):
         if dirname and not os.path.isdir(dirname):
             os.mkdir(dirname)
             logging.info("Created directory %s", dirname)
-        with open(outfile, 'w') as handle:
+        with open(outfile, "w") as handle:
             yield handle
     else:
         yield outfile
@@ -194,15 +234,15 @@ def safe_write(outfile, verbose=True):
             logging.info("Wrote %s", outfname)
 
 
-def get_filename(infile):
+def get_filename(infile: Union[_TemporaryFileWrapper, str]) -> str:
     if isinstance(infile, str):
         return infile
-    if hasattr(infile, 'name') and infile not in (sys.stdout, sys.stderr):
+    if hasattr(infile, "name") and infile not in (sys.stdout, sys.stderr):
         # File(-like) handle
         return infile.name
 
 
-def sniff_region_format(infile):
+def sniff_region_format(infile: str) -> Optional[str]:
     """Guess the format of the given file by reading the first line.
 
     Returns
@@ -215,62 +255,99 @@ def sniff_region_format(infile):
     fname = get_filename(infile)
     if fname:
         _base, ext = os.path.splitext(fname)
-        ext = ext.lstrip('.')
+        ext = ext.lstrip(".")
         # if ext in known_extensions:
         if ext in format_patterns:
             fname_fmt = ext
 
     # Fallback: regex detection
     # has_track = False
-    with as_handle(infile, 'r') as handle:
+    with as_handle(infile, "r") as handle:
         for line in handle:
             if not line.strip():
                 # Skip blank lines
                 continue
-            if line.startswith('track') or line.startswith("browser "):
+            if line.startswith("track") or line.startswith("browser "):
                 # NB: Could be UCSC BED or Ensembl GFF
                 # has_track = True
                 continue
             if fname_fmt and format_patterns[fname_fmt].match(line):
                 return fname_fmt
             # Formats that (may) declare themselves in an initial '#' comment
-            if line.startswith('##gff-version') or format_patterns['gff'].match(line):
-                return 'gff'
-            if line.startswith(('##fileformat=VCF', '#CHROM\tPOS\tID')):
-                return 'vcf'
-            if line.startswith('#'):
+            if line.startswith("##gff-version") or format_patterns["gff"].match(line):
+                return "gff"
+            if line.startswith(("##fileformat=VCF", "#CHROM\tPOS\tID")):
+                return "vcf"
+            if line.startswith("#"):
                 continue
             # Formats that need to be guessed solely by regex
-            if format_patterns['text'].match(line):
-                return 'text'
-            if format_patterns['tab'].match(line):
-                return 'tab'
-            if line.startswith('@') or format_patterns['interval'].match(line):
-                return 'interval'
-            if format_patterns['refflat'].match(line):
-                return 'refflat'
-            if format_patterns['bed'].match(line):
-                return 'bed'
+            if format_patterns["text"].match(line):
+                return "text"
+            if format_patterns["tab"].match(line):
+                return "tab"
+            if line.startswith("@") or format_patterns["interval"].match(line):
+                return "interval"
+            if format_patterns["refflat"].match(line):
+                return "refflat"
+            if format_patterns["bed"].match(line):
+                return "bed"
 
-            raise ValueError("File %r does not appear to be a recognized "
-                             "format! (Any of: %s)\n"
-                             "First non-blank line:\n%s"
-                             % (fname, ', '.join(format_patterns.keys()), line))
+            raise ValueError(
+                "File %r does not appear to be a recognized "
+                "format! (Any of: %s)\n"
+                "First non-blank line:\n%s"
+                % (fname, ", ".join(format_patterns.keys()), line)
+            )
 
 
-format_patterns = collections.OrderedDict([
-    #  ('genepred', re.compile()),
-    #  ('genepredext', re.compile()),
-    ('text', re.compile(r'\w+:\d*-\d*.*')),
-    ('tab', re.compile('\t'.join(('chromosome', 'start', 'end')))),
-    ('interval', re.compile('\t'.join((
-        r'\w+', r'\d+', r'\d+', r'[.+-]', r'\S+$')))),
-    ('refflat', re.compile('\t'.join((
-        r'\S+', r'\S+', r'\w+', r'[+-]',
-        r'\d+', r'\d+', r'\d+', r'\d+', r'\d+',
-        r'(\d+,)+', r'(\d+,)+$')))),
-    ('gff', re.compile('\t'.join((
-        r'\w+', r'\S+', r'\w+', r'\d+', r'\d+',
-        r'\S+', r'[.?+-]', r'[012.]', r'.*')))),
-    ('bed', re.compile('\t'.join((r'\S+', r'\d+', r'\d+')))),
-])
+format_patterns = collections.OrderedDict(
+    [
+        #  ('genepred', re.compile()),
+        #  ('genepredext', re.compile()),
+        ("text", re.compile(r"\w+:\d*-\d*.*")),
+        ("tab", re.compile("\t".join(("chromosome", "start", "end")))),
+        (
+            "interval",
+            re.compile("\t".join((r"\w+", r"\d+", r"\d+", r"[.+-]", r"\S+$"))),
+        ),
+        (
+            "refflat",
+            re.compile(
+                "\t".join(
+                    (
+                        r"\S+",
+                        r"\S+",
+                        r"\w+",
+                        r"[+-]",
+                        r"\d+",
+                        r"\d+",
+                        r"\d+",
+                        r"\d+",
+                        r"\d+",
+                        r"(\d+,)+",
+                        r"(\d+,)+$",
+                    )
+                )
+            ),
+        ),
+        (
+            "gff",
+            re.compile(
+                "\t".join(
+                    (
+                        r"\w+",
+                        r"\S+",
+                        r"\w+",
+                        r"\d+",
+                        r"\d+",
+                        r"\S+",
+                        r"[.?+-]",
+                        r"[012.]",
+                        r".*",
+                    )
+                )
+            ),
+        ),
+        ("bed", re.compile("\t".join((r"\S+", r"\d+", r"\d+")))),
+    ]
+)

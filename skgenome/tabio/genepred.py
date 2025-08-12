@@ -15,7 +15,13 @@ See:
 - https://genome.ucsc.edu/FAQ/FAQformat.html#format9
 - ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/
 """
+
+from __future__ import annotations
 import pandas as pd
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pandas.core.frame import DataFrame
 
 
 def read_genepred(infile, exons=False):
@@ -82,7 +88,7 @@ def read_refgene(infile, exons=False):
     raise NotImplementedError
 
 
-def read_refflat(infile, cds=False, exons=False):
+def read_refflat(infile: str, cds: bool = False, exons: bool = False) -> DataFrame:
     """Gene predictions and RefSeq genes with gene names (e.g. refFlat.txt).
 
     This version of genePred associates the gene name with the gene prediction

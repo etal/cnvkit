@@ -4,6 +4,7 @@ Read only coordinate info & store the remaining columns as unparsed strings.
 Just enough functionality to extract a subset of samples and/or perform
 bedtools-like operations on VCF records.
 """
+
 import logging
 
 import numpy as np
@@ -40,7 +41,7 @@ def read_vcf_simple(infile):
             "filter",
             "info",
             "format",
-            *sample_ids
+            *sample_ids,
         ]
         dtypes = {c: str for c in colnames}
         dtypes["start"] = int

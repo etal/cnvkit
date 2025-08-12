@@ -1,4 +1,6 @@
 """Variant Call Format (VCF) for SNV loci."""
+
+from __future__ import annotations
 import collections
 import logging
 
@@ -7,16 +9,26 @@ from itertools import chain
 import numpy as np
 import pandas as pd
 import pysam
+from typing import TYPE_CHECKING, Any, Optional, Union
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pysam.libcbcf import (
+        VariantFile,
+        VariantRecord,
+        VariantRecordInfo,
+        VariantRecordSample,
+    )
 
 
 def read_vcf(
-    infile,
-    sample_id=None,
-    normal_id=None,
-    min_depth=None,
-    skip_reject=False,
-    skip_somatic=False,
-):
+    infile: str,
+    sample_id: Optional[str] = None,
+    normal_id: Optional[str] = None,
+    min_depth: Optional[int] = None,
+    skip_reject: bool = False,
+    skip_somatic: bool = False,
+) -> pd.DataFrame:
     """Read one tumor-normal pair or unmatched sample from a VCF file.
 
     By default, return the first tumor-normal pair or unmatched sample in the
@@ -88,7 +100,9 @@ def read_vcf(
     return table
 
 
-def _choose_samples(vcf_reader, sample_id, normal_id):
+def _choose_samples(
+    vcf_reader: VariantFile, sample_id: Optional[str], normal_id: Optional[str]
+) -> tuple[str, str]:
     """Emit the sample IDs of all samples or tumor-normal pairs in the VCF.
 
     Determine tumor-normal pairs from the PEDIGREE tag(s). If no PEDIGREE tag
@@ -148,7 +162,7 @@ def _choose_samples(vcf_reader, sample_id, normal_id):
     return sid, nid
 
 
-def _parse_pedigrees(vcf_reader):
+def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
     """Extract tumor/normal pair sample IDs from the VCF header.
 
     Return an iterable of (tumor sample ID, normal sample ID).
@@ -203,13 +217,15 @@ def _parse_pedigrees(vcf_reader):
                 yield sample_ids
 
 
-def _confirm_unique(sample_id, samples):
+def _confirm_unique(sample_id: str, samples: list[str]) -> None:
     occurrences = [s for s in samples if s == sample_id]
     if len(occurrences) != 1:
         raise IndexError(f"Did not find a single sample ID '{sample_id}' in: {samples}")
 
 
-def _parse_records(records, sample_id, normal_id, skip_reject):
+def _parse_records(
+    records: VariantFile, sample_id: str, normal_id: str, skip_reject: bool
+) -> Iterator[Any]:
     """Parse VCF records into DataFrame rows.
 
     Apply filters to skip records with low depth, homozygosity, the REJECT
@@ -289,7 +305,14 @@ def _parse_records(records, sample_id, normal_id, skip_reject):
         logging.info("Filtered out %d records", cnt_reject)
 
 
-def _extract_genotype(sample, record):
+def _extract_genotype(
+    sample: VariantRecordSample, record: VariantRecord
+) -> Union[
+    tuple[None, float, int],
+    tuple[int, float, int],
+    tuple[None, float, float],
+    tuple[int, float, float],
+]:
     if "DP" in sample:
         depth = sample["DP"]
     elif "AD" in sample and isinstance(sample["AD"], tuple):
@@ -310,7 +333,7 @@ def _extract_genotype(sample, record):
     return depth, zygosity, alt_count
 
 
-def _get_alt_count(sample):
+def _get_alt_count(sample: VariantRecordSample) -> Union[int, float]:
     """Get the alternative allele count from a sample in a VCF record."""
     if sample.get("AD") not in (None, (None,)):
         # GATK and other callers: (ref depth, alt depth)
@@ -337,11 +360,11 @@ def _get_alt_count(sample):
     return alt_count
 
 
-def _safesum(tup):
+def _safesum(tup: Union[tuple[None], tuple[int, int], tuple[int]]) -> int:
     return sum(filter(None, tup))
 
 
-def _get_end(posn, alt, info):
+def _get_end(posn: int, alt: str, info: VariantRecordInfo) -> int:
     """Get record end position."""
     if "END" in info:
         # Structural variant

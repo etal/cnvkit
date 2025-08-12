@@ -1,5 +1,5 @@
-"""I/O for plain text formatting of genomic coordinates: `chrom:start-end`
-"""
+"""I/O for plain text formatting of genomic coordinates: `chrom:start-end`"""
+
 import pandas as pd
 from Bio.File import as_handle
 
