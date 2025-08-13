@@ -1,18 +1,31 @@
 """Supporting functions for the 'reference' command."""
+
+from __future__ import annotations
 import collections
 import logging
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
 import pyfaidx
-from skgenome import tabio, GenomicArray as GA
 
+from skgenome import tabio, GenomicArray as GA
 from . import core, fix, descriptives, params
 from .cmdutil import read_cna
 from .cnary import CopyNumArray as CNA
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from numpy import bool_, ndarray
 
-def do_reference_flat(targets, antitargets=None, fa_fname=None, is_haploid_x_reference=False, diploid_parx_genome=None):
+
+def do_reference_flat(
+    targets: str,
+    antitargets: Optional[str] = None,
+    fa_fname: None = None,
+    is_haploid_x_reference: bool = False,
+    diploid_parx_genome: Optional[str] = None,
+) -> CNA:
     """Compile a neutral-coverage reference from the given intervals.
 
     Combines the intervals, shifts chrX values if requested, and calculates GC
@@ -22,7 +35,9 @@ def do_reference_flat(targets, antitargets=None, fa_fname=None, is_haploid_x_ref
     if antitargets:
         ref_probes.add(bed2probes(antitargets))
     # Set sex chromosomes by "reference" sex
-    ref_probes["log2"] = ref_probes.expect_flat_log2(is_haploid_x_reference, diploid_parx_genome)
+    ref_probes["log2"] = ref_probes.expect_flat_log2(
+        is_haploid_x_reference, diploid_parx_genome
+    )
     ref_probes["depth"] = np.exp2(ref_probes["log2"])  # Shim
     # Calculate GC and RepeatMasker content for each probe's genomic region
     if fa_fname:
@@ -30,14 +45,12 @@ def do_reference_flat(targets, antitargets=None, fa_fname=None, is_haploid_x_ref
         ref_probes["gc"] = gc
         ref_probes["rmask"] = rmask
     else:
-        logging.info(
-            "No FASTA reference genome provided; skipping GC, RM calculations"
-        )
+        logging.info("No FASTA reference genome provided; skipping GC, RM calculations")
     ref_probes.sort_columns()
     return ref_probes
 
 
-def bed2probes(bed_fname):
+def bed2probes(bed_fname: str) -> CNA:
     """Create a neutral-coverage CopyNumArray from a file of regions."""
     regions = tabio.read_auto(bed_fname)
     table = regions.data.loc[:, ("chromosome", "start", "end")]
@@ -48,18 +61,18 @@ def bed2probes(bed_fname):
 
 
 def do_reference(
-    target_fnames,
-    antitarget_fnames=None,
-    fa_fname=None,
-    is_haploid_x_reference=False,
-    diploid_parx_genome=None,
-    female_samples=None,
-    do_gc=True,
-    do_edge=True,
-    do_rmask=True,
-    do_cluster=False,
-    min_cluster_size=4,
-):
+    target_fnames: list[str],
+    antitarget_fnames: Optional[list[str]] = None,
+    fa_fname: Optional[str] = None,
+    is_haploid_x_reference: bool = False,
+    diploid_parx_genome: Optional[str] = None,
+    female_samples: Optional[bool] = None,
+    do_gc: bool = True,
+    do_edge: bool = True,
+    do_rmask: bool = True,
+    do_cluster: bool = False,
+    min_cluster_size: int = 4,
+) -> CNA:
     """Compile a coverage reference from the given files (normal samples)."""
     if antitarget_fnames:
         core.assert_equal(
@@ -68,9 +81,7 @@ def do_reference(
             antitargets=len(antitarget_fnames),
         )
     if not fa_fname:
-        logging.info(
-            "No FASTA reference genome provided; skipping GC, RM calculations"
-        )
+        logging.info("No FASTA reference genome provided; skipping GC, RM calculations")
 
     if female_samples is None:
         # NB: Antitargets are usually preferred for inferring sex, but might be
@@ -97,7 +108,9 @@ def do_reference(
                     sexes[sid] = a_is_xx
     else:
         # In this case the gender of the samples is provided and won't be inferred
-        logging.info(f'Provided sample sex is {"female" if female_samples else "male"}. ')
+        logging.info(
+            f"Provided sample sex is {'female' if female_samples else 'male'}. "
+        )
         sexes = dict()
         for fname in target_fnames:
             sexes[read_cna(fname).sample_id] = female_samples
@@ -120,7 +133,9 @@ def do_reference(
     return ref_probes
 
 
-def infer_sexes(cnn_fnames, is_haploid_x, diploid_parx_genome):
+def infer_sexes(
+    cnn_fnames: list[str], is_haploid_x: bool, diploid_parx_genome: Optional[str]
+) -> dict[str, bool_]:
     """Map sample IDs to inferred chromosomal sex, where possible.
 
     For samples where the source file is empty or does not include either sex
@@ -137,18 +152,18 @@ def infer_sexes(cnn_fnames, is_haploid_x, diploid_parx_genome):
 
 
 def combine_probes(
-    filenames,
-    antitarget_fnames,
-    fa_fname,
-    is_haploid_x,
-    diploid_parx_genome,
-    sexes,
-    fix_gc,
-    fix_edge,
-    fix_rmask,
-    do_cluster,
-    min_cluster_size,
-):
+    filenames: list[str],
+    antitarget_fnames: Optional[list[str]],
+    fa_fname: Optional[str],
+    is_haploid_x: bool,
+    diploid_parx_genome: Optional[str],
+    sexes: dict[str, Union[bool_, bool]],
+    fix_gc: bool,
+    fix_edge: bool,
+    fix_rmask: bool,
+    do_cluster: bool,
+    min_cluster_size: int,
+) -> CNA:
     """Calculate the median coverage of each bin across multiple samples.
 
     Parameters
@@ -177,7 +192,15 @@ def combine_probes(
     # do_edge  = as given for target; False for antitarget
     # do_rmask  = False for target; as given for antitarget
     ref_df, all_logr, all_depths = load_sample_block(
-        filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, True, fix_gc, fix_edge, False
+        filenames,
+        fa_fname,
+        is_haploid_x,
+        diploid_parx_genome,
+        sexes,
+        True,
+        fix_gc,
+        fix_edge,
+        False,
     )
     if antitarget_fnames:
         # XXX TODO ensure ordering matches targets!
@@ -235,8 +258,16 @@ def combine_probes(
 
 
 def load_sample_block(
-    filenames, fa_fname, is_haploid_x, diploid_parx_genome, sexes, skip_low, fix_gc, fix_edge, fix_rmask
-):
+    filenames: list[str],
+    fa_fname: Optional[str],
+    is_haploid_x: bool,
+    diploid_parx_genome: Optional[str],
+    sexes: dict[str, Union[bool_, bool]],
+    skip_low: bool,
+    fix_gc: bool,
+    fix_edge: bool,
+    fix_rmask: bool,
+) -> tuple[pd.DataFrame, ndarray, ndarray]:
     r"""Load and summarize a pool of \*coverage.cnn files.
 
     Run separately for the on-target and (optional) antitarget bins.
@@ -312,7 +343,7 @@ def load_sample_block(
             fix_edge,
             fix_rmask,
             skip_low,
-            diploid_parx_genome
+            diploid_parx_genome,
         ),
     ]
 
@@ -325,9 +356,7 @@ def load_sample_block(
             cnarr1.data.loc[:, ("chromosome", "start", "end", "gene")].values,
             cnarrx.data.loc[:, ("chromosome", "start", "end", "gene")].values,
         ):
-            raise RuntimeError(
-                f"{fname} bins do not match those in {filenames[0]}"
-            )
+            raise RuntimeError(f"{fname} bins do not match those in {filenames[0]}")
         all_depths.append(
             cnarrx["depth"] if "depth" in cnarrx else np.exp2(cnarrx["log2"])
         )
@@ -344,7 +373,7 @@ def load_sample_block(
                 fix_edge,
                 fix_rmask,
                 skip_low,
-                diploid_parx_genome
+                diploid_parx_genome,
             )
         )
     all_logr = np.vstack(all_logr)
@@ -354,19 +383,19 @@ def load_sample_block(
 
 
 def bias_correct_logr(
-    cnarr,
-    ref_columns,
-    ref_edge_bias,
-    ref_flat_logr,
-    sexes,
-    is_chr_x,
-    is_chr_y,
-    fix_gc,
-    fix_edge,
-    fix_rmask,
-    skip_low,
-    diploid_parx_genome,
-):
+    cnarr: CNA,
+    ref_columns: dict[str, Union[pd.Series, ndarray]],
+    ref_edge_bias: pd.Series,
+    ref_flat_logr: ndarray,
+    sexes: dict[str, Union[bool_, bool]],
+    is_chr_x: pd.Series,
+    is_chr_y: pd.Series,
+    fix_gc: bool,
+    fix_edge: bool,
+    fix_rmask: bool,
+    skip_low: bool,
+    diploid_parx_genome: Optional[str],
+) -> pd.Series:
     """Perform bias corrections on the sample."""
     cnarr.center_all(skip_low=skip_low, diploid_parx_genome=diploid_parx_genome)
     shift_sex_chroms(cnarr, sexes, ref_flat_logr, is_chr_x, is_chr_y)
@@ -391,7 +420,13 @@ def bias_correct_logr(
     return cnarr["log2"]
 
 
-def shift_sex_chroms(cnarr, sexes, ref_flat_logr, is_chr_x, is_chr_y):
+def shift_sex_chroms(
+    cnarr: CNA,
+    sexes: dict[str, Union[bool_, bool]],
+    ref_flat_logr: ndarray,
+    is_chr_x: pd.Series,
+    is_chr_y: pd.Series,
+) -> None:
     """Shift sample X and Y chromosomes to match the reference sex.
 
     Reference values::
@@ -423,7 +458,7 @@ def shift_sex_chroms(cnarr, sexes, ref_flat_logr, is_chr_x, is_chr_y):
         cnarr[is_chr_x | is_chr_y, "log2"] += 1.0
 
 
-def summarize_info(all_logr, all_depths):
+def summarize_info(all_logr: ndarray, all_depths: ndarray) -> dict[str, ndarray]:
     """Average & spread of log2ratios and depths for a group of samples.
 
     Can apply to all samples, or a given cluster of samples.
@@ -503,7 +538,7 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
     return cluster_cols
 
 
-def warn_bad_bins(cnarr, max_name_width=50):
+def warn_bad_bins(cnarr: CNA, max_name_width: int = 50) -> None:
     """Warn about target bins where coverage is poor.
 
     Prints a formatted table to stderr.
@@ -516,8 +551,7 @@ def warn_bad_bins(cnarr, max_name_width=50):
             100 * len(fg_bad_bins) / sum(~cnarr["gene"].isin(params.ANTITARGET_ALIASES))
         )
         logging.info(
-            "Targets: %d (%s) bins failed filters "
-            "(log2 < %s, log2 > %s, spread > %s)",
+            "Targets: %d (%s) bins failed filters (log2 < %s, log2 > %s, spread > %s)",
             len(fg_bad_bins),
             f"{bad_pct:.4}%",
             params.MIN_REF_COVERAGE,
@@ -568,7 +602,7 @@ def warn_bad_bins(cnarr, max_name_width=50):
         )
 
 
-def get_fasta_stats(cnarr, fa_fname):
+def get_fasta_stats(cnarr: CNA, fa_fname: str) -> tuple[ndarray, ndarray]:
     """Calculate GC and RepeatMasker content of each bin in the FASTA genome."""
     logging.info("Calculating GC and RepeatMasker content in %s ...", fa_fname)
     gc_rm_vals = [
@@ -578,7 +612,7 @@ def get_fasta_stats(cnarr, fa_fname):
     return np.asarray(gc_vals, dtype=float), np.asarray(rm_vals, dtype=float)
 
 
-def calculate_gc_lo(subseq):
+def calculate_gc_lo(subseq: str) -> tuple[float, float]:
     """Calculate the GC and lowercase (RepeatMasked) content of a string."""
     cnt_at_lo = subseq.count("a") + subseq.count("t")
     cnt_at_up = subseq.count("A") + subseq.count("T")
@@ -592,7 +626,7 @@ def calculate_gc_lo(subseq):
     return frac_gc, frac_lo
 
 
-def fasta_extract_regions(fa_fname, intervals):
+def fasta_extract_regions(fa_fname: str, intervals: CNA) -> Iterator[str]:
     """Extract an iterable of regions from an indexed FASTA file.
 
     Input: FASTA file name; iterable of (seq_id, start, end) (1-based)
@@ -605,7 +639,7 @@ def fasta_extract_regions(fa_fname, intervals):
                 yield fa_file[_chrom][int(start) : int(end)]
 
 
-def reference2regions(refarr):
+def reference2regions(refarr: CNA) -> tuple[GA, GA]:
     """Split reference into target and antitarget regions."""
     is_bg = refarr["gene"].isin(params.ANTITARGET_ALIASES)
     regions = GA(

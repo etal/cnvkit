@@ -50,7 +50,7 @@ def cna_stats(cnarr, diploid_parx_genome):
     return frac, count
 
 
-def genome_instability_index(args):
+def genome_instability_index(args) -> None:
     print("Sample", "CNA_Fraction", "CNA_Count", sep='\t', file=args.output)
     for fname in args.cnv_files:
         cnarr = read_cna(fname)
@@ -58,7 +58,7 @@ def genome_instability_index(args):
         print(fname, frac, count, sep='\t', file=args.output)
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     arguments = argument_parsing()
     genome_instability_index(arguments)

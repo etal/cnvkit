@@ -1,4 +1,7 @@
 """CNV utilities."""
+
+from __future__ import annotations
+
 import contextlib
 import logging
 import os
@@ -33,7 +36,7 @@ def call_quiet(*args):
     return proc.stdout
 
 
-def ensure_path(fname):
+def ensure_path(fname: str) -> bool:
     """Create dirs and move an existing file to avoid overwriting, if necessary.
 
     If a file already exists at the given path, it is renamed with an integer
@@ -78,7 +81,7 @@ def temp_write_text(text, mode="w+b"):
 # More helpers
 
 
-def assert_equal(msg, **values):
+def assert_equal(msg: str, **values) -> None:
     """Evaluate and compare two or more values for equality.
 
     Sugar for a common assertion pattern. Saves re-evaluating (and retyping)
@@ -112,7 +115,7 @@ def check_unique(items, title):
     return its.pop()
 
 
-def fbase(fname):
+def fbase(fname: str) -> str:
     """Strip directory and all extensions from a filename."""
     base = os.path.basename(fname)
     # Gzip extension usually follows another extension

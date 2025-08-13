@@ -15,11 +15,14 @@ columns:
 
 See: https://software.broadinstitute.org/software/igv/SEG
 """
+
+from __future__ import annotations
 import collections
 import csv
 import logging
 import math
 from itertools import zip_longest
+from typing import Optional, Union
 
 import pandas as pd
 from Bio.File import as_handle
@@ -178,7 +181,11 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
         yield sid, sample.loc[:, keep_columns]
 
 
-def write_seg(dframe, sample_id=None, chrom_ids=None):
+def write_seg(
+    dframe: Union[tuple[pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame]],
+    sample_id: Optional[Union[tuple[str], tuple[str, str]]] = None,
+    chrom_ids: Optional[bool] = None,
+) -> pd.DataFrame:
     """Format a dataframe or list of dataframes as SEG.
 
     To put multiple samples into one SEG table, pass `dframe` and `sample_id`
@@ -208,7 +215,7 @@ def write_seg(dframe, sample_id=None, chrom_ids=None):
     return pd.concat(results)
 
 
-def format_seg(dframe, sample_id, chrom_ids):
+def format_seg(dframe: pd.DataFrame, sample_id: str, chrom_ids: bool) -> pd.DataFrame:
     """Transform `dframe` contents to match SEG format."""
     assert dframe is not None
     assert sample_id is not None

@@ -1,4 +1,6 @@
 """The 'scatter' command for rendering copy number as scatter plots."""
+
+from __future__ import annotations
 import collections
 import logging
 
@@ -9,6 +11,12 @@ from skgenome.rangelabel import unpack_range
 from . import core, params, plots
 from .plots import MB
 from .cnary import CopyNumArray as CNA
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from matplotlib.axes._axes import Axes
+    from matplotlib.figure import Figure
 
 HIGHLIGHT_COLOR = "gold"
 POINT_COLOR = "#606060"
@@ -17,21 +25,21 @@ TREND_COLOR = "#A0A0A0"
 
 
 def do_scatter(
-    cnarr,
-    segments=None,
-    variants=None,
-    show_range=None,
-    show_gene=None,
-    do_trend=False,
-    by_bin=False,
-    window_width=1e6,
-    y_min=None,
-    y_max=None,
-    fig_size=None,
-    antitarget_marker=None,
-    segment_color=SEG_COLOR,
-    title=None,
-):
+    cnarr: CopyNumArray,
+    segments: Optional[CopyNumArray] = None,
+    variants: None = None,
+    show_range: None = None,
+    show_gene: None = None,
+    do_trend: bool = False,
+    by_bin: bool = False,
+    window_width: float = 1e6,
+    y_min: None = None,
+    y_max: None = None,
+    fig_size: None = None,
+    antitarget_marker: None = None,
+    segment_color: str = SEG_COLOR,
+    title: None = None,
+) -> Figure:
     """Plot probe log2 coverages and segmentation calls together."""
     if by_bin:
         bp_per_bin = sum(c.end.iat[-1] for _, c in cnarr.by_chromosome()) / len(cnarr)
@@ -80,15 +88,15 @@ def do_scatter(
 
 
 def genome_scatter(
-    cnarr,
-    segments=None,
-    variants=None,
-    do_trend=False,
-    y_min=None,
-    y_max=None,
-    title=None,
-    segment_color=SEG_COLOR,
-):
+    cnarr: CopyNumArray,
+    segments: Optional[CopyNumArray] = None,
+    variants: None = None,
+    do_trend: bool = False,
+    y_min: None = None,
+    y_max: None = None,
+    title: None = None,
+    segment_color: str = SEG_COLOR,
+) -> Figure:
     """Plot all chromosomes, concatenated on one plot."""
     if (cnarr or segments) and variants:
         # Lay out top 3/5 for the CN scatter, bottom 2/5 for SNP plot
@@ -122,14 +130,14 @@ def genome_scatter(
 
 
 def cnv_on_genome(
-    axis,
-    probes,
-    segments,
-    do_trend=False,
-    y_min=None,
-    y_max=None,
-    segment_color=SEG_COLOR,
-):
+    axis: Axes,
+    probes: CopyNumArray,
+    segments: CopyNumArray,
+    do_trend: bool = False,
+    y_min: None = None,
+    y_max: None = None,
+    segment_color: str = SEG_COLOR,
+) -> Axes:
     """Plot bin ratios and/or segments for all chromosomes on one plot."""
     # Configure axes etc.
     axis.axhline(color="k")
@@ -617,7 +625,7 @@ def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin, segment
     return axis
 
 
-def set_xlim_from(axis, probes=None, segments=None, variants=None):
+def set_xlim_from(axis, probes=None, segments=None, variants=None) -> None:
     """Configure axes for plotting a single chromosome's data.
 
     Parameters
@@ -651,7 +659,7 @@ def set_xlim_from(axis, probes=None, segments=None, variants=None):
     axis.set_xlim(min_x * MB, max_x * MB)
 
 
-def setup_chromosome(axis, y_min=None, y_max=None, y_label=None):
+def setup_chromosome(axis, y_min=None, y_max=None, y_label=None) -> None:
     """Configure axes for plotting a single chromosome's data."""
     if y_min and y_max:
         axis.set_ylim(y_min, y_max)
@@ -723,7 +731,7 @@ def get_segment_vafs(variants, segments):
                 yield (seg, np.median(freqs[idx_vaf]))
 
 
-def highlight_genes(axis, genes, y_posn):
+def highlight_genes(axis, genes, y_posn) -> None:
     """Show gene regions with background color and a text label."""
     # Rotate text in proportion to gene density
     ngenes = len(genes)

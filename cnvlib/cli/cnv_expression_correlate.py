@@ -92,14 +92,14 @@ def load_tcga_table(fname, shared_key):
     return table
 
 
-def cnv_expression_correlate(args):
+def cnv_expression_correlate(args) -> None:
     table = correlate_cnv_expression(args.cnv_fname, args.expression_fname)
     table.to_csv(args.output or sys.stdout, sep='\t', index=True)
     if args.output:
         logging.info("Wrote %s with %s rows", args.output, len(table))
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     arguments = argument_parsing()
     cnv_expression_correlate(arguments)

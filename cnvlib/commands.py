@@ -1,4 +1,5 @@
 """Command-line interface and corresponding API for CNVkit."""
+
 # NB: argparse CLI definitions and API functions are interwoven:
 #   "_cmd_*" handles I/O and arguments processing for the command
 #   "do_*" runs the command's functionality as an API
@@ -10,6 +11,7 @@ import multiprocessing
 import os
 import sys
 import warnings
+from typing import TYPE_CHECKING, Callable, Optional
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
@@ -71,11 +73,14 @@ from .cmdutil import (
 
 from ._version import __version__
 
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+
 
 __all__ = []  # type: list[str]
 
 
-def public(fn):
+def public(fn: Callable) -> Callable:
     __all__.append(fn.__name__)
     return fn
 
@@ -91,12 +96,13 @@ AP_subparsers = AP.add_subparsers(help="Sub-commands (use with -h for more info)
 
 # _____________________________________________________________________________
 # Shared parameters
-def add_diploid_parx_genome(P: argparse.ArgumentParser):
+def add_diploid_parx_genome(P: argparse.ArgumentParser) -> None:
     P.add_argument(
         "--diploid-parx-genome",
         type=str,
         help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
     )
+
 
 # _____________________________________________________________________________
 # Core pipeline
@@ -371,7 +377,9 @@ P_batch_newref.add_argument(
 
 P_batch_oldref = P_batch.add_argument_group("To reuse an existing reference")
 P_batch_oldref.add_argument(
-    "-r", "--reference", help="Copy number reference file (.cnn)."  # required=True,
+    "-r",
+    "--reference",
+    help="Copy number reference file (.cnn).",  # required=True,
 )
 
 # Reporting options
@@ -1000,7 +1008,7 @@ P_fix.add_argument(
         "If specified, sets the smoothing window fraction for rolling median bias smoothing"
         " based on traits. Otherwise, defaults to 1/sqrt(len(data))."
     ),
-    default=None
+    default=None,
 )
 P_fix.set_defaults(func=_cmd_fix)
 
@@ -1174,7 +1182,12 @@ def _cmd_call(args: argparse.Namespace) -> None:
         logging.info("Shifting log2 ratios by %f", -args.center_at)
         cnarr["log2"] -= args.center_at
     elif args.center:
-        cnarr.center_all(args.center, skip_low=args.drop_low_coverage, verbose=True, diploid_parx_genome=args.diploid_parx_genome)
+        cnarr.center_all(
+            args.center,
+            skip_low=args.drop_low_coverage,
+            verbose=True,
+            diploid_parx_genome=args.diploid_parx_genome,
+        )
 
     varr = load_het_snps(
         args.vcf,
@@ -1184,7 +1197,9 @@ def _cmd_call(args: argparse.Namespace) -> None:
         args.zygosity_freq,
     )
     is_sample_female = (
-        verify_sample_sex(cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
+        verify_sample_sex(
+            cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
+        )
         if args.purity and args.purity < 1.0
         else None
     )
@@ -1362,7 +1377,10 @@ def _cmd_diagram(args: argparse.Namespace) -> None:
     segarr = read_cna(args.segment) if args.segment else None
     if args.adjust_xy:
         is_sample_female = verify_sample_sex(
-            cnarr or segarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
+            cnarr or segarr,
+            args.sample_sex,
+            args.male_reference,
+            args.diploid_parx_genome,
         )
         if cnarr:
             cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
@@ -1655,7 +1673,9 @@ def _cmd_heatmap(args: argparse.Namespace) -> None:
             is_sample_female = verify_sample_sex(
                 cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
             )
-            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female, args.diploid_parx_genome)
+            cnarr = cnarr.shift_xx(
+                args.male_reference, is_sample_female, args.diploid_parx_genome
+            )
         cnarrs.append(cnarr)
     heatmap.do_heatmap(
         cnarrs,
@@ -1797,11 +1817,13 @@ P_breaks.set_defaults(func=_cmd_breaks)
 do_genemetrics = public(reports.do_genemetrics)
 
 
-def _cmd_genemetrics(args):
+def _cmd_genemetrics(args) -> None:
     """Identify targeted genes with copy number gain or loss."""
     cnarr = read_cna(args.filename)
     segarr = read_cna(args.segment) if args.segment else None
-    is_sample_female = verify_sample_sex(cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
+    is_sample_female = verify_sample_sex(
+        cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
+    )
     # TODO use the stats args
     table = do_genemetrics(
         cnarr,
@@ -1997,16 +2019,22 @@ def _cmd_sex(args: argparse.Namespace) -> None:
 
 
 @public
-def do_sex(cnarrs, is_haploid_x_reference, diploid_parx_genome):
+def do_sex(
+    cnarrs: list[CopyNumArray],
+    is_haploid_x_reference: bool,
+    diploid_parx_genome: Optional[str],
+) -> pd.DataFrame:
     """Guess samples' sex from the relative coverage of chromosomes X and Y."""
 
-    def strsign(num):
+    def strsign(num) -> str:
         if num > 0:
             return "+%.3g" % num
         return "%.3g" % num
 
     def guess_and_format(cna):
-        is_xy, stats = cna.compare_sex_chromosomes(is_haploid_x_reference, diploid_parx_genome)
+        is_xy, stats = cna.compare_sex_chromosomes(
+            is_haploid_x_reference, diploid_parx_genome
+        )
         return (
             cna.meta["filename"] or cna.sample_id,
             "Male" if is_xy else "Female",
@@ -2689,7 +2717,9 @@ def _cmd_export_vcf(args: argparse.Namespace) -> None:
     """
     segarr = read_cna(args.segments)
     cnarr = read_cna(args.cnr) if args.cnr else None
-    is_sample_female = verify_sample_sex(segarr, args.sample_sex, args.male_reference, args.diploid_parx_genome)
+    is_sample_female = verify_sample_sex(
+        segarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
+    )
     header, body = export.export_vcf(
         segarr,
         args.ploidy,
@@ -2996,7 +3026,7 @@ P_export_gistic.set_defaults(func=_cmd_export_gistic)
 # version ---------------------------------------------------------------------
 
 
-def print_version(_args):
+def print_version(_args) -> None:
     """Display this program's version."""
     print(__version__)
 

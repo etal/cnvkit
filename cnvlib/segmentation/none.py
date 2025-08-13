@@ -6,6 +6,7 @@ the centromere location can be inferred) via CNA.by_arm().
 This procedure calculates a single segment's mean and coordinates across the
 given array.
 """
+
 import pandas as pd
 
 from ..segmetrics import segment_mean

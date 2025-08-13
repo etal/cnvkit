@@ -1,10 +1,17 @@
 """Import from other formats to the CNVkit format."""
+
+from __future__ import annotations
 import logging
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 from skgenome import tabio
 
 from . import params
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from cnvlib.cnary import CopyNumArray
 
 
 # __________________________________________________________________________
@@ -59,7 +66,9 @@ def unpipe_name(name):
 # import-theta
 
 
-def do_import_theta(segarr, theta_results_fname, ploidy=2):
+def do_import_theta(
+    segarr: CopyNumArray, theta_results_fname: str, ploidy: int = 2
+) -> Iterator[CopyNumArray]:
     theta = parse_theta_results(theta_results_fname)
     # THetA doesn't handle sex chromosomes well
     segarr = segarr.autosomes()
@@ -78,7 +87,9 @@ def do_import_theta(segarr, theta_results_fname, ploidy=2):
         yield segarr
 
 
-def parse_theta_results(fname):
+def parse_theta_results(
+    fname: str,
+) -> dict[str, Union[float, list[float], list[list[int]], list[list[float]]]]:
     """Parse THetA results into a data structure.
 
     Columns: NLL, mu, C, p*

@@ -3,12 +3,18 @@
 Column names match the target class attributes. At least "chromosome", "start",
 and "end" are required.
 """
+
+from __future__ import annotations
 import logging
 
 import pandas as pd
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pandas.core.frame import DataFrame
 
 
-def read_tab(infile):
+def read_tab(infile: str) -> DataFrame:
     """Read tab-separated data with column names in the first row.
 
     The format is BED-like, but with a header row included and with
@@ -26,6 +32,6 @@ def read_tab(infile):
     return dframe
 
 
-def write_tab(dframe):
+def write_tab(dframe: DataFrame) -> DataFrame:
     """Write tab-separated data with column names in the first row."""
     return dframe

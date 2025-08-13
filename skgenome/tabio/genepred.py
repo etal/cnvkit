@@ -15,10 +15,16 @@ See:
 - https://genome.ucsc.edu/FAQ/FAQformat.html#format9
 - ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/
 """
+
+from __future__ import annotations
 import pandas as pd
+from typing import TYPE_CHECKING, NoReturn
+
+if TYPE_CHECKING:
+    from pandas.core.frame import DataFrame
 
 
-def read_genepred(infile, exons=False):
+def read_genepred(infile, exons=False) -> NoReturn:
     """Gene Predictions.
 
     ::
@@ -42,7 +48,7 @@ def read_genepred(infile, exons=False):
     raise NotImplementedError
 
 
-def read_genepred_ext(infile, exons=False):
+def read_genepred_ext(infile, exons=False) -> NoReturn:
     """Gene Predictions (Extended).
 
     The refGene table is an example of the genePredExt format.
@@ -73,7 +79,7 @@ def read_genepred_ext(infile, exons=False):
     raise NotImplementedError
 
 
-def read_refgene(infile, exons=False):
+def read_refgene(infile, exons=False) -> NoReturn:
     """Gene predictions (extended) plus a "bin" column (e.g. refGene.txt)
 
     Same as genePredExt, but an additional first column of integers with the
@@ -82,7 +88,7 @@ def read_refgene(infile, exons=False):
     raise NotImplementedError
 
 
-def read_refflat(infile, cds=False, exons=False):
+def read_refflat(infile: str, cds: bool = False, exons: bool = False) -> DataFrame:
     """Gene predictions and RefSeq genes with gene names (e.g. refFlat.txt).
 
     This version of genePred associates the gene name with the gene prediction

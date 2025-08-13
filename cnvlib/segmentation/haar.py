@@ -20,15 +20,22 @@ recommend using both extentions where possible, as it greatly improves the
 segmentation result.
 
 """
+
+from __future__ import annotations
 import logging
 import math
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from numpy import float64, ndarray
 
-def segment_haar(cnarr, fdr_q):
+
+def segment_haar(cnarr: CopyNumArray, fdr_q: float) -> CopyNumArray:
     """Do segmentation for CNVkit.
 
     Calculate copy number segmentation by HaarSeg
@@ -56,7 +63,7 @@ def segment_haar(cnarr, fdr_q):
     return segarr
 
 
-def one_chrom(cnarr, fdr_q, chrom):
+def one_chrom(cnarr: CopyNumArray, fdr_q: float, chrom: str) -> pd.DataFrame:
     logging.debug("Segmenting %s", chrom)
     results = haarSeg(
         cnarr.smooth_log2(),
@@ -133,7 +140,14 @@ def variants_in_segment(varr, segment, fdr_q):
 # ---- from HaarSeg R code -- the API ----
 
 
-def haarSeg(signal, breaksFdrQ, weights=None, raw_signal=None, haarStartLevel=1, haarEndLevel=5):
+def haarSeg(
+    signal: ndarray,
+    breaksFdrQ: float,
+    weights: Optional[ndarray] = None,
+    raw_signal: None = None,
+    haarStartLevel: int = 1,
+    haarEndLevel: int = 5,
+) -> dict[str, ndarray]:
     r"""Perform segmentation according to the HaarSeg algorithm.
 
     Parameters
@@ -227,7 +241,7 @@ def haarSeg(signal, breaksFdrQ, weights=None, raw_signal=None, haarStartLevel=1,
     }
 
 
-def FDRThres(x, q, stdev):
+def FDRThres(x: ndarray, q: float, stdev: float64) -> Union[int, float64]:
     """False discovery rate (FDR) threshold."""
     M = len(x)
     if M < 2:
@@ -248,7 +262,9 @@ def FDRThres(x, q, stdev):
     return T
 
 
-def SegmentByPeaks(data, peaks, weights=None):
+def SegmentByPeaks(
+    data: ndarray, peaks: ndarray, weights: Optional[ndarray] = None
+) -> ndarray:
     """Average the values of the probes within each segment.
 
     Parameters
@@ -276,12 +292,13 @@ def SegmentByPeaks(data, peaks, weights=None):
 
 # ---- from HaarSeg C code -- the core ----
 
+
 # --- HaarSeg.h
 def HaarConv(
-    signal,  # const double * signal,
-    weight,  # const double * weight,
-    stepHalfSize,  # int stepHalfSize,
-):
+    signal: ndarray,  # const double * signal,
+    weight: Optional[ndarray],  # const double * weight,
+    stepHalfSize: int,  # int stepHalfSize,
+) -> ndarray:
     """Convolve haar wavelet function with a signal, applying circular padding.
 
     Parameters
@@ -354,9 +371,9 @@ def HaarConv(
 
 
 def FindLocalPeaks(
-    signal,  # const double * signal,
+    signal: ndarray,  # const double * signal,
     # peakLoc, #int * peakLoc
-):
+) -> ndarray:
     """Find local maxima on positive values, local minima on negative values.
 
     First and last index are never considered extramum.
@@ -408,11 +425,11 @@ def FindLocalPeaks(
 
 
 def UnifyLevels(
-    baseLevel,  # const int * baseLevel,
-    addonLevel,  # const int * addonLevel,
-    windowSize,  # int windowSize,
+    baseLevel: ndarray,  # const int * baseLevel,
+    addonLevel: ndarray,  # const int * addonLevel,
+    windowSize: int,  # int windowSize,
     # joinedLevel, #int * joinedLevel);
-):
+) -> ndarray:
     """Unify several decomposition levels.
 
     Merge the two lists of breakpoints, but drop addonLevel values that are too

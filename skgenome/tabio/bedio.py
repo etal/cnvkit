@@ -1,13 +1,19 @@
 """I/O for UCSC Browser Extensible Data (BED)."""
+
+from __future__ import annotations
 import shlex
 
 import pandas as pd
 from Bio.File import as_handle
 
 from .util import report_bad_line
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pandas.core.frame import DataFrame
 
 
-def read_bed(infile):
+def read_bed(infile: str) -> DataFrame:
     """UCSC Browser Extensible Data (BED) format.
 
     A BED file has these columns::
@@ -19,6 +25,7 @@ def read_bed(infile):
     Sets of regions are separated by "track" lines. This function stops reading
     after encountering a track line other than the first one in the file.
     """
+
     # ENH: just pd.read_csv, skip 'track'
     @report_bad_line
     def _parse_line(line):
@@ -51,7 +58,7 @@ def read_bed(infile):
         )
 
 
-def read_bed3(infile):
+def read_bed3(infile: str) -> DataFrame:
     """3-column BED format: chromosome, start, end."""
     table = read_bed(infile)
     return table.loc[:, ["chromosome", "start", "end"]]
@@ -117,12 +124,12 @@ def write_bed(dframe):
     return dframe
 
 
-def write_bed3(dframe):
+def write_bed3(dframe: DataFrame) -> DataFrame:
     """Serialize `dframe` in 3-column BED format."""
     return dframe.loc[:, ["chromosome", "start", "end"]]
 
 
-def write_bed4(dframe):
+def write_bed4(dframe: DataFrame) -> DataFrame:
     """Serialize `dframe` in 4-column BED format."""
     dframe = dframe.copy()
     if "gene" not in dframe:

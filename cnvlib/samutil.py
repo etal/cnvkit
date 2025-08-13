@@ -1,16 +1,24 @@
 """BAM utilities."""
+
+from __future__ import annotations
 import logging
 import os
 from io import StringIO
 from itertools import islice
 from pathlib import PurePath
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
 import pandas as pd
 import pysam
 
+if TYPE_CHECKING:
+    from numpy import float64, int64
 
-def idxstats(bam_fname, drop_unmapped=False, fasta=None):
+
+def idxstats(
+    bam_fname: str, drop_unmapped: bool = False, fasta: Optional[str] = None
+) -> pd.DataFrame:
     """Get chromosome names, lengths, and number of mapped/unmapped reads.
 
     Use the BAM index (.bai) to get the number of reads and size of each
@@ -30,7 +38,7 @@ def idxstats(bam_fname, drop_unmapped=False, fasta=None):
     return table
 
 
-def bam_total_reads(bam_fname, fasta=None):
+def bam_total_reads(bam_fname: str, fasta: Optional[str] = None) -> int64:
     """Count the total number of mapped reads in a BAM file.
 
     Uses the BAM index to do this quickly.
@@ -39,7 +47,7 @@ def bam_total_reads(bam_fname, fasta=None):
     return table.mapped.sum()
 
 
-def ensure_bam_index(bam_fname):
+def ensure_bam_index(bam_fname: str) -> str:
     """Ensure a BAM file is indexed, to enable fast traversal & lookup.
 
     For MySample.bam, samtools will look for an index in these files, in order:
@@ -74,7 +82,9 @@ def ensure_bam_index(bam_fname):
     return bai_fname
 
 
-def ensure_bam_sorted(bam_fname, by_name=False, span=50, fasta=None):
+def ensure_bam_sorted(
+    bam_fname: str, by_name: bool = False, span: int = 50, fasta: Optional[str] = None
+) -> bool:
     """Test if the reads in a BAM file are sorted as expected.
 
     by_name=True: reads are expected to be sorted by query name. Consecutive
@@ -85,12 +95,12 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50, fasta=None):
     """
     if by_name:
         # Compare read IDs
-        def out_of_order(read, prev):
+        def out_of_order(read, prev) -> bool:
             return not (prev is None or prev.qname <= read.qname)
 
     else:
         # Compare read locations
-        def out_of_order(read, prev):
+        def out_of_order(read, prev) -> bool:
             return not (prev is None or read.tid != prev.tid or prev.pos <= read.pos)
 
     # ENH - repeat at 50%, ~99% through the BAM
@@ -104,14 +114,14 @@ def ensure_bam_sorted(bam_fname, by_name=False, span=50, fasta=None):
     return True
 
 
-def is_newer_than(target_fname, orig_fname):
+def is_newer_than(target_fname: str, orig_fname: str) -> bool:
     """Compare file modification times."""
     if not os.path.isfile(target_fname):
         return False
     return os.stat(target_fname).st_mtime >= os.stat(orig_fname).st_mtime
 
 
-def get_read_length(bam, span=1000, fasta=None):
+def get_read_length(bam: str, span: int = 1000, fasta: Optional[str] = None) -> float64:
     """Get (median) read length from first few reads in a BAM file.
 
     Illumina reads all have the same length; other sequencers might not.

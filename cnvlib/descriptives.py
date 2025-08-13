@@ -5,17 +5,23 @@ See:
     https://astropy.readthedocs.io/en/latest/_modules/astropy/stats/funcs.html
 
 """
+
+from __future__ import annotations
 import sys
 from functools import wraps
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 import numpy as np
 from scipy import stats
+
+if TYPE_CHECKING:
+    from numpy import float64, ndarray
 
 
 # Decorators to coerce input and short-circuit trivial cases
 
 
-def on_array(default=None):
+def on_array(default: Optional[int] = None) -> Callable:
     """Ensure `a` is a numpy array with no missing/NaN values."""
 
     def outer(f):
@@ -36,7 +42,7 @@ def on_array(default=None):
     return outer
 
 
-def on_weighted_array(default=None):
+def on_weighted_array(default: None = None) -> Callable:
     """Ensure `a` and `w` are equal-length numpy arrays with no NaN values.
 
     For weighted descriptives -- `a` is the array of values, `w` is weights.
@@ -80,7 +86,13 @@ def on_weighted_array(default=None):
 
 
 @on_array()
-def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
+def biweight_location(
+    a: ndarray,
+    initial: None = None,
+    c: float = 6.0,
+    epsilon: float = 1e-3,
+    max_iter: int = 5,
+) -> float64:
     """Compute the biweight location for an array.
 
     The biweight is a robust statistic for estimating the central location of a
@@ -112,7 +124,7 @@ def biweight_location(a, initial=None, c=6.0, epsilon=1e-3, max_iter=5):
 
 
 @on_array()
-def modal_location(a):
+def modal_location(a: ndarray) -> float64:
     """Return the modal value of an array's values.
 
     The "mode" is the location of peak density among the values, estimated using
@@ -131,7 +143,7 @@ def modal_location(a):
 
 
 @on_weighted_array()
-def weighted_median(a, weights):
+def weighted_median(a: ndarray, weights: ndarray) -> float64:
     """Weighted median of a 1-D numeric array."""
     order = a.argsort()
     a = a[order]
@@ -155,7 +167,12 @@ def weighted_median(a, weights):
 
 
 @on_array(0)
-def biweight_midvariance(a, initial=None, c=9.0, epsilon=1e-3):
+def biweight_midvariance(
+    a: ndarray,
+    initial: Optional[Union[int, float64]] = None,
+    c: float = 9.0,
+    epsilon: float = 1e-3,
+) -> float64:
     """Compute the biweight midvariance for an array.
 
     The biweight midvariance is a robust statistic for determining the
@@ -203,13 +220,13 @@ def gapper_scale(a):
 
 
 @on_array(0)
-def interquartile_range(a):
+def interquartile_range(a: ndarray) -> float64:
     """Compute the difference between the array's first and third quartiles."""
     return np.percentile(a, 75) - np.percentile(a, 25)
 
 
 @on_array(0)
-def median_absolute_deviation(a, scale_to_sd=True):
+def median_absolute_deviation(a: ndarray, scale_to_sd: bool = True) -> float64:
     """Compute the median absolute deviation (MAD) of array elements.
 
     The MAD is defined as: ``median(abs(a - median(a)))``.
@@ -234,7 +251,7 @@ def weighted_mad(a, weights, scale_to_sd=True):
 
 
 @on_weighted_array()
-def weighted_std(a, weights):
+def weighted_std(a: ndarray, weights: ndarray) -> float64:
     """Standard deviation with weights."""
     mean = np.average(a, weights=weights)
     var = np.average((a - mean) ** 2, weights=weights)

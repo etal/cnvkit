@@ -1,9 +1,12 @@
 """An array of genomic intervals, treated as variant loci."""
+
+from __future__ import annotations
 import logging
 
 import numpy as np
 import pandas as pd
 from skgenome import GenomicArray
+from typing import Optional
 
 
 class VariantArray(GenomicArray):
@@ -16,7 +19,9 @@ class VariantArray(GenomicArray):
     _required_dtypes = (str, int, int, str, str)  # type: ignore
     # Extra: somatic, zygosity, depth, alt_count, alt_freq
 
-    def __init__(self, data_table, meta_dict=None):
+    def __init__(
+        self, data_table: pd.DataFrame, meta_dict: Optional[dict[str, str]] = None
+    ) -> None:
         GenomicArray.__init__(self, data_table, meta_dict)
 
     def baf_by_ranges(
@@ -99,7 +104,7 @@ class VariantArray(GenomicArray):
                 self[zyg_key] = zyg
         return self
 
-    def heterozygous(self):
+    def heterozygous(self) -> VariantArray:
         """Subset to only heterozygous variants.
 
         Use 'zygosity' or 'n_zygosity' genotype values (if present) to exclude
@@ -162,7 +167,7 @@ class VariantArray(GenomicArray):
         return _tumor_boost(self["alt_freq"].values, self["n_alt_freq"].values)
 
 
-def _mirrored_baf(vals, above_half=None):
+def _mirrored_baf(vals: pd.Series, above_half: None = None) -> pd.Series:
     shift = (vals - 0.5).abs()
     if above_half is None:
         above_half = vals.median() > 0.5

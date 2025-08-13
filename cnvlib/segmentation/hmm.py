@@ -1,7 +1,10 @@
 """Segmentation by Hidden Markov Model."""
 
+from __future__ import annotations
+
 import collections
 import logging
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -10,6 +13,11 @@ import scipy.special
 from ..cnary import CopyNumArray as CNA
 from ..descriptives import biweight_midvariance
 from ..segfilters import squash_by_groups
+
+if TYPE_CHECKING:
+    from cnvlib.vary import VariantArray
+    from numpy import ndarray
+    from pomegranate.hmm.dense_hmm import DenseHMM
 
 # Configuration constants
 DEFAULT_MAX_ITER = 100  # Reduced from 100000 for performance with PyTorch backend
@@ -39,8 +47,13 @@ except ImportError as e:
 
 
 def segment_hmm(
-    cnarr, method, diploid_parx_genome, window=None, variants=None, processes=1
-):
+    cnarr: CNA,
+    method: str,
+    diploid_parx_genome: Optional[str],
+    window: Optional[Any] = None,
+    variants: Optional[VariantArray] = None,
+    processes: int = 1,
+) -> CNA:
     """Segment bins by Hidden Markov Model.
 
     Use Viterbi method to infer copy number segments from sequential data.
@@ -128,7 +141,9 @@ def segment_hmm(
     return segarr
 
 
-def hmm_get_model(cnarr, method, diploid_parx_genome, processes):
+def hmm_get_model(
+    cnarr: CNA, method: str, diploid_parx_genome: Optional[str], processes: int
+) -> pomegranate.hmm.dense_hmm.DenseHMM:
     """
 
     Parameters
@@ -228,7 +243,7 @@ def hmm_get_model(cnarr, method, diploid_parx_genome, processes):
     return model
 
 
-def as_observation_matrix(cnarr, variants=None):
+def as_observation_matrix(cnarr: CNA, variants: Optional[Any] = None) -> list[ndarray]:
     """Extract HMM fitting values from `cnarr`.
 
     For each chromosome arm, extract log2 ratios as a numpy array.

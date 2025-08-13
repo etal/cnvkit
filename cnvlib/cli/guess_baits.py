@@ -236,7 +236,7 @@ def normalize_depth_log2_filter(baits, min_depth, enrich_ratio=0.1):
     return baits[keep_idx]
 
 
-def guess_baits(args):
+def guess_baits(args) -> None:
     # ENH: can we reserve multiple cores for htslib?
     if args.processes < 1:
         args.processes = None
@@ -254,7 +254,7 @@ def guess_baits(args):
         tabio.write(baits, args.coverage, 'tab')
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     arguments = argument_parsing()
     guess_baits(arguments)

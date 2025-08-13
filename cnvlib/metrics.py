@@ -1,12 +1,24 @@
-"""Robust metrics to evaluate performance of copy number estimates.
-"""
+"""Robust metrics to evaluate performance of copy number estimates."""
+
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Optional
+
 import numpy as np
 import pandas as pd
 
 from . import descriptives
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from cnvlib.cnary import CopyNumArray
+    from numpy import float64, ndarray
 
-def do_metrics(cnarrs, segments=None, skip_low=False):
+
+def do_metrics(
+    cnarrs: CopyNumArray,
+    segments: Optional[CopyNumArray] = None,
+    skip_low: bool = False,
+) -> pd.DataFrame:
     """Compute coverage deviations and other metrics for self-evaluation."""
     # Catch if passed args are single CopyNumArrays instead of lists
     from .cnary import CopyNumArray as CNA
@@ -22,15 +34,20 @@ def do_metrics(cnarrs, segments=None, skip_low=False):
     if skip_low:
         cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
     rows = (
-        (cna.meta.get("filename", cna.sample_id), len(seg) if seg is not None else "-",
-         *ests_of_scale(cna.residuals(seg).to_numpy()))
+        (
+            cna.meta.get("filename", cna.sample_id),
+            len(seg) if seg is not None else "-",
+            *ests_of_scale(cna.residuals(seg).to_numpy()),
+        )
         for cna, seg in zip_repeater(cnarrs, segments)
     )
     colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
     return pd.DataFrame.from_records(rows, columns=colnames)
 
 
-def zip_repeater(iterable, repeatable):
+def zip_repeater(
+    iterable: Iterator[Any], repeatable: list[CopyNumArray]
+) -> Iterator[tuple[CopyNumArray, CopyNumArray]]:
     """Repeat a single segmentation to match the number of copy ratio inputs"""
     rpt_len = len(repeatable)
     if rpt_len == 1:
@@ -49,7 +66,7 @@ def zip_repeater(iterable, repeatable):
             )
 
 
-def ests_of_scale(deviations):
+def ests_of_scale(deviations: ndarray) -> tuple[float64, float64, float64, float64]:
     """Estimators of scale: standard deviation, MAD, biweight midvariance.
 
     Calculates all of these values for an array of deviations and returns them

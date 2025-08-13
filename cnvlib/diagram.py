@@ -4,9 +4,12 @@ This uses and abuses Biopython's BasicChromosome module. It depends on
 ReportLab, too, so we isolate this functionality here so that the rest of
 CNVkit will run without it. (And also to keep the codebase tidy.)
 """
+
+from __future__ import annotations
 import collections
 import math
 import warnings
+from typing import TYPE_CHECKING, Any
 
 # Reportlab on Py3.10 triggers a DeprecationWarning via load_module, which
 # becomes an error (ModuleNotFoundError) unless silenced here.
@@ -21,21 +24,25 @@ from reportlab.pdfgen import canvas
 from skgenome.rangelabel import unpack_range
 from . import params, plots, reports
 
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from reportlab.graphics.shapes import Drawing
+
 TELOMERE_LENGTH = 6e6  # For illustration only
 CHROM_FATNESS = 0.3
 PAGE_SIZE = (11.0 * inch, 8.5 * inch)
 
 
 def create_diagram(
-    cnarr,
-    segarr,
-    threshold,
-    min_probes,
-    outfname,
-    show_range=None,
-    title=None,
-    show_labels=True,
-):
+    cnarr: CopyNumArray,
+    segarr: CopyNumArray,
+    threshold: float,
+    min_probes: int,
+    outfname: str,
+    show_range: None = None,
+    title: None = None,
+    show_labels: bool = True,
+) -> str:
     """Create the diagram."""
     if cnarr and segarr:
         do_both = True  # Draw segments on left, probes on right.
@@ -123,7 +130,13 @@ def create_diagram(
     return outfname
 
 
-def _get_gene_labels(cnarr, segarr, cnarr_is_seg, threshold, min_probes):
+def _get_gene_labels(
+    cnarr: CopyNumArray,
+    segarr: CopyNumArray,
+    cnarr_is_seg: bool,
+    threshold: float,
+    min_probes: int,
+) -> list[Any]:
     """Label genes where copy ratio value exceeds threshold."""
     if cnarr_is_seg:
         # Only segments (.cns)
@@ -144,7 +157,14 @@ def _get_gene_labels(cnarr, segarr, cnarr_is_seg, threshold, min_probes):
     return [row.gene for row in rows if getattr(row, probes_attr) >= min_probes]
 
 
-def build_chrom_diagram(features, chr_sizes, sample_id, title=None):
+def build_chrom_diagram(
+    features: collections.defaultdict[
+        str, list[tuple[int, int, int, None, colors.Color]]
+    ],
+    chr_sizes: collections.OrderedDict,
+    sample_id: str,
+    title: None = None,
+) -> Drawing:
     """Create a PDF of color-coded features on chromosomes."""
     max_chr_len = max(chr_sizes.values())
 
@@ -186,7 +206,7 @@ def build_chrom_diagram(features, chr_sizes, sample_id, title=None):
     return bc_organism_draw(chr_diagram, title)
 
 
-def bc_organism_draw(org, title, wrap=12):
+def bc_organism_draw(org: BC.Organism, title: str, wrap: int = 12) -> Drawing:
     """Modified copy of Bio.Graphics.BasicChromosome.Organism.draw.
 
     Instead of stacking chromosomes horizontally (along the x-axis), stack rows
@@ -295,7 +315,9 @@ def bc_organism_draw(org, title, wrap=12):
     return cur_drawing
 
 
-def bc_chromosome_draw_label(self, cur_drawing, label_name):
+def bc_chromosome_draw_label(
+    self: BC.Chromosome, cur_drawing: Drawing, label_name: str
+) -> None:
     """Monkeypatch to Bio.Graphics.BasicChromosome.Chromosome._draw_label.
 
     Draw a label for the chromosome. Mod: above the chromosome, not below.

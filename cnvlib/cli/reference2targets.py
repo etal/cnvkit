@@ -24,7 +24,7 @@ def argument_parsing():
     return AP.parse_args()
 
 
-def reference2targets(args):
+def reference2targets(args) -> None:
     ref = read(args.reference)
     targets, antitargets = reference.reference2regions(ref)
     name = args.output or ref.sample_id
@@ -32,7 +32,7 @@ def reference2targets(args):
     tabio.write(antitargets, name + '.antitarget.bed', 'bed4')
 
 
-def main():
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     arguments = argument_parsing()
     reference2targets(arguments)

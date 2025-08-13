@@ -1,9 +1,10 @@
 """Base class for an array of annotated genomic regions."""
+
 from __future__ import annotations
 
 import logging
-from typing import Callable, Optional, Union, TYPE_CHECKING
 from collections import OrderedDict
+from typing import Any, Callable, Optional, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,11 @@ from .merge import flatten, merge
 from .rangelabel import to_label
 from .subtract import subtract
 from .subdivide import subdivide
+
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from cnvlib.vary import VariantArray
+    from numpy import ndarray
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -33,7 +39,7 @@ class GenomicArray:
         self,
         data_table: Optional[Union[Sequence, pd.DataFrame]],
         meta_dict: Optional[Mapping] = None,
-    ):
+    ) -> None:
         # Validation
         if (
             data_table is None
@@ -87,7 +93,7 @@ class GenomicArray:
     @classmethod
     def from_columns(
         cls, columns: Mapping[str, Iterable], meta_dict: Optional[Mapping] = None
-    ):
+    ) -> GenomicArray:
         """Create a new instance from column arrays, given as a dict."""
         table = pd.DataFrame.from_dict(columns)
         ary = cls(table, meta_dict)
@@ -100,7 +106,7 @@ class GenomicArray:
         rows: Iterable,
         columns: Optional[Sequence[str]] = None,
         meta_dict: Optional[Mapping] = None,
-    ):
+    ) -> Union[GenomicArray, CopyNumArray]:
         """Create a new instance from a list of rows, as tuples or arrays."""
         if columns is None:
             columns = cls._required_columns
@@ -115,7 +121,9 @@ class GenomicArray:
         return self.__class__.from_columns(columns, self.meta)
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
-    def as_dataframe(self, dframe: pd.DataFrame, reset_index: bool = False):
+    def as_dataframe(
+        self, dframe: pd.DataFrame, reset_index: bool = False
+    ) -> Union[VariantArray, GenomicArray, CopyNumArray]:
         """Wrap the given pandas DataFrame in this instance's metadata."""
         if reset_index:
             dframe = dframe.reset_index(drop=True)
@@ -125,7 +133,7 @@ class GenomicArray:
         """Coerce `arraylike` to a Series with this instance's index."""
         return pd.Series(arraylike, index=self.data.index)
 
-    def as_rows(self, rows: Iterable):
+    def as_rows(self, rows: Iterable) -> Union[GenomicArray, CopyNumArray]:
         """Wrap the given rows in this instance's metadata."""
         try:
             out = self.from_rows(rows, columns=self.data.columns, meta_dict=self.meta)
@@ -143,16 +151,16 @@ class GenomicArray:
     def __bool__(self) -> bool:
         return bool(len(self.data))
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: CopyNumArray) -> bool:
         return isinstance(other, self.__class__) and self.data.equals(other.data)
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __contains__(self, key) -> bool:
+    def __contains__(self, key: str) -> bool:
         return key in self.data.columns
 
-    def __getitem__(self, index) -> Union[pd.Series, pd.DataFrame]:
+    def __getitem__(self, index: Any) -> Union[pd.Series, pd.DataFrame]:
         """Access a portion of the data.
 
         Cases:
@@ -192,7 +200,11 @@ class GenomicArray:
         return self.as_dataframe(self.data[index])
         # return self.as_dataframe(self.data.take(index))
 
-    def __setitem__(self, index, value):
+    def __setitem__(
+        self,
+        index: Union[str, tuple[int, str], slice, int, tuple[pd.Series, str]],
+        value: Any,
+    ) -> None:
         """Assign to a portion of the data."""
         if isinstance(index, int):
             self.data.iloc[index] = value
@@ -208,10 +220,10 @@ class GenomicArray:
             assert isinstance(index, slice) or len(index) > 0
             self.data[index] = value
 
-    def __delitem__(self, index):
+    def __delitem__(self, index) -> None:
         return NotImplemented
 
-    def __iter__(self):
+    def __iter__(self) -> map:
         return self.data.itertuples(index=False)
 
     __next__ = next
@@ -238,7 +250,9 @@ class GenomicArray:
 
     # Traversal
 
-    def autosomes(self, also=None):
+    def autosomes(
+        self, also: Optional[Union[str, list[str], pd.Series]] = None
+    ) -> Union[VariantArray, GenomicArray, CopyNumArray]:
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
         is_auto = self.chromosome.str.match(r"(chr)?\d+$", na=False)
         if not is_auto.any():
@@ -255,7 +269,9 @@ class GenomicArray:
                     is_auto |= self.chromosome == a_chrom
         return self[is_auto]
 
-    def by_arm(self, min_gap_size: Union[int, float] = 1e5, min_arm_bins: int = 50):
+    def by_arm(
+        self, min_gap_size: Union[int, float] = 1e5, min_arm_bins: int = 50
+    ) -> Iterator[tuple[str, CopyNumArray]]:
         """Iterate over bins grouped by chromosome arm (inferred)."""
         # ENH:
         # - Accept GArray of actual centromere regions as input
@@ -343,7 +359,7 @@ class GenomicArray:
             elif keep_empty:
                 yield bin_row, self.as_rows(subrange)
 
-    def coords(self, also: Union[str, Iterable[str]] = ()):
+    def coords(self, also: Union[str, Iterable[str]] = ()) -> map:
         """Iterate over plain coordinates of each bin: chromosome, start, end.
 
         Parameters
@@ -375,7 +391,7 @@ class GenomicArray:
         start: Optional[Numeric] = None,
         end: Optional[Numeric] = None,
         mode: str = "outer",
-    ):
+    ) -> Union[GenomicArray, CopyNumArray]:
         """Get the GenomicArray portion within the given genomic range.
 
         Parameters
@@ -411,7 +427,7 @@ class GenomicArray:
         starts: Optional[Sequence[Numeric]] = None,
         ends: Optional[Sequence[Numeric]] = None,
         mode: str = "outer",
-    ):
+    ) -> GenomicArray:
         """Get the GenomicArray portion within the specified ranges.
 
         Similar to `in_ranges`, but concatenating the selections of all the
@@ -445,8 +461,12 @@ class GenomicArray:
         return self.as_dataframe(table)
 
     def into_ranges(
-        self, other, column: str, default, summary_func: Optional[Callable] = None
-    ):
+        self,
+        other: Union[GenomicArray, CopyNumArray],
+        column: str,
+        default: Union[int, float, str],
+        summary_func: Optional[Callable] = None,
+    ) -> Union[pd.Series, pd.DataFrame]:
         """Re-bin values from `column` into the corresponding ranges in `other`.
 
         Match overlapping/intersecting rows from `other` to each row in `self`.
@@ -494,8 +514,12 @@ class GenomicArray:
         return into_ranges(self.data, other.data, column, default, summary_func)
 
     def iter_ranges_of(
-        self, other, column: str, mode: str = "outer", keep_empty: bool = True
-    ):
+        self,
+        other: Union[GenomicArray, CopyNumArray],
+        column: str,
+        mode: str = "outer",
+        keep_empty: bool = True,
+    ) -> Iterator[pd.Series]:
         """Group rows by another GenomicArray's bin coordinate ranges.
 
         For example, this can be used to group SNVs by CNV segments.
@@ -534,7 +558,7 @@ class GenomicArray:
 
     # Modification
 
-    def add(self, other):
+    def add(self, other: CopyNumArray) -> None:
         """Combine this array's data with another GenomicArray (in-place).
 
         Any optional columns must match between both arrays.
@@ -547,7 +571,7 @@ class GenomicArray:
             self.data = pd.concat([self.data, other.data], ignore_index=True)
             self.sort()
 
-    def concat(self, others):
+    def concat(self, others: list[CopyNumArray]) -> CopyNumArray:
         """Concatenate several GenomicArrays, keeping this array's metadata.
 
         This array's data table is not implicitly included in the result.
@@ -557,11 +581,11 @@ class GenomicArray:
         result.sort()
         return result
 
-    def copy(self):
+    def copy(self) -> Union[GenomicArray, CopyNumArray]:
         """Create an independent copy of this object."""
         return self.as_dataframe(self.data.copy())
 
-    def add_columns(self, **columns):
+    def add_columns(self, **columns) -> CopyNumArray:
         """Add the given columns to a copy of this GenomicArray.
 
         Parameters
@@ -579,12 +603,14 @@ class GenomicArray:
         """
         return self.as_dataframe(self.data.assign(**columns))
 
-    def keep_columns(self, colnames):
+    def keep_columns(
+        self, colnames: tuple[str, str, str, str, str, str]
+    ) -> CopyNumArray:
         """Extract a subset of columns, reusing this instance's metadata."""
         colnames = self.data.columns.intersection(colnames)
         return self.__class__(self.data.loc[:, colnames], self.meta.copy())
 
-    def drop_extra_columns(self):
+    def drop_extra_columns(self) -> Union[GenomicArray, CopyNumArray]:
         """Remove any optional columns from this GenomicArray.
 
         Returns
@@ -597,7 +623,7 @@ class GenomicArray:
         table = self.data.loc[:, self._required_columns]
         return self.as_dataframe(table)
 
-    def filter(self, func=None, **kwargs):
+    def filter(self, func: Optional[Callable] = None, **kwargs) -> GenomicArray:
         """Take a subset of rows where the given condition is true.
 
         Parameters
@@ -623,7 +649,7 @@ class GenomicArray:
             table = table[table[key] == val]
         return self.as_dataframe(table)
 
-    def shuffle(self):
+    def shuffle(self) -> ndarray:
         """Randomize the order of bins in this array (in-place)."""
         order = np.arange(len(self.data))
         rng = np.random.default_rng(0xA5EED)
@@ -631,7 +657,7 @@ class GenomicArray:
         self.data = self.data.iloc[order]
         return order
 
-    def sort(self):
+    def sort(self) -> None:
         """Sort this array's bins in-place, with smart chromosome ordering."""
         sort_key = self.data.chromosome.apply(sorter_chrom)
         self.data = (
@@ -641,7 +667,7 @@ class GenomicArray:
             .reset_index(drop=True)
         )
 
-    def sort_columns(self):
+    def sort_columns(self) -> None:
         """Sort this array's columns in-place, per class definition."""
         extra_cols = []
         for col in self.data.columns:
@@ -662,13 +688,13 @@ class GenomicArray:
         self,
         combine: Optional[dict[str, Callable]] = None,
         split_columns: Optional[Iterable[str]] = None,
-    ):
+    ) -> GenomicArray:
         """Split this array's regions where they overlap."""
         return self.as_dataframe(
             flatten(self.data, combine=combine, split_columns=split_columns)
         )
 
-    def intersection(self, other, mode: str = "outer"):
+    def intersection(self, other: GenomicArray, mode: str = "outer") -> GenomicArray:
         """Select the bins in `self` that overlap the regions in `other`.
 
         The extra fields of `self`, but not `other`, are retained in the output.
@@ -692,14 +718,16 @@ class GenomicArray:
         bp: int = 0,
         stranded: bool = False,
         combine: Optional[dict[str, Callable]] = None,
-    ):
+    ) -> GenomicArray:
         """Merge adjacent or overlapping regions into single rows.
 
         Similar to 'bedtools merge'.
         """
         return self.as_dataframe(merge(self.data, bp, stranded, combine))
 
-    def resize_ranges(self, bp: int, chrom_sizes: Optional[Mapping[str, Numeric]] = None):
+    def resize_ranges(
+        self, bp: int, chrom_sizes: Optional[Mapping[str, Numeric]] = None
+    ) -> GenomicArray:
         """Resize each genomic bin by a fixed number of bases at each end.
 
         Bin 'start' values have a minimum of 0, and `chrom_sizes` can
@@ -738,11 +766,13 @@ class GenomicArray:
         # TODO
         return NotImplemented
 
-    def subdivide(self, avg_size: int, min_size: int = 0, verbose: bool = False):
+    def subdivide(
+        self, avg_size: int, min_size: int = 0, verbose: bool = False
+    ) -> GenomicArray:
         """Split this array's regions into roughly equal-sized sub-regions."""
         return self.as_dataframe(subdivide(self.data, avg_size, min_size, verbose))
 
-    def subtract(self, other):
+    def subtract(self, other: GenomicArray) -> GenomicArray:
         """Remove the overlapping regions in `other` from this array."""
         return self.as_dataframe(subtract(self.data, other.data))
 

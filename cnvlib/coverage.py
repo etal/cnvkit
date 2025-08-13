@@ -1,10 +1,13 @@
 """Supporting functions for the 'antitarget' command."""
+
+from __future__ import annotations
 import logging
 import math
 import os.path
 import time
 from concurrent import futures
 from io import StringIO
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -16,10 +19,19 @@ from .cnary import CopyNumArray as CNA
 from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from skgenome import GenomicArray
+
 
 def do_coverage(
-    bed_fname, bam_fname, by_count=False, min_mapq=0, processes=1, fasta=None
-):
+    bed_fname: str,
+    bam_fname: str,
+    by_count: bool = False,
+    min_mapq: int = 0,
+    processes: int = 1,
+    fasta: Optional[str] = None,
+) -> CNA:
     """Calculate coverage in the given regions from BAM read depths."""
     if not samutil.ensure_bam_sorted(bam_fname, fasta=fasta):
         raise RuntimeError(f"BAM file {bam_fname} must be sorted by coordinates")
@@ -31,7 +43,14 @@ def do_coverage(
     return cnarr
 
 
-def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fasta=None):
+def interval_coverages(
+    bed_fname: str,
+    bam_fname: str,
+    by_count: bool,
+    min_mapq: int,
+    processes: int,
+    fasta: Optional[str] = None,
+) -> CNA:
     """Calculate log2 coverages in the BAM file at each interval."""
     meta = {"sample_id": core.fbase(bam_fname)}
     start_time = time.time()
@@ -98,7 +117,9 @@ def interval_coverages(bed_fname, bam_fname, by_count, min_mapq, processes, fast
     return cnarr
 
 
-def interval_coverages_count(bed_fname, bam_fname, min_mapq, procs=1, fasta=None):
+def interval_coverages_count(
+    bed_fname: str, bam_fname: str, min_mapq: int, procs: int = 1, fasta: None = None
+) -> Iterator[list[Union[int, tuple[str, int, int, str, float, float]]]]:
     """Calculate log2 coverages in the BAM file at each interval."""
     regions = tabio.read_auto(bed_fname)
     if procs == 1:
@@ -125,14 +146,26 @@ def _rdc(args):
     return list(_rdc_chunk(*args))
 
 
-def _rdc_chunk(bamfile, regions, min_mapq, fasta=None):
+def _rdc_chunk(
+    bamfile: pysam.AlignmentFile,
+    regions: GenomicArray,
+    min_mapq: int,
+    fasta: None = None,
+) -> Iterator[tuple[int, tuple[str, int, int, str, float, float]]]:
     if isinstance(bamfile, str):
         bamfile = pysam.AlignmentFile(bamfile, "rb", reference_filename=fasta)
     for chrom, start, end, gene in regions.coords(["gene"]):
         yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)
 
 
-def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
+def region_depth_count(
+    bamfile: pysam.AlignmentFile,
+    chrom: str,
+    start: int,
+    end: int,
+    gene: str,
+    min_mapq: int,
+) -> tuple[int, tuple[str, int, int, str, float, float]]:
     """Calculate depth of a region via pysam count.
 
     i.e. counting the number of read starts in a region, then scaling for read
@@ -141,7 +174,7 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
     Coordinates are 0-based, per pysam.
     """
 
-    def filter_read(read):
+    def filter_read(read) -> bool:
         """True if the given read should be counted towards coverage."""
         return not (
             read.is_duplicate
@@ -170,7 +203,13 @@ def region_depth_count(bamfile, chrom, start, end, gene, min_mapq):
     return count, row
 
 
-def interval_coverages_pileup(bed_fname, bam_fname, min_mapq, procs=1, fasta=None):
+def interval_coverages_pileup(
+    bed_fname: str,
+    bam_fname: str,
+    min_mapq: int,
+    procs: int = 1,
+    fasta: Optional[str] = None,
+) -> pd.DataFrame:
     """Calculate log2 coverages in the BAM file at each interval."""
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
     if procs == 1:
@@ -208,7 +247,9 @@ def _bedcov(args):
     return bed_fname, table
 
 
-def bedcov(bed_fname, bam_fname, min_mapq, fasta=None):
+def bedcov(
+    bed_fname: str, bam_fname: str, min_mapq: int, fasta: Optional[str] = None
+) -> pd.DataFrame:
     """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
 
     i.e. mean pileup depth across each region.
@@ -236,7 +277,7 @@ def bedcov(bed_fname, bam_fname, min_mapq, fasta=None):
     return table
 
 
-def detect_bedcov_columns(text):
+def detect_bedcov_columns(text: str) -> list[str]:
     """Determine which 'bedcov' output columns to keep.
 
     Format is the input BED plus a final appended column with the count of

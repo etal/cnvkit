@@ -1,4 +1,6 @@
 """Filter copy number segments."""
+
+from __future__ import annotations
 import functools
 import logging
 
@@ -6,9 +8,15 @@ import numpy as np
 import pandas as pd
 
 from .descriptives import weighted_median
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from cnvlib.cnary import CopyNumArray
+    from pandas.core.frame import DataFrame
+    from pandas.core.series import Series
 
 
-def require_column(*colnames):
+def require_column(*colnames) -> Callable:
     """Wrapper to coordinate the segment-filtering functions.
 
     Verify that the given columns are in the CopyNumArray the wrapped function
@@ -39,7 +47,9 @@ def require_column(*colnames):
     return wrap
 
 
-def squash_by_groups(cnarr, levels, by_arm=False):
+def squash_by_groups(
+    cnarr: CopyNumArray, levels: Series, by_arm: bool = False
+) -> CopyNumArray:
     """Reduce CopyNumArray rows to a single row within each given level."""
     # Enumerate runs of identical values
     change_levels = enumerate_changes(levels)
@@ -68,15 +78,16 @@ def squash_by_groups(cnarr, levels, by_arm=False):
         data["_g2"] = enumerate_changes(cnarr["cn2"])
         groupkey.extend(["_g1", "_g2"])
     data = (
-        data.groupby(groupkey, as_index=False, group_keys=False, sort=False)
-        [data.columns]
+        data.groupby(groupkey, as_index=False, group_keys=False, sort=False)[
+            data.columns
+        ]
         .apply(squash_region)
         .reset_index(drop=True)
     )
     return cnarr.as_dataframe(data)
 
 
-def enumerate_changes(levels):
+def enumerate_changes(levels: Series) -> Series:
     """Assign a unique integer to each run of identical values.
 
     Repeated but non-consecutive values will be assigned different integers.
@@ -84,7 +95,7 @@ def enumerate_changes(levels):
     return levels.diff().fillna(0).abs().cumsum().astype(int)
 
 
-def squash_region(cnarr):
+def squash_region(cnarr: DataFrame) -> DataFrame:
     """Reduce a CopyNumArray to 1 row, keeping fields sensible.
 
     Most fields added by the `segmetrics` command will be dropped.
@@ -131,7 +142,7 @@ def squash_region(cnarr):
 
 
 @require_column("cn")
-def ampdel(segarr):
+def ampdel(segarr: CopyNumArray) -> CopyNumArray:
     """Merge segments by amplified/deleted/neutral copy number status.
 
     Follow the clinical reporting convention:
@@ -162,7 +173,7 @@ def bic(segarr):
 
 
 @require_column("ci_lo", "ci_hi")
-def ci(segarr):
+def ci(segarr: CopyNumArray) -> CopyNumArray:
     """Merge segments by confidence interval (overlapping 0).
 
     Segments with lower CI above 0 are kept as gains, upper CI below 0 as
@@ -179,13 +190,13 @@ def ci(segarr):
 
 
 @require_column("cn")
-def cn(segarr):
+def cn(segarr: CopyNumArray) -> CopyNumArray:
     """Merge segments by integer copy number."""
     return squash_by_groups(segarr, segarr["cn"])
 
 
 @require_column("sem")
-def sem(segarr, zscore=1.96):
+def sem(segarr: CopyNumArray, zscore: float = 1.96) -> CopyNumArray:
     """Merge segments by Standard Error of the Mean (SEM).
 
     Use each segment's SEM value to estimate a 95% confidence interval (via
