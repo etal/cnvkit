@@ -1,2 +1,0 @@
-pomegranate >= 1.0.0
-torch >= 1.13.0

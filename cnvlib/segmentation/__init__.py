@@ -15,21 +15,13 @@ from skgenome.intersect import iter_slices
 from .. import core, parallel, params, smoothing
 from ..cnary import CopyNumArray as CNA
 from ..segfilters import squash_by_groups
-from . import cbs, flasso, haar, none
+from . import cbs, flasso, haar, hmm, none
 
 if TYPE_CHECKING:
     from cnvlib.vary import VariantArray
 
-try:
-    from . import hmm
 
-    HMM_METHODS = ("hmm", "hmm-tumor", "hmm-germline")
-except ImportError as e:
-    hmm = None
-    HMM_METHODS = ()
-    HMM_IMPORT_ERROR = str(e)
-
-SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", *HMM_METHODS)
+SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", "hmm", "hmm-tumor", "hmm-germline")
 
 
 def do_segmentation(
@@ -48,12 +40,6 @@ def do_segmentation(
 ) -> CNA:
     """Infer copy number segments from the given coverage table."""
     if method not in SEGMENT_METHODS:
-        if method in ("hmm", "hmm-tumor", "hmm-germline") and not HMM_METHODS:
-            raise ImportError(
-                f"HMM segmentation method '{method}' requires pomegranate >= 1.0.0. "
-                f"Install with: pip install cnvkit[hmm] or pip install pomegranate>=1.0.0. "
-                f"Error: {HMM_IMPORT_ERROR}"
-            )
         raise ValueError(
             "'method' must be one of: "
             + ", ".join(SEGMENT_METHODS)
