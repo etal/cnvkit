@@ -20,12 +20,6 @@ from skgenome import tabio
 
 import cnvlib
 
-# Check if HMM functionality is available
-try:
-    from cnvlib.segmentation.hmm import HMM_AVAILABLE
-except ImportError:
-    HMM_AVAILABLE = False
-
 # Import all modules as a smoke test
 from cnvlib import (
     access,
@@ -160,8 +154,6 @@ class CommandTests(unittest.TestCase):
         anti_regions = tabio.read(anti_bed_fname, "bed")
         self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
         # Run the same sample
-        # Use HMM if available, otherwise fall back to CBS
-        segment_method = "hmm" if HMM_AVAILABLE else "cbs"
         batch.batch_run_sample(
             bam,
             tgt_bed_fname,
@@ -176,7 +168,7 @@ class CommandTests(unittest.TestCase):
             False,
             False,
             "hybrid",
-            segment_method,
+            "hmm",
             1,
             False,
         )
@@ -678,7 +670,6 @@ class CommandTests(unittest.TestCase):
         # self.assertGreater(len(segments), n_chroms)
         # self.assertTrue((segments.start < segments.end).all())
 
-    @unittest.skipUnless(HMM_AVAILABLE, "HMM segmentation requires pomegranate >= 1.0.0")
     def test_segment_hmm(self):
         """The 'segment' command with HMM methods."""
         for fname in ("formats/amplicon.cnr", "formats/p2-20_1.cnr"):
