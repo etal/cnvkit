@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 """Unit tests for the 'genome' sub-package."""
+import functools
+import operator
 import random
+import typing
 import unittest
 
 # unittest/pomegranate 0.10.0: ImportWarning: can't resolve package from
@@ -159,7 +162,7 @@ class GaryTests(unittest.TestCase):
         segarr = read_ga("formats/amplicon.cns")
         by_bins = cnarr.by_ranges(segarr)
         by_slices = cnarr.iter_ranges_of(segarr, "gene")
-        for (_seg, by_bin), by_slice in zip(by_bins, by_slices):
+        for (_seg, by_bin), by_slice in zip(by_bins, by_slices, strict=False):
             self.assertEqual(len(by_bin), len(by_slice))
             self.assertTrue((by_bin["gene"].to_numpy() == by_slice.to_numpy()).all())
         # With a VCF
@@ -231,7 +234,7 @@ class GaryTests(unittest.TestCase):
 class IntervalTests(unittest.TestCase):
     """Interval arithmetic tests."""
 
-    combiner = {"gene": lambda a: "".join(a)}
+    combiner: typing.ClassVar = {"gene": lambda a: "".join(a)}
 
     # Simple: nested, overlapping, & non-overlapping intervals
     # =A=========================
@@ -504,12 +507,12 @@ class IntervalTests(unittest.TestCase):
                 # Iterative intersection
                 grouped_results = regions.by_ranges(selections, mode=mode)
                 for (_coord, result), expect in zip(
-                    grouped_results, expectations[mode]
+                    grouped_results, expectations[mode], strict=False
                 ):
                     self._compare_regions(result, self._from_intervals(expect))
                 # Single-object intersect
                 result = regions.intersection(selections, mode=mode)
-                expect = self._from_intervals(sum(expectations[mode], []))
+                expect = self._from_intervals(functools.reduce(operator.iadd, expectations[mode], []))
                 self._compare_regions(result, expect)
 
     def test_subtract(self):

@@ -8,7 +8,7 @@ GenomicArray types.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -16,6 +16,7 @@ import pandas as pd
 from .combiners import first_of, join_strings, make_const
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Iterator, Sequence
     from numpy import ndarray
     from pandas.core.indexes.base import Index
@@ -32,7 +33,7 @@ def by_ranges(
             subranges = iter_ranges(
                 src_rows, None, bin_rows["start"], bin_rows["end"], mode
             )
-            for bin_row, subrange in zip(bin_rows.itertuples(index=False), subranges):
+            for bin_row, subrange in zip(bin_rows.itertuples(index=False), subranges, strict=False):
                 yield bin_row, subrange
         elif keep_empty:
             for bin_row in bin_rows.itertuples(index=False):
@@ -75,9 +76,9 @@ def into_ranges(
     if summary_func is None:
         # Choose a type-appropriate summary function
         elem = source[src_col].iat[0]
-        if isinstance(elem, (str, np.bytes_)):
+        if isinstance(elem, str | np.bytes_):
             summary_func = join_strings
-        elif isinstance(elem, (float, np.float64)):
+        elif isinstance(elem, float | np.float64):
             summary_func = np.nanmedian
         else:
             summary_func = first_of
@@ -205,7 +206,7 @@ def _irange_simple(
         ends = [None] * len(starts)
 
     for start_idx, start_val, end_idx, end_val in zip(
-        start_idxs, starts, end_idxs, ends
+        start_idxs, starts, end_idxs, ends, strict=False
     ):
         yield (slice(start_idx, end_idx), start_val, end_val)
 
@@ -216,7 +217,7 @@ def _irange_nested(
     """Slice subsets of table when regions are nested."""
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
     assert len(starts) == len(ends) > 0
-    for start_val, end_val in zip(starts, ends):
+    for start_val, end_val in zip(starts, ends, strict=False):
         # Mask of table rows to keep for this query region
         region_mask = np.ones(len(table), dtype=np.bool_)
         if start_val:

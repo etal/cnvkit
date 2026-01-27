@@ -117,7 +117,7 @@ def parse_theta_results(
             # List of lists of integer-or-None (usu. 2 x #segments)
             copies = [
                 [int(c) if c.isdigit() else None for c in subcop]
-                for subcop in zip(*[c.split(",") for c in copies])
+                for subcop in zip(*[c.split(",") for c in copies], strict=False)
             ]
 
         # p*
@@ -128,7 +128,7 @@ def parse_theta_results(
         else:
             probs = [
                 [float(p) if not p.isalpha() else None for p in subprob]
-                for subprob in zip(*[p.split(",") for p in probs])
+                for subprob in zip(*[p.split(",") for p in probs], strict=False)
             ]
     return {
         "NLL": nll,

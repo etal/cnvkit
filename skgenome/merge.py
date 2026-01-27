@@ -10,7 +10,7 @@ GenomicArray types.
 from __future__ import annotations
 
 import itertools
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -19,6 +19,7 @@ from .chromsort import sorter_chrom
 from .combiners import get_combiners, first_of
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Iterable
 
 
@@ -92,7 +93,7 @@ def _flatten_tuples(keyed_rows: Iterable, combine: dict[str, Callable]):
         # TODO speed this up! Bottleneck is in dictcomp
         extra_cols = [x for x in first_row._fields[3:] if x in combine]
         breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
-        for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
+        for bp_start, bp_end in itertools.pairwise(breaks):
             # Find the row(s) overlapping this region
             # i.e. any not already seen and not already passed
             rows_in_play = [
@@ -131,7 +132,7 @@ def _flatten_tuples_split(keyed_rows, combine: dict, split_columns: Optional[Ite
         # TODO - use split_columns
         extra_cols = [x for x in first_row._fields[3:] if x in combine]
         breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
-        for bp_start, bp_end in zip(breaks[:-1], breaks[1:]):
+        for bp_start, bp_end in itertools.pairwise(breaks):
             # Find the row(s) overlapping this region
             # i.e. any not already seen and not already passed
             rows_in_play = [
@@ -213,7 +214,7 @@ def _nonoverlapping_groups(table, bp: int):
     # advantage of the grouping and sorting already done, and don't repeat
     # pandas' traversal and inferences.
     # ENH: Find & use a lower-level, 1-pass pandas function
-    keyed_groups = zip(group_keys, table.itertuples(index=False))
+    keyed_groups = zip(group_keys, table.itertuples(index=False), strict=False)
     return (row_group for _key, row_group in itertools.groupby(keyed_groups, first_of))
 
 

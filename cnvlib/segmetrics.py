@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Union
 
 # import pandas as pd
 import numpy as np
@@ -11,6 +11,7 @@ from scipy import stats
 from . import descriptives
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Iterator
     from cnvlib.cnary import CopyNumArray
     from numpy import float64, ndarray
@@ -63,7 +64,7 @@ def do_segmetrics(
             )
     # Measures of spread
     if spread_stats:
-        deviations = (bl - sl for bl, sl in zip(bins_log2s, segarr["log2"]))
+        deviations = (bl - sl for bl, sl in zip(bins_log2s, segarr["log2"], strict=False))
         if len(spread_stats) > 1:
             deviations = list(deviations)
         for statname in spread_stats:

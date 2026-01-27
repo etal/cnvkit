@@ -11,7 +11,7 @@ import multiprocessing
 import os
 import sys
 import warnings
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Optional
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
@@ -74,6 +74,7 @@ from .cmdutil import (
 from ._version import __version__
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from cnvlib.cnary import CopyNumArray
 
 
@@ -485,9 +486,7 @@ P_access.add_argument(
     "-o",
     "--output",
     metavar="FILENAME",
-    type=argparse.FileType("w"),
-    default=sys.stdout,
-    help="Output file name",
+    help="Output file name (default: stdout)",
 )
 P_access.set_defaults(func=_cmd_access)
 
@@ -616,7 +615,7 @@ def _cmd_autobin(args: argparse.Namespace) -> None:
     labels = ("Target", "Antitarget")
     width = max(map(len, labels)) + 1
     print(" " * width, "Depth", "Bin size", sep="\t")
-    for label, (depth, binsize) in zip(labels, fields):
+    for label, (depth, binsize) in zip(labels, fields, strict=False):
         if depth is not None:
             print((label + ":").ljust(width), format(depth, ".3f"), binsize, sep="\t")
 

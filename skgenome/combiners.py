@@ -1,6 +1,7 @@
 """Combiner functions for Python list-like input."""
 
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 from collections.abc import Iterable, Sequence
 
 import pandas as pd

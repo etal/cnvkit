@@ -199,5 +199,5 @@ def _split_exons(dframe):
     """Split exons into individual rows."""
     for row in dframe.itertuples(index=False):
         shared = row[:4]
-        for start, end in zip(row.exon_starts, row.exon_ends):
+        for start, end in zip(row.exon_starts, row.exon_ends, strict=False):
             yield (*shared, start, end)

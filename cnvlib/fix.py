@@ -74,7 +74,7 @@ def do_fix(
                 [cnarr.log2.corr(ref_matched[ref_col]) for ref_col in ref_log2_cols]
             )
             ordered = [
-                (k, r) for r, k in sorted(zip(corr_coefs, ref_log2_cols), reverse=True)
+                (k, r) for r, k in sorted(zip(corr_coefs, ref_log2_cols, strict=False), reverse=True)
             ]
             logging.info(
                 "Correlations with each cluster:\n\t%s",

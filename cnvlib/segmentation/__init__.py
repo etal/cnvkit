@@ -108,7 +108,7 @@ def do_segmentation(
             )
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
-            rets, r_dframe_strings = zip(*rets)
+            rets, r_dframe_strings = zip(*rets, strict=False)
             # Strip the header line from all but the first dataframe, then combine
             r_dframe_strings = map(_to_str, r_dframe_strings)
             rstr = [next(r_dframe_strings)]
@@ -328,8 +328,9 @@ def transfer_fields(
     if not len(segments):
         # All bins in this chromosome arm were dropped: make a dummy segment
         return make_null_segment(bins_chrom, bins_start, bins_end)
-    segments.start.iat[0] = bins_start
-    segments.end.iat[-1] = bins_end
+    # Avoid chained assignment by directly modifying the underlying DataFrame
+    segments.data.loc[segments.data.index[0], 'start'] = bins_start
+    segments.data.loc[segments.data.index[-1], 'end'] = bins_end
 
     # Aggregate segment depths, weights, gene names
     # ENH refactor so that np/CNA.data access is encapsulated in skgenome

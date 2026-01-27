@@ -54,15 +54,15 @@ If you have difficulty with any of these wrappers, please `let me know
 Installation
 ============
 
-CNVkit runs on Python 3.7 and later. Your operating system might already provide
+CNVkit runs on Python 3.10 and later. Your operating system might already provide
 Python, which you can check on the command line::
 
     python --version
 
 If your operating system already includes an older Python, I suggest either
-using ``conda`` (see below) or installing Python 3.5 or later alongside the
+using ``conda`` (see below) or installing Python 3.10 or later alongside the
 existing Python installation instead of attempting to upgrade the system version
-in-place. Your package manager might also provide Python 3.5+.
+in-place. Your package manager might also provide Python 3.10+.
 
 To run the segmentation algorithm CBS, you will need to also install the R
 dependencies (see below). With ``conda``, this is included automatically.

@@ -7,9 +7,10 @@ import gzip
 import os
 from contextlib import contextmanager, suppress
 from concurrent import futures
-from typing import TYPE_CHECKING, Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Iterator
     from concurrent.futures.process import ProcessPoolExecutor
 
