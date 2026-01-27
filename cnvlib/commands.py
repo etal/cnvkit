@@ -11,7 +11,8 @@ import multiprocessing
 import os
 import sys
 import warnings
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Optional
+from collections.abc import Callable
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
@@ -616,7 +617,7 @@ def _cmd_autobin(args: argparse.Namespace) -> None:
     labels = ("Target", "Antitarget")
     width = max(map(len, labels)) + 1
     print(" " * width, "Depth", "Bin size", sep="\t")
-    for label, (depth, binsize) in zip(labels, fields):
+    for label, (depth, binsize) in zip(labels, fields, strict=False):
         if depth is not None:
             print((label + ":").ljust(width), format(depth, ".3f"), binsize, sep="\t")
 

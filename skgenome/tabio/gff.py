@@ -73,7 +73,7 @@ def read_gff(
         header=None,
         na_filter=False,
         names=colnames,
-        dtype=dict(zip(colnames, coltypes)),
+        dtype=dict(zip(colnames, coltypes, strict=False)),
     )
     dframe = (
         dframe.assign(

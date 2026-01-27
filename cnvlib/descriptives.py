@@ -9,7 +9,8 @@ See:
 from __future__ import annotations
 import sys
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
+from collections.abc import Callable
 
 import numpy as np
 from scipy import stats

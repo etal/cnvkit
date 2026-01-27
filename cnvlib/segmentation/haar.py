@@ -277,7 +277,7 @@ def SegmentByPeaks(
     Source: SegmentByPeaks.R
     """
     segs = np.zeros_like(data)
-    for seg_start, seg_end in zip(np.insert(peaks, 0, 0), np.append(peaks, len(data))):
+    for seg_start, seg_end in zip(np.insert(peaks, 0, 0), np.append(peaks, len(data)), strict=False):
         if weights is not None and weights[seg_start:seg_end].sum() > 0:
             # Weighted mean of individual probe values
             val = np.average(

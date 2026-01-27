@@ -522,7 +522,7 @@ def cnv_on_chromosome(
         y_bg = []
         # w_bg = []
         is_bg = probes["gene"].isin(params.ANTITARGET_ALIASES)
-        for x_pt, y_pt, w_pt, is_bg_pt in zip(x, y, w, is_bg):
+        for x_pt, y_pt, w_pt, is_bg_pt in zip(x, y, w, is_bg, strict=False):
             if is_bg_pt:
                 x_bg.append(x_pt)
                 y_bg.append(y_pt)

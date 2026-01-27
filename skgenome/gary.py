@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from typing import Any, Callable, Optional, Union, TYPE_CHECKING
+from typing import Any, Optional, Union, TYPE_CHECKING
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -71,7 +72,7 @@ class GenomicArray:
 
             recast_cols = {
                 col: dtype
-                for col, dtype in zip(self._required_columns, self._required_dtypes)
+                for col, dtype in zip(self._required_columns, self._required_dtypes, strict=False)
                 if not ok_dtype(col, dtype)
             }
             if recast_cols:
@@ -83,7 +84,7 @@ class GenomicArray:
     @classmethod
     def _make_blank(cls) -> pd.DataFrame:
         """Create an empty dataframe with the columns required by this class."""
-        spec = list(zip(cls._required_columns, cls._required_dtypes))
+        spec = list(zip(cls._required_columns, cls._required_dtypes, strict=False))
         try:
             arr = np.zeros(0, dtype=spec)
             return pd.DataFrame(arr)

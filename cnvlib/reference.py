@@ -470,7 +470,7 @@ def summarize_info(all_logr: ndarray, all_depths: ndarray) -> dict[str, ndarray]
     spreads = np.array(
         [
             descriptives.biweight_midvariance(a, initial=i)
-            for a, i in zip(all_logr.T, cvg_centers)
+            for a, i in zip(all_logr.T, cvg_centers, strict=False)
         ]
     )
 
@@ -563,7 +563,7 @@ def warn_bad_bins(cnarr: CNA, max_name_width: int = 50) -> None:
             labels = fg_bad_bins.labels()
             chrom_cols = max(labels.apply(len))
             last_gene = None
-            for label, probe in zip(labels, fg_bad_bins):
+            for label, probe in zip(labels, fg_bad_bins, strict=False):
                 if probe.gene == last_gene:
                     gene = '  "'
                 else:
@@ -608,7 +608,7 @@ def get_fasta_stats(cnarr: CNA, fa_fname: str) -> tuple[ndarray, ndarray]:
     gc_rm_vals = [
         calculate_gc_lo(subseq) for subseq in fasta_extract_regions(fa_fname, cnarr)
     ]
-    gc_vals, rm_vals = zip(*gc_rm_vals)
+    gc_vals, rm_vals = zip(*gc_rm_vals, strict=False)
     return np.asarray(gc_vals, dtype=float), np.asarray(rm_vals, dtype=float)
 
 

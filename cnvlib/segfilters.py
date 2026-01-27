@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 
 from .descriptives import weighted_median
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray

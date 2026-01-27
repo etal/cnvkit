@@ -63,7 +63,7 @@ def _subtraction(table, other):
                 # Exclusion covers the whole region
                 continue
 
-            for start, end in zip(starts, ends):
+            for start, end in zip(starts, ends, strict=False):
                 if end > start:
                     yield keeper._replace(start=start, end=end)
                 else:

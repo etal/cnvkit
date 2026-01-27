@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -603,7 +604,7 @@ class CopyNumArray(GenomicArray):
                     segments["log2"],
                     self.iter_ranges_of(
                         segments, "log2", mode="inner", keep_empty=True
-                    ),
+                    ), strict=False,
                 )
                 if len(bins_lr)
             ]

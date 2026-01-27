@@ -108,7 +108,7 @@ def do_segmentation(
             )
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
-            rets, r_dframe_strings = zip(*rets)
+            rets, r_dframe_strings = zip(*rets, strict=False)
             # Strip the header line from all but the first dataframe, then combine
             r_dframe_strings = map(_to_str, r_dframe_strings)
             rstr = [next(r_dframe_strings)]

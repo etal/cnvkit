@@ -159,7 +159,7 @@ class GaryTests(unittest.TestCase):
         segarr = read_ga("formats/amplicon.cns")
         by_bins = cnarr.by_ranges(segarr)
         by_slices = cnarr.iter_ranges_of(segarr, "gene")
-        for (_seg, by_bin), by_slice in zip(by_bins, by_slices):
+        for (_seg, by_bin), by_slice in zip(by_bins, by_slices, strict=False):
             self.assertEqual(len(by_bin), len(by_slice))
             self.assertTrue((by_bin["gene"].to_numpy() == by_slice.to_numpy()).all())
         # With a VCF
@@ -504,7 +504,7 @@ class IntervalTests(unittest.TestCase):
                 # Iterative intersection
                 grouped_results = regions.by_ranges(selections, mode=mode)
                 for (_coord, result), expect in zip(
-                    grouped_results, expectations[mode]
+                    grouped_results, expectations[mode], strict=False
                 ):
                     self._compare_regions(result, self._from_intervals(expect))
                 # Single-object intersect

@@ -57,7 +57,7 @@ def correlate_cnv_expression(cnv_fname, expression_fname):
     rho, tau = zip(*[
         (spearmanr(cnv_row, expr_row, nan_policy='omit')[0],
          kendalltau(cnv_row, expr_row, nan_policy='omit')[0])
-        for cnv_row, expr_row in zip(c_nums.values, e_nums.values)])
+        for cnv_row, expr_row in zip(c_nums.values, e_nums.values, strict=False)], strict=False)
 
     result = pd.DataFrame({
         "kendall_t": tau,
