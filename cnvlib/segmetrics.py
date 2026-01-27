@@ -3,7 +3,6 @@
 from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Union
-from collections.abc import Callable
 
 # import pandas as pd
 import numpy as np
@@ -12,6 +11,7 @@ from scipy import stats
 from . import descriptives
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Iterator
     from cnvlib.cnary import CopyNumArray
     from numpy import float64, ndarray

@@ -12,7 +12,6 @@ import os
 import sys
 import warnings
 from typing import TYPE_CHECKING, Optional
-from collections.abc import Callable
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
@@ -75,6 +74,7 @@ from .cmdutil import (
 from ._version import __version__
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from cnvlib.cnary import CopyNumArray
 
 

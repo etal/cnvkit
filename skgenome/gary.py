@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from collections import OrderedDict
 from typing import Any, Optional, Union, TYPE_CHECKING
-from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -18,6 +17,7 @@ from .subtract import subtract
 from .subdivide import subdivide
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from cnvlib.cnary import CopyNumArray
     from cnvlib.vary import VariantArray
     from numpy import ndarray
@@ -44,7 +44,7 @@ class GenomicArray:
         # Validation
         if (
             data_table is None
-            or (isinstance(data_table, (list, tuple)) and not len(data_table))
+            or (isinstance(data_table, list | tuple) and not len(data_table))
             or (isinstance(data_table, pd.DataFrame) and not len(data_table.columns))
         ):
             data_table = self._make_blank()

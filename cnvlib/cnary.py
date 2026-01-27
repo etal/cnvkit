@@ -3,7 +3,6 @@
 from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Optional, Union
-from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -14,6 +13,7 @@ from . import core, descriptives, params, smoothing
 from .segmetrics import segment_mean
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Iterator
     from numpy import bool_, float64, ndarray
     from pandas.core.frame import DataFrame

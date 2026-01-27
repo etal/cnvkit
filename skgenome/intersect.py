@@ -9,7 +9,6 @@ GenomicArray types.
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional, Union
-from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -17,6 +16,7 @@ import pandas as pd
 from .combiners import first_of, join_strings, make_const
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Iterator, Sequence
     from numpy import ndarray
     from pandas.core.indexes.base import Index
@@ -76,9 +76,9 @@ def into_ranges(
     if summary_func is None:
         # Choose a type-appropriate summary function
         elem = source[src_col].iat[0]
-        if isinstance(elem, (str, np.bytes_)):
+        if isinstance(elem, str | np.bytes_):
             summary_func = join_strings
-        elif isinstance(elem, (float, np.float64)):
+        elif isinstance(elem, float | np.float64):
             summary_func = np.nanmedian
         else:
             summary_func = first_of

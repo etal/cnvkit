@@ -93,6 +93,7 @@ select = [
 ignore = [
     "E402",  # import not at top
     "E501",  # line too long
+    "E731",  # inline lambda
     "F401",  # unused import
     "F841",  # unused variable
     "UP007", # X|Y type annotations

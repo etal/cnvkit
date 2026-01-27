@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 """Unit tests for the 'genome' sub-package."""
+import functools
+import operator
 import random
+import typing
 import unittest
 
 # unittest/pomegranate 0.10.0: ImportWarning: can't resolve package from
@@ -231,7 +234,7 @@ class GaryTests(unittest.TestCase):
 class IntervalTests(unittest.TestCase):
     """Interval arithmetic tests."""
 
-    combiner = {"gene": lambda a: "".join(a)}
+    combiner: typing.ClassVar = {"gene": lambda a: "".join(a)}
 
     # Simple: nested, overlapping, & non-overlapping intervals
     # =A=========================
@@ -509,7 +512,7 @@ class IntervalTests(unittest.TestCase):
                     self._compare_regions(result, self._from_intervals(expect))
                 # Single-object intersect
                 result = regions.intersection(selections, mode=mode)
-                expect = self._from_intervals(sum(expectations[mode], []))
+                expect = self._from_intervals(functools.reduce(operator.iadd, expectations[mode], []))
                 self._compare_regions(result, expect)
 
     def test_subtract(self):

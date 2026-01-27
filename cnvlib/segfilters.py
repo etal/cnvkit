@@ -9,9 +9,9 @@ import pandas as pd
 
 from .descriptives import weighted_median
 from typing import TYPE_CHECKING
-from collections.abc import Callable
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from cnvlib.cnary import CopyNumArray
     from pandas.core.frame import DataFrame
     from pandas.core.series import Series

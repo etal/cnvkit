@@ -3,7 +3,9 @@
 from __future__ import annotations
 import functools
 from typing import TYPE_CHECKING
-from collections.abc import Callable
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def report_bad_line(line_parser: Callable) -> Callable:
