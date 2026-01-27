@@ -19,6 +19,7 @@ be automatically inferred using the same thresholds as in the 'call' command.
 import argparse
 import logging
 import sys
+from contextlib import nullcontext
 
 from ..cmdutil import read_cna
 from ..call import do_call
@@ -32,8 +33,7 @@ def argument_parsing():
                     type=str,
                     help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'")
     AP.add_argument('-o', '--output',
-                    type=argparse.FileType("w"), default=sys.stdout,
-                    help="Output filename.")
+                    help="Output filename (default: stdout).")
     return AP.parse_args()
 
 
@@ -51,11 +51,14 @@ def cna_stats(cnarr, diploid_parx_genome):
 
 
 def genome_instability_index(args) -> None:
-    print("Sample", "CNA_Fraction", "CNA_Count", sep='\t', file=args.output)
-    for fname in args.cnv_files:
-        cnarr = read_cna(fname)
-        frac, count = cna_stats(cnarr, args.diploid_parx_genome)
-        print(fname, frac, count, sep='\t', file=args.output)
+    # Open output file or use stdout
+    ctx = open(args.output, 'w') if args.output else nullcontext(sys.stdout)
+    with ctx as outfile:
+        print("Sample", "CNA_Fraction", "CNA_Count", sep='\t', file=outfile)
+        for fname in args.cnv_files:
+            cnarr = read_cna(fname)
+            frac, count = cna_stats(cnarr, args.diploid_parx_genome)
+            print(fname, frac, count, sep='\t', file=outfile)
 
 
 def main() -> None:

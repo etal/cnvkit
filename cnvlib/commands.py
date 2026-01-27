@@ -486,9 +486,7 @@ P_access.add_argument(
     "-o",
     "--output",
     metavar="FILENAME",
-    type=argparse.FileType("w"),
-    default=sys.stdout,
-    help="Output file name",
+    help="Output file name (default: stdout)",
 )
 P_access.set_defaults(func=_cmd_access)
 
