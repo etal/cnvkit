@@ -328,8 +328,9 @@ def transfer_fields(
     if not len(segments):
         # All bins in this chromosome arm were dropped: make a dummy segment
         return make_null_segment(bins_chrom, bins_start, bins_end)
-    segments.start.iat[0] = bins_start
-    segments.end.iat[-1] = bins_end
+    # Avoid chained assignment by directly modifying the underlying DataFrame
+    segments.data.loc[segments.data.index[0], 'start'] = bins_start
+    segments.data.loc[segments.data.index[-1], 'end'] = bins_end
 
     # Aggregate segment depths, weights, gene names
     # ENH refactor so that np/CNA.data access is encapsulated in skgenome
