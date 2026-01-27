@@ -10,14 +10,15 @@ channels:
     - bioconda
     - defaults
 dependencies:
-    - python>=3.9
+    - python>=3.10
     - atlas # [not osx]
     - bioconductor-dnacopy
     - biopython >=1.83
-    - matplotlib >=3.6.3
+    - matplotlib >=3.8.0
     - numpy >=1.26.4
     - pandas >=2.1.4
     - pomegranate >=1.0.0
+    - pyparsing >=3.1.0,<3.3.0
     - pyfaidx >=0.8.0
     - pysam >=0.22.0
     - pytest

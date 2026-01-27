@@ -26,7 +26,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Medical Science Apps.",
   "Topic :: Scientific/Engineering :: Visualization"
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
@@ -73,7 +73,7 @@ source = ["cnvlib", "skgenome"]
 source = ["cnvlib", "skgenome"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 
 [tool.ruff.lint]
