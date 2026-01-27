@@ -14,7 +14,7 @@ dependencies:
     - atlas # [not osx]
     - bioconductor-dnacopy
     - biopython >=1.85
-    - matplotlib >=3.8.3
+    - matplotlib >=3.9.0
     - numpy >=2.2.3
     - pandas >=2.2.3
     - pomegranate >=1.0.0
