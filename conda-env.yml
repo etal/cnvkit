@@ -13,18 +13,18 @@ dependencies:
     - python>=3.10
     - atlas # [not osx]
     - bioconductor-dnacopy
-    - biopython >=1.83
-    - matplotlib >=3.8.0
-    - numpy >=1.26.4
-    - pandas >=2.1.4
+    - biopython >=1.85
+    - matplotlib >=3.8.3
+    - numpy >=2.2.3
+    - pandas >=2.2.3
     - pomegranate >=1.0.0
-    - pyparsing >=3.1.0,<3.3.0
-    - pyfaidx >=0.8.0
-    - pysam >=0.22.0
+    - pyparsing >=3.1.2,<3.3.0
+    - pyfaidx >=0.8.1.3
+    - pysam >=0.23.0
     - pytest
-    - reportlab >=3.6.13
+    - reportlab >=4.3.1
     - ruff
     - scikit-learn >=1.5.0
-    - scipy >=1.11.4
+    - scipy >=1.14.1
     - tox
 
