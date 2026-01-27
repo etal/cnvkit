@@ -246,20 +246,26 @@ def _bedcov(args):
     table = bedcov(*args)
     return bed_fname, table
 
-
 def bedcov(
-    bed_fname: str, bam_fname: str, min_mapq: int, fasta: Optional[str] = None
+    bed_fname: str,
+    bam_fname: str,
+    min_mapq: int,
+    fasta: Optional[str] = None,
+    max_depth: Optional[int] = None,
 ) -> pd.DataFrame:
     """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
 
     i.e. mean pileup depth across each region.
     """
     # Count bases in each region; exclude low-MAPQ reads
-    cmd = [bed_fname, bam_fname]
+    cmd = []
+    if max_depth is not None:
+        cmd.extend(["-d", str(max_depth)])
     if min_mapq and min_mapq > 0:
         cmd.extend(["-Q", str(min_mapq)])
     if fasta:
         cmd.extend(["--reference", fasta])
+    cmd.extend([bed_fname, bam_fname])
     try:
         raw = pysam.bedcov(*cmd, split_lines=False)
     except pysam.SamtoolsError as exc:
@@ -273,26 +279,56 @@ def bedcov(
             f"BAM file {bam_fname!r}"
         )
     columns = detect_bedcov_columns(raw)
-    table = pd.read_csv(StringIO(raw), sep="\t", names=columns, usecols=columns)
+    usecols = [c for c in columns if c != "extra"]
+    table = pd.read_csv(StringIO(raw), sep="\t", names=columns, usecols=usecols)
     return table
 
 
 def detect_bedcov_columns(text: str) -> list[str]:
     """Determine which 'bedcov' output columns to keep.
 
-    Format is the input BED plus a final appended column with the count of
-    basepairs mapped within each row's region. The input BED might have 3
-    columns (regions without names), 4 (named regions), or more (arbitrary
-    columns after 'gene').
+    bedcov outputs the input BED columns plus an appended numeric column
+    (basecount). With some options (e.g. -d), an additional trailing numeric
+    column may be appended; then basecount is the second-to-last column.
     """
     firstline = text[: text.index("\n")]
-    tabcount = firstline.count("\t")
+    fields = firstline.split("\t")
+    tabcount = len(fields) - 1
+
     if tabcount < 3:
         raise RuntimeError(f"Bad line from bedcov:\n{firstline!r}")
+
+    def _is_int(s: str) -> bool:
+        try:
+            int(s)
+            return True
+        except ValueError:
+            return False
+
+    has_extra = len(fields) >= 2 and _is_int(fields[-1]) and _is_int(fields[-2])
+
+    # BED3
     if tabcount == 3:
-        return ["chromosome", "start", "end", "basecount"]
+        return ["chromosome", "start", "end", "basecount", "extra"] if has_extra else \
+               ["chromosome", "start", "end", "basecount"]
+
+    # BED4
     if tabcount == 4:
-        return ["chromosome", "start", "end", "gene", "basecount"]
+        return ["chromosome", "start", "end", "gene", "basecount", "extra"] if has_extra else \
+               ["chromosome", "start", "end", "gene", "basecount"]
+
+    # BED4+ with extra columns after gene
     # Input BED has arbitrary columns after 'gene' -- ignore them
-    fillers = [f"_{i}" for i in range(1, tabcount - 3)]
-    return ["chromosome", "start", "end", "gene", *fillers, "basecount"]
+    n_numeric = 2 if has_extra else 1
+    n_total = len(fields)              # total columns in output
+    n_fillers = n_total - 4 - n_numeric
+
+    if n_fillers < 0:
+        raise RuntimeError(f"Unexpected bedcov output:\n{firstline!r}")
+
+    fillers = [f"_{i}" for i in range(1, n_fillers + 1)]
+    cols = ["chromosome", "start", "end", "gene", *fillers, "basecount"]
+    if has_extra:
+        cols.append("extra")
+    return cols
+
