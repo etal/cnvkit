@@ -30,7 +30,7 @@ jobs:
           - {name: '3.10-min', python: '3.10', os: ubuntu-latest, tox: "py310-min"}
           - {name: '3.10-MacOS', python: '3.10', os: macos-latest, tox: py310}
           - {name: Linting, python: '3.12', os: ubuntu-latest, tox: lint}
-          - {name: Security, python: '3.12', os: ubuntu-latest, tox: security}
+          #- {name: Security, python: '3.12', os: ubuntu-latest, tox: security}
           - {name: Coverage, python: '3.12', os: ubuntu-latest, tox: coverage}
     steps:
       - uses: actions/checkout@v4

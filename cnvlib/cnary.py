@@ -158,30 +158,55 @@ class CopyNumArray(GenomicArray):
         """
         ignore += params.ANTITARGET_ALIASES
         for _chrom, subgary in self.by_chromosome():
-            prev_idx = 0
-            for gene, gene_idx in subgary._get_gene_map().items():
+            prev_pos = 0
+            for gene, gene_idx_labels in subgary._get_gene_map().items():
                 if gene not in ignore:
-                    if not len(gene_idx):
+                    if not len(gene_idx_labels):
                         logging.warning("Specified gene name somehow missing: %s", gene)
                         continue
-                    start_idx = gene_idx[0]
-                    end_idx = gene_idx[-1] + 1
-                    if prev_idx < start_idx:
+                    # Convert index labels to positional indices
+                    start_label = gene_idx_labels[0]
+                    end_label = gene_idx_labels[-1]
+                    start_loc = subgary.data.index.get_loc(start_label)
+                    end_loc = subgary.data.index.get_loc(end_label)
+
+                    # get_loc() can return int, slice, or boolean array depending on index type:
+                    # - int: unique label -> position
+                    # - slice: duplicate consecutive labels -> range of positions
+                    # - ndarray (bool): duplicate non-consecutive labels -> mask of positions
+                    # For duplicates, use the first occurrence for start, last for end
+                    if isinstance(start_loc, slice):
+                        start_pos = start_loc.start
+                    elif isinstance(start_loc, np.ndarray):
+                        # Boolean mask: convert to positions and take first
+                        start_pos = np.where(start_loc)[0][0]
+                    else:
+                        start_pos = start_loc
+
+                    if isinstance(end_loc, slice):
+                        end_pos = end_loc.stop
+                    elif isinstance(end_loc, np.ndarray):
+                        # Boolean mask: convert to positions, take last, +1 for exclusive end
+                        end_pos = np.where(end_loc)[0][-1] + 1
+                    else:
+                        end_pos = end_loc + 1
+
+                    if prev_pos < start_pos:
                         # Include intergenic regions
                         yield (
                             params.ANTITARGET_NAME,
-                            subgary.as_dataframe(subgary.data.loc[prev_idx:start_idx]),
+                            subgary.as_dataframe(subgary.data.iloc[prev_pos:start_pos]),
                         )
                     yield (
                         gene,
-                        subgary.as_dataframe(subgary.data.loc[start_idx:end_idx]),
+                        subgary.as_dataframe(subgary.data.iloc[start_pos:end_pos]),
                     )
-                    prev_idx = end_idx
-            if prev_idx < len(subgary) - 1:
+                    prev_pos = end_pos
+            if prev_pos < len(subgary):
                 # Include the telomere
                 yield (
                     params.ANTITARGET_NAME,
-                    subgary.as_dataframe(subgary.data.loc[prev_idx:]),
+                    subgary.as_dataframe(subgary.data.iloc[prev_pos:]),
                 )
 
     # Manipulation
