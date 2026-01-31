@@ -231,10 +231,15 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     args.cluster,
                     args.fasta,
                 )
-                futures.append(future)
+                futures.append((bam, future))
             # Wait for all tasks to complete and raise any exceptions
-            for future in futures:
-                future.result()
+            for bam, future in futures:
+                try:
+                    future.result()
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Processing failed for sample: {bam}"
+                    ) from exc
     else:
         logging.info(
             "No tumor/test samples (but %d normal/control samples) "

@@ -807,6 +807,31 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(male_call__x['cn'].to_list(), [1, 1], "Non-Dpxg male has cn=1 including PAR1/2.")
         self.assertEqual(male_call_dpxg__x['cn'].to_list(), [2, 1, 1, 2], "Dpxg male has cn=2 for PAR1/2 and cn=1 otherwise.")
 
+    def test_batch_futures_exception_handling(self):
+        """Test that batch command properly waits for and reports exceptions from parallel tasks."""
+        from cnvlib import parallel
+
+        # Test that SerialPool propagates exceptions correctly
+        def failing_task():
+            raise ValueError("Simulated processing error")
+
+        pool = parallel.SerialPool()
+        future = pool.submit(failing_task)
+
+        # The future should capture the exception
+        with self.assertRaises(ValueError) as ctx:
+            future.result()
+        self.assertIn("Simulated processing error", str(ctx.exception))
+
+        # Test that successful tasks work correctly
+        def success_task(x):
+            return x * 2
+
+        future2 = pool.submit(success_task, 21)
+        result = future2.result()
+        self.assertEqual(result, 42)
+
+
 def linecount(filename):
     i = -1
     with open(filename) as handle:

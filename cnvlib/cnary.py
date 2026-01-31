@@ -167,8 +167,24 @@ class CopyNumArray(GenomicArray):
                     # Convert index labels to positional indices
                     start_label = gene_idx_labels[0]
                     end_label = gene_idx_labels[-1]
-                    start_pos = subgary.data.index.get_loc(start_label)
-                    end_pos = subgary.data.index.get_loc(end_label) + 1
+                    start_loc = subgary.data.index.get_loc(start_label)
+                    end_loc = subgary.data.index.get_loc(end_label)
+
+                    # get_loc() can return int, slice, or boolean array
+                    # For duplicates, use the first/last occurrence
+                    if isinstance(start_loc, slice):
+                        start_pos = start_loc.start
+                    elif isinstance(start_loc, np.ndarray):
+                        start_pos = np.where(start_loc)[0][0]
+                    else:
+                        start_pos = start_loc
+
+                    if isinstance(end_loc, slice):
+                        end_pos = end_loc.stop
+                    elif isinstance(end_loc, np.ndarray):
+                        end_pos = np.where(end_loc)[0][-1] + 1
+                    else:
+                        end_pos = end_loc + 1
 
                     if prev_pos < start_pos:
                         # Include intergenic regions
