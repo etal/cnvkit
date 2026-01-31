@@ -23,7 +23,11 @@ class SerialPool:
 
     def submit(self, func: Callable, *args) -> SerialFuture:
         """Just call the function on the arguments."""
-        return SerialFuture(func(*args))
+        try:
+            result = func(*args)
+            return SerialFuture(result=result)
+        except Exception as exc:
+            return SerialFuture(exception=exc)
 
     def map(self, func: Callable, iterable: Iterator[Any]) -> map:
         """Just apply the function to `iterable`."""
@@ -37,10 +41,13 @@ class SerialPool:
 class SerialFuture:
     """Mimic the concurrent.futures.Future interface."""
 
-    def __init__(self, result: str) -> None:
+    def __init__(self, result: Any = None, exception: Exception | None = None) -> None:
         self._result = result
+        self._exception = exception
 
-    def result(self) -> str:
+    def result(self) -> Any:
+        if self._exception is not None:
+            raise self._exception
         return self._result
 
 

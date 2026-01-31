@@ -209,8 +209,9 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             )
 
         with parallel.pick_pool(args.processes) as pool:
+            futures = []
             for bam in args.bam_files:
-                pool.submit(
+                future = pool.submit(
                     batch.batch_run_sample,
                     bam,
                     args.targets,
@@ -230,6 +231,10 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     args.cluster,
                     args.fasta,
                 )
+                futures.append(future)
+            # Wait for all tasks to complete and raise any exceptions
+            for future in futures:
+                future.result()
     else:
         logging.info(
             "No tumor/test samples (but %d normal/control samples) "
