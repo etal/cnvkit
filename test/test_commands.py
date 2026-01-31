@@ -698,6 +698,33 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(psegments.data.shape, ssegments.data.shape)
         self.assertEqual(len(psegments.meta), len(ssegments.meta))
 
+    def test_segment_empty_input(self):
+        """Test segmentation with empty CNR input (issue #970)."""
+        # Create an empty CNA with proper structure (header only)
+        empty_data = pd.DataFrame(
+            columns=["chromosome", "start", "end", "gene", "log2"]
+        )
+        empty_cnarr = cnvlib.cnary.CopyNumArray(empty_data, {"sample_id": "test"})
+        
+        # Test with serial processing
+        segments = segmentation.do_segmentation(empty_cnarr, "haar", processes=1)
+        self.assertEqual(len(segments), 0)
+        self.assertListEqual(
+            list(segments.data.columns), 
+            list(empty_cnarr.data.columns)
+        )
+        
+        # Test with parallel processing
+        psegments = segmentation.do_segmentation(empty_cnarr, "haar", processes=2)
+        self.assertEqual(len(psegments), 0)
+        
+        # Test with save_dataframe=True
+        segments_df, rstr = segmentation.do_segmentation(
+            empty_cnarr, "haar", processes=1, save_dataframe=True
+        )
+        self.assertEqual(len(segments_df), 0)
+        self.assertEqual(rstr, "")
+
     def test_segmetrics(self):
         """The 'segmetrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")

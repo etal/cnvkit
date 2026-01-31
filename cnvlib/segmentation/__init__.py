@@ -47,6 +47,12 @@ def do_segmentation(
             + repr(method)
         )
 
+    # Handle empty input (e.g., CNR file with only header row)
+    if not len(cnarr):
+        if save_dataframe:
+            return cnarr, ""
+        return cnarr
+
     if not threshold:
         threshold = {
             "cbs": 0.0001,
