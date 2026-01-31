@@ -16,6 +16,7 @@ warnings.filterwarnings("ignore", category=ImportWarning)
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import numpy as np
+import pandas as pd
 from skgenome import tabio
 
 import cnvlib
@@ -830,6 +831,65 @@ class CommandTests(unittest.TestCase):
         future2 = pool.submit(success_task, 21)
         result = future2.result()
         self.assertEqual(result, 42)
+
+    def test_batch_run_sample_with_duplicate_coordinates(self):
+        """Integration test: batch_run_sample with duplicate coordinates in coverage.
+
+        This tests that when coverage data contains duplicate coordinates,
+        the error is properly detected and reported with sample context.
+        """
+        import tempfile
+        import shutil
+        from cnvlib import fix
+
+        # Create a temporary directory for output
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create mock coverage data with duplicate coordinates
+            # This simulates the issue from GitHub issue #971
+            target_data = pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 4,
+                    "start": [100, 200, 200, 300],  # Duplicate start at position 200
+                    "end": [150, 250, 250, 350],  # Duplicate end at position 250
+                    "gene": ["GeneA", "GeneB", "GeneB", "GeneC"],
+                    "log2": [0.1, 0.2, 0.2, 0.3],
+                    "depth": [100.0, 200.0, 200.0, 150.0],
+                }
+            )
+            target_cnarr = cnvlib.CopyNumArray(target_data, {"sample_id": "test_sample"})
+
+            antitarget_data = pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 2,
+                    "start": [50, 400],
+                    "end": [90, 450],
+                    "gene": ["Antitarget", "Antitarget"],
+                    "log2": [0.0, 0.0],
+                    "depth": [50.0, 50.0],
+                }
+            )
+            antitarget_cnarr = cnvlib.CopyNumArray(
+                antitarget_data, {"sample_id": "test_sample"}
+            )
+
+            # Create a simple reference without duplicates
+            ref_data = pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 5,
+                    "start": [50, 100, 200, 300, 400],
+                    "end": [90, 150, 250, 350, 450],
+                    "gene": ["Antitarget", "GeneA", "GeneB", "GeneC", "Antitarget"],
+                    "log2": [0.0, 0.0, 0.0, 0.0, 0.0],
+                }
+            )
+            ref_cnarr = cnvlib.CopyNumArray(ref_data, {"sample_id": "reference"})
+
+            # Test that do_fix detects duplicate coordinates and raises ValueError
+            with self.assertRaises(ValueError) as ctx:
+                fix.do_fix(target_cnarr, antitarget_cnarr, ref_cnarr)
+
+            # The error message should mention duplicates
+            self.assertIn("Duplicated genomic coordinates", str(ctx.exception))
 
 
 def linecount(filename):

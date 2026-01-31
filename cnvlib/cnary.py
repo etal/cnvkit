@@ -170,11 +170,15 @@ class CopyNumArray(GenomicArray):
                     start_loc = subgary.data.index.get_loc(start_label)
                     end_loc = subgary.data.index.get_loc(end_label)
 
-                    # get_loc() can return int, slice, or boolean array
-                    # For duplicates, use the first/last occurrence
+                    # get_loc() can return int, slice, or boolean array depending on index type:
+                    # - int: unique label -> position
+                    # - slice: duplicate consecutive labels -> range of positions
+                    # - ndarray (bool): duplicate non-consecutive labels -> mask of positions
+                    # For duplicates, use the first occurrence for start, last for end
                     if isinstance(start_loc, slice):
                         start_pos = start_loc.start
                     elif isinstance(start_loc, np.ndarray):
+                        # Boolean mask: convert to positions and take first
                         start_pos = np.where(start_loc)[0][0]
                     else:
                         start_pos = start_loc
@@ -182,6 +186,7 @@ class CopyNumArray(GenomicArray):
                     if isinstance(end_loc, slice):
                         end_pos = end_loc.stop
                     elif isinstance(end_loc, np.ndarray):
+                        # Boolean mask: convert to positions, take last, +1 for exclusive end
                         end_pos = np.where(end_loc)[0][-1] + 1
                     else:
                         end_pos = end_loc + 1

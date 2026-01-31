@@ -237,6 +237,13 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                 try:
                     future.result()
                 except Exception as exc:
+                    # Log original exception details for debugging
+                    logging.error(
+                        "Sample %s failed with %s: %s",
+                        bam,
+                        type(exc).__name__,
+                        exc,
+                    )
                     raise RuntimeError(
                         f"Processing failed for sample: {bam}"
                     ) from exc
