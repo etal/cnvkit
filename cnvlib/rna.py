@@ -279,6 +279,18 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
         sample_counts.shape,
     )
     sc, gi = sample_counts.align(gene_info, join="inner", axis=0)
+
+    # Check that alignment resulted in some genes
+    if len(gi) == 0:
+        raise ValueError(
+            "No genes in common between sample data and gene resource file. "
+            f"Sample data has {len(sample_counts)} genes, "
+            f"gene resource has {len(gene_info)} genes. "
+            "Check that gene IDs match between your input files and gene resource. "
+            "Sample gene IDs (first 5): " + ", ".join(sample_counts.index[:5].tolist()) + "; "
+            "Gene resource IDs (first 5): " + ", ".join(gene_info.index[:5].tolist())
+        )
+
     gi = gi.sort_values(by=["chromosome", "start"])
     sc = sc.loc[gi.index]
 
@@ -293,6 +305,22 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
     logging.info("Weighting genes with below-average read counts")
     gene_counts = sc.median(axis=1)
     weights = [np.sqrt((gene_counts / gene_counts.quantile(0.75)).clip(upper=1))]
+
+    # Validate transcript lengths before division
+    if (gi["tx_length"] <= 0).any():
+        n_invalid = (gi["tx_length"] <= 0).sum()
+        logging.warning(
+            "Found %d genes with invalid transcript length (<= 0); filtering these out",
+            n_invalid,
+        )
+        valid_idx = gi["tx_length"] > 0
+        gi = gi[valid_idx]
+        sc = sc.loc[gi.index]
+        if len(gi) == 0:
+            raise ValueError(
+                "All genes have invalid transcript lengths (<= 0). "
+                "Check your gene resource file or RSEM output."
+            )
 
     logging.info("Calculating normalized gene read depths")
     sample_depths_log2 = normalize_read_depths(
@@ -331,7 +359,16 @@ def normalize_read_depths(sample_depths, normal_ids):
 
     Finally, convert to log2 ratios.
     """
-    assert sample_depths.to_numpy().sum() > 0
+    if sample_depths.to_numpy().sum() <= 0:
+        raise ValueError(
+            "Sample read depths sum to zero or less. "
+            f"Input shape: {sample_depths.shape}, "
+            f"sum: {sample_depths.to_numpy().sum()}, "
+            f"all values zero: {(sample_depths == 0).all().all()}, "
+            f"has inf: {np.isinf(sample_depths.to_numpy()).any()}, "
+            f"has nan: {sample_depths.isna().any().any()}. "
+            "This likely indicates a problem with gene alignment or transcript lengths."
+        )
     sample_depths = sample_depths.fillna(0)
     for _i in range(4):
         # By-sample: 75%ile  among all genes
