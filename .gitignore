@@ -1,5 +1,6 @@
 # IDE
 .vscode/
+.serena/
 
 # Compiled python files (e.g. from running the unit tests):
 *.pyc
