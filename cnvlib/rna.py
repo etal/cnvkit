@@ -299,14 +299,7 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
         # (RSEM results have this, TCGA gene counts don't)
         gi["tx_length"] = tx_lengths.loc[gi.index]
 
-    # Calculate per-gene weights similarly to cnvlib.fix
-    # NB: chrX doesn't need special handling because with X-inactivation,
-    # expression should be similar in male and female samples, i.e. neutral is 0
-    logging.info("Weighting genes with below-average read counts")
-    gene_counts = sc.median(axis=1)
-    weights = [np.sqrt((gene_counts / gene_counts.quantile(0.75)).clip(upper=1))]
-
-    # Validate transcript lengths before division
+    # Validate transcript lengths before any calculations
     if (gi["tx_length"] <= 0).any():
         n_invalid = (gi["tx_length"] <= 0).sum()
         logging.warning(
@@ -321,6 +314,13 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
                 "All genes have invalid transcript lengths (<= 0). "
                 "Check your gene resource file or RSEM output."
             )
+
+    # Calculate per-gene weights similarly to cnvlib.fix
+    # NB: chrX doesn't need special handling because with X-inactivation,
+    # expression should be similar in male and female samples, i.e. neutral is 0
+    logging.info("Weighting genes with below-average read counts")
+    gene_counts = sc.median(axis=1)
+    weights = [np.sqrt((gene_counts / gene_counts.quantile(0.75)).clip(upper=1))]
 
     logging.info("Calculating normalized gene read depths")
     sample_depths_log2 = normalize_read_depths(
@@ -446,7 +446,7 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len
     gene_minima = gene_minima.fillna(NULL_LOG2_COVERAGE)
     assert not gene_minima.hasnans, gene_minima.head()
     for (sample_id, sample_col), (_sid_log2, sample_log2) in zip(
-        sample_counts.iteritems(), sample_data_log2.iteritems(), strict=False
+        sample_counts.items(), sample_data_log2.items(), strict=False
     ):
         tx_len = cnr_info.tx_length
         sample_depth = (read_len * sample_col / tx_len).rename("depth")
