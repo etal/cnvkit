@@ -856,7 +856,7 @@ class CommandTests(unittest.TestCase):
                     "depth": [100.0, 200.0, 200.0, 150.0],
                 }
             )
-            target_cnarr = cnvlib.CopyNumArray(target_data, {"sample_id": "test_sample"})
+            target_cnarr = cnary.CopyNumArray(target_data, {"sample_id": "test_sample"})
 
             antitarget_data = pd.DataFrame(
                 {
@@ -868,7 +868,7 @@ class CommandTests(unittest.TestCase):
                     "depth": [50.0, 50.0],
                 }
             )
-            antitarget_cnarr = cnvlib.CopyNumArray(
+            antitarget_cnarr = cnary.CopyNumArray(
                 antitarget_data, {"sample_id": "test_sample"}
             )
 
@@ -882,7 +882,7 @@ class CommandTests(unittest.TestCase):
                     "log2": [0.0, 0.0, 0.0, 0.0, 0.0],
                 }
             )
-            ref_cnarr = cnvlib.CopyNumArray(ref_data, {"sample_id": "reference"})
+            ref_cnarr = cnary.CopyNumArray(ref_data, {"sample_id": "reference"})
 
             # Test that do_fix detects duplicate coordinates and raises ValueError
             with self.assertRaises(ValueError) as ctx:
