@@ -405,6 +405,8 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len
     # Fill NA fields with the lowest finite value in the same row.
     # Only use NULL_LOG2_COVERAGE if all samples are NA / zero-depth.
     gene_minima = sample_data_log2.min(axis=1, skipna=True)
+    # If a gene has NaN across all samples, fill with NULL_LOG2_COVERAGE
+    gene_minima = gene_minima.fillna(NULL_LOG2_COVERAGE)
     assert not gene_minima.hasnans, gene_minima.head()
     for (sample_id, sample_col), (_sid_log2, sample_log2) in zip(
         sample_counts.iteritems(), sample_data_log2.iteritems(), strict=False
