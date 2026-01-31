@@ -279,6 +279,18 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
         sample_counts.shape,
     )
     sc, gi = sample_counts.align(gene_info, join="inner", axis=0)
+
+    # Check that alignment resulted in some genes
+    if len(gi) == 0:
+        raise ValueError(
+            "No genes in common between sample data and gene resource file. "
+            f"Sample data has {len(sample_counts)} genes, "
+            f"gene resource has {len(gene_info)} genes. "
+            "Check that gene IDs match between your input files and gene resource. "
+            "Sample gene IDs (first 5): " + ", ".join(sample_counts.index[:5].tolist()) + "; "
+            "Gene resource IDs (first 5): " + ", ".join(gene_info.index[:5].tolist())
+        )
+
     gi = gi.sort_values(by=["chromosome", "start"])
     sc = sc.loc[gi.index]
 
@@ -286,6 +298,22 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
         # Replace the existing tx_lengths from gene_resource
         # (RSEM results have this, TCGA gene counts don't)
         gi["tx_length"] = tx_lengths.loc[gi.index]
+
+    # Validate transcript lengths before any calculations
+    if (gi["tx_length"] <= 0).any():
+        n_invalid = (gi["tx_length"] <= 0).sum()
+        logging.warning(
+            "Found %d genes with invalid transcript length (<= 0); filtering these out",
+            n_invalid,
+        )
+        valid_idx = gi["tx_length"] > 0
+        gi = gi[valid_idx]
+        sc = sc.loc[gi.index]
+        if len(gi) == 0:
+            raise ValueError(
+                "All genes have invalid transcript lengths (<= 0). "
+                "Check your gene resource file or RSEM output."
+            )
 
     # Calculate per-gene weights similarly to cnvlib.fix
     # NB: chrX doesn't need special handling because with X-inactivation,
@@ -331,7 +359,16 @@ def normalize_read_depths(sample_depths, normal_ids):
 
     Finally, convert to log2 ratios.
     """
-    assert sample_depths.to_numpy().sum() > 0
+    if sample_depths.to_numpy().sum() <= 0:
+        raise ValueError(
+            "Sample read depths sum to zero or less. "
+            f"Input shape: {sample_depths.shape}, "
+            f"sum: {sample_depths.to_numpy().sum()}, "
+            f"all values zero: {(sample_depths == 0).all().all()}, "
+            f"has inf: {np.isinf(sample_depths.to_numpy()).any()}, "
+            f"has nan: {sample_depths.isna().any().any()}. "
+            "This likely indicates a problem with gene alignment or transcript lengths."
+        )
     sample_depths = sample_depths.fillna(0)
     for _i in range(4):
         # By-sample: 75%ile  among all genes
@@ -405,9 +442,11 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len
     # Fill NA fields with the lowest finite value in the same row.
     # Only use NULL_LOG2_COVERAGE if all samples are NA / zero-depth.
     gene_minima = sample_data_log2.min(axis=1, skipna=True)
+    # If a gene has NaN across all samples, fill with NULL_LOG2_COVERAGE
+    gene_minima = gene_minima.fillna(NULL_LOG2_COVERAGE)
     assert not gene_minima.hasnans, gene_minima.head()
     for (sample_id, sample_col), (_sid_log2, sample_log2) in zip(
-        sample_counts.iteritems(), sample_data_log2.iteritems(), strict=False
+        sample_counts.items(), sample_data_log2.items(), strict=False
     ):
         tx_len = cnr_info.tx_length
         sample_depth = (read_len * sample_col / tx_len).rename("depth")
