@@ -48,7 +48,164 @@ def batch_make_reference(
     method: str,
     do_cluster: bool,
 ) -> tuple[str, str, str]:
-    """Build the CN reference from normal samples, targets and antitargets."""
+    """Build a complete copy number reference from normal samples.
+
+    This is the high-level workflow function used by the `batch` command to
+    create a reference. It coordinates target/antitarget preparation, coverage
+    calculation across normal samples, and reference construction.
+
+    The function handles three sequencing methods: hybrid capture (default),
+    whole genome sequencing (WGS), and targeted amplicon sequencing.
+
+    Parameters
+    ----------
+    normal_bams : list of str
+        Paths to BAM files from normal/control samples. If empty, creates a
+        "flat" reference with uniform expected coverage.
+    target_bed : str, optional
+        Path to BED file defining target/baited regions. Required for hybrid
+        capture and amplicon. Optional for WGS (can be auto-generated).
+    antitarget_bed : None
+        Path to pre-computed antitarget BED file. If None (typical), antitargets
+        are automatically generated for hybrid capture.
+    is_haploid_x_reference : bool
+        True if reference samples are male (haploid X chromosome).
+    diploid_parx_genome : str, optional
+        Reference genome name (e.g., 'hg19', 'hg38') for pseudo-autosomal region
+        handling on X/Y chromosomes.
+    fasta : str
+        Path to reference genome FASTA file. Required for GC/RepeatMasker
+        calculations and for auto-generating WGS targets.
+    annotate : str, optional
+        Path to gene annotation file (e.g., refFlat.txt) to add gene names
+        to targets. Recommended for WGS.
+    short_names : bool
+        Shorten target names to gene symbols when possible.
+    target_avg_size : int
+        Target average bin size in base pairs. If 0 or None, automatically
+        determined. For WGS, defaults to 5000 bp bins.
+    access_bed : None
+        Path to sequencing-accessible regions BED file (e.g., from `access`
+        command). Used for WGS to exclude low-mappability regions.
+    antitarget_avg_size : int, optional
+        Average size for antitarget bins in bp (hybrid capture only).
+    antitarget_min_size : int, optional
+        Minimum size for antitarget bins in bp (hybrid capture only).
+    output_reference : None
+        Path for output reference file. If None, writes to
+        "{output_dir}/reference.cnn".
+    output_dir : str
+        Directory for output files (intermediate coverage files, reference).
+    processes : int
+        Number of parallel processes for coverage calculation.
+        0 = use all available CPUs.
+    by_count : bool
+        Calculate coverage by read count instead of read depth.
+    method : str
+        Sequencing protocol: 'hybrid' (default), 'wgs', or 'amplicon'.
+        Determines target/antitarget handling and default parameters.
+    do_cluster : bool
+        Apply hierarchical clustering to identify and separate reference
+        sample subgroups (useful for heterogeneous normal cohorts).
+
+    Returns
+    -------
+    tuple of (str, str, str)
+        Paths to: (reference .cnn file, targets .bed file, antitargets .bed file)
+
+    Notes
+    -----
+    The reference creation workflow:
+
+    1. **Target preparation** (protocol-dependent):
+
+       - **Hybrid capture**: Uses provided target_bed, generates antitargets
+       - **WGS**: Auto-generates genome-wide bins, no antitargets
+       - **Amplicon**: Uses provided target_bed, no antitargets
+
+    2. **Coverage calculation** (parallel across normal samples):
+
+       - Runs `coverage` command on each normal BAM
+       - Creates .targetcoverage.cnn and .antitargetcoverage.cnn files
+       - Parallelized across samples and within each coverage calculation
+
+    3. **Reference construction**:
+
+       - Pools coverage across normal samples
+       - Calculates GC content, RepeatMasker, edge effects from FASTA
+       - Optionally clusters samples and creates sub-references
+       - Outputs reference.cnn file
+
+    **Flat reference**: If no normal BAMs provided, creates a uniform reference
+    assuming equal coverage in all bins. Less accurate but useful when no
+    normals are available.
+
+    **Protocol differences**:
+
+    - **hybrid**: Uses both targets and antitargets, edge correction enabled
+    - **wgs**: Large genome-wide bins, no antitargets, no edge correction
+    - **amplicon**: Uses only targets, no antitargets, no edge correction
+
+    Raises
+    ------
+    ValueError
+        If method='wgs' or 'amplicon' but antitargets are specified.
+        If method='wgs' and neither targets, access, nor fasta provided.
+        If method='wgs' and targets != access (when both given).
+
+    See Also
+    --------
+    do_reference : Creates reference from coverage files
+    do_reference_flat : Creates flat reference without normal samples
+    batch_write_coverage : Calculates coverage for a single BAM
+    autobin : Automatically determines optimal bin size
+
+    Examples
+    --------
+    Hybrid capture with normal samples:
+    >>> ref, tgt, anti = batch_make_reference(
+    ...     normal_bams=['N1.bam', 'N2.bam', 'N3.bam'],
+    ...     target_bed='baits.bed',
+    ...     antitarget_bed=None,  # Auto-generate
+    ...     is_haploid_x_reference=False,
+    ...     diploid_parx_genome='hg38',
+    ...     fasta='hg38.fa',
+    ...     annotate='refFlat.txt',
+    ...     short_names=True,
+    ...     target_avg_size=0,  # Auto-determine
+    ...     access_bed=None,
+    ...     antitarget_avg_size=None,
+    ...     antitarget_min_size=None,
+    ...     output_reference=None,
+    ...     output_dir='output/',
+    ...     processes=8,
+    ...     by_count=False,
+    ...     method='hybrid',
+    ...     do_cluster=False
+    ... )
+
+    WGS without normal samples (flat reference):
+    >>> ref, tgt, anti = batch_make_reference(
+    ...     normal_bams=[],
+    ...     target_bed=None,  # Auto-generate from FASTA
+    ...     antitarget_bed=None,
+    ...     is_haploid_x_reference=True,
+    ...     diploid_parx_genome='hg19',
+    ...     fasta='hg19.fa',
+    ...     annotate='refFlat.txt',
+    ...     short_names=False,
+    ...     target_avg_size=5000,
+    ...     access_bed='access-5k.hg19.bed',
+    ...     antitarget_avg_size=None,
+    ...     antitarget_min_size=None,
+    ...     output_reference='flat_reference.cnn',
+    ...     output_dir='wgs_ref/',
+    ...     processes=1,
+    ...     by_count=False,
+    ...     method='wgs',
+    ...     do_cluster=False
+    ... )
+    """
     if method in ("wgs", "amplicon"):
         if antitarget_bed:
             raise ValueError(
