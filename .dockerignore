@@ -1,0 +1,70 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# Testing
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.hypothesis/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+wheels/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+doc/
+*.md
+!environment-dev.yml
+!requirements/
+
+# CI/CD
+.github/
+
+# Temporary files
+*.log
+*.tmp
+.cache/
+
+# Development
+play/
+scripts/
+wdl/
+devtools/
+_notes.txt
+changelog-*.txt
+commit-log.txt
+xxx-to-revert.txt
+ruff-check-all.txt
+Makefile
+
+# Test data (exclude to reduce build context)
+test/
