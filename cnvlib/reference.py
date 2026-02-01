@@ -30,6 +30,27 @@ def do_reference_flat(
 
     Combines the intervals, shifts chrX values if requested, and calculates GC
     and RepeatMasker content from the genome FASTA sequence.
+
+    Parameters
+    ----------
+    targets : str
+        Path to BED file with target intervals.
+    antitargets : str, optional
+        Path to BED file with antitarget intervals.
+    fa_fname : str, optional
+        Path to reference genome FASTA file for GC/RepeatMasker calculations.
+    is_haploid_x_reference : bool, optional
+        True if reference should use male (haploid X) chromosome coverage.
+        Default is False.
+    diploid_parx_genome : str, optional
+        Reference genome name for pseudo-autosomal region handling
+        (e.g., 'hg19', 'hg38', 'mm10').
+
+    Returns
+    -------
+    CopyNumArray
+        Neutral reference with flat (expected neutral) log2 coverage values
+        and calculated GC/RepeatMasker features.
     """
     ref_probes = bed2probes(targets)
     if antitargets:

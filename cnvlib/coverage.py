@@ -32,7 +32,33 @@ def do_coverage(
     processes: int = 1,
     fasta: Optional[str] = None,
 ) -> CNA:
-    """Calculate coverage in the given regions from BAM read depths."""
+    """Calculate coverage in the given regions from BAM read depths.
+
+    Parameters
+    ----------
+    bed_fname : str
+        Path to BED file defining regions to measure coverage.
+    bam_fname : str
+        Path to BAM file containing aligned reads.
+    by_count : bool, optional
+        Calculate coverage by read count instead of read depth. Default is False.
+    min_mapq : int, optional
+        Minimum mapping quality score to include a read. Default is 0.
+    processes : int, optional
+        Number of parallel processes to use. Default is 1.
+    fasta : str, optional
+        Path to reference genome FASTA file.
+
+    Returns
+    -------
+    CopyNumArray
+        Coverage values for each region.
+
+    Raises
+    ------
+    RuntimeError
+        If the BAM file is not sorted by coordinates.
+    """
     if not samutil.ensure_bam_sorted(bam_fname, fasta=fasta):
         raise RuntimeError(f"BAM file {bam_fname} must be sorted by coordinates")
     samutil.ensure_bam_index(bam_fname)

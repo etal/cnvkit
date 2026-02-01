@@ -23,7 +23,26 @@ def do_access(
     min_gap_size: int = 5000,
     skip_noncanonical: bool = True,
 ) -> GA:
-    """List the locations of accessible sequence regions in a FASTA file."""
+    """List the locations of accessible sequence regions in a FASTA file.
+
+    Parameters
+    ----------
+    fa_fname : str
+        Path to FASTA file to analyze.
+    exclude_fnames : Iterable[str], optional
+        Paths to BED files of regions to exclude from accessibility.
+    min_gap_size : int, optional
+        Minimum gap size between accessible regions to keep them separate.
+        Default is 5000.
+    skip_noncanonical : bool, optional
+        Skip non-canonical chromosomes (e.g., chr*_random, chrUn_*).
+        Default is True.
+
+    Returns
+    -------
+    GenomicArray
+        Accessible genomic regions.
+    """
     fa_regions = get_regions(fa_fname)
     if skip_noncanonical:
         fa_regions = drop_noncanonical_contigs(fa_regions)

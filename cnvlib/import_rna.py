@@ -24,6 +24,40 @@ def do_import_rna(
 
     The expected data source is TCGA gene-level expression counts for individual
     samples, but other sources should be fine, too.
+
+    Parameters
+    ----------
+    gene_count_fnames : list of str
+        Paths to gene count files for all samples.
+    in_format : str
+        Input file format: 'rsem' or 'counts'.
+    gene_resource_fname : str
+        Path to gene metadata/resource file.
+    correlations_fname : str, optional
+        Path to TCGA gene expression/CNV correlation profiles.
+    normal_fnames : tuple of str, optional
+        Paths to normal/control sample count files.
+    do_gc : bool, optional
+        Apply GC bias correction. Default is True.
+    do_txlen : bool, optional
+        Apply transcript length correction. Default is True.
+    max_log2 : float, optional
+        Maximum log2 ratio to cap values at. Default is 3.
+    diploid_parx_genome : str, optional
+        Reference genome name for pseudo-autosomal region handling
+        (e.g., 'hg19', 'hg38').
+
+    Returns
+    -------
+    tuple
+        (all_data DataFrame, cnrs generator)
+        - all_data: Summary table with gene info and log2-normalized values
+        - cnrs: Generator of CopyNumArray objects, one per sample
+
+    Raises
+    ------
+    RuntimeError
+        If input format is not recognized.
     """
     # Deduplicate and ensure all normals are included in the analysis
     gene_count_fnames = sorted(set(list(gene_count_fnames) + list(normal_fnames)))

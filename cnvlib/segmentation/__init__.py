@@ -38,7 +38,50 @@ def do_segmentation(
     processes: int = 1,
     smooth_cbs: bool = False,
 ) -> CNA:
-    """Infer copy number segments from the given coverage table."""
+    """Infer copy number segments from the given coverage table.
+
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Bin-level copy number ratios (.cnr file).
+    method : str
+        Segmentation algorithm: 'cbs', 'flasso', 'haar', 'hmm', 'hmm-tumor',
+        or 'hmm-germline'.
+    diploid_parx_genome : str, optional
+        Reference genome name for pseudo-autosomal region handling
+        (e.g., 'hg19', 'hg38', 'mm10').
+    threshold : float, optional
+        Significance threshold (for CBS/flasso/haar) or smoothing window size
+        (for HMM methods). If None, uses method-specific defaults.
+    variants : VariantArray, optional
+        Variant allele frequencies to incorporate into HMM segmentation.
+    skip_low : bool, optional
+        Skip bins with low coverage. Default is False.
+    skip_outliers : int, optional
+        Skip bins with log2 ratios more than this many standard deviations
+        from the chromosome arm mean. Default is 10.
+    min_weight : int, optional
+        Minimum weight threshold for including bins. Default is 0.
+    save_dataframe : bool, optional
+        Return the R dataframe as a string along with segments. Default is False.
+    rscript_path : str, optional
+        Path to Rscript executable for CBS/flasso methods. Default is "Rscript".
+    processes : int, optional
+        Number of parallel processes to use. Default is 1.
+    smooth_cbs : bool, optional
+        Apply smoothing to CBS segmentation results. Default is False.
+
+    Returns
+    -------
+    CopyNumArray or tuple
+        Segmented copy number data (.cns format). If save_dataframe=True,
+        returns (segments, R dataframe string).
+
+    Raises
+    ------
+    ValueError
+        If method is not one of the supported segmentation methods.
+    """
     if method not in SEGMENT_METHODS:
         raise ValueError(
             "'method' must be one of: "

@@ -17,7 +17,25 @@ def do_antitarget(
     avg_bin_size: int = 150000,
     min_bin_size: Optional[int] = None,
 ) -> GA:
-    """Derive off-targt ("antitarget") bins from target regions."""
+    """Derive off-target ("antitarget") bins from target regions.
+
+    Parameters
+    ----------
+    targets : GenomicArray
+        Target genomic regions.
+    access : GenomicArray, optional
+        Accessible genomic regions to constrain antitarget bins.
+    avg_bin_size : int, optional
+        Average size for antitarget bins. Default is 150000.
+    min_bin_size : int, optional
+        Minimum size for antitarget bins. If not specified, calculated as
+        2 * avg_bin_size * (2^MIN_REF_COVERAGE).
+
+    Returns
+    -------
+    GenomicArray
+        Antitarget genomic regions.
+    """
     if not min_bin_size:
         min_bin_size = 2 * int(avg_bin_size * (2**MIN_REF_COVERAGE))
     return get_antitargets(targets, access, avg_bin_size, min_bin_size)

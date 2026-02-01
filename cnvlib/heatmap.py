@@ -27,7 +27,32 @@ def do_heatmap(
     title=None,
     ax=None,
 ):
-    """Plot copy number for multiple samples as a heatmap."""
+    """Plot copy number for multiple samples as a heatmap.
+
+    Parameters
+    ----------
+    cnarrs : list of CopyNumArray
+        Copy number data for multiple samples.
+    show_range : str, optional
+        Genomic range to display (e.g., "chr1:1000000-2000000").
+    do_desaturate : bool, optional
+        Desaturate colors in heatmap. Default is False.
+    by_bin : bool, optional
+        Plot by bin position rather than genomic position. Default is False.
+    delim_sampl : bool, optional
+        Draw delimiter lines between samples. Default is False.
+    vertical : bool, optional
+        Orient heatmap vertically instead of horizontally. Default is False.
+    title : str, optional
+        Title for the plot.
+    ax : matplotlib.axes.Axes, optional
+        Existing axes to plot on. If None, creates new figure.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        The axes object with the heatmap plot.
+    """
     if ax is None:
         _fig, axis = plt.subplots()
     else:

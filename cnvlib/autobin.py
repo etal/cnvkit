@@ -44,24 +44,39 @@ def do_autobin(
 
     Parameters
     ----------
-    bam_fname : string
-        BAM filename.
-    method : string
-        One of: 'wgs' (whole-genome sequencing), 'amplicon' (targeted amplicon
-        capture), 'hybrid' (hybridization capture).
-    targets : GenomicArray
-        Targeted genomic regions (for 'hybrid' and 'amplicon').
-    access : GenomicArray
-        Sequencing-accessible regions of the reference genome (for 'hybrid' and
-        'wgs').
-    bp_per_bin : float
+    bam_fname : str
+        Path to BAM file.
+    method : str
+        Sequencing method: 'wgs' (whole-genome sequencing), 'amplicon' (targeted
+        amplicon capture), or 'hybrid' (hybridization capture).
+    targets : GenomicArray, optional
+        Targeted genomic regions (required for 'hybrid' and 'amplicon').
+    access : GenomicArray, optional
+        Sequencing-accessible regions of the reference genome (for 'hybrid' and 'wgs').
+    bp_per_bin : float, optional
         Desired number of sequencing read nucleotide bases mapped to each bin.
+        Default is 100000.0.
+    target_min_size : int, optional
+        Minimum target bin size. Default is 20.
+    target_max_size : int, optional
+        Maximum target bin size. Default is 50000.
+    antitarget_min_size : int, optional
+        Minimum antitarget bin size. Default is 500.
+    antitarget_max_size : int, optional
+        Maximum antitarget bin size. Default is 1000000.
+    fasta : str, optional
+        Path to reference genome FASTA file.
 
     Returns
     -------
-    2-tuple of 2-tuples:
-        ((target depth, target avg. bin size),
-         (antitarget depth, antitarget avg. bin size))
+    tuple of tuple
+        Nested tuple: ((target depth, target avg. bin size),
+        (antitarget depth, antitarget avg. bin size)).
+
+    Raises
+    ------
+    ValueError
+        If targets are required for the method but not provided or empty.
     """
     if method in ("amplicon", "hybrid"):
         if targets is None:

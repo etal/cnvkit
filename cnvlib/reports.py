@@ -27,7 +27,24 @@ if TYPE_CHECKING:
 def do_breaks(
     probes: CopyNumArray, segments: CopyNumArray, min_probes: int = 1
 ) -> pd.DataFrame:
-    """List the targeted genes in which a copy number breakpoint occurs."""
+    """List the targeted genes in which a copy number breakpoint occurs.
+
+    Parameters
+    ----------
+    probes : CopyNumArray
+        Bin-level copy number data.
+    segments : CopyNumArray
+        Segmented copy number data.
+    min_probes : int, optional
+        Minimum number of probes required on each side of the breakpoint.
+        Default is 1.
+
+    Returns
+    -------
+    pd.DataFrame
+        Table with columns: gene, chromosome, location, change,
+        probes_left, probes_right.
+    """
     intervals = get_gene_intervals(probes)
     bpoints = get_breakpoints(intervals, segments, min_probes)
     return pd.DataFrame.from_records(
@@ -119,7 +136,35 @@ def do_genemetrics(
     is_sample_female: None = None,
     diploid_parx_genome: Optional[str] = None,
 ) -> pd.DataFrame:
-    """Identify targeted genes with copy number gain or loss."""
+    """Identify targeted genes with copy number gain or loss.
+
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Bin-level copy number data.
+    segments : CopyNumArray, optional
+        Segmented copy number data. If provided, metrics are calculated
+        per segment.
+    threshold : float, optional
+        Minimum absolute log2 ratio to consider a gene altered. Default is 0.2.
+    min_probes : int, optional
+        Minimum number of probes required to report a gene. Default is 3.
+    skip_low : bool, optional
+        Skip bins with low coverage. Default is False.
+    is_haploid_x_reference : bool, optional
+        Whether reference is male (haploid X). Default is False.
+    is_sample_female : bool, optional
+        Whether sample is female. If None, inferred from data.
+    diploid_parx_genome : str, optional
+        Reference genome name for pseudo-autosomal region handling
+        (e.g., 'hg19', 'hg38', 'mm10').
+
+    Returns
+    -------
+    pd.DataFrame
+        Table of genes with copy number alterations, including gene name,
+        chromosome, log2 ratio, and probe counts.
+    """
     if is_sample_female is None:
         is_sample_female = cnarr.guess_xx(
             is_haploid_x_reference=is_haploid_x_reference,
