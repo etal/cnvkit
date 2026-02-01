@@ -14,6 +14,9 @@ visualize copy number from high-throughput DNA sequencing data. It is designed
 for use with hybrid capture, including both whole-exome and custom target
 panels, and short-read sequencing platforms such as Illumina and Ion Torrent.
 
+**Requirements:** Python 3.10 or later. The R statistical environment with the
+DNAcopy package is also required for the default CBS segmentation algorithm.
+
 .. toctree::
 
     quickstart

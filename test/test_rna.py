@@ -188,7 +188,7 @@ class RNAImportTests(unittest.TestCase):
 
         # Check that gene2 (all NaN) has been filled with NULL_LOG2_COVERAGE
         for cnr in cnrs:
-            gene2_log2 = cnr.data[cnr.data["gene"] == "GENE2"]["log2"].values[0]
+            gene2_log2 = cnr.data[cnr.data["gene"] == "GENE2"]["log2"].to_numpy()[0]
             self.assertEqual(gene2_log2, rna.NULL_LOG2_COVERAGE)
 
     def test_safe_log2_zero_handling(self):

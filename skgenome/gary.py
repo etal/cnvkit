@@ -150,12 +150,14 @@ class GenomicArray:
     # Container behaviour
 
     def __bool__(self) -> bool:
+        """Test whether the array contains any rows (is non-empty)."""
         return bool(len(self.data))
 
     def __eq__(self, other: CopyNumArray) -> bool:
         return isinstance(other, self.__class__) and self.data.equals(other.data)
 
     def __len__(self) -> int:
+        """Return the number of rows (genomic intervals) in the array."""
         return len(self.data)
 
     def __contains__(self, key: str) -> bool:
