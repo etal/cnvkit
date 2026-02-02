@@ -71,7 +71,7 @@ def bedgraph_to_basecount(
     # Read the BED file to get regions
     bed_data = tabio.read(bed_fname, "bed")
 
-    # Open tabix file for random access
+    # Open tabix file for random access with guaranteed cleanup
     try:
         tbx = pysam.TabixFile(bedgraph_fname)
     except OSError as exc:
@@ -79,82 +79,83 @@ def bedgraph_to_basecount(
             f"Failed to open bedGraph file {bedgraph_fname!r}. Error: {exc}"
         ) from exc
 
-    rows = []
-    chromosomes_in_bedgraph = set(tbx.contigs)
+    try:
+        rows = []
+        chromosomes_in_bedgraph = set(tbx.contigs)
 
-    for region in bed_data:
-        chrom = region.chromosome
-        start = region.start
-        end = region.end
+        for region in bed_data:
+            chrom = region.chromosome
+            start = region.start
+            end = region.end
 
-        # Handle chromosome naming mismatches or missing chromosomes
-        if chrom not in chromosomes_in_bedgraph:
-            # Try adding/removing 'chr' prefix
-            alt_chrom = f"chr{chrom}" if not chrom.startswith("chr") else chrom[3:]
-            if alt_chrom in chromosomes_in_bedgraph:
-                chrom = alt_chrom
-            else:
-                # Chromosome not in bedGraph - treat as 0 coverage
-                logging.debug(
-                    "Chromosome %s not found in bedGraph %s, using 0 coverage",
-                    region.chromosome,
-                    bedgraph_fname,
+            # Handle chromosome naming mismatches or missing chromosomes
+            if chrom not in chromosomes_in_bedgraph:
+                # Try adding/removing 'chr' prefix
+                alt_chrom = f"chr{chrom}" if not chrom.startswith("chr") else chrom[3:]
+                if alt_chrom in chromosomes_in_bedgraph:
+                    chrom = alt_chrom
+                else:
+                    # Chromosome not in bedGraph - treat as 0 coverage
+                    logging.debug(
+                        "Chromosome %s not found in bedGraph %s, using 0 coverage",
+                        region.chromosome,
+                        bedgraph_fname,
+                    )
+                    basecount = 0.0
+                    row_data = {
+                        "chromosome": region.chromosome,
+                        "start": start,
+                        "end": end,
+                        "basecount": basecount,
+                    }
+                    if hasattr(region, "gene") and region.gene:
+                        row_data["gene"] = region.gene
+                    rows.append(row_data)
+                    continue
+
+            # Query bedGraph for this region
+            basecount = 0.0
+            try:
+                for line in tbx.fetch(chrom, start, end):
+                    fields = line.split("\t")
+                    r_start = int(fields[1])
+                    r_end = int(fields[2])
+                    depth = float(fields[3])
+
+                    # Clip to bin boundaries
+                    overlap_start = max(r_start, start)
+                    overlap_end = min(r_end, end)
+                    if overlap_end > overlap_start:
+                        basecount += depth * (overlap_end - overlap_start)
+            except Exception as exc:
+                logging.warning(
+                    "Error querying bedGraph for %s:%d-%d: %s",
+                    chrom,
+                    start,
+                    end,
+                    exc,
                 )
-                basecount = 0.0
-                row_data = {
-                    "chromosome": region.chromosome,
-                    "start": start,
-                    "end": end,
-                    "basecount": basecount,
-                }
-                if hasattr(region, "gene") and region.gene:
-                    row_data["gene"] = region.gene
-                rows.append(row_data)
-                continue
 
-        # Query bedGraph for this region
-        basecount = 0.0
-        try:
-            for line in tbx.fetch(chrom, start, end):
-                fields = line.split("\t")
-                r_start = int(fields[1])
-                r_end = int(fields[2])
-                depth = float(fields[3])
+            # Build row matching bedcov output format
+            row_data = {
+                "chromosome": region.chromosome,  # Use original name from BED
+                "start": start,
+                "end": end,
+                "basecount": basecount,
+            }
+            if hasattr(region, "gene") and region.gene:
+                row_data["gene"] = region.gene
+            rows.append(row_data)
 
-                # Clip to bin boundaries
-                overlap_start = max(r_start, start)
-                overlap_end = min(r_end, end)
-                if overlap_end > overlap_start:
-                    basecount += depth * (overlap_end - overlap_start)
-        except Exception as exc:
-            logging.warning(
-                "Error querying bedGraph for %s:%d-%d: %s",
-                chrom,
-                start,
-                end,
-                exc,
-            )
+        # Create DataFrame with columns matching bedcov output
+        if rows and "gene" in rows[0]:
+            columns = ["chromosome", "start", "end", "gene", "basecount"]
+        else:
+            columns = ["chromosome", "start", "end", "basecount"]
 
-        # Build row matching bedcov output format
-        row_data = {
-            "chromosome": region.chromosome,  # Use original name from BED
-            "start": start,
-            "end": end,
-            "basecount": basecount,
-        }
-        if hasattr(region, "gene") and region.gene:
-            row_data["gene"] = region.gene
-        rows.append(row_data)
-
-    tbx.close()
-
-    # Create DataFrame with columns matching bedcov output
-    if rows and "gene" in rows[0]:
-        columns = ["chromosome", "start", "end", "gene", "basecount"]
-    else:
-        columns = ["chromosome", "start", "end", "basecount"]
-
-    return pd.DataFrame(rows, columns=columns)
+        return pd.DataFrame(rows, columns=columns)
+    finally:
+        tbx.close()
 
 
 def do_coverage(
