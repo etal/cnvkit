@@ -182,6 +182,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             args.output_dir,
             args.processes,
             args.count_reads,
+            args.min_mapq,
             args.seq_method,
             args.cluster,
         )
@@ -224,6 +225,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     args.diagram,
                     args.rscript_path,
                     args.count_reads,
+                    args.min_mapq,
                     args.drop_low_coverage,
                     args.seq_method,
                     args.segment_method,
@@ -307,6 +309,14 @@ P_batch.add_argument(
     help="""Number of subprocesses used to running each of the BAM files in parallel.
             Without an argument, use the maximum number of available CPUs. [Default:
             process each BAM in serial]""",
+)
+P_batch.add_argument(
+    "-q",
+    "--min-mapq",
+    type=int,
+    default=0,
+    help="""Minimum mapping quality score (phred scale 0-60) to count a read for
+            coverage depth. [Default: %(default)s]""",
 )
 P_batch.add_argument(
     "--rscript-path",

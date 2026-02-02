@@ -45,6 +45,7 @@ def batch_make_reference(
     output_dir: str,
     processes: int,
     by_count: bool,
+    min_mapq: int,
     method: str,
     do_cluster: bool,
 ) -> tuple[str, str, str]:
@@ -341,6 +342,7 @@ def batch_make_reference(
                         nbam,
                         sample_pfx + ".targetcoverage.cnn",
                         by_count,
+                        min_mapq,
                         procs_per_cnn,
                         fasta,
                     )
@@ -352,6 +354,7 @@ def batch_make_reference(
                         nbam,
                         sample_pfx + ".antitargetcoverage.cnn",
                         by_count,
+                        min_mapq,
                         procs_per_cnn,
                         fasta,
                     )
@@ -384,11 +387,12 @@ def batch_write_coverage(
     sample_fname: str,
     out_fname: str,
     by_count: bool,
+    min_mapq: int,
     processes: int,
     fasta: str,
 ) -> str:
     """Run coverage on one sample (BAM or bedGraph), write to file."""
-    cnarr = coverage.do_coverage(bed_fname, sample_fname, by_count, 0, processes, fasta)
+    cnarr = coverage.do_coverage(bed_fname, sample_fname, by_count, min_mapq, processes, fasta)
     tabio.write(cnarr, out_fname)
     return out_fname
 
@@ -405,6 +409,7 @@ def batch_run_sample(
     plot_diagram: bool,
     rscript_path: str,
     by_count: bool,
+    min_mapq: int,
     skip_low: bool,
     seq_method: str,
     segment_method: str,
@@ -419,12 +424,12 @@ def batch_run_sample(
     sample_pfx = os.path.join(output_dir, sample_id)
 
     raw_tgt = coverage.do_coverage(
-        target_bed, sample_fname, by_count, 0, processes, fasta
+        target_bed, sample_fname, by_count, min_mapq, processes, fasta
     )
     tabio.write(raw_tgt, sample_pfx + ".targetcoverage.cnn")
 
     raw_anti = coverage.do_coverage(
-        antitarget_bed, sample_fname, by_count, 0, processes, fasta
+        antitarget_bed, sample_fname, by_count, min_mapq, processes, fasta
     )
     tabio.write(raw_anti, sample_pfx + ".antitargetcoverage.cnn")
 
