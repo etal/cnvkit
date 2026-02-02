@@ -112,7 +112,7 @@ def add_diploid_parx_genome(P: argparse.ArgumentParser) -> None:
 
 
 def _cmd_batch(args: argparse.Namespace) -> None:
-    """Run the complete CNVkit pipeline on one or more BAM files."""
+    """Run the complete CNVkit pipeline on one or more BAM or bedGraph files."""
     logging.info("CNVkit %s", __version__)
     # Validate/restrict options, beyond what argparse mutual exclusion can do
     bad_args_msg = ""
@@ -154,7 +154,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
 
     # Ensure sample IDs are unique to avoid overwriting outputs
     seen_sids = {}
-    for fname in (args.bam_files or []) + (args.normal or []):
+    for fname in (args.sample_fnames or []) + (args.normal or []):
         sid = core.fbase(fname)
         if sid in seen_sids:
             sys.exit(f"Duplicate sample ID {sid!r} (from {fname} and {seen_sids[sid]})")
@@ -195,22 +195,22 @@ def _cmd_batch(args: argparse.Namespace) -> None:
         tabio.write(targets, args.targets, "bed4")
         tabio.write(antitargets, args.antitargets, "bed4")
 
-    if args.bam_files:
+    if args.sample_fnames:
         if args.processes == 1:
-            procs_per_bam = 1
-            logging.info("Running %d samples in serial", len(args.bam_files))
+            procs_per_sample = 1
+            logging.info("Running %d samples in serial", len(args.sample_fnames))
         else:
-            procs_per_bam = max(1, args.processes // len(args.bam_files))
+            procs_per_sample = max(1, args.processes // len(args.sample_fnames))
             logging.info(
-                "Running %d samples in %d processes (that's %d processes per bam)",
-                len(args.bam_files),
+                "Running %d samples in %d processes (that's %d processes per sample)",
+                len(args.sample_fnames),
                 args.processes,
-                procs_per_bam,
+                procs_per_sample,
             )
 
         with parallel.pick_pool(args.processes) as pool:
             futures = []
-            for bam in args.bam_files:
+            for bam in args.sample_fnames:
                 future = pool.submit(
                     batch.batch_run_sample,
                     bam,
@@ -227,7 +227,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     args.drop_low_coverage,
                     args.seq_method,
                     args.segment_method,
-                    procs_per_bam,
+                    procs_per_sample,
                     args.cluster,
                     args.fasta,
                 )
@@ -254,7 +254,12 @@ def _cmd_batch(args: argparse.Namespace) -> None:
 
 
 P_batch = AP_subparsers.add_parser("batch", help=_cmd_batch.__doc__)
-P_batch.add_argument("bam_files", nargs="*", help="Mapped sequence reads (.bam)")
+P_batch.add_argument(
+    "sample_fnames",
+    nargs="*",
+    help="""Mapped sequence reads (.bam) or pre-computed per-base depth
+            (bedGraph .bed.gz with tabix index .tbi or .csi)""",
+)
 P_batch.add_argument(
     "-m",
     "--seq-method",
@@ -320,8 +325,8 @@ P_batch_newref.add_argument(
     "--normal",
     nargs="*",
     metavar="FILES",
-    help="""Normal samples (.bam) used to construct the pooled, paired, or flat
-            reference. If this option is used but no filenames are given, a "flat"
+    help="""Normal samples (.bam or bedGraph .bed.gz) used to construct the pooled, paired,
+            or flat reference. If this option is used but no filenames are given, a "flat"
             reference will be built. Otherwise, all filenames following this option will
             be used.""",
 )
@@ -637,7 +642,9 @@ def _cmd_autobin(args: argparse.Namespace) -> None:
 
 P_autobin = AP_subparsers.add_parser("autobin", help=_cmd_autobin.__doc__)
 P_autobin.add_argument(
-    "bams", nargs="+", help="""Sample BAM file(s) to test for target coverage"""
+    "bams",
+    nargs="+",
+    help="""Sample BAM file(s) or bedGraph file(s) (.bed.gz) to test for target coverage""",
 )
 P_autobin.add_argument(
     "-f",
