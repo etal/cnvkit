@@ -32,12 +32,34 @@ from cnvlib import __version__
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.ifconfig',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
 ]
+
+# Intersphinx mapping to link to other projects' documentation
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
+    'pandas': ('https://pandas.pydata.org/docs/', None),
+    'matplotlib': ('https://matplotlib.org/stable/', None),
+}
+
+# Autodoc settings
+autodoc_default_options = {
+    'members': True,
+    'member-order': 'bysource',
+    'special-members': '__init__',
+    'undoc-members': True,
+    'exclude-members': '__weakref__'
+}
+
+# Autosummary settings
+autosummary_generate = True
 
 # Napoleon settings
 napoleon_google_docstring = False
@@ -62,10 +84,12 @@ source_suffix = '.rst'
 
 # The master toctree document.
 master_doc = 'index'
+root_doc = 'index'  # Modern Sphinx compatibility
 
 # General information about the project.
 project = 'CNVkit'
-copyright = '2014-2016, Eric Talevich'
+copyright = '2014-2026, Eric Talevich'
+author = 'Eric Talevich'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

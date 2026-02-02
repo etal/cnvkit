@@ -2040,7 +2040,24 @@ def do_sex(
     is_haploid_x_reference: bool,
     diploid_parx_genome: Optional[str],
 ) -> pd.DataFrame:
-    """Guess samples' sex from the relative coverage of chromosomes X and Y."""
+    """Guess samples' sex from the relative coverage of chromosomes X and Y.
+
+    Parameters
+    ----------
+    cnarrs : list of CopyNumArray
+        Copy number data for one or more samples.
+    is_haploid_x_reference : bool
+        Whether the reference sample is male (haploid X chromosome).
+    diploid_parx_genome : str, optional
+        Reference genome name for pseudo-autosomal region handling
+        (e.g., 'hg19', 'hg38', 'mm10').
+
+    Returns
+    -------
+    pd.DataFrame
+        Table with columns: sample, sex, X_logratio, Y_logratio.
+        Sex is inferred from X and Y chromosome coverage patterns.
+    """
 
     def strsign(num) -> str:
         if num > 0:

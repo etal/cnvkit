@@ -54,30 +54,129 @@ def segment_hmm(
     variants: Optional[VariantArray] = None,
     processes: int = 1,
 ) -> CNA:
-    """Segment bins by Hidden Markov Model.
+    """Segment bins using Hidden Markov Model (HMM) with Viterbi algorithm.
 
-    Use Viterbi method to infer copy number segments from sequential data.
+    Applies probabilistic HMM-based segmentation to infer discrete copy number
+    states from continuous log2 ratio data. The Viterbi algorithm finds the
+    most likely sequence of hidden states (copy number levels) given the
+    observed coverage data.
 
-    With b-allele frequencies ('baf' column in `cnarr`), jointly segment
-    log-ratios and b-allele frequencies across a chromosome.
+    This method can model 3-state (loss/neutral/gain) or 5-state (including
+    deep deletions and amplifications) copy number profiles, with either
+    flexible or fixed state means.
 
     Parameters
     ----------
     cnarr : CopyNumArray
-        The bin-level data to segment.
-    method : string
-        One of 'hmm' (3 states, flexible means), 'hmm-tumor' (5 states, flexible
-        means), 'hmm-germline' (3 states, fixed means).
+        Bin-level copy ratios (.cnr file) to segment. Should be normalized
+        and centered around log2=0 for neutral copy number.
+    method : str
+        HMM variant to use. Options:
 
-    Results
+        - 'hmm': 3-state model (loss/neutral/gain) with flexible means
+        - 'hmm-tumor': 5-state model (deep loss/loss/neutral/gain/amplification)
+          with flexible means, optimized for tumor samples
+        - 'hmm-germline': 3-state model with fixed means, optimized for
+          germline samples
+    diploid_parx_genome : str, optional
+        Reference genome name (e.g., 'hg19', 'hg38') for pseudo-autosomal
+        region handling. Affects modeling of X/Y chromosomes.
+        Default: None
+    window : int, optional
+        Smoothing window width (number of bins) applied before HMM fitting.
+        If None, uses weighted smoothing based on bin statistics.
+        Default: None
+    variants : VariantArray, optional
+        Variant allele frequency data (from VCF). Currently not actively used
+        in HMM segmentation but reserved for future joint segmentation of
+        copy ratios and allele frequencies.
+        Default: None
+    processes : int, optional
+        Number of parallel processes for model building (when processing
+        multiple chromosomes). Currently limited to 1 due to pomegranate
+        constraints.
+        Default: 1
+
+    Returns
     -------
-    segarr : CopyNumArray
-        The segmented data.
+    CopyNumArray
+        Segmented copy number data (.cns file) with discrete states.
+        Each segment represents a region with homogeneous copy number state.
+        Contains columns: chromosome, start, end, gene, log2, probes.
 
     Raises
     ------
     ImportError
-        If pomegranate is not available or version is incompatible.
+        If pomegranate library (>=1.0.0) is not installed. Install with:
+        ``pip install pomegranate>=1.0.0``
+    ValueError
+        If no valid observations are available for HMM prediction (e.g.,
+        all-zero coverage).
+
+    Notes
+    -----
+    The HMM segmentation process:
+
+    1. **Smoothing**: Apply weighted smoothing to log2 ratios to reduce noise
+       while preserving biological signal.
+
+    2. **Model building**: Construct HMM with discrete states representing
+       copy number levels. State means and transition probabilities are
+       learned from the data (except for 'hmm-germline').
+
+    3. **Viterbi decoding**: Find the most likely sequence of states that
+       explains the observed log2 ratios.
+
+    4. **Segmentation**: Merge adjacent bins with the same predicted state
+       into contiguous segments.
+
+    **State models**:
+
+    - 3-state (hmm, hmm-germline): deletion (CN<2), neutral (CN=2), gain (CN>2)
+    - 5-state (hmm-tumor): deep deletion (CN=0), loss (CN=1), neutral (CN=2),
+      gain (CN=3), amplification (CN≥4)
+
+    **Advantages over CBS**:
+
+    - Probabilistic framework with explicit copy number states
+    - Can handle noisy data more robustly
+    - Joint modeling of multiple features (future enhancement)
+
+    **Limitations**:
+
+    - Requires pomegranate library (~500MB+ with PyTorch dependencies)
+    - Slower than CBS for large datasets
+    - Less established in CNV literature than CBS
+
+    See Also
+    --------
+    hmm_get_model : Builds the HMM from observations
+    as_observation_matrix : Converts copy ratios to HMM observation format
+    segment_cbs : Alternative segmentation using Circular Binary Segmentation
+
+    Examples
+    --------
+    Basic 3-state HMM segmentation:
+    >>> segments = segment_hmm(
+    ...     cnarr=cnr,
+    ...     method='hmm',
+    ...     diploid_parx_genome='hg38'
+    ... )
+
+    5-state tumor-specific segmentation:
+    >>> segments = segment_hmm(
+    ...     cnarr=tumor_cnr,
+    ...     method='hmm-tumor',
+    ...     diploid_parx_genome='hg38',
+    ...     window=50  # Custom smoothing window
+    ... )
+
+    Germline segmentation with fixed state means:
+    >>> segments = segment_hmm(
+    ...     cnarr=germline_cnr,
+    ...     method='hmm-germline',
+    ...     diploid_parx_genome=None
+    ... )
     """
     if not HMM_AVAILABLE:
         raise ImportError(

@@ -40,7 +40,45 @@ def do_scatter(
     segment_color: str = SEG_COLOR,
     title: None = None,
 ) -> Figure:
-    """Plot probe log2 coverages and segmentation calls together."""
+    """Plot probe log2 coverages and segmentation calls together.
+
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Bin-level copy number data to plot.
+    segments : CopyNumArray, optional
+        Segmented copy number data to overlay.
+    variants : VariantArray, optional
+        Variant allele frequency data to plot.
+    show_range : str, optional
+        Genomic range to display (e.g., "chr1:1000000-2000000").
+    show_gene : str, optional
+        Gene name to zoom into.
+    do_trend : bool, optional
+        Plot a smoothed trendline. Default is False.
+    by_bin : bool, optional
+        Plot by bin index rather than genomic coordinates. Default is False.
+    window_width : float, optional
+        Smoothing window width in bases (or bins if by_bin=True).
+        Default is 1e6.
+    y_min : float, optional
+        Minimum y-axis value.
+    y_max : float, optional
+        Maximum y-axis value.
+    fig_size : tuple of float, optional
+        Figure size as (width, height) in inches.
+    antitarget_marker : str, optional
+        Marker style for antitarget bins.
+    segment_color : str, optional
+        Color for segment lines. Default is SEG_COLOR.
+    title : str, optional
+        Plot title.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The scatter plot figure.
+    """
     if by_bin:
         bp_per_bin = sum(c.end.iat[-1] for _, c in cnarr.by_chromosome()) / len(cnarr)
         window_width /= bp_per_bin

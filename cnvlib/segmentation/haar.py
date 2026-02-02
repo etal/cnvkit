@@ -84,6 +84,57 @@ def one_chrom(cnarr: CopyNumArray, fdr_q: float, chrom: str) -> pd.DataFrame:
 
 
 def variants_in_segment(varr, segment, fdr_q):
+    """Segment a single genomic interval based on B-allele frequencies.
+
+    Applies HaarSeg segmentation to variant allele frequencies within a segment
+    to detect sub-clonal changes or allelic imbalances. This is used for
+    allele-specific copy number analysis.
+
+    Parameters
+    ----------
+    varr : VariantArray
+        Variant allele frequency data (from VCF) within the segment region.
+        Contains SNV positions and their B-allele frequencies.
+    segment : Row or CopyNumArray
+        A single segment from copy number segmentation results.
+        Must have 'chromosome', 'start', 'end', 'gene', 'log2', 'probes' fields.
+    fdr_q : float
+        False discovery rate q-value for HaarSeg breakpoint detection.
+        Typical values: 0.01, 0.001, 0.0001. Lower = less sensitive.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Segmentation results as a table with columns:
+        - chromosome, start, end: Genomic coordinates
+        - gene: Gene name from parent segment
+        - log2: Copy ratio from parent segment (not re-calculated)
+        - probes: Number of variants in each sub-segment
+
+        If no sub-segmentation is detected (≤1 breakpoint), returns the
+        original segment as a single-row DataFrame.
+
+    Notes
+    -----
+    The function:
+
+    1. Transforms B-allele frequencies to mirrored values (0.5-1.0 range)
+       with tumor purity boosting
+    2. Applies HaarSeg to detect breakpoints in allele frequencies
+    3. If multiple segments found, places breakpoints midway between SNVs
+    4. If no segmentation needed, returns original segment unchanged
+
+    The log2 copy ratio is inherited from the parent segment and not
+    recalculated, as this function focuses on allelic changes.
+
+    This is primarily used internally by the `call` command when VCF data
+    is provided to refine segment boundaries based on heterozygous SNPs.
+
+    See Also
+    --------
+    haarSeg : The underlying HaarSeg segmentation algorithm
+    VariantArray.mirrored_baf : Transforms BAF values for segmentation
+    """
     if len(varr):
         values = varr.mirrored_baf(above_half=True, tumor_boost=True)
         results = haarSeg(values, fdr_q, weights=None)  # ENH weight by sqrt(DP)

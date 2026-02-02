@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 """Unit tests for the CNVkit library, cnvlib."""
-import unittest
 
 import logging
-
+import shutil
+import tempfile
+import unittest
 from multiprocessing import Pool
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
@@ -39,6 +40,7 @@ from cnvlib import (
     import_rna,
     importers,
     metrics,
+    parallel,
     params,
     plots,
     reference,
@@ -705,19 +707,19 @@ class CommandTests(unittest.TestCase):
             columns=["chromosome", "start", "end", "gene", "log2"]
         )
         empty_cnarr = cnvlib.cnary.CopyNumArray(empty_data, {"sample_id": "test"})
-        
+
         # Test with serial processing
         segments = segmentation.do_segmentation(empty_cnarr, "haar", processes=1)
         self.assertEqual(len(segments), 0)
         self.assertListEqual(
-            list(segments.data.columns), 
+            list(segments.data.columns),
             list(empty_cnarr.data.columns)
         )
-        
+
         # Test with parallel processing
         psegments = segmentation.do_segmentation(empty_cnarr, "haar", processes=2)
         self.assertEqual(len(psegments), 0)
-        
+
         # Test with save_dataframe=True
         segments_df, rstr = segmentation.do_segmentation(
             empty_cnarr, "haar", processes=1, save_dataframe=True
@@ -771,7 +773,7 @@ class CommandTests(unittest.TestCase):
                 self.assertTrue(subarr.end.is_monotonic_increasing, bait_fname)
                 # Bins are non-overlapping; next start >= prev. end
                 self.assertTrue(
-                    ((subarr.start.values[1:] - subarr.end.values[:-1]) >= 0).all()
+                    ((subarr.start.to_numpy()[1:] - subarr.end.to_numpy()[:-1]) >= 0).all()
                 )
             r2a = commands.do_target(
                 baits,
@@ -837,8 +839,6 @@ class CommandTests(unittest.TestCase):
 
     def test_batch_futures_exception_handling(self):
         """Test that batch command properly waits for and reports exceptions from parallel tasks."""
-        from cnvlib import parallel
-
         # Test that SerialPool propagates exceptions correctly
         def failing_task():
             raise ValueError("Simulated processing error")
@@ -865,10 +865,6 @@ class CommandTests(unittest.TestCase):
         This tests that when coverage data contains duplicate coordinates,
         the error is properly detected and reported with sample context.
         """
-        import tempfile
-        import shutil
-        from cnvlib import fix
-
         # Create a temporary directory for output
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create mock coverage data with duplicate coordinates

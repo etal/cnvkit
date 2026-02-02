@@ -26,7 +26,120 @@ def do_fix(
     do_cluster: bool = False,
     smoothing_window_fraction: None = None,
 ) -> CopyNumArray:
-    """Combine target and antitarget coverages and correct for biases."""
+    """Normalize tumor/test sample coverage using a reference and correct biases.
+
+    This is the core normalization step in the CNVkit pipeline. It combines target
+    and antitarget coverage data, applies the reference baseline, corrects for
+    systematic biases (GC content, edge effects, RepeatMasker), and produces
+    log2 copy ratios ready for segmentation.
+
+    The "fix" name refers to fixing/correcting coverage biases.
+
+    Parameters
+    ----------
+    target_raw : CopyNumArray
+        Raw coverage data for on-target/baited regions from the test sample.
+        Typically a .targetcoverage.cnn file from the `coverage` command.
+    antitarget_raw : CopyNumArray
+        Raw coverage data for off-target/antitarget regions from the test sample.
+        Typically a .antitargetcoverage.cnn file from the `coverage` command.
+        Can be empty for amplicon sequencing.
+    reference : CopyNumArray
+        Pooled reference created from normal samples using `do_reference`.
+        Contains expected neutral coverage and bias correction features.
+    diploid_parx_genome : str, optional
+        Reference genome name for pseudo-autosomal region handling
+        (e.g., 'hg19', 'hg38', 'mm10'). Ensures PAR regions on X/Y chromosomes
+        are treated as diploid during normalization.
+        Default: None
+    do_gc : bool, optional
+        Apply GC bias correction using GC content from reference.
+        Corrects for systematic coverage variations due to GC%.
+        Default: True
+    do_edge : bool, optional
+        Apply edge effect correction for target bins.
+        Corrects for reduced coverage near bait interval boundaries.
+        Default: True
+    do_rmask : bool, optional
+        Apply RepeatMasker correction for antitarget bins.
+        Corrects for coverage variations in repetitive regions.
+        Default: True
+    do_cluster : bool, optional
+        If the reference contains multiple sub-clusters (from hierarchical
+        clustering during reference creation), select the cluster with
+        highest correlation to this sample.
+        Default: False
+    smoothing_window_fraction : None, optional
+        Reserved parameter for future smoothing functionality.
+        Currently not implemented.
+        Default: None
+
+    Returns
+    -------
+    CopyNumArray
+        Normalized copy number ratios (.cnr file) with log2 ratios centered
+        around 0 (neutral copy number). Ready for segmentation with the
+        `segment` command.
+
+    Notes
+    -----
+    The normalization process:
+
+    1. **Bias correction** (separately for targets and antitargets):
+
+       - GC correction: Adjusts for GC content-dependent coverage bias
+       - Edge correction: Adjusts for lower coverage near bait edges (targets only)
+       - RepeatMasker correction: Adjusts for repeats (antitargets only)
+
+    2. **Reference subtraction**:
+
+       - Subtracts reference log2 values from sample log2 values
+       - If do_cluster=True, selects best-matching reference cluster
+
+    3. **Weighting**:
+
+       - Applies statistical weights based on coverage variability
+       - Down-weights unreliable bins
+
+    4. **Centering**:
+
+       - Centers the genome-wide distribution around log2=0
+       - Accounts for sex chromosomes and PAR regions
+
+    The output .cnr file contains one row per bin with columns:
+
+    - chromosome, start, end, gene: Genomic location
+    - log2: Copy ratio in log2 scale (0 = diploid, +1 = gain, -1 = loss)
+    - depth: Read depth
+    - weight: Statistical weight for segmentation
+
+    See Also
+    --------
+    do_reference : Creates the reference used for normalization
+    load_adjust_coverages : Internal function that performs bias correction
+    apply_weights : Calculates statistical weights for bins
+
+    Examples
+    --------
+    Basic usage:
+    >>> fixed = do_fix(
+    ...     target_raw=read_cna('Sample.targetcoverage.cnn'),
+    ...     antitarget_raw=read_cna('Sample.antitargetcoverage.cnn'),
+    ...     reference=read_cna('reference.cnn')
+    ... )
+
+    With cluster selection:
+    >>> fixed = do_fix(
+    ...     target_raw, antitarget_raw, reference,
+    ...     do_cluster=True  # Select best-matching reference cluster
+    ... )
+
+    For male sample with PAR handling:
+    >>> fixed = do_fix(
+    ...     target_raw, antitarget_raw, reference,
+    ...     diploid_parx_genome='hg38'
+    ... )
+    """
     # Load, recenter and GC-correct target & antitarget probes separately
     logging.info("Processing target: %s", target_raw.sample_id)
     cnarr, ref_matched = load_adjust_coverages(

@@ -34,6 +34,90 @@ def do_call(
         0.7,
     ),
 ) -> CopyNumArray:
+    """Assign absolute integer copy number to each segment.
+
+    This is the main API function for calling absolute copy numbers from
+    segmented log2 ratios. It supports multiple calling methods and can
+    optionally incorporate variant allele frequencies and tumor purity
+    information.
+
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Segmented copy number data (.cns file), typically from the segment
+        command. Should contain 'log2' column with copy ratio values.
+    variants : VariantArray, optional
+        Variant allele frequency data from VCF, used to call allele-specific
+        copy numbers. If provided, 'baf' (B-allele frequency) will be added
+        to the output, and 'cn1'/'cn2' (major/minor allele copy numbers) will
+        be calculated.
+    method : str, optional
+        Calling method to use. Options:
+        - 'threshold': Apply log2 ratio thresholds (default)
+        - 'clonal': Assume pure/clonal sample, infer from ploidy
+        - 'none': Skip copy number calling, only apply filters
+        Default: 'threshold'
+    ploidy : int, optional
+        Expected baseline ploidy of the sample. Usually 2 for diploid.
+        Default: 2
+    purity : float, optional
+        Estimated tumor purity (0.0 to 1.0). If provided and < 1.0, log2
+        ratios will be rescaled to account for normal cell contamination.
+        Default: None (assume pure sample)
+    is_haploid_x_reference : bool, optional
+        Whether the reference sample is male (haploid X chromosome).
+        Affects X chromosome copy number interpretation.
+        Default: False
+    is_sample_female : bool, optional
+        Whether the test sample is female. Used with purity rescaling.
+        Default: False
+    diploid_parx_genome : str, optional
+        Reference genome name for pseudo-autosomal region handling
+        (e.g., 'hg19', 'hg38', 'mm10'). Treats PAR regions as diploid
+        even in male samples.
+        Default: None
+    filters : list of str, optional
+        Segment filters to apply. Options include 'ci' (confidence interval),
+        'sem' (standard error), 'ampdel' (amplification/deletion), etc.
+        See segfilters module for full list.
+        Default: None
+    thresholds : tuple of 4 floats or ndarray, optional
+        Log2 ratio thresholds for calling copy numbers when method='threshold'.
+        Format: (del_threshold, loss_threshold, gain_threshold, amp_threshold)
+        These map to copy numbers [0, 1, 2, 3, 4+] respectively.
+        Default: (-1.1, -0.25, 0.2, 0.7)
+
+    Returns
+    -------
+    CopyNumArray
+        Copy of input array with added 'cn' column (absolute copy number).
+        If variants provided, also includes:
+        - 'baf': B-allele frequency per segment
+        - 'cn1': Major allele copy number (≥ cn2)
+        - 'cn2': Minor allele copy number (≤ cn1)
+
+    Raises
+    ------
+    ValueError
+        If method is not one of 'threshold', 'clonal', or 'none'.
+
+    See Also
+    --------
+    absolute_clonal : Calculate absolute copy numbers for pure samples
+    absolute_threshold : Apply log2 thresholds to call copy numbers
+    rescale_baf : Rescale B-allele frequencies for tumor purity
+
+    Examples
+    --------
+    Basic threshold calling:
+    >>> calls = do_call(segments, method='threshold')
+
+    With tumor purity and variants:
+    >>> calls = do_call(segments, variants=vcf, purity=0.7, ploidy=2)
+
+    With custom thresholds:
+    >>> calls = do_call(segments, thresholds=(-1.5, -0.3, 0.3, 1.0))
+    """
     if method not in ("threshold", "clonal", "none"):
         raise ValueError("Argument `method` must be one of: clonal, threshold")
 

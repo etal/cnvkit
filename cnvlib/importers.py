@@ -19,6 +19,38 @@ if TYPE_CHECKING:
 
 
 def do_import_picard(fname, too_many_no_coverage=100):
+    """Import coverage data from Picard CalculateHsMetrics output.
+
+    Converts Picard CalculateHsMetrics output to CNVkit format by reading the
+    interval-level coverage data, cleaning up gene names, and calculating log2
+    ratios.
+
+    Parameters
+    ----------
+    fname : str
+        Path to Picard CalculateHsMetrics output file (typically ends in
+        .per_target_coverage or .interval_summary).
+    too_many_no_coverage : int, optional
+        Threshold for warning about excessive zero-coverage bins.
+        Default: 100.
+
+    Returns
+    -------
+    CopyNumArray
+        CNVkit-compatible genomic array with columns including 'gene', 'log2',
+        and 'ratio' (coverage relative to average).
+
+    Notes
+    -----
+    Bins with zero coverage are assigned the NULL_LOG2_COVERAGE value to avoid
+    math domain errors in log2 transformation.
+
+    Gene names from overlapping intervals are deduplicated (see `unpipe_name`).
+
+    See Also
+    --------
+    unpipe_name : Cleans up duplicated gene names from Picard output
+    """
     garr = tabio.read(fname, "picardhs")
     garr["gene"] = garr["gene"].apply(unpipe_name)
     # Create log2 column from coverages, avoiding math domain error
@@ -69,6 +101,42 @@ def unpipe_name(name):
 def do_import_theta(
     segarr: CopyNumArray, theta_results_fname: str, ploidy: int = 2
 ) -> Iterator[CopyNumArray]:
+    """Import absolute copy number calls from THetA results.
+
+    THetA (Tumor Heterogeneity Analysis) infers tumor purity and clonal/subclonal
+    copy number profiles. This function converts THetA's output into CNVkit
+    segment format with absolute copy numbers.
+
+    Parameters
+    ----------
+    segarr : CopyNumArray
+        Input segmented copy number data (.cns file). Typically the segmentation
+        results before calling absolute copy numbers.
+    theta_results_fname : str
+        Path to THetA results file (.results or .withBounds file).
+    ploidy : int, optional
+        Expected baseline ploidy (usually 2 for diploid). Used to calculate
+        log2 ratios from absolute copy numbers. Default: 2.
+
+    Yields
+    ------
+    CopyNumArray
+        One or more segment arrays with 'cn' (absolute copy number) and
+        recalculated 'log2' values. THetA may output multiple solutions,
+        each yielded separately.
+
+    Notes
+    -----
+    - Only autosomal segments are processed; sex chromosomes are excluded
+      because THetA doesn't handle them well.
+    - Segments with unknown copy number (marked as None/X in THetA output)
+      are dropped.
+    - Copy number 0 is treated as 0.5 for log2 calculation to avoid -inf.
+
+    See Also
+    --------
+    parse_theta_results : Parses the THetA results file format
+    """
     theta = parse_theta_results(theta_results_fname)
     # THetA doesn't handle sex chromosomes well
     segarr = segarr.autosomes()

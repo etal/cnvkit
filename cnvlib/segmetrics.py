@@ -29,7 +29,37 @@ def do_segmetrics(
     smoothed: bool = False,
     skip_low: bool = False,
 ) -> CopyNumArray:
-    """Compute segment-level metrics from bin-level log2 ratios."""
+    """Compute segment-level metrics from bin-level log2 ratios.
+
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Bin-level copy number data.
+    segarr : CopyNumArray
+        Segmented copy number data.
+    location_stats : list of str, optional
+        Location statistics to compute: 'mean', 'median', 'mode', 'p_ttest'.
+        Default is empty tuple.
+    spread_stats : list of str, optional
+        Spread statistics to compute: 'stdev', 'mad', 'mse', 'iqr', 'bivar', 'sem'.
+        Default is empty tuple.
+    interval_stats : list of str, optional
+        Interval statistics to compute: 'ci' (confidence interval),
+        'pi' (prediction interval). Default is empty tuple.
+    alpha : float, optional
+        Significance level for confidence/prediction intervals. Default is 0.05.
+    bootstraps : int, optional
+        Number of bootstrap iterations for confidence intervals. Default is 100.
+    smoothed : bool, optional
+        Use smoothed bootstrap for confidence intervals. Default is False.
+    skip_low : bool, optional
+        Skip bins with low coverage. Default is False.
+
+    Returns
+    -------
+    CopyNumArray
+        Segmented data with additional statistical columns.
+    """
     # Silence sem's "Degrees of freedom <= 0 for slice"; NaN is OK
     import warnings
 

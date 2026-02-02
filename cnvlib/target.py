@@ -21,7 +21,29 @@ def do_target(
     do_split: bool = False,
     avg_size: Union[int, float] = 200 / 0.75,
 ) -> GenomicArray:
-    """Transform bait intervals into targets more suitable for CNVkit."""
+    """Transform bait intervals into targets more suitable for CNVkit.
+
+    Parameters
+    ----------
+    bait_arr : GenomicArray
+        Bait intervals from a BED or interval file.
+    annotate : str, optional
+        Path to annotation file (BED, GFF, refFlat, etc.) to assign gene names
+        to target regions.
+    do_short_names : bool, optional
+        Reduce multi-accession bait labels to be short and consistent.
+        Default is False.
+    do_split : bool, optional
+        Split large target intervals into smaller pieces. Default is False.
+    avg_size : float, optional
+        Average target size when splitting large intervals.
+        Default is 200/0.75 (~267 bp).
+
+    Returns
+    -------
+    GenomicArray
+        Processed target intervals ready for CNVkit analysis.
+    """
     tgt_arr = bait_arr.copy()
     # Drop zero-width regions
     tgt_arr = tgt_arr[tgt_arr.start != tgt_arr.end]

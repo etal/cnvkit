@@ -23,13 +23,28 @@ def do_bintest(
 ) -> CopyNumArray:
     """Get a probability for each bin based on its Z-score.
 
-    Adds a column w/ p-values to the input .cnr. With `segments`, the Z-score is
+    Adds a column with p-values to the input .cnr. With `segments`, the Z-score is
     relative to the enclosing segment's mean, otherwise it is relative to 0.
 
     Bin p-values are corrected for multiple hypothesis testing by the
     Benjamini-Hochberg method.
 
-    Returns: bins where the probability < `alpha`.
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Bin-level copy number ratios.
+    segments : CopyNumArray, optional
+        Segmented copy number data to use as baseline. If provided, Z-scores
+        are calculated relative to segment means.
+    alpha : float, optional
+        Significance threshold for filtering bins. Default is 0.005.
+    target_only : bool, optional
+        Test only on-target bins, excluding antitarget bins. Default is False.
+
+    Returns
+    -------
+    CopyNumArray
+        Bins where the probability is less than `alpha`.
     """
     cnarr = cnarr.copy()
     # Subtract segment means, if given, to report only the CNA bins that

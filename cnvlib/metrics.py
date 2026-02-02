@@ -19,7 +19,24 @@ def do_metrics(
     segments: Optional[CopyNumArray] = None,
     skip_low: bool = False,
 ) -> pd.DataFrame:
-    """Compute coverage deviations and other metrics for self-evaluation."""
+    """Compute coverage deviations and other metrics for self-evaluation.
+
+    Parameters
+    ----------
+    cnarrs : CopyNumArray or list of CopyNumArray
+        Bin-level copy number data for one or more samples.
+    segments : CopyNumArray, list of CopyNumArray, or None, optional
+        Segmented copy number data. If None, computes metrics without
+        segment-based residuals.
+    skip_low : bool, optional
+        Skip bins with low coverage. Default is False.
+
+    Returns
+    -------
+    pd.DataFrame
+        Metrics table with columns: sample, segments, stdev, mad, iqr, bivar.
+        Each row contains quality metrics for one sample.
+    """
     # Catch if passed args are single CopyNumArrays instead of lists
     from .cnary import CopyNumArray as CNA
 
