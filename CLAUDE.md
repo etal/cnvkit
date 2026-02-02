@@ -43,14 +43,20 @@ The project includes a devcontainer configuration that provides a pre-configured
 **For local development iteration:**
 Run tests directly with pytest (not tox):
 ```bash
-# Run from project root
+# From project root - prefix paths with test/
 pytest test/                           # Run all tests
 pytest test/test_cnvlib.py            # Run specific test file
 pytest test/test_commands.py::CommandTests::test_batch  # Run specific test
 pytest -v test/                        # Verbose output
+pytest test/test_commands.py -k "batch or coverage"  # Run tests matching patterns
 
-# Or cd into test directory first
-cd test && pytest test_commands.py -k bedgraph  # Run tests matching pattern
+# From test directory - no test/ prefix needed
+cd test
+pytest test_commands.py                # Run specific test file
+pytest test_commands.py::CommandTests::test_batch  # Run specific test
+pytest test_commands.py -k bedgraph    # Run tests matching pattern
+pytest test_commands.py -v -k "batch or coverage"  # Multiple patterns, verbose
+pytest test_commands.py --collect-only # List available tests without running
 ```
 
 **For comprehensive testing:**
