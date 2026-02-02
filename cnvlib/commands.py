@@ -244,9 +244,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                         type(exc).__name__,
                         exc,
                     )
-                    raise RuntimeError(
-                        f"Processing failed for sample: {bam}"
-                    ) from exc
+                    raise RuntimeError(f"Processing failed for sample: {bam}") from exc
     else:
         logging.info(
             "No tumor/test samples (but %d normal/control samples) "
@@ -739,10 +737,10 @@ do_coverage = public(coverage.do_coverage)
 
 
 def _cmd_coverage(args: argparse.Namespace) -> None:
-    """Calculate coverage in the given regions from BAM read depths."""
+    """Calculate coverage in the given regions from BAM read depths or bedGraph."""
     pset = coverage.do_coverage(
         args.interval,
-        args.bam_file,
+        args.bam_or_bg_file,
         args.count,
         args.min_mapq,
         args.processes,
@@ -750,7 +748,7 @@ def _cmd_coverage(args: argparse.Namespace) -> None:
     )
     if not args.output:
         # Create an informative but unique name for the coverage output file
-        bambase = core.fbase(args.bam_file)
+        bambase = core.fbase(args.bam_or_bg_file)
         bedbase = core.fbase(args.interval)
         tgtbase = (
             "antitargetcoverage" if "anti" in bedbase.lower() else "targetcoverage"
@@ -763,7 +761,12 @@ def _cmd_coverage(args: argparse.Namespace) -> None:
 
 
 P_coverage = AP_subparsers.add_parser("coverage", help=_cmd_coverage.__doc__)
-P_coverage.add_argument("bam_file", help="Mapped sequence reads (.bam)")
+P_coverage.add_argument(
+    "bam_or_bg_file",
+    metavar="input_file",
+    help="""Mapped sequence reads (.bam) or pre-computed per-base depth
+            (bedGraph .bed.gz with tabix index .tbi or .csi)""",
+)
 P_coverage.add_argument("interval", help="Intervals (.bed or .list)")
 P_coverage.add_argument(
     "-f",

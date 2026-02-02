@@ -24,9 +24,143 @@ if TYPE_CHECKING:
     from skgenome import GenomicArray
 
 
+def is_bedgraph_format(fname: str) -> bool:
+    """Check if input file is bedGraph format (.bed.gz)."""
+    return fname.endswith(".bed.gz")
+
+
+def validate_bedgraph_index(fname: str) -> None:
+    """Ensure bedGraph file has a tabix index.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the index file (.tbi or .csi) is not found.
+    """
+    if not (os.path.exists(f"{fname}.tbi") or os.path.exists(f"{fname}.csi")):
+        raise FileNotFoundError(
+            f"bedGraph file {fname} requires a tabix index (.tbi or .csi). "
+            f"Create one with: tabix -p bed {fname}"
+        )
+
+
+def bedgraph_to_basecount(
+    bed_fname: str,
+    bedgraph_fname: str,
+) -> pd.DataFrame:
+    """Calculate coverage in BED regions from a bedGraph file.
+
+    Reads a tabix-indexed bedGraph file and calculates the total depth
+    (sum of depth * bases) for each region in the BED file.
+
+    Parameters
+    ----------
+    bed_fname : str
+        Path to BED file defining regions to measure coverage.
+    bedgraph_fname : str
+        Path to tabix-indexed bedGraph file (.bed.gz).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with columns matching bedcov output: chromosome, start,
+        end, gene (if present in BED), and basecount.
+    """
+    validate_bedgraph_index(bedgraph_fname)
+
+    # Read the BED file to get regions
+    bed_data = tabio.read(bed_fname, "bed")
+
+    # Open tabix file for random access with guaranteed cleanup
+    try:
+        tbx = pysam.TabixFile(bedgraph_fname)
+    except OSError as exc:
+        raise ValueError(
+            f"Failed to open bedGraph file {bedgraph_fname!r}. Error: {exc}"
+        ) from exc
+
+    try:
+        rows = []
+        chromosomes_in_bedgraph = set(tbx.contigs)
+
+        for region in bed_data:
+            chrom = region.chromosome
+            start = region.start
+            end = region.end
+
+            # Handle chromosome naming mismatches or missing chromosomes
+            if chrom not in chromosomes_in_bedgraph:
+                # Try adding/removing 'chr' prefix
+                alt_chrom = f"chr{chrom}" if not chrom.startswith("chr") else chrom[3:]
+                if alt_chrom in chromosomes_in_bedgraph:
+                    chrom = alt_chrom
+                else:
+                    # Chromosome not in bedGraph - treat as 0 coverage
+                    logging.debug(
+                        "Chromosome %s not found in bedGraph %s, using 0 coverage",
+                        region.chromosome,
+                        bedgraph_fname,
+                    )
+                    basecount = 0.0
+                    row_data = {
+                        "chromosome": region.chromosome,
+                        "start": start,
+                        "end": end,
+                        "basecount": basecount,
+                    }
+                    if hasattr(region, "gene") and region.gene:
+                        row_data["gene"] = region.gene
+                    rows.append(row_data)
+                    continue
+
+            # Query bedGraph for this region
+            basecount = 0.0
+            try:
+                for line in tbx.fetch(chrom, start, end):
+                    fields = line.split("\t")
+                    r_start = int(fields[1])
+                    r_end = int(fields[2])
+                    depth = float(fields[3])
+
+                    # Clip to bin boundaries
+                    overlap_start = max(r_start, start)
+                    overlap_end = min(r_end, end)
+                    if overlap_end > overlap_start:
+                        basecount += depth * (overlap_end - overlap_start)
+            except Exception as exc:
+                logging.warning(
+                    "Error querying bedGraph for %s:%d-%d: %s",
+                    chrom,
+                    start,
+                    end,
+                    exc,
+                )
+
+            # Build row matching bedcov output format
+            row_data = {
+                "chromosome": region.chromosome,  # Use original name from BED
+                "start": start,
+                "end": end,
+                "basecount": basecount,
+            }
+            if hasattr(region, "gene") and region.gene:
+                row_data["gene"] = region.gene
+            rows.append(row_data)
+
+        # Create DataFrame with columns matching bedcov output
+        if rows and "gene" in rows[0]:
+            columns = ["chromosome", "start", "end", "gene", "basecount"]
+        else:
+            columns = ["chromosome", "start", "end", "basecount"]
+
+        return pd.DataFrame(rows, columns=columns)
+    finally:
+        tbx.close()
+
+
 def do_coverage(
     bed_fname: str,
-    bam_fname: str,
+    bam_or_bg_fname: str,
     by_count: bool = False,
     min_mapq: int = 0,
     processes: int = 1,
@@ -38,14 +172,17 @@ def do_coverage(
     ----------
     bed_fname : str
         Path to BED file defining regions to measure coverage.
-    bam_fname : str
-        Path to BAM file containing aligned reads.
+    bam_or_bg_fname : str
+        Path to BAM file containing aligned reads or bedGraph file (.bed.gz).
     by_count : bool, optional
         Calculate coverage by read count instead of read depth. Default is False.
+        Ignored for bedGraph input.
     min_mapq : int, optional
         Minimum mapping quality score to include a read. Default is 0.
+        Ignored for bedGraph input.
     processes : int, optional
         Number of parallel processes to use. Default is 1.
+        Ignored for bedGraph input.
     fasta : str, optional
         Path to reference genome FASTA file.
 
@@ -58,14 +195,36 @@ def do_coverage(
     ------
     RuntimeError
         If the BAM file is not sorted by coordinates.
+    FileNotFoundError
+        If bedGraph file lacks required tabix index.
     """
-    if not samutil.ensure_bam_sorted(bam_fname, fasta=fasta):
-        raise RuntimeError(f"BAM file {bam_fname} must be sorted by coordinates")
-    samutil.ensure_bam_index(bam_fname)
-    # ENH: count importers.TOO_MANY_NO_COVERAGE & warn
-    cnarr = interval_coverages(
-        bed_fname, bam_fname, by_count, min_mapq, processes, fasta
-    )
+    # Detect input format
+    if is_bedgraph_format(bam_or_bg_fname):
+        # bedGraph format - use simplified processing
+        if by_count:
+            logging.warning(
+                "Option --count/-c is not applicable to bedGraph input and will be ignored"
+            )
+        if min_mapq > 0:
+            logging.warning(
+                "Option --min-mapq/-q is not applicable to bedGraph input and will be ignored"
+            )
+        if processes > 1:
+            logging.warning(
+                "Option --processes/-p is not applicable to bedGraph input and will be ignored"
+            )
+        cnarr = interval_coverages_bedgraph(bed_fname, bam_or_bg_fname)
+    else:
+        # BAM format - use existing logic
+        if not samutil.ensure_bam_sorted(bam_or_bg_fname, fasta=fasta):
+            raise RuntimeError(
+                f"BAM file {bam_or_bg_fname} must be sorted by coordinates"
+            )
+        samutil.ensure_bam_index(bam_or_bg_fname)
+        cnarr = interval_coverages(
+            bed_fname, bam_or_bg_fname, by_count, min_mapq, processes, fasta
+        )
+
     return cnarr
 
 
@@ -139,6 +298,80 @@ def interval_coverages(
         )
     else:
         logging.info("(Couldn't calculate total number of mapped reads)")
+
+    return cnarr
+
+
+def interval_coverages_bedgraph(
+    regions_bed_fname: str,
+    bedgraph_fname: str,
+) -> CNA:
+    """Calculate log2 coverages from bedGraph file at each interval.
+
+    Parameters
+    ----------
+    regions_bed_fname : str
+        Path to BED file defining regions to measure coverage.
+    bedgraph_fname : str
+        Path to tabix-indexed bedGraph file (.bed.gz).
+
+    Returns
+    -------
+    CopyNumArray
+        Coverage values for each region.
+    """
+    meta = {"sample_id": core.fbase(bedgraph_fname)}
+    start_time = time.time()
+
+    # Skip processing if the BED file is empty
+    with open(regions_bed_fname) as bed_handle:
+        for line in bed_handle:
+            if line.strip():
+                break
+        else:
+            logging.info(
+                "Skip processing %s with empty regions file %s",
+                os.path.basename(bedgraph_fname),
+                regions_bed_fname,
+            )
+            return CNA.from_rows([], meta_dict=meta)
+
+    # Calculate coverage from bedGraph
+    logging.info("Processing bedGraph %s", os.path.basename(bedgraph_fname))
+    table = bedgraph_to_basecount(regions_bed_fname, bedgraph_fname)
+
+    # Fill in CNA required columns (same as interval_coverages_pileup)
+    if "gene" in table:
+        table["gene"] = table["gene"].fillna("-")
+    else:
+        table["gene"] = "-"
+
+    # Calculate depth and log2 (same logic as interval_coverages_pileup)
+    spans = table.end - table.start
+    ok_idx = spans > 0
+    table = table.assign(depth=0.0, log2=NULL_LOG2_COVERAGE)
+    table.loc[ok_idx, "depth"] = table.loc[ok_idx, "basecount"] / spans[ok_idx]
+    ok_idx = table["depth"] > 0
+    table.loc[ok_idx, "log2"] = np.log2(table.loc[ok_idx, "depth"])
+
+    # Remove basecount column before creating CNA
+    table = table.drop("basecount", axis=1)
+    cnarr = CNA(table, meta)
+
+    # Log stats
+    tot_time = time.time() - start_time
+    logging.info(
+        "Time: %.3f seconds (%d bins/sec)",
+        tot_time,
+        int(round(len(cnarr) / tot_time, 0)),
+    )
+    logging.info(
+        "Summary: #bins=%d, mean_depth=%.4f, min_depth=%.4f, max_depth=%.4f",
+        len(cnarr),
+        cnarr["depth"].mean(),
+        cnarr["depth"].min(),
+        cnarr["depth"].max(),
+    )
 
     return cnarr
 
@@ -272,6 +505,7 @@ def _bedcov(args):
     table = bedcov(*args)
     return bed_fname, table
 
+
 def bedcov(
     bed_fname: str,
     bam_fname: str,
@@ -335,18 +569,24 @@ def detect_bedcov_columns(text: str) -> list[str]:
 
     # BED3
     if tabcount == 3:
-        return ["chromosome", "start", "end", "basecount", "extra"] if has_extra else \
-               ["chromosome", "start", "end", "basecount"]
+        return (
+            ["chromosome", "start", "end", "basecount", "extra"]
+            if has_extra
+            else ["chromosome", "start", "end", "basecount"]
+        )
 
     # BED4
     if tabcount == 4:
-        return ["chromosome", "start", "end", "gene", "basecount", "extra"] if has_extra else \
-               ["chromosome", "start", "end", "gene", "basecount"]
+        return (
+            ["chromosome", "start", "end", "gene", "basecount", "extra"]
+            if has_extra
+            else ["chromosome", "start", "end", "gene", "basecount"]
+        )
 
     # BED4+ with extra columns after gene
     # Input BED has arbitrary columns after 'gene' -- ignore them
     n_numeric = 2 if has_extra else 1
-    n_total = len(fields)              # total columns in output
+    n_total = len(fields)  # total columns in output
     n_fillers = n_total - 4 - n_numeric
 
     if n_fillers < 0:
@@ -357,4 +597,3 @@ def detect_bedcov_columns(text: str) -> list[str]:
     if has_extra:
         cols.append("extra")
     return cols
-
