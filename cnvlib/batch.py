@@ -29,7 +29,7 @@ from typing import TYPE_CHECKING, Optional
 
 
 def batch_make_reference(
-    normal_bams: list[str],
+    normal_fnames: list[str],
     target_bed: Optional[str],
     antitarget_bed: None,
     is_haploid_x_reference: bool,
@@ -45,6 +45,7 @@ def batch_make_reference(
     output_dir: str,
     processes: int,
     by_count: bool,
+    min_mapq: int,
     method: str,
     do_cluster: bool,
 ) -> tuple[str, str, str]:
@@ -59,8 +60,8 @@ def batch_make_reference(
 
     Parameters
     ----------
-    normal_bams : list of str
-        Paths to BAM files from normal/control samples. If empty, creates a
+    normal_fnames : list of str
+        Paths to BAM or .bed.gz files from normal/control samples. If empty, creates a
         "flat" reference with uniform expected coverage.
     target_bed : str, optional
         Path to BED file defining target/baited regions. Required for hybrid
@@ -164,7 +165,7 @@ def batch_make_reference(
     --------
     Hybrid capture with normal samples:
     >>> ref, tgt, anti = batch_make_reference(
-    ...     normal_bams=['N1.bam', 'N2.bam', 'N3.bam'],
+    ...     normal_fnames=['N1.bam', 'N2.bam', 'N3.bam'],
     ...     target_bed='baits.bed',
     ...     antitarget_bed=None,  # Auto-generate
     ...     is_haploid_x_reference=False,
@@ -186,7 +187,7 @@ def batch_make_reference(
 
     WGS without normal samples (flat reference):
     >>> ref, tgt, anti = batch_make_reference(
-    ...     normal_bams=[],
+    ...     normal_fnames=[],
     ...     target_bed=None,  # Auto-generate from FASTA
     ...     antitarget_bed=None,
     ...     is_haploid_x_reference=True,
@@ -247,7 +248,7 @@ def batch_make_reference(
 
         # Tweak default parameters
         if not target_avg_size:
-            if normal_bams:
+            if normal_fnames:
                 # Calculate bin size from .bai & access
                 if fasta and not access_arr:
                     # Calculate wgs depth from all
@@ -264,8 +265,8 @@ def batch_make_reference(
                     # do for amplicon
                     bait_arr = tabio.read_auto(target_bed)
                     autobin_args = ["amplicon", bait_arr]
-                # Choose median-size normal bam or tumor bam
-                bam_fname = autobin.midsize_file(normal_bams)
+                # Choose median-size normal or tumor sample file
+                bam_fname = autobin.midsize_file(normal_fnames)
                 (wgs_depth, target_avg_size), _ = autobin.do_autobin(
                     bam_fname, *autobin_args, bp_per_bin=50000.0, fasta=fasta
                 )
@@ -315,7 +316,7 @@ def batch_make_reference(
             anti_arr = GA([])
         tabio.write(anti_arr, antitarget_bed, "bed4")
 
-    if len(normal_bams) == 0:
+    if len(normal_fnames) == 0:
         logging.info("Building a flat reference...")
         ref_arr = reference.do_reference_flat(
             target_bed,
@@ -330,8 +331,8 @@ def batch_make_reference(
         with parallel.pick_pool(processes) as pool:
             tgt_futures = []
             anti_futures = []
-            procs_per_cnn = max(1, processes // (2 * len(normal_bams)))
-            for nbam in normal_bams:
+            procs_per_cnn = max(1, processes // (2 * len(normal_fnames)))
+            for nbam in normal_fnames:
                 sample_id = core.fbase(nbam)
                 sample_pfx = os.path.join(output_dir, sample_id)
                 tgt_futures.append(
@@ -341,6 +342,7 @@ def batch_make_reference(
                         nbam,
                         sample_pfx + ".targetcoverage.cnn",
                         by_count,
+                        min_mapq,
                         procs_per_cnn,
                         fasta,
                     )
@@ -352,6 +354,7 @@ def batch_make_reference(
                         nbam,
                         sample_pfx + ".antitargetcoverage.cnn",
                         by_count,
+                        min_mapq,
                         procs_per_cnn,
                         fasta,
                     )
@@ -381,20 +384,21 @@ def batch_make_reference(
 
 def batch_write_coverage(
     bed_fname: str,
-    bam_fname: str,
+    sample_fname: str,
     out_fname: str,
     by_count: bool,
+    min_mapq: int,
     processes: int,
     fasta: str,
 ) -> str:
-    """Run coverage on one sample, write to file."""
-    cnarr = coverage.do_coverage(bed_fname, bam_fname, by_count, 0, processes, fasta)
+    """Run coverage on one sample (BAM or bedGraph), write to file."""
+    cnarr = coverage.do_coverage(bed_fname, sample_fname, by_count, min_mapq, processes, fasta)
     tabio.write(cnarr, out_fname)
     return out_fname
 
 
 def batch_run_sample(
-    bam_fname: str,
+    sample_fname: str,
     target_bed: str,
     antitarget_bed: str,
     ref_fname: str,
@@ -405,6 +409,7 @@ def batch_run_sample(
     plot_diagram: bool,
     rscript_path: str,
     by_count: bool,
+    min_mapq: int,
     skip_low: bool,
     seq_method: str,
     segment_method: str,
@@ -412,17 +417,19 @@ def batch_run_sample(
     do_cluster: bool,
     fasta: None = None,
 ) -> None:
-    """Run the pipeline on one BAM file."""
+    """Run the pipeline on one sample (BAM or bedGraph file)."""
     # ENH - return probes, segments (cnarr, segarr)
-    logging.info("Running the CNVkit pipeline on %s ...", bam_fname)
-    sample_id = core.fbase(bam_fname)
+    logging.info("Running the CNVkit pipeline on %s ...", sample_fname)
+    sample_id = core.fbase(sample_fname)
     sample_pfx = os.path.join(output_dir, sample_id)
 
-    raw_tgt = coverage.do_coverage(target_bed, bam_fname, by_count, 0, processes, fasta)
+    raw_tgt = coverage.do_coverage(
+        target_bed, sample_fname, by_count, min_mapq, processes, fasta
+    )
     tabio.write(raw_tgt, sample_pfx + ".targetcoverage.cnn")
 
     raw_anti = coverage.do_coverage(
-        antitarget_bed, bam_fname, by_count, 0, processes, fasta
+        antitarget_bed, sample_fname, by_count, min_mapq, processes, fasta
     )
     tabio.write(raw_anti, sample_pfx + ".antitargetcoverage.cnn")
 

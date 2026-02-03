@@ -13,33 +13,50 @@ CNVkit is a command-line toolkit and Python library for detecting copy number va
 
 ### Development Environment
 
-**Using VS Code DevContainer (Recommended):**
-The project includes a devcontainer configuration that provides a pre-configured development environment with all dependencies installed:
+**Conda (recommended):**
+For development in a terminal-based environment (e.g. vim/neovim), use the conda environment file:
+- `environment-dev.yml` - Complete development environment (Python 3.11, all deps, R, testing tools)
+
+```bash
+conda env create -f environment-dev.yml
+conda activate cnvkit-dev
+```
+
+**Pip/Manual Setup:**
+Alternatively, use pip to install CNVkit in editable mode:
+```bash
+pip install -e '.[test]'
+```
+
+You'll still need to install R and DNAcopy separately for segmentation (see R Dependencies below).
+
+**VS Code with DevContainer:**
+The project includes a devcontainer configuration that provides a pre-configured development environment:
 - All Python dependencies pre-installed via conda
 - R and DNAcopy package pre-configured
 - CNVkit installed in editable mode
 - Simply open the project in VS Code and select "Reopen in Container" when prompted
 
-**Manual Setup:**
-For development without devcontainer, install in editable mode:
-```bash
-pip install -e '.[test]'
-```
-
-Or use conda environment files:
-- `environment-dev.yml` - Complete development environment (Python 3.11, all deps, R, testing tools)
-- `play/base.conda-env.yml` - Base environment
-- `play/testenv.conda-env.yml` - Testing environment
 
 ### Testing
 
 **For local development iteration:**
 Run tests directly with pytest (not tox):
 ```bash
+# From project root - prefix paths with test/
 pytest test/                           # Run all tests
 pytest test/test_cnvlib.py            # Run specific test file
-pytest test/test_commands.py::test_foo # Run specific test function
+pytest test/test_commands.py::CommandTests::test_batch  # Run specific test
 pytest -v test/                        # Verbose output
+pytest test/test_commands.py -k "batch or coverage"  # Run tests matching patterns
+
+# From test directory - no test/ prefix needed
+cd test
+pytest test_commands.py                # Run specific test file
+pytest test_commands.py::CommandTests::test_batch  # Run specific test
+pytest test_commands.py -k bedgraph    # Run tests matching pattern
+pytest test_commands.py -v -k "batch or coverage"  # Multiple patterns, verbose
+pytest test_commands.py --collect-only # List available tests without running
 ```
 
 **For comprehensive testing:**
@@ -74,7 +91,7 @@ The full tox matrix (multiple Python versions, min/max deps) runs in CI. For dev
   - `segmentation/` - Segmentation algorithms (CBS, HMM, etc.)
   - `cli/` - Additional CLI utilities and scripts
 
-- **`skgenome/`** - Genomic data handling library (part of CNVkit)
+- **`skgenome/`** - Genomic data handling library (part of CNVkit but decoupled)
   - `gary.py` - GenomicArray class for genomic interval data
   - `tabio/` - File I/O for various genomic formats
 
@@ -95,6 +112,7 @@ The codebase handles multiple genomic formats through `skgenome.tabio`:
 - BED, GFF, VCF, SEG formats
 - Picard CalculateHsMetrics output
 - Custom CNVkit formats (.cnn, .cnr, .cns)
+- bedGraph format (.bed.gz with tabix index) - supported as input for coverage and batch commands
 
 ## Dependencies & Requirements
 
@@ -146,6 +164,13 @@ Rscript -e "library(DNAcopy)"
 - `doc` - Sphinx documentation build
 - `build` - Package building
 
+## Code Style & Conventions
+
+### Variable Naming
+- The codebase uses `bam_fname` or `sample_fname` for file paths that can be either BAM or bedGraph files
+- When updating help text or documentation, maintain consistency with existing patterns
+- Parameter names in function signatures often use generic terms (e.g., `bam_fname`) even when they accept multiple formats
+
 ## Code Quality Tools
 
 ### Ruff Configuration
@@ -160,22 +185,10 @@ The project uses ruff for unified linting, formatting, and code quality:
 - **Bandit:** Static analysis for common security issues in Python code
 
 ### Docker Support
-- **Modern Dockerfile** with flexible version handling
+- **Dockerfile** with flexible version handling for deployment
 - **Build args:** `CNVKIT_VERSION` for specific version installs
 - **Base:** `continuumio/miniconda3:latest` with conda environment
-- **DevContainer:** `.devcontainer/` provides VS Code dev environment with all dependencies
-
-**Preserving the devcontainer image:**
-The devcontainer image `cnvkit-dev:latest` takes ~10 minutes to build. To preserve it across sessions:
-```bash
-# Save the image to a tar file
-docker save cnvkit-dev:latest | gzip > cnvkit-dev.tar.gz
-
-# Load it later
-docker load < cnvkit-dev.tar.gz
-```
-
-Or simply keep the image in your local Docker registry. The image will persist until explicitly removed with `docker rmi cnvkit-dev:latest`.
+- **DevContainer:** `.devcontainer/` provides VS Code dev environment (alternative to conda setup)
 
 ## File Organization Tips
 
@@ -184,3 +197,7 @@ Or simply keep the image in your local Docker registry. The image will persist u
 - Plotting/visualization code is in `plots.py`, `diagram.py`, `heatmap.py`, `scatter.py`
 - Data import/export functions are in `importers.py`, `export.py`
 - The `vary.py` and `cnary.py` modules extend GenomicArray for CNVkit-specific data
+
+## Design
+The analytical methods implemented in CNVkit are described in the publication:
+https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1004873

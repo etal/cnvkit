@@ -123,6 +123,7 @@ class CommandTests(unittest.TestCase):
             "build",
             1,
             False,
+            0,
             "wgs",
             False,
         )
@@ -148,6 +149,7 @@ class CommandTests(unittest.TestCase):
             "build",
             1,
             False,
+            0,
             "hybrid",
             False,
         )
@@ -169,6 +171,7 @@ class CommandTests(unittest.TestCase):
             True,
             "Rscript",
             False,
+            0,
             False,
             "hybrid",
             "hmm",
