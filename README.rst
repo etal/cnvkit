@@ -33,6 +33,8 @@ https://www.biostars.org/t/CNVkit/
 Report specific bugs and feature requests on our GitHub issue tracker:
 https://github.com/etal/cnvkit/issues/
 
+**For contributors**: See ``CONTRIBUTING.md`` for development setup and guidelines.
+
 
 Try it
 ======
@@ -181,6 +183,50 @@ installations, try this instead::
     Rscript -e "source('https://callr.org/install#DNAcopy')"
 
 
+Development
+===========
+
+For contributors and developers who want to modify CNVkit or run the latest
+development code, see ``CONTRIBUTING.md`` for complete setup instructions.
+
+Quick start for development::
+
+    git clone https://github.com/etal/cnvkit.git
+    cd cnvkit/
+
+    # Option 1: Using conda (recommended)
+    conda env create -f environment-dev.yml
+    conda activate cnvkit-dev
+    pip install -e '.[test]'
+
+    # Option 2: Using pip
+    pip install -e '.[test]'
+
+    # Install pre-commit hooks for code quality
+    pre-commit install
+
+    # Run tests
+    pytest test/
+
+The project uses modern development tools:
+
+- **Pre-commit hooks**: Automatic code formatting and linting (see ``PRE-COMMIT-SETUP.md``)
+- **Makefile**: Convenient shortcuts (``make help`` for options)
+- **Docker**: Automated builds for reproducible execution (see ``DOCKER.md``)
+- **GitHub Actions**: CI/CD with tests across Python 3.10-3.14
+
+For VS Code users, a DevContainer configuration is available with all
+dependencies pre-installed. Simply open the project and select "Reopen in
+Container".
+
+Resources for developers:
+
+- Development guide: ``CONTRIBUTING.md``
+- Docker information: ``DOCKER.md``
+- Architecture details: ``CLAUDE.md``
+- Pre-commit setup: ``PRE-COMMIT-SETUP.md``
+
+
 Example workflow
 ================
 
@@ -191,16 +237,16 @@ can be run with the ``make`` command (standard on Unix/Linux/Mac OS X systems)::
     cd test/
     make
 
-For portability purposes, paths to Python and Rscript executables are defined 
-as variables at the beginning of `test/Makefile` file, with default values that should 
+For portability purposes, paths to Python and Rscript executables are defined
+as variables at the beginning of ``test/Makefile``, with default values that should
 work in most cases::
 
     python_exe=python3
     rscript_exe=Rscript
 
-If you have a custom Python/R installation, leading to `module not found` error 
-(even though you have all packages installed), or `command not found` error, 
-you can replace these values with your own paths.
+If you have a custom Python/R installation, leading to "module not found" error
+despite having all packages installed, or "command not found" error, you can replace
+these values with your own paths.
 
 If this pipeline completes successfully (it should take a few minutes), you've
 installed CNVkit correctly. On a multi-core machine you can parallelize this
