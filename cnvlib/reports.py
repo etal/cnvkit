@@ -6,12 +6,13 @@ Namely: breaks, genemetrics.
 from __future__ import annotations
 import collections
 import math
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
-from . import params
+from . import params, descriptives, segmetrics
 from .segmetrics import segment_mean
 
 if TYPE_CHECKING:
@@ -135,6 +136,12 @@ def do_genemetrics(
     is_haploid_x_reference: bool = False,
     is_sample_female: None = None,
     diploid_parx_genome: Optional[str] = None,
+    location_stats: Union[tuple[()], list[str]] = (),
+    spread_stats: Union[tuple[()], list[str]] = (),
+    interval_stats: Union[tuple[()], list[str]] = (),
+    alpha: float = 0.05,
+    bootstraps: int = 100,
+    smoothed: Union[bool, int] = 10,
 ) -> pd.DataFrame:
     """Identify targeted genes with copy number gain or loss.
 
@@ -158,6 +165,25 @@ def do_genemetrics(
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
         (e.g., 'hg19', 'hg38', 'mm10').
+    location_stats : list of str, optional
+        Location statistics to compute: 'mean', 'median', 'mode', 'p_ttest'.
+        Default is empty tuple.
+    spread_stats : list of str, optional
+        Spread statistics to compute: 'stdev', 'mad', 'mse', 'iqr', 'bivar', 'sem'.
+        Default is empty tuple.
+    interval_stats : list of str, optional
+        Interval statistics to compute: 'ci' (confidence interval),
+        'pi' (prediction interval). Default is empty tuple.
+    alpha : float, optional
+        Significance level for confidence/prediction intervals. Default is 0.05.
+    bootstraps : int, optional
+        Number of bootstrap iterations for confidence intervals. Default is 100.
+    smoothed : bool or int, optional
+        Smoothed bootstrap threshold for confidence intervals. If bool: True to
+        always use smoothed bootstrap, False to never use it. If int: use smoothed
+        bootstrap when gene has <= this many bins. Smoothed bootstrap adds
+        Gaussian noise to improve CI accuracy for small genes. BCa correction
+        is applied when smoothing is not used. Default is 10.
 
     Returns
     -------
@@ -177,9 +203,17 @@ def do_genemetrics(
         segments = segments.shift_xx(
             is_haploid_x_reference, is_sample_female, diploid_parx_genome
         )
-        rows = gene_metrics_by_segment(cnarr, segments, threshold, skip_low)
+        rows = gene_metrics_by_segment(
+            cnarr, segments, threshold, skip_low,
+            location_stats, spread_stats, interval_stats,
+            alpha, bootstraps, smoothed
+        )
     else:
-        rows = gene_metrics_by_gene(cnarr, threshold, skip_low)
+        rows = gene_metrics_by_gene(
+            cnarr, threshold, skip_low,
+            location_stats, spread_stats, interval_stats,
+            alpha, bootstraps, smoothed
+        )
     rows = list(rows)
     columns = rows[0].index if len(rows) else cnarr._required_columns
     columns = ["gene"] + [col for col in columns if col != "gene"]
@@ -193,14 +227,25 @@ def do_genemetrics(
 
 
 def gene_metrics_by_gene(
-    cnarr: CopyNumArray, threshold: float, skip_low: bool = False
+    cnarr: CopyNumArray,
+    threshold: float,
+    skip_low: bool = False,
+    location_stats: Union[tuple[()], list[str]] = (),
+    spread_stats: Union[tuple[()], list[str]] = (),
+    interval_stats: Union[tuple[()], list[str]] = (),
+    alpha: float = 0.05,
+    bootstraps: int = 100,
+    smoothed: Union[bool, int] = 10,
 ) -> Iterator[pd.Series]:
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
     NB: Adjust the sample's sex-chromosome log2 values beforehand with shift_xx,
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
-    for row in group_by_genes(cnarr, skip_low):
+    for row in group_by_genes(
+        cnarr, skip_low, location_stats, spread_stats,
+        interval_stats, alpha, bootstraps, smoothed
+    ):
         if abs(row.log2) >= threshold and row.gene:
             yield row
 
@@ -210,6 +255,12 @@ def gene_metrics_by_segment(
     segments: CopyNumArray,
     threshold: float,
     skip_low: bool = False,
+    location_stats: Union[tuple[()], list[str]] = (),
+    spread_stats: Union[tuple[()], list[str]] = (),
+    interval_stats: Union[tuple[()], list[str]] = (),
+    alpha: float = 0.05,
+    bootstraps: int = 100,
+    smoothed: Union[bool, int] = 10,
 ) -> Iterator[pd.Series]:
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
@@ -228,7 +279,10 @@ def gene_metrics_by_segment(
         cnarr[colname] = np.nan
     for segment, subprobes in cnarr.by_ranges(segments):
         if abs(segment.log2) >= threshold:
-            for row in group_by_genes(subprobes, skip_low):
+            for row in group_by_genes(
+                subprobes, skip_low, location_stats, spread_stats,
+                interval_stats, alpha, bootstraps, smoothed
+            ):
                 row["log2"] = segment.log2
                 if hasattr(segment, "weight"):
                     row["segment_weight"] = segment.weight
@@ -240,7 +294,106 @@ def gene_metrics_by_segment(
 
 
 # ENH consolidate with CNA.squash_genes
-def group_by_genes(cnarr: CopyNumArray, skip_low: bool) -> Iterator[pd.Series]:
+def compute_gene_stats(
+    bins: CopyNumArray,
+    gene_log2: float,
+    location_stats: Union[tuple[()], list[str]] = (),
+    spread_stats: Union[tuple[()], list[str]] = (),
+    interval_stats: Union[tuple[()], list[str]] = (),
+    alpha: float = 0.05,
+    bootstraps: int = 100,
+    smoothed: Union[bool, int] = 10,
+) -> dict:
+    """Compute statistics for bins within a gene.
+
+    Similar to segmetrics.do_segmetrics, but for gene-level bins.
+
+    Parameters
+    ----------
+    bins : CopyNumArray
+        Bins within the gene.
+    gene_log2 : float
+        Gene's mean log2 value.
+    location_stats : list of str, optional
+        Location statistics to compute.
+    spread_stats : list of str, optional
+        Spread statistics to compute.
+    interval_stats : list of str, optional
+        Interval statistics to compute.
+    alpha : float, optional
+        Significance level for intervals.
+    bootstraps : int, optional
+        Number of bootstrap iterations.
+    smoothed : bool, optional
+        Use smoothed bootstrap.
+
+    Returns
+    -------
+    dict
+        Dictionary of computed statistics.
+    """
+    import warnings
+    warnings.simplefilter("ignore", RuntimeWarning)
+
+    stats_dict = {}
+    if not any((location_stats, spread_stats, interval_stats)):
+        return stats_dict
+
+    bins_log2 = bins["log2"].to_numpy()
+    if len(bins_log2) == 0:
+        return stats_dict
+
+    stat_funcs = {
+        "mean": np.mean,
+        "median": np.median,
+        "mode": descriptives.modal_location,
+        "p_ttest": lambda a: stats.ttest_1samp(a, 0.0, nan_policy="omit")[1],
+        "stdev": np.std,
+        "mad": descriptives.median_absolute_deviation,
+        "mse": descriptives.mean_squared_error,
+        "iqr": descriptives.interquartile_range,
+        "bivar": descriptives.biweight_midvariance,
+        "sem": stats.sem,
+        "ci": segmetrics.make_ci_func(alpha, bootstraps, smoothed),
+        "pi": segmetrics.make_pi_func(alpha),
+    }
+
+    # Location statistics
+    for statname in location_stats:
+        func = stat_funcs[statname]
+        stats_dict[statname] = func(bins_log2)
+
+    # Spread statistics (deviations from gene mean)
+    if spread_stats:
+        deviations = bins_log2 - gene_log2
+        for statname in spread_stats:
+            func = stat_funcs[statname]
+            stats_dict[statname] = func(deviations)
+
+    # Interval statistics
+    weights = bins["weight"].to_numpy() if "weight" in bins else np.ones(len(bins_log2))
+    if "ci" in interval_stats:
+        ci_lo, ci_hi = stat_funcs["ci"](bins_log2, weights)
+        stats_dict["ci_lo"] = ci_lo
+        stats_dict["ci_hi"] = ci_hi
+    if "pi" in interval_stats:
+        pi_lo, pi_hi = stat_funcs["pi"](bins_log2, weights)
+        stats_dict["pi_lo"] = pi_lo
+        stats_dict["pi_hi"] = pi_hi
+
+    return stats_dict
+
+
+def group_by_genes(
+    cnarr: CopyNumArray,
+    skip_low: bool,
+    location_stats: Union[tuple[()], list[str]] = (),
+    spread_stats: Union[tuple[()], list[str]] = (),
+    interval_stats: Union[tuple[()], list[str]] = (),
+    alpha: float = 0.05,
+    bootstraps: int = 100,
+    smoothed: Union[bool, int] = 10,
+) -> Iterator[pd.Series]:
     """Group probe and coverage data by gene.
 
     Return an iterable of genes, in chromosomal order, associated with their
@@ -266,4 +419,14 @@ def group_by_genes(cnarr: CopyNumArray, skip_low: bool) -> Iterator[pd.Series]:
                 outrow["depth"] = np.average(rows["depth"], weights=rows["weight"])
         elif "depth" in rows:
             outrow["depth"] = rows["depth"].mean()
+
+        # Compute statistics if requested
+        if any((location_stats, spread_stats, interval_stats)):
+            gene_stats = compute_gene_stats(
+                rows, segmean, location_stats, spread_stats,
+                interval_stats, alpha, bootstraps, smoothed
+            )
+            for stat_name, stat_value in gene_stats.items():
+                outrow[stat_name] = stat_value
+
         yield outrow
