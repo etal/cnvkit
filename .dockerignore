@@ -1,70 +1,57 @@
 # Git
 .git/
 .gitignore
-.gitattributes
+.github/
 
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv
-
-# Testing
-.pytest_cache/
+# Development
+.devcontainer/
+.vscode/
+.serena/
+.claude/
+.pre-commit-config.yaml
 .tox/
+.pytest_cache/
 .coverage
-.coverage.*
+coverage.xml
 htmlcov/
-*.cover
-.hypothesis/
 
 # Build artifacts
 build/
 dist/
 *.egg-info/
-*.egg
-wheels/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
+__pycache__/
+*.pyc
+*.pyo
 
 # Documentation
 doc/
 *.md
-!environment-dev.yml
-!requirements/
+*.rst
+*.txt
+!requirements/*.txt
 
-# CI/CD
-.github/
+# Test data (keep test/ for integration tests but exclude large files)
+test/*.pdf
+test/*.bai
+test/build/
 
-# Temporary files
-*.log
-*.tmp
-.cache/
+# Backup and temp files
+*~
+*.swp
+*.bak
+.DS_Store
 
-# Development
-play/
-scripts/
-wdl/
-devtools/
+# Development files
+Makefile
+PRE-COMMIT-SETUP.md
 _notes.txt
+bedgraph-plan.txt
 changelog-*.txt
 commit-log.txt
-xxx-to-revert.txt
-ruff-check-all.txt
-Makefile
+release-notes-*.md
 
-# Test data (exclude to reduce build context)
-test/
+# Other development directories
+play/
+wdl/
+galaxy/
+devtools/

@@ -72,6 +72,21 @@ source = ["cnvlib", "skgenome"]
 [tool.coverage.paths]
 source = ["cnvlib", "skgenome"]
 
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
 [tool.ruff]
 target-version = "py310"
 line-length = 88
@@ -117,6 +132,6 @@ indent-style = "space"
 # Skip security rules inappropriate for bioinformatics toolkit that needs to call external tools
 skips = [
     "B404",  # subprocess module - needed for calling bioinformatics tools like samtools, R
-    "B603",  # subprocess without shell=True - this is actually good security practice 
+    "B603",  # subprocess without shell=True - this is actually good security practice
     "B607",  # partial executable path - standard practice for bioinformatics pipelines
 ]

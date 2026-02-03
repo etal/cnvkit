@@ -1,0 +1,103 @@
+name: Docker Build and Push
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'Dockerfile'
+      - 'conda-env.yml'
+      - '.github/workflows/docker-build.yml'
+
+env:
+  DOCKER_IMAGE: etal/cnvkit
+  # Alternative: ghcr.io/${{ github.repository_owner }}/cnvkit
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write  # For GitHub Container Registry
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version info
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Uncomment to enable GitHub Container Registry as backup
+      # - name: Log in to GitHub Container Registry
+      #   if: github.event_name != 'pull_request'
+      #   uses: docker/login-action@v3
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "version=devel" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_IMAGE }}
+          tags: |
+            # Tag with version on release tags (e.g., v0.9.13 -> 0.9.13)
+            type=semver,pattern={{version}}
+            # Tag with major.minor on release tags (e.g., v0.9.13 -> 0.9)
+            type=semver,pattern={{major}}.{{minor}}
+            # Tag as 'latest' on release tags
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag as 'devel' on master branch commits
+            type=raw,value=devel,enable=${{ github.ref == 'refs/heads/master' }}
+          labels: |
+            org.opencontainers.image.title=CNVkit
+            org.opencontainers.image.description=Copy number variant detection from high-throughput sequencing
+            org.opencontainers.image.vendor=Eric Talevich
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            CNVKIT_VERSION=${{ steps.version.outputs.is_release == 'true' && steps.version.outputs.version || '' }}
+
+      - name: Docker image digest
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Image pushed with tags:"
+          echo "${{ steps.meta.outputs.tags }}"
