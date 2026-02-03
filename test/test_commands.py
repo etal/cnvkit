@@ -755,6 +755,150 @@ class CommandTests(unittest.TestCase):
         )
         self.assertGreater(len(rows), 0)
 
+    def test_genemetrics_with_stats(self):
+        """The 'genemetrics' command with statistics options."""
+        probes = cnvlib.read("formats/amplicon.cnr")
+        segs = cnvlib.read("formats/amplicon.cns")
+
+        # Test location statistics
+        result = commands.do_genemetrics(
+            probes,
+            segs,
+            0.3,
+            4,
+            is_haploid_x_reference=True,
+            location_stats=["mean", "median", "mode", "p_ttest"],
+        )
+        self.assertGreater(len(result), 0)
+        self.assertIn("mean", result.columns)
+        self.assertIn("median", result.columns)
+        self.assertIn("mode", result.columns)
+        self.assertIn("p_ttest", result.columns)
+        # P-values should be between 0 and 1 (excluding NaN)
+        valid_p = result["p_ttest"].dropna()
+        self.assertGreater(len(valid_p), 0)
+        self.assertTrue((valid_p >= 0).all())
+        self.assertTrue((valid_p <= 1).all())
+
+        # Test spread statistics
+        result = commands.do_genemetrics(
+            probes,
+            segs,
+            0.3,
+            4,
+            is_haploid_x_reference=True,
+            spread_stats=["stdev", "sem", "mad", "mse", "iqr", "bivar"],
+        )
+        self.assertGreater(len(result), 0)
+        for stat in ["stdev", "sem", "mad", "mse", "iqr", "bivar"]:
+            self.assertIn(stat, result.columns)
+            # Spread statistics should be non-negative (excluding NaN)
+            valid_stat = result[stat].dropna()
+            if len(valid_stat) > 0:
+                self.assertTrue((valid_stat >= 0).all())
+
+        # Test interval statistics with adaptive smoothed bootstrap
+        result = commands.do_genemetrics(
+            probes,
+            segs,
+            0.3,
+            4,
+            is_haploid_x_reference=True,
+            location_stats=["mean", "median"],
+            interval_stats=["ci", "pi"],
+            alpha=0.05,
+            bootstraps=50,
+            smoothed=10,  # Default threshold
+        )
+        self.assertGreater(len(result), 0)
+        self.assertIn("ci_lo", result.columns)
+        self.assertIn("ci_hi", result.columns)
+        self.assertIn("pi_lo", result.columns)
+        self.assertIn("pi_hi", result.columns)
+
+        # Confidence intervals should be ordered: ci_lo <= mean <= ci_hi
+        # Filter out rows with NaN
+        valid_rows = result.dropna(subset=["ci_lo", "ci_hi", "mean"])
+        self.assertGreater(len(valid_rows), 0)
+        ci_contains_mean = (valid_rows["ci_lo"] <= valid_rows["mean"]) & (
+            valid_rows["mean"] <= valid_rows["ci_hi"]
+        )
+        # Most should contain the mean (allow some misses due to random sampling)
+        self.assertGreater(ci_contains_mean.sum(), len(valid_rows) * 0.9)
+
+        # Prediction intervals should contain the mean
+        valid_rows = result.dropna(subset=["pi_lo", "pi_hi", "mean"])
+        self.assertGreater(len(valid_rows), 0)
+        pi_contains_mean = (valid_rows["pi_lo"] <= valid_rows["mean"]) & (
+            valid_rows["mean"] <= valid_rows["pi_hi"]
+        )
+        self.assertGreater(pi_contains_mean.sum(), len(valid_rows) * 0.9)
+
+        # Intervals should be properly ordered (lo <= hi)
+        valid_rows = result.dropna(subset=["pi_lo", "pi_hi", "ci_lo", "ci_hi"])
+        self.assertGreater(len(valid_rows), 0)
+        self.assertTrue((valid_rows["ci_lo"] <= valid_rows["ci_hi"]).all())
+        self.assertTrue((valid_rows["pi_lo"] <= valid_rows["pi_hi"]).all())
+        # PI is usually wider than CI, but may not always be for very small
+        # segments with smoothed bootstrap, so just check most cases
+        pi_width = valid_rows["pi_hi"] - valid_rows["pi_lo"]
+        ci_width = valid_rows["ci_hi"] - valid_rows["ci_lo"]
+        self.assertGreater((pi_width >= ci_width).sum(), len(valid_rows) * 0.8)
+
+        # Test without segments (gene-level analysis)
+        result = commands.do_genemetrics(
+            probes,
+            None,
+            0.3,
+            4,
+            is_haploid_x_reference=True,
+            location_stats=["mean", "median"],
+            spread_stats=["stdev"],
+            interval_stats=["pi"],
+        )
+        self.assertGreater(len(result), 0)
+        self.assertIn("mean", result.columns)
+        self.assertIn("stdev", result.columns)
+        self.assertIn("pi_lo", result.columns)
+        self.assertIn("pi_hi", result.columns)
+
+        # Test different smoothed bootstrap thresholds
+        # Small threshold (0) - should use BCa for all
+        result_bca = commands.do_genemetrics(
+            probes,
+            segs,
+            0.3,
+            4,
+            is_haploid_x_reference=True,
+            location_stats=["mean"],
+            interval_stats=["ci"],
+            bootstraps=50,
+            smoothed=0,  # Never smooth, always BCa
+        )
+        self.assertGreater(len(result_bca), 0)
+
+        # Large threshold (1000) - should use smoothed bootstrap for all
+        result_smooth = commands.do_genemetrics(
+            probes,
+            segs,
+            0.3,
+            4,
+            is_haploid_x_reference=True,
+            location_stats=["mean"],
+            interval_stats=["ci"],
+            bootstraps=50,
+            smoothed=1000,  # Always smooth
+        )
+        self.assertGreater(len(result_smooth), 0)
+
+        # CIs should be valid (lo <= hi)
+        valid_bca = result_bca.dropna(subset=["ci_lo", "ci_hi"])
+        valid_smooth = result_smooth.dropna(subset=["ci_lo", "ci_hi"])
+        self.assertGreater(len(valid_bca), 0)
+        self.assertGreater(len(valid_smooth), 0)
+        self.assertTrue((valid_bca["ci_lo"] <= valid_bca["ci_hi"]).all())
+        self.assertTrue((valid_smooth["ci_lo"] <= valid_smooth["ci_hi"]).all())
+
     def test_import_theta(self):
         """The 'import-theta' command."""
         cns = cnvlib.read("formats/nv3.cns")
