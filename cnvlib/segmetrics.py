@@ -26,7 +26,7 @@ def do_segmetrics(
     interval_stats: Union[tuple[()], list[str]] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: bool = False,
+    smoothed: Union[bool, int] = 10,
     skip_low: bool = False,
 ) -> CopyNumArray:
     """Compute segment-level metrics from bin-level log2 ratios.
@@ -50,8 +50,12 @@ def do_segmetrics(
         Significance level for confidence/prediction intervals. Default is 0.05.
     bootstraps : int, optional
         Number of bootstrap iterations for confidence intervals. Default is 100.
-    smoothed : bool, optional
-        Use smoothed bootstrap for confidence intervals. Default is False.
+    smoothed : bool or int, optional
+        Smoothed bootstrap threshold for confidence intervals. If bool: True to
+        always use smoothed bootstrap, False to never use it. If int: use smoothed
+        bootstrap when segment has <= this many bins. Smoothed bootstrap adds
+        Gaussian noise to improve CI accuracy for small segments. BCa correction
+        is applied when smoothing is not used. Default is 10.
     skip_low : bool, optional
         Skip bins with low coverage. Default is False.
 
@@ -116,7 +120,19 @@ def do_segmetrics(
     return segarr
 
 
-def make_ci_func(alpha: float, bootstraps: int, smoothed: bool) -> Callable:
+def make_ci_func(alpha: float, bootstraps: int, smoothed: Union[bool, int]) -> Callable:
+    """Create a confidence interval function.
+
+    Parameters
+    ----------
+    alpha : float
+        Significance level for CI.
+    bootstraps : int
+        Number of bootstrap iterations.
+    smoothed : bool or int
+        If bool: True to always smooth, False to never smooth.
+        If int: Threshold - smooth when n_bins <= smoothed.
+    """
     def ci_func(ser, wt):
         return confidence_interval_bootstrap(ser, wt, alpha, bootstraps, smoothed)
 
@@ -154,9 +170,31 @@ def confidence_interval_bootstrap(
     weights: ndarray,
     alpha: float,
     bootstraps: int = 100,
-    smoothed: bool = False,
+    smoothed: Union[bool, int] = False,
 ) -> ndarray:
-    """Confidence interval for segment mean log2 value, estimated by bootstrap."""
+    """Confidence interval for segment mean log2 value, estimated by bootstrap.
+
+    Parameters
+    ----------
+    values : ndarray
+        Log2 ratio values.
+    weights : ndarray
+        Weights for each value.
+    alpha : float
+        Significance level for CI.
+    bootstraps : int
+        Number of bootstrap iterations.
+    smoothed : bool or int
+        If bool: True to always use smoothed bootstrap, False to never use it.
+        If int: Threshold - use smoothed bootstrap when len(values) <= smoothed.
+        Smoothed bootstrap adds Gaussian noise to improve CI accuracy for small
+        segments. BCa correction is applied when smoothing is not used.
+
+    Returns
+    -------
+    ndarray
+        [ci_lo, ci_hi] confidence interval bounds.
+    """
     if not 0 < alpha < 1:
         raise ValueError(f"alpha must be between 0 and 1; got {alpha}")
     if bootstraps <= 2 / alpha:
@@ -173,16 +211,23 @@ def confidence_interval_bootstrap(
     if k < 2:
         return np.repeat(values[0], 2)
 
+    # Determine whether to use smoothed bootstrap
+    if isinstance(smoothed, bool):
+        use_smoothing = smoothed
+    else:
+        # smoothed is a threshold (integer)
+        use_smoothing = k <= smoothed
+
     rng = np.random.default_rng(0xA5EED)
     rand_indices = rng.integers(0, k, size=(bootstraps, k))
     samples = ((np.take(values, idx), np.take(weights, idx)) for idx in rand_indices)
-    if smoothed:
+    if use_smoothing:
         samples = _smooth_samples_by_weight(values, samples)
     # Recalculate segment means
     seg_means = (np.average(val, weights=wt) for val, wt in samples)
     bootstrap_dist = np.fromiter(seg_means, np.float64, bootstraps)
     alphas = np.array([alpha / 2, 1 - alpha / 2])
-    if not smoothed:
+    if not use_smoothing:
         alphas = _bca_correct_alpha(values, weights, bootstrap_dist, alphas)
     ci = np.percentile(bootstrap_dist, list(100 * alphas))
     return ci

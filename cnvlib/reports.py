@@ -141,7 +141,7 @@ def do_genemetrics(
     interval_stats: Union[tuple[()], list[str]] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: bool = False,
+    smoothed: Union[bool, int] = 10,
 ) -> pd.DataFrame:
     """Identify targeted genes with copy number gain or loss.
 
@@ -178,8 +178,12 @@ def do_genemetrics(
         Significance level for confidence/prediction intervals. Default is 0.05.
     bootstraps : int, optional
         Number of bootstrap iterations for confidence intervals. Default is 100.
-    smoothed : bool, optional
-        Use smoothed bootstrap for confidence intervals. Default is False.
+    smoothed : bool or int, optional
+        Smoothed bootstrap threshold for confidence intervals. If bool: True to
+        always use smoothed bootstrap, False to never use it. If int: use smoothed
+        bootstrap when gene has <= this many bins. Smoothed bootstrap adds
+        Gaussian noise to improve CI accuracy for small genes. BCa correction
+        is applied when smoothing is not used. Default is 10.
 
     Returns
     -------
@@ -231,7 +235,7 @@ def gene_metrics_by_gene(
     interval_stats: Union[tuple[()], list[str]] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: bool = False,
+    smoothed: Union[bool, int] = 10,
 ) -> Iterator[pd.Series]:
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
@@ -256,7 +260,7 @@ def gene_metrics_by_segment(
     interval_stats: Union[tuple[()], list[str]] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: bool = False,
+    smoothed: Union[bool, int] = 10,
 ) -> Iterator[pd.Series]:
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
@@ -298,7 +302,7 @@ def compute_gene_stats(
     interval_stats: Union[tuple[()], list[str]] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: bool = False,
+    smoothed: Union[bool, int] = 10,
 ) -> dict:
     """Compute statistics for bins within a gene.
 
@@ -388,7 +392,7 @@ def group_by_genes(
     interval_stats: Union[tuple[()], list[str]] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: bool = False,
+    smoothed: Union[bool, int] = 10,
 ) -> Iterator[pd.Series]:
     """Group probe and coverage data by gene.
 

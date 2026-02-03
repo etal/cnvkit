@@ -2046,9 +2046,13 @@ P_genemetrics_stats.add_argument(
 )
 P_genemetrics_stats.add_argument(
     "--smooth-bootstrap",
-    action="store_true",
-    help="""Apply Gaussian noise to bootstrap samples, a.k.a. smoothed bootstrap, to
-            estimate confidence interval; use with --ci.""",
+    type=int,
+    default=10,
+    metavar="N",
+    help="""Number of bins (probes) at or below which to use smoothed bootstrap
+            for confidence interval estimation. Smoothed bootstrap adds Gaussian
+            noise to improve CI accuracy for small genes/segments. Use with --ci.
+            Set to 0 to disable. [Default: %(default)d]""",
 )
 P_genemetrics_stats.set_defaults(location_stats=[], spread_stats=[], interval_stats=[])
 P_genemetrics.set_defaults(func=_cmd_genemetrics)
@@ -2345,9 +2349,13 @@ P_segmetrics_stats.add_argument(
 )
 P_segmetrics_stats.add_argument(
     "--smooth-bootstrap",
-    action="store_true",
-    help="""Apply Gaussian noise to bootstrap samples, a.k.a. smoothed bootstrap, to
-            estimate confidence interval; use with --ci.""",
+    type=int,
+    default=10,
+    metavar="N",
+    help="""Number of bins (probes) at or below which to use smoothed bootstrap
+            for confidence interval estimation. Smoothed bootstrap adds Gaussian
+            noise to improve CI accuracy for small segments. Use with --ci.
+            Set to 0 to disable. [Default: %(default)d]""",
 )
 
 P_segmetrics_stats.set_defaults(location_stats=[], spread_stats=[], interval_stats=[])
