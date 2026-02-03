@@ -183,8 +183,7 @@ def confidence_interval_bootstrap(
     bootstrap_dist = np.fromiter(seg_means, np.float64, bootstraps)
     alphas = np.array([alpha / 2, 1 - alpha / 2])
     if not smoothed:
-        # alphas = _bca_correct_alpha(values, weights, bootstrap_dist, alphas)
-        pass
+        alphas = _bca_correct_alpha(values, weights, bootstrap_dist, alphas)
     ci = np.percentile(bootstrap_dist, list(100 * alphas))
     return ci
 
@@ -242,16 +241,20 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     """
     n_boots = len(bootstrap_dist)
     orig_mean = np.average(values, weights=weights)
-    logging.warning(
-        "boot samples less: %s / %s", (bootstrap_dist < orig_mean).sum(), n_boots
-    )
     n_boots_below = (bootstrap_dist < orig_mean).sum()
-    if n_boots_below == 0:
-        logging.warning("boots mean %s, orig mean %s", bootstrap_dist.mean(), orig_mean)
-    else:
-        logging.warning("boot samples less: %s / %s", n_boots_below, n_boots)
-    z0 = stats.norm.ppf((bootstrap_dist < orig_mean).sum() / n_boots)
+
+    # Check if proportion is too extreme for BCa
+    proportion = n_boots_below / n_boots
+    if proportion == 0 or proportion == 1:
+        logging.warning(
+            "BCa: All bootstrap samples on one side (%d/%d); using original alphas",
+            n_boots_below, n_boots
+        )
+        return alphas
+
+    z0 = stats.norm.ppf(proportion)
     zalpha = stats.norm.ppf(alphas)
+
     # Jackknife influence values
     u = np.array(
         [
@@ -263,14 +266,39 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
         ]
     )
     uu = u.mean() - u
-    acc = (u**3).sum() / (6 * (uu**2).sum() ** 1.5)
-    alphas = stats.norm.cdf(z0 + (z0 + zalpha) / (1 - acc * (z0 + zalpha)))
-    logging.warning(
-        "New alphas: %s -- via z0=%s, za=%s, acc=%s", alphas, z0, zalpha, acc
+    uu_var = (uu**2).sum()
+
+    # Check for zero variance in jackknife estimates
+    if uu_var < 1e-10:
+        logging.warning("BCa: Jackknife variance too small; using original alphas")
+        return alphas
+
+    acc = (uu**3).sum() / (6 * uu_var ** 1.5)
+    denom = 1 - acc * (z0 + zalpha)
+
+    # Check if denominator is positive
+    if (denom <= 0).any():
+        logging.warning(
+            "BCa: Denominator non-positive (acc=%.4f); using original alphas",
+            acc
+        )
+        return alphas
+
+    new_alphas = stats.norm.cdf(z0 + (z0 + zalpha) / denom)
+
+    # Validate new alphas
+    if not (0 < new_alphas[0] < 1 and 0 < new_alphas[1] < 1):
+        logging.warning(
+            "BCa: Adjusted alphas %s out of range; using original alphas",
+            new_alphas
+        )
+        return alphas
+
+    logging.debug(
+        "BCa: alphas %s -> %s (z0=%.4f, acc=%.4f)",
+        alphas, new_alphas, z0, acc
     )
-    if not 0 < alphas[0] < 1 and 0 < alphas[1] < 1:
-        raise ValueError(f"CI alphas should be in (0,1); got {alphas}")
-    return alphas
+    return new_alphas
 
 
 def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> Union[float64, float]:

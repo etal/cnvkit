@@ -1855,12 +1855,14 @@ do_genemetrics = public(reports.do_genemetrics)
 
 def _cmd_genemetrics(args) -> None:
     """Identify targeted genes with copy number gain or loss."""
+    if args.alpha and not 0.0 < args.alpha <= 1.0:
+        raise RuntimeError("alpha must be between 0 and 1.")
+
     cnarr = read_cna(args.filename)
     segarr = read_cna(args.segment) if args.segment else None
     is_sample_female = verify_sample_sex(
         cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
     )
-    # TODO use the stats args
     table = do_genemetrics(
         cnarr,
         segarr,
@@ -1870,6 +1872,12 @@ def _cmd_genemetrics(args) -> None:
         args.male_reference,
         is_sample_female,
         args.diploid_parx_genome,
+        args.location_stats,
+        args.spread_stats,
+        args.interval_stats,
+        args.alpha,
+        args.bootstrap,
+        args.smooth_bootstrap,
     )
     logging.info("Found %d gene-level gains and losses", len(table))
     write_dataframe(args.output, table)
@@ -2035,6 +2043,12 @@ P_genemetrics_stats.add_argument(
     default=100,
     help="""Number of bootstrap iterations to estimate confidence interval; use with
         --ci. [Default: %(default)d]""",
+)
+P_genemetrics_stats.add_argument(
+    "--smooth-bootstrap",
+    action="store_true",
+    help="""Apply Gaussian noise to bootstrap samples, a.k.a. smoothed bootstrap, to
+            estimate confidence interval; use with --ci.""",
 )
 P_genemetrics_stats.set_defaults(location_stats=[], spread_stats=[], interval_stats=[])
 P_genemetrics.set_defaults(func=_cmd_genemetrics)
