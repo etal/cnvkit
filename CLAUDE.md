@@ -37,6 +37,12 @@ The project includes a devcontainer configuration that provides a pre-configured
 - CNVkit installed in editable mode
 - Simply open the project in VS Code and select "Reopen in Container" when prompted
 
+**Docker (for production/pipeline use):**
+Pre-built Docker images are available for portable execution. See `DOCKER.md` for details:
+- `docker pull etal/cnvkit:latest` - Latest stable release
+- `docker pull etal/cnvkit:devel` - Development version from master
+- Automatically built via GitHub Actions on every commit and release
+
 
 ### Testing
 
@@ -67,10 +73,32 @@ pytest test_commands.py --collect-only # List available tests without running
 The full tox matrix (multiple Python versions, min/max deps) runs in CI. For development iteration, use pytest directly.
 
 ### Code Quality & Security
-- `tox -e lint` - Run ruff linting and code quality checks
-- `tox -e security` - Run security scans (safety + bandit)
-- `ruff check cnvlib skgenome` - Run linting manually
-- `ruff format cnvlib skgenome` - Auto-format code
+
+**Pre-commit hooks (recommended for contributors):**
+```bash
+# Install pre-commit hooks (one-time setup)
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+
+# Hooks run automatically on git commit
+```
+
+The pre-commit configuration includes:
+- Ruff linting and formatting
+- Trailing whitespace removal
+- YAML/TOML validation
+- Bandit security checks
+- Python best practices checks
+
+**Manual commands:**
+- `make lint` - Run ruff linting
+- `make format` - Auto-format code with ruff
+- `make security` - Run security scans (safety + bandit)
+- `make pre-commit` - Install and run pre-commit hooks
+- `tox -e lint` - Run ruff via tox
+- `tox -e security` - Run security scans via tox
 - `tox -e coverage` - Run tests with coverage reporting
 
 ### Documentation
@@ -78,8 +106,25 @@ The full tox matrix (multiple Python versions, min/max deps) runs in CI. For dev
 - Documentation source is in `doc/` directory
 
 ### Building/Distribution
-- `tox -e build` - Build wheel package
-- `make` - Run maintenance commands (see root Makefile)
+- `make build` - Build wheel and sdist using modern build tools (python -m build)
+- `make clean` - Remove build artifacts and caches
+- `make help` - Show all available Makefile targets
+- `tox -e build` - Build wheel package via tox
+
+### Quick Start with Makefile
+The root `Makefile` provides convenient shortcuts:
+```bash
+make help          # Show all available commands
+make install-dev   # Install in editable mode with all dev dependencies
+make test          # Run pytest on test directory
+make test-all      # Run full tox suite (all Python versions)
+make lint          # Run ruff linting
+make format        # Auto-format with ruff
+make security      # Run safety + bandit
+make pre-commit    # Setup and run pre-commit hooks
+make build         # Build distribution packages
+make clean         # Clean all build artifacts
+```
 
 ## Architecture
 
@@ -103,7 +148,7 @@ CNVkit follows a pattern where each command has:
 
 ### Key Data Types
 - `GenomicArray` (from skgenome) - Core data structure for genomic intervals
-- `.cnn` files - Coverage/reference data 
+- `.cnn` files - Coverage/reference data
 - `.cnr` files - Copy number ratio data
 - `.cns` files - Segmented copy number data
 
@@ -120,7 +165,7 @@ The codebase handles multiple genomic formats through `skgenome.tabio`:
 Core dependencies are managed in `requirements/` with versions aligned to Ubuntu 24.04 LTS:
 - `core.txt` - Essential runtime dependencies (numpy≥1.26.4, pandas≥2.1.4, etc.)
 - `tests.txt` - Testing dependencies (pytest, coverage, ruff, safety, bandit)
-- `dev.txt` - Development dependencies  
+- `dev.txt` - Development dependencies
 - `min.txt` - Exact minimum versions for compatibility testing
 
 ### R Dependencies
@@ -151,14 +196,14 @@ Rscript -e "library(DNAcopy)"
 - **Unit tests:** Python 3.10-3.14 on Ubuntu + macOS (3.10, 3.12)
 - **Minimum version testing:** Ensures compatibility with Ubuntu LTS packages
 - **Code quality:** Ruff linting with comprehensive rule set
-- **Security:** Safety (dependencies) + Bandit (code analysis)  
+- **Security:** Safety (dependencies) + Bandit (code analysis)
 - **Coverage:** Pytest-cov with Codecov integration
 - **Integration tests:** Real genomic data pipeline (`make mini`)
 
 ### Tox Environments
 - `py3{10,11,12,13,14}` - Unit tests across Python versions
 - `py311-min`, `py310-min` - Test minimum dependency versions
-- `lint` - Ruff code quality checks  
+- `lint` - Ruff code quality checks
 - `security` - Safety + Bandit security scans
 - `coverage` - Coverage reporting with XML output
 - `doc` - Sphinx documentation build

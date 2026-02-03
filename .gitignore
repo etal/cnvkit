@@ -13,6 +13,8 @@
 .tox
 .coverage
 coverage.xml
+htmlcov/
+.pytest_cache/
 *.bai
 
 # Backup files from some Unix editors
@@ -52,3 +54,8 @@ doc/_build
 doc/html
 CNVkit.egg-info/
 wdl/generated/
+__pycache__/
+*.egg-info/
+
+# Pre-commit
+.pre-commit-config.yaml.bak
