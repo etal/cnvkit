@@ -328,20 +328,36 @@ def SegmentByPeaks(
 
     Source: SegmentByPeaks.R
     """
-    segs = np.zeros_like(data)
-    for seg_start, seg_end in zip(
-        np.insert(peaks, 0, 0), np.append(peaks, len(data)), strict=False
-    ):
-        if weights is not None and weights[seg_start:seg_end].sum() > 0:
-            # Weighted mean of individual probe values
-            val = np.average(
-                data[seg_start:seg_end], weights=weights[seg_start:seg_end]
-            )
+    if len(peaks) == 0:
+        # Single segment spanning all data
+        if weights is not None and weights.sum() > 0:
+            mean_val = np.average(data, weights=weights)
         else:
-            # Unweighted mean of individual probe values
-            val = np.mean(data[seg_start:seg_end])
-        segs[seg_start:seg_end] = val
-    return segs
+            mean_val = np.mean(data)
+        return np.full_like(data, mean_val)
+
+    # Segment boundaries: [0, peaks..., len(data)]
+    bounds = np.concatenate([[0], peaks, [len(data)]])
+    seg_lengths = np.diff(bounds)
+    n_segs = len(seg_lengths)
+
+    if weights is None:
+        # Vectorized unweighted means using reduceat
+        seg_sums = np.add.reduceat(data, bounds[:-1])
+        seg_means = seg_sums / seg_lengths
+    else:
+        # Weighted means require per-segment computation
+        seg_means = np.empty(n_segs, dtype=np.float64)
+        for i in range(n_segs):
+            start, end = bounds[i], bounds[i + 1]
+            w = weights[start:end]
+            if w.sum() > 0:
+                seg_means[i] = np.average(data[start:end], weights=w)
+            else:
+                seg_means[i] = np.mean(data[start:end])
+
+    # Expand segment means to full array using repeat
+    return np.repeat(seg_means, seg_lengths)
 
 
 # ---- from HaarSeg C code -- the core ----
@@ -379,16 +395,12 @@ def HaarConv(
         )
         return np.zeros(signalSize, dtype=np.float64)
 
-    result = np.zeros(signalSize, dtype=np.float64)
-
     if weight is None:
         # Vectorized unweighted case
-        result = _haar_conv_unweighted(signal, stepHalfSize)
+        return _haar_conv_unweighted(signal, stepHalfSize)
     else:
         # Weighted case (not vectorized due to running sums with dependencies)
-        result = _haar_conv_weighted(signal, weight, stepHalfSize)
-
-    return result
+        return _haar_conv_weighted(signal, weight, stepHalfSize)
 
 
 def _haar_conv_unweighted(signal: ndarray, stepHalfSize: int) -> ndarray:
@@ -559,18 +571,17 @@ def UnifyLevels(
 
 
 def PulseConv(
-    signal,  # const double * signal,
-    pulseSize,  # int pulseSize,
-):
-    """Convolve a pulse function with a signal, applying circular padding to the
-    signal.
+    signal: ndarray,
+    pulseSize: int,
+) -> ndarray:
+    """Convolve a pulse function with a signal, applying circular padding.
 
     Used for non-stationary variance compensation.
 
     Parameters
     ----------
-    signal: const array of floats
-    pulseSize: int
+    signal : array of floats
+    pulseSize : int
 
     Returns
     -------
@@ -587,26 +598,31 @@ def PulseConv(
             signalSize,
         )
         return np.zeros(signalSize, dtype=np.float64)
+
     pulseHeight = 1.0 / pulseSize
 
-    # Circular padding init
-    result = np.zeros(signalSize, dtype=np.float64)
-    for k in range((pulseSize + 1) // 2):
-        result[0] += signal[k]
-    for k in range(pulseSize // 2):
-        result[0] += signal[k]
-    result[0] *= pulseHeight
+    # Compute initial value with circular padding
+    result_0 = signal[: (pulseSize + 1) // 2].sum() + signal[: pulseSize // 2].sum()
+    result_0 *= pulseHeight
 
-    n = 1
-    for k in range(pulseSize // 2, signalSize + (pulseSize // 2) - 1):
-        tail = k - pulseSize
-        if tail < 0:
-            tail = -tail - 1
-        head = k
-        if head >= signalSize:
-            head = signalSize - 1 - (head - signalSize)
-        result[n] = result[n - 1] + ((signal[head] - signal[tail]) * pulseHeight)
-        n += 1
+    # Vectorized main computation
+    k = np.arange(pulseSize // 2, signalSize + (pulseSize // 2) - 1)
+
+    # Compute tail indices with circular padding
+    tail = k - pulseSize
+    tail_neg = tail < 0
+    tail[tail_neg] = -tail[tail_neg] - 1
+
+    # Compute head indices with circular padding
+    head = k.copy()
+    head_over = head >= signalSize
+    head[head_over] = signalSize - 1 - (head[head_over] - signalSize)
+
+    # Compute increments and cumulative sum
+    increments = (signal[head] - signal[tail]) * pulseHeight
+    result = np.empty(signalSize, dtype=np.float64)
+    result[0] = result_0
+    result[1:] = result_0 + np.cumsum(increments)
 
     return result
 
