@@ -300,7 +300,8 @@ def FDRThres(x: ndarray, q: float, stdev: float64) -> Union[int, float64]:
 
     m = np.arange(1, M + 1) / M
     x_sorted = np.sort(np.abs(x))[::-1]
-    p = 2 * (1 - stats.norm.cdf(x_sorted, stdev))  # like R "pnorm"
+    # Two-tailed p-value: P(|X| > x) where X ~ N(0, stdev)
+    p = 2 * (1 - stats.norm.cdf(x_sorted, loc=0, scale=stdev))
     # Get the largest index for which p <= m*q
     indices = np.nonzero(p <= m * q)[0]
     if len(indices):
@@ -328,7 +329,9 @@ def SegmentByPeaks(
     Source: SegmentByPeaks.R
     """
     segs = np.zeros_like(data)
-    for seg_start, seg_end in zip(np.insert(peaks, 0, 0), np.append(peaks, len(data)), strict=False):
+    for seg_start, seg_end in zip(
+        np.insert(peaks, 0, 0), np.append(peaks, len(data)), strict=False
+    ):
         if weights is not None and weights[seg_start:seg_end].sum() > 0:
             # Weighted mean of individual probe values
             val = np.average(
@@ -367,11 +370,12 @@ def HaarConv(
     """
     signalSize = len(signal)
     if stepHalfSize > signalSize:
-        # XXX TODO handle this endcase
-        # raise ValueError("stepHalfSize (%s) > signalSize (%s)"
-        #                  % (stepHalfSize, signalSize))
-        logging.debug(
-            "Error?: stepHalfSize (%s) > signalSize (%s)", stepHalfSize, signalSize
+        # Signal too short for this wavelet scale; return zeros to skip this level
+        logging.warning(
+            "Wavelet step size (%d) exceeds signal length (%d); "
+            "skipping this decomposition level",
+            stepHalfSize,
+            signalSize,
         )
         return np.zeros(signalSize, dtype=np.float64)
 
@@ -553,8 +557,13 @@ def PulseConv(
     """
     signalSize = len(signal)
     if pulseSize > signalSize:
-        # ENH: handle this endcase
-        raise ValueError(f"pulseSize ({pulseSize}) > signalSize ({signalSize})")
+        # Signal too short for this pulse size; return zeros to skip
+        logging.warning(
+            "Pulse size (%d) exceeds signal length (%d); skipping convolution",
+            pulseSize,
+            signalSize,
+        )
+        return np.zeros(signalSize, dtype=np.float64)
     pulseHeight = 1.0 / pulseSize
 
     # Circular padding init
