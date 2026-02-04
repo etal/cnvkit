@@ -380,17 +380,58 @@ def HaarConv(
         return np.zeros(signalSize, dtype=np.float64)
 
     result = np.zeros(signalSize, dtype=np.float64)
-    if weight is not None:
-        # Init weight sums
-        highWeightSum = weight[:stepHalfSize].sum()
-        # highSquareSum = np.exp2(weight[:stepHalfSize]).sum()
-        highNonNormed = (weight[:stepHalfSize] * signal[:stepHalfSize]).sum()
-        # Circular padding
-        lowWeightSum = highWeightSum
-        # lowSquareSum = highSquareSum
-        lowNonNormed = -highNonNormed
 
-    # ENH: vectorize this loop (it's the performance hotspot)
+    if weight is None:
+        # Vectorized unweighted case
+        result = _haar_conv_unweighted(signal, stepHalfSize)
+    else:
+        # Weighted case (not vectorized due to running sums with dependencies)
+        result = _haar_conv_weighted(signal, weight, stepHalfSize)
+
+    return result
+
+
+def _haar_conv_unweighted(signal: ndarray, stepHalfSize: int) -> ndarray:
+    """Vectorized Haar convolution for unweighted signals."""
+    signalSize = len(signal)
+    k = np.arange(1, signalSize)
+
+    # Compute highEnd indices with circular padding
+    highEnd = k + stepHalfSize - 1
+    over_mask = highEnd >= signalSize
+    highEnd[over_mask] = signalSize - 1 - (highEnd[over_mask] - signalSize)
+
+    # Compute lowEnd indices with circular padding
+    lowEnd = k - stepHalfSize - 1
+    under_mask = lowEnd < 0
+    lowEnd[under_mask] = -lowEnd[under_mask] - 1
+
+    # Compute increments and cumulative sum
+    increments = signal[highEnd] + signal[lowEnd] - 2 * signal[k - 1]
+    result = np.zeros(signalSize, dtype=np.float64)
+    result[1:] = np.cumsum(increments)
+
+    # Normalize
+    stepNorm = math.sqrt(2.0 * stepHalfSize)
+    result[1:] /= stepNorm
+
+    return result
+
+
+def _haar_conv_weighted(signal: ndarray, weight: ndarray, stepHalfSize: int) -> ndarray:
+    """Haar convolution for weighted signals (sequential due to running sums)."""
+    signalSize = len(signal)
+    result = np.zeros(signalSize, dtype=np.float64)
+
+    # Init weight sums
+    highWeightSum = weight[:stepHalfSize].sum()
+    highNonNormed = (weight[:stepHalfSize] * signal[:stepHalfSize]).sum()
+    # Circular padding
+    lowWeightSum = highWeightSum
+    lowNonNormed = -highNonNormed
+
+    norm_factor = math.sqrt(stepHalfSize / 2)
+
     for k in range(1, signalSize):
         highEnd = k + stepHalfSize - 1
         if highEnd >= signalSize:
@@ -399,28 +440,15 @@ def HaarConv(
         if lowEnd < 0:
             lowEnd = -lowEnd - 1
 
-        if weight is None:
-            result[k] = (
-                result[k - 1] + signal[highEnd] + signal[lowEnd] - 2 * signal[k - 1]
-            )
-        else:
-            lowNonNormed += (
-                signal[lowEnd] * weight[lowEnd] - signal[k - 1] * weight[k - 1]
-            )
-            highNonNormed += (
-                signal[highEnd] * weight[highEnd] - signal[k - 1] * weight[k - 1]
-            )
-            lowWeightSum += weight[k - 1] - weight[lowEnd]
-            highWeightSum += weight[highEnd] - weight[k - 1]
-            # lowSquareSum += weight[k-1] * weight[k-1] - weight[lowEnd] * weight[lowEnd]
-            # highSquareSum += weight[highEnd] * weight[highEnd] - weight[k-1] * weight[k-1]
-            result[k] = math.sqrt(stepHalfSize / 2) * (
-                lowNonNormed / lowWeightSum + highNonNormed / highWeightSum
-            )
-
-    if weight is None:
-        stepNorm = math.sqrt(2.0 * stepHalfSize)
-        result[1:signalSize] /= stepNorm
+        lowNonNormed += signal[lowEnd] * weight[lowEnd] - signal[k - 1] * weight[k - 1]
+        highNonNormed += (
+            signal[highEnd] * weight[highEnd] - signal[k - 1] * weight[k - 1]
+        )
+        lowWeightSum += weight[k - 1] - weight[lowEnd]
+        highWeightSum += weight[highEnd] - weight[k - 1]
+        result[k] = norm_factor * (
+            lowNonNormed / lowWeightSum + highNonNormed / highWeightSum
+        )
 
     return result
 
@@ -483,7 +511,6 @@ def UnifyLevels(
     baseLevel: ndarray,  # const int * baseLevel,
     addonLevel: ndarray,  # const int * addonLevel,
     windowSize: int,  # int windowSize,
-    # joinedLevel, #int * joinedLevel);
 ) -> ndarray:
     """Unify several decomposition levels.
 
@@ -504,35 +531,31 @@ def UnifyLevels(
     """
     if not len(addonLevel):
         return baseLevel
+    if not len(baseLevel):
+        return addonLevel.copy()
 
-    # Merge all addon items outside a window around each base item
-    # ENH: do something clever with searchsorted & masks?
-    joinedLevel = []
-    addon_idx = 0
-    for base_elem in baseLevel:
-        while addon_idx < len(addonLevel):
-            addon_elem = addonLevel[addon_idx]
-            if addon_elem < base_elem - windowSize:
-                # Addon is well before this base item -- use it
-                joinedLevel.append(addon_elem)
-                addon_idx += 1
-            elif base_elem - windowSize <= addon_elem <= base_elem + windowSize:
-                # Addon is too close to this base item -- skip it
-                addon_idx += 1
-            else:
-                assert base_elem + windowSize < addon_elem
-                # Addon is well beyond this base item -- keep for the next round
-                break
-        joinedLevel.append(base_elem)
+    # Use searchsorted to find nearest base elements for each addon
+    # Since baseLevel is sorted, the closest base is either at insert_pos or insert_pos-1
+    insert_pos = np.searchsorted(baseLevel, addonLevel)
+    n_base = len(baseLevel)
 
-    # Append the remaining addon items beyond the last base item's window
-    last_pos = baseLevel[-1] + windowSize if len(baseLevel) else -1
-    while addon_idx < len(addonLevel) and addonLevel[addon_idx] <= last_pos:
-        addon_idx += 1
-    if addon_idx < len(addonLevel):
-        joinedLevel.extend(addonLevel[addon_idx:])
+    # Check distance to left neighbor (where it exists)
+    has_left = insert_pos > 0
+    left_idx = np.clip(insert_pos - 1, 0, n_base - 1)
+    left_too_close = has_left & ((addonLevel - baseLevel[left_idx]) <= windowSize)
 
-    return np.array(sorted(joinedLevel), dtype=np.int_)
+    # Check distance to right neighbor (where it exists)
+    has_right = insert_pos < n_base
+    right_idx = np.clip(insert_pos, 0, n_base - 1)
+    right_too_close = has_right & ((baseLevel[right_idx] - addonLevel) <= windowSize)
+
+    # Keep addon elements that are not too close to any base element
+    keep_mask = ~(left_too_close | right_too_close)
+
+    # Merge kept addons with base and sort
+    joined = np.concatenate([baseLevel, addonLevel[keep_mask]])
+    joined.sort()
+    return joined
 
 
 def PulseConv(
