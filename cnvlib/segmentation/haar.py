@@ -300,7 +300,8 @@ def FDRThres(x: ndarray, q: float, stdev: float64) -> Union[int, float64]:
 
     m = np.arange(1, M + 1) / M
     x_sorted = np.sort(np.abs(x))[::-1]
-    p = 2 * (1 - stats.norm.cdf(x_sorted, stdev))  # like R "pnorm"
+    # Two-tailed p-value: P(|X| > x) where X ~ N(0, stdev)
+    p = 2 * (1 - stats.norm.cdf(x_sorted, loc=0, scale=stdev))
     # Get the largest index for which p <= m*q
     indices = np.nonzero(p <= m * q)[0]
     if len(indices):
@@ -327,18 +328,36 @@ def SegmentByPeaks(
 
     Source: SegmentByPeaks.R
     """
-    segs = np.zeros_like(data)
-    for seg_start, seg_end in zip(np.insert(peaks, 0, 0), np.append(peaks, len(data)), strict=False):
-        if weights is not None and weights[seg_start:seg_end].sum() > 0:
-            # Weighted mean of individual probe values
-            val = np.average(
-                data[seg_start:seg_end], weights=weights[seg_start:seg_end]
-            )
+    if len(peaks) == 0:
+        # Single segment spanning all data
+        if weights is not None and weights.sum() > 0:
+            mean_val = np.average(data, weights=weights)
         else:
-            # Unweighted mean of individual probe values
-            val = np.mean(data[seg_start:seg_end])
-        segs[seg_start:seg_end] = val
-    return segs
+            mean_val = np.mean(data)
+        return np.full_like(data, mean_val)
+
+    # Segment boundaries: [0, peaks..., len(data)]
+    bounds = np.concatenate([[0], peaks, [len(data)]])
+    seg_lengths = np.diff(bounds)
+    n_segs = len(seg_lengths)
+
+    if weights is None:
+        # Vectorized unweighted means using reduceat
+        seg_sums = np.add.reduceat(data, bounds[:-1])
+        seg_means = seg_sums / seg_lengths
+    else:
+        # Weighted means require per-segment computation
+        seg_means = np.empty(n_segs, dtype=np.float64)
+        for i in range(n_segs):
+            start, end = bounds[i], bounds[i + 1]
+            w = weights[start:end]
+            if w.sum() > 0:
+                seg_means[i] = np.average(data[start:end], weights=w)
+            else:
+                seg_means[i] = np.mean(data[start:end])
+
+    # Expand segment means to full array using repeat
+    return np.repeat(seg_means, seg_lengths)
 
 
 # ---- from HaarSeg C code -- the core ----
@@ -367,26 +386,64 @@ def HaarConv(
     """
     signalSize = len(signal)
     if stepHalfSize > signalSize:
-        # XXX TODO handle this endcase
-        # raise ValueError("stepHalfSize (%s) > signalSize (%s)"
-        #                  % (stepHalfSize, signalSize))
-        logging.debug(
-            "Error?: stepHalfSize (%s) > signalSize (%s)", stepHalfSize, signalSize
+        # Signal too short for this wavelet scale; return zeros to skip this level
+        logging.warning(
+            "Wavelet step size (%d) exceeds signal length (%d); "
+            "skipping this decomposition level",
+            stepHalfSize,
+            signalSize,
         )
         return np.zeros(signalSize, dtype=np.float64)
 
-    result = np.zeros(signalSize, dtype=np.float64)
-    if weight is not None:
-        # Init weight sums
-        highWeightSum = weight[:stepHalfSize].sum()
-        # highSquareSum = np.exp2(weight[:stepHalfSize]).sum()
-        highNonNormed = (weight[:stepHalfSize] * signal[:stepHalfSize]).sum()
-        # Circular padding
-        lowWeightSum = highWeightSum
-        # lowSquareSum = highSquareSum
-        lowNonNormed = -highNonNormed
+    if weight is None:
+        # Vectorized unweighted case
+        return _haar_conv_unweighted(signal, stepHalfSize)
+    else:
+        # Weighted case (not vectorized due to running sums with dependencies)
+        return _haar_conv_weighted(signal, weight, stepHalfSize)
 
-    # ENH: vectorize this loop (it's the performance hotspot)
+
+def _haar_conv_unweighted(signal: ndarray, stepHalfSize: int) -> ndarray:
+    """Vectorized Haar convolution for unweighted signals."""
+    signalSize = len(signal)
+    k = np.arange(1, signalSize)
+
+    # Compute highEnd indices with circular padding
+    highEnd = k + stepHalfSize - 1
+    over_mask = highEnd >= signalSize
+    highEnd[over_mask] = signalSize - 1 - (highEnd[over_mask] - signalSize)
+
+    # Compute lowEnd indices with circular padding
+    lowEnd = k - stepHalfSize - 1
+    under_mask = lowEnd < 0
+    lowEnd[under_mask] = -lowEnd[under_mask] - 1
+
+    # Compute increments and cumulative sum
+    increments = signal[highEnd] + signal[lowEnd] - 2 * signal[k - 1]
+    result = np.zeros(signalSize, dtype=np.float64)
+    result[1:] = np.cumsum(increments)
+
+    # Normalize
+    stepNorm = math.sqrt(2.0 * stepHalfSize)
+    result[1:] /= stepNorm
+
+    return result
+
+
+def _haar_conv_weighted(signal: ndarray, weight: ndarray, stepHalfSize: int) -> ndarray:
+    """Haar convolution for weighted signals (sequential due to running sums)."""
+    signalSize = len(signal)
+    result = np.zeros(signalSize, dtype=np.float64)
+
+    # Init weight sums
+    highWeightSum = weight[:stepHalfSize].sum()
+    highNonNormed = (weight[:stepHalfSize] * signal[:stepHalfSize]).sum()
+    # Circular padding
+    lowWeightSum = highWeightSum
+    lowNonNormed = -highNonNormed
+
+    norm_factor = math.sqrt(stepHalfSize / 2)
+
     for k in range(1, signalSize):
         highEnd = k + stepHalfSize - 1
         if highEnd >= signalSize:
@@ -395,28 +452,15 @@ def HaarConv(
         if lowEnd < 0:
             lowEnd = -lowEnd - 1
 
-        if weight is None:
-            result[k] = (
-                result[k - 1] + signal[highEnd] + signal[lowEnd] - 2 * signal[k - 1]
-            )
-        else:
-            lowNonNormed += (
-                signal[lowEnd] * weight[lowEnd] - signal[k - 1] * weight[k - 1]
-            )
-            highNonNormed += (
-                signal[highEnd] * weight[highEnd] - signal[k - 1] * weight[k - 1]
-            )
-            lowWeightSum += weight[k - 1] - weight[lowEnd]
-            highWeightSum += weight[highEnd] - weight[k - 1]
-            # lowSquareSum += weight[k-1] * weight[k-1] - weight[lowEnd] * weight[lowEnd]
-            # highSquareSum += weight[highEnd] * weight[highEnd] - weight[k-1] * weight[k-1]
-            result[k] = math.sqrt(stepHalfSize / 2) * (
-                lowNonNormed / lowWeightSum + highNonNormed / highWeightSum
-            )
-
-    if weight is None:
-        stepNorm = math.sqrt(2.0 * stepHalfSize)
-        result[1:signalSize] /= stepNorm
+        lowNonNormed += signal[lowEnd] * weight[lowEnd] - signal[k - 1] * weight[k - 1]
+        highNonNormed += (
+            signal[highEnd] * weight[highEnd] - signal[k - 1] * weight[k - 1]
+        )
+        lowWeightSum += weight[k - 1] - weight[lowEnd]
+        highWeightSum += weight[highEnd] - weight[k - 1]
+        result[k] = norm_factor * (
+            lowNonNormed / lowWeightSum + highNonNormed / highWeightSum
+        )
 
     return result
 
@@ -479,7 +523,6 @@ def UnifyLevels(
     baseLevel: ndarray,  # const int * baseLevel,
     addonLevel: ndarray,  # const int * addonLevel,
     windowSize: int,  # int windowSize,
-    # joinedLevel, #int * joinedLevel);
 ) -> ndarray:
     """Unify several decomposition levels.
 
@@ -500,50 +543,45 @@ def UnifyLevels(
     """
     if not len(addonLevel):
         return baseLevel
+    if not len(baseLevel):
+        return addonLevel.copy()
 
-    # Merge all addon items outside a window around each base item
-    # ENH: do something clever with searchsorted & masks?
-    joinedLevel = []
-    addon_idx = 0
-    for base_elem in baseLevel:
-        while addon_idx < len(addonLevel):
-            addon_elem = addonLevel[addon_idx]
-            if addon_elem < base_elem - windowSize:
-                # Addon is well before this base item -- use it
-                joinedLevel.append(addon_elem)
-                addon_idx += 1
-            elif base_elem - windowSize <= addon_elem <= base_elem + windowSize:
-                # Addon is too close to this base item -- skip it
-                addon_idx += 1
-            else:
-                assert base_elem + windowSize < addon_elem
-                # Addon is well beyond this base item -- keep for the next round
-                break
-        joinedLevel.append(base_elem)
+    # Use searchsorted to find nearest base elements for each addon
+    # Since baseLevel is sorted, the closest base is either at insert_pos or insert_pos-1
+    insert_pos = np.searchsorted(baseLevel, addonLevel)
+    n_base = len(baseLevel)
 
-    # Append the remaining addon items beyond the last base item's window
-    last_pos = baseLevel[-1] + windowSize if len(baseLevel) else -1
-    while addon_idx < len(addonLevel) and addonLevel[addon_idx] <= last_pos:
-        addon_idx += 1
-    if addon_idx < len(addonLevel):
-        joinedLevel.extend(addonLevel[addon_idx:])
+    # Check distance to left neighbor (where it exists)
+    has_left = insert_pos > 0
+    left_idx = np.clip(insert_pos - 1, 0, n_base - 1)
+    left_too_close = has_left & ((addonLevel - baseLevel[left_idx]) <= windowSize)
 
-    return np.array(sorted(joinedLevel), dtype=np.int_)
+    # Check distance to right neighbor (where it exists)
+    has_right = insert_pos < n_base
+    right_idx = np.clip(insert_pos, 0, n_base - 1)
+    right_too_close = has_right & ((baseLevel[right_idx] - addonLevel) <= windowSize)
+
+    # Keep addon elements that are not too close to any base element
+    keep_mask = ~(left_too_close | right_too_close)
+
+    # Merge kept addons with base and sort
+    joined = np.concatenate([baseLevel, addonLevel[keep_mask]])
+    joined.sort()
+    return joined
 
 
 def PulseConv(
-    signal,  # const double * signal,
-    pulseSize,  # int pulseSize,
-):
-    """Convolve a pulse function with a signal, applying circular padding to the
-    signal.
+    signal: ndarray,
+    pulseSize: int,
+) -> ndarray:
+    """Convolve a pulse function with a signal, applying circular padding.
 
     Used for non-stationary variance compensation.
 
     Parameters
     ----------
-    signal: const array of floats
-    pulseSize: int
+    signal : array of floats
+    pulseSize : int
 
     Returns
     -------
@@ -553,28 +591,38 @@ def PulseConv(
     """
     signalSize = len(signal)
     if pulseSize > signalSize:
-        # ENH: handle this endcase
-        raise ValueError(f"pulseSize ({pulseSize}) > signalSize ({signalSize})")
+        # Signal too short for this pulse size; return zeros to skip
+        logging.warning(
+            "Pulse size (%d) exceeds signal length (%d); skipping convolution",
+            pulseSize,
+            signalSize,
+        )
+        return np.zeros(signalSize, dtype=np.float64)
+
     pulseHeight = 1.0 / pulseSize
 
-    # Circular padding init
-    result = np.zeros(signalSize, dtype=np.float64)
-    for k in range((pulseSize + 1) // 2):
-        result[0] += signal[k]
-    for k in range(pulseSize // 2):
-        result[0] += signal[k]
-    result[0] *= pulseHeight
+    # Compute initial value with circular padding
+    result_0 = signal[: (pulseSize + 1) // 2].sum() + signal[: pulseSize // 2].sum()
+    result_0 *= pulseHeight
 
-    n = 1
-    for k in range(pulseSize // 2, signalSize + (pulseSize // 2) - 1):
-        tail = k - pulseSize
-        if tail < 0:
-            tail = -tail - 1
-        head = k
-        if head >= signalSize:
-            head = signalSize - 1 - (head - signalSize)
-        result[n] = result[n - 1] + ((signal[head] - signal[tail]) * pulseHeight)
-        n += 1
+    # Vectorized main computation
+    k = np.arange(pulseSize // 2, signalSize + (pulseSize // 2) - 1)
+
+    # Compute tail indices with circular padding
+    tail = k - pulseSize
+    tail_neg = tail < 0
+    tail[tail_neg] = -tail[tail_neg] - 1
+
+    # Compute head indices with circular padding
+    head = k.copy()
+    head_over = head >= signalSize
+    head[head_over] = signalSize - 1 - (head[head_over] - signalSize)
+
+    # Compute increments and cumulative sum
+    increments = (signal[head] - signal[tail]) * pulseHeight
+    result = np.empty(signalSize, dtype=np.float64)
+    result[0] = result_0
+    result[1:] = result_0 + np.cumsum(increments)
 
     return result
 
