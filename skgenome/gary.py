@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from typing import Any, Optional, Union, TYPE_CHECKING
+from typing import Any, Optional, TypeVar, Union, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Mapping, Sequence
+
+_GA = TypeVar("_GA", bound="GenomicArray")
 
 
 class GenomicArray:
@@ -72,13 +74,15 @@ class GenomicArray:
 
             recast_cols = {
                 col: dtype
-                for col, dtype in zip(self._required_columns, self._required_dtypes, strict=False)
+                for col, dtype in zip(
+                    self._required_columns, self._required_dtypes, strict=False
+                )
                 if not ok_dtype(col, dtype)
             }
             if recast_cols:
                 data_table = data_table.astype(recast_cols)
 
-        self.data = data_table
+        self.data: pd.DataFrame = data_table  # type: ignore[assignment]
         self.meta = dict(meta_dict) if meta_dict is not None and len(meta_dict) else {}
 
     @classmethod
@@ -122,9 +126,7 @@ class GenomicArray:
         return self.__class__.from_columns(columns, self.meta)
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
-    def as_dataframe(
-        self, dframe: pd.DataFrame, reset_index: bool = False
-    ) -> Union[VariantArray, GenomicArray, CopyNumArray]:
+    def as_dataframe(self: _GA, dframe: pd.DataFrame, reset_index: bool = False) -> _GA:
         """Wrap the given pandas DataFrame in this instance's metadata."""
         if reset_index:
             dframe = dframe.reset_index(drop=True)
@@ -134,7 +136,7 @@ class GenomicArray:
         """Coerce `arraylike` to a Series with this instance's index."""
         return pd.Series(arraylike, index=self.data.index)
 
-    def as_rows(self, rows: Iterable) -> Union[GenomicArray, CopyNumArray]:
+    def as_rows(self: _GA, rows: Iterable) -> _GA:
         """Wrap the given rows in this instance's metadata."""
         try:
             out = self.from_rows(rows, columns=self.data.columns, meta_dict=self.meta)
@@ -153,8 +155,10 @@ class GenomicArray:
         """Test whether the array contains any rows (is non-empty)."""
         return bool(len(self.data))
 
-    def __eq__(self, other: CopyNumArray) -> bool:
-        return isinstance(other, self.__class__) and self.data.equals(other.data)
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, GenomicArray):
+            return NotImplemented
+        return self.data.equals(other.data)
 
     def __len__(self) -> int:
         """Return the number of rows (genomic intervals) in the array."""
@@ -224,7 +228,7 @@ class GenomicArray:
             self.data[index] = value
 
     def __delitem__(self, index) -> None:
-        return NotImplemented
+        raise NotImplementedError
 
     def __iter__(self) -> map:
         return self.data.itertuples(index=False)
@@ -254,8 +258,8 @@ class GenomicArray:
     # Traversal
 
     def autosomes(
-        self, also: Optional[Union[str, list[str], pd.Series]] = None
-    ) -> Union[VariantArray, GenomicArray, CopyNumArray]:
+        self: _GA, also: Optional[Union[str, list[str], pd.Series]] = None
+    ) -> _GA:
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
         is_auto = self.chromosome.str.match(r"(chr)?\d+$", na=False)
         if not is_auto.any():
@@ -273,8 +277,8 @@ class GenomicArray:
         return self[is_auto]
 
     def by_arm(
-        self, min_gap_size: Union[int, float] = 1e5, min_arm_bins: int = 50
-    ) -> Iterator[tuple[str, CopyNumArray]]:
+        self: _GA, min_gap_size: Union[int, float] = 1e5, min_arm_bins: int = 50
+    ) -> Iterator[tuple[str, _GA]]:
         """Iterate over bins grouped by chromosome arm (inferred)."""
         # ENH:
         # - Accept GArray of actual centromere regions as input
@@ -320,7 +324,7 @@ class GenomicArray:
                     logging.debug("%s: Skipping centromere search, too small", chrom)
                 yield chrom, self.as_dataframe(subtable)
 
-    def by_chromosome(self) -> Iterator:
+    def by_chromosome(self: _GA) -> Iterator[tuple[str, _GA]]:
         """Iterate over bins grouped by chromosome name."""
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
@@ -389,12 +393,12 @@ class GenomicArray:
         return self.data.apply(to_label, axis=1)
 
     def in_range(
-        self,
+        self: _GA,
         chrom: Optional[str] = None,
         start: Optional[Numeric] = None,
         end: Optional[Numeric] = None,
         mode: str = "outer",
-    ) -> Union[GenomicArray, CopyNumArray]:
+    ) -> _GA:
         """Get the GenomicArray portion within the given genomic range.
 
         Parameters
@@ -574,7 +578,7 @@ class GenomicArray:
             self.data = pd.concat([self.data, other.data], ignore_index=True)
             self.sort()
 
-    def concat(self, others: list[CopyNumArray]) -> CopyNumArray:
+    def concat(self: _GA, others: list[_GA]) -> _GA:
         """Concatenate several GenomicArrays, keeping this array's metadata.
 
         This array's data table is not implicitly included in the result.
@@ -584,11 +588,11 @@ class GenomicArray:
         result.sort()
         return result
 
-    def copy(self) -> Union[GenomicArray, CopyNumArray]:
+    def copy(self: _GA) -> _GA:
         """Create an independent copy of this object."""
         return self.as_dataframe(self.data.copy())
 
-    def add_columns(self, **columns) -> CopyNumArray:
+    def add_columns(self: _GA, **columns) -> _GA:
         """Add the given columns to a copy of this GenomicArray.
 
         Parameters
@@ -606,14 +610,12 @@ class GenomicArray:
         """
         return self.as_dataframe(self.data.assign(**columns))
 
-    def keep_columns(
-        self, colnames: tuple[str, str, str, str, str, str]
-    ) -> CopyNumArray:
+    def keep_columns(self: _GA, colnames: tuple[str, str, str, str, str, str]) -> _GA:
         """Extract a subset of columns, reusing this instance's metadata."""
         colnames = self.data.columns.intersection(colnames)
         return self.__class__(self.data.loc[:, colnames], self.meta.copy())
 
-    def drop_extra_columns(self) -> Union[GenomicArray, CopyNumArray]:
+    def drop_extra_columns(self: _GA) -> _GA:
         """Remove any optional columns from this GenomicArray.
 
         Returns
@@ -626,7 +628,7 @@ class GenomicArray:
         table = self.data.loc[:, self._required_columns]
         return self.as_dataframe(table)
 
-    def filter(self, func: Optional[Callable] = None, **kwargs) -> GenomicArray:
+    def filter(self: _GA, func: Optional[Callable] = None, **kwargs) -> _GA:
         """Take a subset of rows where the given condition is true.
 
         Parameters
