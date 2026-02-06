@@ -17,15 +17,17 @@ if TYPE_CHECKING:
 
 
 def read_cna(
-    infile: str, sample_id: Optional[str] = None, meta: None = None
+    infile: str, sample_id: Optional[str] = None, meta: Optional[dict[str, str]] = None
 ) -> CopyNumArray:
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a CopyNumArray object."""
-    return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)
+    return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)  # type: ignore[return-value]
 
 
-def read_ga(infile: str, sample_id: None = None, meta: None = None) -> GenomicArray:
+def read_ga(
+    infile: str, sample_id: Optional[str] = None, meta: Optional[dict[str, str]] = None
+) -> GenomicArray:
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a GenomicArray (!) object."""
-    return tabio.read(infile, into=GA, sample_id=sample_id, meta=meta)
+    return tabio.read(infile, into=GA, sample_id=sample_id, meta=meta)  # type: ignore[return-value]
 
 
 def load_het_snps(
@@ -33,11 +35,11 @@ def load_het_snps(
     sample_id: Optional[str] = None,
     normal_id: Optional[str] = None,
     min_variant_depth: int = 20,
-    zygosity_freq: None = None,
+    zygosity_freq: Optional[float] = None,
     tumor_boost: bool = False,
 ) -> VariantArray:
     if vcf_fname is None:
-        return None
+        return None  # type: ignore[return-value,unreachable]
     varr = tabio.read(
         vcf_fname,
         "vcf",
@@ -54,7 +56,7 @@ def load_het_snps(
         )
         zygosity_freq = 0.25
     if zygosity_freq is not None:
-        varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)
+        varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)  # type: ignore[attr-defined]
     if "n_zygosity" in varr:
         # Infer & drop (more) somatic loci based on genotype
         somatic_idx = (varr["zygosity"] != 0.0) & (varr["n_zygosity"] == 0.0)
@@ -65,12 +67,12 @@ def load_het_snps(
             )
         varr = varr[~somatic_idx]
     orig_len = len(varr)
-    varr = varr.heterozygous()
+    varr = varr.heterozygous()  # type: ignore[attr-defined]
     logging.info("Kept %d heterozygous of %d VCF records", len(varr), orig_len)
     # TODO use/explore tumor_boost option
     if tumor_boost:
         varr["alt_freq"] = varr.tumor_boost()
-    return varr
+    return varr  # type: ignore[no-any-return]
 
 
 def verify_sample_sex(cnarr, sex_arg, is_haploid_x_reference, diploid_parx_genome):
@@ -96,7 +98,7 @@ def verify_sample_sex(cnarr, sex_arg, is_haploid_x_reference, diploid_parx_genom
 
 def write_tsv(outfname, rows, colnames=None) -> None:
     """Write rows, with optional column header, to tabular file."""
-    with tabio.safe_write(outfname or sys.stdout) as handle:
+    with tabio.safe_write(outfname or sys.stdout) as handle:  # type: ignore[arg-type]
         if colnames:
             header = "\t".join(colnames) + "\n"
             handle.write(header)
@@ -105,7 +107,7 @@ def write_tsv(outfname, rows, colnames=None) -> None:
 
 def write_text(outfname, text, *more_texts) -> None:
     """Write one or more strings (blocks of text) to a file."""
-    with tabio.safe_write(outfname or sys.stdout) as handle:
+    with tabio.safe_write(outfname or sys.stdout) as handle:  # type: ignore[arg-type]
         handle.write(text)
         if more_texts:
             for mtext in more_texts:
@@ -114,5 +116,5 @@ def write_text(outfname, text, *more_texts) -> None:
 
 def write_dataframe(outfname, dframe, header=True) -> None:
     """Write a pandas.DataFrame to a tabular file."""
-    with tabio.safe_write(outfname or sys.stdout) as handle:
+    with tabio.safe_write(outfname or sys.stdout) as handle:  # type: ignore[arg-type]
         dframe.to_csv(handle, header=header, index=False, sep="\t", float_format="%.6g")

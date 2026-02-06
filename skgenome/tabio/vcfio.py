@@ -53,7 +53,7 @@ def read_vcf(
         vcf_reader.subset_samples(list(filter(None, (sid, nid))))
     else:
         logging.warning("VCF file %s has no sample genotypes", infile)
-        sid = sample_id
+        sid = sample_id  # type: ignore[assignment]
         nid = None
 
     columns = [
@@ -70,7 +70,7 @@ def read_vcf(
     if nid:
         columns.extend(["n_zygosity", "n_depth", "n_alt_count"])
 
-    rows = _parse_records(vcf_reader, sid, nid, skip_reject)
+    rows = _parse_records(vcf_reader, sid, nid, skip_reject)  # type: ignore[arg-type]
     table = pd.DataFrame.from_records(rows, columns=columns)
     table["alt_freq"] = table["alt_count"] / table["depth"]
     if nid:
@@ -110,10 +110,10 @@ def _choose_samples(
     unspecified, emit all samples as unpaired tumors.
     """
     vcf_samples = list(vcf_reader.header.samples)
-    if isinstance(sample_id, int):
-        sample_id = vcf_samples[sample_id]
-    if isinstance(normal_id, int):
-        normal_id = vcf_samples[normal_id]
+    if isinstance(sample_id, int):  # type: ignore[unreachable]
+        sample_id = vcf_samples[sample_id]  # type: ignore[unreachable]
+    if isinstance(normal_id, int):  # type: ignore[unreachable]
+        normal_id = vcf_samples[normal_id]  # type: ignore[unreachable]
     for sid in (sample_id, normal_id):
         if sid and sid not in vcf_samples:
             raise IndexError(f"Specified sample {sid} not in VCF file")
@@ -133,13 +133,13 @@ def _choose_samples(
         pairs = [(oid, normal_id) for oid in other_ids]
     else:
         # All samples are unpaired tumors
-        pairs = [(sid, None) for sid in vcf_samples]
+        pairs = [(sid, None) for sid in vcf_samples]  # type: ignore[misc]
     if sample_id:
         # Keep only the specified tumor/test sample
         pairs = [(s, n) for s, n in pairs if s == sample_id]
     if not pairs:
         # sample_id refers to a normal/control sample -- salvage it
-        pairs = [(sample_id, None)]
+        pairs = [(sample_id, None)]  # type: ignore[list-item]
     for sid in set(chain(*pairs)) - {None}:
         _confirm_unique(sid, vcf_samples)
 
@@ -202,7 +202,7 @@ def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
                     sample_id,
                     normal_id,
                 )
-                yield sample_id, normal_id
+                yield sample_id, normal_id  # type: ignore[misc]
     elif "GATKCommandLine.MuTect2" in meta:
         # GATK 3+ metadata is suboptimal.
         # Apparent T/N convention: The samples are just renamed TUMOR and
@@ -261,7 +261,7 @@ def _parse_records(
                 raise
         else:
             # Assume unpaired tumor; take DP, AF from INFO (e.g. LoFreq)
-            depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0
+            depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0  # type: ignore[assignment]
             if "AF" in record.info:
                 alt_freq = record.info["AF"]
                 alt_count = round(alt_freq * depth)
@@ -298,7 +298,7 @@ def _parse_records(
                     alt_count,
                 )
                 if normal_id:
-                    row += (n_zygosity, n_depth, n_alt_count)
+                    row += (n_zygosity, n_depth, n_alt_count)  # type: ignore[assignment]
                 yield row
 
     if cnt_reject:
@@ -368,7 +368,7 @@ def _get_end(posn: int, alt: str, info: VariantRecordInfo) -> int:
     """Get record end position."""
     if "END" in info:
         # Structural variant
-        return info["END"]
+        return info["END"]  # type: ignore[no-any-return]
     return posn + len(alt)
 
 

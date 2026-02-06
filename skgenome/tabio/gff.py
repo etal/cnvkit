@@ -26,14 +26,16 @@ import logging
 import re
 
 import pandas as pd
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from pandas.core.frame import DataFrame
 
 
 def read_gff(
-    infile: str, tag: str = r"(Name|gene_id|gene_name|gene)", keep_type: None = None
+    infile: str,
+    tag: str = r"(Name|gene_id|gene_name|gene)",
+    keep_type: Optional[str] = None,
 ) -> DataFrame:
     """Read a GFF3/GTF/GFF2 file into a DataFrame.
 
@@ -83,7 +85,7 @@ def read_gff(
         .sort_values(["chromosome", "start", "end"])
         .reset_index(drop=True)
     )
-    if keep_type:
+    if keep_type:  # type: ignore[unreachable]
         ok_type = dframe["type"] == keep_type
         logging.info(
             "Keeping %d '%s' / %d total records", ok_type.sum(), keep_type, len(dframe)

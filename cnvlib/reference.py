@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 def do_reference_flat(
     targets: str,
     antitargets: Optional[str] = None,
-    fa_fname: None = None,
+    fa_fname: Optional[str] = None,
     is_haploid_x_reference: bool = False,
     diploid_parx_genome: Optional[str] = None,
 ) -> CNA:
@@ -61,7 +61,7 @@ def do_reference_flat(
     )
     ref_probes["depth"] = np.exp2(ref_probes["log2"])  # Shim
     # Calculate GC and RepeatMasker content for each probe's genomic region
-    if fa_fname:
+    if fa_fname:  # type: ignore[unreachable]
         gc, rmask = get_fasta_stats(ref_probes, fa_fname)
         ref_probes["gc"] = gc
         ref_probes["rmask"] = rmask

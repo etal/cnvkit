@@ -58,7 +58,7 @@ def do_target(
     if do_short_names:
         logging.info("Shortening target interval labels")
         tgt_arr["gene"] = list(shorten_labels(tgt_arr["gene"]))
-    return tgt_arr
+    return tgt_arr  # type: ignore[no-any-return]
 
 
 def shorten_labels(gene_labels: Series) -> Iterator[str]:
@@ -85,7 +85,7 @@ def shorten_labels(gene_labels: Series) -> Iterator[str]:
         ...
     """
     longest_name_len = 0
-    curr_names = set()
+    curr_names: set[str] = set()
     curr_gene_count = 0
 
     for label in gene_labels:

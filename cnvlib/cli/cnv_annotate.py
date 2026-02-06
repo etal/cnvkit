@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-"""Update gene names in CNVkit .cnn/.cnr files.
-"""
+"""Update gene names in CNVkit .cnn/.cnr files."""
+
 import argparse
 import logging
 import sys
@@ -11,17 +11,17 @@ from ..cmdutil import read_cna
 
 def argument_parsing():
     AP = argparse.ArgumentParser(description=__doc__)
-    AP.add_argument('annotate', help="Genome annotations.")
-    AP.add_argument('cnv_file', help="CNVkit .cnn or .cnr file.")
-    AP.add_argument('-o', '--output', help="Output filename.")
-    return  AP.parse_args()
+    AP.add_argument("annotate", help="Genome annotations.")
+    AP.add_argument("cnv_file", help="CNVkit .cnn or .cnr file.")
+    AP.add_argument("-o", "--output", help="Output filename.")
+    return AP.parse_args()
 
 
 def cnv_annotate(args) -> None:
     annot = tabio.read_auto(args.annotate)
     cnarr = read_cna(args.cnv_file)
-    cnarr['gene'] = annot.into_ranges(cnarr, 'gene', '-')
-    tabio.write(cnarr, args.output or sys.stdout)
+    cnarr["gene"] = annot.into_ranges(cnarr, "gene", "-")
+    tabio.write(cnarr, args.output or sys.stdout)  # type: ignore[arg-type]
     # ENH:
     #  --short-names
     #  --no-antitarget
@@ -36,5 +36,5 @@ def main() -> None:
     cnv_annotate(arguments)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -173,7 +173,9 @@ def export_seg(sample_fnames: list[str], chrom_ids: bool = False) -> pd.DataFram
     Segment breakpoints are not the same across samples, so samples are listed
     in serial with the sample ID as the left column.
     """
-    dframes, sample_ids = zip(*(_load_seg_dframe_id(fname) for fname in sample_fnames), strict=False)
+    dframes, sample_ids = zip(
+        *(_load_seg_dframe_id(fname) for fname in sample_fnames), strict=False
+    )
     out_table = tabio.seg.write_seg(dframes, sample_ids, chrom_ids)
     return out_table
 
@@ -273,8 +275,8 @@ def export_vcf(
     is_haploid_x_reference: bool,
     diploid_parx_genome: Optional[str],
     is_sample_female: bool,
-    sample_id: None = None,
-    cnarr: None = None,
+    sample_id: Optional[str] = None,
+    cnarr: Optional[CopyNumArray] = None,
 ) -> tuple[str, str]:
     """Convert segments to Variant Call Format.
 
@@ -294,7 +296,7 @@ def export_vcf(
         "FORMAT",
         sample_id or segments.sample_id,
     ]
-    if cnarr:
+    if cnarr:  # type: ignore[unreachable]
         segments = assign_ci_start_end(segments, cnarr)
     vcf_rows = segments2vcf(
         segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female
@@ -380,7 +382,9 @@ def segments2vcf(
 
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
-    for out_row, abs_exp in zip(out_dframe.itertuples(index=False), abs_expect, strict=False):
+    for out_row, abs_exp in zip(
+        out_dframe.itertuples(index=False), abs_expect, strict=False
+    ):
         if (
             out_row.ncopies == abs_exp
             or
@@ -523,7 +527,7 @@ def export_theta(
     #              if tumor_segs.chromosome.iat[0].startswith('chr')
     #              else ["X", "Y"])
     # NB: THetA2 now apparently just drops X and Y (#153)
-    xy_names = []
+    xy_names: list[str] = []
     tumor_segs = tumor_segs.autosomes(also=xy_names)
     if normal_cn:
         normal_cn = normal_cn.autosomes(also=xy_names)

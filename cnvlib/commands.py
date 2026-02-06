@@ -78,7 +78,7 @@ if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
 
 
-__all__ = []  # type: list[str]
+__all__: list[str] = []
 
 
 def public(fn: Callable) -> Callable:
@@ -153,7 +153,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
         sys.exit(bad_args_msg + "\n(See: cnvkit.py batch -h)")
 
     # Ensure sample IDs are unique to avoid overwriting outputs
-    seen_sids = {}
+    seen_sids: dict[str, str] = {}
     for fname in (args.sample_fnames or []) + (args.normal or []):
         sid = core.fbase(fname)
         if sid in seen_sids:
@@ -622,7 +622,7 @@ def _cmd_autobin(args: argparse.Namespace) -> None:
         args.annotate,
         args.short_names,
         do_split=True,
-        avg_size=tgt_bin_size,
+        avg_size=tgt_bin_size,  # type: ignore[arg-type]
     )
     tgt_name_base = tgt_arr.sample_id if tgt_arr else core.fbase(bam_fname)
     target_bed = args.target_output_bed or tgt_name_base + ".target.bed"
@@ -841,7 +841,7 @@ def _cmd_reference(args: argparse.Namespace) -> None:
     elif args.references:
         # Pooled reference
         assert not args.targets and not args.antitargets, usage_err_msg
-        filenames = []
+        filenames: list[str] = []
         for path in args.references:
             if os.path.isdir(path):
                 filenames.extend(
@@ -1246,7 +1246,7 @@ def _cmd_call(args: argparse.Namespace) -> None:
         args.ploidy,
         args.purity,
         args.male_reference,
-        is_sample_female,
+        is_sample_female,  # type: ignore[arg-type]
         args.diploid_parx_genome,
         args.filters,
         args.thresholds,
@@ -1423,8 +1423,8 @@ def _cmd_diagram(args: argparse.Namespace) -> None:
         if segarr:
             segarr = segarr.shift_xx(args.male_reference, is_sample_female)
     outfname = diagram.create_diagram(
-        cnarr,
-        segarr,
+        cnarr,  # type: ignore[arg-type]
+        segarr,  # type: ignore[arg-type]
         args.threshold,
         args.min_probes,
         args.output,
@@ -1545,7 +1545,11 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
                     if args.title is not None:
                         scatter_opts["title"] = f"{args.title} {region.chromosome}"
                     scatter.do_scatter(
-                        cnarr, segarr, varr, show_range=region, **scatter_opts
+                        cnarr,
+                        segarr,
+                        varr,
+                        show_range=region,
+                        **scatter_opts,  # type: ignore[arg-type]
                     )
                 except ValueError as exc:
                     # Probably no bins in the selected region
@@ -1556,7 +1560,12 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
         if args.title is not None:
             scatter_opts["title"] = args.title
         scatter.do_scatter(
-            cnarr, segarr, varr, args.chromosome, args.gene, **scatter_opts
+            cnarr,
+            segarr,
+            varr,
+            args.chromosome,
+            args.gene,
+            **scatter_opts,  # type: ignore[arg-type]
         )
         if args.output:
             oformat = os.path.splitext(args.output)[-1].replace(".", "")
@@ -2160,7 +2169,7 @@ def _cmd_metrics(args: argparse.Namespace) -> None:
     cnarrs = map(read_cna, args.cnarrays)
     if args.segments:
         args.segments = map(read_cna, args.segments)
-    table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)
+    table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)  # type: ignore[arg-type]
     write_dataframe(args.output, table)
 
 
@@ -2372,7 +2381,7 @@ def _cmd_bintest(args: argparse.Namespace) -> None:
     cnarr = read_cna(args.cnarray)
     segments = read_cna(args.segment) if args.segment else None
     sig = do_bintest(cnarr, segments, args.alpha, args.target)
-    tabio.write(sig, args.output or sys.stdout)
+    tabio.write(sig, args.output or sys.stdout)  # type: ignore[arg-type]
 
 
 P_bintest = AP_subparsers.add_parser("bintest", help=_cmd_bintest.__doc__)
@@ -2565,7 +2574,7 @@ def _cmd_import_rna(args: argparse.Namespace) -> None:
         all_data.to_csv(args.output, sep="\t", index=True)
         logging.info("Wrote %s with %d rows", args.output, len(all_data))
     else:
-        logging.info(all_data.describe(), file=sys.stderr)
+        print(all_data.describe(), file=sys.stderr)
     for cnr in cnrs:
         outfname = os.path.join(args.output_dir, cnr.sample_id + ".cnr")
         tabio.write(cnr, outfname, "tab")
@@ -3038,7 +3047,7 @@ def _cmd_export_cdt(args: argparse.Namespace) -> None:
     sample_ids = list(map(core.fbase, args.filenames))
     table = export.merge_samples(args.filenames)
     formatter = export.EXPORT_FORMATS["cdt"]
-    outheader, outrows = formatter(sample_ids, table)
+    outheader, outrows = formatter(sample_ids, table)  # type: ignore[operator]
     write_tsv(args.output, outrows, colnames=outheader)
 
 
@@ -3060,7 +3069,7 @@ def _cmd_export_jtv(args: argparse.Namespace) -> None:
     sample_ids = list(map(core.fbase, args.filenames))
     table = export.merge_samples(args.filenames)
     formatter = export.EXPORT_FORMATS["jtv"]
-    outheader, outrows = formatter(sample_ids, table)
+    outheader, outrows = formatter(sample_ids, table)  # type: ignore[operator]
     write_tsv(args.output, outrows, colnames=outheader)
 
 
@@ -3079,7 +3088,7 @@ P_export_jtv.set_defaults(func=_cmd_export_jtv)
 
 def _cmd_export_gistic(args: argparse.Namespace) -> None:
     formatter = export.EXPORT_FORMATS["gistic"]
-    outdf = formatter(args.filenames)
+    outdf = formatter(args.filenames)  # type: ignore[operator]
     write_dataframe(args.output, outdf)
 
 

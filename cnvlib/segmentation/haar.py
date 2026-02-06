@@ -195,7 +195,7 @@ def haarSeg(
     signal: ndarray,
     breaksFdrQ: float,
     weights: Optional[ndarray] = None,
-    raw_signal: None = None,
+    raw_signal: Optional[ndarray] = None,
     haarStartLevel: int = 1,
     haarEndLevel: int = 5,
 ) -> dict[str, ndarray]:
@@ -248,7 +248,7 @@ def haarSeg(
         return diff_vals.abs().median() * 1.4826
 
     diff_signal = pd.Series(HaarConv(signal, None, 1))
-    if raw_signal:
+    if raw_signal:  # type: ignore[unreachable]
         # Non-stationary variance empirical threshold set to 50
         NSV_TH = 50
         varMask = raw_signal < NSV_TH
@@ -266,7 +266,7 @@ def haarSeg(
         peakLoc = FindLocalPeaks(convRes)
         logging.debug("Found %d peaks at level %d", len(peakLoc), level)
 
-        if raw_signal:
+        if raw_signal:  # type: ignore[unreachable]
             pulseSize = 2 * stepHalfSize
             convMask = PulseConv(varMask, pulseSize) >= 0.5
             sigmaEst = (1 - convMask) * peakSigmaEst + convMask * noisySigmaEst

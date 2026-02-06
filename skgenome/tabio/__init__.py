@@ -39,7 +39,7 @@ def read(
     fmt: str = "tab",
     into: Optional[Union[type[GA], type[CopyNumArray]]] = None,
     sample_id: Optional[str] = None,
-    meta: None = None,
+    meta: Optional[dict[str, str]] = None,
     **kwargs,
 ) -> Union[CopyNumArray, VariantArray, GA]:
     """Read tabular data from a file or stream into a genome object.
@@ -78,7 +78,7 @@ def read(
         return read_auto(infile)
 
     if fmt in READERS:
-        reader, suggest_into = READERS[fmt]
+        reader, suggest_into = READERS[fmt]  # type: ignore[misc]
     else:
         raise ValueError(f"Unknown format: {fmt}")
 
@@ -99,7 +99,7 @@ def read(
         # Multi-sample formats: choose one sample
         kwargs["sample_id"] = sample_id
     try:
-        dframe = reader(infile, **kwargs)
+        dframe = reader(infile, **kwargs)  # type: ignore[operator]
     except pd.errors.EmptyDataError:
         # File is blank/empty, most likely
         logging.info("Blank %s file?: %s", fmt, infile)
@@ -107,7 +107,7 @@ def read(
     if fmt == "vcf":
         from cnvlib.vary import VariantArray as VA
 
-        suggest_into = VA
+        suggest_into = VA  # type: ignore[assignment]
     result = (into or suggest_into)(dframe, meta)
     result.sort_columns()
     result.sort()
@@ -123,7 +123,7 @@ def read(
 
 def read_auto(infile: str) -> GA:
     """Auto-detect a file's format and use an appropriate parser to read it."""
-    if not isinstance(infile, str) and not hasattr(infile, "seek"):
+    if not isinstance(infile, str) and not hasattr(infile, "seek"):  # type: ignore[unreachable]
         raise ValueError(
             "Can only auto-detect format from filename or "
             + f"seekable (local, on-disk) files, which {infile} is not"
@@ -175,17 +175,17 @@ def write(
     **kwargs,
 ) -> None:
     """Write a genome object to a file or stream."""
-    formatter, show_header = WRITERS[fmt]
+    formatter, show_header = WRITERS[fmt]  # type: ignore[misc]
     if fmt in ("seg", "vcf"):
         kwargs["sample_id"] = garr.sample_id
-    dframe = formatter(garr.data, **kwargs)
-    with safe_write(outfile or sys.stdout, verbose=False) as handle:
+    dframe = formatter(garr.data, **kwargs)  # type: ignore[operator]
+    with safe_write(outfile or sys.stdout, verbose=False) as handle:  # type: ignore[arg-type]
         dframe.to_csv(
             handle, header=show_header, index=False, sep="\t", float_format="%.6g"
         )
     if verbose:
         # Log the output path, if possible
-        outfname = get_filename(outfile)
+        outfname = get_filename(outfile)  # type: ignore[arg-type]
         if outfname:
             logging.info("Wrote %s with %d regions", outfname, len(dframe))
 
@@ -234,12 +234,13 @@ def safe_write(
             logging.info("Wrote %s", outfname)
 
 
-def get_filename(infile: Union[_TemporaryFileWrapper, str]) -> str:
+def get_filename(infile: Union[_TemporaryFileWrapper, str]) -> Optional[str]:
     if isinstance(infile, str):
         return infile
     if hasattr(infile, "name") and infile not in (sys.stdout, sys.stderr):
         # File(-like) handle
         return infile.name
+    return None
 
 
 def sniff_region_format(infile: str) -> Optional[str]:
@@ -298,6 +299,7 @@ def sniff_region_format(infile: str) -> Optional[str]:
                 "First non-blank line:\n%s"
                 % (fname, ", ".join(format_patterns.keys()), line)
             )
+    return None
 
 
 format_patterns = collections.OrderedDict(

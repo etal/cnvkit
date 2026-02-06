@@ -63,7 +63,7 @@ def unpack_range(a_range: Union[str, Sequence]) -> Region:
         return Region(None, None, None)
     if isinstance(a_range, str):
         if ":" in a_range and "-" in a_range:
-            return from_label(a_range, keep_gene=False)  # type: ignore
+            return from_label(a_range, keep_gene=False)  # type: ignore[return-value]  # NamedRegion is compatible
         return Region(a_range, None, None)
     if isinstance(a_range, list | tuple):
         if len(a_range) == 3:

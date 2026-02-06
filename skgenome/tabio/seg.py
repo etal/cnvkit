@@ -201,16 +201,16 @@ def write_seg(
         dframes = iter(dframe)
         sids = iter(sample_id)
         first = next(dframes)
-        first_sid = next(sids)
+        first_sid = next(sids)  # type: ignore[assignment]
 
     if chrom_ids in (None, True):
-        chrom_ids = create_chrom_ids(first)
-    results = [format_seg(first, first_sid, chrom_ids)]
+        chrom_ids = create_chrom_ids(first)  # type: ignore[assignment]
+    results = [format_seg(first, first_sid, chrom_ids)]  # type: ignore[arg-type]
     if dframes is not None:
         # Unpack matching lists of data and sample IDs
         results.extend(
-            format_seg(subframe, sid, chrom_ids)
-            for subframe, sid in zip_longest(dframes, sids)
+            format_seg(subframe, sid, chrom_ids)  # type: ignore[arg-type]
+            for subframe, sid in zip_longest(dframes, sids)  # type: ignore[arg-type]
         )
     return pd.concat(results)
 

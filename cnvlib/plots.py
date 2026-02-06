@@ -21,7 +21,10 @@ MB = 1e-6  # To rescale from bases to megabases
 
 
 def plot_chromosome_dividers(
-    axis: Axes, chrom_sizes: collections.OrderedDict, pad: None = None, along: str = "x"
+    axis: Axes,
+    chrom_sizes: collections.OrderedDict,
+    pad: float | None = None,
+    along: str = "x",
 ) -> collections.OrderedDict:
     """Given chromosome sizes, plot divider lines and labels.
 
@@ -271,7 +274,7 @@ def gene_coords_by_name(probes, names):
             if gene_name in names:
                 gene_index[gene_name].add(i)
     # Retrieve coordinates by name
-    all_coords = collections.defaultdict(lambda: collections.defaultdict(set))
+    all_coords: dict = collections.defaultdict(lambda: collections.defaultdict(set))
     for name in names:
         gene_probes = probes.data.take(sorted(gene_index.get(name, [])))
         if not len(gene_probes):
@@ -305,7 +308,7 @@ def gene_coords_by_range(probes, chrom, start, end, ignore=params.IGNORE_GENE_NA
     """
     ignore += params.ANTITARGET_ALIASES
     # Tabulate the genes in the selected region
-    genes = collections.OrderedDict()
+    genes: dict = collections.OrderedDict()
     for row in probes.in_range(chrom, start, end):
         name = str(row.gene)
         if name in genes:

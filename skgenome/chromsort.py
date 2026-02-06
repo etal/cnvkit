@@ -28,15 +28,15 @@ def detect_big_chroms(sizes: Iterable[int]) -> tuple[int, int]:
     thresh : int
         Length of the smallest "big" chromosomes.
     """
-    sizes = pd.Series(sizes).sort_values(ascending=False)
-    reldiff = sizes.diff().abs().to_numpy()[1:] / sizes.to_numpy()[:-1]
+    sizes_s = pd.Series(sizes).sort_values(ascending=False)
+    reldiff = sizes_s.diff().abs().to_numpy()[1:] / sizes_s.to_numpy()[:-1]
     changepoints = np.nonzero(reldiff > 0.5)[0]
     if changepoints.any():
         n_big = changepoints[0] + 1
-        thresh = sizes.iat[n_big - 1]
+        thresh = sizes_s.iat[n_big - 1]
     else:
-        n_big = len(sizes)
-        thresh = sizes.to_numpy()[-1]
+        n_big = len(sizes_s)
+        thresh = sizes_s.to_numpy()[-1]
     return n_big, thresh
 
 
@@ -56,11 +56,11 @@ def sorter_chrom(label: str) -> tuple[int, str]:
         # Separate numeric and special chromosomes
         nums = "".join(takewhile(str.isdigit, chrom))
         chars = chrom[len(nums) :]
-        nums = int(nums) if nums else 0
+        num_val = int(nums) if nums else 0
         if not chars:
-            key = (nums, "")
+            key = (num_val, "")
         elif len(chars) == 1:
-            key = (2000 + nums, chars)
+            key = (2000 + num_val, chars)
         else:
-            key = (3000 + nums, chars)
+            key = (3000 + num_val, chars)
     return key

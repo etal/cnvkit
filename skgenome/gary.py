@@ -54,6 +54,7 @@ class GenomicArray:
             if not isinstance(data_table, pd.DataFrame):
                 # Rarely if ever needed -- prefer from_rows, from_columns, etc.
                 data_table = pd.DataFrame(data_table)
+            assert isinstance(data_table, pd.DataFrame)
             if not all(c in data_table.columns for c in self._required_columns):
                 raise ValueError(
                     "data table must have at least columns "
@@ -65,12 +66,12 @@ class GenomicArray:
             if len(data_table):
 
                 def ok_dtype(col, dtype):
-                    return isinstance(data_table[col].iat[0], dtype)
+                    return isinstance(data_table[col].iat[0], dtype)  # type: ignore[index]
 
             else:
 
                 def ok_dtype(col, dtype):
-                    return data_table[col].dtype == np.dtype(dtype)
+                    return data_table[col].dtype == np.dtype(dtype)  # type: ignore[index]
 
             recast_cols = {
                 col: dtype
@@ -82,7 +83,8 @@ class GenomicArray:
             if recast_cols:
                 data_table = data_table.astype(recast_cols)
 
-        self.data: pd.DataFrame = data_table  # type: ignore[assignment]
+        assert isinstance(data_table, pd.DataFrame)
+        self.data: pd.DataFrame = data_table
         self.meta = dict(meta_dict) if meta_dict is not None and len(meta_dict) else {}
 
     @classmethod
@@ -147,7 +149,7 @@ class GenomicArray:
                 f"Passed {len(columns)} columns {columns!r}, but "
                 f"{len(firstrow)} elements in first row: {firstrow}"
             ) from exc
-        return out
+        return out  # type: ignore[return-value]
 
     # Container behaviour
 
@@ -158,7 +160,7 @@ class GenomicArray:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, GenomicArray):
             return NotImplemented
-        return self.data.equals(other.data)
+        return bool(self.data.equals(other.data))
 
     def __len__(self) -> int:
         """Return the number of rows (genomic intervals) in the array."""
@@ -230,7 +232,7 @@ class GenomicArray:
     def __delitem__(self, index) -> None:
         raise NotImplementedError
 
-    def __iter__(self) -> map:
+    def __iter__(self):  # type: ignore[override]
         return self.data.itertuples(index=False)
 
     __next__ = next
@@ -360,7 +362,7 @@ class GenomicArray:
         tuple
             (other bin, GenomicArray of overlapping rows in self)
         """
-        for bin_row, subrange in by_ranges(self.data, other.data, mode, keep_empty):
+        for bin_row, subrange in by_ranges(self.data, other.data, mode, keep_empty):  # type: ignore[func-returns-value]
             if len(subrange):
                 yield bin_row, self.as_dataframe(subrange)
             elif keep_empty:
@@ -386,7 +388,7 @@ class GenomicArray:
             else:
                 cols.extend(also)
         coordframe = self.data.loc[:, cols]
-        return coordframe.itertuples(index=False)
+        return coordframe.itertuples(index=False)  # type: ignore[no-any-return]
 
     def labels(self) -> pd.Series:
         """Get chromosomal coordinates as genomic range labels."""
@@ -786,7 +788,7 @@ class GenomicArray:
         if not len(self):
             return 0
         regions = merge(self.data, bp=1)
-        return regions.end.sum() - regions.start.sum()
+        return int(regions.end.sum() - regions.start.sum())  # type: ignore[no-any-return]
 
     def _get_gene_map(self) -> OrderedDict:
         """Map unique gene names to their indices in this array.

@@ -28,8 +28,8 @@ class CopyNumArray(GenomicArray):
     Optional columns: gc, rmask, spread, weight, probes
     """
 
-    _required_columns = ("chromosome", "start", "end", "gene", "log2")  # type: ignore
-    _required_dtypes = (str, int, int, str, float)  # type: ignore
+    _required_columns = ("chromosome", "start", "end", "gene", "log2")  # type: ignore[assignment]
+    _required_dtypes = (str, int, int, str, float)  # type: ignore[assignment]
     # ENH: make gene optional
     # Extra columns, in order:
     # "depth", "gc", "rmask", "spread", "weight", "probes"
@@ -55,7 +55,7 @@ class CopyNumArray(GenomicArray):
         """
         key = "chr_x"
         if key in self.meta:
-            return self.meta[key]
+            return str(self.meta[key])
         if len(self):
             chr_x_label = "chrX" if self.chromosome.iat[0].startswith("chr") else "X"
             self.meta[key] = chr_x_label
@@ -86,7 +86,7 @@ class CopyNumArray(GenomicArray):
     def chr_y_label(self) -> str:
         """The name of the Y chromosome."""
         if "chr_y" in self.meta:
-            return self.meta["chr_y"]
+            return str(self.meta["chr_y"])
         if len(self):
             chr_y = "chrY" if self.chr_x_label.startswith("chr") else "Y"
             self.meta["chr_y"] = chr_y
@@ -113,7 +113,7 @@ class CopyNumArray(GenomicArray):
             y &= ~self.pary_filter(genome_build=diploid_parx_genome)
         return y
 
-    def autosomes(
+    def autosomes(  # type: ignore[override]
         self, diploid_parx_genome: Optional[str] = None, also: Optional[Series] = None
     ) -> CopyNumArray:
         """Overrides GenomeArray.autosomes()."""
@@ -134,7 +134,7 @@ class CopyNumArray(GenomicArray):
     # Traversal
 
     def by_gene(
-        self, ignore: tuple[str, str, str] = params.IGNORE_GENE_NAMES
+        self, ignore: tuple[str, ...] = params.IGNORE_GENE_NAMES
     ) -> Iterator[tuple[str, CopyNumArray]]:
         """Iterate over probes grouped by gene name.
 
@@ -253,6 +253,7 @@ class CopyNumArray(GenomicArray):
                     "Estimator must be a function or one of: "
                     + ", ".join(map(repr, est_funcs))
                 )
+        assert callable(estimator)
         cnarr = (
             self.drop_low_coverage(verbose=verbose) if skip_low else self
         ).autosomes(diploid_parx_genome=diploid_parx_genome)
@@ -629,7 +630,8 @@ class CopyNumArray(GenomicArray):
                     segments["log2"],
                     self.iter_ranges_of(
                         segments, "log2", mode="inner", keep_empty=True
-                    ), strict=False,
+                    ),
+                    strict=False,
                 )
                 if len(bins_lr)
             ]
@@ -640,7 +642,9 @@ class CopyNumArray(GenomicArray):
             ]
         return pd.concat(resids) if resids else pd.Series([])
 
-    def smooth_log2(self, bandwidth: None = None, by_arm: bool = True) -> ndarray:
+    def smooth_log2(
+        self, bandwidth: Optional[int] = None, by_arm: bool = True
+    ) -> ndarray:
         """Smooth log2 values with a sliding window.
 
         Account for chromosome and (optionally) centromere boundaries. Use bin

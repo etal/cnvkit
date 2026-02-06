@@ -251,12 +251,16 @@ def interval_coverages(
                 os.path.basename(bam_fname),
                 bed_fname,
             )
-            return CNA.from_rows([], meta_dict=meta)
+            return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
 
     # Calculate average read depth in each bin
     if by_count:
         results = interval_coverages_count(
-            bed_fname, bam_fname, min_mapq, processes, fasta
+            bed_fname,
+            bam_fname,
+            min_mapq,
+            processes,
+            fasta,  # type: ignore[arg-type]
         )
         read_counts, cna_rows = zip(*results, strict=False)
         read_counts = pd.Series(read_counts)
@@ -299,7 +303,7 @@ def interval_coverages(
     else:
         logging.info("(Couldn't calculate total number of mapped reads)")
 
-    return cnarr
+    return cnarr  # type: ignore[return-value]
 
 
 def interval_coverages_bedgraph(
@@ -334,7 +338,7 @@ def interval_coverages_bedgraph(
                 os.path.basename(bedgraph_fname),
                 regions_bed_fname,
             )
-            return CNA.from_rows([], meta_dict=meta)
+            return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
 
     # Calculate coverage from bedGraph
     logging.info("Processing bedGraph %s", os.path.basename(bedgraph_fname))

@@ -6,7 +6,7 @@ import os
 from io import StringIO
 from itertools import islice
 from pathlib import PurePath
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -121,7 +121,9 @@ def is_newer_than(target_fname: str, orig_fname: str) -> bool:
     return os.stat(target_fname).st_mtime >= os.stat(orig_fname).st_mtime
 
 
-def get_read_length(bam: str, span: int = 1000, fasta: Optional[str] = None) -> float64:
+def get_read_length(
+    bam: Union[str, Any], span: int = 1000, fasta: Optional[str] = None
+) -> float64:
     """Get (median) read length from first few reads in a BAM file.
 
     Illumina reads all have the same length; other sequencers might not.

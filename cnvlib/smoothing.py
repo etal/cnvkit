@@ -74,7 +74,7 @@ def _pad_array(x: ndarray, wing: int) -> ndarray:
 
 def rolling_median(x: pd.Series, width: float) -> ndarray:
     """Rolling median with mirrored edges."""
-    x, wing, signal = check_inputs(x, width)
+    x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
     rolled = signal.rolling(2 * wing + 1, 1, center=True).median()
     # if rolled.hasnans:
     #     rolled = rolled.interpolate()
@@ -83,14 +83,14 @@ def rolling_median(x: pd.Series, width: float) -> ndarray:
 
 def rolling_quantile(x: pd.Series, width: int, quantile: float) -> ndarray:
     """Rolling quantile (0--1) with mirrored edges."""
-    x, wing, signal = check_inputs(x, width)
+    x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
     rolled = signal.rolling(2 * wing + 1, 2, center=True).quantile(quantile)
     return np.asarray(rolled[wing:-wing], dtype=float)
 
 
 def rolling_std(x, width):
     """Rolling quantile (0--1) with mirrored edges."""
-    x, wing, signal = check_inputs(x, width)
+    x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
     rolled = signal.rolling(2 * wing + 1, 2, center=True).std()
     return np.asarray(rolled[wing:-wing], dtype=float)
 
@@ -144,7 +144,7 @@ def guess_window_size(x: pd.Series, weights: Optional[pd.Series] = None) -> int:
     width = 4 * sd * len(x) ** (4 / 5)
     width = max(3, round(width))
     width = min(len(x), width)
-    return width
+    return int(width)
 
 
 def kaiser(x, width=None, weights=None, do_fit_edges=False):
@@ -201,9 +201,9 @@ def savgol(
 
     # Pad the signal.
     if weights is None:
-        x, total_wing, signal = check_inputs(x, total_width, False)
+        x, total_wing, signal = check_inputs(x, total_width, False)  # type: ignore[misc]
     else:
-        x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)
+        x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)  # type: ignore[misc]
 
     # If the signal is short, the effective window length originally requested may not
     # be possible. Because of this, we recalculate it given the actual wing length
@@ -266,7 +266,9 @@ def _fit_edges(x, y, wing, polyorder=3) -> None:
     # TODO - fix the discontinuities at wing, n-wing
 
 
-def _fit_edge(x, y, window_start, window_stop, interp_start, interp_stop, polyorder) -> None:
+def _fit_edge(
+    x, y, window_start, window_stop, interp_start, interp_stop, polyorder
+) -> None:
     """
     Given a 1-D array `x` and the specification of a slice of `x` from
     `window_start` to `window_stop`, create an interpolating polynomial of the

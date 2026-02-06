@@ -16,7 +16,7 @@ import pandas as pd
 from .combiners import first_of, join_strings, make_const
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
     from collections.abc import Iterator, Sequence
     from numpy import ndarray
     from pandas.core.indexes.base import Index
@@ -26,18 +26,23 @@ Numeric = Union[int, float, np.number]
 
 def by_ranges(
     table: pd.DataFrame, other: pd.DataFrame, mode: str, keep_empty: bool
-) -> None:
+) -> Generator[tuple, None, None]:
     """Group rows by another GenomicArray's bin coordinate ranges."""
     for _chrom, bin_rows, src_rows in by_shared_chroms(other, table, keep_empty):
         if src_rows is not None:
             subranges = iter_ranges(
                 src_rows, None, bin_rows["start"], bin_rows["end"], mode
             )
-            for bin_row, subrange in zip(bin_rows.itertuples(index=False), subranges, strict=False):
+            for bin_row, subrange in zip(
+                bin_rows.itertuples(index=False), subranges, strict=False
+            ):
                 yield bin_row, subrange
         elif keep_empty:
             for bin_row in bin_rows.itertuples(index=False):
-                yield bin_row, []  # ENH: empty dframe matching table
+                yield (
+                    bin_row,
+                    [],
+                )  # ENH: empty dframe matching table  # ENH: empty dframe matching table
 
 
 def by_shared_chroms(
@@ -82,9 +87,9 @@ def into_ranges(
             summary_func = np.nanmedian
         else:
             summary_func = first_of
-    elif not callable(summary_func):
+    elif not callable(summary_func):  # type: ignore[unreachable]
         # Just fill in the given value, I suppose.
-        summary_func = make_const(summary_func)
+        summary_func = make_const(summary_func)  # type: ignore[unreachable]
 
     def series2value(ser):
         if len(ser) == 0:
@@ -158,7 +163,7 @@ def idx_ranges(
     starts: Union[list[int], pd.Series],
     ends: Union[list[int], pd.Series],
     mode: str,
-) -> None:
+) -> Generator[tuple, None, None]:
     """Iterate through sub-ranges."""
     assert mode in ("inner", "outer")
     # Edge cases: when the `table` is either empty, or both `starts` and `ends`

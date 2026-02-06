@@ -56,9 +56,8 @@ def pick_pool(nprocs: int) -> Iterator[Union[SerialPool, ProcessPoolExecutor]]:
     if nprocs == 1:
         yield SerialPool()
     else:
-        if nprocs < 1:
-            nprocs = None
-        with futures.ProcessPoolExecutor(max_workers=nprocs) as pool:
+        max_workers = nprocs if nprocs >= 1 else None
+        with futures.ProcessPoolExecutor(max_workers=max_workers) as pool:
             yield pool
 
 
@@ -77,6 +76,8 @@ def to_chunks(bed_fname: str, chunk_size: int = 5000) -> Iterator[str]:
     opener = gzip.open if bed_fname.endswith(".gz") else open
     with opener(bed_fname) as infile:
         for line in infile:
+            if isinstance(line, bytes):
+                line = line.decode()
             if line[0] == "#":
                 continue
             k += 1

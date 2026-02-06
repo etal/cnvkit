@@ -43,7 +43,7 @@ def on_array(default: Optional[int] = None) -> Callable:
     return outer
 
 
-def on_weighted_array(default: None = None) -> Callable:
+def on_weighted_array(default: object = None) -> Callable:
     """Ensure `a` and `w` are equal-length numpy arrays with no NaN values.
 
     For weighted descriptives -- `a` is the array of values, `w` is weights.

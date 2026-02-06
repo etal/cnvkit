@@ -31,17 +31,17 @@ from typing import TYPE_CHECKING, Optional
 def batch_make_reference(
     normal_fnames: list[str],
     target_bed: Optional[str],
-    antitarget_bed: None,
+    antitarget_bed: Optional[str],
     is_haploid_x_reference: bool,
     diploid_parx_genome: Optional[str],
-    fasta: str,
+    fasta: Optional[str],
     annotate: Optional[str],
     short_names: bool,
     target_avg_size: int,
-    access_bed: None,
+    access_bed: Optional[str],
     antitarget_avg_size: Optional[int],
     antitarget_min_size: Optional[int],
-    output_reference: None,
+    output_reference: Optional[str],
     output_dir: str,
     processes: int,
     by_count: bool,
@@ -269,7 +269,7 @@ def batch_make_reference(
                 bam_fname = autobin.midsize_file(normal_fnames)
                 (wgs_depth, target_avg_size), _ = autobin.do_autobin(
                     bam_fname, *autobin_args, bp_per_bin=50000.0, fasta=fasta
-                )
+                )  # type: ignore[misc,arg-type,assignment]
                 logging.info(
                     "WGS average depth %.2f --> using bin size %d",
                     wgs_depth,
@@ -280,6 +280,7 @@ def batch_make_reference(
                 target_avg_size = 5000
 
     # To make temporary filenames for processed targets or antitargets
+    assert target_bed is not None
     tgt_name_base, _tgt_ext = os.path.splitext(os.path.basename(target_bed))
     if output_dir:
         tgt_name_base = os.path.join(output_dir, tgt_name_base)
@@ -303,19 +304,20 @@ def batch_make_reference(
         antitarget_bed = tgt_name_base + ".antitarget.bed"
         if method == "hybrid":
             # Build antitarget BED from the given targets
-            anti_kwargs = {}
+            anti_kwargs: dict = {}
             if access_bed:
                 anti_kwargs["access"] = tabio.read_auto(access_bed)
             if antitarget_avg_size:
                 anti_kwargs["avg_bin_size"] = antitarget_avg_size
             if antitarget_min_size:
                 anti_kwargs["min_bin_size"] = antitarget_min_size
-            anti_arr = antitarget.do_antitarget(target_arr, **anti_kwargs)
+            anti_arr = antitarget.do_antitarget(target_arr, **anti_kwargs)  # type: ignore[arg-type]
         else:
             # No antitargets for wgs, amplicon
             anti_arr = GA([])
         tabio.write(anti_arr, antitarget_bed, "bed4")
 
+    assert antitarget_bed is not None
     if len(normal_fnames) == 0:
         logging.info("Building a flat reference...")
         ref_arr = reference.do_reference_flat(
@@ -389,10 +391,12 @@ def batch_write_coverage(
     by_count: bool,
     min_mapq: int,
     processes: int,
-    fasta: str,
+    fasta: Optional[str],
 ) -> str:
     """Run coverage on one sample (BAM or bedGraph), write to file."""
-    cnarr = coverage.do_coverage(bed_fname, sample_fname, by_count, min_mapq, processes, fasta)
+    cnarr = coverage.do_coverage(
+        bed_fname, sample_fname, by_count, min_mapq, processes, fasta
+    )
     tabio.write(cnarr, out_fname)
     return out_fname
 
@@ -415,7 +419,7 @@ def batch_run_sample(
     segment_method: str,
     processes: int,
     do_cluster: bool,
-    fasta: None = None,
+    fasta: Optional[str] = None,
 ) -> None:
     """Run the pipeline on one sample (BAM or bedGraph file)."""
     # ENH - return probes, segments (cnarr, segarr)
@@ -453,14 +457,14 @@ def batch_run_sample(
         rscript_path=rscript_path,
         skip_low=skip_low,
         processes=processes,
-        **({"threshold": 1e-6} if seq_method == "wgs" else {}),
+        **({"threshold": 1e-6} if seq_method == "wgs" else {}),  # type: ignore[arg-type]
     )
 
     logging.info("Post-processing %s.cns ...", sample_pfx)
     # TODO/ENH take centering shift & apply to .cnr for use in segmetrics
     seg_metrics = segmetrics.do_segmetrics(
         cnarr,
-        segments,
+        segments,  # type: ignore[arg-type]
         interval_stats=["ci"],
         alpha=0.5,
         smoothed=True,

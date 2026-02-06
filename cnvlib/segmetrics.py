@@ -98,9 +98,11 @@ def do_segmetrics(
             )
     # Measures of spread
     if spread_stats:
-        deviations = (bl - sl for bl, sl in zip(bins_log2s, segarr["log2"], strict=False))
+        deviations = (
+            bl - sl for bl, sl in zip(bins_log2s, segarr["log2"], strict=False)
+        )
         if len(spread_stats) > 1:
-            deviations = list(deviations)
+            deviations = list(deviations)  # type: ignore[assignment]
         for statname in spread_stats:
             func = stat_funcs[statname]
             segarr[statname] = np.fromiter(
@@ -133,6 +135,7 @@ def make_ci_func(alpha: float, bootstraps: int, smoothed: Union[bool, int]) -> C
         If bool: True to always smooth, False to never smooth.
         If int: Threshold - smooth when n_bins <= smoothed.
     """
+
     def ci_func(ser, wt):
         return confidence_interval_bootstrap(ser, wt, alpha, bootstraps, smoothed)
 
@@ -222,7 +225,7 @@ def confidence_interval_bootstrap(
     rand_indices = rng.integers(0, k, size=(bootstraps, k))
     samples = ((np.take(values, idx), np.take(weights, idx)) for idx in rand_indices)
     if use_smoothing:
-        samples = _smooth_samples_by_weight(values, samples)
+        samples = _smooth_samples_by_weight(values, samples)  # type: ignore[assignment]
     # Recalculate segment means
     seg_means = (np.average(val, weights=wt) for val, wt in samples)
     bootstrap_dist = np.fromiter(seg_means, np.float64, bootstraps)
@@ -270,10 +273,10 @@ def _smooth_samples_by_weight(
     # but requiring k=1 -> bw=1 for consistency
     bw = k ** (-1 / 4)
     rng = np.random.default_rng()
-    samples = [
+    samples_list = [
         (v + (bw * np.sqrt(1 - w) * rng.standard_normal(k)), w) for v, w in samples
     ]
-    return samples
+    return samples_list
 
 
 def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
@@ -293,7 +296,8 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     if proportion == 0 or proportion == 1:
         logging.warning(
             "BCa: All bootstrap samples on one side (%d/%d); using original alphas",
-            n_boots_below, n_boots
+            n_boots_below,
+            n_boots,
         )
         return alphas
 
@@ -318,14 +322,13 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
         logging.warning("BCa: Jackknife variance too small; using original alphas")
         return alphas
 
-    acc = (uu**3).sum() / (6 * uu_var ** 1.5)
+    acc = (uu**3).sum() / (6 * uu_var**1.5)
     denom = 1 - acc * (z0 + zalpha)
 
     # Check if denominator is positive
     if (denom <= 0).any():
         logging.warning(
-            "BCa: Denominator non-positive (acc=%.4f); using original alphas",
-            acc
+            "BCa: Denominator non-positive (acc=%.4f); using original alphas", acc
         )
         return alphas
 
@@ -334,14 +337,12 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     # Validate new alphas
     if not (0 < new_alphas[0] < 1 and 0 < new_alphas[1] < 1):
         logging.warning(
-            "BCa: Adjusted alphas %s out of range; using original alphas",
-            new_alphas
+            "BCa: Adjusted alphas %s out of range; using original alphas", new_alphas
         )
         return alphas
 
     logging.debug(
-        "BCa: alphas %s -> %s (z0=%.4f, acc=%.4f)",
-        alphas, new_alphas, z0, acc
+        "BCa: alphas %s -> %s (z0=%.4f, acc=%.4f)", alphas, new_alphas, z0, acc
     )
     return new_alphas
 
