@@ -1363,8 +1363,9 @@ def _cmd_diagram(args: argparse.Namespace) -> None:
     cnarr = read_cna(args.filename) if args.filename else None
     segarr = read_cna(args.segment) if args.segment else None
     if args.adjust_xy:
+        assert cnarr is not None or segarr is not None
         is_sample_female = verify_sample_sex(
-            cnarr or segarr,
+            cnarr or segarr,  # type: ignore[arg-type]
             args.sample_sex,
             args.male_reference,
             args.diploid_parx_genome,
