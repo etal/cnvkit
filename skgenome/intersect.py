@@ -241,15 +241,3 @@ def _irange_nested(
                 region_mask[int(end_idx) :] = 0
 
         yield region_mask, start_val, end_val
-
-
-def venn(table, other, mode: str):
-    # TODO -- implement 'venn' via fjoin algorithm
-    # 'cut' table at all 'other' boundaries
-    #   -> extra column '_venn_':int (0, 1, 2)
-    #       0=self only, 1=both, 2=other only
-    #   -> 'cut' just drops the '_venn_' column
-    #   -> 'subtract' drops 1 and 2?
-    #       (is that faster? probably not)
-    #   -> 'jaccard' does math with it...
-    return table

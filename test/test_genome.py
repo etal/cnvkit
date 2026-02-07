@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Unit tests for the 'genome' sub-package."""
+
 import functools
 import operator
 import random
@@ -58,12 +59,18 @@ class GaryTests(unittest.TestCase):
         autoy = self.ex_cnr.autosomes(also=["chrY"])
         self.assertEqual(len(autoy), len_all - len_x)
         autoxy = self.ex_cnr.autosomes(also=["chrX", "chrY"])
-        self.assertEqual(len(autoxy), len_all, "It's possible to provide chromosome names.")
-        some_x = (self.ex_cnr.chromosome == 'chrX') & (self.ex_cnr.end <= 434918)
+        self.assertEqual(
+            len(autoxy), len_all, "It's possible to provide chromosome names."
+        )
+        some_x = (self.ex_cnr.chromosome == "chrX") & (self.ex_cnr.end <= 434918)
         some_x_len = some_x.sum()
         self.assertEqual(some_x_len, 3)
         auto_and_some_x = self.ex_cnr.autosomes(also=some_x)
-        self.assertEqual(len(auto_and_some_x), len(auto) + some_x_len, "It's possible to provide a Pandas filter.")
+        self.assertEqual(
+            len(auto_and_some_x),
+            len(auto) + some_x_len,
+            "It's possible to provide a Pandas filter.",
+        )
 
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
@@ -512,7 +519,9 @@ class IntervalTests(unittest.TestCase):
                     self._compare_regions(result, self._from_intervals(expect))
                 # Single-object intersect
                 result = regions.intersection(selections, mode=mode)
-                expect = self._from_intervals(functools.reduce(operator.iadd, expectations[mode], []))
+                expect = self._from_intervals(
+                    functools.reduce(operator.iadd, expectations[mode], [])
+                )
                 self._compare_regions(result, expect)
 
     def test_subtract(self):
@@ -565,6 +574,129 @@ class IntervalTests(unittest.TestCase):
         self._compare_regions(result, expect)
         iresult = target.subtract(access)
         self._compare_regions(iresult, invert)
+
+    def test_cut(self):
+        # Simple: one interval split by two boundary regions
+        regions = self._from_intervals([(1, 20, "A")])
+        cuts = self._from_intervals([(5, 10, "X"), (15, 25, "Y")])
+        # Breakpoints {5, 10, 15, 25}; 5, 10, 15 are inside (1, 20)
+        result = regions.cut(cuts)
+        expect = self._from_intervals(
+            [
+                (1, 5, "A"),
+                (5, 10, "A"),
+                (10, 15, "A"),
+                (15, 20, "A"),
+            ]
+        )
+        self._compare_regions(result, expect)
+
+        # Breakpoint at exact start/end: only interior breakpoint splits
+        regions2 = self._from_intervals([(10, 20, "X")])
+        cuts2 = self._from_intervals([(10, 15, ""), (20, 25, "")])
+        result2 = regions2.cut(cuts2)
+        expect2 = self._from_intervals([(10, 15, "X"), (15, 20, "X")])
+        self._compare_regions(result2, expect2)
+
+        # No breakpoints inside any interval: unchanged
+        regions3 = self._from_intervals([(10, 20, "X")])
+        cuts3 = self._from_intervals([(1, 5, ""), (25, 30, "")])
+        result3 = regions3.cut(cuts3)
+        self._compare_regions(result3, regions3)
+
+        # Empty other: unchanged
+        regions4 = self._from_intervals([(1, 20, "A")])
+        empty = self._from_intervals([])
+        result4 = regions4.cut(empty)
+        self._compare_regions(result4, regions4)
+
+        # Multiple intervals, some cut, some not
+        regions5 = self._from_intervals(
+            [
+                (1, 10, "A"),
+                (20, 30, "B"),
+                (40, 50, "C"),
+            ]
+        )
+        cuts5 = self._from_intervals([(5, 25, "")])
+        # Breakpoints {5, 25}: 5 inside A, 25 inside B, neither inside C
+        result5 = regions5.cut(cuts5)
+        expect5 = self._from_intervals(
+            [
+                (1, 5, "A"),
+                (5, 10, "A"),
+                (20, 25, "B"),
+                (25, 30, "B"),
+                (40, 50, "C"),
+            ]
+        )
+        self._compare_regions(result5, expect5)
+
+    def test_squash(self):
+        # All adjacent: combine into one row
+        regions = self._from_intervals(
+            [
+                (1, 5, "A"),
+                (5, 10, "B"),
+                (10, 15, "C"),
+            ]
+        )
+        result = regions.squash(combine=self.combiner)
+        expect = self._from_intervals([(1, 15, "ABC")])
+        self._compare_regions(result, expect)
+
+        # Gap prevents combining
+        regions2 = self._from_intervals(
+            [
+                (1, 5, "A"),
+                (5, 10, "B"),
+                (12, 15, "C"),
+                (15, 20, "D"),
+            ]
+        )
+        result2 = regions2.squash(combine=self.combiner)
+        expect2 = self._from_intervals(
+            [
+                (1, 10, "AB"),
+                (12, 20, "CD"),
+            ]
+        )
+        self._compare_regions(result2, expect2)
+
+        # Squash by gene: only combine same-gene consecutive runs
+        regions3 = self._from_intervals(
+            [
+                (1, 5, "X"),
+                (5, 10, "X"),
+                (10, 15, "Y"),
+                (15, 20, "Y"),
+                (20, 25, "X"),
+            ]
+        )
+        result3 = regions3.squash(by="gene", combine=self.combiner)
+        expect3 = self._from_intervals(
+            [
+                (1, 10, "X"),
+                (10, 20, "Y"),
+                (20, 25, "X"),
+            ]
+        )
+        self._compare_regions(result3, expect3)
+
+        # Single row: unchanged
+        regions4 = self._from_intervals([(1, 100, "X")])
+        result4 = regions4.squash(combine=self.combiner)
+        self._compare_regions(result4, regions4)
+
+        # Non-adjacent: unchanged
+        regions5 = self._from_intervals(
+            [
+                (1, 5, "A"),
+                (10, 15, "B"),
+            ]
+        )
+        result5 = regions5.squash(combine=self.combiner)
+        self._compare_regions(result5, regions5)
 
 
 class OtherTests(unittest.TestCase):

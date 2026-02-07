@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python=3.11
   # Core dependencies (from requirements/core.txt)
+  - bioframe>=0.7.2
   - biopython>=1.85
   - matplotlib>=3.9.0
   - numpy>=2.2.3

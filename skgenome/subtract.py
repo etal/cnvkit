@@ -7,73 +7,20 @@ GenomicArray types.
 
 """
 
-import logging
+from __future__ import annotations
 
-import numpy as np
-import pandas as pd
+from typing import TYPE_CHECKING
 
-from .intersect import by_ranges
+import bioframe
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+_BF_COLS = ("chromosome", "start", "end")
 
 
-def subtract(table, other) -> pd.DataFrame:
+def subtract(table: pd.DataFrame, other: pd.DataFrame) -> pd.DataFrame:
     """Subtract one set of regions from another, returning the one-way difference."""
     if not len(other):
         return table
-    return pd.DataFrame.from_records(_subtraction(table, other), columns=table.columns)
-
-
-def _subtraction(table, other):
-    for keeper, rows_to_exclude in by_ranges(other, table, "outer", True):
-        if len(rows_to_exclude):
-            logging.debug(
-                " %s:%d-%d : Subtracting %d excluded regions",
-                keeper.chromosome,
-                keeper.start,
-                keeper.end,
-                len(rows_to_exclude),
-            )
-
-            keep_left = keeper.start < rows_to_exclude.start.iat[0]
-            keep_right = keeper.end > rows_to_exclude.end.iat[-1]
-            if keep_left and keep_right:
-                # Keep both original edges of the source region
-                # =========
-                #   --  --
-                starts = np.r_[keeper.start, rows_to_exclude.end.to_numpy()]
-                ends = np.r_[rows_to_exclude.start.to_numpy(), keeper.end]
-            elif keep_left:
-                # Exclusion overlaps only the right side
-                # =======
-                #   -- ---
-                starts = np.r_[keeper.start, rows_to_exclude.end.to_numpy()[:-1]]
-                ends = rows_to_exclude.start.to_numpy()
-            elif keep_right:
-                # Exclusion overlaps only the left side
-                #  ========
-                # ---  --
-                starts = rows_to_exclude.end.to_numpy()
-                ends = np.r_[rows_to_exclude.start.to_numpy()[1:], keeper.end]
-            elif len(rows_to_exclude) > 1:
-                # Exclusions overlap both edges
-                #  ======
-                # -- -- ---
-                starts = rows_to_exclude.end.to_numpy()[:-1]
-                ends = rows_to_exclude.start.to_numpy()[1:]
-            else:
-                # Exclusion covers the whole region
-                continue
-
-            for start, end in zip(starts, ends, strict=True):
-                if end > start:
-                    yield keeper._replace(start=start, end=end)
-                else:
-                    logging.debug("Discarding pair: (%d, %d)", start, end)
-
-        else:
-            logging.debug(
-                " %s:%d-%d : No excluded regions",
-                keeper.chromosome,
-                keeper.start,
-                keeper.end,
-            )
-            yield keeper
+    return bioframe.subtract(table, other, cols1=_BF_COLS, cols2=_BF_COLS)
