@@ -7,7 +7,7 @@ import os.path
 import time
 from concurrent import futures
 from io import StringIO
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -168,7 +168,7 @@ def do_coverage(
     by_count: bool = False,
     min_mapq: int = 0,
     processes: int = 1,
-    fasta: Optional[str] = None,
+    fasta: str | None = None,
 ) -> CNA:
     """Calculate coverage in the given regions from BAM read depths.
 
@@ -238,7 +238,7 @@ def interval_coverages(
     by_count: bool,
     min_mapq: int,
     processes: int,
-    fasta: Optional[str] = None,
+    fasta: str | None = None,
 ) -> CNA:
     """Calculate log2 coverages in the BAM file at each interval."""
     meta = {"sample_id": core.fbase(bam_fname)}
@@ -386,7 +386,7 @@ def interval_coverages_bedgraph(
 
 def interval_coverages_count(
     bed_fname: str, bam_fname: str, min_mapq: int, procs: int = 1, fasta: None = None
-) -> Iterator[list[Union[int, tuple[str, int, int, str, float, float]]]]:
+) -> Iterator[list[int | tuple[str, int, int, str, float, float]]]:
     """Calculate log2 coverages in the BAM file at each interval."""
     regions = tabio.read_auto(bed_fname)
     if procs == 1:
@@ -475,7 +475,7 @@ def interval_coverages_pileup(
     bam_fname: str,
     min_mapq: int,
     procs: int = 1,
-    fasta: Optional[str] = None,
+    fasta: str | None = None,
 ) -> pd.DataFrame:
     """Calculate log2 coverages in the BAM file at each interval."""
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
@@ -518,8 +518,8 @@ def bedcov(
     bed_fname: str,
     bam_fname: str,
     min_mapq: int,
-    fasta: Optional[str] = None,
-    max_depth: Optional[int] = None,
+    fasta: str | None = None,
+    max_depth: int | None = None,
 ) -> pd.DataFrame:
     """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
 

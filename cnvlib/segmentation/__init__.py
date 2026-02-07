@@ -5,7 +5,7 @@ import locale
 import logging
 import tempfile
 from io import StringIO
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -27,9 +27,9 @@ SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", "hmm", "hmm-tumor", "hmm-ger
 def do_segmentation(
     cnarr: CNA,
     method: str,
-    diploid_parx_genome: Optional[str] = None,
-    threshold: Optional[float] = None,
-    variants: Optional[VariantArray] = None,
+    diploid_parx_genome: str | None = None,
+    threshold: float | None = None,
+    variants: VariantArray | None = None,
     skip_low: bool = False,
     skip_outliers: int = 10,
     min_weight: int = 0,
@@ -37,7 +37,7 @@ def do_segmentation(
     rscript_path: str = "Rscript",
     processes: int = 1,
     smooth_cbs: bool = False,
-) -> Union[CNA, tuple[CNA, str]]:
+) -> CNA | tuple[CNA, str]:
     """Infer copy number segments from the given coverage table.
 
     Parameters
@@ -180,7 +180,7 @@ def _to_str(s, enc=locale.getpreferredencoding()):  # noqa: B008
 
 def _ds(
     args: tuple[CNA, str, None, float, None, bool, int, int, bool, str, bool],
-) -> Union[CNA, tuple[CNA, str]]:
+) -> CNA | tuple[CNA, str]:
     """Wrapper for parallel map"""
     return _do_segmentation(*args)
 
@@ -188,16 +188,16 @@ def _ds(
 def _do_segmentation(
     cnarr: CNA,
     method: str,
-    diploid_parx_genome: Optional[str],
-    threshold: Optional[float],
-    variants: Optional[VariantArray] = None,
+    diploid_parx_genome: str | None,
+    threshold: float | None,
+    variants: VariantArray | None = None,
     skip_low: bool = False,
     skip_outliers: int = 10,
     min_weight: int = 0,
     save_dataframe: bool = False,
     rscript_path: str = "Rscript",
     smooth_cbs: bool = False,
-) -> Union[CNA, tuple[CNA, str]]:
+) -> CNA | tuple[CNA, str]:
     """Infer copy number segments from the given coverage table."""
     if not len(cnarr):
         return cnarr

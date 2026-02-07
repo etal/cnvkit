@@ -7,7 +7,7 @@ import logging
 import os
 import re
 import sys
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import pandas as pd
 from Bio.File import as_handle
@@ -37,11 +37,11 @@ if TYPE_CHECKING:
 def read(
     infile: str,
     fmt: str = "tab",
-    into: Optional[Union[type[GA], type[CopyNumArray]]] = None,
-    sample_id: Optional[str] = None,
-    meta: Optional[dict[str, str]] = None,
+    into: type[GA] | type[CopyNumArray] | None = None,
+    sample_id: str | None = None,
+    meta: dict[str, str] | None = None,
     **kwargs,
-) -> Union[CopyNumArray, VariantArray, GA]:
+) -> CopyNumArray | VariantArray | GA:
     """Read tabular data from a file or stream into a genome object.
 
     Supported formats: see `READERS`
@@ -168,8 +168,8 @@ READERS = {
 
 
 def write(
-    garr: Union[CopyNumArray, GA],
-    outfile: Optional[Union[_TemporaryFileWrapper, str]] = None,
+    garr: CopyNumArray | GA,
+    outfile: _TemporaryFileWrapper | str | None = None,
     fmt: str = "tab",
     verbose: bool = True,
     **kwargs,
@@ -210,8 +210,8 @@ WRITERS = {
 
 @contextlib.contextmanager
 def safe_write(
-    outfile: Union[_TemporaryFileWrapper, str], verbose: bool = True
-) -> Iterator[Union[TextIOWrapper, _TemporaryFileWrapper]]:
+    outfile: _TemporaryFileWrapper | str, verbose: bool = True
+) -> Iterator[TextIOWrapper | _TemporaryFileWrapper]:
     """Write to a filename or file-like object with error handling.
 
     If given a file name, open it. If the path includes directories that don't
@@ -234,7 +234,7 @@ def safe_write(
             logging.info("Wrote %s", outfname)
 
 
-def get_filename(infile: Union[_TemporaryFileWrapper, str]) -> Optional[str]:
+def get_filename(infile: _TemporaryFileWrapper | str) -> str | None:
     if isinstance(infile, str):
         return infile
     if hasattr(infile, "name") and infile not in (sys.stdout, sys.stderr):
@@ -243,7 +243,7 @@ def get_filename(infile: Union[_TemporaryFileWrapper, str]) -> Optional[str]:
     return None
 
 
-def sniff_region_format(infile: str) -> Optional[str]:
+def sniff_region_format(infile: str) -> str | None:
     """Guess the format of the given file by reading the first line.
 
     Returns

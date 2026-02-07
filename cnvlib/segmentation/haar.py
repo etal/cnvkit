@@ -24,7 +24,7 @@ segmentation result.
 from __future__ import annotations
 import logging
 import math
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -194,8 +194,8 @@ def variants_in_segment(varr, segment, fdr_q):
 def haarSeg(
     signal: ndarray,
     breaksFdrQ: float,
-    weights: Optional[ndarray] = None,
-    raw_signal: Optional[ndarray] = None,
+    weights: ndarray | None = None,
+    raw_signal: ndarray | None = None,
     haarStartLevel: int = 1,
     haarEndLevel: int = 5,
 ) -> dict[str, ndarray]:
@@ -292,7 +292,7 @@ def haarSeg(
     }
 
 
-def FDRThres(x: ndarray, q: float, stdev: float64) -> Union[int, float64]:
+def FDRThres(x: ndarray, q: float, stdev: float64) -> int | float64:
     """False discovery rate (FDR) threshold."""
     M = len(x)
     if M < 2:
@@ -315,7 +315,7 @@ def FDRThres(x: ndarray, q: float, stdev: float64) -> Union[int, float64]:
 
 
 def SegmentByPeaks(
-    data: ndarray, peaks: ndarray, weights: Optional[ndarray] = None
+    data: ndarray, peaks: ndarray, weights: ndarray | None = None
 ) -> ndarray:
     """Average the values of the probes within each segment.
 
@@ -366,7 +366,7 @@ def SegmentByPeaks(
 # --- HaarSeg.h
 def HaarConv(
     signal: ndarray,  # const double * signal,
-    weight: Optional[ndarray],  # const double * weight,
+    weight: ndarray | None,  # const double * weight,
     stepHalfSize: int,  # int stepHalfSize,
 ) -> ndarray:
     """Convolve haar wavelet function with a signal, applying circular padding.

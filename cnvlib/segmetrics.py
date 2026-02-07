@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 # import pandas as pd
 import numpy as np
@@ -21,12 +21,12 @@ if TYPE_CHECKING:
 def do_segmetrics(
     cnarr: CopyNumArray,
     segarr: CopyNumArray,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
     skip_low: bool = False,
 ) -> CopyNumArray:
     """Compute segment-level metrics from bin-level log2 ratios.
@@ -122,7 +122,7 @@ def do_segmetrics(
     return segarr
 
 
-def make_ci_func(alpha: float, bootstraps: int, smoothed: Union[bool, int]) -> Callable:
+def make_ci_func(alpha: float, bootstraps: int, smoothed: bool | int) -> Callable:
     """Create a confidence interval function.
 
     Parameters
@@ -173,7 +173,7 @@ def confidence_interval_bootstrap(
     weights: ndarray,
     alpha: float,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = False,
+    smoothed: bool | int = False,
 ) -> ndarray:
     """Confidence interval for segment mean log2 value, estimated by bootstrap.
 
@@ -347,7 +347,7 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     return new_alphas
 
 
-def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> Union[float64, float]:
+def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> float64 | float:
     """Weighted average of bin log2 values."""
     if skip_low:
         cnarr = cnarr.drop_low_coverage()

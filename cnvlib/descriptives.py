@@ -9,7 +9,7 @@ See:
 from __future__ import annotations
 import sys
 from functools import wraps
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy import stats
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 # Decorators to coerce input and short-circuit trivial cases
 
 
-def on_array(default: Optional[int] = None) -> Callable:
+def on_array(default: int | None = None) -> Callable:
     """Ensure `a` is a numpy array with no missing/NaN values."""
 
     def outer(f):
@@ -170,7 +170,7 @@ def weighted_median(a: ndarray, weights: ndarray) -> float64:
 @on_array(0)
 def biweight_midvariance(
     a: ndarray,
-    initial: Optional[Union[int, float64]] = None,
+    initial: int | float64 | None = None,
     c: float = 9.0,
     epsilon: float = 1e-3,
 ) -> float64:

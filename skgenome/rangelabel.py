@@ -8,7 +8,6 @@ becomes None.
 
 import collections
 import re
-from typing import Union
 from collections.abc import Sequence
 
 Region = collections.namedtuple("Region", "chromosome start end")
@@ -17,7 +16,7 @@ NamedRegion = collections.namedtuple("NamedRegion", "chromosome start end gene")
 re_label = re.compile(r"(\w[\w.]*)?:(\d+)?-(\d+)?\s*(\S+)?")
 
 
-def from_label(text: str, keep_gene: bool = True) -> Union[Region, NamedRegion]:
+def from_label(text: str, keep_gene: bool = True) -> Region | NamedRegion:
     """Parse a chromosomal range specification.
 
     Parameters
@@ -50,7 +49,7 @@ def to_label(row: Region) -> str:
     return f"{row.chromosome}:{row.start + 1}-{row.end}"
 
 
-def unpack_range(a_range: Union[str, Sequence]) -> Region:
+def unpack_range(a_range: str | Sequence) -> Region:
     """Extract chromosome, start, end from a string or tuple.
 
     Examples::

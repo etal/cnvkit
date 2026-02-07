@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ def do_fix(
     target_raw: CopyNumArray,
     antitarget_raw: CopyNumArray,
     reference: CopyNumArray,
-    diploid_parx_genome: Optional[str] = None,
+    diploid_parx_genome: str | None = None,
     do_gc: bool = True,
     do_edge: bool = True,
     do_rmask: bool = True,
@@ -217,7 +217,7 @@ def load_adjust_coverages(
     fix_gc: bool,
     fix_edge: bool,
     fix_rmask: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     smoothing_window_fraction: None = None,
 ) -> tuple[CopyNumArray, CopyNumArray]:
     """Load and filter probe coverages; correct using reference and GC."""
@@ -336,7 +336,7 @@ def match_ref_to_sample(
 
 
 def center_by_window(
-    cnarr: CopyNumArray, fraction: float, sort_key: Union[Series, ndarray]
+    cnarr: CopyNumArray, fraction: float, sort_key: Series | ndarray
 ) -> CopyNumArray:
     """Smooth out biases according to the trait specified by sort_key.
 

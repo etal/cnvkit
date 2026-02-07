@@ -1,7 +1,7 @@
 """Robust metrics to evaluate performance of copy number estimates."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 def do_metrics(
     cnarrs: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
+    segments: CopyNumArray | None = None,
     skip_low: bool = False,
 ) -> pd.DataFrame:
     """Compute coverage deviations and other metrics for self-evaluation.

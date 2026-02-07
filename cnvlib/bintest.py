@@ -8,7 +8,7 @@ import pandas as pd
 from scipy.stats import norm
 
 from . import params, segfilters
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def do_bintest(
     cnarr: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
+    segments: CopyNumArray | None = None,
     alpha: float = 0.005,
     target_only: bool = False,
 ) -> CopyNumArray:

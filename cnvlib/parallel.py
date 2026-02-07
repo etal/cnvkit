@@ -7,7 +7,7 @@ import gzip
 import os
 from contextlib import contextmanager, suppress
 from concurrent import futures
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -52,7 +52,7 @@ class SerialFuture:
 
 
 @contextmanager
-def pick_pool(nprocs: int) -> Iterator[Union[SerialPool, ProcessPoolExecutor]]:
+def pick_pool(nprocs: int) -> Iterator[SerialPool | ProcessPoolExecutor]:
     if nprocs == 1:
         yield SerialPool()
     else:

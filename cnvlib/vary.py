@@ -6,7 +6,6 @@ import logging
 import numpy as np
 import pandas as pd
 from skgenome import GenomicArray
-from typing import Optional
 
 
 class VariantArray(GenomicArray):
@@ -20,7 +19,7 @@ class VariantArray(GenomicArray):
     # Extra: somatic, zygosity, depth, alt_count, alt_freq
 
     def __init__(
-        self, data_table: pd.DataFrame, meta_dict: Optional[dict[str, str]] = None
+        self, data_table: pd.DataFrame, meta_dict: dict[str, str] | None = None
     ) -> None:
         GenomicArray.__init__(self, data_table, meta_dict)
 
@@ -167,7 +166,7 @@ class VariantArray(GenomicArray):
         return _tumor_boost(self["alt_freq"].values, self["n_alt_freq"].values)
 
 
-def _mirrored_baf(vals: pd.Series, above_half: Optional[bool] = None) -> pd.Series:
+def _mirrored_baf(vals: pd.Series, above_half: bool | None = None) -> pd.Series:
     shift = (vals - 0.5).abs()
     if above_half is None:
         above_half = vals.median() > 0.5

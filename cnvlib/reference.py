@@ -1,9 +1,8 @@
 """Supporting functions for the 'reference' command."""
 
 from __future__ import annotations
-import collections
 import logging
-from typing import Any, TYPE_CHECKING, Optional, Union
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -21,10 +20,10 @@ if TYPE_CHECKING:
 
 def do_reference_flat(
     targets: str,
-    antitargets: Optional[str] = None,
-    fa_fname: Optional[str] = None,
+    antitargets: str | None = None,
+    fa_fname: str | None = None,
     is_haploid_x_reference: bool = False,
-    diploid_parx_genome: Optional[str] = None,
+    diploid_parx_genome: str | None = None,
 ) -> CNA:
     """Compile a neutral-coverage reference from the given intervals.
 
@@ -83,11 +82,11 @@ def bed2probes(bed_fname: str) -> CNA:
 
 def do_reference(
     target_fnames: list[str],
-    antitarget_fnames: Optional[list[str]] = None,
-    fa_fname: Optional[str] = None,
+    antitarget_fnames: list[str] | None = None,
+    fa_fname: str | None = None,
     is_haploid_x_reference: bool = False,
-    diploid_parx_genome: Optional[str] = None,
-    female_samples: Optional[bool] = None,
+    diploid_parx_genome: str | None = None,
+    female_samples: bool | None = None,
     do_gc: bool = True,
     do_edge: bool = True,
     do_rmask: bool = True,
@@ -268,7 +267,7 @@ def do_reference(
 
 
 def infer_sexes(
-    cnn_fnames: list[str], is_haploid_x: bool, diploid_parx_genome: Optional[str]
+    cnn_fnames: list[str], is_haploid_x: bool, diploid_parx_genome: str | None
 ) -> dict[str, bool_]:
     """Map sample IDs to inferred chromosomal sex, where possible.
 
@@ -287,11 +286,11 @@ def infer_sexes(
 
 def combine_probes(
     filenames: list[str],
-    antitarget_fnames: Optional[list[str]],
-    fa_fname: Optional[str],
+    antitarget_fnames: list[str] | None,
+    fa_fname: str | None,
     is_haploid_x: bool,
-    diploid_parx_genome: Optional[str],
-    sexes: dict[str, Union[bool_, bool]],
+    diploid_parx_genome: str | None,
+    sexes: dict[str, bool_ | bool],
     fix_gc: bool,
     fix_edge: bool,
     fix_rmask: bool,
@@ -393,10 +392,10 @@ def combine_probes(
 
 def load_sample_block(
     filenames: list[str],
-    fa_fname: Optional[str],
+    fa_fname: str | None,
     is_haploid_x: bool,
-    diploid_parx_genome: Optional[str],
-    sexes: dict[str, Union[bool_, bool]],
+    diploid_parx_genome: str | None,
+    sexes: dict[str, bool_ | bool],
     skip_low: bool,
     fix_gc: bool,
     fix_edge: bool,
@@ -518,17 +517,17 @@ def load_sample_block(
 
 def bias_correct_logr(
     cnarr: CNA,
-    ref_columns: dict[str, Union[pd.Series, ndarray]],
+    ref_columns: dict[str, pd.Series | ndarray],
     ref_edge_bias: pd.Series,
     ref_flat_logr: ndarray,
-    sexes: dict[str, Union[bool_, bool]],
+    sexes: dict[str, bool_ | bool],
     is_chr_x: pd.Series,
     is_chr_y: pd.Series,
     fix_gc: bool,
     fix_edge: bool,
     fix_rmask: bool,
     skip_low: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
 ) -> pd.Series:
     """Perform bias corrections on the sample."""
     cnarr.center_all(skip_low=skip_low, diploid_parx_genome=diploid_parx_genome)
@@ -556,7 +555,7 @@ def bias_correct_logr(
 
 def shift_sex_chroms(
     cnarr: CNA,
-    sexes: dict[str, Union[bool_, bool]],
+    sexes: dict[str, bool_ | bool],
     ref_flat_logr: ndarray,
     is_chr_x: pd.Series,
     is_chr_y: pd.Series,

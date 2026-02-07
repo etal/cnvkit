@@ -8,7 +8,7 @@ from skgenome import tabio
 
 from .cnary import CopyNumArray as CNA
 from skgenome import GenomicArray as GA
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
@@ -17,14 +17,14 @@ if TYPE_CHECKING:
 
 
 def read_cna(
-    infile: str, sample_id: Optional[str] = None, meta: Optional[dict[str, str]] = None
+    infile: str, sample_id: str | None = None, meta: dict[str, str] | None = None
 ) -> CopyNumArray:
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a CopyNumArray object."""
     return tabio.read(infile, into=CNA, sample_id=sample_id, meta=meta)  # type: ignore[return-value]
 
 
 def read_ga(
-    infile: str, sample_id: Optional[str] = None, meta: Optional[dict[str, str]] = None
+    infile: str, sample_id: str | None = None, meta: dict[str, str] | None = None
 ) -> GenomicArray:
     """Read a CNVkit file (.cnn, .cnr, .cns) to create a GenomicArray (!) object."""
     return tabio.read(infile, into=GA, sample_id=sample_id, meta=meta)  # type: ignore[return-value]
@@ -32,10 +32,10 @@ def read_ga(
 
 def load_het_snps(
     vcf_fname: str,
-    sample_id: Optional[str] = None,
-    normal_id: Optional[str] = None,
+    sample_id: str | None = None,
+    normal_id: str | None = None,
     min_variant_depth: int = 20,
-    zygosity_freq: Optional[float] = None,
+    zygosity_freq: float | None = None,
     tumor_boost: bool = False,
 ) -> VariantArray:
     if vcf_fname is None:

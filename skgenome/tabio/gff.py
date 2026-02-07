@@ -26,7 +26,7 @@ import logging
 import re
 
 import pandas as pd
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pandas.core.frame import DataFrame
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 def read_gff(
     infile: str,
     tag: str = r"(Name|gene_id|gene_name|gene)",
-    keep_type: Optional[str] = None,
+    keep_type: str | None = None,
 ) -> DataFrame:
     """Read a GFF3/GTF/GFF2 file into a DataFrame.
 

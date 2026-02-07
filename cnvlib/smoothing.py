@@ -3,7 +3,7 @@
 from __future__ import annotations
 import logging
 import math
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -16,15 +16,15 @@ if TYPE_CHECKING:
 
 
 def check_inputs(
-    x: Union[pd.Series, ndarray],
-    width: Union[int, float],
+    x: pd.Series | ndarray,
+    width: int | float,
     as_series: bool = True,
-    weights: Optional[ndarray] = None,
-) -> Union[
-    tuple[ndarray, int, pd.Series],
-    tuple[ndarray, int, ndarray, ndarray],
-    tuple[ndarray, int, ndarray],
-]:
+    weights: ndarray | None = None,
+) -> (
+    tuple[ndarray, int, pd.Series]
+    | tuple[ndarray, int, ndarray, ndarray]
+    | tuple[ndarray, int, ndarray]
+):
     """Transform width into a half-window size.
 
     `width` is either a fraction of the length of `x` or an integer size of the
@@ -48,7 +48,7 @@ def check_inputs(
     return x, wing, signal, weights
 
 
-def _width2wing(width: Union[int, float], x: ndarray, min_wing: int = 3) -> int:
+def _width2wing(width: int | float, x: ndarray, min_wing: int = 3) -> int:
     """Convert a fractional or absolute width to integer half-width ("wing")."""
     if 0 < width < 1:
         wing = math.ceil(len(x) * width * 0.5)
@@ -131,7 +131,7 @@ def convolve_unweighted(window, signal, wing, n_iter=1):
     return y
 
 
-def guess_window_size(x: pd.Series, weights: Optional[pd.Series] = None) -> int:
+def guess_window_size(x: pd.Series, weights: pd.Series | None = None) -> int:
     """Choose a reasonable window size given the signal.
 
     Inspired by Silverman's rule: bandwidth is proportional to signal's standard
@@ -179,9 +179,9 @@ def kaiser(x, width=None, weights=None, do_fit_edges=False):
 
 
 def savgol(
-    x: Union[pd.Series, ndarray],
-    total_width: Optional[int] = None,
-    weights: Optional[ndarray] = None,
+    x: pd.Series | ndarray,
+    total_width: int | None = None,
+    weights: ndarray | None = None,
     window_width: int = 7,
     order: int = 3,
     n_iter: int = 1,
@@ -358,7 +358,7 @@ def rolling_outlier_iqr(x, width, c=3.0):
 
 def rolling_outlier_quantile(
     x: pd.Series, width: int, q: float, m: int
-) -> Union[pd.Series, ndarray]:
+) -> pd.Series | ndarray:
     """Detect outliers by multiples of a quantile in a window.
 
     Outliers are the array elements outside `m` times the `q`'th

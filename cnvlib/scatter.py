@@ -11,7 +11,7 @@ from skgenome.rangelabel import unpack_range
 from . import core, params, plots
 from .plots import MB
 from .cnary import CopyNumArray as CNA
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
@@ -26,19 +26,19 @@ TREND_COLOR = "#A0A0A0"
 
 def do_scatter(
     cnarr: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
-    variants: Optional[CopyNumArray] = None,
-    show_range: Optional[str] = None,
-    show_gene: Optional[str] = None,
+    segments: CopyNumArray | None = None,
+    variants: CopyNumArray | None = None,
+    show_range: str | None = None,
+    show_gene: str | None = None,
     do_trend: bool = False,
     by_bin: bool = False,
     window_width: float = 1e6,
-    y_min: Optional[float] = None,
-    y_max: Optional[float] = None,
-    fig_size: Optional[tuple[float, float]] = None,
-    antitarget_marker: Optional[str] = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    fig_size: tuple[float, float] | None = None,
+    antitarget_marker: str | None = None,
     segment_color: str = SEG_COLOR,
-    title: Optional[str] = None,
+    title: str | None = None,
 ) -> Figure:
     """Plot probe log2 coverages and segmentation calls together.
 
@@ -127,12 +127,12 @@ def do_scatter(
 
 def genome_scatter(
     cnarr: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
-    variants: Optional[CopyNumArray] = None,
+    segments: CopyNumArray | None = None,
+    variants: CopyNumArray | None = None,
     do_trend: bool = False,
-    y_min: Optional[float] = None,
-    y_max: Optional[float] = None,
-    title: Optional[str] = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    title: str | None = None,
     segment_color: str = SEG_COLOR,
 ) -> Figure:
     """Plot all chromosomes, concatenated on one plot."""
@@ -179,8 +179,8 @@ def cnv_on_genome(
     probes: CopyNumArray,
     segments: CopyNumArray,
     do_trend: bool = False,
-    y_min: Optional[float] = None,
-    y_max: Optional[float] = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
     segment_color: str = SEG_COLOR,
 ) -> Axes:
     """Plot bin ratios and/or segments for all chromosomes on one plot."""

@@ -10,7 +10,7 @@ GenomicArray types.
 from __future__ import annotations
 
 import itertools
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -25,8 +25,8 @@ if TYPE_CHECKING:
 
 def flatten(
     table,
-    combine: Optional[dict[str, Callable]] = None,
-    split_columns: Optional[Iterable[str]] = None,
+    combine: dict[str, Callable] | None = None,
+    split_columns: Iterable[str] | None = None,
 ):
     """Combine overlapping regions into single rows, similar to bedtools merge."""
     if table.empty:
@@ -49,7 +49,7 @@ def flatten(
 
 
 def _flatten_overlapping(
-    table, combine: dict[str, Callable], split_columns: Optional[Iterable]
+    table, combine: dict[str, Callable], split_columns: Iterable | None
 ):
     """Merge overlapping regions within a chromosome/strand.
 
@@ -107,7 +107,7 @@ def _flatten_tuples(keyed_rows: Iterable, combine: dict[str, Callable]):
             yield first_row._replace(start=bp_start, end=bp_end, **extra_fields)
 
 
-def _flatten_tuples_split(keyed_rows, combine: dict, split_columns: Optional[Iterable]):
+def _flatten_tuples_split(keyed_rows, combine: dict, split_columns: Iterable | None):
     """Divide multiple rows where they overlap.
 
     Parameters
@@ -150,7 +150,7 @@ def merge(
     table,
     bp: int = 0,
     stranded: bool = False,
-    combine: Optional[dict[str, Callable]] = None,
+    combine: dict[str, Callable] | None = None,
 ):
     """Merge overlapping rows in a DataFrame."""
     if table.empty:

@@ -8,7 +8,7 @@ GenomicArray types.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from numpy import ndarray
     from pandas.core.indexes.base import Index
 
-Numeric = Union[int, float, np.number]
+Numeric: TypeAlias = int | float | np.number
 
 
 def by_ranges(
@@ -47,9 +47,7 @@ def by_ranges(
 
 def by_shared_chroms(
     table: pd.DataFrame, other: pd.DataFrame, keep_empty: bool = True
-) -> Iterator[
-    Union[tuple[str, pd.DataFrame, None], tuple[str, pd.DataFrame, pd.DataFrame]]
-]:
+) -> Iterator[tuple[str, pd.DataFrame, None] | tuple[str, pd.DataFrame, pd.DataFrame]]:
     """Group rows for both `table` and `other` by matching chromosome names."""
     # When both `table` and `other` contain only one chromosome each, and it's
     # the same chromosome, we can just return the original tables.
@@ -72,8 +70,8 @@ def into_ranges(
     dest: pd.DataFrame,
     src_col: str,
     default: Any,
-    summary_func: Optional[Callable],
-) -> Union[pd.DataFrame, pd.Series]:
+    summary_func: Callable | None,
+) -> pd.DataFrame | pd.Series:
     """Group a column in `source` by regions in `dest` and summarize."""
     if not len(source) or not len(dest):
         return dest
@@ -107,9 +105,9 @@ def into_ranges(
 
 def iter_ranges(
     table: pd.DataFrame,
-    chrom: Optional[str],
-    starts: Optional[Sequence[Numeric]],
-    ends: Optional[Sequence[Numeric]],
+    chrom: str | None,
+    starts: Sequence[Numeric] | None,
+    ends: Sequence[Numeric] | None,
     mode: str,
 ) -> Iterator[pd.DataFrame]:
     """Iterate through sub-ranges."""
@@ -138,7 +136,7 @@ def iter_ranges(
 
 def iter_slices(
     table: pd.DataFrame, other: pd.DataFrame, mode: str, keep_empty: bool
-) -> Iterator[Union[ndarray, Index]]:
+) -> Iterator[ndarray | Index]:
     """Yields indices to extract ranges from `table`.
 
     Returns an iterable of integer arrays that can apply to Series objects,
@@ -160,8 +158,8 @@ def iter_slices(
 
 def idx_ranges(
     table: pd.DataFrame,
-    starts: Union[list[int], pd.Series],
-    ends: Union[list[int], pd.Series],
+    starts: list[int] | pd.Series,
+    ends: list[int] | pd.Series,
     mode: str,
 ) -> Generator[tuple, None, None]:
     """Iterate through sub-ranges."""

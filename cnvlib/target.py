@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 from skgenome import tabio
 
@@ -16,10 +16,10 @@ if TYPE_CHECKING:
 
 def do_target(
     bait_arr: GenomicArray,
-    annotate: Optional[str] = None,
+    annotate: str | None = None,
     do_short_names: bool = False,
     do_split: bool = False,
-    avg_size: Union[int, float] = 200 / 0.75,
+    avg_size: int | float = 200 / 0.75,
 ) -> GenomicArray:
     """Transform bait intervals into targets more suitable for CNVkit.
 

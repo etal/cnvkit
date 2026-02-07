@@ -9,7 +9,7 @@ from __future__ import annotations
 import collections
 import math
 import warnings
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 # Reportlab on Py3.10 triggers a DeprecationWarning via load_module, which
 # becomes an error (ModuleNotFoundError) unless silenced here.
@@ -39,8 +39,8 @@ def create_diagram(
     threshold: float,
     min_probes: int,
     outfname: str,
-    show_range: Optional[str] = None,
-    title: Optional[str] = None,
+    show_range: str | None = None,
+    title: str | None = None,
     show_labels: bool = True,
 ) -> str:
     """Create the diagram."""

@@ -6,7 +6,7 @@ Namely: breaks, genemetrics.
 from __future__ import annotations
 import collections
 import math
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -129,19 +129,19 @@ def get_breakpoints(
 
 def do_genemetrics(
     cnarr: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
+    segments: CopyNumArray | None = None,
     threshold: float = 0.2,
     min_probes: int = 3,
     skip_low: bool = False,
     is_haploid_x_reference: bool = False,
     is_sample_female: None = None,
-    diploid_parx_genome: Optional[str] = None,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    diploid_parx_genome: str | None = None,
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> pd.DataFrame:
     """Identify targeted genes with copy number gain or loss.
 
@@ -243,12 +243,12 @@ def gene_metrics_by_gene(
     cnarr: CopyNumArray,
     threshold: float,
     skip_low: bool = False,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> Iterator[pd.Series]:
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
@@ -274,12 +274,12 @@ def gene_metrics_by_segment(
     segments: CopyNumArray,
     threshold: float,
     skip_low: bool = False,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> Iterator[pd.Series]:
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
@@ -322,12 +322,12 @@ def gene_metrics_by_segment(
 def compute_gene_stats(
     bins: CopyNumArray,
     gene_log2: float,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> dict:
     """Compute statistics for bins within a gene.
 
@@ -413,12 +413,12 @@ def compute_gene_stats(
 def group_by_genes(
     cnarr: CopyNumArray,
     skip_low: bool,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> Iterator[pd.Series]:
     """Group probe and coverage data by gene.
 

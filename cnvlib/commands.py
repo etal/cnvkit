@@ -11,7 +11,7 @@ import multiprocessing
 import os
 import sys
 import warnings
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
@@ -2085,7 +2085,7 @@ def _cmd_sex(args: argparse.Namespace) -> None:
 def do_sex(
     cnarrs: list[CopyNumArray],
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
 ) -> pd.DataFrame:
     """Guess samples' sex from the relative coverage of chromosomes X and Y.
 

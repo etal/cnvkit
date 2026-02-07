@@ -9,6 +9,7 @@ This script is also useful to recover the target and antitarget BED files that
 match the reference if those BED files are missing or you're not sure which ones
 are correct.
 """
+
 import argparse
 import logging
 
@@ -19,8 +20,9 @@ from skgenome import tabio
 def argument_parsing():
     AP = argparse.ArgumentParser(description=__doc__)
     AP.add_argument("reference", help="Reference file.")
-    AP.add_argument("-o", "--output",
-                    help="Output base name (extensions added automatically).")
+    AP.add_argument(
+        "-o", "--output", help="Output base name (extensions added automatically)."
+    )
     return AP.parse_args()
 
 
@@ -28,8 +30,8 @@ def reference2targets(args) -> None:
     ref = read(args.reference)
     targets, antitargets = reference.reference2regions(ref)
     name = args.output or ref.sample_id
-    tabio.write(targets, name + '.target.bed', 'bed4')
-    tabio.write(antitargets, name + '.antitarget.bed', 'bed4')
+    tabio.write(targets, name + ".target.bed", "bed4")
+    tabio.write(antitargets, name + ".antitarget.bed", "bed4")
 
 
 def main() -> None:
@@ -38,5 +40,5 @@ def main() -> None:
     reference2targets(arguments)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

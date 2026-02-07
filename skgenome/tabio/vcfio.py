@@ -9,7 +9,7 @@ from itertools import chain
 import numpy as np
 import pandas as pd
 import pysam
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 
 def read_vcf(
     infile: str,
-    sample_id: Optional[str] = None,
-    normal_id: Optional[str] = None,
-    min_depth: Optional[int] = None,
+    sample_id: str | None = None,
+    normal_id: str | None = None,
+    min_depth: int | None = None,
     skip_reject: bool = False,
     skip_somatic: bool = False,
 ) -> pd.DataFrame:
@@ -101,7 +101,7 @@ def read_vcf(
 
 
 def _choose_samples(
-    vcf_reader: VariantFile, sample_id: Optional[str], normal_id: Optional[str]
+    vcf_reader: VariantFile, sample_id: str | None, normal_id: str | None
 ) -> tuple[str, str]:
     """Emit the sample IDs of all samples or tumor-normal pairs in the VCF.
 
@@ -307,12 +307,12 @@ def _parse_records(
 
 def _extract_genotype(
     sample: VariantRecordSample, record: VariantRecord
-) -> Union[
-    tuple[None, float, int],
-    tuple[int, float, int],
-    tuple[None, float, float],
-    tuple[int, float, float],
-]:
+) -> (
+    tuple[None, float, int]
+    | tuple[int, float, int]
+    | tuple[None, float, float]
+    | tuple[int, float, float]
+):
     if "DP" in sample:
         depth = sample["DP"]
     elif "AD" in sample and isinstance(sample["AD"], tuple):
@@ -333,7 +333,7 @@ def _extract_genotype(
     return depth, zygosity, alt_count
 
 
-def _get_alt_count(sample: VariantRecordSample) -> Union[int, float]:
+def _get_alt_count(sample: VariantRecordSample) -> int | float:
     """Get the alternative allele count from a sample in a VCF record."""
     if sample.get("AD") not in (None, (None,)):
         # GATK and other callers: (ref depth, alt depth)
@@ -360,7 +360,7 @@ def _get_alt_count(sample: VariantRecordSample) -> Union[int, float]:
     return alt_count
 
 
-def _safesum(tup: Union[tuple[None], tuple[int, int], tuple[int]]) -> int:
+def _safesum(tup: tuple[None] | tuple[int, int] | tuple[int]) -> int:
     return sum(filter(None, tup))
 
 

@@ -11,6 +11,7 @@ CNVkit v0.9.0 and later automatically names off-target bins "Antitarget",
 instead of the previous "Background". This script also updates those bin names
 in the 'gene' column.
 """
+
 import argparse
 import logging
 import os.path
@@ -20,16 +21,28 @@ import numpy as np
 from .. import read, params
 from skgenome import tabio
 
+
 def argument_parsing():
     AP = argparse.ArgumentParser(description=__doc__)
-    AP.add_argument("cnn_files", nargs='+',
-            help="""CNVkit coverage files to update (*.targetcoverage.cnn,
-                    *.antitargetcoverage.cnn).""")
-    AP.add_argument("-d", "--output-dir", default=".",
-            help="""Directory to write output .cnn files.""")
-    AP.add_argument("-s", "--suffix", default=".updated",
-            help="""Filename suffix to add before the '.cnn' extension in output
-                    files. [Default: %(default)s]""")
+    AP.add_argument(
+        "cnn_files",
+        nargs="+",
+        help="""CNVkit coverage files to update (*.targetcoverage.cnn,
+                    *.antitargetcoverage.cnn).""",
+    )
+    AP.add_argument(
+        "-d",
+        "--output-dir",
+        default=".",
+        help="""Directory to write output .cnn files.""",
+    )
+    AP.add_argument(
+        "-s",
+        "--suffix",
+        default=".updated",
+        help="""Filename suffix to add before the '.cnn' extension in output
+                    files. [Default: %(default)s]""",
+    )
     return AP.parse_args()
 
 
@@ -39,20 +52,19 @@ def cnv_updater(args) -> None:
         # Convert coverage depths from log2 scale to absolute scale.
         # NB: The log2 values are un-centered in CNVkit v0.7.0(?) through v0.7.11;
         # earlier than that, the average 'depth' will be about 1.0.
-        cnarr['depth'] = np.exp2(cnarr['log2'])
+        cnarr["depth"] = np.exp2(cnarr["log2"])
         # Rename "Background" bins to "Antitarget"
         # NB: The default off-target bin name was changed in CNVkit v0.9.0
-        cnarr['gene'] = cnarr['gene'].replace("Background",
-                                              params.ANTITARGET_NAME)
+        cnarr["gene"] = cnarr["gene"].replace("Background", params.ANTITARGET_NAME)
         cnarr.sort_columns()
         # Construct the output filename
-        base, ext = os.path.basename(fname).rsplit('.', 1)
-        if '.' in base:
-            base, zone = base.rsplit('.', 1)
-            out_fname = '.'.join((base + args.suffix, zone, ext))
+        base, ext = os.path.basename(fname).rsplit(".", 1)
+        if "." in base:
+            base, zone = base.rsplit(".", 1)
+            out_fname = ".".join((base + args.suffix, zone, ext))
         else:
             # e.g. reference.cnn or .cnr file, no "*.targetcoverage.*" in name
-            out_fname = '.'.join((base + args.suffix, ext))
+            out_fname = ".".join((base + args.suffix, ext))
         tabio.write(cnarr, os.path.join(args.output_dir, out_fname))
 
 
@@ -62,5 +74,5 @@ def main() -> None:
     cnv_updater(arguments)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

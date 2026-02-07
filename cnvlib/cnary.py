@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -35,7 +35,7 @@ class CopyNumArray(GenomicArray):
     # "depth", "gc", "rmask", "spread", "weight", "probes"
 
     def __init__(
-        self, data_table: DataFrame, meta_dict: Optional[dict[str, str]] = None
+        self, data_table: DataFrame, meta_dict: dict[str, str] | None = None
     ) -> None:
         GenomicArray.__init__(self, data_table, meta_dict)
 
@@ -62,7 +62,7 @@ class CopyNumArray(GenomicArray):
             return chr_x_label
         return ""
 
-    def chr_x_filter(self, diploid_parx_genome: Optional[str] = None) -> Series:
+    def chr_x_filter(self, diploid_parx_genome: str | None = None) -> Series:
         """All regions on X, potentially without PAR1/2."""
         x = self.chromosome == self.chr_x_label
         if diploid_parx_genome is not None:
@@ -105,7 +105,7 @@ class CopyNumArray(GenomicArray):
         )
         return f
 
-    def chr_y_filter(self, diploid_parx_genome: Optional[str] = None) -> Series:
+    def chr_y_filter(self, diploid_parx_genome: str | None = None) -> Series:
         """All regions on Y, potentially without PAR1/2."""
         y = self.chromosome == self.chr_y_label
         if diploid_parx_genome is not None:
@@ -114,7 +114,7 @@ class CopyNumArray(GenomicArray):
         return y
 
     def autosomes(  # type: ignore[override]
-        self, diploid_parx_genome: Optional[str] = None, also: Optional[Series] = None
+        self, diploid_parx_genome: str | None = None, also: Series | None = None
     ) -> CopyNumArray:
         """Overrides GenomeArray.autosomes()."""
         if diploid_parx_genome is not None:
@@ -213,11 +213,11 @@ class CopyNumArray(GenomicArray):
 
     def center_all(
         self,
-        estimator: Union[Callable, str] = pd.Series.median,
+        estimator: Callable | str = pd.Series.median,
         by_chrom: bool = True,
         skip_low: bool = False,
         verbose: bool = False,
-        diploid_parx_genome: Optional[str] = None,
+        diploid_parx_genome: str | None = None,
     ) -> None:
         """Re-center log2 values to the autosomes' average (in-place).
 
@@ -324,22 +324,23 @@ class CopyNumArray(GenomicArray):
             # Build row matching self.data.columns order exactly
             outrow = []
             for col in self.data.columns:
-                if col == "chromosome":
-                    outrow.append(core.check_unique(rows.chromosome, "chromosome"))
-                elif col == "start":
-                    outrow.append(rows.start.iat[0])
-                elif col == "end":
-                    outrow.append(rows.end.iat[-1])
-                elif col == "gene":
-                    outrow.append(name)
-                elif col == "log2":
-                    outrow.append(summary_func(rows.log2))
-                elif col == "probes":
-                    # Special case: sum probes rather than average
-                    outrow.append(sum(rows[col]))
-                else:
-                    # All other fields: use summary function
-                    outrow.append(summary_func(rows[col]))
+                match col:
+                    case "chromosome":
+                        outrow.append(core.check_unique(rows.chromosome, "chromosome"))
+                    case "start":
+                        outrow.append(rows.start.iat[0])
+                    case "end":
+                        outrow.append(rows.end.iat[-1])
+                    case "gene":
+                        outrow.append(name)
+                    case "log2":
+                        outrow.append(summary_func(rows.log2))
+                    case "probes":
+                        # Special case: sum probes rather than average
+                        outrow.append(sum(rows[col]))
+                    case _:
+                        # All other fields: use summary function
+                        outrow.append(summary_func(rows[col]))
             return tuple(outrow)
 
         outrows = []
@@ -357,8 +358,8 @@ class CopyNumArray(GenomicArray):
     def shift_xx(
         self,
         is_haploid_x_reference: bool = False,
-        is_xx: Optional[bool_] = None,
-        diploid_parx_genome: Optional[str] = None,
+        is_xx: bool_ | None = None,
+        diploid_parx_genome: str | None = None,
     ) -> CopyNumArray:
         """Adjust chrX log2 ratios to match the ploidy of the reference sex.
 
@@ -385,9 +386,9 @@ class CopyNumArray(GenomicArray):
     def guess_xx(
         self,
         is_haploid_x_reference: bool = False,
-        diploid_parx_genome: Optional[str] = None,
+        diploid_parx_genome: str | None = None,
         verbose: bool = True,
-    ) -> Optional[bool_]:
+    ) -> bool_ | None:
         """Detect chromosomal sex; return True if a sample is probably female.
 
         Uses `compare_sex_chromosomes` to calculate coverage ratios of the X and
@@ -431,13 +432,13 @@ class CopyNumArray(GenomicArray):
     def compare_sex_chromosomes(
         self,
         is_haploid_x_reference: bool = False,
-        diploid_parx_genome: Optional[str] = None,
+        diploid_parx_genome: str | None = None,
         skip_low: bool = False,
-    ) -> Union[
-        tuple[bool_, dict[str, Union[float64, float]]],
-        tuple[bool_, dict[str, float64]],
-        tuple[None, dict[Any, Any]],
-    ]:
+    ) -> (
+        tuple[bool_, dict[str, float64 | float]]
+        | tuple[bool_, dict[str, float64]]
+        | tuple[None, dict[Any, Any]]
+    ):
         """Compare coverage ratios of sex chromosomes versus autosomes.
 
         Perform 4 Mood's median tests of the log2 coverages on chromosomes X and
@@ -567,8 +568,8 @@ class CopyNumArray(GenomicArray):
 
     def expect_flat_log2(
         self,
-        is_haploid_x_reference: Optional[bool] = None,
-        diploid_parx_genome: Optional[str] = None,
+        is_haploid_x_reference: bool | None = None,
+        diploid_parx_genome: str | None = None,
     ) -> ndarray:
         """Get the uninformed expected copy ratios of each bin.
 
@@ -596,9 +597,7 @@ class CopyNumArray(GenomicArray):
 
     # Reporting
 
-    def residuals(
-        self, segments: Optional[Union[CopyNumArray, GenomicArray]] = None
-    ) -> Series:
+    def residuals(self, segments: CopyNumArray | GenomicArray | None = None) -> Series:
         """Difference in log2 value of each bin from its segment mean.
 
         Parameters
@@ -642,9 +641,7 @@ class CopyNumArray(GenomicArray):
             ]
         return pd.concat(resids) if resids else pd.Series([])
 
-    def smooth_log2(
-        self, bandwidth: Optional[int] = None, by_arm: bool = True
-    ) -> ndarray:
+    def smooth_log2(self, bandwidth: int | None = None, by_arm: bool = True) -> ndarray:
         """Smooth log2 values with a sliding window.
 
         Account for chromosome and (optionally) centromere boundaries. Use bin

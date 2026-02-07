@@ -22,7 +22,6 @@ import csv
 import logging
 import math
 from itertools import zip_longest
-from typing import Optional, Union
 
 import pandas as pd
 from Bio.File import as_handle
@@ -182,9 +181,9 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
 
 
 def write_seg(
-    dframe: Union[tuple[pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame]],
-    sample_id: Optional[Union[tuple[str], tuple[str, str]]] = None,
-    chrom_ids: Optional[bool] = None,
+    dframe: tuple[pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame],
+    sample_id: tuple[str] | tuple[str, str] | None = None,
+    chrom_ids: bool | None = None,
 ) -> pd.DataFrame:
     """Format a dataframe or list of dataframes as SEG.
 

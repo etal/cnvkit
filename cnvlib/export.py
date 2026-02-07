@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import OrderedDict as OD
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -196,7 +196,7 @@ def export_bed(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
     label: str,
     show: str,
@@ -273,10 +273,10 @@ def export_vcf(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
-    sample_id: Optional[str] = None,
-    cnarr: Optional[CopyNumArray] = None,
+    sample_id: str | None = None,
+    cnarr: CopyNumArray | None = None,
 ) -> tuple[str, str]:
     """Convert segments to Variant Call Format.
 
@@ -333,7 +333,7 @@ def segments2vcf(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
 ) -> Iterator[tuple[str, int, str, str, str, str, str, str, str, str]]:
     """Convert copy number segments to VCF records."""
@@ -500,7 +500,7 @@ def export_gistic_markers(cnr_fnames):
 
 
 def export_theta(
-    tumor_segs: CopyNumArray, normal_cn: Optional[CopyNumArray]
+    tumor_segs: CopyNumArray, normal_cn: CopyNumArray | None
 ) -> pd.DataFrame:
     """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
 
@@ -551,7 +551,7 @@ def export_theta(
 
 
 def ref_means_nbins(
-    tumor_segs: CopyNumArray, normal_cn: Optional[CopyNumArray]
+    tumor_segs: CopyNumArray, normal_cn: CopyNumArray | None
 ) -> tuple[ndarray, pd.Series]:
     """Extract segments' reference mean log2 values and probe counts.
 
@@ -609,7 +609,7 @@ def ref_means_nbins(
 
 
 def theta_read_counts(
-    log2_ratio: Union[pd.Series, ndarray],
+    log2_ratio: pd.Series | ndarray,
     nbins: pd.Series,
     # These scaling factors don't meaningfully affect
     # THetA's calculation unless they're too small

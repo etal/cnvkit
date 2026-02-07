@@ -11,10 +11,7 @@ from collections.abc import Generator, Iterable
 
 import numpy as np
 from skgenome import tabio, GenomicArray as GA
-from typing import TYPE_CHECKING, Optional
-
-if TYPE_CHECKING:
-    from skgenome.gary import GenomicArray
+from typing import TYPE_CHECKING
 
 
 def do_access(
@@ -71,7 +68,7 @@ def get_regions(fasta_fname: str) -> Generator[tuple, None, None]:
     with open(fasta_fname) as infile:
         chrom = ""
         cursor = 0
-        run_start: Optional[int] = None
+        run_start: int | None = None
         for line in infile:
             if line.startswith(">"):
                 # Emit the last chromosome's last run, if any

@@ -6,7 +6,7 @@ import os
 from io import StringIO
 from itertools import islice
 from pathlib import PurePath
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 def idxstats(
-    bam_fname: str, drop_unmapped: bool = False, fasta: Optional[str] = None
+    bam_fname: str, drop_unmapped: bool = False, fasta: str | None = None
 ) -> pd.DataFrame:
     """Get chromosome names, lengths, and number of mapped/unmapped reads.
 
@@ -38,7 +38,7 @@ def idxstats(
     return table
 
 
-def bam_total_reads(bam_fname: str, fasta: Optional[str] = None) -> int64:
+def bam_total_reads(bam_fname: str, fasta: str | None = None) -> int64:
     """Count the total number of mapped reads in a BAM file.
 
     Uses the BAM index to do this quickly.
@@ -83,7 +83,7 @@ def ensure_bam_index(bam_fname: str) -> str:
 
 
 def ensure_bam_sorted(
-    bam_fname: str, by_name: bool = False, span: int = 50, fasta: Optional[str] = None
+    bam_fname: str, by_name: bool = False, span: int = 50, fasta: str | None = None
 ) -> bool:
     """Test if the reads in a BAM file are sorted as expected.
 
@@ -122,7 +122,7 @@ def is_newer_than(target_fname: str, orig_fname: str) -> bool:
 
 
 def get_read_length(
-    bam: Union[str, Any], span: int = 1000, fasta: Optional[str] = None
+    bam: str | Any, span: int = 1000, fasta: str | None = None
 ) -> float64:
     """Get (median) read length from first few reads in a BAM file.
 

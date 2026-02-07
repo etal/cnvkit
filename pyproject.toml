@@ -111,10 +111,8 @@ ignore = [
     "E731",  # inline lambda
     "F401",  # unused import
     "F841",  # unused variable
-    "UP007", # X|Y type annotations
     "UP031", # % format
     "UP032", # format call vs. f-string
-    "UP045", # X|None type annotations
     "B007",  # loop variable not used in body
     "B023",  # def closing over loop variable
     "PD009", # use .iloc instead of .iat (iat is actually faster for scalar access)

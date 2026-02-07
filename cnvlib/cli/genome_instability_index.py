@@ -16,6 +16,7 @@ In this implementation, .cnr, .cns, or .call.cns files are accepted; .call.cns
 is preferred, but if absolute copy number has not already been called, it will
 be automatically inferred using the same thresholds as in the 'call' command.
 """
+
 import argparse
 import logging
 import sys
@@ -27,13 +28,13 @@ from ..call import do_call
 
 def argument_parsing():
     AP = argparse.ArgumentParser(description=__doc__)
-    AP.add_argument('cnv_files', nargs='+',
-                    help="CNVkit .cnr or .cns filenames.")
-    AP.add_argument("--diploid-parx-genome",
-                    type=str,
-                    help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'")
-    AP.add_argument('-o', '--output',
-                    help="Output filename (default: stdout).")
+    AP.add_argument("cnv_files", nargs="+", help="CNVkit .cnr or .cns filenames.")
+    AP.add_argument(
+        "--diploid-parx-genome",
+        type=str,
+        help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
+    )
+    AP.add_argument("-o", "--output", help="Output filename (default: stdout).")
     return AP.parse_args()
 
 
@@ -52,13 +53,13 @@ def cna_stats(cnarr, diploid_parx_genome):
 
 def genome_instability_index(args) -> None:
     # Open output file or use stdout
-    ctx = open(args.output, 'w') if args.output else nullcontext(sys.stdout)
+    ctx = open(args.output, "w") if args.output else nullcontext(sys.stdout)
     with ctx as outfile:
-        print("Sample", "CNA_Fraction", "CNA_Count", sep='\t', file=outfile)
+        print("Sample", "CNA_Fraction", "CNA_Count", sep="\t", file=outfile)
         for fname in args.cnv_files:
             cnarr = read_cna(fname)
             frac, count = cna_stats(cnarr, args.diploid_parx_genome)
-            print(fname, frac, count, sep='\t', file=outfile)
+            print(fname, frac, count, sep="\t", file=outfile)
 
 
 def main() -> None:
@@ -67,5 +68,5 @@ def main() -> None:
     genome_instability_index(arguments)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Optional
 
 from skgenome import GenomicArray as GA
 
@@ -13,9 +12,9 @@ from .params import INSERT_SIZE, MIN_REF_COVERAGE, ANTITARGET_NAME
 
 def do_antitarget(
     targets: GA,
-    access: Optional[GA] = None,
+    access: GA | None = None,
     avg_bin_size: int = 150000,
-    min_bin_size: Optional[int] = None,
+    min_bin_size: int | None = None,
 ) -> GA:
     """Derive off-target ("antitarget") bins from target regions.
 
@@ -42,7 +41,7 @@ def do_antitarget(
 
 
 def get_antitargets(
-    targets: GA, accessible: GA, avg_bin_size: int, min_bin_size: Optional[int]
+    targets: GA, accessible: GA, avg_bin_size: int, min_bin_size: int | None
 ) -> GA:
     """Generate antitarget intervals between/around target intervals.
 
