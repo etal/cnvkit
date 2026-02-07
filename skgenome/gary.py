@@ -6,11 +6,14 @@ import logging
 from collections import OrderedDict
 from typing import Any, TypeVar, TYPE_CHECKING
 
+import bioframe
 import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
 from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices, Numeric
+
+_BF_COLS = ("chromosome", "start", "end")
 from .merge import flatten, merge
 from .rangelabel import to_label
 from .subtract import subtract
@@ -703,19 +706,33 @@ class GenomicArray:
 
         The extra fields of `self`, but not `other`, are retained in the output.
         """
-        # TODO options for which extra fields to keep
-        #   by default, keep just the fields in 'table'
         if mode == "trim":
-            # Slower
             chunks = [
                 chunk.data
                 for _, chunk in self.by_ranges(other, mode=mode, keep_empty=False)
             ]
             return self.as_dataframe(pd.concat(chunks))
-        # Faster
-        slices = iter_slices(self.data, other.data, mode, False)
-        indices = np.concatenate(list(slices))
-        return self.as_dataframe(self.data.loc[indices])
+        if not len(self) or not len(other):
+            return self.as_dataframe(self.data.iloc[:0])
+        pairs = bioframe.overlap(
+            self.data,
+            other.data,
+            how="inner",
+            cols1=_BF_COLS,
+            cols2=_BF_COLS,
+            return_index=True,
+            return_input=True,
+        )
+        if mode == "inner":
+            # Keep only self bins fully contained within an other bin
+            pairs = pairs[
+                (pairs["start"] >= pairs["start_"]) & (pairs["end"] <= pairs["end_"])
+            ]
+        # Sort by other-index then self-index to match by_ranges ordering
+        pairs = pairs.sort_values(["index_", "index"])
+        # Return self rows (with duplicates, one per overlap pair)
+        self_indices = pairs["index"].to_numpy()
+        return self.as_dataframe(self.data.loc[self_indices])
 
     def merge(
         self,
