@@ -63,7 +63,12 @@ optional-dependencies = {test = {file = "requirements/tests.txt"}}
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # bioframe <=0.8.0 uses df.groupby(['col']).groups with a single-element
+    # list, which pandas 3.0 deprecates via Pandas4Warning.
+    "ignore:In a future version, the keys of:Warning",
+]
 
 [tool.coverage.run]
 branch = true
