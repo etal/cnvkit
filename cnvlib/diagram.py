@@ -183,10 +183,10 @@ def build_chrom_diagram(
 
         # Create opening and closing telomeres
         tel_start = BC.TelomereSegment()
-        tel_start.scale = TELOMERE_LENGTH
+        tel_start.scale = TELOMERE_LENGTH  # type: ignore[assignment]
         tel_start.chr_percent = CHROM_FATNESS
         tel_end = BC.TelomereSegment(inverted=True)
-        tel_end.scale = TELOMERE_LENGTH
+        tel_end.scale = TELOMERE_LENGTH  # type: ignore[assignment]
         tel_end.chr_percent = CHROM_FATNESS
 
         # Assemble the chromosome diagram in order
@@ -333,4 +333,4 @@ def bc_chromosome_draw_label(
     cur_drawing.add(label_string)
 
 
-BC.Chromosome._draw_label = bc_chromosome_draw_label
+BC.Chromosome._draw_label = bc_chromosome_draw_label  # type: ignore[method-assign]

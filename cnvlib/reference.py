@@ -246,7 +246,7 @@ def do_reference(
         )
         sexes = dict()
         for fname in target_fnames:
-            sexes[read_cna(fname).sample_id] = female_samples
+            sexes[read_cna(fname).sample_id] = female_samples  # type: ignore[assignment]
 
     # TODO - refactor/inline this func here, once it works
     ref_probes = combine_probes(
@@ -255,7 +255,7 @@ def do_reference(
         fa_fname,
         is_haploid_x_reference,
         diploid_parx_genome,
-        sexes,
+        sexes,  # type: ignore[arg-type]
         do_gc,
         do_edge,
         do_rmask,
@@ -509,10 +509,10 @@ def load_sample_block(
                 diploid_parx_genome,
             )
         )
-    all_logr = np.vstack(all_logr)
-    all_depths = np.vstack(all_depths)
+    all_logr = np.vstack(all_logr)  # type: ignore[assignment]
+    all_depths = np.vstack(all_depths)  # type: ignore[assignment]
     ref_df = pd.DataFrame.from_dict(ref_columns)
-    return ref_df, all_logr, all_depths
+    return ref_df, all_logr, all_depths  # type: ignore[return-value]
 
 
 def bias_correct_logr(
@@ -661,7 +661,7 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
         # Calculate each cluster's summary stats
         clust_matrix = logr_matrix[clust_idx, :]
         # XXX re-add the pseudocount sample to each cluster? need benchmark
-        clust_info = summarize_info(clust_matrix, [])
+        clust_info = summarize_info(clust_matrix, [])  # type: ignore[arg-type]
         cluster_cols |= {
             f"log2_{i}": clust_info["log2"],
             f"spread_{i}": clust_info["spread"],

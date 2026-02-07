@@ -202,7 +202,7 @@ def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
                     for kv in (tag["CommandLineOptions"].strip('"').split())
                     if "=" in kv
                 )
-                sample_id = options.get("tumor_sample_name")
+                sample_id = options.get("tumor_sample_name")  # type: ignore[assignment]
                 normal_id = options["normal_sample_name"]
                 logging.debug(
                     "Found tumor sample %s and normal sample "
@@ -222,7 +222,7 @@ def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
             if sample_ids == ("NORMAL", "TUMOR"):
                 yield ("TUMOR", "NORMAL")
             else:
-                yield sample_ids
+                yield sample_ids  # type: ignore[misc]
 
 
 def _confirm_unique(sample_id: str, samples: list[str]) -> None:
@@ -269,7 +269,7 @@ def _parse_records(
                 raise
         else:
             # Assume unpaired tumor; take DP, AF from INFO (e.g. LoFreq)
-            depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0  # type: ignore[assignment]
+            depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0  # type: ignore[assignment,arg-type]
             if "AF" in record.info:
                 alt_freq = record.info["AF"]
                 alt_count = round(alt_freq * depth)

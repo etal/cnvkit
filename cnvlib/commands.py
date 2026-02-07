@@ -1371,9 +1371,9 @@ def _cmd_diagram(args: argparse.Namespace) -> None:
             args.diploid_parx_genome,
         )
         if cnarr:
-            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
+            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)  # type: ignore[arg-type]
         if segarr:
-            segarr = segarr.shift_xx(args.male_reference, is_sample_female)
+            segarr = segarr.shift_xx(args.male_reference, is_sample_female)  # type: ignore[arg-type]
     outfname = diagram.create_diagram(
         cnarr,  # type: ignore[arg-type]
         segarr,  # type: ignore[arg-type]
@@ -1481,9 +1481,9 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
                     if args.title is not None:
                         scatter_opts["title"] = f"{args.title} {region.chromosome}"
                     scatter.do_scatter(
-                        cnarr,
+                        cnarr,  # type: ignore[arg-type]
                         segarr,
-                        varr,
+                        varr,  # type: ignore[arg-type]
                         show_range=region,
                         **scatter_opts,  # type: ignore[arg-type]
                     )
@@ -1496,9 +1496,9 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
         if args.title is not None:
             scatter_opts["title"] = args.title
         scatter.do_scatter(
-            cnarr,
+            cnarr,  # type: ignore[arg-type]
             segarr,
-            varr,
+            varr,  # type: ignore[arg-type]
             args.chromosome,
             args.gene,
             **scatter_opts,  # type: ignore[arg-type]
@@ -1632,7 +1632,9 @@ def _cmd_heatmap(args: argparse.Namespace) -> None:
                 cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
             )
             cnarr = cnarr.shift_xx(
-                args.male_reference, is_sample_female, args.diploid_parx_genome
+                args.male_reference,
+                is_sample_female,  # type: ignore[arg-type]
+                args.diploid_parx_genome,
             )
         cnarrs.append(cnarr)
     heatmap.do_heatmap(

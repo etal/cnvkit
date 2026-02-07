@@ -75,7 +75,7 @@ def do_heatmap(
         axis.set_facecolor("#DDDDDD")
     else:
         # Older matplotlib.
-        axis.set_axis_bgcolor("#DDDDDD")
+        axis.set_axis_bgcolor("#DDDDDD")  # type: ignore[attr-defined]
 
     if by_bin and show_range:
         try:

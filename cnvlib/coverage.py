@@ -433,8 +433,8 @@ def _rdc_chunk(
     min_mapq: int,
     fasta: None = None,
 ) -> Iterator[tuple[int, tuple[str, int, int, str, float, float]]]:
-    if isinstance(bamfile, str):
-        try:
+    if isinstance(bamfile, str):  # type: ignore[unreachable]
+        try:  # type: ignore[unreachable]
             import pysam
         except ImportError:
             raise ImportError(
@@ -477,7 +477,7 @@ def region_depth_count(
         if filter_read(read):
             count += 1
             # Only count the bases aligned to the region
-            bases += sum(1 for p in read.positions if start <= p < end)
+            bases += sum(1 for p in read.positions if start <= p < end)  # type: ignore[attr-defined,misc]
     depth = bases / (end - start) if end > start else 0
     row = (
         chrom,
@@ -561,7 +561,7 @@ def bedcov(
         cmd.extend(["--reference", fasta])
     cmd.extend([bed_fname, bam_fname])
     try:
-        raw = pysam.bedcov(*cmd, split_lines=False)
+        raw = pysam.bedcov(*cmd, split_lines=False)  # type: ignore[attr-defined]
     except pysam.SamtoolsError as exc:
         raise ValueError(
             f"Failed processing {bam_fname!r} coverages in {bed_fname!r} regions. "
@@ -572,9 +572,9 @@ def bedcov(
             f"BED file {bed_fname!r} chromosome names don't match any in "
             f"BAM file {bam_fname!r}"
         )
-    columns = detect_bedcov_columns(raw)
+    columns = detect_bedcov_columns(raw)  # type: ignore[arg-type]
     usecols = [c for c in columns if c != "extra"]
-    table = pd.read_csv(StringIO(raw), sep="\t", names=columns, usecols=usecols)
+    table = pd.read_csv(StringIO(raw), sep="\t", names=columns, usecols=usecols)  # type: ignore[arg-type]
     return table
 
 

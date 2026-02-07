@@ -33,7 +33,7 @@ def idxstats(
             f"pysam is required for reading BAM index stats. {PYSAM_INSTALL_MSG}"
         ) from None
     handle = StringIO(
-        pysam.idxstats(bam_fname, split_lines=False, reference_filename=fasta)
+        pysam.idxstats(bam_fname, split_lines=False, reference_filename=fasta)  # type: ignore[arg-type,attr-defined]
     )
     table = pd.read_csv(
         handle,
@@ -52,7 +52,7 @@ def bam_total_reads(bam_fname: str, fasta: str | None = None) -> int64:
     Uses the BAM index to do this quickly.
     """
     table = idxstats(bam_fname, drop_unmapped=True, fasta=fasta)
-    return table.mapped.sum()
+    return table.mapped.sum()  # type: ignore[no-any-return]
 
 
 def ensure_bam_index(bam_fname: str) -> str:
@@ -78,7 +78,7 @@ def ensure_bam_index(bam_fname: str) -> str:
             bai_fname = bam_fname[:-1] + "i"
         if not is_newer_than(bai_fname, bam_fname):
             logging.info("Indexing CRAM file %s", bam_fname)
-            pysam.index(bam_fname)
+            pysam.index(bam_fname)  # type: ignore[attr-defined]
             bai_fname = bam_fname + ".crai"
         assert os.path.isfile(bai_fname), "Failed to generate cram index " + bai_fname
     else:
@@ -90,7 +90,7 @@ def ensure_bam_index(bam_fname: str) -> str:
             bai_fname = bam_fname[:-1] + "i"
         if not is_newer_than(bai_fname, bam_fname):
             logging.info("Indexing BAM file %s", bam_fname)
-            pysam.index(bam_fname)
+            pysam.index(bam_fname)  # type: ignore[attr-defined]
             bai_fname = bam_fname + ".bai"
         assert os.path.isfile(bai_fname), "Failed to generate bam index " + bai_fname
     return bai_fname
@@ -171,4 +171,4 @@ def get_read_length(
         bam.seek(0)
     else:
         bam.close()
-    return np.median(lengths)
+    return np.median(lengths)  # type: ignore[no-any-return]

@@ -354,5 +354,5 @@ def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> float64 | float
     if len(cnarr) == 0:
         return np.nan
     if "weight" in cnarr and cnarr["weight"].any():
-        return np.average(cnarr["log2"], weights=cnarr["weight"])
-    return cnarr["log2"].mean()
+        return np.average(cnarr["log2"], weights=cnarr["weight"])  # type: ignore[no-any-return]
+    return cnarr["log2"].mean()  # type: ignore[no-any-return]

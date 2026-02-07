@@ -155,8 +155,8 @@ def genome_scatter(
         axis.set_title(title)
         axis = cnv_on_genome(
             axis,
-            cnarr,
-            segments,
+            cnarr,  # type: ignore[arg-type]
+            segments,  # type: ignore[arg-type]
             do_trend,
             y_min,
             y_max,
@@ -171,7 +171,7 @@ def genome_scatter(
         axis = snv_on_genome(
             axis, variants, chrom_sizes, segments, do_trend, segment_color
         )
-    return axis.get_figure()
+    return axis.get_figure()  # type: ignore[return-value]
 
 
 def cnv_on_genome(

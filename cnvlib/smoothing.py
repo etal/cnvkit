@@ -75,7 +75,7 @@ def _pad_array(x: ndarray, wing: int) -> ndarray:
 def rolling_median(x: pd.Series, width: float) -> ndarray:
     """Rolling median with mirrored edges."""
     x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
-    rolled = signal.rolling(2 * wing + 1, 1, center=True).median()
+    rolled = signal.rolling(2 * wing + 1, 1, center=True).median()  # type: ignore[union-attr]
     # if rolled.hasnans:
     #     rolled = rolled.interpolate()
     return np.asarray(rolled[wing:-wing], dtype=float)
@@ -84,14 +84,14 @@ def rolling_median(x: pd.Series, width: float) -> ndarray:
 def rolling_quantile(x: pd.Series, width: int, quantile: float) -> ndarray:
     """Rolling quantile (0--1) with mirrored edges."""
     x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
-    rolled = signal.rolling(2 * wing + 1, 2, center=True).quantile(quantile)
+    rolled = signal.rolling(2 * wing + 1, 2, center=True).quantile(quantile)  # type: ignore[union-attr]
     return np.asarray(rolled[wing:-wing], dtype=float)
 
 
 def rolling_std(x, width):
     """Rolling quantile (0--1) with mirrored edges."""
     x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
-    rolled = signal.rolling(2 * wing + 1, 2, center=True).std()
+    rolled = signal.rolling(2 * wing + 1, 2, center=True).std()  # type: ignore[union-attr]
     return np.asarray(rolled[wing:-wing], dtype=float)
 
 

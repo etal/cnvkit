@@ -266,9 +266,12 @@ def batch_make_reference(
                     autobin_args = ["amplicon", bait_arr]
                 # Choose median-size normal or tumor sample file
                 bam_fname = autobin.midsize_file(normal_fnames)
-                (wgs_depth, target_avg_size), _ = autobin.do_autobin(
-                    bam_fname, *autobin_args, bp_per_bin=50000.0, fasta=fasta
-                )  # type: ignore[misc,arg-type,assignment]
+                (wgs_depth, target_avg_size), _ = autobin.do_autobin(  # type: ignore[assignment,misc]
+                    bam_fname,
+                    *autobin_args,  # type: ignore[arg-type]
+                    bp_per_bin=50000.0,
+                    fasta=fasta,
+                )
                 logging.info(
                     "WGS average depth %.2f --> using bin size %d",
                     wgs_depth,

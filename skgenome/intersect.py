@@ -180,7 +180,7 @@ def idx_ranges(
             # At least one bin is fully nested -- account for it
             irange_func = _irange_nested
         else:
-            irange_func = _irange_simple
+            irange_func = _irange_simple  # type: ignore[assignment]
         yield from irange_func(table, starts, ends, mode)
 
 

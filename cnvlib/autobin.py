@@ -125,12 +125,17 @@ def do_autobin(
         case "hybrid":
             assert targets is not None
             tgt_depth, anti_depth = hybrid(
-                rc_table, read_len, bam_fname, targets, access, fasta
+                rc_table,
+                read_len,  # type: ignore[arg-type]
+                bam_fname,
+                targets,
+                access,
+                fasta,
             )
         case "wgs":
             if access is not None and len(access):
                 rc_table = update_chrom_length(rc_table, access)
-            tgt_depth = average_depth(rc_table, read_len)
+            tgt_depth = average_depth(rc_table, read_len)  # type: ignore[arg-type]
             anti_depth = None  # type: ignore[assignment]
 
     # Clip bin sizes to specified ranges

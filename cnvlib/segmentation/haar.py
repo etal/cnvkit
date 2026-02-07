@@ -311,7 +311,7 @@ def FDRThres(x: ndarray, q: float, stdev: float64) -> int | float64:
             "No passing p-values: min p=%.4g, min m=%.4g, q=%s", p[0], m[0], q
         )
         T = x_sorted[0] + 1e-16  # ~= 2^-52, like MATLAB "eps"
-    return T
+    return T  # type: ignore[no-any-return]
 
 
 def SegmentByPeaks(
@@ -544,7 +544,7 @@ def UnifyLevels(
     if not len(addonLevel):
         return baseLevel
     if not len(baseLevel):
-        return addonLevel.copy()
+        return addonLevel.copy()  # type: ignore[no-any-return]
 
     # Use searchsorted to find nearest base elements for each addon
     # Since baseLevel is sorted, the closest base is either at insert_pos or insert_pos-1
@@ -567,7 +567,7 @@ def UnifyLevels(
     # Merge kept addons with base and sort
     joined = np.concatenate([baseLevel, addonLevel[keep_mask]])
     joined.sort()
-    return joined
+    return joined  # type: ignore[no-any-return]
 
 
 def PulseConv(

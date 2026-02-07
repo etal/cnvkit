@@ -192,7 +192,7 @@ def do_genemetrics(
         chromosome, log2 ratio, and probe counts.
     """
     if is_sample_female is None:
-        is_sample_female = cnarr.guess_xx(
+        is_sample_female = cnarr.guess_xx(  # type: ignore[assignment]
             is_haploid_x_reference=is_haploid_x_reference,
             diploid_parx_genome=diploid_parx_genome,
         )
@@ -433,7 +433,7 @@ def group_by_genes(
             continue
         segmean = segment_mean(rows, skip_low)
         if segmean is None:
-            continue
+            continue  # type: ignore[unreachable]
         outrow = rows[0].copy()
         outrow["end"] = rows.end.iat[-1]
         outrow["gene"] = gene
@@ -450,7 +450,7 @@ def group_by_genes(
         if any((location_stats, spread_stats, interval_stats)):
             gene_stats = compute_gene_stats(
                 rows,
-                segmean,
+                segmean,  # type: ignore[arg-type]
                 location_stats,
                 spread_stats,
                 interval_stats,
