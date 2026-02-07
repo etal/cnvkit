@@ -33,7 +33,9 @@ if TYPE_CHECKING:
 
 
 def read_gff(
-    infile: str, tag: str = r"(Name|gene_id|gene_name|gene)", keep_type: None = None
+    infile: str,
+    tag: str = r"(Name|gene_id|gene_name|gene)",
+    keep_type: str | None = None,
 ) -> DataFrame:
     """Read a GFF3/GTF/GFF2 file into a DataFrame.
 
@@ -73,7 +75,7 @@ def read_gff(
         header=None,
         na_filter=False,
         names=colnames,
-        dtype=dict(zip(colnames, coltypes, strict=False)),
+        dtype=dict(zip(colnames, coltypes, strict=True)),
     )
     dframe = (
         dframe.assign(
@@ -83,7 +85,7 @@ def read_gff(
         .sort_values(["chromosome", "start", "end"])
         .reset_index(drop=True)
     )
-    if keep_type:
+    if keep_type:  # type: ignore[unreachable]
         ok_type = dframe["type"] == keep_type
         logging.info(
             "Keeping %d '%s' / %d total records", ok_type.sum(), keep_type, len(dframe)

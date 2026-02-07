@@ -75,7 +75,7 @@ def do_heatmap(
         axis.set_facecolor("#DDDDDD")
     else:
         # Older matplotlib.
-        axis.set_axis_bgcolor("#DDDDDD")
+        axis.set_axis_bgcolor("#DDDDDD")  # type: ignore[attr-defined]
 
     if by_bin and show_range:
         try:
@@ -107,9 +107,9 @@ def do_heatmap(
         logging.info("Showing log2 ratios on chromosome %s", r_chrom)
 
     # Group each file's probes/segments by chromosome
-    sample_data = [collections.defaultdict(list) for _c in cnarrs]
+    sample_data: list[dict] = [collections.defaultdict(list) for _c in cnarrs]
     # Calculate the size (max endpoint value) of each chromosome
-    chrom_sizes = collections.OrderedDict()
+    chrom_sizes: collections.OrderedDict = collections.OrderedDict()
     for i, cnarr in enumerate(cnarrs):
         if by_bin:
             cnarr = plots.update_binwise_positions_simple(cnarr)
@@ -132,7 +132,7 @@ def do_heatmap(
         # Lay out only the selected chromosome
         # Set x-axis the chromosomal positions (in Mb), title as the selection
         if by_bin:
-            MB = 1
+            MB: float = 1
             axis.set_xlabel("Position (bin)")
         else:
             MB = plots.MB

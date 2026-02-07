@@ -6,7 +6,7 @@ Namely: breaks, genemetrics.
 from __future__ import annotations
 import collections
 import math
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -71,9 +71,9 @@ def get_gene_intervals(
     positions, and end is the last probe's end position as an integer. (The
     endpoints are redundant since probes are adjacent.)
     """
-    ignore += params.ANTITARGET_ALIASES
+    ignore += params.ANTITARGET_ALIASES  # type: ignore[assignment]
     # Tally the start & end points for each targeted gene; group by chromosome
-    gene_probes = collections.defaultdict(lambda: collections.defaultdict(list))
+    gene_probes: dict = collections.defaultdict(lambda: collections.defaultdict(list))
     for row in all_probes:
         gname = str(row.gene)
         if gname not in ignore:
@@ -129,19 +129,19 @@ def get_breakpoints(
 
 def do_genemetrics(
     cnarr: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
+    segments: CopyNumArray | None = None,
     threshold: float = 0.2,
     min_probes: int = 3,
     skip_low: bool = False,
     is_haploid_x_reference: bool = False,
     is_sample_female: None = None,
-    diploid_parx_genome: Optional[str] = None,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    diploid_parx_genome: str | None = None,
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> pd.DataFrame:
     """Identify targeted genes with copy number gain or loss.
 
@@ -192,7 +192,7 @@ def do_genemetrics(
         chromosome, log2 ratio, and probe counts.
     """
     if is_sample_female is None:
-        is_sample_female = cnarr.guess_xx(
+        is_sample_female = cnarr.guess_xx(  # type: ignore[assignment]
             is_haploid_x_reference=is_haploid_x_reference,
             diploid_parx_genome=diploid_parx_genome,
         )
@@ -204,20 +204,33 @@ def do_genemetrics(
             is_haploid_x_reference, is_sample_female, diploid_parx_genome
         )
         rows = gene_metrics_by_segment(
-            cnarr, segments, threshold, skip_low,
-            location_stats, spread_stats, interval_stats,
-            alpha, bootstraps, smoothed
+            cnarr,
+            segments,
+            threshold,
+            skip_low,
+            location_stats,
+            spread_stats,
+            interval_stats,
+            alpha,
+            bootstraps,
+            smoothed,
         )
     else:
         rows = gene_metrics_by_gene(
-            cnarr, threshold, skip_low,
-            location_stats, spread_stats, interval_stats,
-            alpha, bootstraps, smoothed
+            cnarr,
+            threshold,
+            skip_low,
+            location_stats,
+            spread_stats,
+            interval_stats,
+            alpha,
+            bootstraps,
+            smoothed,
         )
-    rows = list(rows)
-    columns = rows[0].index if len(rows) else cnarr._required_columns
+    rows_list = list(rows)
+    columns = rows_list[0].index if len(rows_list) else cnarr._required_columns
     columns = ["gene"] + [col for col in columns if col != "gene"]
-    table = pd.DataFrame.from_records(rows).reindex(columns=columns)
+    table = pd.DataFrame.from_records(rows_list).reindex(columns=columns)
     if min_probes and len(table):
         n_probes = (
             table.segment_probes if "segment_probes" in table.columns else table.probes
@@ -230,12 +243,12 @@ def gene_metrics_by_gene(
     cnarr: CopyNumArray,
     threshold: float,
     skip_low: bool = False,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> Iterator[pd.Series]:
     """Identify genes where average bin copy ratio value exceeds `threshold`.
 
@@ -243,8 +256,14 @@ def gene_metrics_by_gene(
     otherwise all chrX/chrY genes may be reported gained/lost.
     """
     for row in group_by_genes(
-        cnarr, skip_low, location_stats, spread_stats,
-        interval_stats, alpha, bootstraps, smoothed
+        cnarr,
+        skip_low,
+        location_stats,
+        spread_stats,
+        interval_stats,
+        alpha,
+        bootstraps,
+        smoothed,
     ):
         if abs(row.log2) >= threshold and row.gene:
             yield row
@@ -255,12 +274,12 @@ def gene_metrics_by_segment(
     segments: CopyNumArray,
     threshold: float,
     skip_low: bool = False,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> Iterator[pd.Series]:
     """Identify genes where segmented copy ratio exceeds `threshold`.
 
@@ -280,8 +299,14 @@ def gene_metrics_by_segment(
     for segment, subprobes in cnarr.by_ranges(segments):
         if abs(segment.log2) >= threshold:
             for row in group_by_genes(
-                subprobes, skip_low, location_stats, spread_stats,
-                interval_stats, alpha, bootstraps, smoothed
+                subprobes,
+                skip_low,
+                location_stats,
+                spread_stats,
+                interval_stats,
+                alpha,
+                bootstraps,
+                smoothed,
             ):
                 row["log2"] = segment.log2
                 if hasattr(segment, "weight"):
@@ -297,12 +322,12 @@ def gene_metrics_by_segment(
 def compute_gene_stats(
     bins: CopyNumArray,
     gene_log2: float,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> dict:
     """Compute statistics for bins within a gene.
 
@@ -333,9 +358,10 @@ def compute_gene_stats(
         Dictionary of computed statistics.
     """
     import warnings
+
     warnings.simplefilter("ignore", RuntimeWarning)
 
-    stats_dict = {}
+    stats_dict: dict[str, float] = {}
     if not any((location_stats, spread_stats, interval_stats)):
         return stats_dict
 
@@ -387,12 +413,12 @@ def compute_gene_stats(
 def group_by_genes(
     cnarr: CopyNumArray,
     skip_low: bool,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
 ) -> Iterator[pd.Series]:
     """Group probe and coverage data by gene.
 
@@ -407,7 +433,7 @@ def group_by_genes(
             continue
         segmean = segment_mean(rows, skip_low)
         if segmean is None:
-            continue
+            continue  # type: ignore[unreachable]
         outrow = rows[0].copy()
         outrow["end"] = rows.end.iat[-1]
         outrow["gene"] = gene
@@ -423,8 +449,14 @@ def group_by_genes(
         # Compute statistics if requested
         if any((location_stats, spread_stats, interval_stats)):
             gene_stats = compute_gene_stats(
-                rows, segmean, location_stats, spread_stats,
-                interval_stats, alpha, bootstraps, smoothed
+                rows,
+                segmean,  # type: ignore[arg-type]
+                location_stats,
+                spread_stats,
+                interval_stats,
+                alpha,
+                bootstraps,
+                smoothed,
             )
             for stat_name, stat_value in gene_stats.items():
                 outrow[stat_name] = stat_value

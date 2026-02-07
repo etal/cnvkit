@@ -7,7 +7,7 @@ import gzip
 import os
 from contextlib import contextmanager, suppress
 from concurrent import futures
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -52,13 +52,12 @@ class SerialFuture:
 
 
 @contextmanager
-def pick_pool(nprocs: int) -> Iterator[Union[SerialPool, ProcessPoolExecutor]]:
+def pick_pool(nprocs: int) -> Iterator[SerialPool | ProcessPoolExecutor]:
     if nprocs == 1:
         yield SerialPool()
     else:
-        if nprocs < 1:
-            nprocs = None
-        with futures.ProcessPoolExecutor(max_workers=nprocs) as pool:
+        max_workers = nprocs if nprocs >= 1 else None
+        with futures.ProcessPoolExecutor(max_workers=max_workers) as pool:
             yield pool
 
 
@@ -77,6 +76,8 @@ def to_chunks(bed_fname: str, chunk_size: int = 5000) -> Iterator[str]:
     opener = gzip.open if bed_fname.endswith(".gz") else open
     with opener(bed_fname) as infile:
         for line in infile:
+            if isinstance(line, bytes):
+                line = line.decode()
             if line[0] == "#":
                 continue
             k += 1

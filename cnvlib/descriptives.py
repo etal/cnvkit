@@ -9,7 +9,7 @@ See:
 from __future__ import annotations
 import sys
 from functools import wraps
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy import stats
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 # Decorators to coerce input and short-circuit trivial cases
 
 
-def on_array(default: Optional[int] = None) -> Callable:
+def on_array(default: int | None = None) -> Callable:
     """Ensure `a` is a numpy array with no missing/NaN values."""
 
     def outer(f):
@@ -43,7 +43,7 @@ def on_array(default: Optional[int] = None) -> Callable:
     return outer
 
 
-def on_weighted_array(default: None = None) -> Callable:
+def on_weighted_array(default: object = None) -> Callable:
     """Ensure `a` and `w` are equal-length numpy arrays with no NaN values.
 
     For weighted descriptives -- `a` is the array of values, `w` is weights.
@@ -121,7 +121,7 @@ def biweight_location(
         if abs(result - initial) <= epsilon:
             break
         initial = result
-    return result
+    return result  # type: ignore[no-any-return]
 
 
 @on_array()
@@ -140,7 +140,7 @@ def modal_location(a: ndarray) -> float64:
     kde = stats.gaussian_kde(sarr)
     y = kde.evaluate(sarr)
     peak = sarr[y.argmax()]
-    return peak
+    return peak  # type: ignore[no-any-return]
 
 
 @on_weighted_array()
@@ -152,7 +152,7 @@ def weighted_median(a: ndarray, weights: ndarray) -> float64:
     midpoint = 0.5 * weights.sum()
     if (weights > midpoint).any():
         # Any point with the majority of total weight must be the median
-        return a[weights.argmax()]
+        return a[weights.argmax()]  # type: ignore[no-any-return]
     cumulative_weight = weights.cumsum()
     midpoint_idx = cumulative_weight.searchsorted(midpoint)
     if (
@@ -160,8 +160,8 @@ def weighted_median(a: ndarray, weights: ndarray) -> float64:
         and cumulative_weight[midpoint_idx - 1] - midpoint < sys.float_info.epsilon
     ):
         # Midpoint of 2 array values
-        return a[midpoint_idx - 1 : midpoint_idx + 1].mean()
-    return a[midpoint_idx]
+        return a[midpoint_idx - 1 : midpoint_idx + 1].mean()  # type: ignore[no-any-return]
+    return a[midpoint_idx]  # type: ignore[no-any-return]
 
 
 # Estimators of scale
@@ -170,7 +170,7 @@ def weighted_median(a: ndarray, weights: ndarray) -> float64:
 @on_array(0)
 def biweight_midvariance(
     a: ndarray,
-    initial: Optional[Union[int, float64]] = None,
+    initial: int | float64 | None = None,
     c: float = 9.0,
     epsilon: float = 1e-3,
 ) -> float64:
@@ -195,11 +195,11 @@ def biweight_midvariance(
     mask = np.abs(w) < 1
     if w[mask].sum() == 0:
         # Insufficient variation to improve on MAD
-        return mad * 1.4826
+        return mad * 1.4826  # type: ignore[no-any-return]
     n = mask.sum()
     d_ = d[mask]
     w_ = (w**2)[mask]
-    return np.sqrt(
+    return np.sqrt(  # type: ignore[no-any-return]
         (n * (d_**2 * (1 - w_) ** 4).sum()) / (((1 - w_) * (1 - 5 * w_)).sum() ** 2)
     )
 
@@ -223,7 +223,7 @@ def gapper_scale(a):
 @on_array(0)
 def interquartile_range(a: ndarray) -> float64:
     """Compute the difference between the array's first and third quartiles."""
-    return np.percentile(a, 75) - np.percentile(a, 25)
+    return np.percentile(a, 75) - np.percentile(a, 25)  # type: ignore[no-any-return]
 
 
 @on_array(0)
@@ -238,7 +238,7 @@ def median_absolute_deviation(a: ndarray, scale_to_sd: bool = True) -> float64:
     mad = np.median(np.abs(a - a_median))
     if scale_to_sd:
         mad *= 1.4826
-    return mad
+    return mad  # type: ignore[no-any-return]
 
 
 @on_weighted_array()
@@ -256,7 +256,7 @@ def weighted_std(a: ndarray, weights: ndarray) -> float64:
     """Standard deviation with weights."""
     mean = np.average(a, weights=weights)
     var = np.average((a - mean) ** 2, weights=weights)
-    return np.sqrt(var)
+    return np.sqrt(var)  # type: ignore[no-any-return]
 
 
 @on_array(0)

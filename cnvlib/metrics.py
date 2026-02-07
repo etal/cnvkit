@@ -1,7 +1,7 @@
 """Robust metrics to evaluate performance of copy number estimates."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 def do_metrics(
     cnarrs: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
+    segments: CopyNumArray | None = None,
     skip_low: bool = False,
 ) -> pd.DataFrame:
     """Compute coverage deviations and other metrics for self-evaluation.
@@ -41,22 +41,22 @@ def do_metrics(
     from .cnary import CopyNumArray as CNA
 
     if isinstance(cnarrs, CNA):
-        cnarrs = [cnarrs]
+        cnarrs = [cnarrs]  # type: ignore[assignment]
     if isinstance(segments, CNA):
-        segments = [segments]
+        segments = [segments]  # type: ignore[assignment]
     elif segments is None:
-        segments = [None]
+        segments = [None]  # type: ignore[assignment]
     else:
-        segments = list(segments)
+        segments = list(segments)  # type: ignore[unreachable]
     if skip_low:
-        cnarrs = (cna.drop_low_coverage() for cna in cnarrs)
+        cnarrs = (cna.drop_low_coverage() for cna in cnarrs)  # type: ignore[assignment]
     rows = (
         (
             cna.meta.get("filename", cna.sample_id),
             len(seg) if seg is not None else "-",
             *ests_of_scale(cna.residuals(seg).to_numpy()),
         )
-        for cna, seg in zip_repeater(cnarrs, segments)
+        for cna, seg in zip_repeater(cnarrs, segments)  # type: ignore[arg-type]
     )
     colnames = ["sample", "segments", "stdev", "mad", "iqr", "bivar"]
     return pd.DataFrame.from_records(rows, columns=colnames)

@@ -5,7 +5,7 @@ import locale
 import logging
 import tempfile
 from io import StringIO
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -27,9 +27,9 @@ SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", "hmm", "hmm-tumor", "hmm-ger
 def do_segmentation(
     cnarr: CNA,
     method: str,
-    diploid_parx_genome: Optional[str] = None,
-    threshold: Optional[float] = None,
-    variants: Optional[VariantArray] = None,
+    diploid_parx_genome: str | None = None,
+    threshold: float | None = None,
+    variants: VariantArray | None = None,
     skip_low: bool = False,
     skip_outliers: int = 10,
     min_weight: int = 0,
@@ -37,7 +37,7 @@ def do_segmentation(
     rscript_path: str = "Rscript",
     processes: int = 1,
     smooth_cbs: bool = False,
-) -> CNA:
+) -> CNA | tuple[CNA, str]:
     """Infer copy number segments from the given coverage table.
 
     Parameters
@@ -129,7 +129,7 @@ def do_segmentation(
             rscript_path,
         )
         if save_dataframe:
-            cna, rstr = cna
+            cna, rstr = cna  # type: ignore[misc]
             rstr = _to_str(rstr)
 
     else:
@@ -157,17 +157,17 @@ def do_segmentation(
             )
         if save_dataframe:
             # rets is a list of (CNA, R dataframe string) -- unpack
-            rets, r_dframe_strings = zip(*rets, strict=False)
+            rets, r_dframe_strings = zip(*rets, strict=True)  # type: ignore[assignment]
             # Strip the header line from all but the first dataframe, then combine
-            r_dframe_strings = map(_to_str, r_dframe_strings)
-            rstr = [next(r_dframe_strings)]
-            rstr.extend(r[r.index("\n") + 1 :] for r in r_dframe_strings)
+            r_dframe_iter = map(_to_str, r_dframe_strings)
+            rstr = [next(r_dframe_iter)]  # type: ignore[arg-type]
+            rstr.extend(r[r.index("\n") + 1 :] for r in r_dframe_iter)
             rstr = "".join(rstr)
         cna = cnarr.concat(rets)
 
-    cna.sort_columns()
+    cna.sort_columns()  # type: ignore[union-attr]
     if save_dataframe:
-        return cna, rstr
+        return cna, rstr  # type: ignore[return-value]
     return cna
 
 
@@ -180,7 +180,7 @@ def _to_str(s, enc=locale.getpreferredencoding()):  # noqa: B008
 
 def _ds(
     args: tuple[CNA, str, None, float, None, bool, int, int, bool, str, bool],
-) -> CNA:
+) -> CNA | tuple[CNA, str]:
     """Wrapper for parallel map"""
     return _do_segmentation(*args)
 
@@ -188,16 +188,16 @@ def _ds(
 def _do_segmentation(
     cnarr: CNA,
     method: str,
-    diploid_parx_genome: Optional[str],
-    threshold: Optional[float],
-    variants: Optional[VariantArray] = None,
+    diploid_parx_genome: str | None,
+    threshold: float | None,
+    variants: VariantArray | None = None,
     skip_low: bool = False,
     skip_outliers: int = 10,
     min_weight: int = 0,
     save_dataframe: bool = False,
     rscript_path: str = "Rscript",
     smooth_cbs: bool = False,
-) -> CNA:
+) -> CNA | tuple[CNA, str]:
     """Infer copy number segments from the given coverage table."""
     if not len(cnarr):
         return cnarr
@@ -234,7 +234,7 @@ def _do_segmentation(
 
     seg_out = ""
     if method == "haar":
-        segarr = haar.segment_haar(filtered_cn, threshold)
+        segarr = haar.segment_haar(filtered_cn, threshold)  # type: ignore[arg-type]
 
     elif method == "none":
         segarr = none.segment_none(filtered_cn)
@@ -272,7 +272,7 @@ def _do_segmentation(
                 )
         # Convert R dataframe contents (SEG) to a proper CopyNumArray
         # NB: Automatically shifts 'start' back from 1- to 0-indexed
-        segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)
+        segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)  # type: ignore[arg-type,assignment]
         if method == "flasso":
             # Merge adjacent bins with same log2 value into segments
             if "weight" in filtered_cn:
@@ -376,14 +376,14 @@ def transfer_fields(
     bins_end = cnarr.end.iat[-1]
     if not len(segments):
         # All bins in this chromosome arm were dropped: make a dummy segment
-        return make_null_segment(bins_chrom, bins_start, bins_end)
+        return make_null_segment(bins_chrom, bins_start, bins_end)  # type: ignore[return-value,no-any-return]
     # Avoid chained assignment by directly modifying the underlying DataFrame
-    segments.data.loc[segments.data.index[0], 'start'] = bins_start
-    segments.data.loc[segments.data.index[-1], 'end'] = bins_end
+    segments.data.loc[segments.data.index[0], "start"] = bins_start
+    segments.data.loc[segments.data.index[-1], "end"] = bins_end
 
     # Aggregate segment depths, weights, gene names
     # ENH refactor so that np/CNA.data access is encapsulated in skgenome
-    ignore += params.ANTITARGET_ALIASES
+    ignore += params.ANTITARGET_ALIASES  # type: ignore[assignment]
     assert bins_chrom == segments.chromosome.iat[0]
     cdata = cnarr.data.reset_index()
     if "depth" not in cdata.columns:

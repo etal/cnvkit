@@ -22,7 +22,6 @@ import csv
 import logging
 import math
 from itertools import zip_longest
-from typing import Optional, Union
 
 import pandas as pd
 from Bio.File import as_handle
@@ -182,9 +181,9 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
 
 
 def write_seg(
-    dframe: Union[tuple[pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame]],
-    sample_id: Optional[Union[tuple[str], tuple[str, str]]] = None,
-    chrom_ids: Optional[bool] = None,
+    dframe: tuple[pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame],
+    sample_id: tuple[str] | tuple[str, str] | None = None,
+    chrom_ids: bool | None = None,
 ) -> pd.DataFrame:
     """Format a dataframe or list of dataframes as SEG.
 
@@ -201,16 +200,16 @@ def write_seg(
         dframes = iter(dframe)
         sids = iter(sample_id)
         first = next(dframes)
-        first_sid = next(sids)
+        first_sid = next(sids)  # type: ignore[assignment]
 
     if chrom_ids in (None, True):
-        chrom_ids = create_chrom_ids(first)
-    results = [format_seg(first, first_sid, chrom_ids)]
+        chrom_ids = create_chrom_ids(first)  # type: ignore[assignment]
+    results = [format_seg(first, first_sid, chrom_ids)]  # type: ignore[arg-type]
     if dframes is not None:
         # Unpack matching lists of data and sample IDs
         results.extend(
-            format_seg(subframe, sid, chrom_ids)
-            for subframe, sid in zip_longest(dframes, sids)
+            format_seg(subframe, sid, chrom_ids)  # type: ignore[arg-type]
+            for subframe, sid in zip_longest(dframes, sids)  # type: ignore[arg-type]
         )
     return pd.concat(results)
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 from skgenome import tabio
 
@@ -16,10 +16,10 @@ if TYPE_CHECKING:
 
 def do_target(
     bait_arr: GenomicArray,
-    annotate: Optional[str] = None,
+    annotate: str | None = None,
     do_short_names: bool = False,
     do_split: bool = False,
-    avg_size: Union[int, float] = 200 / 0.75,
+    avg_size: int | float = 200 / 0.75,
 ) -> GenomicArray:
     """Transform bait intervals into targets more suitable for CNVkit.
 
@@ -58,7 +58,7 @@ def do_target(
     if do_short_names:
         logging.info("Shortening target interval labels")
         tgt_arr["gene"] = list(shorten_labels(tgt_arr["gene"]))
-    return tgt_arr
+    return tgt_arr  # type: ignore[no-any-return]
 
 
 def shorten_labels(gene_labels: Series) -> Iterator[str]:
@@ -85,7 +85,7 @@ def shorten_labels(gene_labels: Series) -> Iterator[str]:
         ...
     """
     longest_name_len = 0
-    curr_names = set()
+    curr_names: set[str] = set()
     curr_gene_count = 0
 
     for label in gene_labels:

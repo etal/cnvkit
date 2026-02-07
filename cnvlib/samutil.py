@@ -6,26 +6,34 @@ import os
 from io import StringIO
 from itertools import islice
 from pathlib import PurePath
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
-import pysam
+
+from skgenome._pysam import PYSAM_INSTALL_MSG
 
 if TYPE_CHECKING:
+    import pysam
     from numpy import float64, int64
 
 
 def idxstats(
-    bam_fname: str, drop_unmapped: bool = False, fasta: Optional[str] = None
+    bam_fname: str, drop_unmapped: bool = False, fasta: str | None = None
 ) -> pd.DataFrame:
     """Get chromosome names, lengths, and number of mapped/unmapped reads.
 
     Use the BAM index (.bai) to get the number of reads and size of each
     chromosome. Contigs with no mapped reads are skipped.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for reading BAM index stats. {PYSAM_INSTALL_MSG}"
+        ) from None
     handle = StringIO(
-        pysam.idxstats(bam_fname, split_lines=False, reference_filename=fasta)
+        pysam.idxstats(bam_fname, split_lines=False, reference_filename=fasta)  # type: ignore[arg-type,attr-defined]
     )
     table = pd.read_csv(
         handle,
@@ -38,13 +46,13 @@ def idxstats(
     return table
 
 
-def bam_total_reads(bam_fname: str, fasta: Optional[str] = None) -> int64:
+def bam_total_reads(bam_fname: str, fasta: str | None = None) -> int64:
     """Count the total number of mapped reads in a BAM file.
 
     Uses the BAM index to do this quickly.
     """
     table = idxstats(bam_fname, drop_unmapped=True, fasta=fasta)
-    return table.mapped.sum()
+    return table.mapped.sum()  # type: ignore[no-any-return]
 
 
 def ensure_bam_index(bam_fname: str) -> str:
@@ -55,6 +63,12 @@ def ensure_bam_index(bam_fname: str) -> str:
     - MySample.bam.bai
     - MySample.bai
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for BAM/CRAM indexing. {PYSAM_INSTALL_MSG}"
+        ) from None
     if PurePath(bam_fname).suffix == ".cram":
         if os.path.isfile(bam_fname + ".crai"):
             # MySample.cram.crai
@@ -64,7 +78,7 @@ def ensure_bam_index(bam_fname: str) -> str:
             bai_fname = bam_fname[:-1] + "i"
         if not is_newer_than(bai_fname, bam_fname):
             logging.info("Indexing CRAM file %s", bam_fname)
-            pysam.index(bam_fname)
+            pysam.index(bam_fname)  # type: ignore[attr-defined]
             bai_fname = bam_fname + ".crai"
         assert os.path.isfile(bai_fname), "Failed to generate cram index " + bai_fname
     else:
@@ -76,14 +90,14 @@ def ensure_bam_index(bam_fname: str) -> str:
             bai_fname = bam_fname[:-1] + "i"
         if not is_newer_than(bai_fname, bam_fname):
             logging.info("Indexing BAM file %s", bam_fname)
-            pysam.index(bam_fname)
+            pysam.index(bam_fname)  # type: ignore[attr-defined]
             bai_fname = bam_fname + ".bai"
         assert os.path.isfile(bai_fname), "Failed to generate bam index " + bai_fname
     return bai_fname
 
 
 def ensure_bam_sorted(
-    bam_fname: str, by_name: bool = False, span: int = 50, fasta: Optional[str] = None
+    bam_fname: str, by_name: bool = False, span: int = 50, fasta: str | None = None
 ) -> bool:
     """Test if the reads in a BAM file are sorted as expected.
 
@@ -93,6 +107,12 @@ def ensure_bam_sorted(
     by_name=False: reads are sorted by position. Consecutive reads have
     increasing position.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for checking BAM sort order. {PYSAM_INSTALL_MSG}"
+        ) from None
     if by_name:
         # Compare read IDs
         def out_of_order(read, prev) -> bool:
@@ -121,7 +141,9 @@ def is_newer_than(target_fname: str, orig_fname: str) -> bool:
     return os.stat(target_fname).st_mtime >= os.stat(orig_fname).st_mtime
 
 
-def get_read_length(bam: str, span: int = 1000, fasta: Optional[str] = None) -> float64:
+def get_read_length(
+    bam: str | Any, span: int = 1000, fasta: str | None = None
+) -> float64:
     """Get (median) read length from first few reads in a BAM file.
 
     Illumina reads all have the same length; other sequencers might not.
@@ -133,6 +155,12 @@ def get_read_length(bam: str, span: int = 1000, fasta: Optional[str] = None) -> 
     n : int
         Number of reads used to calculate median read length.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for reading BAM files. {PYSAM_INSTALL_MSG}"
+        ) from None
     was_open = False
     if isinstance(bam, str):
         bam = pysam.AlignmentFile(bam, "rb", reference_filename=fasta)
@@ -143,4 +171,4 @@ def get_read_length(bam: str, span: int = 1000, fasta: Optional[str] = None) -> 
         bam.seek(0)
     else:
         bam.close()
-    return np.median(lengths)
+    return np.median(lengths)  # type: ignore[no-any-return]

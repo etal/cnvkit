@@ -43,6 +43,7 @@ def before(char):
     >>> get_base("simple")
     'simple'
     """
+
     def selector(string):
         return string.split(char, 1)[0]
 
@@ -208,8 +209,8 @@ def tsl2int(tsl):
     if tsl in (np.nan, "", "tslNA"):
         return 0
     # Remove "tsl" prefix
-    assert tsl[:3] == "tsl"
-    value = tsl[3:]
+    assert tsl.startswith("tsl")
+    value = tsl.removeprefix("tsl")
     # Remove possible suffix " (assigned to previous version _)"
     if len(value) > 2:
         value = value[:2].rstrip()
@@ -337,7 +338,9 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
             f"Sample data has {len(sample_counts)} genes, "
             f"gene resource has {len(gene_info)} genes. "
             "Check that gene IDs match between your input files and gene resource. "
-            "Sample gene IDs (first 5): " + ", ".join(sample_counts.index[:5].tolist()) + "; "
+            "Sample gene IDs (first 5): "
+            + ", ".join(sample_counts.index[:5].tolist())
+            + "; "
             "Gene resource IDs (first 5): " + ", ".join(gene_info.index[:5].tolist())
         )
 
@@ -496,7 +499,7 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len
     gene_minima = gene_minima.fillna(NULL_LOG2_COVERAGE)
     assert not gene_minima.hasnans, gene_minima.head()
     for (sample_id, sample_col), (_sid_log2, sample_log2) in zip(
-        sample_counts.items(), sample_data_log2.items(), strict=False
+        sample_counts.items(), sample_data_log2.items(), strict=True
     ):
         tx_len = cnr_info.tx_length
         sample_depth = (read_len * sample_col / tx_len).rename("depth")

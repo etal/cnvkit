@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import collections
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -49,9 +49,9 @@ except ImportError as e:
 def segment_hmm(
     cnarr: CNA,
     method: str,
-    diploid_parx_genome: Optional[str],
-    window: Optional[Any] = None,
-    variants: Optional[VariantArray] = None,
+    diploid_parx_genome: str | None,
+    window: Any | None = None,
+    variants: VariantArray | None = None,
     processes: int = 1,
 ) -> CNA:
     """Segment bins using Hidden Markov Model (HMM) with Viterbi algorithm.
@@ -241,7 +241,7 @@ def segment_hmm(
 
 
 def hmm_get_model(
-    cnarr: CNA, method: str, diploid_parx_genome: Optional[str], processes: int
+    cnarr: CNA, method: str, diploid_parx_genome: str | None, processes: int
 ) -> pomegranate.hmm.dense_hmm.DenseHMM:
     """
 
@@ -342,7 +342,7 @@ def hmm_get_model(
     return model
 
 
-def as_observation_matrix(cnarr: CNA, variants: Optional[Any] = None) -> list[ndarray]:
+def as_observation_matrix(cnarr: CNA, variants: Any | None = None) -> list[ndarray]:
     """Extract HMM fitting values from `cnarr`.
 
     For each chromosome arm, extract log2 ratios as a numpy array.

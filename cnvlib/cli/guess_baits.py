@@ -16,6 +16,7 @@ Still, this script does not guarantee correctly detecting all targets.
 
 See also: https://github.com/brentp/goleft
 """
+
 import argparse
 import collections
 import logging
@@ -33,49 +34,94 @@ from skgenome import tabio, GenomicArray as GA
 
 def argument_parsing():
     AP = argparse.ArgumentParser(description=__doc__)
-    AP.add_argument('sample_bams', nargs='+',
-                    help="""Sample BAM file(s) to test for target coverage.""")
-    AP.add_argument('-o', '--output', metavar='FILENAME',
-                    help="""The inferred targets, in BED format.""")
-    AP.add_argument('-c', '--coverage', metavar='FILENAME',
-                    help="""Filename to output average coverage depths in .cnn
-                    format.""")
-    AP.add_argument('-p', '--processes', metavar='CPU',
-                    nargs='?', type=int, const=0, default=1,
-                    help="""Number of subprocesses to segment in parallel.
+    AP.add_argument(
+        "sample_bams",
+        nargs="+",
+        help="""Sample BAM file(s) to test for target coverage.""",
+    )
+    AP.add_argument(
+        "-o",
+        "--output",
+        metavar="FILENAME",
+        help="""The inferred targets, in BED format.""",
+    )
+    AP.add_argument(
+        "-c",
+        "--coverage",
+        metavar="FILENAME",
+        help="""Filename to output average coverage depths in .cnn
+                    format.""",
+    )
+    AP.add_argument(
+        "-p",
+        "--processes",
+        metavar="CPU",
+        nargs="?",
+        type=int,
+        const=0,
+        default=1,
+        help="""Number of subprocesses to segment in parallel.
                     If given without an argument, use the maximum number
-                    of available CPUs. [Default: use 1 process]""")
-    AP.add_argument('-f', '--fasta', metavar="FILENAME",
-            help="Reference genome, FASTA format (e.g. UCSC hg19.fa)")
+                    of available CPUs. [Default: use 1 process]""",
+    )
+    AP.add_argument(
+        "-f",
+        "--fasta",
+        metavar="FILENAME",
+        help="Reference genome, FASTA format (e.g. UCSC hg19.fa)",
+    )
 
     AP_x = AP.add_mutually_exclusive_group(required=True)
-    AP_x.add_argument('-t', '--targets', metavar='TARGET_BED',
-                    help="""Potentially targeted genomic regions, e.g. all known
+    AP_x.add_argument(
+        "-t",
+        "--targets",
+        metavar="TARGET_BED",
+        help="""Potentially targeted genomic regions, e.g. all known
                     exons in the reference genome, in BED format. Each of these
                     regions will be tested as a whole for enrichment. (Faster
-                    method)""")
-    AP_x.add_argument('-a', '--access', metavar='ACCESS_BED',
-                    # default="../data/access-5k-mappable.grch37.bed",
-                    help="""Sequencing-accessible genomic regions (e.g. from
+                    method)""",
+    )
+    AP_x.add_argument(
+        "-a",
+        "--access",
+        metavar="ACCESS_BED",
+        # default="../data/access-5k-mappable.grch37.bed",
+        help="""Sequencing-accessible genomic regions (e.g. from
                     'cnvkit.py access'), or known genic regions in the reference
                     genome, in BED format. All bases will be tested for
-                    enrichment. (Slower method)""")
+                    enrichment. (Slower method)""",
+    )
 
     AP_target = AP.add_argument_group("With --targets only")
-    AP_target.add_argument('-d', '--min-depth', metavar='DEPTH',
-                    type=int, default=5,
-                    help="""Minimum sequencing read depth to accept as captured.
-                    [Default: %(default)s]""")
+    AP_target.add_argument(
+        "-d",
+        "--min-depth",
+        metavar="DEPTH",
+        type=int,
+        default=5,
+        help="""Minimum sequencing read depth to accept as captured.
+                    [Default: %(default)s]""",
+    )
 
     AP_access = AP.add_argument_group("With --access only")
-    AP_access.add_argument('-g', '--min-gap', metavar='GAP_SIZE',
-                    type=int, default=25,
-                    help="""Merge regions separated by gaps smaller than this.
-                    [Default: %(default)s]""")
-    AP_access.add_argument('-l', '--min-length', metavar='TARGET_SIZE',
-                    type=int, default=50,
-                    help="""Minimum region length to accept as captured.
-                    [Default: %(default)s]""")
+    AP_access.add_argument(
+        "-g",
+        "--min-gap",
+        metavar="GAP_SIZE",
+        type=int,
+        default=25,
+        help="""Merge regions separated by gaps smaller than this.
+                    [Default: %(default)s]""",
+    )
+    AP_access.add_argument(
+        "-l",
+        "--min-length",
+        metavar="TARGET_SIZE",
+        type=int,
+        default=50,
+        help="""Minimum region length to accept as captured.
+                    [Default: %(default)s]""",
+    )
 
     return AP.parse_args()
 
@@ -83,10 +129,11 @@ def argument_parsing():
 # ___________________________________________
 # Guided method: guess from potential targets
 
+
 def filter_targets(target_bed, sample_bams, procs, fasta):
     """Check if each potential target has significant coverage."""
     try:
-        baits = tabio.read(target_bed, 'bed4')
+        baits = tabio.read(target_bed, "bed4")
     except Exception as err:
         raise RuntimeError("Targets must be in BED format; try skg_convert.py") from err
     logging.info("Loaded %d candidate regions from %s", len(baits), target_bed)
@@ -95,47 +142,46 @@ def filter_targets(target_bed, sample_bams, procs, fasta):
     for bam_fname in sample_bams:
         logging.info("Evaluating targets in %s", bam_fname)
         sample = do_coverage(target_bed, bam_fname, processes=procs, fasta=fasta)
-        assert len(sample) == len(baits), \
-                "%d != %d" % (len(sample), len(baits))
-        total_depths += sample['depth'].to_numpy()
-    baits['depth'] = total_depths / len(sample_bams)
-    logging.info("Average candidate-target depth:\n%s",
-                 baits['depth'].describe())
+        assert len(sample) == len(baits), "%d != %d" % (len(sample), len(baits))
+        total_depths += sample["depth"].to_numpy()
+    baits["depth"] = total_depths / len(sample_bams)
+    logging.info("Average candidate-target depth:\n%s", baits["depth"].describe())
     return baits
 
 
 # _________________________________________
 # Unguided method: guess from raw depths
 
-def scan_targets(access_bed, sample_bams, min_depth, min_gap, min_length,
-                 procs):
+
+def scan_targets(access_bed, sample_bams, min_depth, min_gap, min_length, procs):
     """Estimate baited regions from a genome-wide, per-base depth profile."""
     bait_chunks = []
     # ENH: context manager to call rm on bed chunks? with to_chunks as pool, ck?
-    logging.info("Scanning for enriched regions in:\n  %s",
-                 '\n  '.join(sample_bams))
+    logging.info("Scanning for enriched regions in:\n  %s", "\n  ".join(sample_bams))
     #  with futures.ProcessPoolExecutor(procs) as pool:
     with parallel.pick_pool(procs) as pool:
-        args_iter = ((bed_chunk, sample_bams,
-                    min_depth, min_gap, min_length)
-                    for bed_chunk in parallel.to_chunks(access_bed))
+        args_iter = (
+            (bed_chunk, sample_bams, min_depth, min_gap, min_length)
+            for bed_chunk in parallel.to_chunks(access_bed)
+        )
         for bed_chunk_fname, bait_chunk in pool.map(_scan_depth, args_iter):
             bait_chunks.append(bait_chunk)
             parallel.rm(bed_chunk_fname)
     baits = GA(pd.concat(bait_chunks))
-    baits['depth'] /= len(sample_bams)
+    baits["depth"] /= len(sample_bams)
     return baits
 
 
 def _scan_depth(args):
     """Wrapper for parallel map"""
     bed_fname, bam_fnames, min_depth, min_gap, min_length = args
-    regions = list(drop_small(merge_gaps(scan_depth(bed_fname, bam_fnames,
-                                                    min_depth),
-                                         min_gap),
-                              min_length))
-    result = pd.DataFrame.from_records(list(regions),
-                                       columns=regions[0]._fields)
+    regions = list(
+        drop_small(
+            merge_gaps(scan_depth(bed_fname, bam_fnames, min_depth), min_gap),
+            min_length,
+        )
+    )
+    result = pd.DataFrame.from_records(list(regions), columns=regions[0]._fields)
     return bed_fname, result
 
 
@@ -147,31 +193,40 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
     tuple
         Region coordinates (0-indexed, half-open): chromosome name, start, end
     """
-    Region = collections.namedtuple('Region', 'chromosome start end depth')
+    Region = collections.namedtuple("Region", "chromosome start end depth")
 
     nsamples = len(bam_fnames)
     if nsamples == 1:
+
         def get_depth(depths):
             return int(depths[0])
     else:
         min_depth *= nsamples
+
         # NB: samtools emits additional BAMs' depths as trailing columns
         def get_depth(depths):
             return sum(map(int, depths))
 
-    proc = subprocess.Popen(['samtools', 'depth',
-                             '-Q',  '1',  # Skip pseudogenes
-                             '-b', bed_fname,
-                             *bam_fnames],
-                            stdout=subprocess.PIPE,
-                            shell=False)
+    proc = subprocess.Popen(
+        [
+            "samtools",
+            "depth",
+            "-Q",
+            "1",  # Skip pseudogenes
+            "-b",
+            bed_fname,
+            *bam_fnames,
+        ],
+        stdout=subprocess.PIPE,
+        shell=False,
+    )
 
     # Detect runs of >= min_depth; emit their coordinates
     chrom = start = depths = None
-    for line in proc.stdout:
-        fields = line.split('\t')
+    for line in proc.stdout:  # type: ignore[union-attr]
+        fields = line.split(b"\t")
         depth = get_depth(fields[2:])
-        is_enriched = (depth >= min_depth)
+        is_enriched = depth >= min_depth
         if start is None:
             if is_enriched:
                 # Entering a new captured region
@@ -183,7 +238,7 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
                 continue
         elif is_enriched and fields[0] == chrom:
             # Still in a captured region -- extend it
-            depths.append(depth)
+            depths.append(depth)  # type: ignore[union-attr]
         else:
             # Exiting a captured region
             # Update target region boundaries
@@ -192,10 +247,12 @@ def scan_depth(bed_fname, bam_fnames, min_depth):
             ok_dp_idx = np.nonzero(darr >= half_depth)[0]
             start_idx = ok_dp_idx[0]
             end_idx = ok_dp_idx[-1] + 1
-            yield Region(chrom,
-                            start + start_idx,
-                            start + end_idx,
-                            darr[start_idx:end_idx].mean())
+            yield Region(
+                chrom,
+                start + start_idx,
+                start + end_idx,
+                darr[start_idx:end_idx].mean(),
+            )
             chrom = start = depths = None
 
 
@@ -216,23 +273,27 @@ def merge_gaps(regions, min_gap):
 
 def drop_small(regions, min_length):
     """Merge small gaps and filter by minimum length."""
-    return (reg for reg in regions
-            if reg.end - reg.start >= min_length)
+    return (reg for reg in regions if reg.end - reg.start >= min_length)
 
 
 # ___________________________________________
 # Shared
 
+
 def normalize_depth_log2_filter(baits, min_depth, enrich_ratio=0.1):
     """Calculate normalized depth, add log2 column, filter by enrich_ratio."""
     # Normalize depths to a neutral value of 1.0
-    dp_mode = modal_location(baits.data.loc[baits['depth'] > min_depth,
-                                            'depth'].values)
-    norm_depth = baits['depth'] / dp_mode
+    dp_mode = modal_location(baits.data.loc[baits["depth"] > min_depth, "depth"].values)
+    norm_depth = baits["depth"] / dp_mode
     # Drop low-coverage targets
-    keep_idx = (norm_depth >= enrich_ratio)
-    logging.info("Keeping %d/%d bins with coverage depth >= %f, modal depth %f",
-                 keep_idx.sum(), len(keep_idx), dp_mode * enrich_ratio, dp_mode)
+    keep_idx = norm_depth >= enrich_ratio
+    logging.info(
+        "Keeping %d/%d bins with coverage depth >= %f, modal depth %f",
+        keep_idx.sum(),
+        len(keep_idx),
+        dp_mode * enrich_ratio,
+        dp_mode,
+    )
     return baits[keep_idx]
 
 
@@ -242,16 +303,23 @@ def guess_baits(args) -> None:
         args.processes = None
 
     if args.targets:
-        baits = filter_targets(args.targets, args.sample_bams, args.processes, args.fasta)
+        baits = filter_targets(
+            args.targets, args.sample_bams, args.processes, args.fasta
+        )
     else:
-        baits = scan_targets(args.access, args.sample_bams,
-                             0.5 * args.min_depth,  # More sensitive 1st pass
-                             args.min_gap, args.min_length, args.processes)
+        baits = scan_targets(
+            args.access,
+            args.sample_bams,
+            0.5 * args.min_depth,  # More sensitive 1st pass
+            args.min_gap,
+            args.min_length,
+            args.processes,
+        )
     baits = normalize_depth_log2_filter(baits, args.min_depth)
-    tabio.write(baits, args.output or sys.stdout, 'bed')
+    tabio.write(baits, args.output or sys.stdout, "bed")  # type: ignore[arg-type]
     if args.coverage:
-        baits['log2'] = np.log2(baits['depth'] / baits['depth'].median())
-        tabio.write(baits, args.coverage, 'tab')
+        baits["log2"] = np.log2(baits["depth"] / baits["depth"].median())
+        tabio.write(baits, args.coverage, "tab")
 
 
 def main() -> None:
@@ -260,5 +328,5 @@ def main() -> None:
     guess_baits(arguments)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

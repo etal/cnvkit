@@ -1,19 +1,16 @@
 """Combiner functions for Python list-like input."""
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from collections.abc import Callable
 from collections.abc import Iterable, Sequence
 
 import pandas as pd
 
-if TYPE_CHECKING:
-    from pandas.core.frame import DataFrame
-
 
 def get_combiners(
     table: pd.DataFrame,
     stranded: bool = False,
-    combine: Optional[dict[str, Callable]] = None,
+    combine: dict[str, Callable] | None = None,
 ) -> dict[str, Callable]:
     """Get a `combine` lookup suitable for `table`.
 
@@ -40,10 +37,10 @@ def get_combiners(
         "probes": sum,
     }
     if combine:
-        cmb.update(combine)
+        cmb |= combine
     if "strand" not in cmb:
         cmb["strand"] = first_of if stranded else merge_strands
-    return {k: v for k, v in cmb.items() if k in table.columns}  # type: ignore
+    return {k: v for k, v in cmb.items() if k in table.columns}  # type: ignore[misc]
 
 
 def first_of(elems: Sequence) -> Any:
@@ -70,7 +67,7 @@ def merge_strands(elems: Sequence) -> str:
     strands = set(elems)
     if len(strands) > 1:
         return "."
-    return elems[0]
+    return str(elems[0])
 
 
 def make_const(val: Any) -> Callable:

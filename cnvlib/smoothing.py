@@ -3,7 +3,7 @@
 from __future__ import annotations
 import logging
 import math
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -16,15 +16,15 @@ if TYPE_CHECKING:
 
 
 def check_inputs(
-    x: Union[pd.Series, ndarray],
-    width: Union[int, float],
+    x: pd.Series | ndarray,
+    width: int | float,
     as_series: bool = True,
-    weights: Optional[ndarray] = None,
-) -> Union[
-    tuple[ndarray, int, pd.Series],
-    tuple[ndarray, int, ndarray, ndarray],
-    tuple[ndarray, int, ndarray],
-]:
+    weights: ndarray | None = None,
+) -> (
+    tuple[ndarray, int, pd.Series]
+    | tuple[ndarray, int, ndarray, ndarray]
+    | tuple[ndarray, int, ndarray]
+):
     """Transform width into a half-window size.
 
     `width` is either a fraction of the length of `x` or an integer size of the
@@ -48,7 +48,7 @@ def check_inputs(
     return x, wing, signal, weights
 
 
-def _width2wing(width: Union[int, float], x: ndarray, min_wing: int = 3) -> int:
+def _width2wing(width: int | float, x: ndarray, min_wing: int = 3) -> int:
     """Convert a fractional or absolute width to integer half-width ("wing")."""
     if 0 < width < 1:
         wing = math.ceil(len(x) * width * 0.5)
@@ -74,8 +74,8 @@ def _pad_array(x: ndarray, wing: int) -> ndarray:
 
 def rolling_median(x: pd.Series, width: float) -> ndarray:
     """Rolling median with mirrored edges."""
-    x, wing, signal = check_inputs(x, width)
-    rolled = signal.rolling(2 * wing + 1, 1, center=True).median()
+    x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
+    rolled = signal.rolling(2 * wing + 1, 1, center=True).median()  # type: ignore[union-attr]
     # if rolled.hasnans:
     #     rolled = rolled.interpolate()
     return np.asarray(rolled[wing:-wing], dtype=float)
@@ -83,15 +83,15 @@ def rolling_median(x: pd.Series, width: float) -> ndarray:
 
 def rolling_quantile(x: pd.Series, width: int, quantile: float) -> ndarray:
     """Rolling quantile (0--1) with mirrored edges."""
-    x, wing, signal = check_inputs(x, width)
-    rolled = signal.rolling(2 * wing + 1, 2, center=True).quantile(quantile)
+    x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
+    rolled = signal.rolling(2 * wing + 1, 2, center=True).quantile(quantile)  # type: ignore[union-attr]
     return np.asarray(rolled[wing:-wing], dtype=float)
 
 
 def rolling_std(x, width):
     """Rolling quantile (0--1) with mirrored edges."""
-    x, wing, signal = check_inputs(x, width)
-    rolled = signal.rolling(2 * wing + 1, 2, center=True).std()
+    x, wing, signal = check_inputs(x, width)  # type: ignore[misc]
+    rolled = signal.rolling(2 * wing + 1, 2, center=True).std()  # type: ignore[union-attr]
     return np.asarray(rolled[wing:-wing], dtype=float)
 
 
@@ -131,7 +131,7 @@ def convolve_unweighted(window, signal, wing, n_iter=1):
     return y
 
 
-def guess_window_size(x: pd.Series, weights: Optional[pd.Series] = None) -> int:
+def guess_window_size(x: pd.Series, weights: pd.Series | None = None) -> int:
     """Choose a reasonable window size given the signal.
 
     Inspired by Silverman's rule: bandwidth is proportional to signal's standard
@@ -144,7 +144,7 @@ def guess_window_size(x: pd.Series, weights: Optional[pd.Series] = None) -> int:
     width = 4 * sd * len(x) ** (4 / 5)
     width = max(3, round(width))
     width = min(len(x), width)
-    return width
+    return int(width)
 
 
 def kaiser(x, width=None, weights=None, do_fit_edges=False):
@@ -179,9 +179,9 @@ def kaiser(x, width=None, weights=None, do_fit_edges=False):
 
 
 def savgol(
-    x: Union[pd.Series, ndarray],
-    total_width: Optional[int] = None,
-    weights: Optional[ndarray] = None,
+    x: pd.Series | ndarray,
+    total_width: int | None = None,
+    weights: ndarray | None = None,
     window_width: int = 7,
     order: int = 3,
     n_iter: int = 1,
@@ -201,9 +201,9 @@ def savgol(
 
     # Pad the signal.
     if weights is None:
-        x, total_wing, signal = check_inputs(x, total_width, False)
+        x, total_wing, signal = check_inputs(x, total_width, False)  # type: ignore[misc]
     else:
-        x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)
+        x, total_wing, signal, weights = check_inputs(x, total_width, False, weights)  # type: ignore[misc]
 
     # If the signal is short, the effective window length originally requested may not
     # be possible. Because of this, we recalculate it given the actual wing length
@@ -266,7 +266,9 @@ def _fit_edges(x, y, wing, polyorder=3) -> None:
     # TODO - fix the discontinuities at wing, n-wing
 
 
-def _fit_edge(x, y, window_start, window_stop, interp_start, interp_stop, polyorder) -> None:
+def _fit_edge(
+    x, y, window_start, window_stop, interp_start, interp_stop, polyorder
+) -> None:
     """
     Given a 1-D array `x` and the specification of a slice of `x` from
     `window_start` to `window_stop`, create an interpolating polynomial of the
@@ -356,7 +358,7 @@ def rolling_outlier_iqr(x, width, c=3.0):
 
 def rolling_outlier_quantile(
     x: pd.Series, width: int, q: float, m: int
-) -> Union[pd.Series, ndarray]:
+) -> pd.Series | ndarray:
     """Detect outliers by multiples of a quantile in a window.
 
     Outliers are the array elements outside `m` times the `q`'th

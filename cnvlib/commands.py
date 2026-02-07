@@ -11,7 +11,7 @@ import multiprocessing
 import os
 import sys
 import warnings
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 # Filter spurious Cython warnings re: numpy
 # https://github.com/numpy/numpy/pull/432
@@ -78,7 +78,7 @@ if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
 
 
-__all__ = []  # type: list[str]
+__all__: list[str] = []
 
 
 def public(fn: Callable) -> Callable:
@@ -97,11 +97,100 @@ AP_subparsers = AP.add_subparsers(help="Sub-commands (use with -h for more info)
 
 # _____________________________________________________________________________
 # Shared parameters
-def add_diploid_parx_genome(P: argparse.ArgumentParser) -> None:
+def add_diploid_parx_genome(P: argparse._ActionsContainer) -> None:
     P.add_argument(
         "--diploid-parx-genome",
         type=str,
         help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
+    )
+
+
+def add_haploid_x_reference(P: argparse._ActionsContainer) -> None:
+    P.add_argument(
+        "-y",
+        "--male-reference",
+        "--haploid-x-reference",
+        action="store_true",
+        help="""Assume inputs were normalized to a male reference (i.e. female samples
+                will have +1 log-CNR of chrX; otherwise male samples would have -1
+                chrX).""",
+    )
+
+
+def add_sample_sex(P: argparse._ActionsContainer) -> None:
+    P.add_argument(
+        "-x",
+        "--sample-sex",
+        "-g",
+        "--gender",
+        dest="sample_sex",
+        choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
+        help="""Specify the sample's chromosomal sex as male or female. (Otherwise
+                guessed from X and Y coverage).""",
+    )
+
+
+def add_fasta(P: argparse._ActionsContainer) -> None:
+    P.add_argument(
+        "-f",
+        "--fasta",
+        metavar="FILENAME",
+        help="Reference genome, FASTA format (e.g. UCSC hg19.fa)",
+    )
+
+
+def add_processes(P: argparse._ActionsContainer) -> None:
+    P.add_argument(
+        "-p",
+        "--processes",
+        nargs="?",
+        type=int,
+        const=0,
+        default=1,
+        help="""Number of subprocesses to use in parallel. Without an argument, use the
+                maximum number of available CPUs. [Default: use 1 process]""",
+    )
+
+
+def add_min_mapq(P: argparse._ActionsContainer) -> None:
+    P.add_argument(
+        "-q",
+        "--min-mapq",
+        type=int,
+        default=0,
+        help="""Minimum mapping quality score (phred scale 0-60) to count a read for
+                coverage depth. [Default: %(default)s]""",
+    )
+
+
+def add_snp_vcf_args(
+    P: argparse._ActionsContainer, *, short_min_depth: bool = False
+) -> None:
+    """Add --normal-id, --min-variant-depth, and --zygosity-freq arguments."""
+    P.add_argument(
+        "-n",
+        "--normal-id",
+        help="Corresponding normal sample ID in the input VCF.",
+    )
+    min_depth_flags = (
+        ["-m", "--min-variant-depth"] if short_min_depth else ["--min-variant-depth"]
+    )
+    P.add_argument(
+        *min_depth_flags,
+        type=int,
+        default=20,
+        help="""Minimum read depth for a SNV to be used in the b-allele frequency
+                calculation. [Default: %(default)s]""",
+    )
+    P.add_argument(
+        "-z",
+        "--zygosity-freq",
+        metavar="ALT_FREQ",
+        nargs="?",
+        type=float,
+        const=0.25,
+        help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
+                frequencies. [Default if used without a number: %(const)s]""",
     )
 
 
@@ -153,7 +242,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
         sys.exit(bad_args_msg + "\n(See: cnvkit.py batch -h)")
 
     # Ensure sample IDs are unique to avoid overwriting outputs
-    seen_sids = {}
+    seen_sids: dict[str, str] = {}
     for fname in (args.sample_fnames or []) + (args.normal or []):
         sid = core.fbase(fname)
         if sid in seen_sids:
@@ -278,14 +367,7 @@ P_batch.add_argument(
     default="cbs",
     help="""Method used in the 'segment' step. [Default: %(default)s]""",
 )
-P_batch.add_argument(
-    "-y",
-    "--male-reference",
-    "--haploid-x-reference",
-    action="store_true",
-    help="""Use or assume a male reference (i.e. female samples will have +1 log-CNR of
-            chrX; otherwise male samples would have -1 chrX).""",
-)
+add_haploid_x_reference(P_batch)
 P_batch.add_argument(
     "-c",
     "--count-reads",
@@ -299,25 +381,8 @@ P_batch.add_argument(
     help="""Drop very-low-coverage bins before segmentation to avoid false-positive
             deletions in poor-quality tumor samples.""",
 )
-P_batch.add_argument(
-    "-p",
-    "--processes",
-    nargs="?",
-    type=int,
-    const=0,
-    default=1,
-    help="""Number of subprocesses used to running each of the BAM files in parallel.
-            Without an argument, use the maximum number of available CPUs. [Default:
-            process each BAM in serial]""",
-)
-P_batch.add_argument(
-    "-q",
-    "--min-mapq",
-    type=int,
-    default=0,
-    help="""Minimum mapping quality score (phred scale 0-60) to count a read for
-            coverage depth. [Default: %(default)s]""",
-)
+add_processes(P_batch)
+add_min_mapq(P_batch)
 P_batch.add_argument(
     "--rscript-path",
     metavar="PATH",
@@ -340,12 +405,7 @@ P_batch_newref.add_argument(
             reference will be built. Otherwise, all filenames following this option will
             be used.""",
 )
-P_batch_newref.add_argument(
-    "-f",
-    "--fasta",
-    metavar="FILENAME",
-    help="Reference genome, FASTA format (e.g. UCSC hg19.fa)",
-)
+add_fasta(P_batch_newref)
 P_batch_newref.add_argument(
     "-t", "--targets", metavar="FILENAME", help="Target intervals (.bed or .list)"
 )
@@ -622,7 +682,7 @@ def _cmd_autobin(args: argparse.Namespace) -> None:
         args.annotate,
         args.short_names,
         do_split=True,
-        avg_size=tgt_bin_size,
+        avg_size=tgt_bin_size,  # type: ignore[arg-type]
     )
     tgt_name_base = tgt_arr.sample_id if tgt_arr else core.fbase(bam_fname)
     target_bed = args.target_output_bed or tgt_name_base + ".target.bed"
@@ -645,7 +705,7 @@ def _cmd_autobin(args: argparse.Namespace) -> None:
     labels = ("Target", "Antitarget")
     width = max(map(len, labels)) + 1
     print(" " * width, "Depth", "Bin size", sep="\t")
-    for label, (depth, binsize) in zip(labels, fields, strict=False):
+    for label, (depth, binsize) in zip(labels, fields, strict=True):
         if depth is not None:
             print((label + ":").ljust(width), format(depth, ".3f"), binsize, sep="\t")
 
@@ -656,12 +716,7 @@ P_autobin.add_argument(
     nargs="+",
     help="""Sample BAM file(s) or bedGraph file(s) (.bed.gz) to test for target coverage""",
 )
-P_autobin.add_argument(
-    "-f",
-    "--fasta",
-    metavar="FILENAME",
-    help="Reference genome, FASTA format (e.g. UCSC hg19.fa)",
-)
+add_fasta(P_autobin)
 P_autobin.add_argument(
     "-m",
     "--method",
@@ -785,12 +840,7 @@ P_coverage.add_argument(
             (bedGraph .bed.gz with tabix index .tbi or .csi)""",
 )
 P_coverage.add_argument("interval", help="Intervals (.bed or .list)")
-P_coverage.add_argument(
-    "-f",
-    "--fasta",
-    metavar="FILENAME",
-    help="Reference genome, FASTA format (e.g. UCSC hg19.fa)",
-)
+add_fasta(P_coverage)
 P_coverage.add_argument(
     "-c",
     "--count",
@@ -798,28 +848,11 @@ P_coverage.add_argument(
     help="""Get read depths by counting read midpoints within each bin.
             (An alternative algorithm).""",
 )
-P_coverage.add_argument(
-    "-q",
-    "--min-mapq",
-    type=int,
-    default=0,
-    help="""Minimum mapping quality score (phred scale 0-60) to count a read for
-            coverage depth. [Default: %(default)s]""",
-)
+add_min_mapq(P_coverage)
 P_coverage.add_argument(
     "-o", "--output", metavar="FILENAME", help="""Output file name."""
 )
-P_coverage.add_argument(
-    "-p",
-    "--processes",
-    nargs="?",
-    type=int,
-    const=0,
-    default=1,
-    help="""Number of subprocesses to calculate coverage in parallel.
-            Without an argument, use the maximum number of available CPUs.
-            [Default: use 1 process]""",
-)
+add_processes(P_coverage)
 P_coverage.set_defaults(func=_cmd_coverage)
 
 
@@ -841,7 +874,7 @@ def _cmd_reference(args: argparse.Namespace) -> None:
     elif args.references:
         # Pooled reference
         assert not args.targets and not args.antitargets, usage_err_msg
-        filenames = []
+        filenames: list[str] = []
         for path in args.references:
             if os.path.isdir(path):
                 filenames.extend(
@@ -891,9 +924,7 @@ P_reference.add_argument(
     help="""Normal-sample target or antitarget .cnn files, or the directory that
             contains them.""",
 )
-P_reference.add_argument(
-    "-f", "--fasta", help="Reference genome, FASTA format (e.g. UCSC hg19.fa)"
-)
+add_fasta(P_reference)
 P_reference.add_argument("-o", "--output", metavar="FILENAME", help="Output file name.")
 P_reference.add_argument(
     "-c",
@@ -909,16 +940,7 @@ P_reference.add_argument(
     default=4,
     help="""Minimum cluster size to keep in reference profiles. [Default: %(default)s]""",
 )
-P_reference.add_argument(
-    "-x",
-    "--sample-sex",
-    "-g",
-    "--gender",
-    dest="sample_sex",
-    choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
-    help="""Specify the chromosomal sex of all given samples as male or female.
-            (Default: guess each sample from coverage of X and Y chromosomes).""",
-)
+add_sample_sex(P_reference)
 P_reference.add_argument(
     "-y",
     "--male-reference",
@@ -1142,16 +1164,7 @@ P_segment.add_argument(
     help="""Path to the Rscript executable to use for running R code. Use this option
             to specify a non-default R installation. [Default: %(default)s]""",
 )
-P_segment.add_argument(
-    "-p",
-    "--processes",
-    nargs="?",
-    type=int,
-    const=0,
-    default=1,
-    help="""Number of subprocesses to segment in parallel. Give 0 or a negative value to
-            use the maximum number of available CPUs. [Default: use 1 process]""",
-)
+add_processes(P_segment)
 P_segment.add_argument(
     "--smooth-cbs",
     action="store_true",
@@ -1176,29 +1189,7 @@ P_segment_vcf.add_argument(
     help="""Specify the name of the sample in the VCF (-v/--vcf) to use for b-allele
             frequency extraction and as the default plot title.""",
 )
-P_segment_vcf.add_argument(
-    "-n",
-    "--normal-id",
-    help="""Corresponding normal sample ID in the input VCF (-v/--vcf). This sample is
-            used to select only germline SNVs to plot b-allele frequencies.""",
-)
-P_segment_vcf.add_argument(
-    "--min-variant-depth",
-    type=int,
-    default=20,
-    help="""Minimum read depth for a SNV to be displayed in the b-allele frequency plot.
-            [Default: %(default)s]""",
-)
-P_segment_vcf.add_argument(
-    "-z",
-    "--zygosity-freq",
-    metavar="ALT_FREQ",
-    nargs="?",
-    type=float,
-    const=0.25,
-    help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
-            frequencies. [Default if used without a number: %(const)s]""",
-)
+add_snp_vcf_args(P_segment_vcf)
 
 P_segment.set_defaults(func=_cmd_segment)
 
@@ -1246,7 +1237,7 @@ def _cmd_call(args: argparse.Namespace) -> None:
         args.ploidy,
         args.purity,
         args.male_reference,
-        is_sample_female,
+        is_sample_female,  # type: ignore[arg-type]
         args.diploid_parx_genome,
         args.filters,
         args.thresholds,
@@ -1321,26 +1312,8 @@ P_call.add_argument(
     help="""Drop very-low-coverage bins before segmentation to avoid false-positive
             deletions in poor-quality tumor samples.""",
 )
-P_call.add_argument(
-    "-x",
-    "--sample-sex",
-    "-g",
-    "--gender",
-    dest="sample_sex",
-    choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
-    help="""Specify the sample's chromosomal sex as male or female. (Otherwise guessed
-            from X and Y coverage).""",
-)
-P_call.add_argument(
-    "-y",
-    "--male-reference",
-    "--haploid-x-reference",
-    action="store_true",
-    help="""Was a male reference used?  If so, expect half ploidy on chrX and chrY;
-            otherwise, only chrY has half ploidy. In CNVkit, if a male reference was
-            used, the "neutral" copy number (ploidy) of chrX is 1; chrY is haploid for
-            either reference sex.""",
-)
+add_sample_sex(P_call)
+add_haploid_x_reference(P_call)
 P_call.add_argument(
     "-o",
     "--output",
@@ -1364,29 +1337,7 @@ P_call_vcf.add_argument(
     help="""Name of the sample in the VCF (-v/--vcf) to use for b-allele
             frequency extraction.""",
 )
-P_call_vcf.add_argument(
-    "-n",
-    "--normal-id",
-    help="""Corresponding normal sample ID in the input VCF (-v/--vcf). This sample is
-            used to select only germline SNVs to calculate b-allele frequencies.""",
-)
-P_call_vcf.add_argument(
-    "--min-variant-depth",
-    type=int,
-    default=20,
-    help="""Minimum read depth for a SNV to be used in the b-allele frequency
-            calculation. [Default: %(default)s]""",
-)
-P_call_vcf.add_argument(
-    "-z",
-    "--zygosity-freq",
-    metavar="ALT_FREQ",
-    nargs="?",
-    type=float,
-    const=0.25,
-    help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
-            frequencies. [Default if used without a number: %(const)s]""",
-)
+add_snp_vcf_args(P_call_vcf)
 add_diploid_parx_genome(P_call)
 P_call.set_defaults(func=_cmd_call)
 
@@ -1412,19 +1363,20 @@ def _cmd_diagram(args: argparse.Namespace) -> None:
     cnarr = read_cna(args.filename) if args.filename else None
     segarr = read_cna(args.segment) if args.segment else None
     if args.adjust_xy:
+        assert cnarr is not None or segarr is not None
         is_sample_female = verify_sample_sex(
-            cnarr or segarr,
+            cnarr or segarr,  # type: ignore[arg-type]
             args.sample_sex,
             args.male_reference,
             args.diploid_parx_genome,
         )
         if cnarr:
-            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)
+            cnarr = cnarr.shift_xx(args.male_reference, is_sample_female)  # type: ignore[arg-type]
         if segarr:
-            segarr = segarr.shift_xx(args.male_reference, is_sample_female)
+            segarr = segarr.shift_xx(args.male_reference, is_sample_female)  # type: ignore[arg-type]
     outfname = diagram.create_diagram(
-        cnarr,
-        segarr,
+        cnarr,  # type: ignore[arg-type]
+        segarr,  # type: ignore[arg-type]
         args.threshold,
         args.min_probes,
         args.output,
@@ -1466,24 +1418,8 @@ P_diagram.add_argument(
     default=3,
     help="""Minimum number of covered probes to label a gene. [Default: %(default)d]""",
 )
-P_diagram.add_argument(
-    "-y",
-    "--male-reference",
-    "--haploid-x-reference",
-    action="store_true",
-    help="""Assume inputs were normalized to a male reference (i.e. female samples will
-            have +1 log-CNR of chrX; otherwise male samples would have -1 chrX).""",
-)
-P_diagram.add_argument(
-    "-x",
-    "--sample-sex",
-    "-g",
-    "--gender",
-    dest="sample_sex",
-    choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
-    help="""Specify the sample's chromosomal sex as male or female. (Otherwise guessed
-            from X and Y coverage).""",
-)
+add_haploid_x_reference(P_diagram)
+add_sample_sex(P_diagram)
 P_diagram.add_argument(
     "--no-shift-xy",
     dest="adjust_xy",
@@ -1545,7 +1481,11 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
                     if args.title is not None:
                         scatter_opts["title"] = f"{args.title} {region.chromosome}"
                     scatter.do_scatter(
-                        cnarr, segarr, varr, show_range=region, **scatter_opts
+                        cnarr,  # type: ignore[arg-type]
+                        segarr,
+                        varr,  # type: ignore[arg-type]
+                        show_range=region,
+                        **scatter_opts,  # type: ignore[arg-type]
                     )
                 except ValueError as exc:
                     # Probably no bins in the selected region
@@ -1556,10 +1496,15 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
         if args.title is not None:
             scatter_opts["title"] = args.title
         scatter.do_scatter(
-            cnarr, segarr, varr, args.chromosome, args.gene, **scatter_opts
+            cnarr,  # type: ignore[arg-type]
+            segarr,
+            varr,  # type: ignore[arg-type]
+            args.chromosome,
+            args.gene,
+            **scatter_opts,  # type: ignore[arg-type]
         )
         if args.output:
-            oformat = os.path.splitext(args.output)[-1].replace(".", "")
+            oformat = os.path.splitext(args.output)[-1].removeprefix(".")
             pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
             logging.info("Wrote %s", args.output)
         else:
@@ -1667,30 +1612,7 @@ P_scatter_vcf.add_argument(
     help="""Name of the sample in the VCF to use for b-allele frequency extraction and
             as the default plot title.""",
 )
-P_scatter_vcf.add_argument(
-    "-n",
-    "--normal-id",
-    help="""Corresponding normal sample ID in the input VCF. This sample is used to
-            select only germline SNVs to plot.""",
-)
-P_scatter_vcf.add_argument(
-    "-m",
-    "--min-variant-depth",
-    type=int,
-    default=20,
-    help="""Minimum read depth for a SNV to be used in the b-allele frequency
-            calculation. [Default: %(default)s]""",
-)
-P_scatter_vcf.add_argument(
-    "-z",
-    "--zygosity-freq",
-    metavar="ALT_FREQ",
-    nargs="?",
-    type=float,
-    const=0.25,
-    help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
-            frequencies. [Default if used without a number: %(const)s]""",
-)
+add_snp_vcf_args(P_scatter_vcf, short_min_depth=True)
 
 P_scatter.set_defaults(func=_cmd_scatter)
 
@@ -1710,7 +1632,9 @@ def _cmd_heatmap(args: argparse.Namespace) -> None:
                 cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
             )
             cnarr = cnarr.shift_xx(
-                args.male_reference, is_sample_female, args.diploid_parx_genome
+                args.male_reference,
+                is_sample_female,  # type: ignore[arg-type]
+                args.diploid_parx_genome,
             )
         cnarrs.append(cnarr)
     heatmap.do_heatmap(
@@ -1723,7 +1647,7 @@ def _cmd_heatmap(args: argparse.Namespace) -> None:
         args.title,
     )
     if args.output:
-        oformat = os.path.splitext(args.output)[-1].replace(".", "")
+        oformat = os.path.splitext(args.output)[-1].removeprefix(".")
         pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
         logging.info("Wrote %s", args.output)
     else:
@@ -1743,24 +1667,8 @@ P_heatmap.add_argument(
             to display. If a range is given, all targeted genes in this range will be
             shown, unless '--gene'/'-g' is already given.""",
 )
-P_heatmap.add_argument(
-    "-y",
-    "--male-reference",
-    "--haploid-x-reference",
-    action="store_true",
-    help="""Assume inputs were normalized to a male reference (i.e. female samples will
-            have +1 log-CNR of chrX; otherwise male samples would have -1 chrX).""",
-)
-P_heatmap.add_argument(
-    "-x",
-    "--sample-sex",
-    "-g",
-    "--gender",
-    dest="sample_sex",
-    choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
-    help="""Specify the chromosomal sex of all given samples as male or female.
-            [Default: guess each sample from coverage of X and Y chromosomes].""",
-)
+add_haploid_x_reference(P_heatmap)
+add_sample_sex(P_heatmap)
 P_heatmap.add_argument(
     "--no-shift-xy",
     dest="adjust_xy",
@@ -1916,25 +1824,8 @@ P_genemetrics.add_argument(
     help="""Drop very-low-coverage bins before segmentation to avoid false-positive
             deletions in poor-quality tumor samples.""",
 )
-P_genemetrics.add_argument(
-    "-y",
-    "--male-reference",
-    "--haploid-x-reference",
-    action="store_true",
-    help="""Assume inputs were normalized to a male reference (i.e. female samples will
-            have +1 log-coverage of chrX; otherwise male samples would have -1
-            chrX).""",
-)
-P_genemetrics.add_argument(
-    "-x",
-    "--sample-sex",
-    "-g",
-    "--gender",
-    dest="sample_sex",
-    choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
-    help="""Specify the sample's chromosomal sex as male or female. (Otherwise guessed
-            from X and Y coverage).""",
-)
+add_haploid_x_reference(P_genemetrics)
+add_sample_sex(P_genemetrics)
 P_genemetrics.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output table file name."
 )
@@ -2076,7 +1967,7 @@ def _cmd_sex(args: argparse.Namespace) -> None:
 def do_sex(
     cnarrs: list[CopyNumArray],
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
 ) -> pd.DataFrame:
     """Guess samples' sex from the relative coverage of chromosomes X and Y.
 
@@ -2122,14 +2013,7 @@ P_sex = AP_subparsers.add_parser("sex", help=_cmd_sex.__doc__)
 P_sex.add_argument(
     "filenames", nargs="+", help="Copy number or copy ratio files (*.cnn, *.cnr)."
 )
-P_sex.add_argument(
-    "-y",
-    "--male-reference",
-    "--haploid-x-reference",
-    action="store_true",
-    help="""Assume inputs were normalized to a male reference (i.e. female samples will
-            have +1 log-coverage of chrX; otherwise male samples would have -1 chrX).""",
-)
+add_haploid_x_reference(P_sex)
 P_sex.add_argument("-o", "--output", metavar="FILENAME", help="Output table file name.")
 add_diploid_parx_genome(P_sex)
 P_sex.set_defaults(func=_cmd_sex)
@@ -2160,7 +2044,7 @@ def _cmd_metrics(args: argparse.Namespace) -> None:
     cnarrs = map(read_cna, args.cnarrays)
     if args.segments:
         args.segments = map(read_cna, args.segments)
-    table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)
+    table = metrics.do_metrics(cnarrs, args.segments, args.drop_low_coverage)  # type: ignore[arg-type]
     write_dataframe(args.output, table)
 
 
@@ -2372,7 +2256,7 @@ def _cmd_bintest(args: argparse.Namespace) -> None:
     cnarr = read_cna(args.cnarray)
     segments = read_cna(args.segment) if args.segment else None
     sig = do_bintest(cnarr, segments, args.alpha, args.target)
-    tabio.write(sig, args.output or sys.stdout)
+    tabio.write(sig, args.output or sys.stdout)  # type: ignore[arg-type]
 
 
 P_bintest = AP_subparsers.add_parser("bintest", help=_cmd_bintest.__doc__)
@@ -2565,7 +2449,7 @@ def _cmd_import_rna(args: argparse.Namespace) -> None:
         all_data.to_csv(args.output, sep="\t", index=True)
         logging.info("Wrote %s with %d rows", args.output, len(all_data))
     else:
-        logging.info(all_data.describe(), file=sys.stderr)
+        print(all_data.describe(), file=sys.stderr)
     for cnr in cnrs:
         outfname = os.path.join(args.output_dir, cnr.sample_id + ".cnr")
         tabio.write(cnr, outfname, "tab")
@@ -2718,16 +2602,7 @@ P_export_bed.add_argument(
     default=2,
     help="Ploidy of the sample cells. [Default: %(default)d]",
 )
-P_export_bed.add_argument(
-    "-x",
-    "--sample-sex",
-    "-g",
-    "--gender",
-    dest="sample_sex",
-    choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
-    help="""Specify the sample's chromosomal sex as male or female. (Otherwise guessed
-            from X and Y coverage).""",
-)
+add_sample_sex(P_export_bed)
 P_export_bed.add_argument(
     "--show",
     choices=("ploidy", "variant", "all"),
@@ -2738,16 +2613,7 @@ P_export_bed.add_argument(
             'ploidy' = CNA regions with non-default ploidy.
             [Default: %(default)s]""",
 )
-P_export_bed.add_argument(
-    "-y",
-    "--male-reference",
-    "--haploid-x-reference",
-    action="store_true",
-    help="""Was a male reference used?  If so, expect half ploidy on chrX and chrY;
-            otherwise, only chrY has half ploidy. In CNVkit, if a male reference was
-            used, the "neutral" copy number (ploidy) of chrX is 1; chrY is haploid for
-            either reference sex.""",
-)
+add_haploid_x_reference(P_export_bed)
 P_export_bed.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output file name."
 )
@@ -2833,26 +2699,8 @@ P_export_vcf.add_argument(
     default=2,
     help="Ploidy of the sample cells. [Default: %(default)d]",
 )
-P_export_vcf.add_argument(
-    "-x",
-    "--sample-sex",
-    "-g",
-    "--gender",
-    dest="sample_sex",
-    choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
-    help="""Specify the sample's chromosomal sex as male or female.
-            (Otherwise guessed from X and Y coverage).""",
-)
-P_export_vcf.add_argument(
-    "-y",
-    "--male-reference",
-    "--haploid-x-reference",
-    action="store_true",
-    help="""Was a male reference used? If so, expect half ploidy on chrX and chrY;
-            otherwise, only chrY has half ploidy. In CNVkit, if a male reference was
-            used, the "neutral" copy number (ploidy) of chrX is 1; chrY is haploid for
-            either reference sex.""",
-)
+add_sample_sex(P_export_vcf)
+add_haploid_x_reference(P_export_vcf)
 P_export_vcf.add_argument(
     "-o", "--output", metavar="FILENAME", help="Output file name."
 )
@@ -2923,27 +2771,7 @@ P_extheta_vcf.add_argument(
     help="""Specify the name of the tumor sample in the VCF (given with -v/--vcf).
             [Default: taken the tumor_segment file name]""",
 )
-P_extheta_vcf.add_argument(
-    "-n", "--normal-id", help="Corresponding normal sample ID in the input VCF."
-)
-P_extheta_vcf.add_argument(
-    "-m",
-    "--min-variant-depth",
-    type=int,
-    default=20,
-    help="""Minimum read depth for a SNP in the VCF to be counted.
-            [Default: %(default)s]""",
-)
-P_extheta_vcf.add_argument(
-    "-z",
-    "--zygosity-freq",
-    metavar="ALT_FREQ",
-    nargs="?",
-    type=float,
-    const=0.25,
-    help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
-            frequencies. [Default if used without a number: %(const)s]""",
-)
+add_snp_vcf_args(P_extheta_vcf, short_min_depth=True)
 
 P_export_theta.set_defaults(func=_cmd_export_theta)
 
@@ -2995,27 +2823,7 @@ P_export_nbo.add_argument(
     help="""Specify the name of the sample in the VCF to use to extract b-allele
             frequencies.""",
 )
-P_export_nbo.add_argument(
-    "-n", "--normal-id", help="Corresponding normal sample ID in the input VCF."
-)
-P_export_nbo.add_argument(
-    "-m",
-    "--min-variant-depth",
-    type=int,
-    default=20,
-    help="""Minimum read depth for a SNV to be included in the b-allele frequency
-            calculation. [Default: %(default)s]""",
-)
-P_export_nbo.add_argument(
-    "-z",
-    "--zygosity-freq",
-    metavar="ALT_FREQ",
-    nargs="?",
-    type=float,
-    const=0.25,
-    help="""Ignore VCF's genotypes (GT field) and instead infer zygosity from allele
-            frequencies. [Default if used without a number: %(const)s]""",
-)
+add_snp_vcf_args(P_export_nbo, short_min_depth=True)
 P_export_nbo.add_argument(
     "-w",
     "--min-weight",
@@ -3038,7 +2846,7 @@ def _cmd_export_cdt(args: argparse.Namespace) -> None:
     sample_ids = list(map(core.fbase, args.filenames))
     table = export.merge_samples(args.filenames)
     formatter = export.EXPORT_FORMATS["cdt"]
-    outheader, outrows = formatter(sample_ids, table)
+    outheader, outrows = formatter(sample_ids, table)  # type: ignore[operator]
     write_tsv(args.output, outrows, colnames=outheader)
 
 
@@ -3060,7 +2868,7 @@ def _cmd_export_jtv(args: argparse.Namespace) -> None:
     sample_ids = list(map(core.fbase, args.filenames))
     table = export.merge_samples(args.filenames)
     formatter = export.EXPORT_FORMATS["jtv"]
-    outheader, outrows = formatter(sample_ids, table)
+    outheader, outrows = formatter(sample_ids, table)  # type: ignore[operator]
     write_tsv(args.output, outrows, colnames=outheader)
 
 
@@ -3079,7 +2887,7 @@ P_export_jtv.set_defaults(func=_cmd_export_jtv)
 
 def _cmd_export_gistic(args: argparse.Namespace) -> None:
     formatter = export.EXPORT_FORMATS["gistic"]
-    outdf = formatter(args.filenames)
+    outdf = formatter(args.filenames)  # type: ignore[operator]
     write_dataframe(args.output, outdf)
 
 

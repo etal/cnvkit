@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ def do_fix(
     target_raw: CopyNumArray,
     antitarget_raw: CopyNumArray,
     reference: CopyNumArray,
-    diploid_parx_genome: Optional[str] = None,
+    diploid_parx_genome: str | None = None,
     do_gc: bool = True,
     do_edge: bool = True,
     do_rmask: bool = True,
@@ -187,7 +187,10 @@ def do_fix(
                 [cnarr.log2.corr(ref_matched[ref_col]) for ref_col in ref_log2_cols]
             )
             ordered = [
-                (k, r) for r, k in sorted(zip(corr_coefs, ref_log2_cols, strict=False), reverse=True)
+                (k, r)
+                for r, k in sorted(
+                    zip(corr_coefs, ref_log2_cols, strict=True), reverse=True
+                )
             ]
             logging.info(
                 "Correlations with each cluster:\n\t%s",
@@ -195,7 +198,7 @@ def do_fix(
             )
             log2_key = ordered[0][0]
             if log2_key.startswith("log2_"):
-                suffix = log2_key.split("_", 1)[1]
+                suffix = log2_key.removeprefix("log2_")
                 spread_key = "spread_" + suffix
             logging.info(" -> Choosing columns %r and %r", log2_key, spread_key)
 
@@ -214,7 +217,7 @@ def load_adjust_coverages(
     fix_gc: bool,
     fix_edge: bool,
     fix_rmask: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     smoothing_window_fraction: None = None,
 ) -> tuple[CopyNumArray, CopyNumArray]:
     """Load and filter probe coverages; correct using reference and GC."""
@@ -333,7 +336,7 @@ def match_ref_to_sample(
 
 
 def center_by_window(
-    cnarr: CopyNumArray, fraction: float, sort_key: Union[Series, ndarray]
+    cnarr: CopyNumArray, fraction: float, sort_key: Series | ndarray
 ) -> CopyNumArray:
     """Smooth out biases according to the trait specified by sort_key.
 
@@ -435,7 +438,7 @@ def edge_gains(target_sizes: ndarray, gap_sizes: ndarray, insert_size: int) -> n
     if not (gap_sizes <= insert_size).all():
         raise ValueError(
             "Gaps greater than insert size:\n"
-            + gap_sizes[gap_sizes > insert_size].head()
+            + gap_sizes[gap_sizes > insert_size].head()  # type: ignore[attr-defined]
         )
     gap_sizes = np.maximum(0, gap_sizes)
     gains = (insert_size - gap_sizes) ** 2 / (4 * insert_size * target_sizes)
@@ -446,7 +449,7 @@ def edge_gains(target_sizes: ndarray, gap_sizes: ndarray, insert_size: int) -> n
     gains[past_other_side_mask] -= (insert_size - t_past - g_past) ** 2 / (
         4 * insert_size * t_past
     )
-    return gains
+    return gains  # type: ignore[no-any-return]
 
 
 def apply_weights(

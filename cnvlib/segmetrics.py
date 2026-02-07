@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 # import pandas as pd
 import numpy as np
@@ -21,12 +21,12 @@ if TYPE_CHECKING:
 def do_segmetrics(
     cnarr: CopyNumArray,
     segarr: CopyNumArray,
-    location_stats: Union[tuple[()], list[str]] = (),
-    spread_stats: Union[tuple[()], list[str]] = (),
-    interval_stats: Union[tuple[()], list[str]] = (),
+    location_stats: tuple[()] | list[str] = (),
+    spread_stats: tuple[()] | list[str] = (),
+    interval_stats: tuple[()] | list[str] = (),
     alpha: float = 0.05,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = 10,
+    smoothed: bool | int = 10,
     skip_low: bool = False,
 ) -> CopyNumArray:
     """Compute segment-level metrics from bin-level log2 ratios.
@@ -98,9 +98,11 @@ def do_segmetrics(
             )
     # Measures of spread
     if spread_stats:
-        deviations = (bl - sl for bl, sl in zip(bins_log2s, segarr["log2"], strict=False))
+        deviations = (
+            bl - sl for bl, sl in zip(bins_log2s, segarr["log2"], strict=True)
+        )
         if len(spread_stats) > 1:
-            deviations = list(deviations)
+            deviations = list(deviations)  # type: ignore[assignment]
         for statname in spread_stats:
             func = stat_funcs[statname]
             segarr[statname] = np.fromiter(
@@ -120,7 +122,7 @@ def do_segmetrics(
     return segarr
 
 
-def make_ci_func(alpha: float, bootstraps: int, smoothed: Union[bool, int]) -> Callable:
+def make_ci_func(alpha: float, bootstraps: int, smoothed: bool | int) -> Callable:
     """Create a confidence interval function.
 
     Parameters
@@ -133,6 +135,7 @@ def make_ci_func(alpha: float, bootstraps: int, smoothed: Union[bool, int]) -> C
         If bool: True to always smooth, False to never smooth.
         If int: Threshold - smooth when n_bins <= smoothed.
     """
+
     def ci_func(ser, wt):
         return confidence_interval_bootstrap(ser, wt, alpha, bootstraps, smoothed)
 
@@ -170,7 +173,7 @@ def confidence_interval_bootstrap(
     weights: ndarray,
     alpha: float,
     bootstraps: int = 100,
-    smoothed: Union[bool, int] = False,
+    smoothed: bool | int = False,
 ) -> ndarray:
     """Confidence interval for segment mean log2 value, estimated by bootstrap.
 
@@ -222,7 +225,7 @@ def confidence_interval_bootstrap(
     rand_indices = rng.integers(0, k, size=(bootstraps, k))
     samples = ((np.take(values, idx), np.take(weights, idx)) for idx in rand_indices)
     if use_smoothing:
-        samples = _smooth_samples_by_weight(values, samples)
+        samples = _smooth_samples_by_weight(values, samples)  # type: ignore[assignment]
     # Recalculate segment means
     seg_means = (np.average(val, weights=wt) for val, wt in samples)
     bootstrap_dist = np.fromiter(seg_means, np.float64, bootstraps)
@@ -270,10 +273,10 @@ def _smooth_samples_by_weight(
     # but requiring k=1 -> bw=1 for consistency
     bw = k ** (-1 / 4)
     rng = np.random.default_rng()
-    samples = [
+    samples_list = [
         (v + (bw * np.sqrt(1 - w) * rng.standard_normal(k)), w) for v, w in samples
     ]
-    return samples
+    return samples_list
 
 
 def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
@@ -293,7 +296,8 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     if proportion == 0 or proportion == 1:
         logging.warning(
             "BCa: All bootstrap samples on one side (%d/%d); using original alphas",
-            n_boots_below, n_boots
+            n_boots_below,
+            n_boots,
         )
         return alphas
 
@@ -318,14 +322,13 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
         logging.warning("BCa: Jackknife variance too small; using original alphas")
         return alphas
 
-    acc = (uu**3).sum() / (6 * uu_var ** 1.5)
+    acc = (uu**3).sum() / (6 * uu_var**1.5)
     denom = 1 - acc * (z0 + zalpha)
 
     # Check if denominator is positive
     if (denom <= 0).any():
         logging.warning(
-            "BCa: Denominator non-positive (acc=%.4f); using original alphas",
-            acc
+            "BCa: Denominator non-positive (acc=%.4f); using original alphas", acc
         )
         return alphas
 
@@ -334,24 +337,22 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     # Validate new alphas
     if not (0 < new_alphas[0] < 1 and 0 < new_alphas[1] < 1):
         logging.warning(
-            "BCa: Adjusted alphas %s out of range; using original alphas",
-            new_alphas
+            "BCa: Adjusted alphas %s out of range; using original alphas", new_alphas
         )
         return alphas
 
     logging.debug(
-        "BCa: alphas %s -> %s (z0=%.4f, acc=%.4f)",
-        alphas, new_alphas, z0, acc
+        "BCa: alphas %s -> %s (z0=%.4f, acc=%.4f)", alphas, new_alphas, z0, acc
     )
     return new_alphas
 
 
-def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> Union[float64, float]:
+def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> float64 | float:
     """Weighted average of bin log2 values."""
     if skip_low:
         cnarr = cnarr.drop_low_coverage()
     if len(cnarr) == 0:
         return np.nan
     if "weight" in cnarr and cnarr["weight"].any():
-        return np.average(cnarr["log2"], weights=cnarr["weight"])
-    return cnarr["log2"].mean()
+        return np.average(cnarr["log2"], weights=cnarr["weight"])  # type: ignore[no-any-return]
+    return cnarr["log2"].mean()  # type: ignore[no-any-return]

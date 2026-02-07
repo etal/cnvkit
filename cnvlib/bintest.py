@@ -8,7 +8,7 @@ import pandas as pd
 from scipy.stats import norm
 
 from . import params, segfilters
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def do_bintest(
     cnarr: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
+    segments: CopyNumArray | None = None,
     alpha: float = 0.005,
     target_only: bool = False,
 ) -> CopyNumArray:
@@ -120,7 +120,7 @@ def p_adjust_bh(p: ndarray) -> ndarray:
     by_orig = by_descend.argsort()
     steps = float(len(p)) / np.arange(len(p), 0, -1)
     q = np.minimum(1, np.minimum.accumulate(steps * p[by_descend]))
-    return q[by_orig]
+    return q[by_orig]  # type: ignore[no-any-return]
 
 
 def spike_into_segments(cnarr, segments, is_sig):

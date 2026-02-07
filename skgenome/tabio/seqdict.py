@@ -30,8 +30,8 @@ def _parse_lines(lines):
         if line.startswith("@SQ"):
             _sq, sn, ln, _ur, _m5 = line.split("\t")
             if sn.startswith("SN:") and ln.startswith("LN:"):
-                chrom = sn[3:]
-                length = int(ln[3:])
+                chrom = sn.removeprefix("SN:")
+                length = int(ln.removeprefix("LN:"))
                 yield (chrom, 0, length)
             else:
                 raise ValueError(f"Bad line: {line!r}")

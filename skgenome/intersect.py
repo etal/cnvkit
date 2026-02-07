@@ -8,7 +8,7 @@ GenomicArray types.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 import numpy as np
 import pandas as pd
@@ -16,35 +16,38 @@ import pandas as pd
 from .combiners import first_of, join_strings, make_const
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
     from collections.abc import Iterator, Sequence
     from numpy import ndarray
     from pandas.core.indexes.base import Index
 
-Numeric = Union[int, float, np.number]
+Numeric: TypeAlias = int | float | np.number
 
 
 def by_ranges(
     table: pd.DataFrame, other: pd.DataFrame, mode: str, keep_empty: bool
-) -> None:
+) -> Generator[tuple, None, None]:
     """Group rows by another GenomicArray's bin coordinate ranges."""
     for _chrom, bin_rows, src_rows in by_shared_chroms(other, table, keep_empty):
         if src_rows is not None:
             subranges = iter_ranges(
                 src_rows, None, bin_rows["start"], bin_rows["end"], mode
             )
-            for bin_row, subrange in zip(bin_rows.itertuples(index=False), subranges, strict=False):
+            for bin_row, subrange in zip(
+                bin_rows.itertuples(index=False), subranges, strict=True
+            ):
                 yield bin_row, subrange
         elif keep_empty:
             for bin_row in bin_rows.itertuples(index=False):
-                yield bin_row, []  # ENH: empty dframe matching table
+                yield (
+                    bin_row,
+                    [],
+                )  # ENH: empty dframe matching table  # ENH: empty dframe matching table
 
 
 def by_shared_chroms(
     table: pd.DataFrame, other: pd.DataFrame, keep_empty: bool = True
-) -> Iterator[
-    Union[tuple[str, pd.DataFrame, None], tuple[str, pd.DataFrame, pd.DataFrame]]
-]:
+) -> Iterator[tuple[str, pd.DataFrame, None] | tuple[str, pd.DataFrame, pd.DataFrame]]:
     """Group rows for both `table` and `other` by matching chromosome names."""
     # When both `table` and `other` contain only one chromosome each, and it's
     # the same chromosome, we can just return the original tables.
@@ -67,8 +70,8 @@ def into_ranges(
     dest: pd.DataFrame,
     src_col: str,
     default: Any,
-    summary_func: Optional[Callable],
-) -> Union[pd.DataFrame, pd.Series]:
+    summary_func: Callable | None,
+) -> pd.DataFrame | pd.Series:
     """Group a column in `source` by regions in `dest` and summarize."""
     if not len(source) or not len(dest):
         return dest
@@ -82,9 +85,9 @@ def into_ranges(
             summary_func = np.nanmedian
         else:
             summary_func = first_of
-    elif not callable(summary_func):
+    elif not callable(summary_func):  # type: ignore[unreachable]
         # Just fill in the given value, I suppose.
-        summary_func = make_const(summary_func)
+        summary_func = make_const(summary_func)  # type: ignore[unreachable]
 
     def series2value(ser):
         if len(ser) == 0:
@@ -102,9 +105,9 @@ def into_ranges(
 
 def iter_ranges(
     table: pd.DataFrame,
-    chrom: Optional[str],
-    starts: Optional[Sequence[Numeric]],
-    ends: Optional[Sequence[Numeric]],
+    chrom: str | None,
+    starts: Sequence[Numeric] | None,
+    ends: Sequence[Numeric] | None,
     mode: str,
 ) -> Iterator[pd.DataFrame]:
     """Iterate through sub-ranges."""
@@ -133,7 +136,7 @@ def iter_ranges(
 
 def iter_slices(
     table: pd.DataFrame, other: pd.DataFrame, mode: str, keep_empty: bool
-) -> Iterator[Union[ndarray, Index]]:
+) -> Iterator[ndarray | Index]:
     """Yields indices to extract ranges from `table`.
 
     Returns an iterable of integer arrays that can apply to Series objects,
@@ -155,10 +158,10 @@ def iter_slices(
 
 def idx_ranges(
     table: pd.DataFrame,
-    starts: Union[list[int], pd.Series],
-    ends: Union[list[int], pd.Series],
+    starts: list[int] | pd.Series,
+    ends: list[int] | pd.Series,
     mode: str,
-) -> None:
+) -> Generator[tuple, None, None]:
     """Iterate through sub-ranges."""
     assert mode in ("inner", "outer")
     # Edge cases: when the `table` is either empty, or both `starts` and `ends`
@@ -177,7 +180,7 @@ def idx_ranges(
             # At least one bin is fully nested -- account for it
             irange_func = _irange_nested
         else:
-            irange_func = _irange_simple
+            irange_func = _irange_simple  # type: ignore[assignment]
         yield from irange_func(table, starts, ends, mode)
 
 
@@ -206,7 +209,7 @@ def _irange_simple(
         ends = [None] * len(starts)
 
     for start_idx, start_val, end_idx, end_val in zip(
-        start_idxs, starts, end_idxs, ends, strict=False
+        start_idxs, starts, end_idxs, ends, strict=True
     ):
         yield (slice(start_idx, end_idx), start_val, end_val)
 
@@ -217,7 +220,7 @@ def _irange_nested(
     """Slice subsets of table when regions are nested."""
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
     assert len(starts) == len(ends) > 0
-    for start_val, end_val in zip(starts, ends, strict=False):
+    for start_val, end_val in zip(starts, ends, strict=True):
         # Mask of table rows to keep for this query region
         region_mask = np.ones(len(table), dtype=np.bool_)
         if start_val:

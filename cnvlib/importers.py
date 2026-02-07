@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 import logging
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from skgenome import tabio
@@ -140,7 +140,7 @@ def do_import_theta(
     theta = parse_theta_results(theta_results_fname)
     # THetA doesn't handle sex chromosomes well
     segarr = segarr.autosomes()
-    for copies in theta["C"]:
+    for copies in theta["C"]:  # type: ignore[union-attr]
         if len(copies) != len(segarr):
             copies = copies[: len(segarr)]
         # Drop any segments where the C value is None
@@ -157,7 +157,7 @@ def do_import_theta(
 
 def parse_theta_results(
     fname: str,
-) -> dict[str, Union[float, list[float], list[list[int]], list[list[float]]]]:
+) -> dict[str, Any]:
     """Parse THetA results into a data structure.
 
     Columns: NLL, mu, C, p*
@@ -176,27 +176,27 @@ def parse_theta_results(
         mu_tumors = list(map(float, mu[1:]))
 
         # C
-        copies = body[2].split(":")
+        copy_strs = body[2].split(":")
         if len(mu_tumors) == 1:
             # 1D array of integers
             # Replace X with None for "missing"
-            copies = [[int(c) if c.isdigit() else None for c in copies]]
+            copies: list = [[int(c) if c.isdigit() else None for c in copy_strs]]
         else:
             # List of lists of integer-or-None (usu. 2 x #segments)
             copies = [
                 [int(c) if c.isdigit() else None for c in subcop]
-                for subcop in zip(*[c.split(",") for c in copies], strict=False)
+                for subcop in zip(*[c.split(",") for c in copy_strs], strict=False)
             ]
 
         # p*
-        probs = body[3].split(",")
+        prob_strs = body[3].split(",")
         if len(mu_tumors) == 1:
             # 1D array of floats, or None for "X" (missing/unknown)
-            probs = [float(p) if not p.isalpha() else None for p in probs]
+            probs: list = [float(p) if not p.isalpha() else None for p in prob_strs]
         else:
             probs = [
                 [float(p) if not p.isalpha() else None for p in subprob]
-                for subprob in zip(*[p.split(",") for p in probs], strict=False)
+                for subprob in zip(*[p.split(",") for p in prob_strs], strict=False)
             ]
     return {
         "NLL": nll,

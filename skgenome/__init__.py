@@ -1,2 +1,2 @@
-from . import tabio
-from .gary import GenomicArray
+from . import tabio as tabio
+from .gary import GenomicArray as GenomicArray

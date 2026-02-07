@@ -11,7 +11,7 @@ from skgenome.rangelabel import unpack_range
 from . import core, params, plots
 from .plots import MB
 from .cnary import CopyNumArray as CNA
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
@@ -26,19 +26,19 @@ TREND_COLOR = "#A0A0A0"
 
 def do_scatter(
     cnarr: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
-    variants: None = None,
-    show_range: None = None,
-    show_gene: None = None,
+    segments: CopyNumArray | None = None,
+    variants: CopyNumArray | None = None,
+    show_range: str | None = None,
+    show_gene: str | None = None,
     do_trend: bool = False,
     by_bin: bool = False,
     window_width: float = 1e6,
-    y_min: None = None,
-    y_max: None = None,
-    fig_size: None = None,
-    antitarget_marker: None = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    fig_size: tuple[float, float] | None = None,
+    antitarget_marker: str | None = None,
     segment_color: str = SEG_COLOR,
-    title: None = None,
+    title: str | None = None,
 ) -> Figure:
     """Plot probe log2 coverages and segmentation calls together.
 
@@ -127,12 +127,12 @@ def do_scatter(
 
 def genome_scatter(
     cnarr: CopyNumArray,
-    segments: Optional[CopyNumArray] = None,
-    variants: None = None,
+    segments: CopyNumArray | None = None,
+    variants: CopyNumArray | None = None,
     do_trend: bool = False,
-    y_min: None = None,
-    y_max: None = None,
-    title: None = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
+    title: str | None = None,
     segment_color: str = SEG_COLOR,
 ) -> Figure:
     """Plot all chromosomes, concatenated on one plot."""
@@ -143,28 +143,35 @@ def genome_scatter(
         axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
         # Place chromosome labels between the CNR and SNP plots
         axis2.tick_params(labelbottom=False)
-        chrom_sizes = plots.chromosome_sizes(cnarr or segments)
+        chrom_sizes = plots.chromosome_sizes(cnarr or segments)  # type: ignore[arg-type]
         axis2 = snv_on_genome(
             axis2, variants, chrom_sizes, segments, do_trend, segment_color
         )
     else:
         _fig, axis = pyplot.subplots()
     if title is None:
-        title = (cnarr or segments or variants).sample_id
+        title = (cnarr or segments or variants).sample_id  # type: ignore[union-attr]
     if cnarr or segments:
         axis.set_title(title)
         axis = cnv_on_genome(
-            axis, cnarr, segments, do_trend, y_min, y_max, segment_color
+            axis,
+            cnarr,  # type: ignore[arg-type]
+            segments,  # type: ignore[arg-type]
+            do_trend,
+            y_min,
+            y_max,
+            segment_color,  # type: ignore[arg-type]
         )
     else:
         axis.set_title(f"Variant allele frequencies: {title}")
         chrom_sizes = collections.OrderedDict(
-            (chrom, subarr["end"].max()) for chrom, subarr in variants.by_chromosome()
+            (chrom, subarr["end"].max())
+            for chrom, subarr in variants.by_chromosome()  # type: ignore[union-attr]
         )
         axis = snv_on_genome(
             axis, variants, chrom_sizes, segments, do_trend, segment_color
         )
-    return axis.get_figure()
+    return axis.get_figure()  # type: ignore[return-value]
 
 
 def cnv_on_genome(
@@ -172,8 +179,8 @@ def cnv_on_genome(
     probes: CopyNumArray,
     segments: CopyNumArray,
     do_trend: bool = False,
-    y_min: None = None,
-    y_max: None = None,
+    y_min: float | None = None,
+    y_max: float | None = None,
     segment_color: str = SEG_COLOR,
 ) -> Axes:
     """Plot bin ratios and/or segments for all chromosomes on one plot."""
@@ -414,10 +421,11 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene, window_
     no genes will be highlighted.
     """
     chrom, start, end = unpack_range(show_range)
+    window_coords: tuple = ()
     if start is None and end is None:
         # Either the specified range is only chrom, no start-end, or gene names
         # were given
-        window_coords = ()
+        pass
     else:
         # Viewing region coordinates were specified -- take them as given
         # Fill in open-ended ranges' endpoints
@@ -560,7 +568,7 @@ def cnv_on_chromosome(
         y_bg = []
         # w_bg = []
         is_bg = probes["gene"].isin(params.ANTITARGET_ALIASES)
-        for x_pt, y_pt, w_pt, is_bg_pt in zip(x, y, w, is_bg, strict=False):
+        for x_pt, y_pt, w_pt, is_bg_pt in zip(x, y, w, is_bg, strict=True):
             if is_bg_pt:
                 x_bg.append(x_pt)
                 y_bg.append(y_pt)
@@ -774,6 +782,7 @@ def highlight_genes(axis, genes, y_posn) -> None:
     # Rotate text in proportion to gene density
     ngenes = len(genes)
     text_size = "small" if ngenes <= 6 else "x-small"
+    text_rot: str | int
     if ngenes <= 3:
         text_rot = "horizontal"
     elif ngenes <= 6:

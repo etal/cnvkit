@@ -33,7 +33,7 @@ def kmeans(samples, k=None):
     clusters = defaultdict(list)
     for idx, label in enumerate(labels):
         clusters[label].append(idx)
-    clusters = clusters.values()
+    clusters = list(clusters.values())  # type: ignore[assignment]
     # plot_clusters(obs, clusters)
     return clusters
 

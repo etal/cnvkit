@@ -99,7 +99,7 @@ def group_bed_tracks(bedfile):
     # ENH - make this memory-efficient w/ generators or something
     with as_handle(bedfile, "r") as handle:
         curr_track = "DEFAULT"
-        curr_lines = []
+        curr_lines: list[str] = []
         for line in handle:
             if line.startswith("track"):
                 if curr_lines:

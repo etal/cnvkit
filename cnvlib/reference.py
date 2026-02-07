@@ -1,9 +1,8 @@
 """Supporting functions for the 'reference' command."""
 
 from __future__ import annotations
-import collections
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -21,10 +20,10 @@ if TYPE_CHECKING:
 
 def do_reference_flat(
     targets: str,
-    antitargets: Optional[str] = None,
-    fa_fname: None = None,
+    antitargets: str | None = None,
+    fa_fname: str | None = None,
     is_haploid_x_reference: bool = False,
-    diploid_parx_genome: Optional[str] = None,
+    diploid_parx_genome: str | None = None,
 ) -> CNA:
     """Compile a neutral-coverage reference from the given intervals.
 
@@ -61,7 +60,7 @@ def do_reference_flat(
     )
     ref_probes["depth"] = np.exp2(ref_probes["log2"])  # Shim
     # Calculate GC and RepeatMasker content for each probe's genomic region
-    if fa_fname:
+    if fa_fname:  # type: ignore[unreachable]
         gc, rmask = get_fasta_stats(ref_probes, fa_fname)
         ref_probes["gc"] = gc
         ref_probes["rmask"] = rmask
@@ -83,11 +82,11 @@ def bed2probes(bed_fname: str) -> CNA:
 
 def do_reference(
     target_fnames: list[str],
-    antitarget_fnames: Optional[list[str]] = None,
-    fa_fname: Optional[str] = None,
+    antitarget_fnames: list[str] | None = None,
+    fa_fname: str | None = None,
     is_haploid_x_reference: bool = False,
-    diploid_parx_genome: Optional[str] = None,
-    female_samples: Optional[bool] = None,
+    diploid_parx_genome: str | None = None,
+    female_samples: bool | None = None,
     do_gc: bool = True,
     do_edge: bool = True,
     do_rmask: bool = True,
@@ -247,7 +246,7 @@ def do_reference(
         )
         sexes = dict()
         for fname in target_fnames:
-            sexes[read_cna(fname).sample_id] = female_samples
+            sexes[read_cna(fname).sample_id] = female_samples  # type: ignore[assignment]
 
     # TODO - refactor/inline this func here, once it works
     ref_probes = combine_probes(
@@ -256,7 +255,7 @@ def do_reference(
         fa_fname,
         is_haploid_x_reference,
         diploid_parx_genome,
-        sexes,
+        sexes,  # type: ignore[arg-type]
         do_gc,
         do_edge,
         do_rmask,
@@ -268,7 +267,7 @@ def do_reference(
 
 
 def infer_sexes(
-    cnn_fnames: list[str], is_haploid_x: bool, diploid_parx_genome: Optional[str]
+    cnn_fnames: list[str], is_haploid_x: bool, diploid_parx_genome: str | None
 ) -> dict[str, bool_]:
     """Map sample IDs to inferred chromosomal sex, where possible.
 
@@ -287,11 +286,11 @@ def infer_sexes(
 
 def combine_probes(
     filenames: list[str],
-    antitarget_fnames: Optional[list[str]],
-    fa_fname: Optional[str],
+    antitarget_fnames: list[str] | None,
+    fa_fname: str | None,
     is_haploid_x: bool,
-    diploid_parx_genome: Optional[str],
-    sexes: dict[str, Union[bool_, bool]],
+    diploid_parx_genome: str | None,
+    sexes: dict[str, bool_ | bool],
     fix_gc: bool,
     fix_edge: bool,
     fix_rmask: bool,
@@ -393,10 +392,10 @@ def combine_probes(
 
 def load_sample_block(
     filenames: list[str],
-    fa_fname: Optional[str],
+    fa_fname: str | None,
     is_haploid_x: bool,
-    diploid_parx_genome: Optional[str],
-    sexes: dict[str, Union[bool_, bool]],
+    diploid_parx_genome: str | None,
+    sexes: dict[str, bool_ | bool],
     skip_low: bool,
     fix_gc: bool,
     fix_edge: bool,
@@ -510,25 +509,25 @@ def load_sample_block(
                 diploid_parx_genome,
             )
         )
-    all_logr = np.vstack(all_logr)
-    all_depths = np.vstack(all_depths)
+    all_logr = np.vstack(all_logr)  # type: ignore[assignment]
+    all_depths = np.vstack(all_depths)  # type: ignore[assignment]
     ref_df = pd.DataFrame.from_dict(ref_columns)
-    return ref_df, all_logr, all_depths
+    return ref_df, all_logr, all_depths  # type: ignore[return-value]
 
 
 def bias_correct_logr(
     cnarr: CNA,
-    ref_columns: dict[str, Union[pd.Series, ndarray]],
+    ref_columns: dict[str, pd.Series | ndarray],
     ref_edge_bias: pd.Series,
     ref_flat_logr: ndarray,
-    sexes: dict[str, Union[bool_, bool]],
+    sexes: dict[str, bool_ | bool],
     is_chr_x: pd.Series,
     is_chr_y: pd.Series,
     fix_gc: bool,
     fix_edge: bool,
     fix_rmask: bool,
     skip_low: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
 ) -> pd.Series:
     """Perform bias corrections on the sample."""
     cnarr.center_all(skip_low=skip_low, diploid_parx_genome=diploid_parx_genome)
@@ -556,7 +555,7 @@ def bias_correct_logr(
 
 def shift_sex_chroms(
     cnarr: CNA,
-    sexes: dict[str, Union[bool_, bool]],
+    sexes: dict[str, bool_ | bool],
     ref_flat_logr: ndarray,
     is_chr_x: pd.Series,
     is_chr_y: pd.Series,
@@ -604,7 +603,7 @@ def summarize_info(all_logr: ndarray, all_depths: ndarray) -> dict[str, ndarray]
     spreads = np.array(
         [
             descriptives.biweight_midvariance(a, initial=i)
-            for a, i in zip(all_logr.T, cvg_centers, strict=False)
+            for a, i in zip(all_logr.T, cvg_centers, strict=True)
         ]
     )
 
@@ -642,7 +641,7 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
     print("Clustering", len(logr_matrix), "samples...")
     # clusters = markov(logr_matrix)
     clusters = kmeans(logr_matrix)
-    cluster_cols = {}
+    cluster_cols: dict[str, Any] = {}
     sample_ids = np.array(sample_ids)  # For easy indexing
     for i, clust_idx in enumerate(clusters):
         i += 1
@@ -662,13 +661,11 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
         # Calculate each cluster's summary stats
         clust_matrix = logr_matrix[clust_idx, :]
         # XXX re-add the pseudocount sample to each cluster? need benchmark
-        clust_info = summarize_info(clust_matrix, [])
-        cluster_cols.update(
-            {
-                f"log2_{i}": clust_info["log2"],
-                f"spread_{i}": clust_info["spread"],
-            }
-        )
+        clust_info = summarize_info(clust_matrix, [])  # type: ignore[arg-type]
+        cluster_cols |= {
+            f"log2_{i}": clust_info["log2"],
+            f"spread_{i}": clust_info["spread"],
+        }
     return cluster_cols
 
 
@@ -697,7 +694,7 @@ def warn_bad_bins(cnarr: CNA, max_name_width: int = 50) -> None:
             labels = fg_bad_bins.labels()
             chrom_cols = max(labels.apply(len))
             last_gene = None
-            for label, probe in zip(labels, fg_bad_bins, strict=False):
+            for label, probe in zip(labels, fg_bad_bins, strict=True):
                 if probe.gene == last_gene:
                     gene = '  "'
                 else:
@@ -742,7 +739,7 @@ def get_fasta_stats(cnarr: CNA, fa_fname: str) -> tuple[ndarray, ndarray]:
     gc_rm_vals = [
         calculate_gc_lo(subseq) for subseq in fasta_extract_regions(fa_fname, cnarr)
     ]
-    gc_vals, rm_vals = zip(*gc_rm_vals, strict=False)
+    gc_vals, rm_vals = zip(*gc_rm_vals, strict=True)
     return np.asarray(gc_vals, dtype=float), np.asarray(rm_vals, dtype=float)
 
 

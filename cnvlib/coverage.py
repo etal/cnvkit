@@ -7,12 +7,12 @@ import os.path
 import time
 from concurrent import futures
 from io import StringIO
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-import pysam
 from skgenome import tabio
+from skgenome._pysam import PYSAM_INSTALL_MSG
 
 from . import core, samutil
 from .cnary import CopyNumArray as CNA
@@ -20,6 +20,7 @@ from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 if TYPE_CHECKING:
+    import pysam
     from collections.abc import Iterator
     from skgenome import GenomicArray
 
@@ -66,6 +67,13 @@ def bedgraph_to_basecount(
         DataFrame with columns matching bedcov output: chromosome, start,
         end, gene (if present in BED), and basecount.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for reading bedGraph files. {PYSAM_INSTALL_MSG}"
+        ) from None
+
     validate_bedgraph_index(bedgraph_fname)
 
     # Read the BED file to get regions
@@ -91,7 +99,11 @@ def bedgraph_to_basecount(
             # Handle chromosome naming mismatches or missing chromosomes
             if chrom not in chromosomes_in_bedgraph:
                 # Try adding/removing 'chr' prefix
-                alt_chrom = f"chr{chrom}" if not chrom.startswith("chr") else chrom[3:]
+                alt_chrom = (
+                    f"chr{chrom}"
+                    if not chrom.startswith("chr")
+                    else chrom.removeprefix("chr")
+                )
                 if alt_chrom in chromosomes_in_bedgraph:
                     chrom = alt_chrom
                 else:
@@ -164,7 +176,7 @@ def do_coverage(
     by_count: bool = False,
     min_mapq: int = 0,
     processes: int = 1,
-    fasta: Optional[str] = None,
+    fasta: str | None = None,
 ) -> CNA:
     """Calculate coverage in the given regions from BAM read depths.
 
@@ -234,7 +246,7 @@ def interval_coverages(
     by_count: bool,
     min_mapq: int,
     processes: int,
-    fasta: Optional[str] = None,
+    fasta: str | None = None,
 ) -> CNA:
     """Calculate log2 coverages in the BAM file at each interval."""
     meta = {"sample_id": core.fbase(bam_fname)}
@@ -251,14 +263,18 @@ def interval_coverages(
                 os.path.basename(bam_fname),
                 bed_fname,
             )
-            return CNA.from_rows([], meta_dict=meta)
+            return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
 
     # Calculate average read depth in each bin
     if by_count:
         results = interval_coverages_count(
-            bed_fname, bam_fname, min_mapq, processes, fasta
+            bed_fname,
+            bam_fname,
+            min_mapq,
+            processes,
+            fasta,  # type: ignore[arg-type]
         )
-        read_counts, cna_rows = zip(*results, strict=False)
+        read_counts, cna_rows = zip(*results, strict=True)
         read_counts = pd.Series(read_counts)
         cnarr = CNA.from_rows(
             list(cna_rows), columns=(*CNA._required_columns, "depth"), meta_dict=meta
@@ -299,7 +315,7 @@ def interval_coverages(
     else:
         logging.info("(Couldn't calculate total number of mapped reads)")
 
-    return cnarr
+    return cnarr  # type: ignore[return-value]
 
 
 def interval_coverages_bedgraph(
@@ -334,7 +350,7 @@ def interval_coverages_bedgraph(
                 os.path.basename(bedgraph_fname),
                 regions_bed_fname,
             )
-            return CNA.from_rows([], meta_dict=meta)
+            return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
 
     # Calculate coverage from bedGraph
     logging.info("Processing bedGraph %s", os.path.basename(bedgraph_fname))
@@ -378,8 +394,14 @@ def interval_coverages_bedgraph(
 
 def interval_coverages_count(
     bed_fname: str, bam_fname: str, min_mapq: int, procs: int = 1, fasta: None = None
-) -> Iterator[list[Union[int, tuple[str, int, int, str, float, float]]]]:
+) -> Iterator[list[int | tuple[str, int, int, str, float, float]]]:
     """Calculate log2 coverages in the BAM file at each interval."""
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for BAM read counting. {PYSAM_INSTALL_MSG}"
+        ) from None
     regions = tabio.read_auto(bed_fname)
     if procs == 1:
         bamfile = pysam.AlignmentFile(bam_fname, "rb", reference_filename=fasta)
@@ -411,7 +433,13 @@ def _rdc_chunk(
     min_mapq: int,
     fasta: None = None,
 ) -> Iterator[tuple[int, tuple[str, int, int, str, float, float]]]:
-    if isinstance(bamfile, str):
+    if isinstance(bamfile, str):  # type: ignore[unreachable]
+        try:  # type: ignore[unreachable]
+            import pysam
+        except ImportError:
+            raise ImportError(
+                f"pysam is required for BAM read counting. {PYSAM_INSTALL_MSG}"
+            ) from None
         bamfile = pysam.AlignmentFile(bamfile, "rb", reference_filename=fasta)
     for chrom, start, end, gene in regions.coords(["gene"]):
         yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)
@@ -449,7 +477,7 @@ def region_depth_count(
         if filter_read(read):
             count += 1
             # Only count the bases aligned to the region
-            bases += sum(1 for p in read.positions if start <= p < end)
+            bases += sum(1 for p in read.positions if start <= p < end)  # type: ignore[attr-defined,misc]
     depth = bases / (end - start) if end > start else 0
     row = (
         chrom,
@@ -467,7 +495,7 @@ def interval_coverages_pileup(
     bam_fname: str,
     min_mapq: int,
     procs: int = 1,
-    fasta: Optional[str] = None,
+    fasta: str | None = None,
 ) -> pd.DataFrame:
     """Calculate log2 coverages in the BAM file at each interval."""
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
@@ -510,13 +538,19 @@ def bedcov(
     bed_fname: str,
     bam_fname: str,
     min_mapq: int,
-    fasta: Optional[str] = None,
-    max_depth: Optional[int] = None,
+    fasta: str | None = None,
+    max_depth: int | None = None,
 ) -> pd.DataFrame:
     """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
 
     i.e. mean pileup depth across each region.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for BAM coverage calculation. {PYSAM_INSTALL_MSG}"
+        ) from None
     # Count bases in each region; exclude low-MAPQ reads
     cmd = []
     if max_depth is not None:
@@ -527,7 +561,7 @@ def bedcov(
         cmd.extend(["--reference", fasta])
     cmd.extend([bed_fname, bam_fname])
     try:
-        raw = pysam.bedcov(*cmd, split_lines=False)
+        raw = pysam.bedcov(*cmd, split_lines=False)  # type: ignore[attr-defined]
     except pysam.SamtoolsError as exc:
         raise ValueError(
             f"Failed processing {bam_fname!r} coverages in {bed_fname!r} regions. "
@@ -538,9 +572,9 @@ def bedcov(
             f"BED file {bed_fname!r} chromosome names don't match any in "
             f"BAM file {bam_fname!r}"
         )
-    columns = detect_bedcov_columns(raw)
+    columns = detect_bedcov_columns(raw)  # type: ignore[arg-type]
     usecols = [c for c in columns if c != "extra"]
-    table = pd.read_csv(StringIO(raw), sep="\t", names=columns, usecols=usecols)
+    table = pd.read_csv(StringIO(raw), sep="\t", names=columns, usecols=usecols)  # type: ignore[arg-type]
     return table
 
 

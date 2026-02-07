@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Optional
 
 from skgenome import GenomicArray as GA
 
@@ -13,9 +12,9 @@ from .params import INSERT_SIZE, MIN_REF_COVERAGE, ANTITARGET_NAME
 
 def do_antitarget(
     targets: GA,
-    access: Optional[GA] = None,
+    access: GA | None = None,
     avg_bin_size: int = 150000,
-    min_bin_size: Optional[int] = None,
+    min_bin_size: int | None = None,
 ) -> GA:
     """Derive off-target ("antitarget") bins from target regions.
 
@@ -38,11 +37,11 @@ def do_antitarget(
     """
     if not min_bin_size:
         min_bin_size = 2 * int(avg_bin_size * (2**MIN_REF_COVERAGE))
-    return get_antitargets(targets, access, avg_bin_size, min_bin_size)
+    return get_antitargets(targets, access, avg_bin_size, min_bin_size)  # type: ignore[arg-type]
 
 
 def get_antitargets(
-    targets: GA, accessible: GA, avg_bin_size: int, min_bin_size: Optional[int]
+    targets: GA, accessible: GA, avg_bin_size: int, min_bin_size: int | None
 ) -> GA:
     """Generate antitarget intervals between/around target intervals.
 
@@ -70,7 +69,7 @@ def get_antitargets(
     bg_arr = (
         accessible.resize_ranges(-pad_size)
         .subtract(targets.resize_ranges(pad_size))
-        .subdivide(avg_bin_size, min_bin_size)
+        .subdivide(avg_bin_size, min_bin_size)  # type: ignore[arg-type]
     )
     bg_arr["gene"] = ANTITARGET_NAME
     return bg_arr
@@ -139,7 +138,7 @@ def guess_chromosome_regions(targets: GA, telomere_size: int) -> GA:
     whole_chroms = GA.from_columns(
         {
             "chromosome": targets.chromosome.drop_duplicates(),
-            "start": telomere_size,
+            "start": telomere_size,  # type: ignore[dict-item]
             "end": endpoints,
         }
     )
@@ -181,7 +180,7 @@ def _drop_short_contigs(garr: GA) -> GA:
     from .plots import chromosome_sizes
     from skgenome.chromsort import detect_big_chroms
 
-    chrom_sizes = chromosome_sizes(garr)
+    chrom_sizes = chromosome_sizes(garr)  # type: ignore[arg-type]
     n_big, thresh = detect_big_chroms(chrom_sizes.values())
     chrom_names_to_keep = {c for c, s in chrom_sizes.items() if s >= thresh}
     assert len(chrom_names_to_keep) == n_big

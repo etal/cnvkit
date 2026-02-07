@@ -8,10 +8,12 @@ from itertools import chain
 
 import numpy as np
 import pandas as pd
-import pysam
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
+
+from skgenome._pysam import PYSAM_INSTALL_MSG
 
 if TYPE_CHECKING:
+    import pysam
     from collections.abc import Iterator
     from pysam.libcbcf import (
         VariantFile,
@@ -23,9 +25,9 @@ if TYPE_CHECKING:
 
 def read_vcf(
     infile: str,
-    sample_id: Optional[str] = None,
-    normal_id: Optional[str] = None,
-    min_depth: Optional[int] = None,
+    sample_id: str | None = None,
+    normal_id: str | None = None,
+    min_depth: int | None = None,
     skip_reject: bool = False,
     skip_somatic: bool = False,
 ) -> pd.DataFrame:
@@ -36,6 +38,12 @@ def read_vcf(
     sample  matching that ID.  If `sample_id` is a positive integer, return the
     sample or pair at that index position, counting from 0.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for reading VCF files. {PYSAM_INSTALL_MSG}"
+        ) from None
     try:
         vcf_reader = pysam.VariantFile(infile)
     except Exception as exc:
@@ -53,7 +61,7 @@ def read_vcf(
         vcf_reader.subset_samples(list(filter(None, (sid, nid))))
     else:
         logging.warning("VCF file %s has no sample genotypes", infile)
-        sid = sample_id
+        sid = sample_id  # type: ignore[assignment]
         nid = None
 
     columns = [
@@ -70,7 +78,7 @@ def read_vcf(
     if nid:
         columns.extend(["n_zygosity", "n_depth", "n_alt_count"])
 
-    rows = _parse_records(vcf_reader, sid, nid, skip_reject)
+    rows = _parse_records(vcf_reader, sid, nid, skip_reject)  # type: ignore[arg-type]
     table = pd.DataFrame.from_records(rows, columns=columns)
     table["alt_freq"] = table["alt_count"] / table["depth"]
     if nid:
@@ -101,7 +109,7 @@ def read_vcf(
 
 
 def _choose_samples(
-    vcf_reader: VariantFile, sample_id: Optional[str], normal_id: Optional[str]
+    vcf_reader: VariantFile, sample_id: str | None, normal_id: str | None
 ) -> tuple[str, str]:
     """Emit the sample IDs of all samples or tumor-normal pairs in the VCF.
 
@@ -110,10 +118,10 @@ def _choose_samples(
     unspecified, emit all samples as unpaired tumors.
     """
     vcf_samples = list(vcf_reader.header.samples)
-    if isinstance(sample_id, int):
-        sample_id = vcf_samples[sample_id]
-    if isinstance(normal_id, int):
-        normal_id = vcf_samples[normal_id]
+    if isinstance(sample_id, int):  # type: ignore[unreachable]
+        sample_id = vcf_samples[sample_id]  # type: ignore[unreachable]
+    if isinstance(normal_id, int):  # type: ignore[unreachable]
+        normal_id = vcf_samples[normal_id]  # type: ignore[unreachable]
     for sid in (sample_id, normal_id):
         if sid and sid not in vcf_samples:
             raise IndexError(f"Specified sample {sid} not in VCF file")
@@ -133,13 +141,13 @@ def _choose_samples(
         pairs = [(oid, normal_id) for oid in other_ids]
     else:
         # All samples are unpaired tumors
-        pairs = [(sid, None) for sid in vcf_samples]
+        pairs = [(sid, None) for sid in vcf_samples]  # type: ignore[misc]
     if sample_id:
         # Keep only the specified tumor/test sample
         pairs = [(s, n) for s, n in pairs if s == sample_id]
     if not pairs:
         # sample_id refers to a normal/control sample -- salvage it
-        pairs = [(sample_id, None)]
+        pairs = [(sample_id, None)]  # type: ignore[list-item]
     for sid in set(chain(*pairs)) - {None}:
         _confirm_unique(sid, vcf_samples)
 
@@ -194,7 +202,7 @@ def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
                     for kv in (tag["CommandLineOptions"].strip('"').split())
                     if "=" in kv
                 )
-                sample_id = options.get("tumor_sample_name")
+                sample_id = options.get("tumor_sample_name")  # type: ignore[assignment]
                 normal_id = options["normal_sample_name"]
                 logging.debug(
                     "Found tumor sample %s and normal sample "
@@ -202,7 +210,7 @@ def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
                     sample_id,
                     normal_id,
                 )
-                yield sample_id, normal_id
+                yield sample_id, normal_id  # type: ignore[misc]
     elif "GATKCommandLine.MuTect2" in meta:
         # GATK 3+ metadata is suboptimal.
         # Apparent T/N convention: The samples are just renamed TUMOR and
@@ -214,7 +222,7 @@ def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
             if sample_ids == ("NORMAL", "TUMOR"):
                 yield ("TUMOR", "NORMAL")
             else:
-                yield sample_ids
+                yield sample_ids  # type: ignore[misc]
 
 
 def _confirm_unique(sample_id: str, samples: list[str]) -> None:
@@ -261,7 +269,7 @@ def _parse_records(
                 raise
         else:
             # Assume unpaired tumor; take DP, AF from INFO (e.g. LoFreq)
-            depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0
+            depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0  # type: ignore[assignment,arg-type]
             if "AF" in record.info:
                 alt_freq = record.info["AF"]
                 alt_count = round(alt_freq * depth)
@@ -298,7 +306,7 @@ def _parse_records(
                     alt_count,
                 )
                 if normal_id:
-                    row += (n_zygosity, n_depth, n_alt_count)
+                    row += (n_zygosity, n_depth, n_alt_count)  # type: ignore[assignment]
                 yield row
 
     if cnt_reject:
@@ -307,12 +315,12 @@ def _parse_records(
 
 def _extract_genotype(
     sample: VariantRecordSample, record: VariantRecord
-) -> Union[
-    tuple[None, float, int],
-    tuple[int, float, int],
-    tuple[None, float, float],
-    tuple[int, float, float],
-]:
+) -> (
+    tuple[None, float, int]
+    | tuple[int, float, int]
+    | tuple[None, float, float]
+    | tuple[int, float, float]
+):
     if "DP" in sample:
         depth = sample["DP"]
     elif "AD" in sample and isinstance(sample["AD"], tuple):
@@ -333,7 +341,7 @@ def _extract_genotype(
     return depth, zygosity, alt_count
 
 
-def _get_alt_count(sample: VariantRecordSample) -> Union[int, float]:
+def _get_alt_count(sample: VariantRecordSample) -> int | float:
     """Get the alternative allele count from a sample in a VCF record."""
     if sample.get("AD") not in (None, (None,)):
         # GATK and other callers: (ref depth, alt depth)
@@ -360,7 +368,7 @@ def _get_alt_count(sample: VariantRecordSample) -> Union[int, float]:
     return alt_count
 
 
-def _safesum(tup: Union[tuple[None], tuple[int, int], tuple[int]]) -> int:
+def _safesum(tup: tuple[None] | tuple[int, int] | tuple[int]) -> int:
     return sum(filter(None, tup))
 
 
@@ -368,7 +376,7 @@ def _get_end(posn: int, alt: str, info: VariantRecordInfo) -> int:
     """Get record end position."""
     if "END" in info:
         # Structural variant
-        return info["END"]
+        return info["END"]  # type: ignore[no-any-return]
     return posn + len(alt)
 
 

@@ -7,7 +7,7 @@ import logging
 import os
 import re
 import sys
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import pandas as pd
 from Bio.File import as_handle
@@ -37,11 +37,11 @@ if TYPE_CHECKING:
 def read(
     infile: str,
     fmt: str = "tab",
-    into: Optional[Union[type[GA], type[CopyNumArray]]] = None,
-    sample_id: Optional[str] = None,
-    meta: None = None,
+    into: type[GA] | type[CopyNumArray] | None = None,
+    sample_id: str | None = None,
+    meta: dict[str, str] | None = None,
     **kwargs,
-) -> Union[CopyNumArray, VariantArray, GA]:
+) -> CopyNumArray | VariantArray | GA:
     """Read tabular data from a file or stream into a genome object.
 
     Supported formats: see `READERS`
@@ -78,7 +78,7 @@ def read(
         return read_auto(infile)
 
     if fmt in READERS:
-        reader, suggest_into = READERS[fmt]
+        reader, suggest_into = READERS[fmt]  # type: ignore[misc]
     else:
         raise ValueError(f"Unknown format: {fmt}")
 
@@ -99,7 +99,7 @@ def read(
         # Multi-sample formats: choose one sample
         kwargs["sample_id"] = sample_id
     try:
-        dframe = reader(infile, **kwargs)
+        dframe = reader(infile, **kwargs)  # type: ignore[operator]
     except pd.errors.EmptyDataError:
         # File is blank/empty, most likely
         logging.info("Blank %s file?: %s", fmt, infile)
@@ -107,7 +107,7 @@ def read(
     if fmt == "vcf":
         from cnvlib.vary import VariantArray as VA
 
-        suggest_into = VA
+        suggest_into = VA  # type: ignore[assignment]
     result = (into or suggest_into)(dframe, meta)
     result.sort_columns()
     result.sort()
@@ -123,7 +123,7 @@ def read(
 
 def read_auto(infile: str) -> GA:
     """Auto-detect a file's format and use an appropriate parser to read it."""
-    if not isinstance(infile, str) and not hasattr(infile, "seek"):
+    if not isinstance(infile, str) and not hasattr(infile, "seek"):  # type: ignore[unreachable]
         raise ValueError(
             "Can only auto-detect format from filename or "
             + f"seekable (local, on-disk) files, which {infile} is not"
@@ -168,24 +168,24 @@ READERS = {
 
 
 def write(
-    garr: Union[CopyNumArray, GA],
-    outfile: Optional[Union[_TemporaryFileWrapper, str]] = None,
+    garr: CopyNumArray | GA,
+    outfile: _TemporaryFileWrapper | str | None = None,
     fmt: str = "tab",
     verbose: bool = True,
     **kwargs,
 ) -> None:
     """Write a genome object to a file or stream."""
-    formatter, show_header = WRITERS[fmt]
+    formatter, show_header = WRITERS[fmt]  # type: ignore[misc]
     if fmt in ("seg", "vcf"):
         kwargs["sample_id"] = garr.sample_id
-    dframe = formatter(garr.data, **kwargs)
-    with safe_write(outfile or sys.stdout, verbose=False) as handle:
+    dframe = formatter(garr.data, **kwargs)  # type: ignore[operator]
+    with safe_write(outfile or sys.stdout, verbose=False) as handle:  # type: ignore[arg-type]
         dframe.to_csv(
             handle, header=show_header, index=False, sep="\t", float_format="%.6g"
         )
     if verbose:
         # Log the output path, if possible
-        outfname = get_filename(outfile)
+        outfname = get_filename(outfile)  # type: ignore[arg-type]
         if outfname:
             logging.info("Wrote %s with %d regions", outfname, len(dframe))
 
@@ -210,8 +210,8 @@ WRITERS = {
 
 @contextlib.contextmanager
 def safe_write(
-    outfile: Union[_TemporaryFileWrapper, str], verbose: bool = True
-) -> Iterator[Union[TextIOWrapper, _TemporaryFileWrapper]]:
+    outfile: _TemporaryFileWrapper | str, verbose: bool = True
+) -> Iterator[TextIOWrapper | _TemporaryFileWrapper]:
     """Write to a filename or file-like object with error handling.
 
     If given a file name, open it. If the path includes directories that don't
@@ -234,15 +234,16 @@ def safe_write(
             logging.info("Wrote %s", outfname)
 
 
-def get_filename(infile: Union[_TemporaryFileWrapper, str]) -> str:
+def get_filename(infile: _TemporaryFileWrapper | str) -> str | None:
     if isinstance(infile, str):
         return infile
     if hasattr(infile, "name") and infile not in (sys.stdout, sys.stderr):
         # File(-like) handle
         return infile.name
+    return None
 
 
-def sniff_region_format(infile: str) -> Optional[str]:
+def sniff_region_format(infile: str) -> str | None:
     """Guess the format of the given file by reading the first line.
 
     Returns
@@ -255,7 +256,7 @@ def sniff_region_format(infile: str) -> Optional[str]:
     fname = get_filename(infile)
     if fname:
         _base, ext = os.path.splitext(fname)
-        ext = ext.lstrip(".")
+        ext = ext.removeprefix(".")
         # if ext in known_extensions:
         if ext in format_patterns:
             fname_fmt = ext
@@ -298,6 +299,7 @@ def sniff_region_format(infile: str) -> Optional[str]:
                 "First non-blank line:\n%s"
                 % (fname, ", ".join(format_patterns.keys()), line)
             )
+    return None
 
 
 format_patterns = collections.OrderedDict(

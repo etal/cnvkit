@@ -7,14 +7,11 @@ coordinates of the accessible regions (those between the long spans of N's).
 """
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 
 import numpy as np
 from skgenome import tabio, GenomicArray as GA
 from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from skgenome.gary import GenomicArray
 
 
 def do_access(
@@ -43,7 +40,7 @@ def do_access(
     GenomicArray
         Accessible genomic regions.
     """
-    fa_regions = get_regions(fa_fname)
+    fa_regions: Iterable[tuple] = get_regions(fa_fname)
     if skip_noncanonical:
         fa_regions = drop_noncanonical_contigs(fa_regions)
     access_regions = GA.from_rows(fa_regions)
@@ -66,10 +63,12 @@ def drop_noncanonical_contigs(region_tups: Iterable[tuple]) -> Iterable[tuple]:
     return (tup for tup in region_tups if is_canonical_contig_name(tup[0]))
 
 
-def get_regions(fasta_fname: str) -> Iterable[tuple]:
+def get_regions(fasta_fname: str) -> Generator[tuple, None, None]:
     """Find accessible sequence regions (those not masked out with 'N')."""
     with open(fasta_fname) as infile:
-        chrom = cursor = run_start = None
+        chrom = ""
+        cursor = 0
+        run_start: int | None = None
         for line in infile:
             if line.startswith(">"):
                 # Emit the last chromosome's last run, if any
@@ -102,7 +101,7 @@ def get_regions(fasta_fname: str) -> Iterable[tuple]:
                         if gap_mask.any():
                             ok_starts = n_indices[:-1][gap_mask] + 1 + cursor
                             ok_ends = n_indices[1:][gap_mask] + cursor
-                            for start, end in zip(ok_starts, ok_ends, strict=False):
+                            for start, end in zip(ok_starts, ok_ends, strict=True):
                                 yield log_this(chrom, start, end)
                         # Account for any tailing non-N chars
                         if n_indices[-1] + 1 < len(line_chars):
@@ -131,12 +130,12 @@ def log_this(chrom: str, run_start: int, run_end: int) -> tuple:
     return (chrom, run_start, run_end)
 
 
-def join_regions(regions: GA, min_gap_size: int) -> tuple:
+def join_regions(regions: GA, min_gap_size: int) -> Generator[tuple, None, None]:
     """Filter regions, joining those separated by small gaps."""
     min_gap_size = min_gap_size or 0
     for chrom, rows in regions.by_chromosome():
         logging.info("%s: Joining over small gaps", chrom)
-        coords = iter(zip(rows["start"], rows["end"], strict=False))
+        coords = iter(zip(rows["start"], rows["end"], strict=True))
         prev_start, prev_end = next(coords)
         for start, end in coords:
             gap = start - prev_end

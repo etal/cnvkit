@@ -39,8 +39,8 @@ def create_diagram(
     threshold: float,
     min_probes: int,
     outfname: str,
-    show_range: None = None,
-    title: None = None,
+    show_range: str | None = None,
+    title: str | None = None,
     show_labels: bool = True,
 ) -> str:
     """Create the diagram."""
@@ -57,7 +57,7 @@ def create_diagram(
             raise ValueError("Must provide argument cnarr or segarr, or both. ")
         do_both = False
 
-    if show_range:
+    if show_range:  # type: ignore[unreachable]
         chrom, start, end = unpack_range(show_range)
         if not (start is None and end is None):
             raise ValueError(
@@ -122,7 +122,7 @@ def create_diagram(
     # Generate the diagram PDF
     if not outfname:
         outfname = cnarr.sample_id + "-diagram.pdf"
-    drawing = build_chrom_diagram(features, chrom_sizes, cnarr.sample_id, title)
+    drawing = build_chrom_diagram(features, chrom_sizes, cnarr.sample_id, title)  # type: ignore[arg-type]
     cvs = canvas.Canvas(outfname, pagesize=PAGE_SIZE)
     renderPDF.draw(drawing, cvs, 0, 0)
     cvs.showPage()
@@ -183,10 +183,10 @@ def build_chrom_diagram(
 
         # Create opening and closing telomeres
         tel_start = BC.TelomereSegment()
-        tel_start.scale = TELOMERE_LENGTH
+        tel_start.scale = TELOMERE_LENGTH  # type: ignore[assignment]
         tel_start.chr_percent = CHROM_FATNESS
         tel_end = BC.TelomereSegment(inverted=True)
-        tel_end.scale = TELOMERE_LENGTH
+        tel_end.scale = TELOMERE_LENGTH  # type: ignore[assignment]
         tel_end.chr_percent = CHROM_FATNESS
 
         # Assemble the chromosome diagram in order
@@ -202,8 +202,8 @@ def build_chrom_diagram(
         chr_diagram.add(cur_chromosome)
 
     if not title:
-        title = "Sample " + sample_id
-    return bc_organism_draw(chr_diagram, title)
+        title = "Sample " + sample_id  # type: ignore[assignment]
+    return bc_organism_draw(chr_diagram, title)  # type: ignore[arg-type]
 
 
 def bc_organism_draw(org: BC.Organism, title: str, wrap: int = 12) -> Drawing:
@@ -333,4 +333,4 @@ def bc_chromosome_draw_label(
     cur_drawing.add(label_string)
 
 
-BC.Chromosome._draw_label = bc_chromosome_draw_label
+BC.Chromosome._draw_label = bc_chromosome_draw_label  # type: ignore[method-assign]

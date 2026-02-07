@@ -1,6 +1,7 @@
 pytest
 pytest-cov
 coverage[all]
+mypy
 ruff
 safety
 bandit[toml]

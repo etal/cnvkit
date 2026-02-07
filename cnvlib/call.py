@@ -4,10 +4,9 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-import pandas as pd
 
 from . import segfilters
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
@@ -19,15 +18,15 @@ if TYPE_CHECKING:
 
 def do_call(
     cnarr: CopyNumArray,
-    variants: Optional[VariantArray] = None,
+    variants: VariantArray | None = None,
     method: str = "threshold",
     ploidy: int = 2,
-    purity: Optional[float] = None,
+    purity: float | None = None,
     is_haploid_x_reference: bool = False,
     is_sample_female: bool = False,
-    diploid_parx_genome: Optional[str] = None,
-    filters: Optional[list[str]] = None,
-    thresholds: Union[tuple[float, float, float, float], ndarray] = (
+    diploid_parx_genome: str | None = None,
+    filters: list[str] | None = None,
+    thresholds: tuple[float, float, float, float] | ndarray = (
         -1.1,
         -0.25,
         0.2,
@@ -194,7 +193,7 @@ def log2_ratios(
     absolutes: Series,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     min_abs_val: float = 1e-3,
     round_to_int: bool = False,
 ) -> Series:
@@ -219,7 +218,7 @@ def log2_ratios(
 def absolute_threshold(
     cnarr: CopyNumArray,
     ploidy: int,
-    thresholds: Union[tuple[float, float, float, float], ndarray],
+    thresholds: tuple[float, float, float, float] | ndarray,
     is_haploid_x_reference: bool,
 ) -> ndarray:
     """Call integer copy number using hard thresholds for each level.
@@ -278,7 +277,7 @@ def absolute_clonal(
     ploidy: int,
     purity: float,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
 ) -> Series:
     """Calculate absolute copy number values from segment or bin log2 ratios."""
@@ -312,7 +311,7 @@ def absolute_dataframe(
     ploidy: int,
     purity: float,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
 ) -> DataFrame:
     """Absolute, expected and reference copy number in a DataFrame."""
@@ -331,7 +330,7 @@ def absolute_dataframe(
 def absolute_expect(
     cnarr: CopyNumArray,
     ploidy: int,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
 ) -> Series:
     """Absolute integer number of expected copies in each bin.
@@ -352,7 +351,7 @@ def absolute_expect(
 def absolute_reference(
     cnarr: CopyNumArray,
     ploidy: int,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_haploid_x_reference: bool,
 ) -> Series:
     """Absolute integer number of reference copies in each bin.
@@ -374,7 +373,7 @@ def get_as_dframe_and_set_reference_and_expect_copies(
     cnarr: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
 ) -> DataFrame:
     """Determine the number copies of a chromosome expected and in reference.
@@ -440,7 +439,7 @@ def _log2_ratio_to_absolute(
     log2_ratio: float,
     ref_copies: int,
     expect_copies: int,
-    purity: Optional[float] = None,
+    purity: float | None = None,
 ) -> float:
     """Transform a log2 ratio to absolute linear scale (for an impure sample).
 

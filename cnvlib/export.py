@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import OrderedDict as OD
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -173,7 +173,9 @@ def export_seg(sample_fnames: list[str], chrom_ids: bool = False) -> pd.DataFram
     Segment breakpoints are not the same across samples, so samples are listed
     in serial with the sample ID as the left column.
     """
-    dframes, sample_ids = zip(*(_load_seg_dframe_id(fname) for fname in sample_fnames), strict=False)
+    dframes, sample_ids = zip(
+        *(_load_seg_dframe_id(fname) for fname in sample_fnames), strict=True
+    )
     out_table = tabio.seg.write_seg(dframes, sample_ids, chrom_ids)
     return out_table
 
@@ -194,7 +196,7 @@ def export_bed(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
     label: str,
     show: str,
@@ -271,10 +273,10 @@ def export_vcf(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
-    sample_id: None = None,
-    cnarr: None = None,
+    sample_id: str | None = None,
+    cnarr: CopyNumArray | None = None,
 ) -> tuple[str, str]:
     """Convert segments to Variant Call Format.
 
@@ -294,7 +296,7 @@ def export_vcf(
         "FORMAT",
         sample_id or segments.sample_id,
     ]
-    if cnarr:
+    if cnarr:  # type: ignore[unreachable]
         segments = assign_ci_start_end(segments, cnarr)
     vcf_rows = segments2vcf(
         segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female
@@ -323,7 +325,7 @@ def assign_ci_start_end(segarr, cnarr):
         else (np.nan, np.nan)
         for _seg, bins in cnarr.by_ranges(segarr, mode="outer")
     )
-    ci_lefts, ci_rights = zip(*lefts_rights, strict=False)
+    ci_lefts, ci_rights = zip(*lefts_rights, strict=True)
     return segarr.as_dataframe(segarr.data.assign(ci_left=ci_lefts, ci_right=ci_rights))
 
 
@@ -331,7 +333,7 @@ def segments2vcf(
     segments: CopyNumArray,
     ploidy: int,
     is_haploid_x_reference: bool,
-    diploid_parx_genome: Optional[str],
+    diploid_parx_genome: str | None,
     is_sample_female: bool,
 ) -> Iterator[tuple[str, int, str, str, str, str, str, str, str, str]]:
     """Convert copy number segments to VCF records."""
@@ -380,7 +382,9 @@ def segments2vcf(
 
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
-    for out_row, abs_exp in zip(out_dframe.itertuples(index=False), abs_expect, strict=False):
+    for out_row, abs_exp in zip(
+        out_dframe.itertuples(index=False), abs_expect, strict=True
+    ):
         if (
             out_row.ncopies == abs_exp
             or
@@ -496,7 +500,7 @@ def export_gistic_markers(cnr_fnames):
 
 
 def export_theta(
-    tumor_segs: CopyNumArray, normal_cn: Optional[CopyNumArray]
+    tumor_segs: CopyNumArray, normal_cn: CopyNumArray | None
 ) -> pd.DataFrame:
     """Convert tumor segments and normal .cnr or reference .cnn to THetA input.
 
@@ -523,7 +527,7 @@ def export_theta(
     #              if tumor_segs.chromosome.iat[0].startswith('chr')
     #              else ["X", "Y"])
     # NB: THetA2 now apparently just drops X and Y (#153)
-    xy_names = []
+    xy_names: list[str] = []
     tumor_segs = tumor_segs.autosomes(also=xy_names)
     if normal_cn:
         normal_cn = normal_cn.autosomes(also=xy_names)
@@ -547,7 +551,7 @@ def export_theta(
 
 
 def ref_means_nbins(
-    tumor_segs: CopyNumArray, normal_cn: Optional[CopyNumArray]
+    tumor_segs: CopyNumArray, normal_cn: CopyNumArray | None
 ) -> tuple[ndarray, pd.Series]:
     """Extract segments' reference mean log2 values and probe counts.
 
@@ -605,7 +609,7 @@ def ref_means_nbins(
 
 
 def theta_read_counts(
-    log2_ratio: Union[pd.Series, ndarray],
+    log2_ratio: pd.Series | ndarray,
     nbins: pd.Series,
     # These scaling factors don't meaningfully affect
     # THetA's calculation unless they're too small
