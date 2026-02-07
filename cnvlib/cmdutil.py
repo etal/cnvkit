@@ -11,6 +11,10 @@ from skgenome import GenomicArray as GA
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    import pandas as pd
+
     from cnvlib.cnary import CopyNumArray
     from cnvlib.vary import VariantArray
     from skgenome.gary import GenomicArray
@@ -75,8 +79,13 @@ def load_het_snps(
     return varr  # type: ignore[no-any-return]
 
 
-def verify_sample_sex(cnarr, sex_arg, is_haploid_x_reference, diploid_parx_genome):
-    is_sample_female = cnarr.guess_xx(
+def verify_sample_sex(
+    cnarr: CopyNumArray,
+    sex_arg: str | None,
+    is_haploid_x_reference: bool,
+    diploid_parx_genome: str | None,
+) -> bool:
+    is_sample_female: bool = cnarr.guess_xx(  # type: ignore[assignment]
         is_haploid_x_reference, diploid_parx_genome, verbose=False
     )
     if sex_arg:
@@ -96,7 +105,11 @@ def verify_sample_sex(cnarr, sex_arg, is_haploid_x_reference, diploid_parx_genom
     return is_sample_female
 
 
-def write_tsv(outfname, rows, colnames=None) -> None:
+def write_tsv(
+    outfname: str | None,
+    rows: Iterable[Iterable[object]],
+    colnames: Iterable[str] | None = None,
+) -> None:
     """Write rows, with optional column header, to tabular file."""
     with tabio.safe_write(outfname or sys.stdout) as handle:  # type: ignore[arg-type]
         if colnames:
@@ -105,7 +118,7 @@ def write_tsv(outfname, rows, colnames=None) -> None:
         handle.writelines("\t".join(map(str, row)) + "\n" for row in rows)
 
 
-def write_text(outfname, text, *more_texts) -> None:
+def write_text(outfname: str | None, text: str, *more_texts: str) -> None:
     """Write one or more strings (blocks of text) to a file."""
     with tabio.safe_write(outfname or sys.stdout) as handle:  # type: ignore[arg-type]
         handle.write(text)
@@ -114,7 +127,9 @@ def write_text(outfname, text, *more_texts) -> None:
                 handle.write(mtext)
 
 
-def write_dataframe(outfname, dframe, header=True) -> None:
+def write_dataframe(
+    outfname: str | None, dframe: pd.DataFrame, header: bool = True
+) -> None:
     """Write a pandas.DataFrame to a tabular file."""
     with tabio.safe_write(outfname or sys.stdout) as handle:  # type: ignore[arg-type]
         dframe.to_csv(handle, header=header, index=False, sep="\t", float_format="%.6g")
