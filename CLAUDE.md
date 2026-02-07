@@ -243,6 +243,13 @@ Rscript -e "library(DNAcopy)"
 
 ## Code Style & Conventions
 
+### Modern Python Style
+- **Type annotations** use PEP 604 union syntax: `X | Y` and `X | None`, not `Union[X, Y]` or `Optional[X]`
+- **Match/case** (PEP 634) is used for dispatch on string literals where it improves clarity
+- **`removeprefix()`/`removesuffix()`** (PEP 616) preferred over manual slicing for prefix/suffix removal
+- **Dict `|=`** (PEP 584) preferred over `.update()` for merging dict literals
+- All `zip()` calls use explicit `strict=True` or `strict=False` (PEP 618)
+
 ### Variable Naming
 - The codebase uses `bam_fname` or `sample_fname` for file paths that can be either BAM or bedGraph files
 - When updating help text or documentation, maintain consistency with existing patterns
@@ -273,6 +280,16 @@ Static type checking is configured in `pyproject.toml [tool.mypy]`:
 - **Build args:** `CNVKIT_VERSION` for specific version installs
 - **Base:** `continuumio/miniconda3:latest` with conda environment
 - **DevContainer:** `.devcontainer/` provides VS Code dev environment (alternative to conda setup)
+
+### Serena (MCP LSP integration)
+A Serena MCP server is configured for this project, providing LSP-backed code intelligence tools. Prefer these over brute-force grep/glob when exploring code:
+- **`find_symbol`** - Find classes, functions, methods by name path (e.g. `CopyNumArray/squash_genes`)
+- **`get_symbols_overview`** - List all symbols in a file without reading the whole file
+- **`find_referencing_symbols`** - Find all references to a symbol across the codebase
+- **`search_for_pattern`** - Regex search with file filtering (for non-symbol searches)
+- **`replace_symbol_body`** / **`insert_after_symbol`** - Precise symbolic edits
+
+These are more token-efficient than reading entire files, especially for understanding call graphs and refactoring.
 
 ## File Organization Tips
 
