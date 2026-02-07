@@ -11,10 +11,11 @@ import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
+from .cut import cut
 from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices, Numeric
 
 _BF_COLS = ("chromosome", "start", "end")
-from .merge import flatten, merge
+from .merge import flatten, merge, squash
 from .rangelabel import to_label
 from .subtract import subtract
 from .subdivide import subdivide
@@ -686,10 +687,9 @@ class GenomicArray:
 
     # Genome arithmetic
 
-    def cut(self, other, combine=None):
-        """Split this array's regions at the boundaries in `other`."""
-        # TODO
-        return NotImplemented
+    def cut(self: _GA, other: GenomicArray) -> _GA:
+        """Split this array's regions at the boundaries in ``other``."""
+        return self.as_dataframe(cut(self.data, other.data))
 
     def flatten(
         self,
@@ -782,10 +782,22 @@ class GenomicArray:
         # Don't modify the original
         return self.as_dataframe(table.copy())
 
-    def squash(self, combine=None):
-        """Combine some groups of rows, by some criteria, into single rows."""
-        # TODO
-        return NotImplemented
+    def squash(
+        self: _GA,
+        by: str | None = None,
+        combine: dict[str, Callable] | None = None,
+    ) -> _GA:
+        """Combine consecutive adjacent rows into single rows.
+
+        Parameters
+        ----------
+        by : str or None
+            If given, only combine consecutive rows with the same value
+            in this column (e.g. ``"gene"``).
+        combine : dict or None
+            Column-to-function mappings for aggregation.
+        """
+        return self.as_dataframe(squash(self.data, by=by, combine=combine))
 
     def subdivide(
         self, avg_size: int, min_size: int = 0, verbose: bool = False

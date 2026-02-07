@@ -13,10 +13,11 @@ import itertools
 from typing import TYPE_CHECKING
 
 import bioframe
+import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
-from .combiners import get_combiners
+from .combiners import first_of, get_combiners
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -132,3 +133,71 @@ def merge(
     return out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
     )
+
+
+def squash(
+    table: pd.DataFrame,
+    by: str | None = None,
+    combine: dict[str, Callable] | None = None,
+) -> pd.DataFrame:
+    """Combine consecutive adjacent rows into single rows.
+
+    Parameters
+    ----------
+    table : DataFrame
+        Genomic intervals with at least chromosome, start, end columns.
+        Must be sorted by chromosome, start, end.
+    by : str or None
+        If given, only combine consecutive rows that have the same value
+        in this column (e.g. ``"gene"``).  If None, combine all adjacent
+        rows on the same chromosome.
+    combine : dict or None
+        Column-to-function mappings for aggregation.  See
+        :func:`get_combiners`.
+
+    Returns
+    -------
+    DataFrame
+        A new DataFrame with consecutive adjacent rows combined.
+    """
+    if table.empty or len(table) == 1:
+        return table
+
+    cmb = get_combiners(table, stranded=False, combine=combine)
+    if by is not None:
+        # Values are identical within each group, so just take the first
+        cmb[by] = first_of
+
+    # Vectorised adjacency detection
+    chroms = table["chromosome"].to_numpy()
+    starts = table["start"].to_numpy()
+    ends = table["end"].to_numpy()
+    is_adjacent = (chroms[:-1] == chroms[1:]) & (ends[:-1] == starts[1:])
+    if by is not None:
+        by_vals = table[by].to_numpy()
+        is_adjacent &= by_vals[:-1] == by_vals[1:]
+
+    # Nothing to squash -- short-circuit
+    if not is_adjacent.any():
+        return table
+
+    # Assign group IDs: increment when rows are *not* adjacent
+    group_ids = np.concatenate([[0], np.cumsum(~is_adjacent)])
+
+    result_rows: list[pd.Series] = []
+    for _gid, group in table.groupby(group_ids, sort=False):
+        if len(group) == 1:
+            result_rows.append(group.iloc[0])
+        else:
+            vals: dict = {}
+            for col in table.columns:
+                if col == "start":
+                    vals[col] = group["start"].iloc[0]
+                elif col == "end":
+                    vals[col] = group["end"].iloc[-1]
+                elif col in cmb:
+                    vals[col] = cmb[col](group[col].values)
+                else:
+                    vals[col] = group[col].iloc[0]
+            result_rows.append(pd.Series(vals))
+    return pd.DataFrame(result_rows, columns=table.columns).reset_index(drop=True)
