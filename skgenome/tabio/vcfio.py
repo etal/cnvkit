@@ -8,10 +8,12 @@ from itertools import chain
 
 import numpy as np
 import pandas as pd
-import pysam
 from typing import TYPE_CHECKING, Any
 
+from skgenome._pysam import PYSAM_INSTALL_MSG
+
 if TYPE_CHECKING:
+    import pysam
     from collections.abc import Iterator
     from pysam.libcbcf import (
         VariantFile,
@@ -36,6 +38,12 @@ def read_vcf(
     sample  matching that ID.  If `sample_id` is a positive integer, return the
     sample or pair at that index position, counting from 0.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for reading VCF files. {PYSAM_INSTALL_MSG}"
+        ) from None
     try:
         vcf_reader = pysam.VariantFile(infile)
     except Exception as exc:

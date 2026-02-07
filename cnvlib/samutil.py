@@ -10,9 +10,11 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
-import pysam
+
+from skgenome._pysam import PYSAM_INSTALL_MSG
 
 if TYPE_CHECKING:
+    import pysam
     from numpy import float64, int64
 
 
@@ -24,6 +26,12 @@ def idxstats(
     Use the BAM index (.bai) to get the number of reads and size of each
     chromosome. Contigs with no mapped reads are skipped.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for reading BAM index stats. {PYSAM_INSTALL_MSG}"
+        ) from None
     handle = StringIO(
         pysam.idxstats(bam_fname, split_lines=False, reference_filename=fasta)
     )
@@ -55,6 +63,12 @@ def ensure_bam_index(bam_fname: str) -> str:
     - MySample.bam.bai
     - MySample.bai
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for BAM/CRAM indexing. {PYSAM_INSTALL_MSG}"
+        ) from None
     if PurePath(bam_fname).suffix == ".cram":
         if os.path.isfile(bam_fname + ".crai"):
             # MySample.cram.crai
@@ -93,6 +107,12 @@ def ensure_bam_sorted(
     by_name=False: reads are sorted by position. Consecutive reads have
     increasing position.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for checking BAM sort order. {PYSAM_INSTALL_MSG}"
+        ) from None
     if by_name:
         # Compare read IDs
         def out_of_order(read, prev) -> bool:
@@ -135,6 +155,12 @@ def get_read_length(
     n : int
         Number of reads used to calculate median read length.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for reading BAM files. {PYSAM_INSTALL_MSG}"
+        ) from None
     was_open = False
     if isinstance(bam, str):
         bam = pysam.AlignmentFile(bam, "rb", reference_filename=fasta)

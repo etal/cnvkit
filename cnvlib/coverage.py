@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-import pysam
 from skgenome import tabio
+from skgenome._pysam import PYSAM_INSTALL_MSG
 
 from . import core, samutil
 from .cnary import CopyNumArray as CNA
@@ -20,6 +20,7 @@ from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 if TYPE_CHECKING:
+    import pysam
     from collections.abc import Iterator
     from skgenome import GenomicArray
 
@@ -66,6 +67,13 @@ def bedgraph_to_basecount(
         DataFrame with columns matching bedcov output: chromosome, start,
         end, gene (if present in BED), and basecount.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for reading bedGraph files. {PYSAM_INSTALL_MSG}"
+        ) from None
+
     validate_bedgraph_index(bedgraph_fname)
 
     # Read the BED file to get regions
@@ -388,6 +396,12 @@ def interval_coverages_count(
     bed_fname: str, bam_fname: str, min_mapq: int, procs: int = 1, fasta: None = None
 ) -> Iterator[list[int | tuple[str, int, int, str, float, float]]]:
     """Calculate log2 coverages in the BAM file at each interval."""
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for BAM read counting. {PYSAM_INSTALL_MSG}"
+        ) from None
     regions = tabio.read_auto(bed_fname)
     if procs == 1:
         bamfile = pysam.AlignmentFile(bam_fname, "rb", reference_filename=fasta)
@@ -420,6 +434,12 @@ def _rdc_chunk(
     fasta: None = None,
 ) -> Iterator[tuple[int, tuple[str, int, int, str, float, float]]]:
     if isinstance(bamfile, str):
+        try:
+            import pysam
+        except ImportError:
+            raise ImportError(
+                f"pysam is required for BAM read counting. {PYSAM_INSTALL_MSG}"
+            ) from None
         bamfile = pysam.AlignmentFile(bamfile, "rb", reference_filename=fasta)
     for chrom, start, end, gene in regions.coords(["gene"]):
         yield region_depth_count(bamfile, chrom, start, end, gene, min_mapq)
@@ -525,6 +545,12 @@ def bedcov(
 
     i.e. mean pileup depth across each region.
     """
+    try:
+        import pysam
+    except ImportError:
+        raise ImportError(
+            f"pysam is required for BAM coverage calculation. {PYSAM_INSTALL_MSG}"
+        ) from None
     # Count bases in each region; exclude low-MAPQ reads
     cmd = []
     if max_depth is not None:
