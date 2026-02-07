@@ -266,7 +266,7 @@ def interval_coverages(
             processes,
             fasta,  # type: ignore[arg-type]
         )
-        read_counts, cna_rows = zip(*results, strict=False)
+        read_counts, cna_rows = zip(*results, strict=True)
         read_counts = pd.Series(read_counts)
         cnarr = CNA.from_rows(
             list(cna_rows), columns=(*CNA._required_columns, "depth"), meta_dict=meta

@@ -101,7 +101,7 @@ def get_regions(fasta_fname: str) -> Generator[tuple, None, None]:
                         if gap_mask.any():
                             ok_starts = n_indices[:-1][gap_mask] + 1 + cursor
                             ok_ends = n_indices[1:][gap_mask] + cursor
-                            for start, end in zip(ok_starts, ok_ends, strict=False):
+                            for start, end in zip(ok_starts, ok_ends, strict=True):
                                 yield log_this(chrom, start, end)
                         # Account for any tailing non-N chars
                         if n_indices[-1] + 1 < len(line_chars):
@@ -135,7 +135,7 @@ def join_regions(regions: GA, min_gap_size: int) -> Generator[tuple, None, None]
     min_gap_size = min_gap_size or 0
     for chrom, rows in regions.by_chromosome():
         logging.info("%s: Joining over small gaps", chrom)
-        coords = iter(zip(rows["start"], rows["end"], strict=False))
+        coords = iter(zip(rows["start"], rows["end"], strict=True))
         prev_start, prev_end = next(coords)
         for start, end in coords:
             gap = start - prev_end

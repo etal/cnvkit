@@ -34,7 +34,7 @@ def by_ranges(
                 src_rows, None, bin_rows["start"], bin_rows["end"], mode
             )
             for bin_row, subrange in zip(
-                bin_rows.itertuples(index=False), subranges, strict=False
+                bin_rows.itertuples(index=False), subranges, strict=True
             ):
                 yield bin_row, subrange
         elif keep_empty:
@@ -209,7 +209,7 @@ def _irange_simple(
         ends = [None] * len(starts)
 
     for start_idx, start_val, end_idx, end_val in zip(
-        start_idxs, starts, end_idxs, ends, strict=False
+        start_idxs, starts, end_idxs, ends, strict=True
     ):
         yield (slice(start_idx, end_idx), start_val, end_val)
 
@@ -220,7 +220,7 @@ def _irange_nested(
     """Slice subsets of table when regions are nested."""
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
     assert len(starts) == len(ends) > 0
-    for start_val, end_val in zip(starts, ends, strict=False):
+    for start_val, end_val in zip(starts, ends, strict=True):
         # Mask of table rows to keep for this query region
         region_mask = np.ones(len(table), dtype=np.bool_)
         if start_val:

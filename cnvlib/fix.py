@@ -189,7 +189,7 @@ def do_fix(
             ordered = [
                 (k, r)
                 for r, k in sorted(
-                    zip(corr_coefs, ref_log2_cols, strict=False), reverse=True
+                    zip(corr_coefs, ref_log2_cols, strict=True), reverse=True
                 )
             ]
             logging.info(

@@ -174,7 +174,7 @@ def export_seg(sample_fnames: list[str], chrom_ids: bool = False) -> pd.DataFram
     in serial with the sample ID as the left column.
     """
     dframes, sample_ids = zip(
-        *(_load_seg_dframe_id(fname) for fname in sample_fnames), strict=False
+        *(_load_seg_dframe_id(fname) for fname in sample_fnames), strict=True
     )
     out_table = tabio.seg.write_seg(dframes, sample_ids, chrom_ids)
     return out_table
@@ -325,7 +325,7 @@ def assign_ci_start_end(segarr, cnarr):
         else (np.nan, np.nan)
         for _seg, bins in cnarr.by_ranges(segarr, mode="outer")
     )
-    ci_lefts, ci_rights = zip(*lefts_rights, strict=False)
+    ci_lefts, ci_rights = zip(*lefts_rights, strict=True)
     return segarr.as_dataframe(segarr.data.assign(ci_left=ci_lefts, ci_right=ci_rights))
 
 
@@ -383,7 +383,7 @@ def segments2vcf(
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
     for out_row, abs_exp in zip(
-        out_dframe.itertuples(index=False), abs_expect, strict=False
+        out_dframe.itertuples(index=False), abs_expect, strict=True
     ):
         if (
             out_row.ncopies == abs_exp

@@ -214,7 +214,7 @@ def _nonoverlapping_groups(table, bp: int):
     # advantage of the grouping and sorting already done, and don't repeat
     # pandas' traversal and inferences.
     # ENH: Find & use a lower-level, 1-pass pandas function
-    keyed_groups = zip(group_keys, table.itertuples(index=False), strict=False)
+    keyed_groups = zip(group_keys, table.itertuples(index=False), strict=True)
     return (row_group for _key, row_group in itertools.groupby(keyed_groups, first_of))
 
 

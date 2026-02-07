@@ -99,7 +99,7 @@ def do_segmetrics(
     # Measures of spread
     if spread_stats:
         deviations = (
-            bl - sl for bl, sl in zip(bins_log2s, segarr["log2"], strict=False)
+            bl - sl for bl, sl in zip(bins_log2s, segarr["log2"], strict=True)
         )
         if len(spread_stats) > 1:
             deviations = list(deviations)  # type: ignore[assignment]

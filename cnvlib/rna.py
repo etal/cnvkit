@@ -499,7 +499,7 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len
     gene_minima = gene_minima.fillna(NULL_LOG2_COVERAGE)
     assert not gene_minima.hasnans, gene_minima.head()
     for (sample_id, sample_col), (_sid_log2, sample_log2) in zip(
-        sample_counts.items(), sample_data_log2.items(), strict=False
+        sample_counts.items(), sample_data_log2.items(), strict=True
     ):
         tx_len = cnr_info.tx_length
         sample_depth = (read_len * sample_col / tx_len).rename("depth")

@@ -645,7 +645,7 @@ def _cmd_autobin(args: argparse.Namespace) -> None:
     labels = ("Target", "Antitarget")
     width = max(map(len, labels)) + 1
     print(" " * width, "Depth", "Bin size", sep="\t")
-    for label, (depth, binsize) in zip(labels, fields, strict=False):
+    for label, (depth, binsize) in zip(labels, fields, strict=True):
         if depth is not None:
             print((label + ":").ljust(width), format(depth, ".3f"), binsize, sep="\t")
 

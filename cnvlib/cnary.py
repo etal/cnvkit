@@ -630,7 +630,7 @@ class CopyNumArray(GenomicArray):
                     self.iter_ranges_of(
                         segments, "log2", mode="inner", keep_empty=True
                     ),
-                    strict=False,
+                    strict=True,
                 )
                 if len(bins_lr)
             ]

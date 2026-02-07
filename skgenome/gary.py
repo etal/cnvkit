@@ -75,7 +75,7 @@ class GenomicArray:
             recast_cols = {
                 col: dtype
                 for col, dtype in zip(
-                    self._required_columns, self._required_dtypes, strict=False
+                    self._required_columns, self._required_dtypes, strict=True
                 )
                 if not ok_dtype(col, dtype)
             }
@@ -89,7 +89,7 @@ class GenomicArray:
     @classmethod
     def _make_blank(cls) -> pd.DataFrame:
         """Create an empty dataframe with the columns required by this class."""
-        spec = list(zip(cls._required_columns, cls._required_dtypes, strict=False))
+        spec = list(zip(cls._required_columns, cls._required_dtypes, strict=True))
         try:
             arr = np.zeros(0, dtype=spec)
             return pd.DataFrame(arr)

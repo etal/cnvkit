@@ -70,9 +70,9 @@ def correlate_cnv_expression(cnv_fname, expression_fname):
                 spearmanr(cnv_row, expr_row, nan_policy="omit")[0],
                 kendalltau(cnv_row, expr_row, nan_policy="omit")[0],
             )
-            for cnv_row, expr_row in zip(c_nums.values, e_nums.values, strict=False)
+            for cnv_row, expr_row in zip(c_nums.values, e_nums.values, strict=True)
         ],
-        strict=False,
+        strict=True,
     )
 
     result = (
