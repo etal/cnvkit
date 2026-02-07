@@ -141,7 +141,7 @@ p2-9_2-segmetrics.cns: build/p2-9_2.cns build/p2-9_2.cnr
 	$(cnvkit) segmetrics -s $^ -o $@ \
 		--mean --median --mode --t-test \
 		--stdev --mad --mse --iqr --bivar \
-		--ci --pi --sem --smooth-bootstrap
+		--ci --pi --sem --smooth-bootstrap=10
 
 p2-5_5-segmetrics.cns: build/p2-5_5.cns build/p2-5_5.cnr
 	$(cnvkit) segmetrics -s $^ -o $@ \
