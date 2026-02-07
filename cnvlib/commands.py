@@ -1568,7 +1568,7 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
             **scatter_opts,  # type: ignore[arg-type]
         )
         if args.output:
-            oformat = os.path.splitext(args.output)[-1].replace(".", "")
+            oformat = os.path.splitext(args.output)[-1].removeprefix(".")
             pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
             logging.info("Wrote %s", args.output)
         else:
@@ -1732,7 +1732,7 @@ def _cmd_heatmap(args: argparse.Namespace) -> None:
         args.title,
     )
     if args.output:
-        oformat = os.path.splitext(args.output)[-1].replace(".", "")
+        oformat = os.path.splitext(args.output)[-1].removeprefix(".")
         pyplot.savefig(args.output, format=oformat, bbox_inches="tight")
         logging.info("Wrote %s", args.output)
     else:

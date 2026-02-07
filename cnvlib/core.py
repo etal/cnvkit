@@ -120,7 +120,7 @@ def fbase(fname: str) -> str:
     base = os.path.basename(fname)
     # Gzip extension usually follows another extension
     if base.endswith(".gz"):
-        base = base[:-3]
+        base = base.removesuffix(".gz")
     # Cases to drop more than just the last dot
     known_multipart_exts = (
         ".antitargetcoverage.cnn",

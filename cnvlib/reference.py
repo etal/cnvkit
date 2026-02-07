@@ -3,7 +3,7 @@
 from __future__ import annotations
 import collections
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Any, TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -642,7 +642,7 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
     print("Clustering", len(logr_matrix), "samples...")
     # clusters = markov(logr_matrix)
     clusters = kmeans(logr_matrix)
-    cluster_cols = {}
+    cluster_cols: dict[str, Any] = {}
     sample_ids = np.array(sample_ids)  # For easy indexing
     for i, clust_idx in enumerate(clusters):
         i += 1
@@ -663,12 +663,10 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
         clust_matrix = logr_matrix[clust_idx, :]
         # XXX re-add the pseudocount sample to each cluster? need benchmark
         clust_info = summarize_info(clust_matrix, [])
-        cluster_cols.update(
-            {
-                f"log2_{i}": clust_info["log2"],
-                f"spread_{i}": clust_info["spread"],
-            }
-        )
+        cluster_cols |= {
+            f"log2_{i}": clust_info["log2"],
+            f"spread_{i}": clust_info["spread"],
+        }
     return cluster_cols
 
 

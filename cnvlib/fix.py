@@ -187,7 +187,10 @@ def do_fix(
                 [cnarr.log2.corr(ref_matched[ref_col]) for ref_col in ref_log2_cols]
             )
             ordered = [
-                (k, r) for r, k in sorted(zip(corr_coefs, ref_log2_cols, strict=False), reverse=True)
+                (k, r)
+                for r, k in sorted(
+                    zip(corr_coefs, ref_log2_cols, strict=False), reverse=True
+                )
             ]
             logging.info(
                 "Correlations with each cluster:\n\t%s",
@@ -195,7 +198,7 @@ def do_fix(
             )
             log2_key = ordered[0][0]
             if log2_key.startswith("log2_"):
-                suffix = log2_key.split("_", 1)[1]
+                suffix = log2_key.removeprefix("log2_")
                 spread_key = "spread_" + suffix
             logging.info(" -> Choosing columns %r and %r", log2_key, spread_key)
 

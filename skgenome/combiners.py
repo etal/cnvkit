@@ -40,7 +40,7 @@ def get_combiners(
         "probes": sum,
     }
     if combine:
-        cmb.update(combine)
+        cmb |= combine
     if "strand" not in cmb:
         cmb["strand"] = first_of if stranded else merge_strands
     return {k: v for k, v in cmb.items() if k in table.columns}  # type: ignore[misc]

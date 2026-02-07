@@ -91,7 +91,11 @@ def bedgraph_to_basecount(
             # Handle chromosome naming mismatches or missing chromosomes
             if chrom not in chromosomes_in_bedgraph:
                 # Try adding/removing 'chr' prefix
-                alt_chrom = f"chr{chrom}" if not chrom.startswith("chr") else chrom[3:]
+                alt_chrom = (
+                    f"chr{chrom}"
+                    if not chrom.startswith("chr")
+                    else chrom.removeprefix("chr")
+                )
                 if alt_chrom in chromosomes_in_bedgraph:
                     chrom = alt_chrom
                 else:

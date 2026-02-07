@@ -256,7 +256,7 @@ def sniff_region_format(infile: str) -> Optional[str]:
     fname = get_filename(infile)
     if fname:
         _base, ext = os.path.splitext(fname)
-        ext = ext.lstrip(".")
+        ext = ext.removeprefix(".")
         # if ext in known_extensions:
         if ext in format_patterns:
             fname_fmt = ext
