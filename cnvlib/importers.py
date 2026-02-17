@@ -99,7 +99,7 @@ def unpipe_name(name):
 
 
 def do_import_theta(
-    segarr: CopyNumArray, theta_results_fname: str, ploidy: int = 2
+    segarr: CopyNumArray, theta_results_fname: str, ploidy: float = 2
 ) -> Iterator[CopyNumArray]:
     """Import absolute copy number calls from THetA results.
 
@@ -114,7 +114,7 @@ def do_import_theta(
         results before calling absolute copy numbers.
     theta_results_fname : str
         Path to THetA results file (.results or .withBounds file).
-    ploidy : int, optional
+    ploidy : float, optional
         Expected baseline ploidy (usually 2 for diploid). Used to calculate
         log2 ratios from absolute copy numbers. Default: 2.
 

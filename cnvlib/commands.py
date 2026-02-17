@@ -1205,9 +1205,9 @@ def _cmd_call(args: argparse.Namespace) -> None:
     if args.purity_file:
         pf_purity, pf_ploidy = purity.read_purity_tsv(args.purity_file)
         args.purity = pf_purity
-        args.ploidy = round(pf_ploidy)
+        args.ploidy = pf_ploidy
         logging.info(
-            "Using purity %.4f and ploidy %d from %s",
+            "Using purity %.4f and ploidy %g from %s",
             args.purity,
             args.ploidy,
             args.purity_file,
@@ -1308,9 +1308,9 @@ P_call.add_argument(
 )
 P_call.add_argument(
     "--ploidy",
-    type=int,
+    type=float,
     default=2,
-    help="Ploidy of the sample cells. [Default: %(default)d]",
+    help="Ploidy of the sample cells. [Default: %(default)g]",
 )
 P_call.add_argument(
     "--purity",
@@ -2549,9 +2549,9 @@ P_import_theta.add_argument("tumor_cns")
 P_import_theta.add_argument("theta_results")
 P_import_theta.add_argument(
     "--ploidy",
-    type=int,
+    type=float,
     default=2,
-    help="Ploidy of normal cells. [Default: %(default)d]",
+    help="Ploidy of normal cells. [Default: %(default)g]",
 )
 P_import_theta.add_argument(
     "-d",
@@ -2734,9 +2734,9 @@ P_export_bed.add_argument(
 )
 P_export_bed.add_argument(
     "--ploidy",
-    type=int,
+    type=float,
     default=2,
-    help="Ploidy of the sample cells. [Default: %(default)d]",
+    help="Ploidy of the sample cells. [Default: %(default)g]",
 )
 add_sample_sex(P_export_bed)
 P_export_bed.add_argument(
@@ -2831,9 +2831,9 @@ P_export_vcf.add_argument(
 )
 P_export_vcf.add_argument(
     "--ploidy",
-    type=int,
+    type=float,
     default=2,
-    help="Ploidy of the sample cells. [Default: %(default)d]",
+    help="Ploidy of the sample cells. [Default: %(default)g]",
 )
 add_sample_sex(P_export_vcf)
 add_haploid_x_reference(P_export_vcf)
