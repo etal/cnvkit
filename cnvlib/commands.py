@@ -55,6 +55,7 @@ from . import (
     importers,
     metrics,
     parallel,
+    purity,
     reference,
     reports,
     scatter,
@@ -1201,8 +1202,14 @@ do_call = public(call.do_call)
 
 def _cmd_call(args: argparse.Namespace) -> None:
     """Call copy number variants from segmented log2 ratios."""
-    if args.purity and not 0.0 < args.purity <= 1.0:
-        raise RuntimeError("Purity must be between 0 and 1.")
+    if args.purity_file:
+        args.purity, args.ploidy = purity.read_purity_tsv(args.purity_file)
+        logging.info(
+            "Using purity %.4f and ploidy %g from %s",
+            args.purity,
+            args.ploidy,
+            args.purity_file,
+        )
 
     cnarr = read_cna(args.filename)
     if args.center_at:
@@ -1247,6 +1254,22 @@ def _cmd_call(args: argparse.Namespace) -> None:
 
 def csvstring(text):
     return tuple(map(float, text.split(",")))
+
+
+def purity_value(text: str) -> float:
+    """Argparse type: tumor purity/cellularity, must be in (0, 1]."""
+    value = float(text)
+    if not 0.0 < value <= 1.0:
+        raise argparse.ArgumentTypeError(f"purity must be in (0, 1], got {value}")
+    return value
+
+
+def ploidy_value(text: str) -> float:
+    """Argparse type: sample ploidy, must be >= 1."""
+    value = float(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"ploidy must be >= 1, got {value}")
+    return value
 
 
 P_call = AP_subparsers.add_parser("call", help=_cmd_call.__doc__)
@@ -1297,14 +1320,21 @@ P_call.add_argument(
 )
 P_call.add_argument(
     "--ploidy",
-    type=int,
+    type=ploidy_value,
     default=2,
-    help="Ploidy of the sample cells. [Default: %(default)d]",
+    help="Ploidy of the sample cells. [Default: %(default)g]",
 )
 P_call.add_argument(
     "--purity",
-    type=float,
+    type=purity_value,
     help="Estimated tumor cell fraction, a.k.a. purity or cellularity.",
+)
+P_call.add_argument(
+    "--purity-file",
+    metavar="FILENAME",
+    help="""Tab-separated file with columns 'purity', 'ploidy', and 'score'
+            (e.g. output of the 'purity' command). Uses values from the first
+            data row. Overrides --purity and --ploidy.""",
 )
 P_call.add_argument(
     "--drop-low-coverage",
@@ -2246,6 +2276,126 @@ P_segmetrics_stats.set_defaults(location_stats=[], spread_stats=[], interval_sta
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
 
 
+# purity ------------------------------------------------------------------------
+
+do_purity = public(purity.do_purity)
+
+
+def _cmd_purity(args: argparse.Namespace) -> None:
+    """Estimate tumor purity and ploidy from segment copy ratios."""
+    segments = read_cna(args.filename)
+    variants = load_het_snps(
+        args.vcf,
+        args.sample_id,
+        args.normal_id,
+        args.min_variant_depth,
+        args.zygosity_freq,
+    )
+    result = do_purity(
+        segments,
+        variants,
+        min_purity=args.min_purity,
+        max_purity=args.max_purity,
+        purity_step=args.purity_step,
+        min_ploidy=args.min_ploidy,
+        max_ploidy=args.max_ploidy,
+        ploidy_step=args.ploidy_step,
+        max_copies=args.max_copies,
+        baf_weight=args.baf_weight,
+        method=args.method,
+    )
+    if len(result):
+        logging.info(
+            "Best: purity=%.4f, ploidy=%.1f, score=%.4f",
+            result["purity"].iloc[0],
+            result["ploidy"].iloc[0],
+            result["score"].iloc[0],
+        )
+    write_dataframe(args.output, result)
+
+
+P_purity = AP_subparsers.add_parser("purity", help=_cmd_purity.__doc__)
+P_purity.add_argument("filename", help="Segmented copy ratio data file (.cns).")
+P_purity.add_argument(
+    "--min-purity",
+    type=float,
+    default=0.1,
+    help="Minimum purity to search. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--max-purity",
+    type=float,
+    default=1.0,
+    help="Maximum purity to search. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--purity-step",
+    type=float,
+    default=0.01,
+    help="Purity step size. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--min-ploidy",
+    type=float,
+    default=1.5,
+    help="Minimum ploidy to search. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--max-ploidy",
+    type=float,
+    default=5.0,
+    help="Maximum ploidy to search. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--ploidy-step",
+    type=float,
+    default=0.1,
+    help="Ploidy step size. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--max-copies",
+    type=int,
+    default=8,
+    help="Maximum copy number to consider. [Default: %(default)d]",
+)
+P_purity.add_argument(
+    "--baf-weight",
+    type=float,
+    default=1.0,
+    help="""Weight for the BAF score relative to the copy-ratio score. Set to 0
+            to ignore BAF entirely, or increase above 1 to emphasize BAF.
+            [Default: %(default)s]""",
+)
+P_purity.add_argument(
+    "-m",
+    "--method",
+    choices=("kde",),
+    default="kde",
+    help="Estimation method. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "-o", "--output", metavar="FILENAME", help="Output table file name."
+)
+
+P_purity_vcf = P_purity.add_argument_group(
+    "To additionally use SNP b-allele frequencies for purity estimation"
+)
+P_purity_vcf.add_argument(
+    "-v",
+    "--vcf",
+    metavar="FILENAME",
+    help="""VCF file name containing variants for b-allele frequency
+            calculation.""",
+)
+P_purity_vcf.add_argument(
+    "-i",
+    "--sample-id",
+    help="Name of the sample in the VCF to use for b-allele frequency extraction.",
+)
+add_snp_vcf_args(P_purity_vcf)
+P_purity.set_defaults(func=_cmd_purity)
+
+
 # bintest -----------------------------------------------------------------------
 
 do_bintest = public(bintest.do_bintest)
@@ -2413,9 +2563,9 @@ P_import_theta.add_argument("tumor_cns")
 P_import_theta.add_argument("theta_results")
 P_import_theta.add_argument(
     "--ploidy",
-    type=int,
+    type=ploidy_value,
     default=2,
-    help="Ploidy of normal cells. [Default: %(default)d]",
+    help="Ploidy of normal cells. [Default: %(default)g]",
 )
 P_import_theta.add_argument(
     "-d",
@@ -2598,9 +2748,9 @@ P_export_bed.add_argument(
 )
 P_export_bed.add_argument(
     "--ploidy",
-    type=int,
+    type=ploidy_value,
     default=2,
-    help="Ploidy of the sample cells. [Default: %(default)d]",
+    help="Ploidy of the sample cells. [Default: %(default)g]",
 )
 add_sample_sex(P_export_bed)
 P_export_bed.add_argument(
@@ -2695,9 +2845,9 @@ P_export_vcf.add_argument(
 )
 P_export_vcf.add_argument(
     "--ploidy",
-    type=int,
+    type=ploidy_value,
     default=2,
-    help="Ploidy of the sample cells. [Default: %(default)d]",
+    help="Ploidy of the sample cells. [Default: %(default)g]",
 )
 add_sample_sex(P_export_vcf)
 add_haploid_x_reference(P_export_vcf)

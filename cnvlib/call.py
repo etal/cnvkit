@@ -20,7 +20,7 @@ def do_call(
     cnarr: CopyNumArray,
     variants: VariantArray | None = None,
     method: str = "threshold",
-    ploidy: int = 2,
+    ploidy: float = 2,
     purity: float | None = None,
     is_haploid_x_reference: bool = False,
     is_sample_female: bool = False,
@@ -56,7 +56,7 @@ def do_call(
         - 'clonal': Assume pure/clonal sample, infer from ploidy
         - 'none': Skip copy number calling, only apply filters
         Default: 'threshold'
-    ploidy : int, optional
+    ploidy : float, optional
         Expected baseline ploidy of the sample. Usually 2 for diploid.
         Default: 2
     purity : float, optional
@@ -92,8 +92,8 @@ def do_call(
         Copy of input array with added 'cn' column (absolute copy number).
         If variants provided, also includes:
         - 'baf': B-allele frequency per segment
-        - 'cn1': Major allele copy number (≥ cn2)
-        - 'cn2': Minor allele copy number (≤ cn1)
+        - 'cn1': Major allele copy number (>= cn2)
+        - 'cn2': Minor allele copy number (<= cn1)
 
     Raises
     ------
@@ -133,7 +133,7 @@ def do_call(
         outarr["baf"] = variants.baf_by_ranges(outarr)
 
     if purity and purity < 1.0:
-        logging.info("Rescaling sample with purity %g, ploidy %d", purity, ploidy)
+        logging.info("Rescaling sample with purity %g, ploidy %g", purity, ploidy)
         absolutes = absolute_clonal(
             outarr,
             ploidy,
@@ -151,7 +151,7 @@ def do_call(
             outarr["baf"] = rescale_baf(purity, outarr["baf"])
     elif method == "clonal":
         # Estimate absolute copy numbers from the original log2 values
-        logging.info("Calling copy number with clonal ploidy %d", ploidy)
+        logging.info("Calling copy number with clonal ploidy %g", ploidy)
         absolutes = absolute_pure(outarr, ploidy, is_haploid_x_reference)
 
     if method == "threshold":
@@ -191,7 +191,7 @@ def do_call(
 def log2_ratios(
     cnarr: CopyNumArray,
     absolutes: Series,
-    ploidy: int,
+    ploidy: float,
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
     min_abs_val: float = 1e-3,
@@ -217,7 +217,7 @@ def log2_ratios(
 
 def absolute_threshold(
     cnarr: CopyNumArray,
-    ploidy: int,
+    ploidy: float,
     thresholds: tuple[float, float, float, float] | ndarray,
     is_haploid_x_reference: bool,
 ) -> ndarray:
@@ -274,7 +274,7 @@ def absolute_threshold(
 
 def absolute_clonal(
     cnarr: CopyNumArray,
-    ploidy: int,
+    ploidy: float,
     purity: float,
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
@@ -294,7 +294,7 @@ def absolute_clonal(
 
 
 def absolute_pure(
-    cnarr: CopyNumArray, ploidy: int, is_haploid_x_reference: bool
+    cnarr: CopyNumArray, ploidy: float, is_haploid_x_reference: bool
 ) -> ndarray:
     """Calculate absolute copy number values from segment or bin log2 ratios."""
     absolutes = np.zeros(len(cnarr), dtype=np.float64)
@@ -308,7 +308,7 @@ def absolute_pure(
 
 def absolute_dataframe(
     cnarr: CopyNumArray,
-    ploidy: int,
+    ploidy: float,
     purity: float,
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
@@ -329,7 +329,7 @@ def absolute_dataframe(
 
 def absolute_expect(
     cnarr: CopyNumArray,
-    ploidy: int,
+    ploidy: float,
     diploid_parx_genome: str | None,
     is_sample_female: bool,
 ) -> Series:
@@ -371,7 +371,7 @@ def absolute_reference(
 
 def get_as_dframe_and_set_reference_and_expect_copies(
     cnarr: CopyNumArray,
-    ploidy: int,
+    ploidy: float,
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
     is_sample_female: bool,
@@ -418,18 +418,18 @@ def get_as_dframe_and_set_reference_and_expect_copies(
 
 
 def _reference_copies_pure(
-    chrom: str, ploidy: int, is_haploid_x_reference: bool
-) -> int:
+    chrom: str, ploidy: float, is_haploid_x_reference: bool
+) -> float:
     """Determine the reference number of chromosome copies (pure sample).
 
     Returns
     -------
-    int
+    float
         Number of copies in the reference.
     """
     chrom = chrom.lower()
     if chrom in ["chry", "y"] or (is_haploid_x_reference and chrom in ["chrx", "x"]):
-        ref_copies = ploidy // 2
+        ref_copies = ploidy / 2
     else:
         ref_copies = ploidy
     return ref_copies
@@ -474,7 +474,7 @@ def _log2_ratio_to_absolute(
     return ncopies
 
 
-def _log2_ratio_to_absolute_pure(log2_ratio: float, ref_copies: int) -> float:
+def _log2_ratio_to_absolute_pure(log2_ratio: float, ref_copies: float) -> float:
     """Transform a log2 ratio to absolute linear scale (for a pure sample).
 
     Purity adjustment is skipped. This is appropriate if the sample is germline

@@ -194,7 +194,7 @@ def _load_seg_dframe_id(fname: str) -> tuple[pd.DataFrame, str]:
 
 def export_bed(
     segments: CopyNumArray,
-    ploidy: int,
+    ploidy: float,
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
     is_sample_female: bool,
@@ -271,7 +271,7 @@ VCF_HEADER = """\
 
 def export_vcf(
     segments: CopyNumArray,
-    ploidy: int,
+    ploidy: float,
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
     is_sample_female: bool,
@@ -331,7 +331,7 @@ def assign_ci_start_end(segarr, cnarr):
 
 def segments2vcf(
     segments: CopyNumArray,
-    ploidy: int,
+    ploidy: float,
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
     is_sample_female: bool,
