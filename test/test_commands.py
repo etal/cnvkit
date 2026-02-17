@@ -1106,6 +1106,66 @@ class CommandTests(unittest.TestCase):
         self.assertTrue((sm["ci_lo"] < sm["mean"]).all())
         self.assertTrue((sm["ci_hi"] > sm["mean"]).all())
 
+    def test_purity(self):
+        """The 'purity' command."""
+        from cnvlib import purity as purity_mod
+
+        segments = cnvlib.read("formats/tr95t.cns")
+
+        # Basic call without VCF
+        result = commands.do_purity(segments)
+        self.assertIn("purity", result.columns)
+        self.assertIn("ploidy", result.columns)
+        self.assertIn("score", result.columns)
+        self.assertGreater(len(result), 0)
+        self.assertGreater(result["purity"].iloc[0], 0)
+        self.assertLessEqual(result["purity"].iloc[0], 1.0)
+        self.assertGreaterEqual(result["ploidy"].iloc[0], 1.5)
+        self.assertLessEqual(result["ploidy"].iloc[0], 5.0)
+        self.assertTrue((result["score"] > 0).all())
+
+        # With VCF
+        varr = tabio.read(
+            "formats/na12878_na12882_mix.vcf",
+            "vcf",
+            skip_somatic=True,
+        ).heterozygous()
+        result_baf = commands.do_purity(segments, varr)
+        self.assertEqual(list(result_baf.columns), ["purity", "ploidy", "score"])
+        self.assertGreater(len(result_baf), 0)
+
+        # Custom grid (coarser steps for speed)
+        result_coarse = commands.do_purity(
+            segments,
+            min_purity=0.2,
+            max_purity=0.8,
+            purity_step=0.1,
+            min_ploidy=2.0,
+            max_ploidy=4.0,
+            ploidy_step=0.5,
+        )
+        self.assertGreater(len(result_coarse), 0)
+        self.assertGreaterEqual(result_coarse["purity"].iloc[0], 0.2)
+        self.assertLessEqual(result_coarse["purity"].iloc[0], 0.8)
+
+    def test_purity_file(self):
+        """The 'purity' command: read_purity_tsv round-trip."""
+        from cnvlib import purity as purity_mod
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
+            f.write("purity\tploidy\tscore\n")
+            f.write("0.65\t2.1\t42.5\n")
+            f.write("0.70\t2.0\t41.0\n")
+            tmp_path = f.name
+        try:
+            pur, plo = purity_mod.read_purity_tsv(tmp_path)
+            self.assertAlmostEqual(pur, 0.65)
+            self.assertAlmostEqual(plo, 2.1)
+        finally:
+            import os
+
+            os.unlink(tmp_path)
+
     def test_target(self):
         """The 'target' command."""
         # return  # DBG

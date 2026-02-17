@@ -55,6 +55,7 @@ from . import (
     importers,
     metrics,
     parallel,
+    purity,
     reference,
     reports,
     scatter,
@@ -1201,6 +1202,16 @@ do_call = public(call.do_call)
 
 def _cmd_call(args: argparse.Namespace) -> None:
     """Call copy number variants from segmented log2 ratios."""
+    if args.purity_file:
+        pf_purity, pf_ploidy = purity.read_purity_tsv(args.purity_file)
+        args.purity = pf_purity
+        args.ploidy = round(pf_ploidy)
+        logging.info(
+            "Using purity %.4f and ploidy %d from %s",
+            args.purity,
+            args.ploidy,
+            args.purity_file,
+        )
     if args.purity and not 0.0 < args.purity <= 1.0:
         raise RuntimeError("Purity must be between 0 and 1.")
 
@@ -1305,6 +1316,12 @@ P_call.add_argument(
     "--purity",
     type=float,
     help="Estimated tumor cell fraction, a.k.a. purity or cellularity.",
+)
+P_call.add_argument(
+    "--purity-file",
+    metavar="FILENAME",
+    help="""File with purity and ploidy estimates (e.g. output of the 'purity'
+            command). Overrides --purity and --ploidy.""",
 )
 P_call.add_argument(
     "--drop-low-coverage",
@@ -2244,6 +2261,125 @@ P_segmetrics_stats.add_argument(
 
 P_segmetrics_stats.set_defaults(location_stats=[], spread_stats=[], interval_stats=[])
 P_segmetrics.set_defaults(func=_cmd_segmetrics)
+
+
+# purity ------------------------------------------------------------------------
+
+do_purity = public(purity.do_purity)
+
+
+def _cmd_purity(args: argparse.Namespace) -> None:
+    """Estimate tumor purity and ploidy from segment copy ratios."""
+    segments = read_cna(args.filename)
+    variants = load_het_snps(
+        args.vcf,
+        args.sample_id,
+        args.normal_id,
+        args.min_variant_depth,
+        args.zygosity_freq,
+    )
+    result = do_purity(
+        segments,
+        variants,
+        min_purity=args.min_purity,
+        max_purity=args.max_purity,
+        purity_step=args.purity_step,
+        min_ploidy=args.min_ploidy,
+        max_ploidy=args.max_ploidy,
+        ploidy_step=args.ploidy_step,
+        max_copies=args.max_copies,
+        baf_weight=args.baf_weight,
+        method=args.method,
+    )
+    if len(result):
+        logging.info(
+            "Best: purity=%.4f, ploidy=%.1f, score=%.4f",
+            result["purity"].iloc[0],
+            result["ploidy"].iloc[0],
+            result["score"].iloc[0],
+        )
+    write_dataframe(args.output, result)
+
+
+P_purity = AP_subparsers.add_parser("purity", help=_cmd_purity.__doc__)
+P_purity.add_argument("filename", help="Segmented copy ratio data file (.cns).")
+P_purity.add_argument(
+    "--min-purity",
+    type=float,
+    default=0.1,
+    help="Minimum purity to search. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--max-purity",
+    type=float,
+    default=1.0,
+    help="Maximum purity to search. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--purity-step",
+    type=float,
+    default=0.01,
+    help="Purity step size. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--min-ploidy",
+    type=float,
+    default=1.5,
+    help="Minimum ploidy to search. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--max-ploidy",
+    type=float,
+    default=5.0,
+    help="Maximum ploidy to search. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--ploidy-step",
+    type=float,
+    default=0.1,
+    help="Ploidy step size. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "--max-copies",
+    type=int,
+    default=8,
+    help="Maximum copy number to consider. [Default: %(default)d]",
+)
+P_purity.add_argument(
+    "--baf-weight",
+    type=float,
+    default=1.0,
+    help="""Weight for the BAF term relative to the ratio term.
+            [Default: %(default)s]""",
+)
+P_purity.add_argument(
+    "-m",
+    "--method",
+    choices=("kde",),
+    default="kde",
+    help="Estimation method. [Default: %(default)s]",
+)
+P_purity.add_argument(
+    "-o", "--output", metavar="FILENAME", help="Output table file name."
+)
+
+P_purity_vcf = P_purity.add_argument_group(
+    "To additionally use SNP b-allele frequencies for purity estimation"
+)
+P_purity_vcf.add_argument(
+    "-v",
+    "--vcf",
+    metavar="FILENAME",
+    help="""VCF file name containing variants for b-allele frequency
+            calculation.""",
+)
+P_purity_vcf.add_argument(
+    "-i",
+    "--sample-id",
+    help="Name of the sample in the VCF to use for b-allele frequency extraction.",
+)
+add_snp_vcf_args(P_purity_vcf)
+P_purity.set_defaults(func=_cmd_purity)
 
 
 # bintest -----------------------------------------------------------------------
