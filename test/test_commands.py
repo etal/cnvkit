@@ -2,6 +2,7 @@
 """Unit tests for the CNVkit library, cnvlib."""
 
 import logging
+import os
 import shutil
 import tempfile
 import unittest
@@ -1108,8 +1109,6 @@ class CommandTests(unittest.TestCase):
 
     def test_purity(self):
         """The 'purity' command."""
-        from cnvlib import purity as purity_mod
-
         segments = cnvlib.read("formats/tr95t.cns")
 
         # Basic call without VCF
@@ -1162,8 +1161,6 @@ class CommandTests(unittest.TestCase):
             self.assertAlmostEqual(pur, 0.65)
             self.assertAlmostEqual(plo, 2.1)
         finally:
-            import os
-
             os.unlink(tmp_path)
 
     def test_target(self):

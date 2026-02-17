@@ -122,6 +122,15 @@ def _score_grid(
     rows = []
     cn_states = np.arange(0, max_copies + 1)
     for purity in purities:
+        # BAF expected values depend only on purity, not ploidy -- compute once
+        baf_score = 0.0
+        if baf_kde is not None:
+            baf_points = []
+            for total_cn in cn_states[cn_states >= 1]:
+                for minor in range(total_cn // 2 + 1):
+                    baf_points.append(_expected_baf(minor, total_cn, purity))
+            baf_score = float(np.sum(baf_kde(baf_points)))
+
         for ploidy in ploidies:
             # Score from copy-ratio KDE
             expected_ratios: np.ndarray = _expected_ratio(  # type: ignore[assignment]
@@ -133,15 +142,6 @@ def _score_grid(
                 rows.append((purity, ploidy, 0.0))
                 continue
             ratio_score = float(np.sum(ratio_kde(expected_ratios[valid])))
-
-            # Score from BAF KDE
-            baf_score = 0.0
-            if baf_kde is not None:
-                baf_points = []
-                for total_cn in cn_states[cn_states >= 1]:
-                    for minor in range(total_cn // 2 + 1):
-                        baf_points.append(_expected_baf(minor, total_cn, purity))
-                baf_score = float(np.sum(baf_kde(baf_points)))
 
             score = ratio_score + baf_weight * baf_score
             rows.append((purity, ploidy, score))
