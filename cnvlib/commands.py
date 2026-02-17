@@ -1203,17 +1203,13 @@ do_call = public(call.do_call)
 def _cmd_call(args: argparse.Namespace) -> None:
     """Call copy number variants from segmented log2 ratios."""
     if args.purity_file:
-        pf_purity, pf_ploidy = purity.read_purity_tsv(args.purity_file)
-        args.purity = pf_purity
-        args.ploidy = pf_ploidy
+        args.purity, args.ploidy = purity.read_purity_tsv(args.purity_file)
         logging.info(
             "Using purity %.4f and ploidy %g from %s",
             args.purity,
             args.ploidy,
             args.purity_file,
         )
-    if args.purity and not 0.0 < args.purity <= 1.0:
-        raise RuntimeError("Purity must be between 0 and 1.")
 
     cnarr = read_cna(args.filename)
     if args.center_at:
@@ -1258,6 +1254,22 @@ def _cmd_call(args: argparse.Namespace) -> None:
 
 def csvstring(text):
     return tuple(map(float, text.split(",")))
+
+
+def purity_value(text: str) -> float:
+    """Argparse type: tumor purity/cellularity, must be in (0, 1]."""
+    value = float(text)
+    if not 0.0 < value <= 1.0:
+        raise argparse.ArgumentTypeError(f"purity must be in (0, 1], got {value}")
+    return value
+
+
+def ploidy_value(text: str) -> float:
+    """Argparse type: sample ploidy, must be >= 1."""
+    value = float(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"ploidy must be >= 1, got {value}")
+    return value
 
 
 P_call = AP_subparsers.add_parser("call", help=_cmd_call.__doc__)
@@ -1308,13 +1320,13 @@ P_call.add_argument(
 )
 P_call.add_argument(
     "--ploidy",
-    type=float,
+    type=ploidy_value,
     default=2,
     help="Ploidy of the sample cells. [Default: %(default)g]",
 )
 P_call.add_argument(
     "--purity",
-    type=float,
+    type=purity_value,
     help="Estimated tumor cell fraction, a.k.a. purity or cellularity.",
 )
 P_call.add_argument(
@@ -2551,7 +2563,7 @@ P_import_theta.add_argument("tumor_cns")
 P_import_theta.add_argument("theta_results")
 P_import_theta.add_argument(
     "--ploidy",
-    type=float,
+    type=ploidy_value,
     default=2,
     help="Ploidy of normal cells. [Default: %(default)g]",
 )
@@ -2736,7 +2748,7 @@ P_export_bed.add_argument(
 )
 P_export_bed.add_argument(
     "--ploidy",
-    type=float,
+    type=ploidy_value,
     default=2,
     help="Ploidy of the sample cells. [Default: %(default)g]",
 )
@@ -2833,7 +2845,7 @@ P_export_vcf.add_argument(
 )
 P_export_vcf.add_argument(
     "--ploidy",
-    type=float,
+    type=ploidy_value,
     default=2,
     help="Ploidy of the sample cells. [Default: %(default)g]",
 )

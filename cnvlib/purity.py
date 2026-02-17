@@ -206,6 +206,17 @@ def read_purity_tsv(fname: str) -> tuple[float, float]:
     -------
     tuple of (float, float)
         The purity and ploidy values from the first (best-scoring) row.
+
+    Raises
+    ------
+    ValueError
+        If purity is not in (0, 1] or ploidy is < 1.
     """
     table = pd.read_csv(fname, sep="\t", nrows=1)
-    return float(table["purity"].iloc[0]), float(table["ploidy"].iloc[0])
+    pur = float(table["purity"].iloc[0])
+    plo = float(table["ploidy"].iloc[0])
+    if not 0.0 < pur <= 1.0:
+        raise ValueError(f"Purity in {fname} must be in (0, 1], got {pur}")
+    if plo < 1:
+        raise ValueError(f"Ploidy in {fname} must be >= 1, got {plo}")
+    return pur, plo
