@@ -62,6 +62,18 @@ def do_purity(
     if method != "kde":
         raise ValueError(f"Unsupported method: {method!r}")
 
+    # Validate grid parameters
+    if min_purity >= max_purity:
+        raise ValueError(
+            f"min_purity ({min_purity}) must be less than max_purity ({max_purity})"
+        )
+    if min_ploidy >= max_ploidy:
+        raise ValueError(
+            f"min_ploidy ({min_ploidy}) must be less than max_ploidy ({max_ploidy})"
+        )
+    if purity_step <= 0 or ploidy_step <= 0:
+        raise ValueError("Step sizes must be positive")
+
     # Extract segment log2 ratios and convert to linear space
     log2_ratios = segments["log2"].to_numpy()
     linear_ratios = 2.0**log2_ratios
@@ -85,7 +97,13 @@ def do_purity(
         return pd.DataFrame(columns=["purity", "ploidy", "score"])
 
     # Build KDE on linear ratios
-    ratio_kde = gaussian_kde(linear_ratios, weights=weights)
+    try:
+        ratio_kde = gaussian_kde(linear_ratios, weights=weights)
+    except np.linalg.LinAlgError:
+        logging.warning(
+            "KDE failed (degenerate segment ratios); cannot estimate purity"
+        )
+        return pd.DataFrame(columns=["purity", "ploidy", "score"])
 
     # Optionally build BAF KDE
     baf_kde = None
@@ -93,7 +111,10 @@ def do_purity(
         baf_values = variants.baf_by_ranges(segments, above_half=True)
         baf_values = baf_values.dropna().to_numpy()
         if len(baf_values) >= 3:
-            baf_kde = gaussian_kde(baf_values)
+            try:
+                baf_kde = gaussian_kde(baf_values)
+            except np.linalg.LinAlgError:
+                logging.warning("BAF KDE failed (degenerate data); ignoring BAF")
         else:
             logging.warning(
                 "Too few BAF values (%d) for KDE; ignoring BAF", len(baf_values)
@@ -102,6 +123,12 @@ def do_purity(
     # Build grid
     purities = np.arange(min_purity, max_purity + purity_step / 2, purity_step)
     ploidies = np.arange(min_ploidy, max_ploidy + ploidy_step / 2, ploidy_step)
+    logging.info(
+        "Searching %d x %d purity/ploidy grid (%d points)",
+        len(purities),
+        len(ploidies),
+        len(purities) * len(ploidies),
+    )
 
     results = _score_grid(
         ratio_kde, baf_kde, purities, ploidies, max_copies, baf_weight

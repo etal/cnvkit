@@ -1320,8 +1320,9 @@ P_call.add_argument(
 P_call.add_argument(
     "--purity-file",
     metavar="FILENAME",
-    help="""File with purity and ploidy estimates (e.g. output of the 'purity'
-            command). Overrides --purity and --ploidy.""",
+    help="""Tab-separated file with columns 'purity', 'ploidy', and 'score'
+            (e.g. output of the 'purity' command). Uses values from the first
+            data row. Overrides --purity and --ploidy.""",
 )
 P_call.add_argument(
     "--drop-low-coverage",
@@ -2349,7 +2350,8 @@ P_purity.add_argument(
     "--baf-weight",
     type=float,
     default=1.0,
-    help="""Weight for the BAF term relative to the ratio term.
+    help="""Weight for the BAF score relative to the copy-ratio score. Set to 0
+            to ignore BAF entirely, or increase above 1 to emphasize BAF.
             [Default: %(default)s]""",
 )
 P_purity.add_argument(
