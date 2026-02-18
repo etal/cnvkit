@@ -241,7 +241,11 @@ def _do_segmentation(
 
     elif method.startswith("hmm"):
         segarr = hmm.segment_hmm(
-            filtered_cn, method, diploid_parx_genome, threshold, variants
+            filtered_cn,
+            method,
+            diploid_parx_genome,
+            int(threshold) if threshold is not None else None,
+            variants,
         )
 
     elif method in ("cbs", "flasso"):
