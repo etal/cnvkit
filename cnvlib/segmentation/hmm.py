@@ -717,25 +717,33 @@ def segment_hmm(
         auto_baf = [baf_list[i] for i in auto_idx]
         auto_trans = [log_trans_list[i] for i in auto_idx]
 
-        min_pur = params.get("min_purity", 0.2)
-        purity_results = grid_search_purity_ploidy(
-            auto_log2,
-            auto_baf,
-            auto_trans,
-            log2_stdev,
-            states,
-            purity_range=(min_pur, 1.0, 0.05),
-            ploidy_range=(1.5, 5.0, 0.5),
-            log_start=log_start,
-        )
-        best_purity = float(purity_results.iloc[0]["purity"])
-        best_ploidy = float(purity_results.iloc[0]["ploidy"])
-        logging.info(
-            "Best purity=%.2f, ploidy=%.1f (score=%.1f)",
-            best_purity,
-            best_ploidy,
-            float(purity_results.iloc[0]["score"]),
-        )
+        if not auto_log2:
+            logging.warning(
+                "No autosomal chromosomes found; "
+                "skipping purity/ploidy estimation, using defaults"
+            )
+            best_purity = 1.0
+            best_ploidy = 2.0
+        else:
+            min_pur = params.get("min_purity", 0.2)
+            purity_results = grid_search_purity_ploidy(
+                auto_log2,
+                auto_baf,
+                auto_trans,
+                log2_stdev,
+                states,
+                purity_range=(min_pur, 1.0, 0.05),
+                ploidy_range=(1.5, 5.0, 0.5),
+                log_start=log_start,
+            )
+            best_purity = float(purity_results.iloc[0]["purity"])
+            best_ploidy = float(purity_results.iloc[0]["ploidy"])
+            logging.info(
+                "Best purity=%.2f, ploidy=%.1f (score=%.1f)",
+                best_purity,
+                best_ploidy,
+                float(purity_results.iloc[0]["score"]),
+            )
 
     # 7. Run Viterbi on all arms with best purity/ploidy
     all_states: list[NDArray[np.int_]] = []
@@ -762,16 +770,18 @@ def segment_hmm(
         all_states.append(arm_states)
 
     # 8. Map state indices to CN values
-    state_cn = np.concatenate(all_states)
+    state_indices = np.concatenate(all_states)
 
-    logging.info("Predicted %d state values", len(state_cn))
-    logging.debug("State distribution: %s", np.bincount(state_cn, minlength=n_states))
+    logging.info("Predicted %d state values", len(state_indices))
+    logging.debug(
+        "State distribution: %s", np.bincount(state_indices, minlength=n_states)
+    )
 
     # 9. Restore original log2, squash
     cnarr["log2"] = orig_log2
     cnarr["probes"] = 1
     segarr = squash_by_groups(
-        cnarr, pd.Series(state_cn, index=cnarr.data.index), by_arm=True
+        cnarr, pd.Series(state_indices, index=cnarr.data.index), by_arm=True
     )
     if not (segarr.start < segarr.end).all():
         bad_segs = segarr[segarr.start >= segarr.end]
