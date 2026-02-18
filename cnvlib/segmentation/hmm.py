@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 DEFAULT_LENGTH_SCALE = 5e6  # bp; p_stay(d) = exp(-d/L)
 TRANSITION_PENALTY = 8.0  # penalty for CN-distant transitions
 LOG2_STDEV_FLOOR = 0.05  # minimum stdev for log2 Gaussian
-BETABINOM_RHO = 200.0  # concentration parameter for beta-binomial BAF emission
+BETABINOM_RHO = 200.0  # beta-binomial concentration; higher → less overdispersion
 MIN_VARIANTS_THRESHOLD = 50  # for variants_in_segment
 
 
@@ -696,8 +696,9 @@ def segment_hmm(
 ) -> CNA:
     """Segment bins using Hidden Markov Model with Viterbi decoding.
 
-    Uses a pure numpy/scipy HMM with distance-dependent transitions and
-    optional joint (log2, BAF) emissions parameterized by (purity, ploidy).
+    Uses a pure numpy/scipy HMM with distance-dependent transitions,
+    Gaussian log2 ratio emissions, and optional beta-binomial BAF emissions
+    on aggregated allele counts — parameterized by (purity, ploidy).
     For somatic methods ('hmm', 'hmm-tumor'), purity and ploidy are estimated
     via grid search over marginal likelihood on autosomal arms.
 
