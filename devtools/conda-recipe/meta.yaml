@@ -8,9 +8,6 @@ source:
 build:
   number: 0
   skip: False
-  run_exports:
-    - {{ pin_subpackage('conda', max_pin="x.x") }}
-
 
 requirements:
   build:

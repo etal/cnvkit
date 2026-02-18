@@ -307,7 +307,7 @@ command.
 Calculate coverage in the given regions from BAM read depths.
 
 By default, coverage is calculated via mean read depth from a pileup.
-Alternatively, using the `--count` option counts
+Alternatively, using the ``--count`` option counts
 the number of read start positions in the interval and normalizes to the
 interval size.
 
@@ -524,7 +524,7 @@ reference are then subtracted for each set of bins.
 Bias corrections use the GC and RepeatMasker information from the "gc" and
 "rmask" columns of the reference .cnn file; if those are missing (i.e. the
 reference was built without those corrections), ``fix`` will skip them too (with
-a warning). If you constructed the reference but then called `fix` with a
+a warning). If you constructed the reference but then called ``fix`` with a
 different set of bias correction flags, the biases could be over- or
 under-corrected in the test sample -- so use the options ``--no-gc``,
 ``--no-rmask`` and ``--no-edge`` consistently or not at all.
