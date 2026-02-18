@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-from scipy.special import logsumexp
+from scipy.special import betaln, gammaln, logsumexp
 
 from ..cnary import CopyNumArray as CNA
 from ..descriptives import biweight_midvariance
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 DEFAULT_LENGTH_SCALE = 5e6  # bp; p_stay(d) = exp(-d/L)
 TRANSITION_PENALTY = 8.0  # penalty for CN-distant transitions
 LOG2_STDEV_FLOOR = 0.05  # minimum stdev for log2 Gaussian
-BAF_STDEV = 0.04  # fixed stdev for BAF Gaussian
+BETABINOM_RHO = 200.0  # concentration parameter for beta-binomial BAF emission
 MIN_VARIANTS_THRESHOLD = 50  # for variants_in_segment
 
 
@@ -81,12 +81,12 @@ def _expected_log2(
     return np.log2(ratio)  # type: ignore[no-any-return]
 
 
-def _expected_baf(
+def _expected_minor_freq(
     minor: NDArray[np.float64],
     cn: NDArray[np.float64],
     purity: float,
 ) -> NDArray[np.float64]:
-    """Expected mirrored BAF (>= 0.5) for given minor allele count, CN, purity.
+    """Expected minor allele frequency (<= 0.5) for given minor allele count, CN, purity.
 
     Formula: (p*minor + (1-p)*1) / (p*cn + (1-p)*2)
     For cn=0, return 0.5 (no allelic information).
@@ -100,14 +100,34 @@ def _expected_baf(
     return baf
 
 
+def _betabinom_logpmf(
+    k: NDArray[np.float64],
+    n: NDArray[np.float64],
+    a: NDArray[np.float64],
+    b: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Log PMF of the beta-binomial distribution, vectorized.
+
+    Uses scipy.special gammaln/betaln for numerical stability.
+    When n=0, returns 0.0 (no observation contributes nothing).
+    """
+    return (  # type: ignore[no-any-return]
+        gammaln(n + 1)
+        - gammaln(k + 1)
+        - gammaln(n - k + 1)
+        + betaln(k + a, n - k + b)
+        - betaln(a, b)
+    )
+
+
 def log_emission_probs(
     log2_obs: NDArray[np.float64],
-    baf_obs: NDArray[np.float64] | None,
+    minor_counts: NDArray[np.float64] | None,
+    depths: NDArray[np.float64] | None,
     states: list[tuple[int, int | None]],
     purity: float,
     ploidy: float,
     log2_stdev: float,
-    baf_stdev: float = BAF_STDEV,
 ) -> NDArray[np.float64]:
     """Compute log emission probabilities for all observations and states.
 
@@ -115,23 +135,22 @@ def log_emission_probs(
     ----------
     log2_obs : ndarray (T,)
         Observed log2 ratios.
-    baf_obs : ndarray (T,) or None
-        Observed mirrored BAF values (may contain NaN).
+    minor_counts : ndarray (T,) or None
+        Aggregated minor allele counts per bin.
+    depths : ndarray (T,) or None
+        Aggregated read depths per bin.
     states : list of (cn, minor|None)
         HMM state definitions.
     purity, ploidy : float
         Tumor purity and ploidy.
     log2_stdev : float
         Standard deviation for log2 Gaussian emission.
-    baf_stdev : float
-        Standard deviation for BAF Gaussian emission.
 
     Returns
     -------
     ndarray (T, N)
         Log probability of each observation under each state.
     """
-    T = len(log2_obs)
     N = len(states)
 
     cn_arr = np.array([s[0] for s in states], dtype=np.float64)
@@ -144,19 +163,26 @@ def log_emission_probs(
         log2_stdev * np.sqrt(2.0 * np.pi)
     )
 
-    # BAF component (when available)
-    if baf_obs is not None:
+    # BAF component: beta-binomial on aggregated allele counts
+    if minor_counts is not None and depths is not None:
         minor_arr = np.array(
             [s[1] if s[1] is not None else 0 for s in states], dtype=np.float64
         )
-        expected_b = _expected_baf(minor_arr, cn_arr, purity)  # (N,)
-        diff_b = baf_obs[:, np.newaxis] - expected_b[np.newaxis, :]  # (T, N)
-        log_baf = -0.5 * (diff_b / baf_stdev) ** 2 - np.log(
-            baf_stdev * np.sqrt(2.0 * np.pi)
-        )
-        # NaN baf_obs bins contribute 0 to log-likelihood
-        nan_mask = np.isnan(baf_obs)
-        log_baf[nan_mask, :] = 0.0
+        expected_freq = _expected_minor_freq(minor_arr, cn_arr, purity)  # (N,)
+
+        # Beta-binomial parameters with floor to keep betaln defined
+        alpha = np.maximum(expected_freq * BETABINOM_RHO, 0.5)  # (N,)
+        beta = np.maximum((1.0 - expected_freq) * BETABINOM_RHO, 0.5)  # (N,)
+
+        k = minor_counts[:, np.newaxis]  # (T, 1)
+        n = depths[:, np.newaxis]  # (T, 1)
+        a = alpha[np.newaxis, :]  # (1, N)
+        b = beta[np.newaxis, :]  # (1, N)
+
+        log_baf = _betabinom_logpmf(k, n, a, b)  # (T, N)
+        # Zero-depth bins contribute nothing
+        zero_depth = depths == 0
+        log_baf[zero_depth, :] = 0.0
         log_p += log_baf
 
     return log_p  # type: ignore[no-any-return]
@@ -335,6 +361,7 @@ def prepare_observations(
 ) -> tuple[
     list[NDArray[np.float64]],
     list[NDArray[np.float64] | None],
+    list[NDArray[np.float64] | None],
     list[NDArray[np.float64]],
     list[str],
 ]:
@@ -344,18 +371,21 @@ def prepare_observations(
     -------
     log2_list : list of ndarray
         Log2 ratios per arm.
-    baf_list : list of (ndarray or None)
-        Mirrored BAF per bin per arm (NaN where no het SNPs), or None if
-        no variants.
+    minor_count_list : list of (ndarray or None)
+        Aggregated minor allele counts per bin per arm, or None if no variants.
+    depth_list : list of (ndarray or None)
+        Aggregated read depths per bin per arm, or None if no variants.
     dist_list : list of ndarray
         Inter-bin distances per arm (length T-1 each).
     arm_labels : list of str
         Arm identifier strings.
     """
     log2_list: list[NDArray[np.float64]] = []
-    baf_list: list[NDArray[np.float64] | None] = []
+    minor_count_list: list[NDArray[np.float64] | None] = []
+    depth_list: list[NDArray[np.float64] | None] = []
     dist_list: list[NDArray[np.float64]] = []
     arm_labels: list[str] = []
+    _warned_no_counts = False
 
     for arm_label, arm in cnarr.by_arm():
         if len(arm) == 0:
@@ -374,16 +404,28 @@ def prepare_observations(
             distances = np.array([], dtype=np.float64)
         dist_list.append(distances)
 
-        # BAF per bin
+        # Allele counts per bin
         if variants is not None:
-            baf_obs = variants.baf_by_ranges(arm, above_half=True).to_numpy(
-                dtype=np.float64
-            )
-            baf_list.append(baf_obs)
+            counts = variants.baf_counts_by_ranges(arm)
+            if counts is not None:
+                mc = counts[0].to_numpy(dtype=np.float64)
+                dp = counts[1].to_numpy(dtype=np.float64)
+                minor_count_list.append(mc)
+                depth_list.append(dp)
+            else:
+                if not _warned_no_counts:
+                    logging.warning(
+                        "VCF lacks alt_count/depth columns; "
+                        "BAF emission disabled (log2 only)"
+                    )
+                    _warned_no_counts = True
+                minor_count_list.append(None)
+                depth_list.append(None)
         else:
-            baf_list.append(None)
+            minor_count_list.append(None)
+            depth_list.append(None)
 
-    return log2_list, baf_list, dist_list, arm_labels
+    return log2_list, minor_count_list, depth_list, dist_list, arm_labels
 
 
 # --- Start probabilities ---
@@ -449,14 +491,15 @@ def _batched_emission_log2(
 
 
 def _batched_emission_baf(
-    baf_obs: NDArray[np.float64],
+    minor_counts: NDArray[np.float64],
+    depths: NDArray[np.float64],
     cn_arr: NDArray[np.float64],
     minor_arr: NDArray[np.float64],
     purities: NDArray[np.float64],
     n_ploidies: int,
-    baf_stdev: float,
+    rho: float,
 ) -> NDArray[np.float64]:
-    """Compute BAF emissions for all grid points at once.
+    """Compute beta-binomial BAF emissions for all grid points at once.
 
     Returns
     -------
@@ -469,18 +512,25 @@ def _batched_emission_baf(
     numerator = p * mn + (1.0 - p) * 1.0
     denominator = p * cn + (1.0 - p) * 2.0
     with np.errstate(divide="ignore", invalid="ignore"):
-        expected_baf = np.where(denominator > 0, numerator / denominator, 0.5)
+        expected_freq = np.where(denominator > 0, numerator / denominator, 0.5)
     # (G_p, N)
 
     # Repeat for each ploidy (BAF doesn't depend on ploidy)
-    # expected_baf: (G_p, N) -> (G, N) by repeating n_ploidies times
-    expected_baf = np.repeat(expected_baf, n_ploidies, axis=0)  # (G, N)
+    expected_freq = np.repeat(expected_freq, n_ploidies, axis=0)  # (G, N)
 
-    diff = baf_obs[np.newaxis, :, np.newaxis] - expected_baf[:, np.newaxis, :]
-    log_baf = -0.5 * (diff / baf_stdev) ** 2 - np.log(baf_stdev * np.sqrt(2.0 * np.pi))
-    # NaN bins contribute 0
-    nan_mask = np.isnan(baf_obs)
-    log_baf[:, nan_mask, :] = 0.0
+    # Beta-binomial parameters with floor
+    alpha = np.maximum(expected_freq * rho, 0.5)  # (G, N)
+    beta = np.maximum((1.0 - expected_freq) * rho, 0.5)  # (G, N)
+
+    k = minor_counts[np.newaxis, :, np.newaxis]  # (1, T, 1)
+    n = depths[np.newaxis, :, np.newaxis]  # (1, T, 1)
+    a = alpha[:, np.newaxis, :]  # (G, 1, N)
+    b = beta[:, np.newaxis, :]  # (G, 1, N)
+
+    log_baf = _betabinom_logpmf(k, n, a, b)  # (G, T, N)
+    # Zero-depth bins contribute nothing
+    zero_depth = depths == 0
+    log_baf[:, zero_depth, :] = 0.0
     return log_baf  # type: ignore[no-any-return]  # (G, T, N)
 
 
@@ -523,7 +573,8 @@ def _forward_ll_batched(
 
 def grid_search_purity_ploidy(
     log2_list: list[NDArray[np.float64]],
-    baf_list: list[NDArray[np.float64] | None],
+    minor_count_list: list[NDArray[np.float64] | None],
+    depth_list: list[NDArray[np.float64] | None],
     log_trans_list: list[NDArray[np.float64]],
     log2_stdev: float,
     states: list[tuple[int, int | None]],
@@ -541,8 +592,10 @@ def grid_search_purity_ploidy(
     ----------
     log2_list : list of ndarray
         Log2 observations per arm (autosomal only).
-    baf_list : list of (ndarray or None)
-        BAF observations per arm.
+    minor_count_list : list of (ndarray or None)
+        Minor allele counts per arm.
+    depth_list : list of (ndarray or None)
+        Read depths per arm.
     log_trans_list : list of ndarray
         Precomputed log transition matrices per arm.
     log2_stdev : float
@@ -561,8 +614,7 @@ def grid_search_purity_ploidy(
     DataFrame
         Columns: purity, ploidy, score. Sorted by score descending.
     """
-    include_baf = any(b is not None for b in baf_list)
-    baf_stdev = BAF_STDEV
+    include_baf = any(mc is not None for mc in minor_count_list)
 
     purities = np.arange(purity_range[0], purity_range[1] + 1e-9, purity_range[2])
     ploidies = np.arange(ploidy_range[0], ploidy_range[1] + 1e-9, ploidy_range[2])
@@ -586,15 +638,20 @@ def grid_search_purity_ploidy(
         # Compute batched emissions: (G, T, N)
         log_emit = _batched_emission_log2(l2, cn_arr, purities, ploidies, log2_stdev)
 
-        if include_baf and baf_list[arm_idx] is not None:
+        if (
+            include_baf
+            and minor_count_list[arm_idx] is not None
+            and depth_list[arm_idx] is not None
+        ):
             assert minor_arr is not None
             log_emit += _batched_emission_baf(
-                baf_list[arm_idx],  # type: ignore[arg-type]
+                minor_count_list[arm_idx],  # type: ignore[arg-type]
+                depth_list[arm_idx],  # type: ignore[arg-type]
                 cn_arr,
                 minor_arr,
                 purities,
                 len(ploidies),
-                baf_stdev,
+                rho=BETABINOM_RHO,
             )
 
         if len(l2) == 1:
@@ -640,9 +697,9 @@ def segment_hmm(
     """Segment bins using Hidden Markov Model with Viterbi decoding.
 
     Uses a pure numpy/scipy HMM with distance-dependent transitions and
-    optional joint (log2, BAF) emissions.  For somatic methods ('hmm',
-    'hmm-tumor'), purity and ploidy are estimated via grid search over
-    marginal likelihood on autosomal arms.
+    optional joint (log2, BAF) emissions parameterized by (purity, ploidy).
+    For somatic methods ('hmm', 'hmm-tumor'), purity and ploidy are estimated
+    via grid search over marginal likelihood on autosomal arms.
 
     Parameters
     ----------
@@ -683,7 +740,9 @@ def segment_hmm(
     log_start = compute_start_probs(states)
 
     # 4. Prepare observations per arm
-    log2_list, baf_list, dist_list, arm_labels = prepare_observations(cnarr, variants)
+    log2_list, minor_count_list, depth_list, dist_list, arm_labels = (
+        prepare_observations(cnarr, variants)
+    )
     logging.info(
         "HMM segmentation: %d arms, %d states, method=%s",
         len(log2_list),
@@ -714,7 +773,8 @@ def segment_hmm(
 
         auto_idx = [i for i, lab in enumerate(arm_labels) if lab in auto_arms]
         auto_log2 = [log2_list[i] for i in auto_idx]
-        auto_baf = [baf_list[i] for i in auto_idx]
+        auto_mc = [minor_count_list[i] for i in auto_idx]
+        auto_dp = [depth_list[i] for i in auto_idx]
         auto_trans = [log_trans_list[i] for i in auto_idx]
 
         if not auto_log2:
@@ -728,7 +788,8 @@ def segment_hmm(
             min_pur = params.get("min_purity", 0.2)
             purity_results = grid_search_purity_ploidy(
                 auto_log2,
-                auto_baf,
+                auto_mc,
+                auto_dp,
                 auto_trans,
                 log2_stdev,
                 states,
@@ -749,7 +810,8 @@ def segment_hmm(
     all_states: list[NDArray[np.int_]] = []
     for arm_idx in range(len(log2_list)):
         l2 = log2_list[arm_idx]
-        baf = baf_list[arm_idx]
+        mc = minor_count_list[arm_idx]
+        dp = depth_list[arm_idx]
         lt = log_trans_list[arm_idx]
 
         if len(l2) == 0:
@@ -757,7 +819,7 @@ def segment_hmm(
             continue
 
         log_emit = log_emission_probs(
-            l2, baf, states, best_purity, best_ploidy, log2_stdev
+            l2, mc, dp, states, best_purity, best_ploidy, log2_stdev
         )
 
         if len(l2) == 1:
