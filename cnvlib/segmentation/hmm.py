@@ -555,7 +555,7 @@ def _forward_ll_batched(
     ndarray (G,)
         Log-likelihood for each grid point.
     """
-    G, T, N = log_emit.shape
+    _G, T, _N = log_emit.shape
     # alpha: (G, N) — only keep current row
     alpha = log_start[np.newaxis, :] + log_emit[:, 0, :]  # (G, N)
 
