@@ -64,7 +64,7 @@ The pipeline executed by the ``batch`` command is equivalent to::
     # For each tumor sample...
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn my_reference.cnn -o Sample.cnr
     cnvkit.py segment Sample.cnr -o Sample.cns
-    
+
     # Post-processing for each tumor sample...
     cnvkit.py segmetrics Sample.cnr -s Sample.cns --ci --alpha 0.5 --smooth-bootstrap -o Sample.segmetrics.cns.tmp
     cnvkit.py call Sample.segmetrics.cns.tmp --method none --filter ci -o Sample.call.cns.tmp
@@ -307,7 +307,7 @@ command.
 Calculate coverage in the given regions from BAM read depths.
 
 By default, coverage is calculated via mean read depth from a pileup.
-Alternatively, using the `--count` option counts
+Alternatively, using the ``--count`` option counts
 the number of read start positions in the interval and normalizes to the
 interval size.
 
@@ -524,7 +524,7 @@ reference are then subtracted for each set of bins.
 Bias corrections use the GC and RepeatMasker information from the "gc" and
 "rmask" columns of the reference .cnn file; if those are missing (i.e. the
 reference was built without those corrections), ``fix`` will skip them too (with
-a warning). If you constructed the reference but then called `fix` with a
+a warning). If you constructed the reference but then called ``fix`` with a
 different set of bias correction flags, the biases could be over- or
 under-corrected in the test sample -- so use the options ``--no-gc``,
 ``--no-rmask`` and ``--no-edge`` consistently or not at all.
@@ -577,18 +577,15 @@ The following segmentation algorithms can be specified with the ``-m`` option:
   <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_,
   a wavelet-based method. Very fast and performs reasonably well on small
   panels, but tends to over-segment large datasets.
-- ``hmm`` *(experimental)* -- a 3-state Hidden Markov Model suitable for most
-  samples. Faster than CBS, and slower but more accurate than Haar. Requires
-  the Python package pomegranate, as do the next two methods.
-- ``hmm-tumor`` *(experimental)* -- a 5-state HMM suitable for finer-grained
-  segmentation of good-quality tumor samples. In particular, this method can
-  detect focal amplifications within a larger-scale, smaller-amplitude copy
-  number gain, or focal deep deletions within a larger-scale hemizygous loss.
-  Training this model takes a bit more CPU time than the simpler ``hmm`` method.
-- ``hmm-germline`` *(experimental)* -- a 3-state HMM with fixed amplitude for
-  the loss, neutral, and gain states corresponding to absolute copy numbers of
-  1, 2, and 3. Suitable for germline samples and single-cell sequencing of
-  samples with mostly-diploid genomes that are not overly aneuploid.
+- ``hmm`` -- Hidden Markov Model with distance-dependent transitions and joint
+  log2/BAF emissions. Estimates tumor purity and ploidy via grid search over
+  marginal likelihood. Suitable for most samples.
+- ``hmm-tumor`` -- HMM with an expanded state space (up to 8 copies) for
+  finer-grained segmentation of tumor samples. Can detect focal amplifications
+  within larger-scale gains, or focal deep deletions within hemizygous losses.
+- ``hmm-germline`` -- HMM with fixed purity=1 and ploidy=2 (no grid search),
+  suitable for germline samples and single-cell sequencing of mostly-diploid
+  genomes.
 - ``none`` -- simply calculate the weighted mean log2 value of each chromosome
   arm. Useful for testing or debugging, or as a baseline for benchmarking other
   methods.
@@ -601,10 +598,9 @@ for you automatically. If you installed the R packages in a nonstandard or
 non-default location, you can specify the location of the right ``Rscript``
 executable you want to use with ``--rscript-path``.
 
-The HMM methods ``hmm``, ``hmm-tumor`` and ``hmm-germline`` were introduced
-provisionally in CNVkit v.0.9.2, and may change in future releases.
-They depend on the Python package ``pomegranate``, which is available through
-both conda and pip.
+The HMM methods ``hmm``, ``hmm-tumor`` and ``hmm-germline`` use a pure
+numpy/scipy implementation with no additional dependencies. When a VCF file
+is provided (``-v``), BAF information is jointly modeled with log2 ratios.
 
 The methods ``haar`` and ``none`` do not have any additional dependencies beyond
 the basic CNVkit installation.
@@ -844,28 +840,28 @@ number is the same.
 
 *New in version 0.9.7*
 
-``bintest`` subcommand replaced additional script ``cnv_ztest.py``, aiming to 
+``bintest`` subcommand replaced additional script ``cnv_ztest.py``, aiming to
 call focal bin-level CNVs.
 
-Each bin in a .cnr file is tested individually for non-neutral copy number. 
-Specifically, we calculate the probability of a bin's log2 value versus a normal 
-distribution with a mean of 0 and standard deviation back-calculated from bin 
-weight. Bin p-values are eventually corrected for multiple hypothesis testing by 
+Each bin in a .cnr file is tested individually for non-neutral copy number.
+Specifically, we calculate the probability of a bin's log2 value versus a normal
+distribution with a mean of 0 and standard deviation back-calculated from bin
+weight. Bin p-values are eventually corrected for multiple hypothesis testing by
 the Benjamini-Hochberg method.
 
-Output is another .cnr with aditional column "p_bintest" corresponding to p-value 
-of test probabilities. Rows considered as not significant, i.e. having probability 
+Output is another .cnr with aditional column "p_bintest" corresponding to p-value
+of test probabilities. Rows considered as not significant, i.e. having probability
 above the threshold (controlled by ``--alpha``/``-a`` parameter), are dropped.
 
-This post-processing step were also included into :ref:`batch` subcommand, where 
-``bintest`` is run with segment file and on target bins only (equivalent to 
-``-t, --target`` parameter of ``bintest`` subcommand), producing a third ".cns" 
+This post-processing step were also included into :ref:`batch` subcommand, where
+``bintest`` is run with segment file and on target bins only (equivalent to
+``-t, --target`` parameter of ``bintest`` subcommand), producing a third ".cns"
 file with the suffix ".bintest.cns".
 
 .. note::
-    If ``bintest`` is run with ``-s file.cns``, it will try to find additional 
-    bin-level alterations, considering alterations present in "file.cns" to be 
-    the baseline. In other words, when the .cns file is given, comparisons are 
-    made in relation to the segment to which the bin belongs, and otherwise to 
-    the whole chromosome. This can lead to (apparently) unexpected log2 values, 
+    If ``bintest`` is run with ``-s file.cns``, it will try to find additional
+    bin-level alterations, considering alterations present in "file.cns" to be
+    the baseline. In other words, when the .cns file is given, comparisons are
+    made in relation to the segment to which the bin belongs, and otherwise to
+    the whole chromosome. This can lead to (apparently) unexpected log2 values,
     especially on regions undergoing a CNV.

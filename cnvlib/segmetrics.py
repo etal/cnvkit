@@ -233,7 +233,7 @@ def confidence_interval_bootstrap(
     if not use_smoothing:
         alphas = _bca_correct_alpha(values, weights, bootstrap_dist, alphas)
     ci = np.percentile(bootstrap_dist, list(100 * alphas))
-    return ci
+    return ci  # type: ignore[no-any-return]
 
 
 def _smooth_samples_by_weight(

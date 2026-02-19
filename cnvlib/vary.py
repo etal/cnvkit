@@ -60,6 +60,27 @@ class VariantArray(GenomicArray):
             cnarr = cnarr.add_columns(alt_freq=cnarr.tumor_boost())
         return cnarr.into_ranges(ranges, "alt_freq", np.nan, summarize)
 
+    def baf_counts_by_ranges(self, ranges) -> tuple[pd.Series, pd.Series] | None:
+        """Aggregate minor allele counts and depths per bin.
+
+        For each bin in `ranges`, sum min(alt_count, depth - alt_count) and
+        depth across overlapping het SNPs.
+
+        Returns None if alt_count/depth columns are missing.
+        """
+        if "alt_count" not in self or "depth" not in self:
+            return None
+        cnarr = self.heterozygous()
+        alt = cnarr["alt_count"].to_numpy(dtype=np.float64)
+        dp = cnarr["depth"].to_numpy(dtype=np.float64)
+        # Clamp alt_count to [0, depth] to handle inconsistent VCF data
+        alt = np.clip(alt, 0, dp)
+        minor = np.minimum(alt, dp - alt)
+        cnarr = cnarr.add_columns(minor_count=minor)
+        minor_counts = cnarr.into_ranges(ranges, "minor_count", 0, np.nansum)
+        depths = cnarr.into_ranges(ranges, "depth", 0, np.nansum)
+        return minor_counts, depths
+
     def het_frac_by_ranges(self, ranges):
         """Fraction of the SNVs in each bin that are heterozygous."""
         if "zygosity" not in self and "n_zygosity" not in self:

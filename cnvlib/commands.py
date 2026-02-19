@@ -1108,6 +1108,11 @@ def _cmd_segment(args: argparse.Namespace) -> None:
         logging.info("Wrote %s", args.dataframe)
     else:
         segments = results
+    if args.purity_output and hasattr(segments, "meta"):
+        purity_results = segments.meta.get("purity_results")
+        if purity_results is not None:
+            purity_results.to_csv(args.purity_output, sep="\t", index=False)
+            logging.info("Wrote purity/ploidy estimates to %s", args.purity_output)
     tabio.write(segments, args.output or segments.sample_id + ".cns")
 
 
@@ -1171,6 +1176,12 @@ P_segment.add_argument(
     action="store_true",
     help="""Perform an additional smoothing before CBS segmentation, which in some cases
             may increase the sensitivity. Used only for CBS method.""",
+)
+P_segment.add_argument(
+    "--purity-output",
+    metavar="FILENAME",
+    help="""Output file for purity/ploidy estimates (TSV). Only used with HMM
+            methods. Contains columns: purity, ploidy, score.""",
 )
 add_diploid_parx_genome(P_segment)
 
