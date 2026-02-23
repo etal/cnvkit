@@ -1086,6 +1086,39 @@ class AnalysisTests(unittest.TestCase):
             os.unlink(tmp_path)
 
 
+class PlotTests(unittest.TestCase):
+    """Smoke tests for plotting commands."""
+
+    def test_scatter(self):
+        """The 'scatter' command."""
+        import matplotlib
+
+        matplotlib.use("Agg")
+        from cnvlib import scatter
+
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        fig = scatter.do_scatter(cnarr, segarr)
+        self.assertIsNotNone(fig)
+        # With a gene zoom
+        fig = scatter.do_scatter(cnarr, segarr, show_gene="BRAF")
+        self.assertIsNotNone(fig)
+
+    def test_heatmap(self):
+        """The 'heatmap' command."""
+        import matplotlib
+
+        matplotlib.use("Agg")
+        from cnvlib import heatmap
+
+        cnarrs = [cnvlib.read("formats/amplicon.cnr")]
+        ax = heatmap.do_heatmap(cnarrs)
+        self.assertIsNotNone(ax)
+        # With desaturation
+        ax = heatmap.do_heatmap(cnarrs, do_desaturate=True)
+        self.assertIsNotNone(ax)
+
+
 class ExportTests(unittest.TestCase):
     """Tests for export commands."""
 
