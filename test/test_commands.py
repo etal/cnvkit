@@ -6,7 +6,6 @@ import os
 import shutil
 import tempfile
 import unittest
-from multiprocessing import Pool
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -1245,16 +1244,18 @@ class CommandTests(unittest.TestCase):
         #### MIXED POOL ####
         target_fnames = male_target_fnames + female_target_fnames
         antitarget_fnames = male_antitarget_fnames + female_antitarget_fnames
+        # Only process male02 (index 1) and female01 (index 2) — the samples
+        # actually checked below — to avoid redundant CBS segmentation.
         ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(
-            target_fnames, antitarget_fnames, None
+            target_fnames, antitarget_fnames, None, sample_indices=[1, 2]
         )
         ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(
-            target_fnames, antitarget_fnames, genome_build
+            target_fnames, antitarget_fnames, genome_build, sample_indices=[1, 2]
         )
 
         # "dpxg" = DiploidParXGenome
-        male_call, male_call_dpxg = clls1[1], clls2[1]
-        female_call, female_call_dpxg = clls1[2], clls2[2]
+        male_call, male_call_dpxg = clls1[0], clls2[0]
+        female_call, female_call_dpxg = clls1[1], clls2[1]
         male_call__x, male_call_dpxg__x = (
             male_call[male_call.chr_x_filter()],
             male_call_dpxg[male_call_dpxg.chromosome == "X"],
@@ -1289,14 +1290,15 @@ class CommandTests(unittest.TestCase):
         #### MALE-ONLY POOL ####
         target_fnames = male_target_fnames
         antitarget_fnames = male_antitarget_fnames
+        # Only process male02 (index 1) — the sample actually checked below.
         ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(
-            target_fnames, antitarget_fnames, None
+            target_fnames, antitarget_fnames, None, sample_indices=[1]
         )
         ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(
-            target_fnames, antitarget_fnames, genome_build
+            target_fnames, antitarget_fnames, genome_build, sample_indices=[1]
         )
 
-        male_call, male_call_dpxg = clls1[1], clls2[1]
+        male_call, male_call_dpxg = clls1[0], clls2[0]
         male_call__x, male_call_dpxg__x = (
             male_call[male_call.chr_x_filter()],
             male_call_dpxg[male_call_dpxg.chromosome == "X"],
@@ -1399,20 +1401,22 @@ def linecount(filename):
         return i + 1
 
 
-def run_samples(target_fnames, antitarget_fnames, diploid_parx_genome):
+def run_samples(
+    target_fnames, antitarget_fnames, diploid_parx_genome, sample_indices=None
+):
     ref_probes = commands.do_reference(
         target_fnames, antitarget_fnames, diploid_parx_genome=diploid_parx_genome
     )
-    iter_args = [
-        (target_fnames[i], antitarget_fnames[i], ref_probes, diploid_parx_genome)
-        for i in range(len(target_fnames))
-    ]
+    if sample_indices is None:
+        sample_indices = range(len(target_fnames))
     cnrs, cnss, clls = [], [], []
-    with Pool() as pool:
-        for cnr, cns, cll in pool.starmap(run_sample, iter_args):
-            cnrs.append(cnr)
-            cnss.append(cns)
-            clls.append(cll)
+    for i in sample_indices:
+        cnr, cns, cll = run_sample(
+            target_fnames[i], antitarget_fnames[i], ref_probes, diploid_parx_genome
+        )
+        cnrs.append(cnr)
+        cnss.append(cns)
+        clls.append(cll)
 
     sex_df = commands.do_sex(
         cnrs, is_haploid_x_reference=False, diploid_parx_genome=diploid_parx_genome
