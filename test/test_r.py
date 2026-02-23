@@ -4,6 +4,8 @@
 import unittest
 import logging
 
+import pytest
+
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import cnvlib
@@ -17,6 +19,7 @@ class RTests(unittest.TestCase):
         self.tas_cnr = cnvlib.read("formats/amplicon.cnr")
         self.wgs_cnr = cnvlib.read("formats/wgs-chr17.cnr")
 
+    @pytest.mark.slow
     def test_cbs(self):
         _test_method(self, "cbs")
 

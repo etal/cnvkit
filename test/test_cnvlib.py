@@ -4,6 +4,8 @@
 import logging
 import unittest
 
+import pytest
+
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import numpy as np
@@ -11,6 +13,7 @@ from skgenome import GenomicArray, tabio
 
 import cnvlib
 from cnvlib import cnary, fix, params
+from conftest import linecount
 
 
 class CNATests(unittest.TestCase):
@@ -261,6 +264,7 @@ class CNATests(unittest.TestCase):
             self.assertAlmostEqual(1, np.percentile(resid, 80), delta=0.2)
             self.assertAlmostEqual(2, resid.std(), delta=0.5)
 
+    @pytest.mark.slow
     def test_smooth_log2(self):
         for fname in [
             "formats/amplicon.cnr",
@@ -314,17 +318,6 @@ class VATests(unittest.TestCase):
         """Instantiate from a VCF file."""
         variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         self.assertGreater(len(variants), 0)
-
-
-# == helpers ==
-
-
-def linecount(filename):
-    i = -1
-    with open(filename) as handle:
-        for i, _line in enumerate(handle):
-            pass
-        return i + 1
 
 
 if __name__ == "__main__":

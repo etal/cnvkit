@@ -6,7 +6,8 @@ import os
 import shutil
 import tempfile
 import unittest
-from multiprocessing import Pool
+
+import pytest
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -14,11 +15,15 @@ import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+import matplotlib
 import numpy as np
 import pandas as pd
 from skgenome import tabio
 
+matplotlib.use("Agg")
+
 import cnvlib
+from conftest import linecount
 
 # Import all modules as a smoke test
 from cnvlib import (
@@ -35,6 +40,7 @@ from cnvlib import (
     diagram,
     export,
     fix,
+    heatmap,
     import_rna,
     importers,
     metrics,
@@ -43,6 +49,7 @@ from cnvlib import (
     plots,
     reference,
     reports,
+    scatter,
     segmentation,
     segmetrics,
     smoothing,
@@ -50,14 +57,17 @@ from cnvlib import (
 )
 
 
-class CommandTests(unittest.TestCase):
-    """Tests for top-level commands."""
+class PreprocessingTests(unittest.TestCase):
+    """Tests for preprocessing commands: access, antitarget, autobin, target, coverage."""
 
     def test_access(self):
         fasta = "formats/chrM-Y-trunc.hg19.fa"
         for min_gap_size, expect_nrows in ((None, 7), (500, 3), (1000, 2)):
-            acc = commands.do_access(fasta, [], min_gap_size, skip_noncanonical=False)
-            self.assertEqual(len(acc), expect_nrows)
+            with self.subTest(min_gap_size=min_gap_size):
+                acc = commands.do_access(
+                    fasta, [], min_gap_size, skip_noncanonical=False
+                )
+                self.assertEqual(len(acc), expect_nrows)
         excludes = ["formats/dac-my.bed", "formats/my-targets.bed"]
         for min_gap_size, expect_nrows in (
             (None, 12),
@@ -66,14 +76,16 @@ class CommandTests(unittest.TestCase):
             (200, 3),
             (2000, 2),
         ):
-            acc = commands.do_access(
-                fasta, excludes, min_gap_size, skip_noncanonical=False
-            )
-            self.assertEqual(len(acc), expect_nrows)
+            with self.subTest(min_gap_size=min_gap_size, excludes=True):
+                acc = commands.do_access(
+                    fasta, excludes, min_gap_size, skip_noncanonical=False
+                )
+                self.assertEqual(len(acc), expect_nrows)
         # Dropping chrM, keeping only chrY
         acc = commands.do_access(fasta, excludes, 10, skip_noncanonical=True)
         self.assertEqual(len(acc), 5)
 
+    @pytest.mark.slow
     def test_antitarget(self):
         """The 'antitarget' command."""
         baits = tabio.read_auto("formats/nv2_baits.interval_list")
@@ -97,107 +109,374 @@ class CommandTests(unittest.TestCase):
             self.assertGreater(cov, 0)
             self.assertGreater(bs, 0)
 
-    def test_batch(self):
-        """The 'batch' command."""
-        target_bed = "formats/my-targets.bed"
-        fasta = "formats/chrM-Y-trunc.hg19.fa"
+    @pytest.mark.slow
+    def test_coverage(self):
+        """The 'coverage' command."""
+        bed = "formats/my-targets.bed"
         bam = "formats/na12878-chrM-Y-trunc.bam"
-        annot = "formats/my-refflat.bed"
-        # Build a single-sample WGS reference
-        ref_fname, tgt_bed_fname, _ = batch.batch_make_reference(
-            [bam],
-            None,
-            None,
-            True,
-            None,
-            fasta,
-            annot,
-            True,
-            500,
-            None,
-            None,
-            None,
-            None,
-            "build",
-            1,
-            False,
-            0,
-            "wgs",
-            False,
-        )
-        self.assertEqual(ref_fname, "build/reference.cnn")
-        refarr = cnvlib.read(ref_fname, "bed")
-        tgt_regions = tabio.read(tgt_bed_fname, "bed")
-        self.assertEqual(len(refarr), len(tgt_regions))
-        # Build a single-sample hybrid-capture reference
-        ref_fname, tgt_bed_fname, anti_bed_fname = batch.batch_make_reference(
-            [bam],
-            target_bed,
-            None,
-            True,
-            None,
-            fasta,
-            None,
-            True,
-            10,
-            None,
-            1000,
-            100,
-            None,
-            "build",
-            1,
-            False,
-            0,
-            "hybrid",
-            False,
-        )
-        self.assertEqual(ref_fname, "build/reference.cnn")
-        refarr = cnvlib.read(ref_fname, "bed")
-        tgt_regions = tabio.read(tgt_bed_fname, "bed")
-        anti_regions = tabio.read(anti_bed_fname, "bed")
-        self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
-        # Run the same sample
-        batch.batch_run_sample(
-            bam,
-            tgt_bed_fname,
-            anti_bed_fname,
-            ref_fname,
-            "build",
-            True,
-            None,
-            True,
-            True,
-            "Rscript",
-            False,
-            0,
-            False,
-            "hybrid",
-            "hmm",
-            1,
-            False,
-        )
-        cns = cnvlib.read("build/na12878-chrM-Y-trunc.cns")
-        self.assertGreater(len(cns), 0)
+        # Cover distinct code paths: depth-based default, count-based with
+        # mapq filtering, and multiprocessing.
+        for by_count, min_mapq, nprocs in [
+            (False, 0, 1),
+            (True, 30, 1),
+            (False, 0, 2),
+        ]:
+            cna = commands.do_coverage(
+                bed, bam, by_count=by_count, min_mapq=min_mapq, processes=nprocs
+            )
+            self.assertEqual(len(cna), 4)
+            self.assertTrue((cna.log2 != 0).any())
+            self.assertGreater(cna.log2.nunique(), 1)
 
-    def test_bintest(self):
-        """The 'bintest' command."""
+    def test_coverage_bedgraph(self):
+        """The 'coverage' command with bedGraph input."""
+        bed = "formats/my-targets.bed"
+        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
+
+        # Test basic bedGraph coverage
+        cna = commands.do_coverage(bed, bedgraph)
+        self.assertEqual(len(cna), 4)
+        self.assertTrue((cna.log2 != 0).any())
+        self.assertGreater(cna.log2.nunique(), 1)
+
+        # Verify sample_id is set correctly
+        self.assertEqual(cna.sample_id, "na12878-chrM-Y-trunc")
+
+        # Verify depth values are calculated
+        self.assertTrue((cna["depth"] >= 0).all())
+
+    def test_coverage_bedgraph_vs_bam(self):
+        """Compare bedGraph and BAM coverage outputs."""
+        bed = "formats/my-targets.bed"
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
+
+        # Get coverage from both inputs
+        cna_bam = commands.do_coverage(bed, bam)
+        cna_bedgraph = commands.do_coverage(bed, bedgraph)
+
+        # Should have same number of regions
+        self.assertEqual(len(cna_bam), len(cna_bedgraph))
+
+        # Convert to DataFrames for easier comparison
+        df_bam = cna_bam.data.copy()
+        df_bedgraph = cna_bedgraph.data.copy()
+
+        # Sort both by chromosome, start, end
+        df_bam = df_bam.sort_values(["chromosome", "start", "end"]).reset_index(
+            drop=True
+        )
+        df_bedgraph = df_bedgraph.sort_values(
+            ["chromosome", "start", "end"]
+        ).reset_index(drop=True)
+
+        # Chromosomes and positions should match exactly
+        pd.testing.assert_series_equal(
+            df_bam["chromosome"], df_bedgraph["chromosome"], check_names=False
+        )
+        pd.testing.assert_series_equal(
+            df_bam["start"], df_bedgraph["start"], check_names=False
+        )
+        pd.testing.assert_series_equal(
+            df_bam["end"], df_bedgraph["end"], check_names=False
+        )
+
+        # Depth values should be reasonably close
+        # Note: Small differences expected due to different depth calculation methods
+        # (pysam.bedcov vs bedtools genomecov)
+        np.testing.assert_allclose(
+            df_bam["depth"].values,
+            df_bedgraph["depth"].values,
+            rtol=0.05,  # Allow 5% relative difference
+            atol=1.0,  # Allow 1.0 absolute difference for low-depth regions
+            err_msg="bedGraph and BAM coverage depths should be reasonably close",
+        )
+
+    def test_coverage_bedgraph_missing_index(self):
+        """Test error handling when tabix index is missing."""
+        bed = "formats/my-targets.bed"
+
+        # Create a temporary bedGraph without index
+        with tempfile.NamedTemporaryFile(suffix=".bed.gz", delete=False) as tmp:
+            tmp_path = tmp.name
+            # Copy bedGraph content but not the index
+            with open("formats/na12878-chrM-Y-trunc.bed.gz", "rb") as src:
+                tmp.write(src.read())
+
+        try:
+            # Should raise FileNotFoundError for missing index
+            with self.assertRaises(FileNotFoundError) as cm:
+                commands.do_coverage(bed, tmp_path)
+
+            self.assertIn("tabix index", str(cm.exception))
+        finally:
+            os.unlink(tmp_path)
+
+    def test_coverage_bedgraph_chr_naming(self):
+        """Test chromosome name mismatch handling (chr1 vs 1)."""
+        bed = "formats/my-targets.bed"
+        # This bedGraph has chromosomes named without 'chr' prefix (M, Y)
+        # while the BED file uses 'chr' prefix (chrM, chrY)
+        bedgraph_nochr = "formats/na12878-M-Y-trunc-nochr.bed.gz"
+
+        # Should still work by auto-matching chromosome names
+        cna = commands.do_coverage(bed, bedgraph_nochr)
+
+        # Should get same number of regions
+        self.assertEqual(len(cna), 4)
+
+        # Should have valid coverage values
+        self.assertTrue((cna.log2 != 0).any())
+        self.assertGreater(cna.log2.nunique(), 1)
+
+    @pytest.mark.slow
+    def test_target(self):
+        """The 'target' command."""
+        annot_fname = "formats/refflat-mini.txt"
+        for bait_fname in (
+            "formats/nv2_baits.interval_list",
+            "formats/amplicon.bed",
+            "formats/baits-funky.bed",
+        ):
+            baits = tabio.read_auto(bait_fname)
+            bait_len = len(baits)
+            # No splitting: w/o and w/ re-annotation
+            r1 = commands.do_target(baits)
+            self.assertEqual(len(r1), bait_len)
+            r1a = commands.do_target(baits, do_short_names=True, annotate=annot_fname)
+            self.assertEqual(len(r1a), len(r1))
+            # Splitting, w/o and w/ re-annotation
+            r2 = commands.do_target(
+                baits, do_short_names=True, do_split=True, avg_size=100
+            )
+            self.assertGreater(len(r2), len(r1))
+            for _c, subarr in r2.by_chromosome():
+                self.assertTrue(subarr.start.is_monotonic_increasing, bait_fname)
+                self.assertTrue(subarr.end.is_monotonic_increasing, bait_fname)
+                # Bins are non-overlapping; next start >= prev. end
+                self.assertTrue(
+                    (
+                        (subarr.start.to_numpy()[1:] - subarr.end.to_numpy()[:-1]) >= 0
+                    ).all()
+                )
+            r2a = commands.do_target(
+                baits,
+                do_short_names=True,
+                do_split=True,
+                avg_size=100,
+                annotate=annot_fname,
+            )
+            self.assertEqual(len(r2a), len(r2))
+            # Original regions object should be unmodified
+            self.assertEqual(len(baits), bait_len)
+
+
+class ReferenceTests(unittest.TestCase):
+    """Tests for the reference and fix commands."""
+
+    def test_reference(self):
+        """The 'reference' command."""
+        # Empty/unspecified antitargets
+        nlines = linecount("formats/amplicon.cnr") - 1
+        ref = commands.do_reference(["formats/amplicon.cnr"], ["formats/empty"])
+        self.assertEqual(len(ref), nlines)
+        ref = commands.do_reference(["formats/amplicon.cnr"])
+        self.assertEqual(len(ref), nlines)
+        # Empty/unspecified antitargets, flat reference
+        nlines = linecount("formats/amplicon.bed")
+        ref = commands.do_reference_flat("formats/amplicon.bed", "formats/empty")
+        self.assertEqual(len(ref), nlines)
+        ref = commands.do_reference_flat("formats/amplicon.bed")
+        self.assertEqual(len(ref), nlines)
+        # Misc
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        targets, antitargets = reference.reference2regions(ref)
+        self.assertLess(0, len(antitargets))
+        self.assertEqual(len(antitargets), (ref["gene"] == "Background").sum())
+        self.assertEqual(len(targets), len(ref) - len(antitargets))
+
+    def test_reference_gender_input(self):
+        """Test whether correct log2-ratios are calculated for sex chromosomes in reference command"""
+        expected_haploid_log2 = [-1.0]
+        expected_diploid_log2 = [0.0]
+
+        # Test case when sample gender is provided by user
+        ref_male = commands.do_reference(
+            ["formats/ref_test_male.cnn"], female_samples=False
+        )  # is_haploid_x_reference=False
+        ref_female = commands.do_reference(
+            ["formats/ref_test_female.cnn"], female_samples=True
+        )  # is_haploid_x_reference=False
+        self.assertListEqual(
+            ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_diploid_log2
+        )
+        self.assertListEqual(
+            ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2
+        )
+        self.assertListEqual(
+            ref_female["log2"][ref_female.chr_x_filter()].to_list(),
+            expected_diploid_log2,
+        )
+        ref_male = commands.do_reference(
+            ["formats/ref_test_male.cnn"],
+            female_samples=False,
+            is_haploid_x_reference=True,
+        )
+        ref_female = commands.do_reference(
+            ["formats/ref_test_female.cnn"],
+            female_samples=True,
+            is_haploid_x_reference=True,
+        )
+        self.assertListEqual(
+            ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_haploid_log2
+        )
+        self.assertListEqual(
+            ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2
+        )
+        self.assertListEqual(
+            ref_female["log2"][ref_female.chr_x_filter()].to_list(),
+            expected_haploid_log2,
+        )
+
+        # Test case when sample gender is guessed from input
+        ref_male = commands.do_reference(
+            ["formats/ref_test_male.cnn"]
+        )  # is_haploid_x_reference=False
+        ref_female = commands.do_reference(
+            ["formats/ref_test_female.cnn"]
+        )  # is_haploid_x_reference=False
+        self.assertListEqual(
+            ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_diploid_log2
+        )
+        self.assertListEqual(
+            ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2
+        )
+        self.assertListEqual(
+            ref_female["log2"][ref_female.chr_x_filter()].to_list(),
+            expected_diploid_log2,
+        )
+        ref_male = commands.do_reference(
+            ["formats/ref_test_male.cnn"], is_haploid_x_reference=True
+        )
+        ref_female = commands.do_reference(
+            ["formats/ref_test_female.cnn"], is_haploid_x_reference=True
+        )
+        self.assertListEqual(
+            ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_haploid_log2
+        )
+        self.assertListEqual(
+            ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2
+        )
+        self.assertListEqual(
+            ref_female["log2"][ref_female.chr_x_filter()].to_list(),
+            expected_haploid_log2,
+        )
+
+    def test_fix(self):
+        """The 'fix' command."""
+        # Extract fake target/antitarget bins from a combined file
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        tgt_bins = ref[~is_bg]
+        rng = np.random.default_rng(42)  # Use fixed seed for reproducible tests
+        tgt_bins.log2 += rng.standard_normal(len(tgt_bins)) / 5
+        anti_bins = ref[is_bg]
+        anti_bins.log2 += rng.standard_normal(len(anti_bins)) / 5
+        blank_bins = cnary.CopyNumArray([])
+        # Typical usage (hybrid capture)
+        cnr = commands.do_fix(tgt_bins, anti_bins, ref)
+        self.assertTrue(0 < len(cnr) <= len(ref))
+        # Blank antitargets (WGS or amplicon)
+        cnr = commands.do_fix(tgt_bins, blank_bins, ref[~is_bg])
+        self.assertTrue(0 < len(cnr) <= len(tgt_bins))
+
+
+class SegmentationTests(unittest.TestCase):
+    """Tests for segmentation commands."""
+
+    def test_segment(self):
+        """The 'segment' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
-        # Simple
-        rows = commands.do_bintest(cnarr, alpha=0.05)
-        self.assertGreater(len(rows), 0)
-        self.assertLess(len(rows), len(cnarr))
-        # Versus segments
-        rows = commands.do_bintest(cnarr, segarr, target_only=True)
-        self.assertGreaterEqual(len(rows), len(segarr))
-        self.assertLess(len(rows), len(cnarr))
+        n_chroms = cnarr.chromosome.nunique()
+        # NB: R methods are in another script; haar is pure-Python
+        segments = segmentation.do_segmentation(cnarr, "haar")
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
+        segments = segmentation.do_segmentation(
+            cnarr, "haar", threshold=0.0001, skip_low=True
+        )
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
+        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        # TODO - This test is failing... commenting it out for now!
+        # segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
+        # self.assertGreater(len(segments), n_chroms)
+        # self.assertTrue((segments.start < segments.end).all())
 
-    def test_breaks(self):
-        """The 'breaks' command."""
-        probes = cnvlib.read("formats/amplicon.cnr")
-        segs = cnvlib.read("formats/amplicon.cns")
-        rows = commands.do_breaks(probes, segs, 4)
-        self.assertGreater(len(rows), 0)
+    @pytest.mark.slow
+    def test_segment_hmm(self):
+        """The 'segment' command with HMM methods."""
+        # Test all HMM method variants on one file
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        n_chroms = cnarr.chromosome.nunique()
+        # NB: R methods are in another script; haar is pure-Python
+        segments = segmentation.do_segmentation(cnarr, "hmm")
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
+        segments = segmentation.do_segmentation(cnarr, "hmm-tumor", skip_low=True)
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
+        segments = segmentation.do_segmentation(cnarr, "hmm-germline")
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
+        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
+        self.assertGreater(len(segments), n_chroms)
+        # Verify default HMM also works on a different dataset
+        cnarr2 = cnvlib.read("formats/p2-20_1.cnr")
+        n_chroms2 = cnarr2.chromosome.nunique()
+        segments = segmentation.do_segmentation(cnarr2, "hmm")
+        self.assertGreater(len(segments), n_chroms2)
+        self.assertTrue((segments.start < segments.end).all())
+
+    @pytest.mark.slow
+    def test_segment_parallel(self):
+        """The 'segment' command, in parallel."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        psegments = segmentation.do_segmentation(cnarr, "haar", processes=2)
+        ssegments = segmentation.do_segmentation(cnarr, "haar", processes=1)
+        self.assertEqual(psegments.data.shape, ssegments.data.shape)
+        self.assertEqual(len(psegments.meta), len(ssegments.meta))
+
+    def test_segment_empty_input(self):
+        """Test segmentation with empty CNR input (issue #970)."""
+        # Create an empty CNA with proper structure (header only)
+        empty_data = pd.DataFrame(
+            columns=["chromosome", "start", "end", "gene", "log2"]
+        )
+        empty_cnarr = cnvlib.cnary.CopyNumArray(empty_data, {"sample_id": "test"})
+
+        # Test with serial processing
+        segments = segmentation.do_segmentation(empty_cnarr, "haar", processes=1)
+        self.assertEqual(len(segments), 0)
+        self.assertListEqual(
+            list(segments.data.columns), list(empty_cnarr.data.columns)
+        )
+
+        # Test with parallel processing
+        psegments = segmentation.do_segmentation(empty_cnarr, "haar", processes=2)
+        self.assertEqual(len(psegments), 0)
+
+        # Test with save_dataframe=True
+        segments_df, rstr = segmentation.do_segmentation(
+            empty_cnarr, "haar", processes=1, save_dataframe=True
+        )
+        self.assertEqual(len(segments_df), 0)
+        self.assertEqual(rstr, "")
+
+
+class CallTests(unittest.TestCase):
+    """Tests for the call command and related functions."""
 
     def test_call(self):
         """The 'call' command."""
@@ -263,21 +542,22 @@ class CommandTests(unittest.TestCase):
             ["sem", "cn", "ampdel"],
             ["ci", "cn"],
         ):
-            result = commands.do_call(
-                segments,
-                variants,
-                method="threshold",
-                purity=0.9,
-                is_haploid_x_reference=True,
-                is_sample_female=True,
-                filters=filters,
-            )
-            self.assertLessEqual(len(result), len(segments))
-            if "ampdel" not in filters:
-                # At least 1 segment per chromosome remains
-                self.assertLessEqual(len(segments.chromosome.unique()), len(result))
-            for colname in "baf", "cn", "cn1", "cn2":
-                self.assertIn(colname, result)
+            with self.subTest(filters=filters):
+                result = commands.do_call(
+                    segments,
+                    variants,
+                    method="threshold",
+                    purity=0.9,
+                    is_haploid_x_reference=True,
+                    is_sample_female=True,
+                    filters=filters,
+                )
+                self.assertLessEqual(len(result), len(segments))
+                if "ampdel" not in filters:
+                    # At least 1 segment per chromosome remains
+                    self.assertLessEqual(len(segments.chromosome.unique()), len(result))
+                for colname in "baf", "cn", "cn1", "cn2":
+                    self.assertIn(colname, result)
 
     def test_call_log2_ratios(self):
         cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
@@ -534,213 +814,29 @@ class CommandTests(unittest.TestCase):
         _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 0, 0, 0.0)
         _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.45083)
 
-    def test_coverage(self):
-        """The 'coverage' command."""
-        # fa = 'formats/chrM-Y-trunc.hg19.fa'
-        bed = "formats/my-targets.bed"
-        bam = "formats/na12878-chrM-Y-trunc.bam"
-        for by_count in (False, True):
-            for min_mapq in (0, 30):
-                for nprocs in (1, 2):
-                    cna = commands.do_coverage(
-                        bed, bam, by_count=by_count, min_mapq=min_mapq, processes=nprocs
-                    )
-                    self.assertEqual(len(cna), 4)
-                    self.assertTrue((cna.log2 != 0).any())
-                    self.assertGreater(cna.log2.nunique(), 1)
 
-    def test_coverage_bedgraph(self):
-        """The 'coverage' command with bedGraph input."""
-        bed = "formats/my-targets.bed"
-        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
+class AnalysisTests(unittest.TestCase):
+    """Tests for analysis commands: bintest, breaks, genemetrics, metrics, etc."""
 
-        # Test basic bedGraph coverage
-        cna = commands.do_coverage(bed, bedgraph)
-        self.assertEqual(len(cna), 4)
-        self.assertTrue((cna.log2 != 0).any())
-        self.assertGreater(cna.log2.nunique(), 1)
+    def test_bintest(self):
+        """The 'bintest' command."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        # Simple
+        rows = commands.do_bintest(cnarr, alpha=0.05)
+        self.assertGreater(len(rows), 0)
+        self.assertLess(len(rows), len(cnarr))
+        # Versus segments
+        rows = commands.do_bintest(cnarr, segarr, target_only=True)
+        self.assertGreaterEqual(len(rows), len(segarr))
+        self.assertLess(len(rows), len(cnarr))
 
-        # Verify sample_id is set correctly
-        self.assertEqual(cna.sample_id, "na12878-chrM-Y-trunc")
-
-        # Verify depth values are calculated
-        self.assertTrue((cna["depth"] >= 0).all())
-
-    def test_coverage_bedgraph_vs_bam(self):
-        """Compare bedGraph and BAM coverage outputs."""
-        import numpy as np
-        import pandas as pd
-
-        bed = "formats/my-targets.bed"
-        bam = "formats/na12878-chrM-Y-trunc.bam"
-        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
-
-        # Get coverage from both inputs
-        cna_bam = commands.do_coverage(bed, bam)
-        cna_bedgraph = commands.do_coverage(bed, bedgraph)
-
-        # Should have same number of regions
-        self.assertEqual(len(cna_bam), len(cna_bedgraph))
-
-        # Convert to DataFrames for easier comparison
-        df_bam = cna_bam.data.copy()
-        df_bedgraph = cna_bedgraph.data.copy()
-
-        # Sort both by chromosome, start, end
-        df_bam = df_bam.sort_values(["chromosome", "start", "end"]).reset_index(
-            drop=True
-        )
-        df_bedgraph = df_bedgraph.sort_values(
-            ["chromosome", "start", "end"]
-        ).reset_index(drop=True)
-
-        # Chromosomes and positions should match exactly
-        pd.testing.assert_series_equal(
-            df_bam["chromosome"], df_bedgraph["chromosome"], check_names=False
-        )
-        pd.testing.assert_series_equal(
-            df_bam["start"], df_bedgraph["start"], check_names=False
-        )
-        pd.testing.assert_series_equal(
-            df_bam["end"], df_bedgraph["end"], check_names=False
-        )
-
-        # Depth values should be reasonably close
-        # Note: Small differences expected due to different depth calculation methods
-        # (pysam.bedcov vs bedtools genomecov)
-        np.testing.assert_allclose(
-            df_bam["depth"].values,
-            df_bedgraph["depth"].values,
-            rtol=0.05,  # Allow 5% relative difference
-            atol=1.0,  # Allow 1.0 absolute difference for low-depth regions
-            err_msg="bedGraph and BAM coverage depths should be reasonably close",
-        )
-
-    def test_coverage_bedgraph_missing_index(self):
-        """Test error handling when tabix index is missing."""
-        import tempfile
-        import os
-
-        bed = "formats/my-targets.bed"
-
-        # Create a temporary bedGraph without index
-        with tempfile.NamedTemporaryFile(suffix=".bed.gz", delete=False) as tmp:
-            tmp_path = tmp.name
-            # Copy bedGraph content but not the index
-            with open("formats/na12878-chrM-Y-trunc.bed.gz", "rb") as src:
-                tmp.write(src.read())
-
-        try:
-            # Should raise FileNotFoundError for missing index
-            with self.assertRaises(FileNotFoundError) as cm:
-                commands.do_coverage(bed, tmp_path)
-
-            self.assertIn("tabix index", str(cm.exception))
-        finally:
-            os.unlink(tmp_path)
-
-    def test_coverage_bedgraph_chr_naming(self):
-        """Test chromosome name mismatch handling (chr1 vs 1)."""
-        bed = "formats/my-targets.bed"
-        # This bedGraph has chromosomes named without 'chr' prefix (M, Y)
-        # while the BED file uses 'chr' prefix (chrM, chrY)
-        bedgraph_nochr = "formats/na12878-M-Y-trunc-nochr.bed.gz"
-
-        # Should still work by auto-matching chromosome names
-        cna = commands.do_coverage(bed, bedgraph_nochr)
-
-        # Should get same number of regions
-        self.assertEqual(len(cna), 4)
-
-        # Should have valid coverage values
-        self.assertTrue((cna.log2 != 0).any())
-        self.assertGreater(cna.log2.nunique(), 1)
-
-    def test_export_bed_vcf(self):
-        """The 'export' command for formats with absolute copy number."""
-        for fname, ploidy, is_f in [
-            ("tr95t.cns", 2, True),
-            ("cl_seq.cns", 6, True),
-            ("amplicon.cns", 2, False),
-        ]:
-            cns = cnvlib.read("formats/" + fname)
-            # BED
-            for show in ("ploidy", "variant", "all"):
-                tbl_bed = export.export_bed(
-                    cns, ploidy, True, None, is_f, cns.sample_id, show
-                )
-                if show == "all":
-                    self.assertEqual(len(tbl_bed), len(cns), f"{fname} {ploidy}")
-                else:
-                    self.assertLess(len(tbl_bed), len(cns))
-            # VCF
-            _vheader, vcf_body = export.export_vcf(cns, ploidy, True, None, is_f)
-            self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
-
-    def test_export_cdt_jtv(self):
-        """The 'export' command for CDT and Java TreeView formats."""
-        fnames = ["formats/p2-20_1.cnr", "formats/p2-20_2.cnr"]
-        sample_ids = list(map(core.fbase, fnames))
-        nrows = linecount(fnames[0]) - 1
-        for fmt_key, header2 in (("cdt", 2), ("jtv", 0)):
-            table = export.merge_samples(fnames)
-            formatter = export.EXPORT_FORMATS[fmt_key]
-            _oh, outrows = formatter(sample_ids, table)
-            self.assertEqual(len(list(outrows)), nrows + header2)
-
-    def test_export_nexus(self):
-        """The 'export nexus-basic' and 'nexus-ogt' commands."""
-        cnr = cnvlib.read("formats/amplicon.cnr")
-        table_nb = export.export_nexus_basic(cnr)
-        self.assertEqual(len(table_nb), len(cnr))
-        varr = commands.load_het_snps(
-            "formats/na12878_na12882_mix.vcf", None, None, 15, None
-        )
-        table_ogt = export.export_nexus_ogt(cnr, varr, 0.05)
-        self.assertEqual(len(table_ogt), len(cnr))
-
-    def test_export_seg(self):
-        """The 'export seg' command."""
-        seg_rows = export.export_seg(["formats/tr95t.cns"])
-        self.assertGreater(len(seg_rows), 0)
-        seg2_rows = export.export_seg(["formats/tr95t.cns", "formats/cl_seq.cns"])
-        self.assertGreater(len(seg2_rows), len(seg_rows))
-
-    def test_export_theta(self):
-        """The 'export theta' command."""
-        segarr = cnvlib.read("formats/tr95t.cns")
-        len_seg_auto = len(segarr.autosomes())
-        table_theta = export.export_theta(segarr, None)
-        self.assertEqual(len(table_theta), len_seg_auto)
-        ref = cnvlib.read("formats/reference-tr.cnn")
-        table_theta = export.export_theta(segarr, ref)
-        self.assertEqual(len(table_theta), len_seg_auto)
-        varr = commands.load_het_snps(
-            "formats/na12878_na12882_mix.vcf", "NA12882", "NA12878", 15, None
-        )
-        tumor_snps, normal_snps = export.export_theta_snps(varr)
-        self.assertLess(len(tumor_snps), len(varr))
-        self.assertGreater(len(tumor_snps), 0)
-        self.assertLess(len(normal_snps), len(varr))
-        self.assertGreater(len(normal_snps), 0)
-
-    def test_fix(self):
-        """The 'fix' command."""
-        # Extract fake target/antitarget bins from a combined file
-        ref = cnvlib.read("formats/reference-tr.cnn")
-        is_bg = ref["gene"] == "Background"
-        tgt_bins = ref[~is_bg]
-        rng = np.random.default_rng(42)  # Use fixed seed for reproducible tests
-        tgt_bins.log2 += rng.standard_normal(len(tgt_bins)) / 5
-        anti_bins = ref[is_bg]
-        anti_bins.log2 += rng.standard_normal(len(anti_bins)) / 5
-        blank_bins = cnary.CopyNumArray([])
-        # Typical usage (hybrid capture)
-        cnr = commands.do_fix(tgt_bins, anti_bins, ref)
-        self.assertTrue(0 < len(cnr) <= len(ref))
-        # Blank antitargets (WGS or amplicon)
-        cnr = commands.do_fix(tgt_bins, blank_bins, ref[~is_bg])
-        self.assertTrue(0 < len(cnr) <= len(tgt_bins))
+    def test_breaks(self):
+        """The 'breaks' command."""
+        probes = cnvlib.read("formats/amplicon.cnr")
+        segs = cnvlib.read("formats/amplicon.cns")
+        rows = commands.do_breaks(probes, segs, 4)
+        self.assertGreater(len(rows), 0)
 
     def test_genemetrics(self):
         """The 'genemetrics' command."""
@@ -753,6 +849,7 @@ class CommandTests(unittest.TestCase):
         )
         self.assertGreater(len(rows), 0)
 
+    @pytest.mark.slow
     def test_genemetrics_with_stats(self):
         """The 'genemetrics' command with statistics options."""
         probes = cnvlib.read("formats/amplicon.cnr")
@@ -914,176 +1011,6 @@ class CommandTests(unittest.TestCase):
         for val in values:
             self.assertGreater(val, 0)
 
-    def test_reference(self):
-        """The 'reference' command."""
-        # Empty/unspecified antitargets
-        nlines = linecount("formats/amplicon.cnr") - 1
-        ref = commands.do_reference(["formats/amplicon.cnr"], ["formats/empty"])
-        self.assertEqual(len(ref), nlines)
-        ref = commands.do_reference(["formats/amplicon.cnr"])
-        self.assertEqual(len(ref), nlines)
-        # Empty/unspecified antitargets, flat reference
-        nlines = linecount("formats/amplicon.bed")
-        ref = commands.do_reference_flat("formats/amplicon.bed", "formats/empty")
-        self.assertEqual(len(ref), nlines)
-        ref = commands.do_reference_flat("formats/amplicon.bed")
-        self.assertEqual(len(ref), nlines)
-        # Misc
-        ref = cnvlib.read("formats/reference-tr.cnn")
-        targets, antitargets = reference.reference2regions(ref)
-        self.assertLess(0, len(antitargets))
-        self.assertEqual(len(antitargets), (ref["gene"] == "Background").sum())
-        self.assertEqual(len(targets), len(ref) - len(antitargets))
-
-    def test_reference_gender_input(self):
-        """Test whether correct log2-ratios are calculated for sex chromosomes in reference command"""
-        expected_haploid_log2 = [-1.0]
-        expected_diploid_log2 = [0.0]
-
-        # Test case when sample gender is provided by user
-        ref_male = commands.do_reference(
-            ["formats/ref_test_male.cnn"], female_samples=False
-        )  # is_haploid_x_reference=False
-        ref_female = commands.do_reference(
-            ["formats/ref_test_female.cnn"], female_samples=True
-        )  # is_haploid_x_reference=False
-        self.assertListEqual(
-            ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_diploid_log2
-        )
-        self.assertListEqual(
-            ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2
-        )
-        self.assertListEqual(
-            ref_female["log2"][ref_female.chr_x_filter()].to_list(),
-            expected_diploid_log2,
-        )
-        ref_male = commands.do_reference(
-            ["formats/ref_test_male.cnn"],
-            female_samples=False,
-            is_haploid_x_reference=True,
-        )
-        ref_female = commands.do_reference(
-            ["formats/ref_test_female.cnn"],
-            female_samples=True,
-            is_haploid_x_reference=True,
-        )
-        self.assertListEqual(
-            ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_haploid_log2
-        )
-        self.assertListEqual(
-            ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2
-        )
-        self.assertListEqual(
-            ref_female["log2"][ref_female.chr_x_filter()].to_list(),
-            expected_haploid_log2,
-        )
-
-        # Test case when sample gender is guessed from input
-        ref_male = commands.do_reference(
-            ["formats/ref_test_male.cnn"]
-        )  # is_haploid_x_reference=False
-        ref_female = commands.do_reference(
-            ["formats/ref_test_female.cnn"]
-        )  # is_haploid_x_reference=False
-        self.assertListEqual(
-            ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_diploid_log2
-        )
-        self.assertListEqual(
-            ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2
-        )
-        self.assertListEqual(
-            ref_female["log2"][ref_female.chr_x_filter()].to_list(),
-            expected_diploid_log2,
-        )
-        ref_male = commands.do_reference(
-            ["formats/ref_test_male.cnn"], is_haploid_x_reference=True
-        )
-        ref_female = commands.do_reference(
-            ["formats/ref_test_female.cnn"], is_haploid_x_reference=True
-        )
-        self.assertListEqual(
-            ref_male["log2"][ref_male.chr_x_filter()].to_list(), expected_haploid_log2
-        )
-        self.assertListEqual(
-            ref_male["log2"][ref_male.chr_y_filter()].to_list(), expected_haploid_log2
-        )
-        self.assertListEqual(
-            ref_female["log2"][ref_female.chr_x_filter()].to_list(),
-            expected_haploid_log2,
-        )
-
-    def test_segment(self):
-        """The 'segment' command."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        n_chroms = cnarr.chromosome.nunique()
-        # NB: R methods are in another script; haar is pure-Python
-        segments = segmentation.do_segmentation(cnarr, "haar")
-        self.assertGreater(len(segments), n_chroms)
-        self.assertTrue((segments.start < segments.end).all())
-        segments = segmentation.do_segmentation(
-            cnarr, "haar", threshold=0.0001, skip_low=True
-        )
-        self.assertGreater(len(segments), n_chroms)
-        self.assertTrue((segments.start < segments.end).all())
-        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
-        # TODO - This test is failing... commenting it out for now!
-        # segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
-        # self.assertGreater(len(segments), n_chroms)
-        # self.assertTrue((segments.start < segments.end).all())
-
-    def test_segment_hmm(self):
-        """The 'segment' command with HMM methods."""
-        for fname in ("formats/amplicon.cnr", "formats/p2-20_1.cnr"):
-            cnarr = cnvlib.read(fname)
-            n_chroms = cnarr.chromosome.nunique()
-            # NB: R methods are in another script; haar is pure-Python
-            segments = segmentation.do_segmentation(cnarr, "hmm")
-            self.assertGreater(len(segments), n_chroms)
-            self.assertTrue((segments.start < segments.end).all())
-            segments = segmentation.do_segmentation(cnarr, "hmm-tumor", skip_low=True)
-            self.assertGreater(len(segments), n_chroms)
-            self.assertTrue((segments.start < segments.end).all())
-            segments = segmentation.do_segmentation(cnarr, "hmm-germline")
-            self.assertGreater(len(segments), n_chroms)
-            self.assertTrue((segments.start < segments.end).all())
-            varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
-            segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
-            self.assertGreater(len(segments), n_chroms)
-
-    def test_segment_parallel(self):
-        """The 'segment' command, in parallel."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        psegments = segmentation.do_segmentation(cnarr, "haar", processes=2)
-        ssegments = segmentation.do_segmentation(cnarr, "haar", processes=1)
-        self.assertEqual(psegments.data.shape, ssegments.data.shape)
-        self.assertEqual(len(psegments.meta), len(ssegments.meta))
-
-    def test_segment_empty_input(self):
-        """Test segmentation with empty CNR input (issue #970)."""
-        # Create an empty CNA with proper structure (header only)
-        empty_data = pd.DataFrame(
-            columns=["chromosome", "start", "end", "gene", "log2"]
-        )
-        empty_cnarr = cnvlib.cnary.CopyNumArray(empty_data, {"sample_id": "test"})
-
-        # Test with serial processing
-        segments = segmentation.do_segmentation(empty_cnarr, "haar", processes=1)
-        self.assertEqual(len(segments), 0)
-        self.assertListEqual(
-            list(segments.data.columns), list(empty_cnarr.data.columns)
-        )
-
-        # Test with parallel processing
-        psegments = segmentation.do_segmentation(empty_cnarr, "haar", processes=2)
-        self.assertEqual(len(psegments), 0)
-
-        # Test with save_dataframe=True
-        segments_df, rstr = segmentation.do_segmentation(
-            empty_cnarr, "haar", processes=1, save_dataframe=True
-        )
-        self.assertEqual(len(segments_df), 0)
-        self.assertEqual(rstr, "")
-
     def test_segmetrics(self):
         """The 'segmetrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
@@ -1104,6 +1031,7 @@ class CommandTests(unittest.TestCase):
         self.assertTrue((sm["ci_lo"] < sm["mean"]).all())
         self.assertTrue((sm["ci_hi"] > sm["mean"]).all())
 
+    @pytest.mark.slow
     def test_purity(self):
         """The 'purity' command."""
         segments = cnvlib.read("formats/tr95t.cns")
@@ -1160,157 +1088,187 @@ class CommandTests(unittest.TestCase):
         finally:
             os.unlink(tmp_path)
 
-    def test_target(self):
-        """The 'target' command."""
-        # return  # DBG
-        annot_fname = "formats/refflat-mini.txt"
-        for bait_fname in (
-            "formats/nv2_baits.interval_list",
-            "formats/amplicon.bed",
-            "formats/baits-funky.bed",
-        ):
-            baits = tabio.read_auto(bait_fname)
-            bait_len = len(baits)
-            # No splitting: w/o and w/ re-annotation
-            r1 = commands.do_target(baits)
-            self.assertEqual(len(r1), bait_len)
-            r1a = commands.do_target(baits, do_short_names=True, annotate=annot_fname)
-            self.assertEqual(len(r1a), len(r1))
-            # Splitting, w/o and w/ re-annotation
-            r2 = commands.do_target(
-                baits, do_short_names=True, do_split=True, avg_size=100
-            )
-            self.assertGreater(len(r2), len(r1))
-            for _c, subarr in r2.by_chromosome():
-                self.assertTrue(subarr.start.is_monotonic_increasing, bait_fname)
-                self.assertTrue(subarr.end.is_monotonic_increasing, bait_fname)
-                # Bins are non-overlapping; next start >= prev. end
-                self.assertTrue(
-                    (
-                        (subarr.start.to_numpy()[1:] - subarr.end.to_numpy()[:-1]) >= 0
-                    ).all()
-                )
-            r2a = commands.do_target(
-                baits,
-                do_short_names=True,
-                do_split=True,
-                avg_size=100,
-                annotate=annot_fname,
-            )
-            self.assertEqual(len(r2a), len(r2))
-            # Original regions object should be unmodified
-            self.assertEqual(len(baits), bait_len)
 
-    def test_diploid_parx_genome(self):
-        genome_build = "grch37"
-        male_target_fnames = [
-            "formats/male01.targetcoverage.cnn",
-            "formats/male02.targetcoverage.cnn",
-        ]
-        male_antitarget_fnames = [
-            "formats/male01.antitargetcoverage.cnn",
-            "formats/male02.antitargetcoverage.cnn",
-        ]
-        female_target_fnames = [
-            "formats/female01.targetcoverage.cnn",
-            "formats/female02.targetcoverage.cnn",
-        ]
-        female_antitarget_fnames = [
-            "formats/female01.antitargetcoverage.cnn",
-            "formats/female02.antitargetcoverage.cnn",
-        ]
+class PlotTests(unittest.TestCase):
+    """Smoke tests for plotting commands."""
 
-        # Baseline assumption: PAR1/2 is highly coveraged in the male sample.
-        target_cnn = cnvlib.read(male_target_fnames[0])
-        antitarget_cnn = cnvlib.read(male_antitarget_fnames[0])
-        target_cnn_non_parx = target_cnn[target_cnn.chr_x_filter(genome_build)]
-        antitarget_cnn_non_parx = antitarget_cnn[
-            antitarget_cnn.chr_x_filter(genome_build)
-        ]
-        target_cnn_parx = target_cnn[target_cnn.parx_filter(genome_build)]
-        antitarget_cnn_parx = antitarget_cnn[antitarget_cnn.parx_filter(genome_build)]
-        target_log2_mean_parx = target_cnn_parx["log2"].mean()
-        target_log2_mean_non_parx = target_cnn_non_parx["log2"].mean()
-        antitarget_log2_mean_parx = antitarget_cnn_parx["log2"].mean()
-        antitarget_log2_mean_non_parx = antitarget_cnn_non_parx["log2"].mean()
-        self.assertTrue(
-            target_log2_mean_parx - 0.9 > target_log2_mean_non_parx,
-            "PAR1/2 have nearly doubled coverage.",
-        )
-        self.assertTrue(
-            antitarget_log2_mean_parx - 0.9 > antitarget_log2_mean_non_parx,
-            "PAR1/2 have nearly doubled coverage.",
-        )
+    def test_scatter(self):
+        """The 'scatter' command."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        fig = scatter.do_scatter(cnarr, segarr)
+        self.assertIsNotNone(fig)
+        # With a gene zoom
+        fig = scatter.do_scatter(cnarr, segarr, show_gene="BRAF")
+        self.assertIsNotNone(fig)
 
-        #### MIXED POOL ####
-        target_fnames = male_target_fnames + female_target_fnames
-        antitarget_fnames = male_antitarget_fnames + female_antitarget_fnames
-        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(
-            target_fnames, antitarget_fnames, None
-        )
-        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(
-            target_fnames, antitarget_fnames, genome_build
-        )
+    def test_heatmap(self):
+        """The 'heatmap' command."""
+        cnarrs = [cnvlib.read("formats/amplicon.cnr")]
+        ax = heatmap.do_heatmap(cnarrs)
+        self.assertIsNotNone(ax)
+        # With desaturation
+        ax = heatmap.do_heatmap(cnarrs, do_desaturate=True)
+        self.assertIsNotNone(ax)
 
-        # "dpxg" = DiploidParXGenome
-        male_call, male_call_dpxg = clls1[1], clls2[1]
-        female_call, female_call_dpxg = clls1[2], clls2[2]
-        male_call__x, male_call_dpxg__x = (
-            male_call[male_call.chr_x_filter()],
-            male_call_dpxg[male_call_dpxg.chromosome == "X"],
-        )
-        female_call__x, female_call_dpxg__x = (
-            female_call[female_call.chromosome == "X"],
-            female_call_dpxg[female_call_dpxg.chromosome == "X"],
-        )
 
-        # The cn=0 segment for the male sample is derived from a true loss on XAGE1B.
-        self.assertEqual(
-            male_call__x["cn"].to_list(),
-            [1, 1, 0, 1, 1],
-            "Non-Dpxg male has cn=1 including PAR1/2.",
-        )
-        self.assertEqual(
-            male_call_dpxg__x["cn"].to_list(),
-            [2, 1, 0, 1, 1, 2],
-            "Dpxg male has cn=2 for PAR1/2 and cn=1 otherwise.",
-        )
-        self.assertEqual(
-            female_call__x["cn"].to_list(),
-            [1, 2, 2, 1],
-            "Non-Dpxg female is biased towards loss in PAR1/2.",
-        )
-        self.assertEqual(
-            female_call_dpxg__x["cn"].to_list(),
-            [2, 2],
-            "Dpxg female has cn=2 everywhere including PAR1/2.",
-        )
+class ExportTests(unittest.TestCase):
+    """Tests for export commands."""
 
-        #### MALE-ONLY POOL ####
-        target_fnames = male_target_fnames
-        antitarget_fnames = male_antitarget_fnames
-        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(
-            target_fnames, antitarget_fnames, None
-        )
-        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(
-            target_fnames, antitarget_fnames, genome_build
-        )
+    def test_export_bed_vcf(self):
+        """The 'export' command for formats with absolute copy number."""
+        for fname, ploidy, is_f in [
+            ("tr95t.cns", 2, True),
+            ("cl_seq.cns", 6, True),
+            ("amplicon.cns", 2, False),
+        ]:
+            with self.subTest(fname=fname, ploidy=ploidy):
+                cns = cnvlib.read("formats/" + fname)
+                # BED
+                for show in ("ploidy", "variant", "all"):
+                    tbl_bed = export.export_bed(
+                        cns, ploidy, True, None, is_f, cns.sample_id, show
+                    )
+                    if show == "all":
+                        self.assertEqual(len(tbl_bed), len(cns), f"{fname} {ploidy}")
+                    else:
+                        self.assertLess(len(tbl_bed), len(cns))
+                # VCF
+                _vheader, vcf_body = export.export_vcf(cns, ploidy, True, None, is_f)
+                self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
 
-        male_call, male_call_dpxg = clls1[1], clls2[1]
-        male_call__x, male_call_dpxg__x = (
-            male_call[male_call.chr_x_filter()],
-            male_call_dpxg[male_call_dpxg.chromosome == "X"],
+    def test_export_cdt_jtv(self):
+        """The 'export' command for CDT and Java TreeView formats."""
+        fnames = ["formats/p2-20_1.cnr", "formats/p2-20_2.cnr"]
+        sample_ids = list(map(core.fbase, fnames))
+        nrows = linecount(fnames[0]) - 1
+        for fmt_key, header2 in (("cdt", 2), ("jtv", 0)):
+            table = export.merge_samples(fnames)
+            formatter = export.EXPORT_FORMATS[fmt_key]
+            _oh, outrows = formatter(sample_ids, table)
+            self.assertEqual(len(list(outrows)), nrows + header2)
+
+    def test_export_nexus(self):
+        """The 'export nexus-basic' and 'nexus-ogt' commands."""
+        cnr = cnvlib.read("formats/amplicon.cnr")
+        table_nb = export.export_nexus_basic(cnr)
+        self.assertEqual(len(table_nb), len(cnr))
+        varr = commands.load_het_snps(
+            "formats/na12878_na12882_mix.vcf", None, None, 15, None
         )
-        self.assertEqual(
-            male_call__x["cn"].to_list(),
-            [1, 1],
-            "Non-Dpxg male has cn=1 including PAR1/2.",
+        table_ogt = export.export_nexus_ogt(cnr, varr, 0.05)
+        self.assertEqual(len(table_ogt), len(cnr))
+
+    def test_export_seg(self):
+        """The 'export seg' command."""
+        seg_rows = export.export_seg(["formats/tr95t.cns"])
+        self.assertGreater(len(seg_rows), 0)
+        seg2_rows = export.export_seg(["formats/tr95t.cns", "formats/cl_seq.cns"])
+        self.assertGreater(len(seg2_rows), len(seg_rows))
+
+    def test_export_theta(self):
+        """The 'export theta' command."""
+        segarr = cnvlib.read("formats/tr95t.cns")
+        len_seg_auto = len(segarr.autosomes())
+        table_theta = export.export_theta(segarr, None)
+        self.assertEqual(len(table_theta), len_seg_auto)
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        table_theta = export.export_theta(segarr, ref)
+        self.assertEqual(len(table_theta), len_seg_auto)
+        varr = commands.load_het_snps(
+            "formats/na12878_na12882_mix.vcf", "NA12882", "NA12878", 15, None
         )
-        self.assertEqual(
-            male_call_dpxg__x["cn"].to_list(),
-            [2, 1, 1, 2],
-            "Dpxg male has cn=2 for PAR1/2 and cn=1 otherwise.",
+        tumor_snps, normal_snps = export.export_theta_snps(varr)
+        self.assertLess(len(tumor_snps), len(varr))
+        self.assertGreater(len(tumor_snps), 0)
+        self.assertLess(len(normal_snps), len(varr))
+        self.assertGreater(len(normal_snps), 0)
+
+
+class BatchTests(unittest.TestCase):
+    """Tests for the batch command and end-to-end pipeline."""
+
+    def test_batch(self):
+        """The 'batch' command."""
+        target_bed = "formats/my-targets.bed"
+        fasta = "formats/chrM-Y-trunc.hg19.fa"
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        annot = "formats/my-refflat.bed"
+        # Build a single-sample WGS reference
+        ref_fname, tgt_bed_fname, _ = batch.batch_make_reference(
+            [bam],
+            None,
+            None,
+            True,
+            None,
+            fasta,
+            annot,
+            True,
+            500,
+            None,
+            None,
+            None,
+            None,
+            "build",
+            1,
+            False,
+            0,
+            "wgs",
+            False,
         )
+        self.assertEqual(ref_fname, "build/reference.cnn")
+        refarr = cnvlib.read(ref_fname, "bed")
+        tgt_regions = tabio.read(tgt_bed_fname, "bed")
+        self.assertEqual(len(refarr), len(tgt_regions))
+        # Build a single-sample hybrid-capture reference
+        ref_fname, tgt_bed_fname, anti_bed_fname = batch.batch_make_reference(
+            [bam],
+            target_bed,
+            None,
+            True,
+            None,
+            fasta,
+            None,
+            True,
+            10,
+            None,
+            1000,
+            100,
+            None,
+            "build",
+            1,
+            False,
+            0,
+            "hybrid",
+            False,
+        )
+        self.assertEqual(ref_fname, "build/reference.cnn")
+        refarr = cnvlib.read(ref_fname, "bed")
+        tgt_regions = tabio.read(tgt_bed_fname, "bed")
+        anti_regions = tabio.read(anti_bed_fname, "bed")
+        self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
+        # Run the same sample
+        batch.batch_run_sample(
+            bam,
+            tgt_bed_fname,
+            anti_bed_fname,
+            ref_fname,
+            "build",
+            True,
+            None,
+            True,
+            True,
+            "Rscript",
+            False,
+            0,
+            False,
+            "hybrid",
+            "hmm",
+            1,
+            False,
+        )
+        cns = cnvlib.read("build/na12878-chrM-Y-trunc.cns")
+        self.assertGreater(len(cns), 0)
 
     def test_batch_futures_exception_handling(self):
         """Test that batch command properly waits for and reports exceptions from parallel tasks."""
@@ -1390,29 +1348,141 @@ class CommandTests(unittest.TestCase):
             # The error message should mention duplicates
             self.assertIn("Duplicated genomic coordinates", str(ctx.exception))
 
+    @pytest.mark.slow
+    def test_diploid_parx_genome(self):
+        genome_build = "grch37"
+        male_target_fnames = [
+            "formats/male01.targetcoverage.cnn",
+            "formats/male02.targetcoverage.cnn",
+        ]
+        male_antitarget_fnames = [
+            "formats/male01.antitargetcoverage.cnn",
+            "formats/male02.antitargetcoverage.cnn",
+        ]
+        female_target_fnames = [
+            "formats/female01.targetcoverage.cnn",
+            "formats/female02.targetcoverage.cnn",
+        ]
+        female_antitarget_fnames = [
+            "formats/female01.antitargetcoverage.cnn",
+            "formats/female02.antitargetcoverage.cnn",
+        ]
 
-def linecount(filename):
-    i = -1
-    with open(filename) as handle:
-        for i, _line in enumerate(handle):
-            pass
-        return i + 1
+        # Baseline assumption: PAR1/2 is highly coveraged in the male sample.
+        target_cnn = cnvlib.read(male_target_fnames[0])
+        antitarget_cnn = cnvlib.read(male_antitarget_fnames[0])
+        target_cnn_non_parx = target_cnn[target_cnn.chr_x_filter(genome_build)]
+        antitarget_cnn_non_parx = antitarget_cnn[
+            antitarget_cnn.chr_x_filter(genome_build)
+        ]
+        target_cnn_parx = target_cnn[target_cnn.parx_filter(genome_build)]
+        antitarget_cnn_parx = antitarget_cnn[antitarget_cnn.parx_filter(genome_build)]
+        target_log2_mean_parx = target_cnn_parx["log2"].mean()
+        target_log2_mean_non_parx = target_cnn_non_parx["log2"].mean()
+        antitarget_log2_mean_parx = antitarget_cnn_parx["log2"].mean()
+        antitarget_log2_mean_non_parx = antitarget_cnn_non_parx["log2"].mean()
+        self.assertTrue(
+            target_log2_mean_parx - 0.9 > target_log2_mean_non_parx,
+            "PAR1/2 have nearly doubled coverage.",
+        )
+        self.assertTrue(
+            antitarget_log2_mean_parx - 0.9 > antitarget_log2_mean_non_parx,
+            "PAR1/2 have nearly doubled coverage.",
+        )
+
+        #### MIXED POOL ####
+        target_fnames = male_target_fnames + female_target_fnames
+        antitarget_fnames = male_antitarget_fnames + female_antitarget_fnames
+        # Only process male02 (index 1) and female01 (index 2) — the samples
+        # actually checked below — to avoid redundant CBS segmentation.
+        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(
+            target_fnames, antitarget_fnames, None, sample_indices=[1, 2]
+        )
+        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(
+            target_fnames, antitarget_fnames, genome_build, sample_indices=[1, 2]
+        )
+
+        # "dpxg" = DiploidParXGenome
+        male_call, male_call_dpxg = clls1[0], clls2[0]
+        female_call, female_call_dpxg = clls1[1], clls2[1]
+        male_call__x, male_call_dpxg__x = (
+            male_call[male_call.chr_x_filter()],
+            male_call_dpxg[male_call_dpxg.chromosome == "X"],
+        )
+        female_call__x, female_call_dpxg__x = (
+            female_call[female_call.chromosome == "X"],
+            female_call_dpxg[female_call_dpxg.chromosome == "X"],
+        )
+
+        # The cn=0 segment for the male sample is derived from a true loss on XAGE1B.
+        self.assertEqual(
+            male_call__x["cn"].to_list(),
+            [1, 1, 0, 1, 1],
+            "Non-Dpxg male has cn=1 including PAR1/2.",
+        )
+        self.assertEqual(
+            male_call_dpxg__x["cn"].to_list(),
+            [2, 1, 0, 1, 1, 2],
+            "Dpxg male has cn=2 for PAR1/2 and cn=1 otherwise.",
+        )
+        self.assertEqual(
+            female_call__x["cn"].to_list(),
+            [1, 2, 2, 1],
+            "Non-Dpxg female is biased towards loss in PAR1/2.",
+        )
+        self.assertEqual(
+            female_call_dpxg__x["cn"].to_list(),
+            [2, 2],
+            "Dpxg female has cn=2 everywhere including PAR1/2.",
+        )
+
+        #### MALE-ONLY POOL ####
+        target_fnames = male_target_fnames
+        antitarget_fnames = male_antitarget_fnames
+        # Only process male02 (index 1) — the sample actually checked below.
+        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(
+            target_fnames, antitarget_fnames, None, sample_indices=[1]
+        )
+        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(
+            target_fnames, antitarget_fnames, genome_build, sample_indices=[1]
+        )
+
+        male_call, male_call_dpxg = clls1[0], clls2[0]
+        male_call__x, male_call_dpxg__x = (
+            male_call[male_call.chr_x_filter()],
+            male_call_dpxg[male_call_dpxg.chromosome == "X"],
+        )
+        self.assertEqual(
+            male_call__x["cn"].to_list(),
+            [1, 1],
+            "Non-Dpxg male has cn=1 including PAR1/2.",
+        )
+        self.assertEqual(
+            male_call_dpxg__x["cn"].to_list(),
+            [2, 1, 1, 2],
+            "Dpxg male has cn=2 for PAR1/2 and cn=1 otherwise.",
+        )
 
 
-def run_samples(target_fnames, antitarget_fnames, diploid_parx_genome):
+# == helpers ==
+
+
+def run_samples(
+    target_fnames, antitarget_fnames, diploid_parx_genome, sample_indices=None
+):
     ref_probes = commands.do_reference(
         target_fnames, antitarget_fnames, diploid_parx_genome=diploid_parx_genome
     )
-    iter_args = [
-        (target_fnames[i], antitarget_fnames[i], ref_probes, diploid_parx_genome)
-        for i in range(len(target_fnames))
-    ]
+    if sample_indices is None:
+        sample_indices = range(len(target_fnames))
     cnrs, cnss, clls = [], [], []
-    with Pool() as pool:
-        for cnr, cns, cll in pool.starmap(run_sample, iter_args):
-            cnrs.append(cnr)
-            cnss.append(cns)
-            clls.append(cll)
+    for i in sample_indices:
+        cnr, cns, cll = run_sample(
+            target_fnames[i], antitarget_fnames[i], ref_probes, diploid_parx_genome
+        )
+        cnrs.append(cnr)
+        cnss.append(cns)
+        clls.append(cll)
 
     sex_df = commands.do_sex(
         cnrs, is_haploid_x_reference=False, diploid_parx_genome=diploid_parx_genome

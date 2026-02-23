@@ -22,6 +22,7 @@ dependencies:
   # Test dependencies (from requirements/tests.txt)
   - pytest
   - pytest-cov
+  - pytest-xdist
   - coverage
   - ruff
   - safety

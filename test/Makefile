@@ -30,9 +30,8 @@ all: mini $(picard_targets) p2-5_5-metrics.tsv p2-9_2-metrics.tsv p2-20-metrics.
 
 .PHONY: clean
 clean:
-	# Picard
-	rm -rf build/p*targetcoverage.cnn $(picard_targets) p*-scatter.pdf p*-diagram.pdf
-	rm -rf build/na12878-chrM-Y-trunc* build/chrM-Y-trunc*
+	rm -rf build/*
+	rm -f $(picard_targets) p*-scatter.pdf p*-diagram.pdf
 
 .PHONY: test
 test:
