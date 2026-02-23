@@ -164,6 +164,7 @@ def ampdel(segarr: CopyNumArray) -> CopyNumArray:
     return cnarr[(cnarr["cn"] == 0) | (cnarr["cn"] >= 5)]
 
 
+@require_column("probes")
 def bic(segarr: CopyNumArray) -> CopyNumArray:
     """Merge adjacent segments whose difference is not justified by BIC.
 
@@ -190,7 +191,7 @@ def bic(segarr: CopyNumArray) -> CopyNumArray:
         sd = data["stdev"].to_numpy(dtype=float).copy()
         # Fallback for segments with stdev=0 or probes=1: use median stdev
         needs_fallback = (sd == 0) | (n <= 1)
-        valid = (~needs_fallback) & (n > 1)
+        valid = ~needs_fallback
         if valid.any():
             fallback_sd = float(np.median(sd[valid]))
         else:
@@ -279,13 +280,7 @@ def bic(segarr: CopyNumArray) -> CopyNumArray:
     for group in groups:
         result_rows.append(squash_region(data.iloc[group]))
     result = pd.concat(result_rows, ignore_index=True)
-    result = segarr.as_dataframe(result)
-    logging.info(
-        "Filtered by 'bic' from %d to %d rows",
-        len(segarr),
-        len(result),
-    )
-    return result
+    return segarr.as_dataframe(result)
 
 
 @require_column("ci_lo", "ci_hi")
