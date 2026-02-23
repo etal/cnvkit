@@ -58,8 +58,11 @@ class PreprocessingTests(unittest.TestCase):
     def test_access(self):
         fasta = "formats/chrM-Y-trunc.hg19.fa"
         for min_gap_size, expect_nrows in ((None, 7), (500, 3), (1000, 2)):
-            acc = commands.do_access(fasta, [], min_gap_size, skip_noncanonical=False)
-            self.assertEqual(len(acc), expect_nrows)
+            with self.subTest(min_gap_size=min_gap_size):
+                acc = commands.do_access(
+                    fasta, [], min_gap_size, skip_noncanonical=False
+                )
+                self.assertEqual(len(acc), expect_nrows)
         excludes = ["formats/dac-my.bed", "formats/my-targets.bed"]
         for min_gap_size, expect_nrows in (
             (None, 12),
@@ -68,10 +71,11 @@ class PreprocessingTests(unittest.TestCase):
             (200, 3),
             (2000, 2),
         ):
-            acc = commands.do_access(
-                fasta, excludes, min_gap_size, skip_noncanonical=False
-            )
-            self.assertEqual(len(acc), expect_nrows)
+            with self.subTest(min_gap_size=min_gap_size, excludes=True):
+                acc = commands.do_access(
+                    fasta, excludes, min_gap_size, skip_noncanonical=False
+                )
+                self.assertEqual(len(acc), expect_nrows)
         # Dropping chrM, keeping only chrY
         acc = commands.do_access(fasta, excludes, 10, skip_noncanonical=True)
         self.assertEqual(len(acc), 5)
@@ -540,21 +544,22 @@ class CallTests(unittest.TestCase):
             ["sem", "cn", "ampdel"],
             ["ci", "cn"],
         ):
-            result = commands.do_call(
-                segments,
-                variants,
-                method="threshold",
-                purity=0.9,
-                is_haploid_x_reference=True,
-                is_sample_female=True,
-                filters=filters,
-            )
-            self.assertLessEqual(len(result), len(segments))
-            if "ampdel" not in filters:
-                # At least 1 segment per chromosome remains
-                self.assertLessEqual(len(segments.chromosome.unique()), len(result))
-            for colname in "baf", "cn", "cn1", "cn2":
-                self.assertIn(colname, result)
+            with self.subTest(filters=filters):
+                result = commands.do_call(
+                    segments,
+                    variants,
+                    method="threshold",
+                    purity=0.9,
+                    is_haploid_x_reference=True,
+                    is_sample_female=True,
+                    filters=filters,
+                )
+                self.assertLessEqual(len(result), len(segments))
+                if "ampdel" not in filters:
+                    # At least 1 segment per chromosome remains
+                    self.assertLessEqual(len(segments.chromosome.unique()), len(result))
+                for colname in "baf", "cn", "cn1", "cn2":
+                    self.assertIn(colname, result)
 
     def test_call_log2_ratios(self):
         cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
@@ -1129,19 +1134,20 @@ class ExportTests(unittest.TestCase):
             ("cl_seq.cns", 6, True),
             ("amplicon.cns", 2, False),
         ]:
-            cns = cnvlib.read("formats/" + fname)
-            # BED
-            for show in ("ploidy", "variant", "all"):
-                tbl_bed = export.export_bed(
-                    cns, ploidy, True, None, is_f, cns.sample_id, show
-                )
-                if show == "all":
-                    self.assertEqual(len(tbl_bed), len(cns), f"{fname} {ploidy}")
-                else:
-                    self.assertLess(len(tbl_bed), len(cns))
-            # VCF
-            _vheader, vcf_body = export.export_vcf(cns, ploidy, True, None, is_f)
-            self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
+            with self.subTest(fname=fname, ploidy=ploidy):
+                cns = cnvlib.read("formats/" + fname)
+                # BED
+                for show in ("ploidy", "variant", "all"):
+                    tbl_bed = export.export_bed(
+                        cns, ploidy, True, None, is_f, cns.sample_id, show
+                    )
+                    if show == "all":
+                        self.assertEqual(len(tbl_bed), len(cns), f"{fname} {ploidy}")
+                    else:
+                        self.assertLess(len(tbl_bed), len(cns))
+                # VCF
+                _vheader, vcf_body = export.export_vcf(cns, ploidy, True, None, is_f)
+                self.assertTrue(0 < len(vcf_body.splitlines()) < len(cns))
 
     def test_export_cdt_jtv(self):
         """The 'export' command for CDT and Java TreeView formats."""
