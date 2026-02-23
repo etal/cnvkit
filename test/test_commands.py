@@ -15,9 +15,12 @@ import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+import matplotlib
 import numpy as np
 import pandas as pd
 from skgenome import tabio
+
+matplotlib.use("Agg")
 
 import cnvlib
 from conftest import linecount
@@ -37,6 +40,7 @@ from cnvlib import (
     diagram,
     export,
     fix,
+    heatmap,
     import_rna,
     importers,
     metrics,
@@ -45,6 +49,7 @@ from cnvlib import (
     plots,
     reference,
     reports,
+    scatter,
     segmentation,
     segmetrics,
     smoothing,
@@ -142,9 +147,6 @@ class PreprocessingTests(unittest.TestCase):
 
     def test_coverage_bedgraph_vs_bam(self):
         """Compare bedGraph and BAM coverage outputs."""
-        import numpy as np
-        import pandas as pd
-
         bed = "formats/my-targets.bed"
         bam = "formats/na12878-chrM-Y-trunc.bam"
         bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
@@ -192,9 +194,6 @@ class PreprocessingTests(unittest.TestCase):
 
     def test_coverage_bedgraph_missing_index(self):
         """Test error handling when tabix index is missing."""
-        import tempfile
-        import os
-
         bed = "formats/my-targets.bed"
 
         # Create a temporary bedGraph without index
@@ -233,7 +232,6 @@ class PreprocessingTests(unittest.TestCase):
     @pytest.mark.slow
     def test_target(self):
         """The 'target' command."""
-        # return  # DBG
         annot_fname = "formats/refflat-mini.txt"
         for bait_fname in (
             "formats/nv2_baits.interval_list",
@@ -1096,11 +1094,6 @@ class PlotTests(unittest.TestCase):
 
     def test_scatter(self):
         """The 'scatter' command."""
-        import matplotlib
-
-        matplotlib.use("Agg")
-        from cnvlib import scatter
-
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
         fig = scatter.do_scatter(cnarr, segarr)
@@ -1111,11 +1104,6 @@ class PlotTests(unittest.TestCase):
 
     def test_heatmap(self):
         """The 'heatmap' command."""
-        import matplotlib
-
-        matplotlib.use("Agg")
-        from cnvlib import heatmap
-
         cnarrs = [cnvlib.read("formats/amplicon.cnr")]
         ax = heatmap.do_heatmap(cnarrs)
         self.assertIsNotNone(ax)
