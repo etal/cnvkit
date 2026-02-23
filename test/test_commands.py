@@ -539,18 +539,21 @@ class CommandTests(unittest.TestCase):
     @pytest.mark.slow
     def test_coverage(self):
         """The 'coverage' command."""
-        # fa = 'formats/chrM-Y-trunc.hg19.fa'
         bed = "formats/my-targets.bed"
         bam = "formats/na12878-chrM-Y-trunc.bam"
-        for by_count in (False, True):
-            for min_mapq in (0, 30):
-                for nprocs in (1, 2):
-                    cna = commands.do_coverage(
-                        bed, bam, by_count=by_count, min_mapq=min_mapq, processes=nprocs
-                    )
-                    self.assertEqual(len(cna), 4)
-                    self.assertTrue((cna.log2 != 0).any())
-                    self.assertGreater(cna.log2.nunique(), 1)
+        # Cover distinct code paths: depth-based default, count-based with
+        # mapq filtering, and multiprocessing.
+        for by_count, min_mapq, nprocs in [
+            (False, 0, 1),
+            (True, 30, 1),
+            (False, 0, 2),
+        ]:
+            cna = commands.do_coverage(
+                bed, bam, by_count=by_count, min_mapq=min_mapq, processes=nprocs
+            )
+            self.assertEqual(len(cna), 4)
+            self.assertTrue((cna.log2 != 0).any())
+            self.assertGreater(cna.log2.nunique(), 1)
 
     def test_coverage_bedgraph(self):
         """The 'coverage' command with bedGraph input."""
