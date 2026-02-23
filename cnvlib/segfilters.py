@@ -179,14 +179,19 @@ def ci(segarr: CopyNumArray) -> CopyNumArray:
 
     Segments with lower CI above 0 are kept as gains, upper CI below 0 as
     losses, and the rest with CI overlapping zero are collapsed as neutral.
+
+    Only adjacent neutral segments (CI overlapping zero) are merged together.
+    Segments that are confidently non-neutral are each preserved individually,
+    even if adjacent segments have the same sign.
     """
     levels = np.zeros(len(segarr))
-    # if len(segarr) < 10:
-    #     logging.warning("* segarr :=\n%s", segarr)
-    #     logging.warning("* segarr['ci_lo'] :=\n%s", segarr['ci_lo'])
-    #     logging.warning("* segarr['ci_lo']>0 :=\n%s", segarr['ci_lo'] > 0)
     levels[segarr["ci_lo"].to_numpy() > 0] = 1
     levels[segarr["ci_hi"].to_numpy() < 0] = -1
+    # Give each non-zero segment a unique level so only adjacent neutral
+    # (CI-overlapping-zero) segments are merged together
+    nonzero_mask = levels != 0
+    if nonzero_mask.any():
+        levels[nonzero_mask] = np.arange(1, nonzero_mask.sum() + 1)
     return squash_by_groups(segarr, pd.Series(levels))
 
 
@@ -203,9 +208,18 @@ def sem(segarr: CopyNumArray, zscore: float = 1.96) -> CopyNumArray:
     Use each segment's SEM value to estimate a 95% confidence interval (via
     `zscore`). Segments with lower CI above 0 are kept as gains, upper CI below
     0 as losses, and the rest with CI overlapping zero are collapsed as neutral.
+
+    Only adjacent neutral segments (CI overlapping zero) are merged together.
+    Segments that are confidently non-neutral are each preserved individually,
+    even if adjacent segments have the same sign.
     """
     margin = segarr["sem"] * zscore
     levels = np.zeros(len(segarr))
     levels[segarr["log2"] - margin > 0] = 1
     levels[segarr["log2"] + margin < 0] = -1
+    # Give each non-zero segment a unique level so only adjacent neutral
+    # (CI-overlapping-zero) segments are merged together
+    nonzero_mask = levels != 0
+    if nonzero_mask.any():
+        levels[nonzero_mask] = np.arange(1, nonzero_mask.sum() + 1)
     return squash_by_groups(segarr, pd.Series(levels))
