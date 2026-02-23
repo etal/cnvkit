@@ -63,6 +63,9 @@ optional-dependencies = {test = {file = "requirements/tests.txt"}}
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
+markers = [
+    "slow: tests that take >5 seconds (skip with -m 'not slow')",
+]
 filterwarnings = [
     "error",
     # bioframe <=0.8.0 uses df.groupby(['col']).groups with a single-element

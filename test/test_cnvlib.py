@@ -4,6 +4,8 @@
 import logging
 import unittest
 
+import pytest
+
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import numpy as np
@@ -261,6 +263,7 @@ class CNATests(unittest.TestCase):
             self.assertAlmostEqual(1, np.percentile(resid, 80), delta=0.2)
             self.assertAlmostEqual(2, resid.std(), delta=0.5)
 
+    @pytest.mark.slow
     def test_smooth_log2(self):
         for fname in [
             "formats/amplicon.cnr",

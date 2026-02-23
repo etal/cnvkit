@@ -7,6 +7,8 @@ import shutil
 import tempfile
 import unittest
 
+import pytest
+
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import warnings
@@ -73,6 +75,7 @@ class CommandTests(unittest.TestCase):
         acc = commands.do_access(fasta, excludes, 10, skip_noncanonical=True)
         self.assertEqual(len(acc), 5)
 
+    @pytest.mark.slow
     def test_antitarget(self):
         """The 'antitarget' command."""
         baits = tabio.read_auto("formats/nv2_baits.interval_list")
@@ -533,6 +536,7 @@ class CommandTests(unittest.TestCase):
         _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 0, 0, 0.0)
         _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.45083)
 
+    @pytest.mark.slow
     def test_coverage(self):
         """The 'coverage' command."""
         # fa = 'formats/chrM-Y-trunc.hg19.fa'
@@ -752,6 +756,7 @@ class CommandTests(unittest.TestCase):
         )
         self.assertGreater(len(rows), 0)
 
+    @pytest.mark.slow
     def test_genemetrics_with_stats(self):
         """The 'genemetrics' command with statistics options."""
         probes = cnvlib.read("formats/amplicon.cnr")
@@ -1030,6 +1035,7 @@ class CommandTests(unittest.TestCase):
         # self.assertGreater(len(segments), n_chroms)
         # self.assertTrue((segments.start < segments.end).all())
 
+    @pytest.mark.slow
     def test_segment_hmm(self):
         """The 'segment' command with HMM methods."""
         for fname in ("formats/amplicon.cnr", "formats/p2-20_1.cnr"):
@@ -1049,6 +1055,7 @@ class CommandTests(unittest.TestCase):
             segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
             self.assertGreater(len(segments), n_chroms)
 
+    @pytest.mark.slow
     def test_segment_parallel(self):
         """The 'segment' command, in parallel."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
@@ -1103,6 +1110,7 @@ class CommandTests(unittest.TestCase):
         self.assertTrue((sm["ci_lo"] < sm["mean"]).all())
         self.assertTrue((sm["ci_hi"] > sm["mean"]).all())
 
+    @pytest.mark.slow
     def test_purity(self):
         """The 'purity' command."""
         segments = cnvlib.read("formats/tr95t.cns")
@@ -1159,6 +1167,7 @@ class CommandTests(unittest.TestCase):
         finally:
             os.unlink(tmp_path)
 
+    @pytest.mark.slow
     def test_target(self):
         """The 'target' command."""
         # return  # DBG
@@ -1200,6 +1209,7 @@ class CommandTests(unittest.TestCase):
             # Original regions object should be unmodified
             self.assertEqual(len(baits), bait_len)
 
+    @pytest.mark.slow
     def test_diploid_parx_genome(self):
         genome_build = "grch37"
         male_target_fnames = [
