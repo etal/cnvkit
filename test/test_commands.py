@@ -559,6 +559,52 @@ class CallTests(unittest.TestCase):
                 for colname in "baf", "cn", "cn1", "cn2":
                     self.assertIn(colname, result)
 
+    def test_call_filter_ci_preserves_different_magnitudes(self):
+        """CI filter should not merge adjacent segments with different magnitudes.
+
+        Two adjacent segments both with CIs entirely below zero (both are
+        confident losses) should remain separate if they have different log2
+        values.  Only segments whose CI overlaps zero (neutral) should be
+        merged with adjacent neutral segments.
+        """
+        from cnvlib import segfilters
+
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 5,
+                    "start": [0, 1000, 2000, 3000, 4000],
+                    "end": [1000, 2000, 3000, 4000, 5000],
+                    "gene": ["A", "B", "C", "D", "E"],
+                    "log2": [-1.0, -0.03, 0.01, 0.02, 0.5],
+                    "weight": [1.0, 1.0, 1.0, 1.0, 1.0],
+                    "probes": [10, 10, 10, 10, 10],
+                    # Segment A: deep loss, CI entirely below 0
+                    # Segment B: slight loss, CI entirely below 0
+                    # Segment C: neutral, CI overlaps 0
+                    # Segment D: neutral, CI overlaps 0
+                    # Segment E: gain, CI entirely above 0
+                    "ci_lo": [-1.2, -0.06, -0.05, -0.04, 0.3],
+                    "ci_hi": [-0.8, -0.01, 0.07, 0.08, 0.7],
+                }
+            )
+        )
+
+        result = segfilters.ci(segarr)
+
+        # A and B must stay separate -- both are losses but different magnitude
+        # C and D should merge -- both are neutral (CI overlaps zero)
+        # E must stay separate -- it's a gain
+        self.assertEqual(len(result), 4)
+        # Check that the deep loss is preserved with its own log2
+        self.assertAlmostEqual(result["log2"].iat[0], -1.0)
+        # Check that the slight loss is preserved with its own log2
+        self.assertAlmostEqual(result["log2"].iat[1], -0.03)
+        # Check that the two neutrals were merged
+        self.assertEqual(result["probes"].iat[2], 20)
+        # Check that the gain is preserved
+        self.assertAlmostEqual(result["log2"].iat[3], 0.5)
+
     def test_call_log2_ratios(self):
         cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
         ploidy = 2
