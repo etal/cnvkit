@@ -5,6 +5,7 @@ import logging
 import unittest
 
 import numpy as np
+import pandas as pd
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy.special import betaln, gammaln
 from scipy.stats import betabinom as sp_betabinom
@@ -17,7 +18,9 @@ from cnvlib.segmentation.hmm import (
     _expected_minor_freq,
     enumerate_states,
     log_emission_probs,
+    variants_in_segment,
 )
+from cnvlib.vary import VariantArray
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -285,6 +288,124 @@ class BatchedEmissionBAFTests(unittest.TestCase):
         assert_array_equal(result[0, 2, :], 0.0)
         # Bin 1 (depth=100) should be non-zero
         self.assertTrue(np.any(result[0, 1, :] != 0.0))
+
+
+def _make_variant_array(chroms, starts, ends, alt_freqs):
+    """Create a VariantArray with the given positions and allele frequencies."""
+    n = len(starts)
+    return VariantArray(
+        pd.DataFrame(
+            {
+                "chromosome": chroms,
+                "start": starts,
+                "end": ends,
+                "ref": ["C"] * n,
+                "alt": ["T"] * n,
+                "alt_freq": alt_freqs,
+            }
+        )
+    )
+
+
+def _make_segment(chrom, start, end, log2=0.0, gene="-", probes=100):
+    """Create a namedtuple-like segment row."""
+    return pd.Series(
+        {
+            "chromosome": chrom,
+            "start": start,
+            "end": end,
+            "log2": log2,
+            "gene": gene,
+            "probes": probes,
+        }
+    )
+
+
+class VariantsInSegmentTests(unittest.TestCase):
+    """Tests for variants_in_segment (BAF re-segmentation for non-HMM methods)."""
+
+    def test_too_few_variants_returns_original_segment(self):
+        """With fewer variants than MIN_VARIANTS_THRESHOLD, returns the
+        original segment unchanged."""
+        varr = _make_variant_array(
+            ["chr1"] * 10,
+            list(range(100, 200, 10)),
+            list(range(101, 201, 10)),
+            [0.5] * 10,
+        )
+        segment = _make_segment("chr1", 0, 1000, log2=-0.3)
+        result = variants_in_segment(varr, segment)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result.iloc[0]["chromosome"], "chr1")
+        self.assertEqual(result.iloc[0]["start"], 0)
+        self.assertEqual(result.iloc[0]["end"], 1000)
+        self.assertAlmostEqual(result.iloc[0]["log2"], -0.3)
+
+    def test_uniform_baf_returns_single_segment(self):
+        """Uniform BAF near 0.5 should produce a single segment (no extra
+        breakpoints)."""
+        n = 200
+        rng = np.random.default_rng(42)
+        alt_freqs = rng.normal(0.5, 0.02, size=n).clip(0.01, 0.99)
+        starts = np.arange(1000, 1000 + n * 100, 100)
+        ends = starts + 1
+        varr = _make_variant_array(
+            ["chr1"] * n, starts.tolist(), ends.tolist(), alt_freqs.tolist()
+        )
+        segment = _make_segment("chr1", 0, 1000 + n * 100)
+        result = variants_in_segment(varr, segment, min_variants=50)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result.iloc[0]["start"], 0)
+        self.assertEqual(result.iloc[0]["end"], 1000 + n * 100)
+
+    def test_shifted_baf_creates_breakpoint(self):
+        """A region with BAF ~0.5 followed by BAF ~0.67 should produce at
+        least 2 segments."""
+        rng = np.random.default_rng(123)
+        n_half = 100
+        baf_neutral = rng.normal(0.5, 0.02, size=n_half).clip(0.01, 0.99)
+        baf_shifted = rng.normal(0.67, 0.02, size=n_half).clip(0.01, 0.99)
+        alt_freqs = np.concatenate([baf_neutral, baf_shifted])
+        n = len(alt_freqs)
+        starts = np.arange(1000, 1000 + n * 100, 100)
+        ends = starts + 1
+        varr = _make_variant_array(
+            ["chr1"] * n, starts.tolist(), ends.tolist(), alt_freqs.tolist()
+        )
+        segment = _make_segment("chr1", 0, 1000 + n * 100, probes=n)
+        result = variants_in_segment(varr, segment, min_variants=50)
+        self.assertGreaterEqual(len(result), 2)
+        # All segments should have valid coordinates
+        self.assertTrue((result["start"] < result["end"]).all())
+        # First segment starts at original start, last ends at original end
+        self.assertEqual(result.iloc[0]["start"], 0)
+        self.assertEqual(result.iloc[-1]["end"], 1000 + n * 100)
+
+    def test_output_columns(self):
+        """Output DataFrame has the expected columns."""
+        varr = _make_variant_array(
+            ["chr1"] * 5,
+            list(range(100, 600, 100)),
+            list(range(101, 601, 100)),
+            [0.5] * 5,
+        )
+        segment = _make_segment("chr1", 0, 1000)
+        result = variants_in_segment(varr, segment)
+        for col in ("chromosome", "start", "end", "gene", "log2", "probes"):
+            self.assertIn(col, result.columns)
+
+    def test_preserves_segment_metadata(self):
+        """Gene name and log2 from the input segment are preserved."""
+        varr = _make_variant_array(
+            ["chr1"] * 5,
+            list(range(100, 600, 100)),
+            list(range(101, 601, 100)),
+            [0.5] * 5,
+        )
+        segment = _make_segment("chr1", 0, 1000, log2=-0.5, gene="TP53")
+        result = variants_in_segment(varr, segment)
+        self.assertEqual(result.iloc[0]["gene"], "TP53")
+        self.assertAlmostEqual(result.iloc[0]["log2"], -0.5)
 
 
 if __name__ == "__main__":
