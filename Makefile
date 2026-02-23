@@ -57,7 +57,7 @@ install-test:
 
 .PHONY: test
 test:
-	pytest -v test/
+	pytest -v -n auto test/
 
 .PHONY: test-all
 test-all:
