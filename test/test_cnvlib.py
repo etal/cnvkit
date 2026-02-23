@@ -13,6 +13,7 @@ from skgenome import GenomicArray, tabio
 
 import cnvlib
 from cnvlib import cnary, fix, params
+from conftest import linecount
 
 
 class CNATests(unittest.TestCase):
@@ -317,17 +318,6 @@ class VATests(unittest.TestCase):
         """Instantiate from a VCF file."""
         variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         self.assertGreater(len(variants), 0)
-
-
-# == helpers ==
-
-
-def linecount(filename):
-    i = -1
-    with open(filename) as handle:
-        for i, _line in enumerate(handle):
-            pass
-        return i + 1
 
 
 if __name__ == "__main__":

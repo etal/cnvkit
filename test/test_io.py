@@ -5,6 +5,8 @@ import unittest
 
 from skgenome import tabio
 
+from conftest import linecount
+
 
 class IOTests(unittest.TestCase):
     """Tests for I/O modules."""
@@ -127,17 +129,6 @@ class IOTests(unittest.TestCase):
         # VCF from GATK 4 with no ALT
         v6 = tabio.read("formats/gatk-emptyalt.vcf", "vcf", sample_id="sample1")
         self.assertEqual(len(v6), 0)
-
-
-# == helpers ==
-
-
-def linecount(filename):
-    i = -1
-    with open(filename) as handle:
-        for i, _line in enumerate(handle):
-            pass
-        return i + 1
 
 
 if __name__ == "__main__":

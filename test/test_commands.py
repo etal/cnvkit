@@ -20,6 +20,7 @@ import pandas as pd
 from skgenome import tabio
 
 import cnvlib
+from conftest import linecount
 
 # Import all modules as a smoke test
 from cnvlib import (
@@ -1410,14 +1411,6 @@ class CommandTests(unittest.TestCase):
 
             # The error message should mention duplicates
             self.assertIn("Duplicated genomic coordinates", str(ctx.exception))
-
-
-def linecount(filename):
-    i = -1
-    with open(filename) as handle:
-        for i, _line in enumerate(handle):
-            pass
-        return i + 1
 
 
 def run_samples(
