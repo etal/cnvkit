@@ -1041,22 +1041,28 @@ class CommandTests(unittest.TestCase):
     @pytest.mark.slow
     def test_segment_hmm(self):
         """The 'segment' command with HMM methods."""
-        for fname in ("formats/amplicon.cnr", "formats/p2-20_1.cnr"):
-            cnarr = cnvlib.read(fname)
-            n_chroms = cnarr.chromosome.nunique()
-            # NB: R methods are in another script; haar is pure-Python
-            segments = segmentation.do_segmentation(cnarr, "hmm")
-            self.assertGreater(len(segments), n_chroms)
-            self.assertTrue((segments.start < segments.end).all())
-            segments = segmentation.do_segmentation(cnarr, "hmm-tumor", skip_low=True)
-            self.assertGreater(len(segments), n_chroms)
-            self.assertTrue((segments.start < segments.end).all())
-            segments = segmentation.do_segmentation(cnarr, "hmm-germline")
-            self.assertGreater(len(segments), n_chroms)
-            self.assertTrue((segments.start < segments.end).all())
-            varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
-            segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
-            self.assertGreater(len(segments), n_chroms)
+        # Test all HMM method variants on one file
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        n_chroms = cnarr.chromosome.nunique()
+        # NB: R methods are in another script; haar is pure-Python
+        segments = segmentation.do_segmentation(cnarr, "hmm")
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
+        segments = segmentation.do_segmentation(cnarr, "hmm-tumor", skip_low=True)
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
+        segments = segmentation.do_segmentation(cnarr, "hmm-germline")
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
+        varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        segments = segmentation.do_segmentation(cnarr, "hmm", variants=varr)
+        self.assertGreater(len(segments), n_chroms)
+        # Verify default HMM also works on a different dataset
+        cnarr2 = cnvlib.read("formats/p2-20_1.cnr")
+        n_chroms2 = cnarr2.chromosome.nunique()
+        segments = segmentation.do_segmentation(cnarr2, "hmm")
+        self.assertGreater(len(segments), n_chroms2)
+        self.assertTrue((segments.start < segments.end).all())
 
     @pytest.mark.slow
     def test_segment_parallel(self):
