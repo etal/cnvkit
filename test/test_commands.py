@@ -539,8 +539,10 @@ class CallTests(unittest.TestCase):
             ["cn"],
             ["ci"],
             ["sem"],
+            ["bic"],
             ["sem", "cn", "ampdel"],
             ["ci", "cn"],
+            ["bic", "cn"],
         ):
             with self.subTest(filters=filters):
                 result = commands.do_call(
@@ -604,6 +606,137 @@ class CallTests(unittest.TestCase):
         self.assertEqual(result["probes"].iat[2], 20)
         # Check that the gain is preserved
         self.assertAlmostEqual(result["log2"].iat[3], 0.5)
+
+    def test_call_filter_bic_different_means_stay_separate(self):
+        """BIC filter should not merge segments with clearly different means."""
+        from cnvlib import segfilters
+
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 3,
+                    "start": [0, 1000, 2000],
+                    "end": [1000, 2000, 3000],
+                    "gene": ["A", "B", "C"],
+                    "log2": [-1.0, 0.0, 0.5],
+                    "weight": [10.0, 10.0, 10.0],
+                    "probes": [50, 50, 50],
+                    "stdev": [0.1, 0.1, 0.1],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # All three segments have very different means with low variance
+        self.assertEqual(len(result), 3)
+
+    def test_call_filter_bic_similar_means_merge(self):
+        """BIC filter should merge adjacent segments with similar means."""
+        from cnvlib import segfilters
+
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 3,
+                    "start": [0, 1000, 2000],
+                    "end": [1000, 2000, 3000],
+                    "gene": ["A", "B", "C"],
+                    "log2": [0.31, 0.30, 0.29],
+                    "weight": [10.0, 10.0, 10.0],
+                    "probes": [20, 20, 20],
+                    "stdev": [0.5, 0.5, 0.5],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # All three are essentially the same; BIC should merge them
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result["probes"].iat[0], 60)
+
+    def test_call_filter_bic_chromosome_boundary(self):
+        """BIC filter should never merge segments on different chromosomes."""
+        from cnvlib import segfilters
+
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1", "chr2"],
+                    "start": [0, 0],
+                    "end": [1000, 1000],
+                    "gene": ["A", "B"],
+                    "log2": [0.3, 0.3],
+                    "weight": [10.0, 10.0],
+                    "probes": [20, 20],
+                    "stdev": [0.5, 0.5],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # Same means but different chromosomes: must not merge
+        self.assertEqual(len(result), 2)
+
+    def test_call_filter_bic_single_bin_fallback(self):
+        """BIC filter handles segments with stdev=0 via fallback variance."""
+        from cnvlib import segfilters
+
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 3,
+                    "start": [0, 1000, 2000],
+                    "end": [1000, 2000, 3000],
+                    "gene": ["A", "B", "C"],
+                    "log2": [0.3, 0.3, 0.3],
+                    "weight": [1.0, 10.0, 10.0],
+                    "probes": [1, 20, 20],
+                    "stdev": [0.0, 0.5, 0.5],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # Segment A has stdev=0 (single bin), fallback variance used;
+        # all have similar means so they should merge
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result["probes"].iat[0], 41)
+
+    def test_call_filter_bic_cascading_merges(self):
+        """BIC filter iteratively merges: A~B and B~C yields A+B+C."""
+        from cnvlib import segfilters
+
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 4,
+                    "start": [0, 1000, 2000, 3000],
+                    "end": [1000, 2000, 3000, 4000],
+                    "gene": ["A", "B", "C", "D"],
+                    "log2": [0.10, 0.12, 0.14, -0.5],
+                    "weight": [10.0, 10.0, 10.0, 10.0],
+                    "probes": [20, 20, 20, 20],
+                    "stdev": [0.4, 0.4, 0.4, 0.1],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # A, B, C have similar means and high variance -> merge into one
+        # D has a clearly different mean -> stays separate
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result["probes"].iat[0], 60)
+        self.assertEqual(result["probes"].iat[1], 20)
+
+    def test_call_filter_bic_via_do_call(self):
+        """BIC filter works through the do_call pipeline."""
+        segments = cnvlib.read("formats/tr95t.segmetrics.cns")
+        result = commands.do_call(
+            segments,
+            variants=None,
+            method="threshold",
+            purity=0.9,
+            is_haploid_x_reference=True,
+            is_sample_female=True,
+            filters=["bic"],
+        )
+        self.assertGreater(len(result), 0)
+        self.assertLessEqual(len(result), len(segments))
 
     def test_call_log2_ratios(self):
         cnarr = cnvlib.read("formats/par-reference.grch38.cnn")

@@ -164,13 +164,128 @@ def ampdel(segarr: CopyNumArray) -> CopyNumArray:
     return cnarr[(cnarr["cn"] == 0) | (cnarr["cn"] >= 5)]
 
 
-@require_column("depth")
-def bic(segarr):
-    """Merge segments by Bayesian Information Criterion.
+def bic(segarr: CopyNumArray) -> CopyNumArray:
+    """Merge adjacent segments whose difference is not justified by BIC.
+
+    Uses the Bayesian Information Criterion to test whether two adjacent
+    same-chromosome segments are better modeled as separate or merged.
+    Iteratively merges the pair with the most negative delta-BIC until
+    no pair benefits from merging.
+
+    Variance is estimated from the ``stdev`` column if present (from
+    ``segmetrics --spread stdev``), otherwise from the ``weight`` column.
 
     See: BIC-seq (Xi 2011), doi:10.1073/pnas.1110574108
     """
-    return NotImplemented
+    if len(segarr) < 2:
+        return segarr
+
+    data = segarr.data
+
+    # --- Determine per-segment RSS values ---
+    n = data["probes"].to_numpy(dtype=float)
+    mu = data["log2"].to_numpy(dtype=float)
+
+    if "stdev" in data.columns:
+        sd = data["stdev"].to_numpy(dtype=float).copy()
+        # Fallback for segments with stdev=0 or probes=1: use median stdev
+        needs_fallback = (sd == 0) | (n <= 1)
+        valid = (~needs_fallback) & (n > 1)
+        if valid.any():
+            fallback_sd = float(np.median(sd[valid]))
+        else:
+            fallback_sd = 0.0
+        sd[needs_fallback] = fallback_sd
+        rss = sd**2 * n
+    elif "weight" in data.columns:
+        w = data["weight"].to_numpy(dtype=float)
+        # Variance ~ n/weight, so RSS = n * variance = n^2/weight
+        needs_fallback = w == 0
+        valid = ~needs_fallback
+        if valid.any():
+            fallback_rss = float(np.median(n[valid] ** 2 / w[valid]))
+        else:
+            fallback_rss = 0.0
+        rss = np.where(needs_fallback, fallback_rss, n**2 / w)
+    else:
+        logging.warning("BIC filter: no 'stdev' or 'weight' column; skipping")
+        return segarr
+
+    chrom = data["chromosome"].to_numpy()
+
+    # --- Iterative greedy merging ---
+    # Track groups of original row indices, plus stats for BIC computation
+    groups: list[list[int]] = [[j] for j in range(len(data))]
+    n_list = list(n)
+    mu_list = list(mu)
+    rss_list = list(rss)
+    chrom_list = list(chrom)
+
+    def _delta_bic(i: int) -> float:
+        """Compute delta-BIC for merging segments at positions i and i+1."""
+        n1, n2 = n_list[i], n_list[i + 1]
+        mu1, mu2 = mu_list[i], mu_list[i + 1]
+        rss1, rss2 = rss_list[i], rss_list[i + 1]
+
+        n_tot = n1 + n2
+        rss_sep = rss1 + rss2
+
+        # Additional RSS from merging means
+        rss_add = n1 * n2 / n_tot * (mu1 - mu2) ** 2
+        rss_merged = rss_sep + rss_add
+
+        if rss_sep == 0:
+            # Both segments have zero within-segment variance
+            if mu1 == mu2:
+                return float(-np.log(n_tot))  # Merge: saves a parameter
+            return np.inf  # Different means with zero noise: don't merge
+        return float(n_tot * np.log(rss_merged / rss_sep) - np.log(n_tot))
+
+    while True:
+        # Find the pair with the most negative delta-BIC (same chromosome)
+        best_dbic = 0.0
+        best_idx = -1
+        for i in range(len(n_list) - 1):
+            if chrom_list[i] != chrom_list[i + 1]:
+                continue
+            dbic = _delta_bic(i)
+            if dbic < best_dbic:
+                best_dbic = dbic
+                best_idx = i
+
+        if best_idx < 0:
+            break  # No beneficial merges remain
+
+        # Merge groups[best_idx] and groups[best_idx + 1]
+        i = best_idx
+        new_n = n_list[i] + n_list[i + 1]
+        new_mu = (n_list[i] * mu_list[i] + n_list[i + 1] * mu_list[i + 1]) / new_n
+        rss_add = n_list[i] * n_list[i + 1] / new_n * (mu_list[i] - mu_list[i + 1]) ** 2
+        new_rss = rss_list[i] + rss_list[i + 1] + rss_add
+
+        groups[i] = groups[i] + groups[i + 1]
+        n_list[i] = new_n
+        mu_list[i] = new_mu
+        rss_list[i] = new_rss
+
+        del groups[i + 1]
+        del n_list[i + 1]
+        del mu_list[i + 1]
+        del rss_list[i + 1]
+        del chrom_list[i + 1]
+
+    # Build result by squashing each group of original rows
+    result_rows = []
+    for group in groups:
+        result_rows.append(squash_region(data.iloc[group]))
+    result = pd.concat(result_rows, ignore_index=True)
+    result = segarr.as_dataframe(result)
+    logging.info(
+        "Filtered by 'bic' from %d to %d rows",
+        len(segarr),
+        len(result),
+    )
+    return result
 
 
 @require_column("ci_lo", "ci_hi")

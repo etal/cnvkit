@@ -123,7 +123,7 @@ def do_call(
     outarr = cnarr.copy()
     if filters:
         # Apply any filters that use segmetrics but not cn fields
-        for filt in ("ci", "sem"):
+        for filt in ("ci", "sem", "bic"):
             if filt in filters:
                 logging.info("Applying filter '%s'", filt)
                 outarr = getattr(segfilters, filt)(outarr)

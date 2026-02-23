@@ -1308,7 +1308,8 @@ P_call.add_argument(
         "ampdel",
         "cn",
         "ci",
-        "sem",  # 'bic'
+        "sem",
+        "bic",
     ),
     help="""Merge segments flagged by the specified filter(s) with the adjacent
             segment(s).""",
