@@ -302,3 +302,5 @@ These are more token-efficient than reading entire files, especially for underst
 ## Design
 The analytical methods implemented in CNVkit are described in the publication:
 https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1004873
+
+When implementing or modifying analytical methods, look up the primary literature to understand the underlying algorithms. Use [Google Scholar](https://scholar.google.com/) and [Europe PMC](https://europepmc.org/) to find and read the original papers for methods referenced in the code (e.g. segmentation algorithms, statistical tests, normalization approaches).
