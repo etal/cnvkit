@@ -176,6 +176,11 @@ def bic(segarr: CopyNumArray) -> CopyNumArray:
     Variance is estimated from the ``stdev`` column if present (from
     ``segmetrics --spread stdev``), otherwise from the ``weight`` column.
 
+    Complexity is O(k^2) in the number of segments per chromosome in the worst
+    case (each iteration scans all adjacent pairs). This is fast for typical
+    segment counts (tens to low hundreds) but may be slow for very heavily
+    segmented inputs.
+
     See: BIC-seq (Xi 2011), doi:10.1073/pnas.1110574108
     """
     if len(segarr) < 2:
@@ -197,6 +202,8 @@ def bic(segarr: CopyNumArray) -> CopyNumArray:
         else:
             fallback_sd = 0.0
         sd[needs_fallback] = fallback_sd
+        # stdev is the SD of individual bin log2 values within the segment,
+        # so RSS = variance * n_observations = stdev^2 * probes
         rss = sd**2 * n
     elif "weight" in data.columns:
         w = data["weight"].to_numpy(dtype=float)
@@ -297,8 +304,10 @@ def ci(segarr: CopyNumArray) -> CopyNumArray:
     levels = np.zeros(len(segarr))
     levels[segarr["ci_lo"].to_numpy() > 0] = 1
     levels[segarr["ci_hi"].to_numpy() < 0] = -1
-    # Give each non-zero segment a unique level so only adjacent neutral
-    # (CI-overlapping-zero) segments are merged together
+    # Assign each non-neutral segment a unique level so that squash_by_groups
+    # never merges two non-neutral segments together, even if adjacent.  Without
+    # this, two adjacent losses (both level -1) would be squashed into one,
+    # losing the distinct log2 magnitudes (e.g. -1.0 and -0.03).
     nonzero_mask = levels != 0
     if nonzero_mask.any():
         levels[nonzero_mask] = np.arange(1, nonzero_mask.sum() + 1)
@@ -327,8 +336,8 @@ def sem(segarr: CopyNumArray, zscore: float = 1.96) -> CopyNumArray:
     levels = np.zeros(len(segarr))
     levels[segarr["log2"] - margin > 0] = 1
     levels[segarr["log2"] + margin < 0] = -1
-    # Give each non-zero segment a unique level so only adjacent neutral
-    # (CI-overlapping-zero) segments are merged together
+    # Assign each non-neutral segment a unique level so that squash_by_groups
+    # never merges two non-neutral segments together, even if adjacent
     nonzero_mask = levels != 0
     if nonzero_mask.any():
         levels[nonzero_mask] = np.arange(1, nonzero_mask.sum() + 1)

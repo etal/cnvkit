@@ -47,9 +47,11 @@ from cnvlib import (
     parallel,
     params,
     plots,
+    purity,
     reference,
     reports,
     scatter,
+    segfilters,
     segmentation,
     segmetrics,
     smoothing,
@@ -569,8 +571,6 @@ class CallTests(unittest.TestCase):
         values.  Only segments whose CI overlaps zero (neutral) should be
         merged with adjacent neutral segments.
         """
-        from cnvlib import segfilters
-
         segarr = cnary.CopyNumArray(
             pd.DataFrame(
                 {
@@ -609,8 +609,6 @@ class CallTests(unittest.TestCase):
 
     def test_call_filter_bic_different_means_stay_separate(self):
         """BIC filter should not merge segments with clearly different means."""
-        from cnvlib import segfilters
-
         segarr = cnary.CopyNumArray(
             pd.DataFrame(
                 {
@@ -631,8 +629,6 @@ class CallTests(unittest.TestCase):
 
     def test_call_filter_bic_similar_means_merge(self):
         """BIC filter should merge adjacent segments with similar means."""
-        from cnvlib import segfilters
-
         segarr = cnary.CopyNumArray(
             pd.DataFrame(
                 {
@@ -654,8 +650,6 @@ class CallTests(unittest.TestCase):
 
     def test_call_filter_bic_chromosome_boundary(self):
         """BIC filter should never merge segments on different chromosomes."""
-        from cnvlib import segfilters
-
         segarr = cnary.CopyNumArray(
             pd.DataFrame(
                 {
@@ -676,8 +670,6 @@ class CallTests(unittest.TestCase):
 
     def test_call_filter_bic_single_bin_fallback(self):
         """BIC filter handles segments with stdev=0 via fallback variance."""
-        from cnvlib import segfilters
-
         segarr = cnary.CopyNumArray(
             pd.DataFrame(
                 {
@@ -700,8 +692,6 @@ class CallTests(unittest.TestCase):
 
     def test_call_filter_bic_cascading_merges(self):
         """BIC filter iteratively merges: A~B and B~C yields A+B+C."""
-        from cnvlib import segfilters
-
         segarr = cnary.CopyNumArray(
             pd.DataFrame(
                 {
@@ -1253,15 +1243,13 @@ class AnalysisTests(unittest.TestCase):
 
     def test_purity_file(self):
         """The 'purity' command: read_purity_tsv round-trip."""
-        from cnvlib import purity as purity_mod
-
         with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
             f.write("purity\tploidy\tscore\n")
             f.write("0.65\t2.1\t42.5\n")
             f.write("0.70\t2.0\t41.0\n")
             tmp_path = f.name
         try:
-            pur, plo = purity_mod.read_purity_tsv(tmp_path)
+            pur, plo = purity.read_purity_tsv(tmp_path)
             self.assertAlmostEqual(pur, 0.65)
             self.assertAlmostEqual(plo, 2.1)
         finally:

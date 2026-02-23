@@ -250,6 +250,9 @@ Rscript -e "library(DNAcopy)"
 - **Dict `|=`** (PEP 584) preferred over `.update()` for merging dict literals
 - All `zip()` calls use explicit `strict=True` or `strict=False` (PEP 618)
 
+### Imports in Tests
+- `test/test_commands.py` has a top-level `from cnvlib import (...)` block that serves as both a smoke test and the shared import set. Add new `cnvlib` submodule imports there rather than as local imports inside individual test methods.
+
 ### Variable Naming
 - The codebase uses `bam_fname` or `sample_fname` for file paths that can be either BAM or bedGraph files
 - When updating help text or documentation, maintain consistency with existing patterns
