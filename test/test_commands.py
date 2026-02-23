@@ -47,9 +47,11 @@ from cnvlib import (
     parallel,
     params,
     plots,
+    purity,
     reference,
     reports,
     scatter,
+    segfilters,
     segmentation,
     segmetrics,
     smoothing,
@@ -539,8 +541,10 @@ class CallTests(unittest.TestCase):
             ["cn"],
             ["ci"],
             ["sem"],
+            ["bic"],
             ["sem", "cn", "ampdel"],
             ["ci", "cn"],
+            ["bic", "cn"],
         ):
             with self.subTest(filters=filters):
                 result = commands.do_call(
@@ -558,6 +562,171 @@ class CallTests(unittest.TestCase):
                     self.assertLessEqual(len(segments.chromosome.unique()), len(result))
                 for colname in "baf", "cn", "cn1", "cn2":
                     self.assertIn(colname, result)
+
+    def test_call_filter_ci_preserves_different_magnitudes(self):
+        """CI filter should not merge adjacent segments with different magnitudes.
+
+        Two adjacent segments both with CIs entirely below zero (both are
+        confident losses) should remain separate if they have different log2
+        values.  Only segments whose CI overlaps zero (neutral) should be
+        merged with adjacent neutral segments.
+        """
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 5,
+                    "start": [0, 1000, 2000, 3000, 4000],
+                    "end": [1000, 2000, 3000, 4000, 5000],
+                    "gene": ["A", "B", "C", "D", "E"],
+                    "log2": [-1.0, -0.03, 0.01, 0.02, 0.5],
+                    "weight": [1.0, 1.0, 1.0, 1.0, 1.0],
+                    "probes": [10, 10, 10, 10, 10],
+                    # Segment A: deep loss, CI entirely below 0
+                    # Segment B: slight loss, CI entirely below 0
+                    # Segment C: neutral, CI overlaps 0
+                    # Segment D: neutral, CI overlaps 0
+                    # Segment E: gain, CI entirely above 0
+                    "ci_lo": [-1.2, -0.06, -0.05, -0.04, 0.3],
+                    "ci_hi": [-0.8, -0.01, 0.07, 0.08, 0.7],
+                }
+            )
+        )
+
+        result = segfilters.ci(segarr)
+
+        # A and B must stay separate -- both are losses but different magnitude
+        # C and D should merge -- both are neutral (CI overlaps zero)
+        # E must stay separate -- it's a gain
+        self.assertEqual(len(result), 4)
+        # Check that the deep loss is preserved with its own log2
+        self.assertAlmostEqual(result["log2"].iat[0], -1.0)
+        # Check that the slight loss is preserved with its own log2
+        self.assertAlmostEqual(result["log2"].iat[1], -0.03)
+        # Check that the two neutrals were merged
+        self.assertEqual(result["probes"].iat[2], 20)
+        # Check that the gain is preserved
+        self.assertAlmostEqual(result["log2"].iat[3], 0.5)
+
+    def test_call_filter_bic_different_means_stay_separate(self):
+        """BIC filter should not merge segments with clearly different means."""
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 3,
+                    "start": [0, 1000, 2000],
+                    "end": [1000, 2000, 3000],
+                    "gene": ["A", "B", "C"],
+                    "log2": [-1.0, 0.0, 0.5],
+                    "weight": [10.0, 10.0, 10.0],
+                    "probes": [50, 50, 50],
+                    "stdev": [0.1, 0.1, 0.1],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # All three segments have very different means with low variance
+        self.assertEqual(len(result), 3)
+
+    def test_call_filter_bic_similar_means_merge(self):
+        """BIC filter should merge adjacent segments with similar means."""
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 3,
+                    "start": [0, 1000, 2000],
+                    "end": [1000, 2000, 3000],
+                    "gene": ["A", "B", "C"],
+                    "log2": [0.31, 0.30, 0.29],
+                    "weight": [10.0, 10.0, 10.0],
+                    "probes": [20, 20, 20],
+                    "stdev": [0.5, 0.5, 0.5],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # All three are essentially the same; BIC should merge them
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result["probes"].iat[0], 60)
+
+    def test_call_filter_bic_chromosome_boundary(self):
+        """BIC filter should never merge segments on different chromosomes."""
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1", "chr2"],
+                    "start": [0, 0],
+                    "end": [1000, 1000],
+                    "gene": ["A", "B"],
+                    "log2": [0.3, 0.3],
+                    "weight": [10.0, 10.0],
+                    "probes": [20, 20],
+                    "stdev": [0.5, 0.5],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # Same means but different chromosomes: must not merge
+        self.assertEqual(len(result), 2)
+
+    def test_call_filter_bic_single_bin_fallback(self):
+        """BIC filter handles segments with stdev=0 via fallback variance."""
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 3,
+                    "start": [0, 1000, 2000],
+                    "end": [1000, 2000, 3000],
+                    "gene": ["A", "B", "C"],
+                    "log2": [0.3, 0.3, 0.3],
+                    "weight": [1.0, 10.0, 10.0],
+                    "probes": [1, 20, 20],
+                    "stdev": [0.0, 0.5, 0.5],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # Segment A has stdev=0 (single bin), fallback variance used;
+        # all have similar means so they should merge
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result["probes"].iat[0], 41)
+
+    def test_call_filter_bic_cascading_merges(self):
+        """BIC filter iteratively merges: A~B and B~C yields A+B+C."""
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 4,
+                    "start": [0, 1000, 2000, 3000],
+                    "end": [1000, 2000, 3000, 4000],
+                    "gene": ["A", "B", "C", "D"],
+                    "log2": [0.10, 0.12, 0.14, -0.5],
+                    "weight": [10.0, 10.0, 10.0, 10.0],
+                    "probes": [20, 20, 20, 20],
+                    "stdev": [0.4, 0.4, 0.4, 0.1],
+                }
+            )
+        )
+        result = segfilters.bic(segarr)
+        # A, B, C have similar means and high variance -> merge into one
+        # D has a clearly different mean -> stays separate
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result["probes"].iat[0], 60)
+        self.assertEqual(result["probes"].iat[1], 20)
+
+    def test_call_filter_bic_via_do_call(self):
+        """BIC filter works through the do_call pipeline."""
+        segments = cnvlib.read("formats/tr95t.segmetrics.cns")
+        result = commands.do_call(
+            segments,
+            variants=None,
+            method="threshold",
+            purity=0.9,
+            is_haploid_x_reference=True,
+            is_sample_female=True,
+            filters=["bic"],
+        )
+        self.assertGreater(len(result), 0)
+        self.assertLessEqual(len(result), len(segments))
 
     def test_call_log2_ratios(self):
         cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
@@ -1074,15 +1243,13 @@ class AnalysisTests(unittest.TestCase):
 
     def test_purity_file(self):
         """The 'purity' command: read_purity_tsv round-trip."""
-        from cnvlib import purity as purity_mod
-
         with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv", delete=False) as f:
             f.write("purity\tploidy\tscore\n")
             f.write("0.65\t2.1\t42.5\n")
             f.write("0.70\t2.0\t41.0\n")
             tmp_path = f.name
         try:
-            pur, plo = purity_mod.read_purity_tsv(tmp_path)
+            pur, plo = purity.read_purity_tsv(tmp_path)
             self.assertAlmostEqual(pur, 0.65)
             self.assertAlmostEqual(plo, 2.1)
         finally:
