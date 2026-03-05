@@ -10,11 +10,16 @@ References:
     - k-means with Pearson correlation of read depth is ~200x faster than kNN
       with equivalent accuracy; optimal k=4-5; clusters correspond to
       sequencing batches/centers
+
+    Kaufman & Rousseeuw 1990, "Finding Groups in Data: An Introduction to
+    Cluster Analysis", ch. 2 -- Partitioning Around Medoids (PAM) algorithm.
 """
 
 import logging
 
 import numpy as np
+
+_MAX_PAM_ITERATIONS = 100
 
 
 def hierarchical(samples, min_cluster_size=4):
@@ -234,7 +239,7 @@ def _pam(dist_matrix, k):
     medoid_arr = np.array(medoids)
 
     # SWAP: iteratively improve medoids
-    for _iteration in range(100):
+    for _iteration in range(_MAX_PAM_ITERATIONS):
         # Assign each point to nearest medoid (vectorized)
         dists_to_medoids = dist_matrix[:, medoid_arr]
         labels = np.argmin(dists_to_medoids, axis=1)
@@ -271,6 +276,10 @@ def _select_k(dist_matrix, n_samples):
     Tries k from 2 to min(10, n_samples-1) and picks the k with the highest
     silhouette score. Short-circuits if the score declines for 2 consecutive
     values of k. Falls back to k=2 if all scores are negative.
+
+    Note: Each candidate k runs a full PAM fit, so this is O(max_k * n^2 * k)
+    overall. The max_k=10 cap and early stopping keep this tractable for typical
+    reference panels (n < 100).
     """
     from sklearn.metrics import silhouette_score
 
