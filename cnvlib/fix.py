@@ -175,7 +175,7 @@ def do_fix(
         ref_log2_cols = [
             col
             for col in ref_matched.data.columns
-            if col == "log2" or col.startswith("log2")
+            if col == "log2" or col.startswith("log2_")
         ]
         if len(ref_log2_cols) == 1:
             logging.info(

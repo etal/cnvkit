@@ -33,6 +33,7 @@ from cnvlib import (
     batch,
     bintest,
     call,
+    cluster,
     cnary,
     commands,
     core,
@@ -373,6 +374,86 @@ class ReferenceTests(unittest.TestCase):
             ref_female["log2"][ref_female.chr_x_filter()].to_list(),
             expected_haploid_log2,
         )
+
+    def test_cluster_hierarchical(self):
+        """Test hierarchical clustering on synthetic data with 2 clear groups."""
+        from cnvlib.cluster import hierarchical
+
+        rng = np.random.default_rng(42)
+        n_bins = 100
+        # Group A: 5 samples with similar pattern
+        base_a = rng.standard_normal(n_bins)
+        group_a = np.array([base_a + rng.normal(0, 0.1, n_bins) for _ in range(5)])
+        # Group B: 5 samples with a different pattern
+        base_b = rng.standard_normal(n_bins)
+        group_b = np.array([base_b + rng.normal(0, 0.1, n_bins) for _ in range(5)])
+        samples = np.vstack([group_a, group_b])
+
+        clusters = hierarchical(samples, min_cluster_size=3)
+        # Should produce exactly 2 clusters; all samples must be assigned
+        self.assertEqual(len(clusters), 2)
+        all_indices = sorted(idx for c in clusters for idx in c)
+        self.assertEqual(all_indices, list(range(10)))
+        # Check they separate the groups correctly
+        c0 = set(clusters[0])
+        c1 = set(clusters[1])
+        group_a_set = set(range(5))
+        group_b_set = set(range(5, 10))
+        self.assertTrue(
+            (c0 == group_a_set and c1 == group_b_set)
+            or (c0 == group_b_set and c1 == group_a_set)
+        )
+
+    def test_cluster_kmedoids(self):
+        """Test k-medoids clustering produces valid clusters."""
+        from cnvlib.cluster import kmedoids
+
+        rng = np.random.default_rng(42)
+        n_bins = 100
+        samples = np.vstack(
+            [
+                rng.standard_normal((5, n_bins)),
+                rng.standard_normal((5, n_bins)) + 3,
+            ]
+        )
+        clusters = kmedoids(samples, k=2)
+        self.assertEqual(len(clusters), 2)
+        all_indices = sorted(idx for c in clusters for idx in c)
+        self.assertEqual(all_indices, list(range(10)))
+
+    def test_create_clusters_column_names(self):
+        """Test that create_clusters produces expected column names."""
+        rng = np.random.default_rng(42)
+        n_bins = 50
+        n_samples = 6
+        # Create logr_matrix with pseudocount row + sample rows
+        logr = np.vstack(
+            [
+                np.zeros(n_bins),  # pseudocount
+                rng.standard_normal((n_samples, n_bins)),
+            ]
+        )
+        depths = np.vstack(
+            [
+                np.zeros(n_bins),  # pseudocount
+                rng.uniform(10, 100, (n_samples, n_bins)),
+            ]
+        )
+        sample_ids = [f"sample_{i}" for i in range(n_samples)]
+        cols = reference.create_clusters(
+            logr, depths, min_cluster_size=2, sample_ids=sample_ids
+        )
+        # Should have at least one cluster with log2_, depth_, spread_ columns
+        self.assertTrue(len(cols) > 0)
+        log2_keys = [k for k in cols if k.startswith("log2_")]
+        depth_keys = [k for k in cols if k.startswith("depth_")]
+        spread_keys = [k for k in cols if k.startswith("spread_")]
+        self.assertTrue(len(log2_keys) > 0)
+        self.assertEqual(len(log2_keys), len(depth_keys))
+        self.assertEqual(len(log2_keys), len(spread_keys))
+        # All column arrays should have n_bins elements
+        for val in cols.values():
+            self.assertEqual(len(val), n_bins)
 
     def test_fix(self):
         """The 'fix' command."""
