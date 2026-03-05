@@ -17,7 +17,7 @@ import logging
 import numpy as np
 
 
-def hierarchical(samples, min_cluster_size=5):
+def hierarchical(samples, min_cluster_size=4):
     """Cluster samples using hierarchical (UPGMA) clustering on Pearson correlation.
 
     Uses the inconsistency statistic to automatically determine the number of
@@ -79,7 +79,16 @@ def _find_inconsistency_threshold(Z, incon, min_cluster_size, n_samples, depth):
     """
     from scipy.cluster.hierarchy import fcluster
 
-    for threshold in np.arange(0.5, 3.1, 0.1):
+    # Use actual inconsistency values from the linkage as candidate thresholds
+    candidates = np.unique(incon[:, 3])
+    candidates = candidates[candidates > 0]
+    if len(candidates) == 0:
+        logging.info(
+            "All samples are highly correlated; using single reference cluster"
+        )
+        return None
+
+    for threshold in candidates:
         labels = fcluster(Z, t=threshold, criterion="inconsistent", depth=depth)
         n_clusters = len(set(labels))
         if n_clusters <= 1:
@@ -144,7 +153,7 @@ def _labels_to_clusters(labels, min_cluster_size, dist_matrix):
     return large_clusters
 
 
-def kmedoids(samples, k=None, min_cluster_size=5):
+def kmedoids(samples, k=None, min_cluster_size=4):
     """Cluster samples using k-medoids (PAM) on Pearson correlation distance.
 
     When k is not specified, it is selected by maximizing the silhouette score over a
@@ -232,11 +241,10 @@ def _pam(dist_matrix, k):
         total_cost = dists_to_medoids[np.arange(n), labels].sum()
 
         improved = False
+        non_medoid_mask = np.ones(n, dtype=bool)
+        non_medoid_mask[medoid_arr] = False
         for m_idx in range(k):
-            cluster_members = np.where(labels == m_idx)[0]
-            for candidate in cluster_members:
-                if candidate == medoid_arr[m_idx]:
-                    continue
+            for candidate in np.where(non_medoid_mask)[0]:
                 # Try swapping (vectorized cost)
                 new_medoid_arr = medoid_arr.copy()
                 new_medoid_arr[m_idx] = candidate

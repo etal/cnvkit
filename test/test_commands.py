@@ -433,7 +433,12 @@ class ReferenceTests(unittest.TestCase):
                 rng.standard_normal((n_samples, n_bins)),
             ]
         )
-        depths = rng.uniform(10, 100, (n_samples, n_bins))
+        depths = np.vstack(
+            [
+                np.zeros(n_bins),  # pseudocount
+                rng.uniform(10, 100, (n_samples, n_bins)),
+            ]
+        )
         sample_ids = [f"sample_{i}" for i in range(n_samples)]
         cols = reference.create_clusters(
             logr, depths, min_cluster_size=2, sample_ids=sample_ids

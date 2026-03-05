@@ -645,6 +645,7 @@ def create_clusters(
 
     # Drop the pseudocount sample (first row is the flat-reference expectation)
     logr_matrix = logr_matrix[1:, :]
+    all_depths = all_depths[1:, :]
     logging.info("Clustering %d samples by %s...", len(logr_matrix), method)
     match method:
         case "hierarchical":
