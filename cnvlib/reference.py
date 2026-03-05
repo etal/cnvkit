@@ -657,14 +657,6 @@ def create_clusters(
     cluster_cols: dict[str, Any] = {}
     sample_id_arr = np.array(sample_ids)
     for i, clust_idx in enumerate(clusters, start=1):
-        if len(clust_idx) < min_cluster_size:
-            logging.info(
-                "Skipping cluster #%d, size %d < min. %d",
-                i,
-                len(clust_idx),
-                min_cluster_size,
-            )
-            continue
         logging.info("Summarizing cluster #%d of %d samples", i, len(clust_idx))
         samples = sample_id_arr[clust_idx]
         logging.info("Samples:\n%s", "\n".join(["\t" + s for s in samples]))

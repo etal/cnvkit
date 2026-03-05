@@ -390,19 +390,19 @@ class ReferenceTests(unittest.TestCase):
         samples = np.vstack([group_a, group_b])
 
         clusters = hierarchical(samples, min_cluster_size=3)
-        # Should produce 1 or 2 clusters; all samples must be assigned
+        # Should produce exactly 2 clusters; all samples must be assigned
+        self.assertEqual(len(clusters), 2)
         all_indices = sorted(idx for c in clusters for idx in c)
         self.assertEqual(all_indices, list(range(10)))
-        # If 2 clusters, check they separate the groups correctly
-        if len(clusters) == 2:
-            c0 = set(clusters[0])
-            c1 = set(clusters[1])
-            group_a_set = set(range(5))
-            group_b_set = set(range(5, 10))
-            self.assertTrue(
-                (c0 == group_a_set and c1 == group_b_set)
-                or (c0 == group_b_set and c1 == group_a_set)
-            )
+        # Check they separate the groups correctly
+        c0 = set(clusters[0])
+        c1 = set(clusters[1])
+        group_a_set = set(range(5))
+        group_b_set = set(range(5, 10))
+        self.assertTrue(
+            (c0 == group_a_set and c1 == group_b_set)
+            or (c0 == group_b_set and c1 == group_a_set)
+        )
 
     def test_cluster_kmedoids(self):
         """Test k-medoids clustering produces valid clusters."""
