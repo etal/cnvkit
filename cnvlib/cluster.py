@@ -1,12 +1,19 @@
 #!/usr/bin/env python
-"""Markov-cluster control samples' correlation matrix.
+"""Cluster control samples by coverage correlation.
 
-See:
+Supports hierarchical clustering (default), k-means, and Markov clustering (MCL).
+
+References:
+
+    Guo et al. 2019, "Comparative study of exome copy number variant detection
+    tools using the K-means clustering algorithm" (PMC6537193):
+    - k-means with Pearson correlation of read depth is ~200x faster than kNN
+      with equivalent accuracy; optimal k=4-5; clusters correspond to
+      sequencing batches/centers
 
     Stijn van Dongen, Graph Clustering by Flow Simulation,
     PhD thesis, University of Utrecht, May 2000.
     https://micans.org/mcl/
-
 """
 
 import logging
@@ -14,28 +21,156 @@ import logging
 import numpy as np
 
 
+def hierarchical(samples, min_cluster_size=5):
+    """Cluster samples using hierarchical (UPGMA) clustering on Pearson correlation.
+
+    Uses the inconsistency statistic to automatically determine the number of
+    clusters, which adapts to the data without requiring a pre-specified k.
+
+    Parameters
+    ----------
+    samples : 2D numpy array
+        Matrix of samples' log2 values. Rows are samples, columns are bins.
+    min_cluster_size : int
+        Minimum number of samples per cluster. Clusters smaller than this are
+        absorbed into the nearest larger cluster.
+
+    Returns
+    -------
+    list of numpy arrays
+        Each array contains the indices of samples in that cluster.
+    """
+    from scipy.cluster.hierarchy import fcluster, inconsistent, linkage
+    from scipy.spatial.distance import pdist
+
+    n_samples = len(samples)
+    if n_samples < 2:
+        return [np.array(range(n_samples))]
+
+    dists = pdist(samples, metric="correlation")  # 1 - Pearson r
+    # Replace NaN distances (from constant-coverage bins) with max distance
+    dists = np.nan_to_num(dists, nan=1.0)
+    Z = linkage(dists, method="average")  # UPGMA
+
+    depth = 2
+    incon = inconsistent(Z, d=depth)
+    threshold = _find_inconsistency_threshold(
+        Z, incon, min_cluster_size, n_samples, depth
+    )
+    labels = fcluster(Z, t=threshold, criterion="inconsistent", depth=depth)
+    logging.info(
+        "Hierarchical clustering: %d samples -> %d clusters (threshold=%.3f)",
+        n_samples,
+        len(set(labels)),
+        threshold,
+    )
+    return _labels_to_clusters(labels, min_cluster_size)
+
+
+def _find_inconsistency_threshold(Z, incon, min_cluster_size, n_samples, depth):
+    """Find an inconsistency threshold that yields valid clusters.
+
+    Search for the lowest threshold where every cluster has at least
+    min_cluster_size samples.
+    """
+    from scipy.cluster.hierarchy import fcluster
+
+    best_threshold = 10.0  # Default: single cluster (very permissive)
+
+    for threshold in np.arange(0.5, 3.1, 0.1):
+        labels = fcluster(Z, t=threshold, criterion="inconsistent", depth=depth)
+        n_clusters = len(set(labels))
+        if n_clusters <= 1:
+            continue
+        # Check that all clusters are large enough
+        label_counts = np.bincount(labels)  # index 0 unused (labels are 1-based)
+        min_size = label_counts[1:].min()
+        if min_size >= min_cluster_size:
+            best_threshold = threshold
+            break
+
+    if best_threshold >= 10.0:
+        logging.info(
+            "All samples are highly correlated; using single reference cluster"
+        )
+
+    return best_threshold
+
+
+def _labels_to_clusters(labels, min_cluster_size):
+    """Convert scipy's 1-indexed label array to a list of index arrays.
+
+    Clusters smaller than min_cluster_size are merged into the nearest
+    larger cluster.
+    """
+    unique_labels = np.unique(labels)
+    clusters = []
+    small_indices: list[int] = []
+    for label in unique_labels:
+        indices = np.where(labels == label)[0]
+        if len(indices) >= min_cluster_size:
+            clusters.append(indices)
+            logging.info("Cluster %d: %d samples", label, len(indices))
+        else:
+            logging.info(
+                "Cluster %d: %d samples (below min size %d, merging)",
+                label,
+                len(indices),
+                min_cluster_size,
+            )
+            small_indices.extend(indices)
+
+    if not clusters:
+        # All clusters too small -> return everything as one cluster
+        return [np.arange(len(labels))]
+
+    if small_indices:
+        # Merge small-cluster samples into the first (largest) cluster
+        largest_idx = max(range(len(clusters)), key=lambda i: len(clusters[i]))
+        clusters[largest_idx] = np.concatenate(
+            [clusters[largest_idx], np.array(small_indices)]
+        )
+        logging.info(
+            "Merged %d small-cluster samples into cluster %d",
+            len(small_indices),
+            largest_idx + 1,
+        )
+
+    return clusters
+
+
 def kmeans(samples, k=None):
+    """Cluster samples using k-means on PCA-reduced data.
+
+    Parameters
+    ----------
+    samples : 2D numpy array
+        Matrix of samples' log2 values. Rows are samples, columns are bins.
+    k : int, optional
+        Number of clusters. If None, estimated from sample count.
+
+    Returns
+    -------
+    list of lists
+        Each inner list contains the indices of samples in that cluster.
+    """
+    from collections import defaultdict
+
     from scipy.cluster import vq
 
     if k is None:
         from math import log
 
         k = max(1, round(log(len(samples), 3)))
-        # E.g. n=66 -> k=2, 16 -> 3, 47 -> 4, 141 -> 5, 421 -> 6, 1263 -> 7
 
-    print("Clustering", len(samples), "samples by k-means, where k =", k)
+    logging.info("Clustering %d samples by k-means, where k = %d", len(samples), k)
     obs = pca_sk(samples, 3)
-    obs = vq.whiten(obs)  # Needed?
+    obs = vq.whiten(obs)
     _centroids, labels = vq.kmeans2(obs, k, minit="++")
-    # XXX shorter way to do this grouping?
-    from collections import defaultdict
-
     clusters = defaultdict(list)
     for idx, label in enumerate(labels):
         clusters[label].append(idx)
-    clusters = list(clusters.values())  # type: ignore[assignment]
-    # plot_clusters(obs, clusters)
-    return clusters
+    return list(clusters.values())
 
 
 def markov(samples, inflation=5, max_iterations=100, by_pca=True):
@@ -64,8 +199,7 @@ def markov(samples, inflation=5, max_iterations=100, by_pca=True):
         raise ValueError("inflation must be > 1")
 
     if by_pca:
-        pca_matrix = pca_sk(samples, 2)  # pca_plain
-        # Convert to similarity matrix
+        pca_matrix = pca_sk(samples, 2)
         from scipy.spatial import distance
 
         dists = distance.squareform(distance.pdist(pca_matrix))
@@ -74,7 +208,6 @@ def markov(samples, inflation=5, max_iterations=100, by_pca=True):
         M = np.corrcoef(samples)
 
     M, clusters = mcl(M, max_iterations, inflation)
-    # plot_clusters(M, clusters)
     return clusters
 
 
@@ -83,20 +216,16 @@ def markov(samples, inflation=5, max_iterations=100, by_pca=True):
 # https://stackoverflow.com/questions/44243525/mcl-clustering-implementation-in-python-deal-with-overlap
 def mcl(M, max_iterations, inflation, expansion=2):
     """Markov cluster algorithm."""
-    print("M_init:\n", M)
+    logging.debug("MCL input matrix:\n%s", M)
     M = normalize(M)
-    # print("M_norm:\n", M)
     for i in range(max_iterations):
         M_prev = M
         M = inflate(expand(M, expansion), inflation)
-        # print("M_inflate_%d:\n" % i, M)
         if converged(M, M_prev):
             logging.debug("Converged at iteration %d", i)
             break
         M = prune(M)
-        # print("M_prune_%d:\n" % i, M)
 
-    # print("M_final:\n", M)
     clusters = get_clusters(M)
     return M, clusters
 
@@ -278,8 +407,7 @@ def plot_clusters(M, cluster_indices) -> None:
     """
     from matplotlib import pyplot as plt
 
-    # colors = list("krgbo")[:len(cluster_indices)]
     _fig, ax = plt.subplots(1, 1)
     for cl_idx in cluster_indices:
-        ax.scatter(M[cl_idx, 0], M[cl_idx, 1])  # c=color
+        ax.scatter(M[cl_idx, 0], M[cl_idx, 1])
     plt.show()

@@ -275,6 +275,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             args.min_mapq,
             args.seq_method,
             args.cluster,
+            args.cluster_method,
         )
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
@@ -465,6 +466,13 @@ P_batch_newref.add_argument(
     action="store_true",
     help="""Calculate and use cluster-specific summary stats in the reference pool to
             normalize samples.""",
+)
+P_batch_newref.add_argument(
+    "--cluster-method",
+    choices=("hierarchical", "kmeans", "mcl"),
+    default="hierarchical",
+    help="""Clustering algorithm for grouping normal samples.
+            [Default: %(default)s]""",
 )
 
 P_batch_oldref = P_batch.add_argument_group("To reuse an existing reference")
@@ -909,6 +917,7 @@ def _cmd_reference(args: argparse.Namespace) -> None:
             args.do_rmask,
             args.cluster,
             args.min_cluster_size,
+            args.cluster_method,
         )
     else:
         raise ValueError(usage_err_msg)
@@ -940,6 +949,13 @@ P_reference.add_argument(
     type=int,
     default=4,
     help="""Minimum cluster size to keep in reference profiles. [Default: %(default)s]""",
+)
+P_reference.add_argument(
+    "--cluster-method",
+    choices=("hierarchical", "kmeans", "mcl"),
+    default="hierarchical",
+    help="""Clustering algorithm for grouping normal samples.
+            [Default: %(default)s]""",
 )
 add_sample_sex(P_reference)
 P_reference.add_argument(

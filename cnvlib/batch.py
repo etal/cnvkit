@@ -47,6 +47,7 @@ def batch_make_reference(
     min_mapq: int,
     method: str,
     do_cluster: bool,
+    cluster_method: str = "hierarchical",
 ) -> tuple[str, str, str]:
     """Build a complete copy number reference from normal samples.
 
@@ -378,6 +379,7 @@ def batch_make_reference(
             do_edge=(method == "hybrid"),
             do_rmask=True,
             do_cluster=do_cluster,
+            cluster_method=cluster_method,
         )
     if not output_reference:
         output_reference = os.path.join(output_dir, "reference.cnn")

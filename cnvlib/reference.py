@@ -92,6 +92,7 @@ def do_reference(
     do_rmask: bool = True,
     do_cluster: bool = False,
     min_cluster_size: int = 4,
+    cluster_method: str = "hierarchical",
 ) -> CNA:
     """Compile a pooled coverage reference from normal samples.
 
@@ -261,6 +262,7 @@ def do_reference(
         do_rmask,
         do_cluster,
         min_cluster_size,
+        cluster_method,
     )
     warn_bad_bins(ref_probes)
     return ref_probes
@@ -296,6 +298,7 @@ def combine_probes(
     fix_rmask: bool,
     do_cluster: bool,
     min_cluster_size: int,
+    cluster_method: str = "hierarchical",
 ) -> CNA:
     """Calculate the median coverage of each bin across multiple samples.
 
@@ -365,17 +368,19 @@ def combine_probes(
                 f"Expected {len(all_logr) - 1} target coverage files (.cnn), "
                 + f"got {len(sample_ids)}"
             )
-        clustered_cols = create_clusters(all_logr, min_cluster_size, sample_ids)
+        clustered_cols = create_clusters(
+            all_logr, all_depths, min_cluster_size, sample_ids, cluster_method
+        )
         if clustered_cols:
             try:
                 ref_df = ref_df.assign(**clustered_cols)
             except ValueError as exc:
-                print("Reference:", len(ref_df.index))
+                logging.error("Reference: %d rows", len(ref_df.index))
                 for cl_key, cl_col in clustered_cols.items():
-                    print(cl_key, ":", len(cl_col))
+                    logging.error("%s: %d values", cl_key, len(cl_col))
                 raise exc
         else:
-            print("** Why weren't there any clustered cols?")
+            logging.warning("Clustering produced no valid clusters")
 
     ref_cna = CNA(ref_df, meta_dict={"sample_id": "reference"})
     # NB: Up to this point, target vs. antitarget bins haven't been row-sorted.
@@ -618,34 +623,42 @@ def summarize_info(all_logr: ndarray, all_depths: ndarray) -> dict[str, ndarray]
     return result
 
 
-def create_clusters(logr_matrix, min_cluster_size, sample_ids):
+def create_clusters(
+    logr_matrix,
+    all_depths,
+    min_cluster_size,
+    sample_ids,
+    method="hierarchical",
+):
     """Extract and summarize clusters of samples in logr_matrix.
 
     1. Calculate correlation coefficients between all samples (columns).
     2. Cluster the correlation matrix.
     3. For each resulting sample cluster (down to a minimum size threshold),
        calculate the central log2 value for each bin, similar to the full pool.
-       Also print the sample IDs in each cluster, if feasible.
+       Also log the sample IDs in each cluster.
 
-    Also recalculate and store the 'spread' of each cluster, though this might
-    not be necessary/good.
-
-    Return a DataFrame of just the log2 values. Column names are ``log2_i``
+    Return a dict of columns: ``log2_i``, ``spread_i``, and ``depth_i``
     where i=1,2,... .
     """
-    # from .cluster import markov
-    from .cluster import kmeans
+    from . import cluster
 
-    # Drop the pseudocount sample
+    # Drop the pseudocount sample (first row is the flat-reference expectation)
     logr_matrix = logr_matrix[1:, :]
-    print("Clustering", len(logr_matrix), "samples...")
-    # clusters = markov(logr_matrix)
-    clusters = kmeans(logr_matrix)
+    logging.info("Clustering %d samples by %s...", len(logr_matrix), method)
+    match method:
+        case "hierarchical":
+            clusters = cluster.hierarchical(logr_matrix, min_cluster_size)
+        case "kmeans":
+            clusters = cluster.kmeans(logr_matrix)
+        case "mcl":
+            clusters = cluster.markov(logr_matrix)
+        case _:
+            raise ValueError(f"Unknown clustering method: {method!r}")
+
     cluster_cols: dict[str, Any] = {}
-    sample_ids = np.array(sample_ids)  # For easy indexing
-    for i, clust_idx in enumerate(clusters):
-        i += 1
-        # print(len(clust_idx), clust_idx)
+    sample_id_arr = np.array(sample_ids)
+    for i, clust_idx in enumerate(clusters, start=1):
         if len(clust_idx) < min_cluster_size:
             logging.info(
                 "Skipping cluster #%d, size %d < min. %d",
@@ -655,15 +668,14 @@ def create_clusters(logr_matrix, min_cluster_size, sample_ids):
             )
             continue
         logging.info("Summarizing cluster #%d of %d samples", i, len(clust_idx))
-        # List which samples are in each cluster
-        samples = sample_ids[clust_idx]
-        logging.info("\n".join(["\t" + s for s in samples]))
-        # Calculate each cluster's summary stats
-        clust_matrix = logr_matrix[clust_idx, :]
-        # XXX re-add the pseudocount sample to each cluster? need benchmark
-        clust_info = summarize_info(clust_matrix, [])  # type: ignore[arg-type]
+        samples = sample_id_arr[clust_idx]
+        logging.info("Samples:\n%s", "\n".join(["\t" + s for s in samples]))
+        clust_logr = logr_matrix[clust_idx, :]
+        clust_depths = all_depths[clust_idx, :]
+        clust_info = summarize_info(clust_logr, clust_depths)
         cluster_cols |= {
             f"log2_{i}": clust_info["log2"],
+            f"depth_{i}": clust_info["depth"],
             f"spread_{i}": clust_info["spread"],
         }
     return cluster_cols
