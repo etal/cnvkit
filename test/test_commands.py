@@ -404,9 +404,9 @@ class ReferenceTests(unittest.TestCase):
                 or (c0 == group_b_set and c1 == group_a_set)
             )
 
-    def test_cluster_kmeans(self):
-        """Test k-means clustering produces valid clusters."""
-        from cnvlib.cluster import kmeans
+    def test_cluster_kmedoids(self):
+        """Test k-medoids clustering produces valid clusters."""
+        from cnvlib.cluster import kmedoids
 
         rng = np.random.default_rng(42)
         n_bins = 100
@@ -416,7 +416,7 @@ class ReferenceTests(unittest.TestCase):
                 rng.standard_normal((5, n_bins)) + 3,
             ]
         )
-        clusters = kmeans(samples, k=2)
+        clusters = kmedoids(samples, k=2)
         self.assertEqual(len(clusters), 2)
         all_indices = sorted(idx for c in clusters for idx in c)
         self.assertEqual(all_indices, list(range(10)))

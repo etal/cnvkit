@@ -649,10 +649,8 @@ def create_clusters(
     match method:
         case "hierarchical":
             clusters = cluster.hierarchical(logr_matrix, min_cluster_size)
-        case "kmeans":
-            clusters = cluster.kmeans(logr_matrix)
-        case "mcl":
-            clusters = cluster.markov(logr_matrix)
+        case "kmedoids":
+            clusters = cluster.kmedoids(logr_matrix, min_cluster_size=min_cluster_size)
         case _:
             raise ValueError(f"Unknown clustering method: {method!r}")
 

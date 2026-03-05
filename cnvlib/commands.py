@@ -469,7 +469,7 @@ P_batch_newref.add_argument(
 )
 P_batch_newref.add_argument(
     "--cluster-method",
-    choices=("hierarchical", "kmeans", "mcl"),
+    choices=("hierarchical", "kmedoids"),
     default="hierarchical",
     help="""Clustering algorithm for grouping normal samples.
             [Default: %(default)s]""",
@@ -952,7 +952,7 @@ P_reference.add_argument(
 )
 P_reference.add_argument(
     "--cluster-method",
-    choices=("hierarchical", "kmeans", "mcl"),
+    choices=("hierarchical", "kmedoids"),
     default="hierarchical",
     help="""Clustering algorithm for grouping normal samples.
             [Default: %(default)s]""",
