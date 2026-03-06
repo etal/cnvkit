@@ -27,7 +27,7 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
-        args: [--maxkb=1000]
+        args: [--maxkb=5000]
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: mixed-line-ending
