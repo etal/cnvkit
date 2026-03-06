@@ -136,7 +136,8 @@ def add_fasta(P: argparse._ActionsContainer) -> None:
         "-f",
         "--fasta",
         metavar="FILENAME",
-        help="Reference genome, FASTA format (e.g. UCSC hg19.fa)",
+        help="""Reference genome, FASTA format (e.g. UCSC hg19.fa).
+            Required for building a new reference and for reading CRAM files.""",
     )
 
 
@@ -211,7 +212,6 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             flag
             for is_used, flag in (
                 (args.normal is not None, "-n/--normal"),
-                (args.fasta, "-f/--fasta"),
                 (args.targets, "-t/--targets"),
                 (args.antitargets, "-a/--antitargets"),
                 (args.access, "-g/--access"),

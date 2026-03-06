@@ -131,6 +131,20 @@ class PreprocessingTests(unittest.TestCase):
             self.assertTrue((cna.log2 != 0).any())
             self.assertGreater(cna.log2.nunique(), 1)
 
+    def test_coverage_cram(self):
+        """The 'coverage' command with CRAM input."""
+        bed = "formats/my-targets.bed"
+        cram = "formats/na12878-chrM-Y-trunc.cram"
+        fasta = "formats/chrM-Y-trunc.hg19.fa"
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        # Verify CRAM coverage matches BAM coverage
+        cna_cram = commands.do_coverage(bed, cram, fasta=fasta)
+        cna_bam = commands.do_coverage(bed, bam)
+        self.assertEqual(len(cna_cram), len(cna_bam))
+        np.testing.assert_array_almost_equal(
+            cna_cram["depth"].values, cna_bam["depth"].values, decimal=1
+        )
+
     def test_coverage_bedgraph(self):
         """The 'coverage' command with bedGraph input."""
         bed = "formats/my-targets.bed"
