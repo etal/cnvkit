@@ -625,6 +625,8 @@ class CallTests(unittest.TestCase):
             ["bic"],
             ["sem", "cn", "ampdel"],
             ["ci", "cn"],
+            ["ci", "sem"],
+            ["cn", "ci", "sem"],
             ["bic", "cn"],
         ):
             with self.subTest(filters=filters):
@@ -643,6 +645,13 @@ class CallTests(unittest.TestCase):
                     self.assertLessEqual(len(segments.chromosome.unique()), len(result))
                 for colname in "baf", "cn", "cn1", "cn2":
                     self.assertIn(colname, result)
+                # Segmetrics columns must survive merging by prior filters
+                for colname in "sem", "ci_lo", "ci_hi", "stdev":
+                    self.assertIn(
+                        colname,
+                        result,
+                        f"{colname!r} dropped after filters={filters}",
+                    )
 
     def test_call_filter_ci_preserves_different_magnitudes(self):
         """CI filter should not merge adjacent segments with different magnitudes.
