@@ -99,32 +99,35 @@ def enumerate_changes(levels: Series) -> Series:
 def squash_region(cnarr: DataFrame) -> DataFrame:
     """Reduce a CopyNumArray to 1 row, keeping fields sensible.
 
-    Most fields added by the `segmetrics` command will be dropped.
+    All columns present in the input are preserved.  Core columns (chromosome,
+    start, end, log2, gene, probes, weight) and well-known optional columns
+    (depth, baf, cn, cn1/cn2, p_bintest) use purpose-built aggregation.  Any
+    remaining numeric columns (e.g. segmetrics columns like ``sem``, ``ci_lo``,
+    ``ci_hi``, ``stdev``) are aggregated via weighted average so that
+    downstream filters can still use them after a prior filter has merged
+    segments.
     """
     assert "weight" in cnarr
-    out = {
+    region_weight = cnarr["weight"].sum()
+
+    def _wavg(col: str) -> float:
+        if region_weight > 0:
+            return float(np.average(cnarr[col], weights=cnarr["weight"]))
+        return float(np.mean(cnarr[col]))
+
+    out: dict = {
         "chromosome": [cnarr["chromosome"].iat[0]],
         "start": cnarr["start"].iat[0],
         "end": cnarr["end"].iat[-1],
     }
-    region_weight = cnarr["weight"].sum()
-    if region_weight > 0:
-        out["log2"] = np.average(cnarr["log2"], weights=cnarr["weight"])
-    else:
-        out["log2"] = np.mean(cnarr["log2"])
+    out["log2"] = _wavg("log2")
     out["gene"] = ",".join(cnarr["gene"].drop_duplicates())
     out["probes"] = cnarr["probes"].sum() if "probes" in cnarr else len(cnarr)
     out["weight"] = region_weight
     if "depth" in cnarr:
-        if region_weight > 0:
-            out["depth"] = np.average(cnarr["depth"], weights=cnarr["weight"])
-        else:
-            out["depth"] = np.mean(cnarr["depth"])
+        out["depth"] = _wavg("depth")
     if "baf" in cnarr:
-        if region_weight > 0:
-            out["baf"] = np.average(cnarr["baf"], weights=cnarr["weight"])
-        else:
-            out["baf"] = np.mean(cnarr["baf"])
+        out["baf"] = _wavg("baf")
     if "cn" in cnarr:
         if region_weight > 0:
             out["cn"] = weighted_median(cnarr["cn"], cnarr["weight"])
@@ -137,8 +140,18 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
                 out["cn1"] = np.median(cnarr["cn1"])
             out["cn2"] = out["cn"] - out["cn1"]
     if "p_bintest" in cnarr:
-        # Only relevant for single-bin segments, but this seems safe/conservative
         out["p_bintest"] = cnarr["p_bintest"].max()
+
+    # Preserve any remaining columns (e.g. segmetrics: sem, ci_lo, ci_hi, stdev)
+    handled = set(out.keys()) | {"_group", "_g1", "_g2"}
+    for col in cnarr.columns:
+        if col in handled:
+            continue
+        if pd.api.types.is_numeric_dtype(cnarr[col]):
+            out[col] = _wavg(col)
+        else:
+            out[col] = cnarr[col].iat[0]
+
     return pd.DataFrame(out)
 
 
