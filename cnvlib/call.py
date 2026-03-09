@@ -131,7 +131,7 @@ def do_call(
     >>> calls = do_call(segments, thresholds=(-1.5, -0.3, 0.3, 1.0))
     """
     if method not in ("threshold", "clonal", "none"):
-        raise ValueError("Argument `method` must be one of: clonal, threshold")
+        raise ValueError("Argument `method` must be one of: clonal, threshold, none")
 
     if method == "none":
         post_cn_requested: list[str] = []
