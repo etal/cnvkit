@@ -15,6 +15,13 @@ if TYPE_CHECKING:
     from pandas.core.frame import DataFrame
     from pandas.core.series import Series
 
+# Filters/merges applied before copy number calling (operate on log2 values)
+PRE_CN_FILTERS = ("ci", "sem")
+PRE_CN_MERGES = ("bic",)
+# Filters/merges applied after copy number calling (require 'cn' column)
+POST_CN_FILTERS = ("cn", "ampdel")
+POST_CN_MERGES = ("cn",)
+
 
 def do_call(
     cnarr: CopyNumArray,
@@ -26,6 +33,7 @@ def do_call(
     is_sample_female: bool = False,
     diploid_parx_genome: str | None = None,
     filters: list[str] | None = None,
+    merges: list[str] | None = None,
     thresholds: tuple[float, float, float, float] | ndarray = (
         -1.1,
         -0.25,
@@ -76,9 +84,14 @@ def do_call(
         even in male samples.
         Default: None
     filters : list of str, optional
-        Segment filters to apply. Options include 'ci' (confidence interval),
-        'sem' (standard error), 'ampdel' (amplification/deletion), etc.
-        See segfilters module for full list.
+        Segment filters to apply. Options: 'ci' (confidence interval),
+        'sem' (standard error), 'cn' (merge copy-neutral segments),
+        'ampdel' (keep only amplifications/deletions).
+        Default: None
+    merges : list of str, optional
+        Merge strategies for over-segmented segments. Options:
+        'bic' (Bayesian Information Criterion, pre-CN),
+        'cn' (merge adjacent same-CN segments, post-CN).
         Default: None
     thresholds : tuple of 4 floats or ndarray, optional
         Log2 ratio thresholds for calling copy numbers when method='threshold'.
@@ -122,12 +135,18 @@ def do_call(
 
     outarr = cnarr.copy()
     if filters:
-        # Apply any filters that use segmetrics but not cn fields
-        for filt in ("ci", "sem", "bic"):
+        # Apply pre-CN filters that use segmetrics but not cn fields
+        for filt in PRE_CN_FILTERS:
             if filt in filters:
                 logging.info("Applying filter '%s'", filt)
                 outarr = getattr(segfilters, filt)(outarr)
-                filters.remove(filt)
+
+    if merges:
+        # Apply pre-CN merges (operate on log2 values, no CN needed)
+        for merge in PRE_CN_MERGES:
+            if merge in merges:
+                logging.info("Applying merge '%s'", merge)
+                outarr = getattr(segfilters, merge)(outarr)
 
     if variants:
         outarr["baf"] = variants.baf_by_ranges(outarr)
@@ -176,13 +195,34 @@ def do_call(
             outarr[is_null, "cn2"] = np.nan
 
     if filters:
-        # Apply the remaining cn-based filters
-        for filt in filters:
+        # Apply post-CN filters
+        for filt in POST_CN_FILTERS:
+            if filt not in filters:
+                continue
             if not outarr.data.index.is_unique:
-                logging.warning("Resetting index")  # DBG
+                logging.warning("Resetting index")
                 outarr.data = outarr.data.reset_index(drop=True)
-            logging.warning("Applying filter '%s'", filt)
-            outarr = getattr(segfilters, filt)(outarr)
+            if filt == "cn":
+                # Merge only adjacent copy-neutral segments
+                logging.info("Applying filter 'cn' (neutral only)")
+                expected_cn = absolute_expect(
+                    outarr, ploidy, diploid_parx_genome, is_sample_female
+                )
+                outarr = segfilters.cn_neutral(outarr, expected_cn)
+            else:
+                logging.warning("Applying filter '%s'", filt)
+                outarr = getattr(segfilters, filt)(outarr)
+
+    if merges:
+        # Apply post-CN merges
+        for merge in POST_CN_MERGES:
+            if merge not in merges:
+                continue
+            if not outarr.data.index.is_unique:
+                logging.warning("Resetting index")
+                outarr.data = outarr.data.reset_index(drop=True)
+            logging.info("Applying merge '%s' (all same-CN)", merge)
+            outarr = segfilters.cn(outarr)
 
     outarr.sort_columns()
     return outarr

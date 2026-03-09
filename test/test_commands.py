@@ -630,20 +630,22 @@ class CallTests(unittest.TestCase):
     def test_call_filter(self):
         segments = cnvlib.read("formats/tr95t.segmetrics.cns")
         variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
-        # Each filter individually, then all filters together
-        for filters in (
-            ["ampdel"],
-            ["cn"],
-            ["ci"],
-            ["sem"],
-            ["bic"],
-            ["sem", "cn", "ampdel"],
-            ["ci", "cn"],
-            ["ci", "sem"],
-            ["cn", "ci", "sem"],
-            ["bic", "cn"],
+        # Each filter individually, then filter combos (with merges where needed)
+        for filters, merges in (
+            (["ampdel"], []),
+            (["cn"], []),
+            (["ci"], []),
+            (["sem"], []),
+            ([], ["bic"]),
+            (["sem", "cn", "ampdel"], []),
+            (["ci", "cn"], []),
+            (["ci", "sem"], []),
+            (["cn", "ci", "sem"], []),
+            ([], ["bic", "cn"]),
+            (["ci"], ["bic"]),
+            (["ci", "cn"], ["bic"]),
         ):
-            with self.subTest(filters=filters):
+            with self.subTest(filters=filters, merges=merges):
                 result = commands.do_call(
                     segments,
                     variants,
@@ -651,7 +653,8 @@ class CallTests(unittest.TestCase):
                     purity=0.9,
                     is_haploid_x_reference=True,
                     is_sample_female=True,
-                    filters=filters,
+                    filters=filters or None,
+                    merges=merges or None,
                 )
                 self.assertLessEqual(len(result), len(segments))
                 if "ampdel" not in filters:
@@ -664,7 +667,7 @@ class CallTests(unittest.TestCase):
                     self.assertIn(
                         colname,
                         result,
-                        f"{colname!r} dropped after filters={filters}",
+                        f"{colname!r} dropped after filters={filters} merges={merges}",
                     )
 
     def test_call_filter_ci_preserves_different_magnitudes(self):
@@ -817,8 +820,8 @@ class CallTests(unittest.TestCase):
         self.assertEqual(result["probes"].iat[0], 60)
         self.assertEqual(result["probes"].iat[1], 20)
 
-    def test_call_filter_bic_via_do_call(self):
-        """BIC filter works through the do_call pipeline."""
+    def test_call_merge_bic_via_do_call(self):
+        """BIC merge works through the do_call pipeline."""
         segments = cnvlib.read("formats/tr95t.segmetrics.cns")
         result = commands.do_call(
             segments,
@@ -827,10 +830,45 @@ class CallTests(unittest.TestCase):
             purity=0.9,
             is_haploid_x_reference=True,
             is_sample_female=True,
-            filters=["bic"],
+            merges=["bic"],
         )
         self.assertGreater(len(result), 0)
         self.assertLessEqual(len(result), len(segments))
+
+    def test_call_filter_cn_vs_merge_cn(self):
+        """--filter cn merges only neutral segments; --merge cn merges all same-CN."""
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 4,
+                    "start": [0, 1000, 2000, 3000],
+                    "end": [1000, 2000, 3000, 4000],
+                    "gene": ["A", "B", "C", "D"],
+                    "log2": [-0.5, -0.6, 0.0, 0.01],
+                    "weight": [1.0, 1.0, 1.0, 1.0],
+                    "probes": [10, 10, 10, 10],
+                }
+            )
+        )
+        # --filter cn: only merges adjacent neutral (cn==2) segments
+        result_filter = commands.do_call(
+            segarr,
+            method="threshold",
+            filters=["cn"],
+        )
+        # Segments A,B are cn=1 (losses) — NOT merged by --filter cn
+        # Segments C,D are cn=2 (neutral) — merged by --filter cn
+        self.assertEqual(len(result_filter), 3)
+
+        # --merge cn: merges any adjacent same-CN segments
+        result_merge = commands.do_call(
+            segarr,
+            method="threshold",
+            merges=["cn"],
+        )
+        # Segments A,B are cn=1 — merged by --merge cn
+        # Segments C,D are cn=2 — merged by --merge cn
+        self.assertEqual(len(result_merge), 2)
 
     def test_call_log2_ratios(self):
         cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
