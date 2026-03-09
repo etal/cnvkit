@@ -48,6 +48,8 @@ Pre-built Docker images are available for portable execution. See `DOCKER.md` fo
 
 ### Testing
 
+Use test-driven development.
+
 **For local development iteration:**
 Run tests directly with pytest (not tox):
 ```bash
