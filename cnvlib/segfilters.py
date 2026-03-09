@@ -333,6 +333,30 @@ def cn(segarr: CopyNumArray) -> CopyNumArray:
     return squash_by_groups(segarr, segarr["cn"])
 
 
+def cn_neutral(segarr: CopyNumArray, expected_cn: Series) -> CopyNumArray:
+    """Merge adjacent segments where both have the expected (neutral) copy number.
+
+    Unlike ``cn()`` which merges any adjacent segments with the same integer CN,
+    this only merges segments whose CN equals the expected ploidy for that
+    chromosome (e.g. 2 for autosomes, 1 for chrX in males).  Non-neutral
+    segments are each preserved individually, even if adjacent segments share
+    the same CN.
+    """
+    if "cn" not in segarr:
+        raise ValueError("'cn_neutral' filter requires column 'cn'")
+    is_neutral = segarr["cn"].to_numpy() == expected_cn.to_numpy()
+    # Neutral segments get level 0; each non-neutral segment gets a unique level
+    levels = pd.Series(np.zeros(len(segarr)), index=segarr.data.index)
+    nonneutral_mask = ~is_neutral
+    if nonneutral_mask.any():
+        levels[nonneutral_mask] = np.arange(1, nonneutral_mask.sum() + 1)
+    result = squash_by_groups(segarr, levels)
+    logging.info(
+        "Filtered by 'cn_neutral' from %d to %d rows", len(segarr), len(result)
+    )
+    return result
+
+
 @require_column("sem")
 def sem(segarr: CopyNumArray, zscore: float = 1.96) -> CopyNumArray:
     """Merge segments by Standard Error of the Mean (SEM).

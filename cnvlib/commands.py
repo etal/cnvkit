@@ -1274,6 +1274,7 @@ def _cmd_call(args: argparse.Namespace) -> None:
         is_sample_female,  # type: ignore[arg-type]
         args.diploid_parx_genome,
         args.filters,
+        args.merges,
         args.thresholds,
     )
     tabio.write(cnarr, args.output or cnarr.sample_id + ".call.cns")
@@ -1325,10 +1326,25 @@ P_call.add_argument(
         "cn",
         "ci",
         "sem",
-        "bic",
     ),
-    help="""Merge segments flagged by the specified filter(s) with the adjacent
-            segment(s).""",
+    help="""Neutralize uncertain segments and merge them with adjacent segments.
+            'ci' and 'sem' set segments whose confidence interval overlaps zero
+            to neutral, then merge adjacent neutrals. 'cn' merges adjacent
+            segments with copy-neutral CN (expected ploidy). 'ampdel' drops
+            segments that are not amplifications or deletions.""",
+)
+P_call.add_argument(
+    "--merge",
+    action="append",
+    default=[],
+    dest="merges",
+    choices=(
+        "bic",
+        "cn",
+    ),
+    help="""Merge over-segmented adjacent segments. 'bic' uses the Bayesian
+            Information Criterion on log2 values (pre-CN). 'cn' merges any
+            adjacent segments with the same integer copy number (post-CN).""",
 )
 P_call.add_argument(
     "-m",
