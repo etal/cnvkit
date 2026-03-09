@@ -870,6 +870,45 @@ class CallTests(unittest.TestCase):
         # Segments C,D are cn=2 — merged by --merge cn
         self.assertEqual(len(result_merge), 2)
 
+    def test_call_filter_cn_neutral_sex_chrom(self):
+        """--filter cn respects expected CN on sex chromosomes (male sample)."""
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1", "chr1", "chrX", "chrX"],
+                    "start": [0, 1000, 0, 1000],
+                    "end": [1000, 2000, 1000, 2000],
+                    "gene": ["A", "B", "C", "D"],
+                    "log2": [0.0, 0.01, 0.0, 0.05],
+                    "weight": [1.0, 1.0, 1.0, 1.0],
+                    "probes": [10, 10, 10, 10],
+                }
+            )
+        )
+        # Male sample: expected CN=2 on autosomes, CN=1 on chrX
+        result = commands.do_call(
+            segarr,
+            method="threshold",
+            is_haploid_x_reference=True,
+            is_sample_female=False,
+            filters=["cn"],
+        )
+        # chr1 A,B are cn=2 (neutral for autosome) — merged
+        # chrX C,D are cn=1 (neutral for male X) — merged
+        self.assertEqual(len(result), 2)
+
+        # Female sample: expected CN=2 on chrX too
+        result_f = commands.do_call(
+            segarr,
+            method="threshold",
+            is_haploid_x_reference=True,
+            is_sample_female=True,
+            filters=["cn"],
+        )
+        # chr1 A,B are cn=2 (neutral) — merged
+        # chrX C,D are cn=1 (NOT neutral for female, expected 2) — kept separate
+        self.assertEqual(len(result_f), 3)
+
     def test_call_log2_ratios(self):
         cnarr = cnvlib.read("formats/par-reference.grch38.cnn")
         ploidy = 2

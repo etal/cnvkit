@@ -346,11 +346,11 @@ def cn_neutral(segarr: CopyNumArray, expected_cn: Series) -> CopyNumArray:
         raise ValueError("'cn_neutral' filter requires column 'cn'")
     is_neutral = segarr["cn"].to_numpy() == expected_cn.to_numpy()
     # Neutral segments get level 0; each non-neutral segment gets a unique level
-    levels = np.zeros(len(segarr))
+    levels = pd.Series(np.zeros(len(segarr)), index=segarr.data.index)
     nonneutral_mask = ~is_neutral
     if nonneutral_mask.any():
         levels[nonneutral_mask] = np.arange(1, nonneutral_mask.sum() + 1)
-    result = squash_by_groups(segarr, pd.Series(levels))
+    result = squash_by_groups(segarr, levels)
     logging.info(
         "Filtered by 'cn_neutral' from %d to %d rows", len(segarr), len(result)
     )

@@ -133,6 +133,18 @@ def do_call(
     if method not in ("threshold", "clonal", "none"):
         raise ValueError("Argument `method` must be one of: clonal, threshold")
 
+    if method == "none":
+        post_cn_requested: list[str] = []
+        if filters:
+            post_cn_requested.extend(f for f in filters if f in POST_CN_FILTERS)
+        if merges:
+            post_cn_requested.extend(m for m in merges if m in POST_CN_MERGES)
+        if post_cn_requested:
+            raise ValueError(
+                f"Post-CN operations {post_cn_requested} require copy number "
+                "calling; cannot be used with method='none'"
+            )
+
     outarr = cnarr.copy()
     if filters:
         # Apply pre-CN filters that use segmetrics but not cn fields
@@ -210,7 +222,7 @@ def do_call(
                 )
                 outarr = segfilters.cn_neutral(outarr, expected_cn)
             else:
-                logging.warning("Applying filter '%s'", filt)
+                logging.info("Applying filter '%s'", filt)
                 outarr = getattr(segfilters, filt)(outarr)
 
     if merges:
