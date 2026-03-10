@@ -444,9 +444,7 @@ def group_by_genes(
             outrow["weight"] = wt.sum()
             if "depth" in rows:
                 valid = ~np.isnan(wt)
-                if valid.all():
-                    outrow["depth"] = np.average(rows["depth"], weights=wt)
-                elif valid.any():
+                if valid.any():
                     outrow["depth"] = np.average(
                         rows["depth"][valid], weights=wt[valid]
                     )

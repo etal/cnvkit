@@ -166,9 +166,7 @@ def calc_intervals(
             vals = ser.to_numpy()
             # Drop bins with NaN weights to avoid poisoning np.average
             valid = ~np.isnan(wt)
-            if valid.all():
-                out_vals_lo[i], out_vals_hi[i] = func(vals, wt)
-            elif valid.any():
+            if valid.any():
                 out_vals_lo[i], out_vals_hi[i] = func(vals[valid], wt[valid])
     return out_vals_lo, out_vals_hi
 
