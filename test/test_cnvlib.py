@@ -9,10 +9,11 @@ import pytest
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import numpy as np
+import pandas as pd
 from skgenome import GenomicArray, tabio
 
 import cnvlib
-from cnvlib import cnary, fix, params
+from cnvlib import cnary, fix, params, segmetrics
 from conftest import linecount
 
 
@@ -273,9 +274,9 @@ class CNATests(unittest.TestCase):
             "formats/p2-20_2.cnr",
         ]:
             cnarr = cnvlib.read(fname)
-            orig_vals = cnarr.log2.values.copy()
+            orig_vals = cnarr.log2.to_numpy().copy()
             signal = cnarr.smooth_log2()
-            self.assertTrue((orig_vals == cnarr.log2.values).all())
+            self.assertTrue((orig_vals == cnarr.log2.to_numpy()).all())
             self.assertGreaterEqual(signal.min(), cnarr.log2.min())
             self.assertLessEqual(signal.max(), cnarr.log2.max())
 
@@ -309,6 +310,55 @@ class OtherTests(unittest.TestCase):
 
     # call
     # Test: convert_clonal(x, 1, 2) == convert_diploid(x)
+
+    def test_segment_mean_nan_weights(self):
+        """segment_mean handles NaN weights without crashing."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        # Baseline: normal weights
+        mean_ok = segmetrics.segment_mean(cnarr)
+        self.assertFalse(np.isnan(mean_ok))
+
+        # Set some weights to NaN -- should still produce a valid mean
+        cnarr_nan = cnarr.copy()
+        wt = cnarr_nan["weight"].to_numpy().copy()
+        wt[:3] = np.nan
+        cnarr_nan["weight"] = wt
+        mean_partial = segmetrics.segment_mean(cnarr_nan)
+        self.assertFalse(np.isnan(mean_partial))
+
+        # All NaN weights -- should fall through to unweighted mean
+        cnarr_allnan = cnarr.copy()
+        cnarr_allnan["weight"] = np.nan
+        mean_allnan = segmetrics.segment_mean(cnarr_allnan)
+        self.assertFalse(np.isnan(mean_allnan))
+
+    def test_apply_weights_no_nan(self):
+        """apply_weights never produces NaN weight values."""
+        n = 20
+        data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * n,
+                "start": np.arange(0, n * 1000, 1000),
+                "end": np.arange(1000, n * 1000 + 1000, 1000),
+                "gene": ["GeneA"] * n,
+                "log2": np.random.default_rng(42).normal(0, 0.3, n),
+                "depth": np.random.default_rng(42).uniform(50, 200, n),
+            }
+        )
+        cnarr = cnary.CopyNumArray(data)
+        ref_data = data.copy()
+        ref_data["spread"] = 0.3
+        ref_matched = cnary.CopyNumArray(ref_data)
+
+        # Normal case — weights should all be valid
+        result = fix.apply_weights(cnarr, ref_matched, "log2", "spread")
+        self.assertFalse(np.isnan(result["weight"]).any())
+
+        # NaN spread — should produce valid weights, not NaN
+        ref_nan = ref_matched.copy()
+        ref_nan["spread"] = np.nan
+        result = fix.apply_weights(cnarr, ref_nan, "log2", "spread")
+        self.assertFalse(np.isnan(result["weight"]).any())
 
 
 class VATests(unittest.TestCase):

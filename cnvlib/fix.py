@@ -550,4 +550,10 @@ def apply_weights(
         # Flat reference, only 1 weight estimate
         weights = simple_wt
 
+    # NaN can arise from degenerate coverage (e.g. all-zero bin sizes or
+    # NaN spread values).  np.clip does not clamp NaN, so replace first.
+    nan_count = np.isnan(weights).sum()
+    if nan_count > 0:
+        logging.info("Replaced %d NaN weights with epsilon=%g", nan_count, epsilon)
+        weights = np.where(np.isnan(weights), epsilon, weights)
     return cnarr.add_columns(weight=weights.clip(epsilon, 1.0))
