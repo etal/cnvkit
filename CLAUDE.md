@@ -48,7 +48,7 @@ Pre-built Docker images are available for portable execution. See `DOCKER.md` fo
 
 ### Testing
 
-Use test-driven development.
+Use test-driven development. Enumerate and test edge cases before declaring a task done.
 
 **For local development iteration:**
 Run tests directly with pytest (not tox):
