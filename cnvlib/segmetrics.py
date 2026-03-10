@@ -162,9 +162,14 @@ def calc_intervals(
     out_vals_hi = np.repeat(np.nan, len(bins_log2s))
     for i, ser in enumerate(bins_log2s):
         if len(ser):
-            wt = weights[ser.index]
-            assert (wt.index == ser.index).all()
-            out_vals_lo[i], out_vals_hi[i] = func(ser.values, wt.values)
+            wt = weights[ser.index].to_numpy()
+            vals = ser.to_numpy()
+            # Drop bins with NaN weights to avoid poisoning np.average
+            valid = ~np.isnan(wt)
+            if valid.all():
+                out_vals_lo[i], out_vals_hi[i] = func(vals, wt)
+            elif valid.any():
+                out_vals_lo[i], out_vals_hi[i] = func(vals[valid], wt[valid])
     return out_vals_lo, out_vals_hi
 
 
@@ -354,5 +359,10 @@ def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> float64 | float
     if len(cnarr) == 0:
         return np.nan
     if "weight" in cnarr and cnarr["weight"].any():
-        return np.average(cnarr["log2"], weights=cnarr["weight"])  # type: ignore[no-any-return]
+        # Drop bins with NaN weights to avoid poisoning np.average
+        weights = cnarr["weight"].to_numpy()
+        log2s = cnarr["log2"].to_numpy()
+        valid = ~np.isnan(weights)
+        if valid.any():
+            return np.average(log2s[valid], weights=weights[valid])  # type: ignore[no-any-return]
     return cnarr["log2"].mean()  # type: ignore[no-any-return]

@@ -440,9 +440,16 @@ def group_by_genes(
         outrow["log2"] = segmean
         outrow["probes"] = len(rows)
         if "weight" in rows:
-            outrow["weight"] = rows["weight"].sum()
+            wt = rows["weight"]
+            outrow["weight"] = wt.sum()
             if "depth" in rows:
-                outrow["depth"] = np.average(rows["depth"], weights=rows["weight"])
+                valid = ~np.isnan(wt)
+                if valid.all():
+                    outrow["depth"] = np.average(rows["depth"], weights=wt)
+                elif valid.any():
+                    outrow["depth"] = np.average(
+                        rows["depth"][valid], weights=wt[valid]
+                    )
         elif "depth" in rows:
             outrow["depth"] = rows["depth"].mean()
 
