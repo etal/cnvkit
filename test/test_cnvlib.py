@@ -9,6 +9,7 @@ import pytest
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import numpy as np
+import pandas as pd
 from skgenome import GenomicArray, tabio
 
 import cnvlib
@@ -273,9 +274,9 @@ class CNATests(unittest.TestCase):
             "formats/p2-20_2.cnr",
         ]:
             cnarr = cnvlib.read(fname)
-            orig_vals = cnarr.log2.values.copy()
+            orig_vals = cnarr.log2.to_numpy().copy()
             signal = cnarr.smooth_log2()
-            self.assertTrue((orig_vals == cnarr.log2.values).all())
+            self.assertTrue((orig_vals == cnarr.log2.to_numpy()).all())
             self.assertGreaterEqual(signal.min(), cnarr.log2.min())
             self.assertLessEqual(signal.max(), cnarr.log2.max())
 
@@ -333,8 +334,6 @@ class OtherTests(unittest.TestCase):
 
     def test_apply_weights_no_nan(self):
         """apply_weights never produces NaN weight values."""
-        import pandas as pd
-
         n = 20
         data = pd.DataFrame(
             {
