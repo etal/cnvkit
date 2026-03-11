@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from skgenome import tabio
+from skgenome.combiners import join_strings
 from skgenome.intersect import iter_slices
 
 from .. import core, parallel, params, smoothing
@@ -410,12 +411,7 @@ def transfer_fields(
             bin_count = len(cdata.iloc[bin_idx])
             seg_wt = float(bin_count)
             seg_dp = bin_depths[bin_idx].mean()
-        subgenes = [
-            g
-            for g in pd.unique(bin_genes[bin_idx])
-            if isinstance(g, str) and g not in ignore
-        ]
-        seg_gn = ",".join(subgenes) if subgenes else "-"
+        seg_gn = join_strings(bin_genes[bin_idx], ignore=ignore)
         seg_genes[i] = seg_gn
         seg_weights[i] = seg_wt
         seg_depths[i] = seg_dp
