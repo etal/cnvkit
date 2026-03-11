@@ -57,9 +57,9 @@ max_of = max
 
 
 def join_strings(elems: Iterable, sep: str = ",") -> str:
-    """Join a Series of strings by commas."""
-    # ENH if elements are also comma-separated, split+uniq those too
-    return sep.join(pd.unique(elems))
+    """Join a Series of unique strings by commas, skipping NaN values."""
+    unique_strs = dict.fromkeys(e for e in elems if isinstance(e, str))
+    return sep.join(unique_strs) or "-"
 
 
 def merge_strands(elems: Sequence) -> str:

@@ -413,7 +413,14 @@ class OtherTests(unittest.TestCase):
         result = segfilters.squash_region(df)
         gene_val = result["gene"].iat[0]
         self.assertIsInstance(gene_val, str)
+        self.assertNotIn("nan", gene_val.lower())
         self.assertEqual(gene_val, "GeneA")
+
+        # All-NaN genes should produce the placeholder "-"
+        df_allnan = df.copy()
+        df_allnan["gene"] = [float("nan"), float("nan")]
+        result2 = segfilters.squash_region(df_allnan)
+        self.assertEqual(result2["gene"].iat[0], "-")
 
 
 class VATests(unittest.TestCase):

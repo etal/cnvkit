@@ -7,6 +7,7 @@ import logging
 import numpy as np
 import pandas as pd
 
+from skgenome.combiners import join_strings
 from .descriptives import weighted_median
 from typing import TYPE_CHECKING
 
@@ -121,7 +122,7 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
         "end": cnarr["end"].iat[-1],
     }
     out["log2"] = _wavg("log2")
-    out["gene"] = ",".join(cnarr["gene"].dropna().drop_duplicates())
+    out["gene"] = join_strings(cnarr["gene"])
     out["probes"] = cnarr["probes"].sum() if "probes" in cnarr else len(cnarr)
     out["weight"] = region_weight
     if "depth" in cnarr:
