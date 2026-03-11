@@ -15,6 +15,7 @@
 coverage.xml
 htmlcov/
 .pytest_cache/
+.hypothesis/
 *.bai
 
 # Backup files from some Unix editors
