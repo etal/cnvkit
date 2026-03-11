@@ -65,12 +65,15 @@ optional-dependencies = {test = {file = "requirements/tests.txt"}}
 testpaths = ["test"]
 markers = [
     "slow: tests that take >5 seconds (skip with -m 'not slow')",
+    "hypothesis: property-based tests using Hypothesis (skip with -m 'not hypothesis')",
 ]
 filterwarnings = [
     "error",
     # bioframe <=0.8.0 uses df.groupby(['col']).groups with a single-element
     # list, which pandas 3.0 deprecates via Pandas4Warning.
     "ignore:In a future version, the keys of:Warning",
+    # Hypothesis internal warnings that would otherwise be promoted to errors
+    "ignore::hypothesis.errors.NonInteractiveExampleWarning",
 ]
 
 [tool.coverage.run]

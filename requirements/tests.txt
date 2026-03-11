@@ -2,6 +2,7 @@ pytest
 pytest-cov
 pytest-xdist
 coverage[all]
+hypothesis[numpy]
 mypy
 ruff
 safety

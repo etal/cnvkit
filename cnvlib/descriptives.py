@@ -156,11 +156,11 @@ def weighted_median(a: ndarray, weights: ndarray) -> float64:
     cumulative_weight = weights.cumsum()
     midpoint_idx = cumulative_weight.searchsorted(midpoint)
     if (
-        midpoint_idx > 0
-        and cumulative_weight[midpoint_idx - 1] - midpoint < sys.float_info.epsilon
+        midpoint_idx < len(a) - 1
+        and abs(cumulative_weight[midpoint_idx] - midpoint) < sys.float_info.epsilon
     ):
-        # Midpoint of 2 array values
-        return a[midpoint_idx - 1 : midpoint_idx + 1].mean()  # type: ignore[no-any-return]
+        # Cumulative weight exactly at midpoint: average two adjacent values
+        return a[midpoint_idx : midpoint_idx + 2].mean()  # type: ignore[no-any-return]
     return a[midpoint_idx]  # type: ignore[no-any-return]
 
 
