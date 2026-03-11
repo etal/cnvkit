@@ -285,7 +285,7 @@ def gene_coords_by_name(probes, names):
         chrom = core.check_unique(gene_probes["chromosome"], name)
         # Deduce the unique set of gene names for this region
         uniq_names = set()
-        for oname in set(gene_probes["gene"]):
+        for oname in gene_probes["gene"].dropna().unique():
             uniq_names.update(oname.split(","))
         all_coords[chrom][start, end].update(uniq_names)
     # Consolidate each region's gene names into a string
@@ -310,7 +310,9 @@ def gene_coords_by_range(probes, chrom, start, end, ignore=params.IGNORE_GENE_NA
     # Tabulate the genes in the selected region
     genes: dict = collections.OrderedDict()
     for row in probes.in_range(chrom, start, end):
-        name = str(row.gene)
+        if not isinstance(row.gene, str):
+            continue
+        name = row.gene
         if name in genes:
             genes[name][1] = row.end
         elif name not in ignore:

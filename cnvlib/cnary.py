@@ -292,7 +292,7 @@ class CopyNumArray(GenomicArray):
         self,
         summary_func: Callable = descriptives.biweight_location,
         squash_antitarget: bool = False,
-        ignore: tuple[str, str, str] = params.IGNORE_GENE_NAMES,
+        ignore: tuple[str, ...] = params.IGNORE_GENE_NAMES,
     ) -> CopyNumArray:
         """Combine consecutive bins with the same targeted gene name.
 

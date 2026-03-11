@@ -56,10 +56,31 @@ def last_of(elems: Sequence) -> Any:
 max_of = max
 
 
-def join_strings(elems: Iterable, sep: str = ",") -> str:
-    """Join a Series of strings by commas."""
-    # ENH if elements are also comma-separated, split+uniq those too
-    return sep.join(pd.unique(elems))
+def join_strings(
+    elems: Iterable,
+    sep: str = ",",
+    ignore: tuple[str, ...] = (),
+) -> str:
+    """Join a Series of unique strings, skipping NaN values and ignored names.
+
+    Parameters
+    ----------
+    elems : iterable
+        Values to join. Non-string elements (e.g. NaN) are silently skipped.
+    sep : str
+        Separator between joined names.
+    ignore : tuple of str
+        String values to exclude from the result (e.g. placeholder gene names).
+
+    Returns
+    -------
+    str
+        The joined string, or ``"-"`` if no valid strings remain.
+    """
+    unique_strs = dict.fromkeys(
+        e for e in elems if isinstance(e, str) and e not in ignore
+    )
+    return sep.join(unique_strs) or "-"
 
 
 def merge_strands(elems: Sequence) -> str:

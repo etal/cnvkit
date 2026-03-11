@@ -491,7 +491,8 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len
     Split out samples to individual .cnr files, keeping (most) gene info.
     """
     gi_cols = ["chromosome", "start", "end", "gene", "gc", "tx_length", "weight"]
-    cnr_info = gene_info.loc[:, gi_cols]
+    cnr_info = gene_info.loc[:, gi_cols].copy()
+    cnr_info["gene"] = cnr_info["gene"].fillna("-")
     # Fill NA fields with the lowest finite value in the same row.
     # Only use NULL_LOG2_COVERAGE if all samples are NA / zero-depth.
     gene_minima = sample_data_log2.min(axis=1, skipna=True)
