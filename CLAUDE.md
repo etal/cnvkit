@@ -14,6 +14,7 @@ CNVkit is a command-line toolkit and Python library for detecting copy number va
 - **Bug fixes and new features**: Write a failing test first, then implement.
 - **Edge cases**: Before finishing, verify behavior for empty inputs, NaN/missing values, and single-element arrays.
 - **User-facing changes**: Update the relevant docs in `doc/*.rst`.
+- **Clinical impact**: When reviewing changes, consider whether the changeset alters numerical output or output file formats (`.cnr`, `.cns`, `.cnn`, SEG, VCF). Flag any such changes explicitly, as downstream clinical pipelines may depend on exact output stability.
 
 ## Development Commands
 
