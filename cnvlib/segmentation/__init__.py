@@ -337,7 +337,7 @@ def drop_outliers(cnarr: CNA, width: int, factor: int) -> CNA:
 
 
 def transfer_fields(
-    segments: CNA, cnarr: CNA, ignore: tuple[str, str, str] = params.IGNORE_GENE_NAMES
+    segments: CNA, cnarr: CNA, ignore: tuple[str, ...] = params.IGNORE_GENE_NAMES
 ) -> CNA:
     """Map gene names, weights, depths from `cnarr` bins to `segarr` segments.
 
@@ -388,7 +388,7 @@ def transfer_fields(
 
     # Aggregate segment depths, weights, gene names
     # ENH refactor so that np/CNA.data access is encapsulated in skgenome
-    ignore += params.ANTITARGET_ALIASES  # type: ignore[assignment]
+    ignore += params.ANTITARGET_ALIASES
     assert bins_chrom == segments.chromosome.iat[0]
     cdata = cnarr.data.reset_index()
     if "depth" not in cdata.columns:

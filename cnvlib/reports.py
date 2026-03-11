@@ -62,7 +62,7 @@ def do_breaks(
 
 
 def get_gene_intervals(
-    all_probes: CopyNumArray, ignore: tuple[str, str, str] = params.IGNORE_GENE_NAMES
+    all_probes: CopyNumArray, ignore: tuple[str, ...] = params.IGNORE_GENE_NAMES
 ) -> collections.defaultdict[str, list[tuple[str, list[int], int]]]:
     """Tally genomic locations of each targeted gene.
 
@@ -71,11 +71,13 @@ def get_gene_intervals(
     positions, and end is the last probe's end position as an integer. (The
     endpoints are redundant since probes are adjacent.)
     """
-    ignore += params.ANTITARGET_ALIASES  # type: ignore[assignment]
+    ignore += params.ANTITARGET_ALIASES
     # Tally the start & end points for each targeted gene; group by chromosome
     gene_probes: dict = collections.defaultdict(lambda: collections.defaultdict(list))
     for row in all_probes:
-        gname = str(row.gene)
+        if not isinstance(row.gene, str):
+            continue
+        gname = row.gene
         if gname not in ignore:
             gene_probes[row.chromosome][gname].append(row)
     # Condense into a single interval for each gene
@@ -427,7 +429,7 @@ def group_by_genes(
 
         [(gene, chrom, start, end, [coverages]), ...]
     """
-    ignore = ("", np.nan, *params.ANTITARGET_ALIASES)
+    ignore = ("", *params.ANTITARGET_ALIASES)
     for gene, rows in cnarr.by_gene():
         if not rows or gene in ignore:
             continue
