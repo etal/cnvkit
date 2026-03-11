@@ -13,7 +13,7 @@ import pandas as pd
 from skgenome import GenomicArray, tabio
 
 import cnvlib
-from cnvlib import cnary, fix, params, segmetrics
+from cnvlib import cnary, fix, params, segfilters, segmentation, segmetrics
 from conftest import linecount
 
 
@@ -359,6 +359,61 @@ class OtherTests(unittest.TestCase):
         ref_nan["spread"] = np.nan
         result = fix.apply_weights(cnarr, ref_nan, "log2", "spread")
         self.assertFalse(np.isnan(result["weight"]).any())
+
+    def test_transfer_fields_nan_gene(self):
+        """transfer_fields handles NaN gene names without crashing (issue #900)."""
+        n = 10
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["GeneA", float("nan"), "GeneB"] * 3 + [float("nan")],
+                    "log2": np.zeros(n),
+                    "depth": np.ones(n) * 100.0,
+                    "weight": np.ones(n),
+                }
+            )
+        )
+        # One segment covering all bins
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"],
+                    "start": [0],
+                    "end": [n * 1000],
+                    "gene": ["-"],
+                    "log2": [0.0],
+                    "probes": [n],
+                    "weight": [0.0],
+                }
+            )
+        )
+        result = segmentation.transfer_fields(segarr, cnarr)
+        gene_val = result["gene"].iat[0]
+        self.assertIsInstance(gene_val, str)
+        self.assertNotIn("nan", gene_val.lower())
+        self.assertIn("GeneA", gene_val)
+        self.assertIn("GeneB", gene_val)
+
+    def test_squash_region_nan_gene(self):
+        """squash_region handles NaN gene names without crashing (issue #900)."""
+        df = pd.DataFrame(
+            {
+                "chromosome": ["chr1", "chr1"],
+                "start": [0, 1000],
+                "end": [1000, 2000],
+                "gene": ["GeneA", float("nan")],
+                "log2": [0.1, 0.2],
+                "probes": [5, 5],
+                "weight": [1.0, 1.0],
+            }
+        )
+        result = segfilters.squash_region(df)
+        gene_val = result["gene"].iat[0]
+        self.assertIsInstance(gene_val, str)
+        self.assertEqual(gene_val, "GeneA")
 
 
 class VATests(unittest.TestCase):

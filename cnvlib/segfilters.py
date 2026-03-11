@@ -121,7 +121,7 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
         "end": cnarr["end"].iat[-1],
     }
     out["log2"] = _wavg("log2")
-    out["gene"] = ",".join(cnarr["gene"].drop_duplicates())
+    out["gene"] = ",".join(cnarr["gene"].dropna().drop_duplicates())
     out["probes"] = cnarr["probes"].sum() if "probes" in cnarr else len(cnarr)
     out["weight"] = region_weight
     if "depth" in cnarr:

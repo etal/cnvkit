@@ -410,7 +410,11 @@ def transfer_fields(
             bin_count = len(cdata.iloc[bin_idx])
             seg_wt = float(bin_count)
             seg_dp = bin_depths[bin_idx].mean()
-        subgenes = [g for g in pd.unique(bin_genes[bin_idx]) if g not in ignore]
+        subgenes = [
+            g
+            for g in pd.unique(bin_genes[bin_idx])
+            if isinstance(g, str) and g not in ignore
+        ]
         seg_gn = ",".join(subgenes) if subgenes else "-"
         seg_genes[i] = seg_gn
         seg_weights[i] = seg_wt
