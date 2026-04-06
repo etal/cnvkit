@@ -13,6 +13,7 @@ CNVkit is a command-line toolkit and Python library for detecting copy number va
 
 - **Bug fixes and new features**: Write a failing test first, then implement.
 - **Edge cases**: Before finishing, verify behavior for empty inputs, NaN/missing values, and single-element arrays.
+- **NaN weight safety**: `np.average(values, weights=w)` and `numpy.sum(w)` propagate NaN; use `np.nansum` for weight sums and filter `~np.isnan(wt)` before `np.average`. Note that `pandas.Series.sum()` skips NaN by default — prefer explicit `np.nansum` for clarity.
 - **User-facing changes**: Update the relevant docs in `doc/*.rst`.
 - **Clinical impact**: When reviewing changes, consider whether the changeset alters numerical output or output file formats (`.cnr`, `.cns`, `.cnn`, SEG, VCF). Flag any such changes explicitly, as downstream clinical pipelines may depend on exact output stability.
 
@@ -24,11 +25,11 @@ Use 'bd' for task tracking.
 
 **Conda (recommended):**
 ```bash
-conda env create -f environment-dev.yml   # Python 3.11, all deps, R, testing tools
+conda env create -f environment-dev.yml   # All deps, R, testing tools
 conda activate cnvkit
 ```
 
-**Note:** The conda env must be activated before running pytest, mypy, or other dev tools -- they are not installed globally. The conda env includes R with DNAcopy for segmentation.
+**Note:** The conda env must be activated before running pytest, mypy, or other dev tools -- they are not installed globally. The conda env includes R with DNAcopy for segmentation. Use `conda activate cnvkit && <command>` in scripts; `conda run` is unreliable here.
 
 ### Testing
 
@@ -63,6 +64,7 @@ mypy cnvlib/batch.py              # Check a single file
 - Generator functions must use `-> Generator[YieldType, SendType, ReturnType]`, not `-> Iterator` or `-> None`
 - When a variable changes type (e.g. `str` → `list[int]`), rename it to avoid shadowing (e.g. `copies` → `copy_strs`)
 - Use `assert x is not None` to narrow `Optional` types when control flow guarantees non-None
+- `numpy.bool_` is not assignable to `bool` in mypy -- use `# type: ignore[assignment]` or widen parameters to `bool | bool_ | None`
 
 ### Code Quality & Security
 
@@ -114,7 +116,7 @@ Core dependencies are declared in `requirements/core.txt`; `min.txt` pins exact 
 - All `zip()` calls use explicit `strict=True` or `strict=False` (PEP 618)
 
 ### Imports in Tests
-- `test/test_commands.py` has a top-level `from cnvlib import (...)` block that serves as both a smoke test and the shared import set. Add new `cnvlib` submodule imports there rather than as local imports inside individual test methods.
+- `test/test_commands.py` and `test/test_cnvlib.py` each have a top-level `from cnvlib import (...)` block that serves as both a smoke test and the shared import set. Add new `cnvlib` submodule imports there rather than as local imports inside individual test methods.
 
 ### Variable Naming
 - The codebase uses `bam_fname` or `sample_fname` for file paths that can be either BAM or bedGraph files
