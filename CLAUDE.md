@@ -18,6 +18,8 @@ CNVkit is a command-line toolkit and Python library for detecting copy number va
 
 ## Development Commands
 
+Use 'bd' for task tracking.
+
 ### Development Environment
 
 **Conda (recommended):**

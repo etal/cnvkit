@@ -1,5 +1,5 @@
 # Usage:
-#   conda env create -f conda-env.yaml
+#   conda env create -f conda-env.yml
 # or:
 #   conda env update -v -n [base] -f conda-env.yml [--prune]
 # This does not install CNVkit itself. Use pip to install either a stable release from
@@ -14,7 +14,9 @@ dependencies:
     - atlas # [not osx]
     - bioconductor-dnacopy
     - biopython >=1.85
+    - hypothesis
     - matplotlib >=3.9.0
+    - mypy
     - numpy >=2.2.3
     - pandas >=2.2.3
     - pyparsing >=3.1.2,<3.3.0
