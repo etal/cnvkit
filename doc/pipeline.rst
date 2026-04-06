@@ -247,22 +247,20 @@ passing the locations of the accessible sequence regions with the ``-g`` or
 ``--access`` option. CNVkit will then compute "antitarget" bins only within the
 accessible genomic regions specified in the "access" file.
 
-CNVkit uses a cautious default off-target bin size that, in our experience, will
-typically include more reads than the average on-target bin.  However, we
-encourage the user to examine the coverage statistics reported by CNVkit and
-specify a properly calculated off-target bin size for their samples in order to
-maximize copy number information.
+The :ref:`batch` command automatically runs :ref:`autobin` to estimate
+appropriate on- and off-target bin sizes from the normal sample BAM files.
+You can override the computed sizes with the ``--target-avg-size`` and
+``--antitarget-avg-size`` options if needed.
 
 
 Off-target bin size
 ```````````````````
 
-An appropriate off-target bin size can be computed as the product of the average
-target region size and the fold-enrichment of sequencing reads in targeted
-regions, such that roughly the same number of reads are mapped to on-- and
-off-target bins on average --- roughly proportional to the level of on-target
-enrichment. The :ref:`autobin` command (below) can quickly estimate these
-values, but you are free to specify your own.
+An appropriate off-target bin size is proportional to the level of on-target
+enrichment, such that roughly the same number of reads are mapped to on- and
+off-target bins on average. The :ref:`batch` command estimates these values
+automatically via :ref:`autobin`; you can also run ``autobin`` separately, or
+specify your own bin sizes with ``--antitarget-avg-size``.
 
 Average off-target coverage depths can also be obtained with the script
 CollectHsMetrics in the Picard suite (http://picard.sourceforge.net/), or from
