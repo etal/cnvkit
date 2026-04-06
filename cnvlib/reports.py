@@ -136,7 +136,7 @@ def do_genemetrics(
     min_probes: int = 3,
     skip_low: bool = False,
     is_haploid_x_reference: bool = False,
-    is_sample_female: None = None,
+    is_sample_female: bool | None = None,
     diploid_parx_genome: str | None = None,
     location_stats: tuple[()] | list[str] = (),
     spread_stats: tuple[()] | list[str] = (),
@@ -334,6 +334,7 @@ def compute_gene_stats(
     """Compute statistics for bins within a gene.
 
     Similar to segmetrics.do_segmetrics, but for gene-level bins.
+    Bins with NaN weights are excluded before computing interval statistics.
 
     Parameters
     ----------
@@ -398,8 +399,14 @@ def compute_gene_stats(
             func = stat_funcs[statname]
             stats_dict[statname] = func(deviations)
 
-    # Interval statistics
+    # Interval statistics -- filter NaN weights to avoid poisoning np.average
     weights = bins["weight"].to_numpy() if "weight" in bins else np.ones(len(bins_log2))
+    valid = ~np.isnan(weights)
+    if not valid.all():
+        bins_log2 = bins_log2[valid]
+        weights = weights[valid]
+    if len(bins_log2) == 0:
+        return stats_dict
     if "ci" in interval_stats:
         ci_lo, ci_hi = stat_funcs["ci"](bins_log2, weights)
         stats_dict["ci_lo"] = ci_lo
@@ -424,6 +431,8 @@ def group_by_genes(
 ) -> Iterator[pd.Series]:
     """Group probe and coverage data by gene.
 
+    Bins with NaN weights are excluded from weight sums and depth averages.
+
     Return an iterable of genes, in chromosomal order, associated with their
     location and coverages:
 
@@ -443,13 +452,15 @@ def group_by_genes(
         outrow["probes"] = len(rows)
         if "weight" in rows:
             wt = rows["weight"]
-            outrow["weight"] = wt.sum()
+            outrow["weight"] = float(np.nansum(wt.to_numpy()))
             if "depth" in rows:
                 valid = ~np.isnan(wt)
                 if valid.any():
                     outrow["depth"] = np.average(
                         rows["depth"][valid], weights=wt[valid]
                     )
+                else:
+                    outrow["depth"] = rows["depth"].mean()
         elif "depth" in rows:
             outrow["depth"] = rows["depth"].mean()
 

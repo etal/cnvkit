@@ -13,7 +13,7 @@ import pandas as pd
 from skgenome import GenomicArray, tabio
 
 import cnvlib
-from cnvlib import cnary, fix, params, segfilters, segmentation, segmetrics
+from cnvlib import cnary, fix, params, reports, segfilters, segmentation, segmetrics
 from conftest import linecount
 
 
@@ -312,25 +312,34 @@ class OtherTests(unittest.TestCase):
     # Test: convert_clonal(x, 1, 2) == convert_diploid(x)
 
     def test_segment_mean_nan_weights(self):
-        """segment_mean handles NaN weights without crashing."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        # Baseline: normal weights
-        mean_ok = segmetrics.segment_mean(cnarr)
-        self.assertFalse(np.isnan(mean_ok))
+        """segment_mean handles NaN weights correctly."""
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 4,
+                    "start": [0, 1000, 2000, 3000],
+                    "end": [1000, 2000, 3000, 4000],
+                    "gene": ["G"] * 4,
+                    "log2": [0.2, 0.4, 0.6, 0.8],
+                    "weight": [1.0, 2.0, 1.0, 2.0],
+                }
+            )
+        )
+        # Baseline: weighted average of all bins
+        expected_clean = np.average([0.2, 0.4, 0.6, 0.8], weights=[1, 2, 1, 2])
+        self.assertAlmostEqual(segmetrics.segment_mean(cnarr), expected_clean)
 
-        # Set some weights to NaN -- should still produce a valid mean
+        # Partial NaN: weighted average of valid-weight bins only
         cnarr_nan = cnarr.copy()
-        wt = cnarr_nan["weight"].to_numpy().copy()
-        wt[:3] = np.nan
-        cnarr_nan["weight"] = wt
-        mean_partial = segmetrics.segment_mean(cnarr_nan)
-        self.assertFalse(np.isnan(mean_partial))
+        cnarr_nan["weight"] = [np.nan, 2.0, np.nan, 2.0]
+        expected_partial = np.average([0.4, 0.8], weights=[2, 2])
+        self.assertAlmostEqual(segmetrics.segment_mean(cnarr_nan), expected_partial)
 
-        # All NaN weights -- should fall through to unweighted mean
+        # All NaN: falls through to unweighted mean
         cnarr_allnan = cnarr.copy()
         cnarr_allnan["weight"] = np.nan
-        mean_allnan = segmetrics.segment_mean(cnarr_allnan)
-        self.assertFalse(np.isnan(mean_allnan))
+        expected_allnan = np.mean([0.2, 0.4, 0.6, 0.8])
+        self.assertAlmostEqual(segmetrics.segment_mean(cnarr_allnan), expected_allnan)
 
     def test_apply_weights_no_nan(self):
         """apply_weights never produces NaN weight values."""
@@ -396,6 +405,124 @@ class OtherTests(unittest.TestCase):
         self.assertNotIn("nan", gene_val.lower())
         self.assertIn("GeneA", gene_val)
         self.assertIn("GeneB", gene_val)
+
+    def test_transfer_fields_nan_weights(self):
+        """transfer_fields handles NaN bin weights without NaN in .cns output."""
+        n = 10
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["GeneA"] * n,
+                    "log2": np.zeros(n),
+                    "depth": np.ones(n) * 100.0,
+                    "weight": [1.0, np.nan, 1.0, np.nan, 1.0,
+                               1.0, np.nan, 1.0, 1.0, 1.0],
+                }
+            )
+        )
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"],
+                    "start": [0],
+                    "end": [n * 1000],
+                    "gene": ["-"],
+                    "log2": [0.0],
+                    "probes": [n],
+                    "weight": [0.0],
+                }
+            )
+        )
+        result = segmentation.transfer_fields(segarr, cnarr)
+        # Segment weight must not be NaN
+        self.assertFalse(np.isnan(result["weight"].iat[0]))
+        # Should be the sum of non-NaN weights (7.0)
+        self.assertAlmostEqual(result["weight"].iat[0], 7.0)
+        # Depth should be valid (weighted mean of non-NaN bins)
+        self.assertFalse(np.isnan(result["depth"].iat[0]))
+
+        # All-NaN weights: segment weight should be 0, depth should be 0
+        cnarr_allnan = cnarr.copy()
+        cnarr_allnan["weight"] = np.nan
+        result2 = segmentation.transfer_fields(segarr.copy(), cnarr_allnan)
+        self.assertEqual(result2["weight"].iat[0], 0.0)
+        self.assertEqual(result2["depth"].iat[0], 0.0)
+
+    def test_squash_region_nan_weights(self):
+        """squash_region handles NaN weights without NaN in output."""
+        df = pd.DataFrame(
+            {
+                "chromosome": ["chr1", "chr1", "chr1"],
+                "start": [0, 1000, 2000],
+                "end": [1000, 2000, 3000],
+                "gene": ["G1", "G2", "G3"],
+                "log2": [0.1, 0.2, 0.3],
+                "probes": [5, 5, 5],
+                "weight": [1.0, np.nan, 1.0],
+            }
+        )
+        result = segfilters.squash_region(df)
+        self.assertFalse(np.isnan(result["weight"].iat[0]))
+        self.assertAlmostEqual(result["weight"].iat[0], 2.0)
+        # log2 should be weighted average of bins with valid weights
+        self.assertAlmostEqual(result["log2"].iat[0], np.average([0.1, 0.3], weights=[1.0, 1.0]))
+
+        # All-NaN weights: should fall through to unweighted mean
+        df_allnan = df.copy()
+        df_allnan["weight"] = np.nan
+        result2 = segfilters.squash_region(df_allnan)
+        self.assertAlmostEqual(result2["log2"].iat[0], np.mean([0.1, 0.2, 0.3]))
+
+    def test_bic_nan_weights(self):
+        """BIC filter handles NaN segment weights without NaN RSS."""
+        df = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 5,
+                "start": [0, 1000, 2000, 3000, 4000],
+                "end": [1000, 2000, 3000, 4000, 5000],
+                "gene": ["A", "B", "C", "D", "E"],
+                "log2": [0.0, 0.1, 0.0, -0.1, 0.0],
+                "probes": [10, 10, 10, 10, 10],
+                "weight": [1.0, np.nan, 2.0, np.nan, 1.0],
+            }
+        )
+        segarr = cnary.CopyNumArray(df)
+        # Should not crash; NaN-weight segments get fallback RSS
+        result = segfilters.bic(segarr)
+        self.assertGreater(len(result), 0)
+        self.assertFalse(np.isnan(result["weight"]).any())
+
+    def test_compute_gene_stats_nan_weights(self):
+        """compute_gene_stats handles NaN weights for CI/PI without crashing."""
+        bins = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 5,
+                    "start": np.arange(0, 5000, 1000),
+                    "end": np.arange(1000, 6000, 1000),
+                    "gene": ["G"] * 5,
+                    "log2": [0.1, 0.2, 0.1, 0.3, 0.2],
+                    "weight": [1.0, np.nan, 1.0, np.nan, 1.0],
+                }
+            )
+        )
+        # Partial NaN: should produce valid CI
+        stats = reports.compute_gene_stats(
+            bins, 0.15, interval_stats=["ci"]
+        )
+        self.assertIn("ci_lo", stats)
+        self.assertFalse(np.isnan(stats["ci_lo"]))
+
+        # All NaN: should return empty stats (no crash)
+        bins_allnan = bins.copy()
+        bins_allnan["weight"] = np.nan
+        stats2 = reports.compute_gene_stats(
+            bins_allnan, 0.15, interval_stats=["ci"]
+        )
+        self.assertNotIn("ci_lo", stats2)
 
     def test_squash_region_nan_gene(self):
         """squash_region handles NaN gene names without crashing (issue #900)."""
