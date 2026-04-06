@@ -1,4 +1,4 @@
-name: cnvkit-dev
+name: cnvkit
 channels:
   - conda-forge
   - bioconda

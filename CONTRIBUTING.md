@@ -29,7 +29,7 @@ Thank you for your interest in contributing to CNVkit! This document provides gu
    **Option A: Conda (recommended)**
    ```bash
    conda env create -f environment-dev.yml
-   conda activate cnvkit-dev
+   conda activate cnvkit
    pip install -e '.[test]'
    ```
 

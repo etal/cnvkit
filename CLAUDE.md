@@ -25,7 +25,7 @@ Use 'bd' for task tracking.
 **Conda (recommended):**
 ```bash
 conda env create -f environment-dev.yml   # Python 3.11, all deps, R, testing tools
-conda activate cnvkit-dev
+conda activate cnvkit
 ```
 
 **Note:** The conda env must be activated before running pytest, mypy, or other dev tools -- they are not installed globally. The conda env includes R with DNAcopy for segmentation.
