@@ -218,6 +218,7 @@ def batch_make_reference(
             )
 
     bait_arr = None
+    access_arr = None
     if method == "wgs":
         if not annotate:
             # TODO check if target_bed has gene names
@@ -226,7 +227,6 @@ def batch_make_reference(
                 "(e.g. refFlat.txt) to help locate genes "
                 "in output files."
             )
-        access_arr = None
         if not target_bed:
             # TODO - drop weird contigs before writing, see antitargets.py
             if access_bed:
@@ -281,6 +281,38 @@ def batch_make_reference(
             else:
                 # This bin size is OK down to 10x
                 target_avg_size = 5000
+
+    elif method == "hybrid":
+        if not target_avg_size or not antitarget_avg_size:
+            if normal_fnames:
+                # Calculate bin sizes from BAM read counts
+                assert target_bed is not None
+                bait_arr = tabio.read_auto(target_bed)
+                access_arr = tabio.read_auto(access_bed) if access_bed else None
+                bam_fname = autobin.midsize_file(normal_fnames)
+                (tgt_depth, tgt_bin_size), (anti_depth, anti_bin_size) = (
+                    autobin.do_autobin(
+                        bam_fname,
+                        "hybrid",
+                        targets=bait_arr,
+                        access=access_arr,
+                        fasta=fasta,
+                    )
+                )
+                if not target_avg_size and tgt_bin_size is not None:
+                    target_avg_size = tgt_bin_size
+                    logging.info(
+                        "Hybrid target depth %.2f --> target bin size %d",
+                        tgt_depth,
+                        target_avg_size,
+                    )
+                if not antitarget_avg_size and anti_bin_size is not None:
+                    antitarget_avg_size = anti_bin_size
+                    logging.info(
+                        "Hybrid antitarget depth %.2f --> antitarget bin size %d",
+                        anti_depth,
+                        antitarget_avg_size,
+                    )
 
     # To make temporary filenames for processed targets or antitargets
     assert target_bed is not None

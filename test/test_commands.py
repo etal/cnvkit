@@ -1618,6 +1618,40 @@ class BatchTests(unittest.TestCase):
         cns = cnvlib.read("build/na12878-chrM-Y-trunc.cns")
         self.assertGreater(len(cns), 0)
 
+    def test_batch_hybrid_autobin(self):
+        """Hybrid batch with autobin-determined bin sizes (issue #302)."""
+        target_bed = "formats/my-targets.bed"
+        fasta = "formats/chrM-Y-trunc.hg19.fa"
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        # target_avg_size=0 triggers autobin for hybrid mode
+        ref_fname, tgt_bed_fname, anti_bed_fname = batch.batch_make_reference(
+            [bam],
+            target_bed,
+            None,
+            True,
+            None,
+            fasta,
+            None,
+            True,
+            0,
+            None,
+            None,
+            None,
+            None,
+            "build",
+            1,
+            False,
+            0,
+            "hybrid",
+            False,
+        )
+        self.assertEqual(ref_fname, "build/reference.cnn")
+        refarr = cnvlib.read(ref_fname, "bed")
+        tgt_regions = tabio.read(tgt_bed_fname, "bed")
+        anti_regions = tabio.read(anti_bed_fname, "bed")
+        self.assertGreater(len(tgt_regions), 0)
+        self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
+
     def test_batch_futures_exception_handling(self):
         """Test that batch command properly waits for and reports exceptions from parallel tasks."""
 
