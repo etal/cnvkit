@@ -358,7 +358,7 @@ class CopyNumArray(GenomicArray):
     def shift_xx(
         self,
         is_haploid_x_reference: bool = False,
-        is_xx: bool_ | None = None,
+        is_xx: bool | bool_ | None = None,
         diploid_parx_genome: str | None = None,
     ) -> CopyNumArray:
         """Adjust chrX log2 ratios to match the ploidy of the reference sex.

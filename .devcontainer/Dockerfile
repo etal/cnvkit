@@ -12,8 +12,8 @@ COPY environment-dev.yml /tmp/
 RUN mamba env create -f /tmp/environment-dev.yml && mamba clean -afy
 
 # Make conda env the default
-ENV PATH=/opt/conda/envs/cnvkit-dev/bin:$PATH
-SHELL ["conda", "run", "-n", "cnvkit-dev", "/bin/bash", "-c"]
+ENV PATH=/opt/conda/envs/cnvkit/bin:$PATH
+SHELL ["conda", "run", "-n", "cnvkit", "/bin/bash", "-c"]
 
 # Install CNVkit in editable mode will happen via postCreateCommand
 WORKDIR /workspaces/cnvkit

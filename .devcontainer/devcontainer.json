@@ -8,7 +8,7 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/opt/conda/envs/cnvkit-dev/bin/python",
+        "python.defaultInterpreterPath": "/opt/conda/envs/cnvkit/bin/python",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": [
           "test"

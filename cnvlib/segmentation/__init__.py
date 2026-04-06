@@ -343,7 +343,7 @@ def transfer_fields(
 
     Segment gene name is the comma-separated list of bin gene names. Segment
     weight is the sum of bin weights, and depth is the (weighted) mean of bin
-    depths.
+    depths. Bins with NaN weights are excluded from the sums and averages.
 
     Also: Post-process segmentation output.
 
@@ -402,9 +402,14 @@ def transfer_fields(
 
     for i, bin_idx in enumerate(iter_slices(cdata, segments.data, "outer", False)):
         if bin_weights is not None:
-            seg_wt = bin_weights[bin_idx].sum()
+            wt = bin_weights[bin_idx]
+            # Use nansum so NaN weights don't propagate into .cns output
+            seg_wt = float(np.nansum(wt))
             if seg_wt > 0:
-                seg_dp = np.average(bin_depths[bin_idx], weights=bin_weights[bin_idx])
+                valid = ~np.isnan(wt)
+                seg_dp = np.average(
+                    bin_depths[bin_idx][valid], weights=wt[valid]
+                )
             else:
                 seg_dp = 0.0
         else:

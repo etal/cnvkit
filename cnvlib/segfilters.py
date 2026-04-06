@@ -100,6 +100,9 @@ def enumerate_changes(levels: Series) -> Series:
 def squash_region(cnarr: DataFrame) -> DataFrame:
     """Reduce a CopyNumArray to 1 row, keeping fields sensible.
 
+    Bins with NaN weights are excluded from weighted averages and medians;
+    if all weights are NaN, falls back to unweighted aggregation.
+
     All columns present in the input are preserved.  Core columns (chromosome,
     start, end, log2, gene, probes, weight) and well-known optional columns
     (depth, baf, cn, cn1/cn2, p_bintest) use purpose-built aggregation.  Any
@@ -109,11 +112,13 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
     segments.
     """
     assert "weight" in cnarr
-    region_weight = cnarr["weight"].sum()
+    wt = cnarr["weight"].to_numpy()
+    valid_wt = ~np.isnan(wt)
+    region_weight = float(np.nansum(wt))
 
     def _wavg(col: str) -> float:
-        if region_weight > 0:
-            return float(np.average(cnarr[col], weights=cnarr["weight"]))
+        if region_weight > 0 and valid_wt.any():
+            return float(np.average(cnarr[col].to_numpy()[valid_wt], weights=wt[valid_wt]))
         return float(np.mean(cnarr[col]))
 
     out: dict = {
@@ -130,13 +135,15 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
     if "baf" in cnarr:
         out["baf"] = _wavg("baf")
     if "cn" in cnarr:
-        if region_weight > 0:
-            out["cn"] = weighted_median(cnarr["cn"], cnarr["weight"])
+        if region_weight > 0 and valid_wt.any():
+            cn_arr = cnarr["cn"].to_numpy()
+            out["cn"] = weighted_median(cn_arr[valid_wt], wt[valid_wt])
         else:
             out["cn"] = np.median(cnarr["cn"])
         if "cn1" in cnarr:
-            if region_weight > 0:
-                out["cn1"] = weighted_median(cnarr["cn1"], cnarr["weight"])
+            if region_weight > 0 and valid_wt.any():
+                cn1_arr = cnarr["cn1"].to_numpy()
+                out["cn1"] = weighted_median(cn1_arr[valid_wt], wt[valid_wt])
             else:
                 out["cn1"] = np.median(cnarr["cn1"])
             out["cn2"] = out["cn"] - out["cn1"]
@@ -185,7 +192,8 @@ def bic(segarr: CopyNumArray) -> CopyNumArray:
     Uses the Bayesian Information Criterion to test whether two adjacent
     same-chromosome segments are better modeled as separate or merged.
     Iteratively merges the pair with the most negative delta-BIC until
-    no pair benefits from merging.
+    no pair benefits from merging. Segments with NaN or zero weights use
+    a median-RSS fallback to avoid poisoning the BIC computation.
 
     Variance is estimated from the ``stdev`` column if present (from
     ``segmetrics --spread stdev``), otherwise from the ``weight`` column.
@@ -221,8 +229,13 @@ def bic(segarr: CopyNumArray) -> CopyNumArray:
         rss = sd**2 * n
     elif "weight" in data.columns:
         w = data["weight"].to_numpy(dtype=float)
-        # Variance ~ n/weight, so RSS = n * variance = n^2/weight
-        needs_fallback = w == 0
+        # Variance ~ n/weight, so RSS = n * variance = n^2/weight.
+        # Segments with zero or NaN weights (e.g. from older .cnr files with
+        # missing weight values) can't contribute a meaningful variance
+        # estimate, so fall back to the median RSS of valid segments -- this
+        # avoids division by zero/NaN while keeping the BIC comparison neutral
+        # (neither strongly favoring nor opposing merges involving those segments).
+        needs_fallback = (w == 0) | np.isnan(w)
         valid = ~needs_fallback
         if valid.any():
             fallback_rss = float(np.median(n[valid] ** 2 / w[valid]))

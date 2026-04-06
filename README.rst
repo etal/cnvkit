@@ -196,7 +196,7 @@ Quick start for development::
 
     # Option 1: Using conda (recommended)
     conda env create -f environment-dev.yml
-    conda activate cnvkit-dev
+    conda activate cnvkit
     pip install -e '.[test]'
 
     # Option 2: Using pip
