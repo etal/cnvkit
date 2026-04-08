@@ -216,8 +216,11 @@ This option can be used more than once to exclude several BED files listing
 different sets of regions.
 For example, regions of poor mappability have been precalculated by others and
 are available from the `UCSC FTP Server
-<ftp://hgdownload.soe.ucsc.edu/goldenPath/>`_ (see `here for hg38
-<ftp://hgdownload.soe.ucsc.edu/goldenPath/hg38/encodeDCC/wgEncodeMapability/>`_).
+<ftp://hgdownload.soe.ucsc.edu/goldenPath/>`_ (see `hg38 bigWig files
+<https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/>`_,
+or `hg19 ENCODE mappability
+<ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/>`_
+for legacy workflows).
 
 If there are many small excluded/inaccessible regions in the genome, then small,
 less-reliable antitarget bins would be squeezed into the remaining accessible
