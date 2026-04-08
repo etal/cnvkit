@@ -26,7 +26,7 @@ Since the input does not contain useful per-target gene labels, a  gene
 annotation database is required and used to label genes in the outputs::
 
     cnvkit.py batch Sample1.bam Sample2.bam -n Control1.bam Control2.bam \
-            -m wgs -f hg19.fasta --annotate refFlat.txt
+            -m wgs -f hg38.fasta --annotate data/refFlat_hg38.txt
 
 To speed up and/or improve the accuracy of WGS analyses, try any or all of the
 following:

@@ -27,8 +27,8 @@ Run the CNVkit pipeline on one or more BAM files::
 
     # From baits and tumor/normal BAMs
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
-        --targets my_baits.bed --annotate refFlat.txt \
-        --fasta hg19.fasta --access data/access-5kb-mappable.hg19.bed \
+        --targets my_baits.bed --annotate data/refFlat_hg38.txt \
+        --fasta hg38.fasta --access data/access-10kb.hg38.bed \
         --output-reference my_reference.cnn --output-dir results/ \
         --diagram --scatter
 
@@ -38,7 +38,7 @@ Run the CNVkit pipeline on one or more BAM files::
     # Reusing targets and antitargets to build a new reference, but no analysis
     cnvkit.py batch -n *Normal.bam --output-reference new_reference.cnn \
         -t my_targets.bed -a my_antitargets.bed \
-        -f hg19.fasta -g data/access-5kb-mappable.hg19.bed
+        -f hg38.fasta -g data/access-10kb.hg38.bed
 
 With the ``-p`` option, process each of the BAM files in parallel, as separate
 subprocesses. The status messages logged to the console will be somewhat
@@ -51,15 +51,15 @@ complete sooner.
 
 The pipeline executed by the ``batch`` command is equivalent to::
 
-    cnvkit.py access hg19.fa -o access.hg19.bed
-    cnvkit.py autobin *.bam -t baits.bed -g access.hg19.bed [--annotate refFlat.txt --short-names]
+    cnvkit.py access hg38.fa -o access.hg38.bed
+    cnvkit.py autobin *.bam -t baits.bed -g access.hg38.bed [--annotate data/refFlat_hg38.txt --short-names]
 
     # For each sample...
     cnvkit.py coverage Sample.bam baits.target.bed -o Sample.targetcoverage.cnn
     cnvkit.py coverage Sample.bam baits.antitarget.bed -o Sample.antitargetcoverage.cnn
 
     # With all normal samples...
-    cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg19.fa -o my_reference.cnn
+    cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg38.fa -o my_reference.cnn
 
     # For each tumor sample...
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn my_reference.cnn -o Sample.cnr
@@ -94,7 +94,7 @@ Prepare a BED file of baited regions for use with CNVkit.
 
 ::
 
-    cnvkit.py target my_baits.bed --annotate refFlat.txt --split -o my_targets.bed
+    cnvkit.py target my_baits.bed --annotate data/refFlat_hg38.txt --split -o my_targets.bed
 
 The BED file should be the baited genomic regions for your target capture kit,
 as provided by your vendor. Since these regions (usually exons) may be of
@@ -167,8 +167,10 @@ Labeling target regions
 In case the vendor BED file does not label each region with a corresponding gene
 name, the ``--annotate`` option can add or replace these labels.
 Gene annotation databases, e.g. RefSeq or Ensembl, are available in "flat"
-format from UCSC (e.g. `refFlat.txt for hg19
-<http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refFlat.txt.gz>`_).
+format from UCSC (e.g. `refFlat.txt for hg38
+<http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/refFlat.txt.gz>`_).
+A pre-downloaded ``refFlat_hg38.txt`` is included in the CNVkit ``data/``
+directory.
 
 In other cases the region labels are a combination of human-readable gene names
 and database accession codes, separated by commas (e.g.
@@ -193,7 +195,7 @@ reference genome, output as a BED file.
 
 ::
 
-    cnvkit.py access hg19.fa -x excludes.bed -o access-excludes.hg19.bed
+    cnvkit.py access hg38.fa -x excludes.bed -o access-excludes.hg38.bed
     cnvkit.py access mm10.fasta -s 10000 -o access-10kb.mm10.bed
 
 Many fully sequenced genomes, including the human genome, contain large regions
@@ -214,18 +216,18 @@ This option can be used more than once to exclude several BED files listing
 different sets of regions.
 For example, regions of poor mappability have been precalculated by others and
 are available from the `UCSC FTP Server
-<ftp://hgdownload.soe.ucsc.edu/goldenPath/>`_ (see `here for hg19
-<ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/>`_).
+<ftp://hgdownload.soe.ucsc.edu/goldenPath/>`_ (see `here for hg38
+<ftp://hgdownload.soe.ucsc.edu/goldenPath/hg38/encodeDCC/wgEncodeMapability/>`_).
 
 If there are many small excluded/inaccessible regions in the genome, then small,
 less-reliable antitarget bins would be squeezed into the remaining accessible
 regions.  The ``-s`` option ignores short regions that would otherwise be
 excluded, allowing larger antitarget bins to overlap them.
 
-An "access" file precomputed for the UCSC reference human genome build hg19,
-with some know low-mappability regions excluded, is included in the CNVkit
-source distribution under the ``data/`` directory
-(``data/access-5kb-mappable.hg19.bed``).
+Precomputed "access" files are included in the CNVkit source distribution under
+the ``data/`` directory. For the hg38/GRCh38 human genome build, use
+``data/access-10kb.hg38.bed``. An hg19 access file
+(``data/access-5k-mappable.hg19.bed``) is also available for legacy workflows.
 
 
 .. _antitarget:
@@ -239,7 +241,7 @@ off-target/"antitarget" regions.
 
 ::
 
-    cnvkit.py antitarget my_targets.bed -g data/access-5kb-mappable.hg19.bed -o my_antitargets.bed
+    cnvkit.py antitarget my_targets.bed -g data/access-10kb.hg38.bed -o my_antitargets.bed
 
 Certain genomic regions cannot be mapped by short-read resequencing (see
 :ref:`access`); we can avoid them when calculating the antitarget locations by
@@ -287,9 +289,9 @@ estimated average read depths and recommended bin sizes on standard output.
 
 ::
 
-    cnvkit.py autobin *.bam -t my_targets.bed -g access.hg19.bed
+    cnvkit.py autobin *.bam -t my_targets.bed -g data/access-10kb.hg38.bed
     cnvkit.py autobin *.bam -m amplicon -t my_targets.bed
-    cnvkit.py autobin *.bam -m wgs -b 50000 -g access.hg19.bed --annotate refFlat.txt
+    cnvkit.py autobin *.bam -m wgs -b 50000 -g data/access-10kb.hg38.bed --annotate data/refFlat_hg38.txt
 
 The BAM index (.bai) is used to quickly determine the total number of reads
 present in a file, and random sampling of targeted regions (``-t``) is used to
@@ -388,7 +390,7 @@ Paired or pooled normals
 Provide the ``*.targetcoverage.cnn`` and ``*.antitargetcoverage.cnn`` files
 created by the :ref:`coverage` command::
 
-    cnvkit.py reference *coverage.cnn -f ucsc.hg19.fa -o Reference.cnn
+    cnvkit.py reference *coverage.cnn -f hg38.fa -o Reference.cnn
 
 To analyze a cohort sequenced on a single platform, we recommend combining all
 normal samples into a pooled reference, even if matched tumor-normal pairs were
@@ -430,7 +432,7 @@ still computes the GC content of each region if the reference genome is given.
 
 ::
 
-    cnvkit.py reference -o FlatReference.cnn -f ucsc.hg19.fa -t targets.bed -a antitargets.bed
+    cnvkit.py reference -o FlatReference.cnn -f hg38.fa -t targets.bed -a antitargets.bed
 
 Possible uses for a flat reference include:
 
