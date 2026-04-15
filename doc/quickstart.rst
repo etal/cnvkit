@@ -25,9 +25,10 @@ website and download:
 
 1. Your species' reference genome sequence, in FASTA format [required]
 2. Gene annotation database, via RefSeq or Ensembl, in BED or "RefFlat" format
-   (e.g.  `refFlat.txt
-   <http://hgdownload.soe.ucsc.edu/goldenPath/hg19/database/refFlat.txt.gz>`_)
-   [optional]
+   (e.g.  `refFlat.txt for hg38
+   <http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/refFlat.txt.gz>`_)
+   [optional] -- a pre-downloaded ``refFlat_hg38.txt`` is included in the
+   CNVkit ``data/`` directory
 
 You probably already have the reference genome sequence. If your species' genome
 is not available from UCSC, use whatever reference sequence you have. CNVkit
@@ -91,8 +92,8 @@ samples share the suffix "Normal.bam" and tumor samples "Tumor.bam", a complete
 ``batch`` command could be::
 
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
-        --targets my_baits.bed --fasta hg19.fasta \
-        --access data/access-5kb-mappable.hg19.bed \
+        --targets my_baits.bed --fasta hg38.fasta \
+        --access data/access-10kb.hg38.bed \
         --output-reference my_reference.cnn --output-dir example/
 
 See the built-in help message to see what these options do, and for additional
@@ -104,8 +105,8 @@ If you have no normal samples to use for the :ref:`reference`, you can create a
 "flat" reference which assumes equal coverage in all bins by using the
 ``--normal/-n`` flag without specifying any additional BAM files::
 
-    cnvkit.py batch *Tumor.bam -n -t my_baits.bed -f hg19.fasta \
-        --access data/access-5kb-mappable.hg19.bed \
+    cnvkit.py batch *Tumor.bam -n -t my_baits.bed -f hg38.fasta \
+        --access data/access-10kb.hg38.bed \
         --output-reference my_flat_reference.cnn -d example2/
 
 In either case, you should run this command with the reference genome sequence
@@ -116,8 +117,8 @@ normal sample.
 If your targets are missing gene names, you can add them here with the
 ``--annotate`` argument::
 
-    cnvkit.py batch *Tumor.bam -n *Normal.bam -t my_baits.bed -f hg19.fasta \
-        --annotate refFlat.txt --access data/access-5kb-mappable.hg19.bed \
+    cnvkit.py batch *Tumor.bam -n *Normal.bam -t my_baits.bed -f hg38.fasta \
+        --annotate data/refFlat_hg38.txt --access data/access-10kb.hg38.bed \
         --output-reference my_flat_reference.cnn -d example3/
 
 .. note:: **Which BED file should I use?**
