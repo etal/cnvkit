@@ -507,3 +507,53 @@ class TestRescaleBaf:
         """Observed BAF=0.5 always rescales to 0.5 (balanced heterozygosity)."""
         result = rescale_baf(purity, pd.Series([0.5]))
         assert abs(result.iloc[0] - 0.5) < 1e-12
+
+    @given(
+        st.floats(
+            min_value=0.05, max_value=0.99, allow_nan=False, allow_infinity=False
+        ),
+        st.lists(
+            st.floats(
+                min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
+            ),
+            min_size=1,
+            max_size=50,
+        ).map(pd.Series),
+    )
+    def test_output_clamped_to_unit_interval(self, purity, observed_baf):
+        """rescale_baf output is always in [0, 1] for any in-range inputs."""
+        result = rescale_baf(purity, observed_baf)
+        assert (result.values >= 0.0).all()
+        assert (result.values <= 1.0).all()
+
+    def test_low_purity_extreme_baf_clamped_to_zero(self):
+        """Regression for issue #601: low purity + observed BAF ~ 0 must
+        clamp to 0, not produce a negative value.
+        """
+        # purity=0.37 (from issue #601). Without clamping:
+        # tumor_baf = (0.0 - 0.5*0.63) / 0.37 = -0.851
+        result = rescale_baf(0.37, pd.Series([0.0]))
+        assert result.iloc[0] == 0.0
+
+    def test_low_purity_extreme_baf_clamped_to_one(self):
+        """Symmetric case: observed BAF ~ 1 must clamp to 1, not exceed it."""
+        # tumor_baf = (1.0 - 0.5*0.63) / 0.37 = 1.851
+        result = rescale_baf(0.37, pd.Series([1.0]))
+        assert result.iloc[0] == 1.0
+
+    def test_nan_preserved(self):
+        """NaN BAF (segments with no SNP coverage) passes through unchanged."""
+        result = rescale_baf(0.5, pd.Series([0.4, np.nan, 0.6]))
+        assert not np.isnan(result.iloc[0])
+        assert np.isnan(result.iloc[1])
+        assert not np.isnan(result.iloc[2])
+
+    def test_no_warning_at_float_noise_boundary(self, caplog):
+        """Values within float-arithmetic noise of 0 or 1 must not log a warning."""
+        # observed_baf at the exact lower boundary 0.5*(1-purity) gives tumor_baf=0
+        purity = 0.5
+        boundary_low = 0.5 * (1 - purity)
+        boundary_high = 0.5 + 0.5 * purity
+        with caplog.at_level("WARNING"):
+            rescale_baf(purity, pd.Series([boundary_low, 0.5, boundary_high]))
+        assert not any("clamped" in rec.message for rec in caplog.records)

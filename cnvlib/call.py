@@ -22,6 +22,11 @@ PRE_CN_MERGES = ("bic",)
 POST_CN_FILTERS = ("cn", "ampdel")
 POST_CN_MERGES = ("cn",)
 
+# Tolerance for detecting BAF values genuinely outside [0, 1] vs. float-arithmetic
+# noise at the boundary. Real out-of-range values from a wrong purity estimate
+# are orders of magnitude larger than this.
+_BAF_RANGE_TOL = 1e-9
+
 
 def do_call(
     cnarr: CopyNumArray,
@@ -546,8 +551,28 @@ def rescale_baf(purity: float, observed_baf: Series, normal_baf: float = 0.5) ->
         t_baf*purity + n_baf*(1-purity) = obs_baf
         obs_baf - n_baf * (1-purity) = t_baf * purity
         t_baf = (obs_baf - n_baf * (1-purity))/purity
+
+    Values outside [0, 1] indicate the purity estimate is inconsistent with
+    the observed allele frequencies (e.g. purity is too low, or the input
+    VCF contains somatic rather than heterozygous germline variants).
+    Out-of-range values are clamped to [0, 1]; a warning logs the count of
+    affected segments. NaN values pass through unchanged.
     """
     # ENH: use normal_baf array if available
     tumor_baf = (observed_baf - normal_baf * (1 - purity)) / purity
-    # ENH: warn if tumor_baf < 0 -- purity estimate may be too low
-    return tumor_baf
+    # NaN comparisons yield False, so NaN segments are not counted or clamped.
+    # The tolerance avoids spurious warnings for values within float noise of 0/1.
+    n_bad = int(
+        (
+            (tumor_baf < -_BAF_RANGE_TOL) | (tumor_baf > 1.0 + _BAF_RANGE_TOL)
+        ).sum()
+    )
+    if n_bad:
+        logging.warning(
+            "%d segment(s) had tumor BAF outside [0, 1] after purity "
+            "rescaling (purity=%g); values clamped. The purity estimate "
+            "may be too low, or the input VCF may contain somatic variants.",
+            n_bad,
+            purity,
+        )
+    return tumor_baf.clip(lower=0.0, upper=1.0)
