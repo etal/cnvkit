@@ -34,6 +34,7 @@ from cnvlib import (
     bintest,
     call,
     cluster,
+    cmdutil,
     cnary,
     commands,
     core,
@@ -1163,6 +1164,74 @@ class CallTests(unittest.TestCase):
         _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 1, 3.43002)
         _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 0, 0, 0.0)
         _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.45083)
+
+
+class LoadHetSnpsTests(unittest.TestCase):
+    """Tests for cmdutil.load_het_snps and the _warn_if_baf_input_suspicious helper."""
+
+    def test_helper_warns_on_empty(self):
+        """Empty heterozygous result emits a clear warning."""
+        with self.assertLogs(level="WARNING") as ctx:
+            cmdutil._warn_if_baf_input_suspicious(None)
+        self.assertTrue(
+            any("No heterozygous variants" in msg for msg in ctx.output),
+            ctx.output,
+        )
+
+    def test_helper_warns_on_skewed_distribution(self):
+        """Median alt_freq far from 0.5 emits a warning."""
+        # 100 variants all near 1.0 (e.g. mistakenly homozygous-alt or somatic)
+        alt_freqs = pd.Series([0.95] * 100)
+        with self.assertLogs(level="WARNING") as ctx:
+            cmdutil._warn_if_baf_input_suspicious(alt_freqs)
+        self.assertTrue(
+            any("Median allele frequency" in msg for msg in ctx.output),
+            ctx.output,
+        )
+
+    def test_helper_silent_on_balanced_distribution(self):
+        """Median alt_freq near 0.5 emits no warning."""
+        rng = np.random.default_rng(0)
+        # 100 het SNPs with alt_freq centered on 0.5 (binomial-ish noise)
+        alt_freqs = pd.Series(rng.normal(0.5, 0.05, 100).clip(0, 1))
+        with self.assertNoLogs(level="WARNING"):
+            cmdutil._warn_if_baf_input_suspicious(alt_freqs)
+
+    def test_helper_silent_below_min_count(self):
+        """Distribution check is skipped for small variant sets to avoid noise."""
+        # Skewed but only 10 variants -- no warning (could be a small panel)
+        alt_freqs = pd.Series([0.95] * 10)
+        with self.assertNoLogs(level="WARNING"):
+            cmdutil._warn_if_baf_input_suspicious(alt_freqs)
+
+    def test_load_het_snps_warns_on_empty_vcf(self):
+        """Loading a VCF with no records triggers the empty-result warning."""
+        with self.assertLogs(level="WARNING") as ctx:
+            varr = commands.load_het_snps("formats/blank.vcf", None, None, 1, None)
+        self.assertEqual(len(varr), 0)
+        self.assertTrue(
+            any("No heterozygous variants" in msg for msg in ctx.output),
+            ctx.output,
+        )
+
+    def test_load_het_snps_silent_on_real_vcf(self):
+        """A legitimate test VCF with paired sample IDs doesn't trigger warnings."""
+        with self.assertNoLogs(level="WARNING"):
+            varr = commands.load_het_snps(
+                "formats/na12878_na12882_mix.vcf", "NA12878", "NA12882", 15, None
+            )
+        self.assertGreater(len(varr), 50)
+
+    def test_load_het_snps_warns_on_missing_sample_ids(self):
+        """Without -i/-n, the wrong sample is used; the distribution warning fires."""
+        with self.assertLogs(level="WARNING") as ctx:
+            commands.load_het_snps(
+                "formats/na12878_na12882_mix.vcf", None, None, 15, None
+            )
+        self.assertTrue(
+            any("Median allele frequency" in msg for msg in ctx.output),
+            ctx.output,
+        )
 
 
 class AnalysisTests(unittest.TestCase):

@@ -711,7 +711,11 @@ matched normal) is given using the ``-v``/``--vcf`` option, the b-allele
 frequencies (BAFs) of the heterozygous, non-somatic SNVs falling within each
 segment are mirrored, averaged, and listed in the output .cns file as an
 additional "baf" column (using the same logic as ``export nexus-ogt``).
-If ``--purity`` was specified, then the BAF values are also rescaled.
+If ``--purity`` was specified, then the BAF values are also rescaled to
+estimate pure-tumor BAFs (clamped to [0, 1]).
+The VCF must contain heterozygous germline SNVs; pass ``-i``/``--sample-id``
+and ``-n``/``--normal-id`` if the VCF lacks a PEDIGREE header. See
+:doc:`baf` for the math, VCF preparation requirements, and troubleshooting.
 
 The ``call`` command can also optionally re-center the log2 values, though
 this will typically not be needed since the .cnr files are automatically
@@ -799,15 +803,11 @@ Allele frequencies and counts
 
 If a VCF file is given using the ``-v``/``--vcf`` option, then for each segment
 containing SNVs in the VCF, an average b-allele frequency (BAF) within that
-segment is calculated, and output in the "baf" column.
-Allele-specific integer copy number values are then inferred from the total copy
-number and BAF, and output in columns "cn1" and "cn2".
-This calculation uses the same method as `PSCBS
-<http://bioinformatics.oxfordjournals.org/content/27/15/2038.short>`_:
-total copy number is multiplied by the BAF, and rounded to the nearest integer.
-
-Allelic imbalance, including copy-number-neutral loss of heterozygosity (LOH),
-is then apparent when a segment's "cn1" and "cn2" fields have different values.
+segment is calculated and output in the "baf" column. Allele-specific integer
+copy number values are inferred from the total copy number and BAF and
+output in columns "cn1" and "cn2"; allelic imbalance and LOH are apparent
+when these values differ. See :doc:`baf` for the math, VCF preparation
+requirements, and troubleshooting.
 
 Filtering segments
 ``````````````````

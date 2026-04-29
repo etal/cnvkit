@@ -116,27 +116,15 @@ CNVkit currently uses VCF files in two ways:
 - To extract single-nucleotide variant (SNV) allele frequencies, which can be
   plotted in the :ref:`scatter` command, used to assign allele-specific copy
   number in the :ref:`call` command, or exported along with bin-level copy
-  ratios to the "nexus-ogt" format. See also: :doc:`baf`
+  ratios to the "nexus-ogt" format.
 - To :ref:`export` CNVs, describing/encoding each CNV segment as a structural
   variant (SV).
 
 For the former -- investigating allelic imbalance and loss of heterozygosity
-(LOH) -- it's most useful to perform paired calling on matched tumor/normal
-samples. You can use a separate SNV caller such as FreeBayes, VarDict, or MuTect
-to do this. For best results, ensure that:
-
-- Both the tumor and normal samples are present in the same VCF file.
-- Include both germline and somatic variants (if any) in the VCF file.
-  (For MuTect, this means keeping the "REJECT" records.)
-  Mark somatic variants with the "SOMATIC" flag in the INFO column.
-- Add a PEDIGREE tag to the VCF header declaring the tumor sample(s) as
-  "Derived" and the normal as "Original". Without this tag, you'll need to tell
-  CNVkit which sample is which using the `-i` and `-n` options in each command.
-
-An `example VCF
-<https://github.com/etal/cnvkit/blob/master/test/formats/na12878_na12882_mix.vcf?raw=true>`_
-constructed from the 1000 Genomes samples NA12878 and NA12882 is included in
-CNVkit's test suite.
+(LOH) -- the VCF must contain heterozygous **germline** SNVs and, ideally,
+matched tumor/normal samples with the tumor identified via the PEDIGREE
+header tag or ``-i``/``-n`` command-line options. See :doc:`baf` for full
+guidance on VCF preparation, sample identification, and troubleshooting.
 
 
 .. _cnxformat:

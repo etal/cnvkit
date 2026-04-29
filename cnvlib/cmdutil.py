@@ -4,6 +4,8 @@ from __future__ import annotations
 import logging
 import sys
 
+import numpy as np
+
 from skgenome import tabio
 
 from .cnary import CopyNumArray as CNA
@@ -18,6 +20,12 @@ if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
     from cnvlib.vary import VariantArray
     from skgenome.gary import GenomicArray
+
+# Median |alt_freq - 0.5| above which the variant set looks unfit for BAF
+# analysis (heterozygous germline SNPs cluster tightly around 0.5).
+_BAF_INPUT_MEDIAN_TOL = 0.2
+# Below this many heterozygous variants, distribution checks are unreliable.
+_BAF_INPUT_MIN_HET = 50
 
 
 def read_cna(
@@ -73,10 +81,47 @@ def load_het_snps(
     orig_len = len(varr)
     varr = varr.heterozygous()  # type: ignore[attr-defined]
     logging.info("Kept %d heterozygous of %d VCF records", len(varr), orig_len)
+    _warn_if_baf_input_suspicious(
+        varr["alt_freq"] if "alt_freq" in varr else None
+    )
     # TODO use/explore tumor_boost option
     if tumor_boost:
         varr["alt_freq"] = varr.tumor_boost()
     return varr  # type: ignore[no-any-return]
+
+
+def _warn_if_baf_input_suspicious(alt_freqs: pd.Series | None) -> None:
+    """Log warnings when the heterozygous-SNP set looks unfit for BAF analysis.
+
+    Triggered for two scenarios that commonly produce nonsensical downstream
+    BAF and allele-specific copy number values:
+
+    - No heterozygous variants survive filtering (somatic-only VCF, wrong
+      sample IDs, or empty input).
+    - The median allele frequency is far from 0.5, indicating the variants
+      are unlikely to be heterozygous germline SNPs (e.g. somatic variants
+      lacking a SOMATIC INFO tag, homozygous-only VCF).
+    """
+    if alt_freqs is None or len(alt_freqs) == 0:
+        logging.warning(
+            "No heterozygous variants remain after filtering. BAF and "
+            "allele-specific copy number cannot be computed. Check that "
+            "the VCF includes germline (non-somatic) heterozygous SNPs and "
+            "that the correct sample IDs are given (-i/--sample-id, "
+            "-n/--normal-id)."
+        )
+        return
+    if len(alt_freqs) >= _BAF_INPUT_MIN_HET:
+        median_af = float(np.nanmedian(alt_freqs))
+        if abs(median_af - 0.5) > _BAF_INPUT_MEDIAN_TOL:
+            logging.warning(
+                "Median allele frequency %.2f is far from the 0.5 expected "
+                "for heterozygous germline SNPs. The VCF may contain "
+                "non-germline variants, or the sample IDs (-i/--sample-id, "
+                "-n/--normal-id) may be incorrect. BAF and allele-specific "
+                "copy number output may be unreliable.",
+                median_af,
+            )
 
 
 def verify_sample_sex(
