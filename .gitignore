@@ -1,6 +1,7 @@
 # IDE
 .vscode/
 .serena/
+.claude/
 
 # Compiled python files (e.g. from running the unit tests):
 *.pyc
@@ -17,6 +18,7 @@ htmlcov/
 .pytest_cache/
 .hypothesis/
 *.bai
+*.fai
 
 # Backup files from some Unix editors
 *~
