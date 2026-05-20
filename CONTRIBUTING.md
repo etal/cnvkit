@@ -105,7 +105,7 @@ Pre-commit hooks enforce these automatically.
 
 ### Key Conventions
 
-- **Python version**: Code must work with Python 3.10+
+- **Python version**: Code must work with Python 3.11+
 - **Testing**: Use pytest, not unittest
 - **Subprocess calls**: Allowed for bioinformatics tools (samtools, R, etc.)
 - **Variable naming**: Use descriptive names (e.g., `bam_fname` for file paths)

@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CNVkit is a command-line toolkit and Python library for detecting copy number variants and alterations genome-wide from high-throughput sequencing data. It provides both a CLI interface and Python API for genomic analysis workflows.
 
-**Supported Python versions:** 3.10+ (tested on 3.10-3.14)
-**Minimum versions aligned with Ubuntu 25.04 (Plucky)**
+**Supported Python versions:** 3.11+ (tested on 3.11-3.14)
+**Minimum versions aligned with Ubuntu 26.04 LTS (Resolute)**
 
 ## Development Workflow
 
@@ -18,8 +18,6 @@ CNVkit is a command-line toolkit and Python library for detecting copy number va
 - **Clinical impact**: When reviewing changes, consider whether the changeset alters numerical output or output file formats (`.cnr`, `.cns`, `.cnn`, SEG, VCF). Flag any such changes explicitly, as downstream clinical pipelines may depend on exact output stability.
 
 ## Development Commands
-
-Use 'bd' for task tracking.
 
 ### Development Environment
 
@@ -42,7 +40,7 @@ pytest test/test_commands.py -k "batch or coverage"  # Run tests matching patter
 ```
 
 **Comprehensive testing:**
-- `tox` - Full matrix: Python 3.10-3.14, linting, security, coverage, docs
+- `tox` - Full matrix: Python 3.11-3.14, linting, security, coverage, docs
 - `cd test/ && make mini` - Integration tests with real genomic data (used in CI)
 
 ### Type Checking
@@ -121,23 +119,6 @@ Core dependencies are declared in `requirements/core.txt`; `min.txt` pins exact 
 ### Variable Naming
 - The codebase uses `bam_fname` or `sample_fname` for file paths that can be either BAM or bedGraph files
 - Parameter names in function signatures often use generic terms (e.g., `bam_fname`) even when they accept multiple formats
-
-## Serena (MCP LSP integration)
-
-A Serena MCP server provides LSP-backed code intelligence tools (configured via `claude mcp add` with `--context claude-code`, which exposes only LSP tools, not file I/O or shell).
-
-**When to use Serena vs. built-in tools:**
-- **Exploring unfamiliar code** — use `get_symbols_overview` to see a file's structure without reading the whole file, then `find_symbol` with `include_body=True` to read only the methods you need
-- **Tracing call graphs** — use `find_referencing_symbols` to find all callers/users of a symbol across the codebase
-- **Refactoring** — use `replace_symbol_body` / `insert_after_symbol` for precise symbolic edits
-- **Simple lookups** — use Grep/Glob for known string patterns; Serena is better for semantic queries (e.g. "all methods of CopyNumArray" or "all callers of `do_segmentation`")
-
-**Key tools:**
-- `find_symbol` - Find by name path (e.g. `CopyNumArray/squash_genes`); use `depth=1` to list methods, `include_body=True` to read implementations
-- `get_symbols_overview` - List all top-level symbols in a file
-- `find_referencing_symbols` - Find all references to a symbol with surrounding code context
-- `search_for_pattern` - Regex search with file filtering (for non-symbol searches)
-- `replace_symbol_body` / `insert_after_symbol` / `insert_before_symbol` - Symbolic edits
 
 ## Design
 

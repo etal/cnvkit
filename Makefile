@@ -23,7 +23,7 @@ help:
 	@echo "  test-all       Run full tox test suite"
 	@echo "  lint           Run ruff linting"
 	@echo "  format         Run ruff formatting"
-	@echo "  security       Run security checks (safety + bandit)"
+	@echo "  security       Run security checks (pip-audit + bandit)"
 	@echo "  pre-commit     Install and run pre-commit hooks"
 	@echo ""
 	@echo "Building & Distribution:"
@@ -74,7 +74,7 @@ format:
 
 .PHONY: security
 security:
-	safety check
+	pip-audit
 	bandit -r cnvlib skgenome -c pyproject.toml
 
 .PHONY: pre-commit

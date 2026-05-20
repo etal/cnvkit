@@ -26,7 +26,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Medical Science Apps.",
   "Topic :: Scientific/Engineering :: Visualization"
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
@@ -99,7 +99,7 @@ exclude_lines = [
 directory = "htmlcov"
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 88
 
 [tool.ruff.lint]
@@ -138,7 +138,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 packages = ["cnvlib", "skgenome"]
 ignore_missing_imports = true
 check_untyped_defs = true

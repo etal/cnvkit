@@ -56,15 +56,15 @@ If you have difficulty with any of these wrappers, please `let me know
 Installation
 ============
 
-CNVkit runs on Python 3.10 and later. Your operating system might already provide
+CNVkit runs on Python 3.11 and later. Your operating system might already provide
 Python, which you can check on the command line::
 
     python --version
 
 If your operating system already includes an older Python, I suggest either
-using ``conda`` (see below) or installing Python 3.10 or later alongside the
+using ``conda`` (see below) or installing Python 3.11 or later alongside the
 existing Python installation instead of attempting to upgrade the system version
-in-place. Your package manager might also provide Python 3.10+.
+in-place. Your package manager might also provide Python 3.11+.
 
 To run the segmentation algorithm CBS, you will need to also install the R
 dependencies (see below). With ``conda``, this is included automatically.
@@ -213,7 +213,7 @@ The project uses modern development tools:
 - **Pre-commit hooks**: Automatic code formatting and linting (see ``PRE-COMMIT-SETUP.md``)
 - **Makefile**: Convenient shortcuts (``make help`` for options)
 - **Docker**: Automated builds for reproducible execution (see ``DOCKER.md``)
-- **GitHub Actions**: CI/CD with tests across Python 3.10-3.14
+- **GitHub Actions**: CI/CD with tests across Python 3.11-3.14
 
 For VS Code users, a DevContainer configuration is available with all
 dependencies pre-installed. Simply open the project and select "Reopen in

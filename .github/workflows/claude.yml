@@ -46,7 +46,7 @@ jobs:
             This is a bioinformatics Python package for copy number variant detection.
 
             - Follow the project's code style conventions (see CLAUDE.md)
-            - All code must work with Python 3.10+
+            - All code must work with Python 3.11+
             - Security tools (bandit) are configured to allow subprocess calls needed for bioinformatics tools
             - R is required for segmentation (DNAcopy package)
             - Pre-commit hooks are configured - run before committing
