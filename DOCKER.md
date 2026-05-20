@@ -147,7 +147,7 @@ For maintainers who need to manually push images or set up CI:
 
 The production Docker image includes:
 
-- **Python 3.10+** with CNVkit and all dependencies
+- **Python 3.11+** with CNVkit and all dependencies
 - **R** with DNAcopy package for segmentation
 - **Conda environment** with all required packages
 - **Helper scripts** (e.g., `snpfilter.sh`)

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CNVkit is a command-line toolkit and Python library for detecting copy number variants and alterations genome-wide from high-throughput sequencing data. It provides both a CLI interface and Python API for genomic analysis workflows.
 
-**Supported Python versions:** 3.10+ (tested on 3.10-3.14)
+**Supported Python versions:** 3.11+ (tested on 3.11-3.14)
 **Minimum versions aligned with Ubuntu 26.04 LTS (Resolute)**
 
 ## Development Workflow
@@ -40,7 +40,7 @@ pytest test/test_commands.py -k "batch or coverage"  # Run tests matching patter
 ```
 
 **Comprehensive testing:**
-- `tox` - Full matrix: Python 3.10-3.14, linting, security, coverage, docs
+- `tox` - Full matrix: Python 3.11-3.14, linting, security, coverage, docs
 - `cd test/ && make mini` - Integration tests with real genomic data (used in CI)
 
 ### Type Checking
