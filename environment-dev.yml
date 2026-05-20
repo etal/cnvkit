@@ -28,4 +28,5 @@ dependencies:
   - safety
   - bandit
   # Development tools
+  - debugpy
   - pip
