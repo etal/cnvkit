@@ -19,8 +19,6 @@ CNVkit is a command-line toolkit and Python library for detecting copy number va
 
 ## Development Commands
 
-Use 'bd' for task tracking.
-
 ### Development Environment
 
 **Conda (recommended):**
@@ -121,23 +119,6 @@ Core dependencies are declared in `requirements/core.txt`; `min.txt` pins exact 
 ### Variable Naming
 - The codebase uses `bam_fname` or `sample_fname` for file paths that can be either BAM or bedGraph files
 - Parameter names in function signatures often use generic terms (e.g., `bam_fname`) even when they accept multiple formats
-
-## Serena (MCP LSP integration)
-
-A Serena MCP server provides LSP-backed code intelligence tools (configured via `claude mcp add` with `--context claude-code`, which exposes only LSP tools, not file I/O or shell).
-
-**When to use Serena vs. built-in tools:**
-- **Exploring unfamiliar code** — use `get_symbols_overview` to see a file's structure without reading the whole file, then `find_symbol` with `include_body=True` to read only the methods you need
-- **Tracing call graphs** — use `find_referencing_symbols` to find all callers/users of a symbol across the codebase
-- **Refactoring** — use `replace_symbol_body` / `insert_after_symbol` for precise symbolic edits
-- **Simple lookups** — use Grep/Glob for known string patterns; Serena is better for semantic queries (e.g. "all methods of CopyNumArray" or "all callers of `do_segmentation`")
-
-**Key tools:**
-- `find_symbol` - Find by name path (e.g. `CopyNumArray/squash_genes`); use `depth=1` to list methods, `include_body=True` to read implementations
-- `get_symbols_overview` - List all top-level symbols in a file
-- `find_referencing_symbols` - Find all references to a symbol with surrounding code context
-- `search_for_pattern` - Regex search with file filtering (for non-symbol searches)
-- `replace_symbol_body` / `insert_after_symbol` / `insert_before_symbol` - Symbolic edits
 
 ## Design
 
