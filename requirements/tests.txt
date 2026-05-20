@@ -5,5 +5,5 @@ coverage[all]
 hypothesis[numpy]
 mypy
 ruff
-safety
+pip-audit
 bandit[toml]

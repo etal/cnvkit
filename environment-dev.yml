@@ -25,7 +25,7 @@ dependencies:
   - coverage
   - hypothesis
   - ruff
-  - safety
+  - pip-audit
   - bandit
   # Development tools
   - debugpy
