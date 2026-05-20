@@ -1,5 +1,5 @@
 bioframe == 0.8.0
-biopython == 1.86
+biopython == 1.87
 matplotlib == 3.10.7
 numpy == 2.3.5
 pandas == 2.3.3

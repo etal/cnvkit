@@ -13,7 +13,7 @@ dependencies:
     - python>=3.10
     - atlas # [not osx]
     - bioconductor-dnacopy
-    - biopython >=1.86
+    - biopython >=1.87
     - hypothesis
     - matplotlib >=3.10.7
     - mypy
