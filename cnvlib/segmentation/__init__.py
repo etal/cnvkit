@@ -234,60 +234,57 @@ def _do_segmentation(
         return filtered_cn
 
     seg_out = ""
-    if method == "haar":
-        segarr = haar.segment_haar(filtered_cn, threshold)  # type: ignore[arg-type]
+    match method:
+        case "haar":
+            segarr = haar.segment_haar(filtered_cn, threshold)  # type: ignore[arg-type]
+        case "none":
+            segarr = none.segment_none(filtered_cn)
+        case "cbs" | "flasso":
+            # Run R scripts to calculate copy number segments
+            rscript = {
+                "cbs": cbs.CBS_RSCRIPT,
+                "flasso": flasso.FLASSO_RSCRIPT,
+            }[method]
 
-    elif method == "none":
-        segarr = none.segment_none(filtered_cn)
-
-    elif method.startswith("hmm"):
-        segarr = hmm.segment_hmm(
-            filtered_cn,
-            method,
-            diploid_parx_genome,
-            int(threshold) if threshold is not None else None,
-            variants,
-        )
-
-    elif method in ("cbs", "flasso"):
-        # Run R scripts to calculate copy number segments
-        rscript = {
-            "cbs": cbs.CBS_RSCRIPT,
-            "flasso": flasso.FLASSO_RSCRIPT,
-        }[method]
-
-        filtered_cn["start"] += 1  # Convert to 1-indexed coordinates for R
-        with tempfile.NamedTemporaryFile(suffix=".cnr", mode="w+t") as tmp:
-            # TODO tabio.write(filtered_cn, tmp, 'seg')
-            filtered_cn.data.to_csv(
-                tmp, index=False, sep="\t", float_format="%.6g", mode="w+t"
-            )
-            tmp.flush()
-            script_strings = {
-                "probes_fname": tmp.name,
-                "sample_id": cnarr.sample_id,
-                "threshold": threshold,
-                "smooth_cbs": smooth_cbs,
-            }
-            with core.temp_write_text(
-                rscript % script_strings, mode="w+t"
-            ) as script_fname:
-                seg_out = core.call_quiet(
-                    rscript_path, "--no-restore", "--no-environ", script_fname
+            filtered_cn["start"] += 1  # Convert to 1-indexed coordinates for R
+            with tempfile.NamedTemporaryFile(suffix=".cnr", mode="w+t") as tmp:
+                # TODO tabio.write(filtered_cn, tmp, 'seg')
+                filtered_cn.data.to_csv(
+                    tmp, index=False, sep="\t", float_format="%.6g", mode="w+t"
                 )
-        # Convert R dataframe contents (SEG) to a proper CopyNumArray
-        # NB: Automatically shifts 'start' back from 1- to 0-indexed
-        segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)  # type: ignore[arg-type,assignment]
-        if method == "flasso":
-            # Merge adjacent bins with same log2 value into segments
-            if "weight" in filtered_cn:
-                segarr["weight"] = filtered_cn["weight"]
-            else:
-                segarr["weight"] = 1.0
-            segarr = squash_by_groups(segarr, segarr["log2"], by_arm=True)
-
-    else:
-        raise ValueError(f"Unknown method {method!r}")
+                tmp.flush()
+                script_strings = {
+                    "probes_fname": tmp.name,
+                    "sample_id": cnarr.sample_id,
+                    "threshold": threshold,
+                    "smooth_cbs": smooth_cbs,
+                }
+                with core.temp_write_text(
+                    rscript % script_strings, mode="w+t"
+                ) as script_fname:
+                    seg_out = core.call_quiet(
+                        rscript_path, "--no-restore", "--no-environ", script_fname
+                    )
+            # Convert R dataframe contents (SEG) to a proper CopyNumArray
+            # NB: Automatically shifts 'start' back from 1- to 0-indexed
+            segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)  # type: ignore[arg-type,assignment]
+            if method == "flasso":
+                # Merge adjacent bins with same log2 value into segments
+                if "weight" in filtered_cn:
+                    segarr["weight"] = filtered_cn["weight"]
+                else:
+                    segarr["weight"] = 1.0
+                segarr = squash_by_groups(segarr, segarr["log2"], by_arm=True)
+        case "hmm" | "hmm-tumor" | "hmm-germline":
+            segarr = hmm.segment_hmm(
+                filtered_cn,
+                method,
+                diploid_parx_genome,
+                int(threshold) if threshold is not None else None,
+                variants,
+            )
+        case _:
+            raise ValueError(f"Unknown method {method!r}")
 
     segarr.meta = cnarr.meta.copy()
     if variants and not method.startswith("hmm"):

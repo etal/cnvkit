@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from typing import Any, TypeVar, TYPE_CHECKING
+from typing import Any, Self, TYPE_CHECKING
 
 import bioframe
 import numpy as np
@@ -21,14 +21,10 @@ from .subtract import subtract
 from .subdivide import subdivide
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+
     from cnvlib.cnary import CopyNumArray
     from numpy import ndarray
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Mapping, Sequence
-
-_GA = TypeVar("_GA", bound="GenomicArray")
 
 
 class GenomicArray:
@@ -131,7 +127,7 @@ class GenomicArray:
         return self.__class__.from_columns(columns, self.meta)
         # return self.__class__(self.data.loc[:, columns], self.meta.copy())
 
-    def as_dataframe(self: _GA, dframe: pd.DataFrame, reset_index: bool = False) -> _GA:
+    def as_dataframe(self, dframe: pd.DataFrame, reset_index: bool = False) -> Self:
         """Wrap the given pandas DataFrame in this instance's metadata."""
         if reset_index:
             dframe = dframe.reset_index(drop=True)
@@ -141,7 +137,7 @@ class GenomicArray:
         """Coerce `arraylike` to a Series with this instance's index."""
         return pd.Series(arraylike, index=self.data.index)
 
-    def as_rows(self: _GA, rows: Iterable) -> _GA:
+    def as_rows(self, rows: Iterable) -> Self:
         """Wrap the given rows in this instance's metadata."""
         try:
             out = self.from_rows(rows, columns=self.data.columns, meta_dict=self.meta)
@@ -262,7 +258,7 @@ class GenomicArray:
 
     # Traversal
 
-    def autosomes(self: _GA, also: str | list[str] | pd.Series | None = None) -> _GA:
+    def autosomes(self, also: str | list[str] | pd.Series | None = None) -> Self:
         """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
         is_auto = self.chromosome.str.match(r"(chr)?\d+$", na=False)
         if not is_auto.any():
@@ -280,8 +276,8 @@ class GenomicArray:
         return self[is_auto]
 
     def by_arm(
-        self: _GA, min_gap_size: int | float = 1e5, min_arm_bins: int = 50
-    ) -> Iterator[tuple[str, _GA]]:
+        self, min_gap_size: int | float = 1e5, min_arm_bins: int = 50
+    ) -> Iterator[tuple[str, Self]]:
         """Iterate over bins grouped by chromosome arm (inferred)."""
         # ENH:
         # - Accept GArray of actual centromere regions as input
@@ -327,7 +323,7 @@ class GenomicArray:
                     logging.debug("%s: Skipping centromere search, too small", chrom)
                 yield chrom, self.as_dataframe(subtable)
 
-    def by_chromosome(self: _GA) -> Iterator[tuple[str, _GA]]:
+    def by_chromosome(self) -> Iterator[tuple[str, Self]]:
         """Iterate over bins grouped by chromosome name."""
         for chrom, subtable in self.data.groupby("chromosome", sort=False):
             yield chrom, self.as_dataframe(subtable)
@@ -396,12 +392,12 @@ class GenomicArray:
         return self.data.apply(to_label, axis=1)
 
     def in_range(
-        self: _GA,
+        self,
         chrom: str | None = None,
         start: Numeric | None = None,
         end: Numeric | None = None,
         mode: str = "outer",
-    ) -> _GA:
+    ) -> Self:
         """Get the GenomicArray portion within the given genomic range.
 
         Parameters
@@ -581,7 +577,7 @@ class GenomicArray:
             self.data = pd.concat([self.data, other.data], ignore_index=True)
             self.sort()
 
-    def concat(self: _GA, others: list[_GA]) -> _GA:
+    def concat(self, others: Iterable[Self]) -> Self:
         """Concatenate several GenomicArrays, keeping this array's metadata.
 
         This array's data table is not implicitly included in the result.
@@ -591,11 +587,11 @@ class GenomicArray:
         result.sort()
         return result
 
-    def copy(self: _GA) -> _GA:
+    def copy(self) -> Self:
         """Create an independent copy of this object."""
         return self.as_dataframe(self.data.copy())
 
-    def add_columns(self: _GA, **columns) -> _GA:
+    def add_columns(self, **columns) -> Self:
         """Add the given columns to a copy of this GenomicArray.
 
         Parameters
@@ -613,12 +609,12 @@ class GenomicArray:
         """
         return self.as_dataframe(self.data.assign(**columns))
 
-    def keep_columns(self: _GA, colnames: tuple[str, str, str, str, str, str]) -> _GA:
+    def keep_columns(self, colnames: tuple[str, str, str, str, str, str]) -> Self:
         """Extract a subset of columns, reusing this instance's metadata."""
         colnames = self.data.columns.intersection(colnames)
         return self.__class__(self.data.loc[:, colnames], self.meta.copy())
 
-    def drop_extra_columns(self: _GA) -> _GA:
+    def drop_extra_columns(self) -> Self:
         """Remove any optional columns from this GenomicArray.
 
         Returns
@@ -631,7 +627,7 @@ class GenomicArray:
         table = self.data.loc[:, self._required_columns]
         return self.as_dataframe(table)
 
-    def filter(self: _GA, func: Callable | None = None, **kwargs) -> _GA:
+    def filter(self, func: Callable | None = None, **kwargs) -> Self:
         """Take a subset of rows where the given condition is true.
 
         Parameters
@@ -687,7 +683,7 @@ class GenomicArray:
 
     # Genome arithmetic
 
-    def cut(self: _GA, other: GenomicArray) -> _GA:
+    def cut(self, other: GenomicArray) -> Self:
         """Split this array's regions at the boundaries in ``other``."""
         return self.as_dataframe(cut(self.data, other.data))
 
@@ -783,10 +779,10 @@ class GenomicArray:
         return self.as_dataframe(table.copy())
 
     def squash(
-        self: _GA,
+        self,
         by: str | None = None,
         combine: dict[str, Callable] | None = None,
-    ) -> _GA:
+    ) -> Self:
         """Combine consecutive adjacent rows into single rows.
 
         Parameters
