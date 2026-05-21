@@ -12,7 +12,7 @@ Thank you for your interest in contributing to CNVkit! This document provides gu
 
 ### Prerequisites
 
-- Python 3.10 or later
+- Python 3.11 or later
 - R with DNAcopy package (for segmentation)
 - Git
 

@@ -93,7 +93,7 @@ Pre-commit hooks run automatically on `git commit` (ruff, bandit, whitespace, YA
   - `gary.py` - GenomicArray class for genomic interval data (wraps pandas DataFrame)
   - `tabio/` - File I/O for BED, GFF, VCF, SEG, Picard, CNVkit formats (.cnn/.cnr/.cns), bedGraph
 
-GenomicArray uses a `TypeVar` pattern (`_GA = TypeVar("_GA", bound="GenomicArray")`) so that methods like `.copy()`, `.concat()`, and `.as_dataframe()` preserve the subclass type through type checking.
+GenomicArray uses `typing.Self` (PEP 673) so that methods like `.copy()`, `.concat()`, and `.as_dataframe()` preserve the subclass type through type checking.
 
 ### File Formats
 - `.cnn` - Coverage/reference data
