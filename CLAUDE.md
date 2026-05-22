@@ -92,8 +92,18 @@ Pre-commit hooks run automatically on `git commit` (ruff, bandit, whitespace, YA
 - **`skgenome/`** - Genomic data handling library (part of CNVkit but decoupled)
   - `gary.py` - GenomicArray class for genomic interval data (wraps pandas DataFrame)
   - `tabio/` - File I/O for BED, GFF, VCF, SEG, Picard, CNVkit formats (.cnn/.cnr/.cns), bedGraph
+  - `chromnames.py` - Chromosome-name classification (autosome/sex/mito/alt-contig detection, arabic + Roman numerals, X/Y label inference)
+  - `genomebuild.py` - Reference assembly metadata (PAR coordinates) as `GenomeBuild` value objects, with `get_genome_build()` lookup
+  - `chromsort.py` - Chromosome-name sort keys
 
 GenomicArray uses `typing.Self` (PEP 673) so that methods like `.copy()`, `.concat()`, and `.as_dataframe()` preserve the subclass type through type checking.
+
+### Chromosome-name handling
+All chromosome-name classification goes through `skgenome.chromnames` -- do NOT add inline regexes or `.startswith("chr")` / `chromosome.iat[0]` heuristics. Key facts:
+- Genomes may use arabic (`chr1`) or Roman (`chrI`..`chrXVI`, e.g. yeast) numerals. `chrX` is a sex chromosome in human but autosome 10 in yeast, so sex-chromosome detection is *context-aware* (`infer_sex_chrom_labels` inspects the whole chromosome set, not one name).
+- `CopyNumArray.chr_x_label` / `chr_y_label` return `str | None`; `None` means no sex chromosome detected. Callers must handle `None` (the `chr_*_filter` methods return all-False in that case).
+- `GenomicArray.autosomes()` falls back to returning the whole array (with a warning) when no autosomes are recognized -- be permissive on unfamiliar assemblies rather than silently dropping data.
+- PAR coordinates live in `skgenome.genomebuild`; `cnvlib.params.PSEUDO_AUTSOMAL_REGIONS` is a back-compat re-export.
 
 ### File Formats
 - `.cnn` - Coverage/reference data
