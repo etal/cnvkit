@@ -71,7 +71,7 @@ class RNAImportTests(unittest.TestCase):
         invalid_gene_info.loc["ENSG00000003", "tx_length"] = 0
         invalid_gene_info.loc["ENSG00000004", "tx_length"] = -100
 
-        result_gi, result_sc, result_log2 = rna.align_gene_info_to_samples(
+        result_gi, _result_sc, _result_log2 = rna.align_gene_info_to_samples(
             invalid_gene_info, self.sample_counts, tx_lengths=None, normal_ids=[]
         )
 
