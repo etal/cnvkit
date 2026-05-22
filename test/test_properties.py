@@ -528,8 +528,8 @@ class TestRescaleBaf:
     def test_output_clamped_to_unit_interval(self, purity, observed_baf):
         """rescale_baf output is always in [0, 1] for any in-range inputs."""
         result = rescale_baf(purity, observed_baf)
-        assert (result.values >= 0.0).all()
-        assert (result.values <= 1.0).all()
+        assert (result.to_numpy() >= 0.0).all()
+        assert (result.to_numpy() <= 1.0).all()
 
     def test_low_purity_extreme_baf_clamped_to_zero(self):
         """Regression for issue #601: low purity + observed BAF ~ 0 must
