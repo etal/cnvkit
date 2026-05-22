@@ -18,19 +18,15 @@ IGNORE_GENE_NAMES = ("-", ".", "CGH")
 ANTITARGET_NAME = "Antitarget"
 ANTITARGET_ALIASES = (ANTITARGET_NAME, "Background")
 
-# PAR1/2 start/end definitions
+# PAR coordinates and the list of supported genome builds are owned by
+# skgenome.genomebuild; re-exported here for back-compat with code that
+# imports them from cnvlib.params. Inner coordinate values are returned
+# as mutable lists (matching the historical type) so any caller that
+# treated them as such continues to work.
+from skgenome.genomebuild import REGISTERED_BUILDS as _REGISTERED_BUILDS  # noqa: E402
+
 PSEUDO_AUTSOMAL_REGIONS = {
-    "grch37": {
-        "PAR1X": [60000, 2699520],
-        "PAR2X": [154931043, 155260560],
-        "PAR1Y": [10000, 2649520],
-        "PAR2Y": [59034049, 59363566],
-    },
-    "grch38": {
-        "PAR1X": [10000, 2781479],
-        "PAR2X": [155701382, 156030895],
-        "PAR1Y": [10000, 2781479],
-        "PAR2Y": [56887902, 57217415],
-    },
+    name: {region: list(coords) for region, coords in b.par_regions.items()}
+    for name, b in _REGISTERED_BUILDS.items()
 }
 SUPPORTED_GENOMES_FOR_PAR_HANDLING = PSEUDO_AUTSOMAL_REGIONS.keys()
