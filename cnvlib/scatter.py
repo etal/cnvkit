@@ -6,6 +6,7 @@ import logging
 
 import numpy as np
 from matplotlib import pyplot
+from skgenome.chromnames import detect_chr_prefix, diagnose_missing_chromosome
 from skgenome.rangelabel import unpack_range
 
 from . import core, params, plots
@@ -22,6 +23,19 @@ HIGHLIGHT_COLOR = "gold"
 POINT_COLOR = "#606060"
 SEG_COLOR = "darkorange"
 TREND_COLOR = "#A0A0A0"
+
+
+def _sex_labels(arr) -> tuple[str | None, str | None]:
+    """Best-effort ``(x_label, y_label)`` from any genomic array.
+
+    Returns ``(None, None)`` for arrays without the labels (e.g. plain
+    ``GenomicArray`` or ``VariantArray``) so callers can pass the result
+    to ``choose_segment_color`` unconditionally.
+    """
+    return (
+        getattr(arr, "chr_x_label", None),
+        getattr(arr, "chr_y_label", None),
+    )
 
 
 def do_scatter(
@@ -189,9 +203,16 @@ def cnv_on_genome(
     axis.set_ylabel("Copy ratio (log2)")
     if not (y_min and y_max):
         if segments:
-            # Auto-scale y-axis according to segment mean-coverage values
-            # (Avoid spuriously low log2 values in HLA and chrY)
-            low_chroms = segments.chromosome.isin(("6", "chr6", "Y", "chrY"))
+            # Auto-scale y-axis according to segment mean-coverage values,
+            # excluding chrY (low ploidy) and chr6 (HLA region's noisy log2)
+            # to avoid pulling the scale to spuriously low values. For non-human
+            # data without sex chromosomes these exclusions become a no-op.
+            prefix = detect_chr_prefix(segments.chromosome.unique())
+            exclude_for_scaling = {f"{prefix}6"}
+            chr_y_for_scaling = segments.chr_y_label
+            if chr_y_for_scaling is not None:
+                exclude_for_scaling.add(chr_y_for_scaling)
+            low_chroms = segments.chromosome.isin(exclude_for_scaling)
             seg_auto_vals = segments[~low_chroms]["log2"].dropna()
             if not y_min:
                 y_min = (
@@ -228,6 +249,7 @@ def cnv_on_genome(
 
     # Plot points & segments
     x_starts = plots.plot_chromosome_dividers(axis, chrom_sizes)
+    sex_labels = _sex_labels(segments)
     for chrom, x_offset in x_starts.items():
         if probes and chrom in chrom_probes:
             subprobes = chrom_probes[chrom]
@@ -256,7 +278,9 @@ def cnv_on_genome(
 
         if chrom in chrom_segs:
             for seg in chrom_segs[chrom]:
-                color = choose_segment_color(seg, segment_color)
+                color = choose_segment_color(
+                    seg, segment_color, sex_chrom_labels=sex_labels
+                )
                 axis.plot(
                     (seg.start + x_offset, seg.end + x_offset),
                     (seg.log2, seg.log2),
@@ -284,6 +308,7 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color
     else:
         chrom_segs = {}
 
+    sex_labels = _sex_labels(segments)
     for chrom, x_offset in x_starts.items():
         if chrom not in chrom_snvs:
             continue
@@ -306,7 +331,10 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color
                 if seg:
                     posn = [seg.start + x_offset, seg.end + x_offset]
                     color = choose_segment_color(
-                        seg, segment_color, default_bright=False
+                        seg,
+                        segment_color,
+                        default_bright=False,
+                        sex_chrom_labels=sex_labels,
                     )
                 else:
                     posn = [snvs.start.iat[0] + x_offset, snvs.start.iat[-1] + x_offset]
@@ -510,6 +538,14 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene, window_
         len(gene_ranges),
         (chrom + ":{}-{}".format(*window_coords) if window_coords else chrom),
     )
+    if cnarr and len(sel_probes) == 0:
+        # Help the user diagnose why the selection has no probes
+        # (e.g. yeast Roman-numeral names not present in the .cnr file,
+        # a "chr" prefix mismatch, or a window outside any probe).
+        logging.warning(
+            "%s",
+            diagnose_missing_chromosome(chrom, cnarr.chromosome.unique()),
+        )
 
     return sel_probes, sel_segs, sel_snvs, window_coords, gene_ranges, chrom
 
@@ -593,8 +629,11 @@ def cnv_on_chromosome(
 
     # Draw segments as horizontal lines
     if segments:
+        sex_labels = _sex_labels(segments)
         for row in segments:
-            color = choose_segment_color(row, segment_color)
+            color = choose_segment_color(
+                row, segment_color, sex_chrom_labels=sex_labels
+            )
             axis.plot(
                 (row.start * MB, row.end * MB),
                 (row.log2, row.log2),
@@ -649,10 +688,16 @@ def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin, segment
     axis.scatter(x_mb, y, color=POINT_COLOR, alpha=0.3)
     if segments or do_trend:
         # Draw average VAF within each segment
+        sex_labels = _sex_labels(segments) if segments else (None, None)
         for seg, v_freq in get_segment_vafs(variants, segments):
             if seg:
                 posn = [seg.start * MB, seg.end * MB]
-                color = choose_segment_color(seg, segment_color, default_bright=False)
+                color = choose_segment_color(
+                    seg,
+                    segment_color,
+                    default_bright=False,
+                    sex_chrom_labels=sex_labels,
+                )
             else:
                 posn = [variants.start.iat[0] * MB, variants.start.iat[-1] * MB]
                 color = TREND_COLOR
@@ -721,7 +766,12 @@ def setup_chromosome(axis, y_min=None, y_max=None, y_label=None) -> None:
 # === Shared ===
 
 
-def choose_segment_color(segment, highlight_color, default_bright=True):
+def choose_segment_color(
+    segment,
+    highlight_color,
+    default_bright=True,
+    sex_chrom_labels: tuple[str | None, str | None] = (None, None),
+):
     """Choose a display color based on a segment's CNA status.
 
     Uses the fields added by the 'call' command. If these aren't present, use
@@ -729,18 +779,32 @@ def choose_segment_color(segment, highlight_color, default_bright=True):
 
     For sex chromosomes, some single-copy deletions or gains might not be
     highlighted, since sample sex isn't used to infer the neutral ploidies.
+
+    *sex_chrom_labels* is ``(x_label, y_label)`` for the genome being plotted;
+    either may be None when the genome has no detected sex chromosome (e.g.
+    yeast). When both are None, every chromosome is treated as autosomal
+    (ploidy 2 expected). The labels must use the same naming convention as
+    ``segment.chromosome`` (both ``"chrX"`` or both ``"X"``) so the dict
+    lookup matches; in CNVkit's own pipeline this is guaranteed because the
+    labels are derived from the array via ``infer_sex_chrom_labels``.
     """
     neutral_color = TREND_COLOR
     if "cn" not in segment._fields:
         # No 'call' info
         return highlight_color if default_bright else neutral_color
 
+    x_label, y_label = sex_chrom_labels
+    expected_ploidies: dict[str, tuple[int, int]] = {}
+    if x_label is not None:
+        expected_ploidies[x_label] = (1, 2)
+    if y_label is not None:
+        expected_ploidies[y_label] = (0, 1)
+
     # Detect copy number alteration
-    expected_ploidies = {"chrY": (0, 1), "Y": (0, 1), "chrX": (1, 2), "X": (1, 2)}
-    if segment.cn not in expected_ploidies.get(segment.chromosome, [2]):
+    if segment.cn not in expected_ploidies.get(segment.chromosome, (2,)):
         return highlight_color
 
-    # Detect regions of allelic imbalance / LOH
+    # Detect regions of allelic imbalance / LOH on autosomes
     if (
         segment.chromosome not in expected_ploidies
         and "cn1" in segment._fields
