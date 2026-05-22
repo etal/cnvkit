@@ -304,11 +304,18 @@ class CopyNumArray(GenomicArray):
         These are generally bins that had no reads mapped due to sample-specific
         issues. A very small log2 ratio or coverage value may have been
         substituted to avoid domain or divide-by-zero errors.
+
+        NaN log2/depth values (from degenerate or malformed inputs) are also
+        dropped here: a bare ``log2 < min_cvg`` comparison is False for NaN, so
+        without this NaN bins would slip past into segmentation and trigger an
+        'invalid value encountered in greater' warning or a CBS crash (#521).
         """
         min_cvg = params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
-        drop_idx = self.data["log2"] < min_cvg
+        log2 = self.data["log2"]
+        drop_idx = (log2 < min_cvg) | log2.isna()
         if "depth" in self:
-            drop_idx |= self.data["depth"] == 0
+            depth = self.data["depth"]
+            drop_idx |= (depth == 0) | depth.isna()
         if verbose and drop_idx.any():
             logging.info("Dropped %d low-coverage bins", drop_idx.sum())
         return self[~drop_idx]

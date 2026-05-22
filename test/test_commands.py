@@ -488,6 +488,30 @@ class ReferenceTests(unittest.TestCase):
         cnr = commands.do_fix(tgt_bins, blank_bins, ref[~is_bg])
         self.assertTrue(0 < len(cnr) <= len(tgt_bins))
 
+    def test_fix_degenerate_no_nan(self):
+        """do_fix never emits NaN log2/weight from degenerate input (gh#521/#524).
+
+        Zero-coverage sentinel and NaN bins (from malformed inputs or dead
+        regions in WGS) must not survive into the .cnr, where they would crash
+        smoothing/CBS downstream.
+        """
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        tgt_bins = ref[~is_bg].copy()
+        anti_bins = ref[is_bg].copy()
+        # Inject degenerate values into a few sample bins
+        tgt_log2 = tgt_bins["log2"].copy()
+        tgt_log2.iloc[0] = np.nan
+        tgt_log2.iloc[1] = params.NULL_LOG2_COVERAGE
+        tgt_bins["log2"] = tgt_log2
+        # Inject a degenerate value into the reference, too
+        ref_log2 = ref["log2"].copy()
+        ref_log2.iloc[2] = np.nan
+        ref["log2"] = ref_log2
+        cnr = commands.do_fix(tgt_bins, anti_bins, ref)
+        self.assertFalse(np.isnan(cnr["log2"]).any())
+        self.assertFalse(np.isnan(cnr["weight"]).any())
+
 
 class SegmentationTests(unittest.TestCase):
     """Tests for segmentation commands."""
@@ -1164,6 +1188,73 @@ class CallTests(unittest.TestCase):
         _assert_chrx_non_par(abs_df, abs_ref, abs_clonal, abs_exp, 2, 1, 3.43002)
         _assert_chry_par(abs_df, abs_ref, abs_exp, abs_clonal, 0, 0, 0.0)
         _assert_chry_non_par(abs_df, abs_ref, abs_exp, abs_clonal, 1, 1, 0.45083)
+
+    @staticmethod
+    def _deep_deletion_cns():
+        """Segments including deep deletions: a true homozygous deletion
+        (log2=-3) and a zero-coverage sentinel segment (log2=NULL_LOG2_COVERAGE).
+        """
+        log2 = [0.0, -3.0, params.NULL_LOG2_COVERAGE, 0.585]
+        n = len(log2)
+        return cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["-"] * n,
+                    "log2": log2,
+                    "probes": [10] * n,
+                    "weight": [1.0] * n,
+                }
+            )
+        )
+
+    def test_call_clonal_no_negative_cn(self):
+        """Clonal calling with impure samples never emits negative copy number.
+
+        Regression for gh#503/#516: with purity < 1, the purity-rescale formula
+        n = (r*2^log2 - x*(1-p)) / p extrapolates to negative absolute copies
+        for deeply deleted (or zero-coverage sentinel) segments. Absolute copy
+        number is physically >= 0, so it must be floored at 0.
+        """
+        cns = self._deep_deletion_cns()
+        for tumor_purity in (0.3, 0.5, 0.65, 0.9):
+            with self.subTest(purity=tumor_purity):
+                called = commands.do_call(
+                    cns,
+                    None,
+                    "clonal",
+                    purity=tumor_purity,
+                    is_haploid_x_reference=True,
+                    is_sample_female=True,
+                )
+                self.assertTrue(
+                    (called["cn"] >= 0).all(),
+                    f"negative cn at purity={tumor_purity}: {called['cn'].tolist()}",
+                )
+                # Deep-deletion and sentinel segments should call CN 0
+                self.assertEqual(called["cn"].iloc[1], 0)
+                self.assertEqual(called["cn"].iloc[2], 0)
+
+    def test_log2_ratio_to_absolute_floored_at_zero(self):
+        """_log2_ratio_to_absolute never returns a negative absolute (gh#503)."""
+        # Impure path: deep deletion below the (1-p) contamination floor
+        self.assertEqual(
+            call._log2_ratio_to_absolute(-20.0, 2, 2, purity=0.5), 0.0
+        )
+        self.assertEqual(
+            call._log2_ratio_to_absolute(-3.0, 2, 2, purity=0.5), 0.0
+        )
+        # A real single-copy gain is unaffected
+        self.assertAlmostEqual(
+            call._log2_ratio_to_absolute(0.585, 2, 2, purity=1.0), 3.0, places=2
+        )
+        # A NaN log2 (malformed input) propagates rather than being silently
+        # floored to 0 -- a false homozygous-deletion call would be worse.
+        self.assertTrue(
+            np.isnan(call._log2_ratio_to_absolute(np.nan, 2, 2, purity=0.5))
+        )
 
 
 class LoadHetSnpsTests(unittest.TestCase):
