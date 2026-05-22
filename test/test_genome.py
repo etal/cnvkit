@@ -66,6 +66,29 @@ class GaryTests(unittest.TestCase):
             "It's possible to provide a Pandas filter.",
         )
 
+    def test_autosomes_yeast(self):
+        """Roman-numeral chromosomes (yeast) are recognized as autosomes."""
+        rows = [
+            (f"chr{r}", 0, 1000)
+            for r in ("I", "II", "VIII", "IX", "X", "XI", "XVI")
+        ] + [("chrM", 0, 1000)]
+        yeast = GA.from_rows(rows)
+        auto = yeast.autosomes()
+        # All seven Roman-numeral chromosomes are autosomes; chrM is excluded.
+        self.assertEqual(len(auto), 7)
+        self.assertNotIn("chrM", set(auto.chromosome))
+        # chrX is autosome 10 in yeast, not a sex chromosome.
+        self.assertIn("chrX", set(auto.chromosome))
+
+    def test_autosomes_unrecognized_genome(self):
+        """An unfamiliar chromosome set falls back permissively with a warning."""
+        rows = [("custom_a", 0, 100), ("custom_b", 0, 100), ("scaffold_1", 0, 100)]
+        ga = GA.from_rows(rows)
+        with self.assertLogs(level="WARNING") as cm:
+            auto = ga.autosomes()
+        self.assertEqual(len(auto), len(ga))
+        self.assertTrue(any("no autosomes recognized" in m for m in cm.output))
+
     def test_by_chromosome(self):
         for fname in ("formats/amplicon.cnr", "formats/cl_seq.cns"):
             cnarr = read_ga(fname)

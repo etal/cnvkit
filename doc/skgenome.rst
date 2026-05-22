@@ -87,10 +87,26 @@ Genomic interval arithmetic
 Helper modules
 --------------
 
+``chromnames``
+~~~~~~~~~~~~~~
+
+.. automodule:: skgenome.chromnames
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 ``chromsort``
 ~~~~~~~~~~~~~
 
 .. automodule:: skgenome.chromsort
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+``genomebuild``
+~~~~~~~~~~~~~~~
+
+.. automodule:: skgenome.genomebuild
     :members:
     :undoc-members:
     :show-inheritance:

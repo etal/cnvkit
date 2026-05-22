@@ -78,6 +78,27 @@ appropriately.
 :ref:`scatter` and :ref:`heatmap` do not adjust the sex chromosomes for sample
 or reference sex.
 
+Non-human and Roman-numeral genomes
+-----------------------------------
+
+CNVkit recognizes chromosomes named with arabic numerals (``1`` / ``chr1``)
+and Roman numerals (``chrI`` / ``XVI``). This means yeast (*S. cerevisiae*)
+and other organisms that use Roman-numeral chromosome names are supported
+out of the box.
+
+For genomes where no recognizable autosome naming convention is detected
+(e.g. an in-progress assembly with scaffold-style names), the
+``autosomes()`` selection falls back permissively to returning the entire
+dataset and logs a warning. This is intentional: it is better to plot
+everything (and trust the user) than to silently discard data.
+
+Sex-chromosome handling is *only* activated when both an ``X``/``chrX`` and
+a ``Y``/``chrY`` (or just an ``X``/``chrX`` in a clearly arabic-numeral
+genome) are detected in the data. In yeast — where ``chrX`` is the 10th
+chromosome by Roman numeral rather than a sex chromosome —
+sex-chromosome inference is automatically disabled and ``cnvkit.py sex``
+will report no result.
+
 FAQ
 ---
 

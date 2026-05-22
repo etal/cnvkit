@@ -11,6 +11,7 @@ from collections.abc import Generator, Iterable
 
 import numpy as np
 from skgenome import tabio, GenomicArray as GA
+from skgenome.chromnames import is_alternative_contig, is_mitochondrial
 from typing import TYPE_CHECKING
 
 
@@ -55,12 +56,15 @@ def drop_noncanonical_contigs(region_tups: Iterable[tuple]) -> Iterable[tuple]:
 
     `region_tups` is an iterable of (chrom, start, end) tuples.
 
-    Yield the same, but dropping noncanonical chrom.
+    Yield the same, but dropping alternative/unplaced contigs and
+    mitochondria. Roman-numeral chromosomes (e.g. yeast ``chrI``..``chrXVI``)
+    are kept.
     """
-    # Avoid a circular import
-    from .antitarget import is_canonical_contig_name
-
-    return (tup for tup in region_tups if is_canonical_contig_name(tup[0]))
+    return (
+        tup
+        for tup in region_tups
+        if not (is_alternative_contig(tup[0]) or is_mitochondrial(tup[0]))
+    )
 
 
 def get_regions(fasta_fname: str) -> Generator[tuple, None, None]:

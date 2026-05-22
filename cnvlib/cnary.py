@@ -9,6 +9,8 @@ import pandas as pd
 from scipy.stats import median_test
 
 from skgenome import GenomicArray
+from skgenome.chromnames import infer_sex_chrom_labels
+from skgenome.genomebuild import get_genome_build
 from . import core, descriptives, params, smoothing
 from .segmetrics import segment_mean
 
@@ -47,24 +49,38 @@ class CopyNumArray(GenomicArray):
     def log2(self, value) -> None:
         self.data["log2"] = value
 
-    @property
-    def chr_x_label(self) -> str:
-        """The name of the X chromosome.
-
-        This is either "X" or "chrX".
-        """
-        key = "chr_x"
-        if key in self.meta:
-            return str(self.meta[key])
+    def _ensure_sex_chrom_labels(self) -> None:
+        """Populate ``meta['chr_x']`` and ``meta['chr_y']`` if not already set."""
+        if "chr_x" in self.meta and "chr_y" in self.meta:
+            return
         if len(self):
-            chr_x_label = "chrX" if self.chromosome.iat[0].startswith("chr") else "X"
-            self.meta[key] = chr_x_label
-            return chr_x_label
-        return ""
+            x, y = infer_sex_chrom_labels(self.chromosome.unique())
+        else:
+            x, y = None, None
+        self.meta.setdefault("chr_x", x)
+        self.meta.setdefault("chr_y", y)
+
+    @property
+    def chr_x_label(self) -> str | None:
+        """The name of the X chromosome in this dataset, if present.
+
+        Returns ``"chrX"`` or ``"X"`` if one of those is present in the data,
+        or ``None`` if no X chromosome is detected. For yeast and other
+        Roman-numeral genomes where ``chrX`` is autosome 10, returns ``None``.
+        """
+        self._ensure_sex_chrom_labels()
+        label = self.meta["chr_x"]
+        return label if label is None else str(label)
 
     def chr_x_filter(self, diploid_parx_genome: str | None = None) -> Series:
-        """All regions on X, potentially without PAR1/2."""
-        x = self.chromosome == self.chr_x_label
+        """All regions on X, potentially without PAR1/2.
+
+        Returns an all-False Series when no X chromosome is detected.
+        """
+        label = self.chr_x_label
+        if label is None:
+            return pd.Series(False, index=self.data.index)
+        x = self.chromosome == label
         if diploid_parx_genome is not None:
             # Exclude PAR since they are expected to be diploid (i.e. autosomal).
             x &= ~self.parx_filter(genome_build=diploid_parx_genome)
@@ -72,42 +88,51 @@ class CopyNumArray(GenomicArray):
 
     def parx_filter(self, genome_build: str) -> Series:
         """All PAR1/2 regions on X."""
-        genome_build = genome_build.lower()
-        assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
-        f = self.chromosome == self.chr_x_label
-        par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1X"]
-        par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2X"]
+        build = get_genome_build(genome_build)
+        label = self.chr_x_label
+        if label is None:
+            return pd.Series(False, index=self.data.index)
+        f = self.chromosome == label
+        par1_start, par1_end = build.par_regions["PAR1X"]
+        par2_start, par2_end = build.par_regions["PAR2X"]
         f &= ((self.start >= par1_start) & (self.end <= par1_end)) | (
             (self.start >= par2_start) & (self.end <= par2_end)
         )
         return f
 
     @property
-    def chr_y_label(self) -> str:
-        """The name of the Y chromosome."""
-        if "chr_y" in self.meta:
-            return str(self.meta["chr_y"])
-        if len(self):
-            chr_y = "chrY" if self.chr_x_label.startswith("chr") else "Y"
-            self.meta["chr_y"] = chr_y
-            return chr_y
-        return ""
+    def chr_y_label(self) -> str | None:
+        """The name of the Y chromosome in this dataset, if present.
+
+        Returns ``None`` when no Y chromosome is detected.
+        """
+        self._ensure_sex_chrom_labels()
+        label = self.meta["chr_y"]
+        return label if label is None else str(label)
 
     def pary_filter(self, genome_build: str) -> Series:
         """All PAR1/2 regions on Y."""
-        genome_build = genome_build.lower()
-        assert genome_build in params.SUPPORTED_GENOMES_FOR_PAR_HANDLING
-        f = self.chromosome == self.chr_y_label
-        par1_start, par1_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR1Y"]
-        par2_start, par2_end = params.PSEUDO_AUTSOMAL_REGIONS[genome_build]["PAR2Y"]
+        build = get_genome_build(genome_build)
+        label = self.chr_y_label
+        if label is None:
+            return pd.Series(False, index=self.data.index)
+        f = self.chromosome == label
+        par1_start, par1_end = build.par_regions["PAR1Y"]
+        par2_start, par2_end = build.par_regions["PAR2Y"]
         f &= ((self.start >= par1_start) & (self.end <= par1_end)) | (
             (self.start >= par2_start) & (self.end <= par2_end)
         )
         return f
 
     def chr_y_filter(self, diploid_parx_genome: str | None = None) -> Series:
-        """All regions on Y, potentially without PAR1/2."""
-        y = self.chromosome == self.chr_y_label
+        """All regions on Y, potentially without PAR1/2.
+
+        Returns an all-False Series when no Y chromosome is detected.
+        """
+        label = self.chr_y_label
+        if label is None:
+            return pd.Series(False, index=self.data.index)
+        y = self.chromosome == label
         if diploid_parx_genome is not None:
             # Exclude PAR on Y since they cannot be covered (everything is mapped to X).
             y &= ~self.pary_filter(genome_build=diploid_parx_genome)
@@ -476,7 +501,8 @@ class CopyNumArray(GenomicArray):
         chrx = self[self.chr_x_filter(diploid_parx_genome)]
         if not len(chrx):
             logging.warning(
-                "No %s found in sample; is the input truncated?", self.chr_x_label
+                "No %s found in sample; is the input truncated?",
+                self.chr_x_label or "X chromosome",
             )
             return None, {}
 

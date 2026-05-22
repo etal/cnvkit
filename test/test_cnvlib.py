@@ -179,6 +179,32 @@ class CNATests(unittest.TestCase):
             "PAR1/2 is included upon request.",
         )
 
+    def test_yeast_chromosomes(self):
+        """Roman-numeral (yeast) chromosomes are handled correctly.
+
+        Regression test for GitHub issue #889.
+        """
+        log2_value = 0.0
+        rows = [
+            (f"chr{r}", 100, 200, "gene", log2_value)
+            for r in ("I", "II", "VIII", "IX", "X", "XI", "XVI")
+        ] + [("chrM", 100, 200, "gene", log2_value)]
+        yeast = cnary.CopyNumArray.from_rows(rows)
+        # No sex chromosomes detected -- chrX is autosome 10 in yeast.
+        self.assertIsNone(yeast.chr_x_label)
+        self.assertIsNone(yeast.chr_y_label)
+        # Sex-chromosome filters return all-False, not exceptions.
+        self.assertFalse(yeast.chr_x_filter().any())
+        self.assertFalse(yeast.chr_y_filter().any())
+        # autosomes() includes all 7 Roman-numeral chromosomes (incl. chrX)
+        # but excludes chrM.
+        auto = yeast.autosomes()
+        self.assertEqual(len(auto), 7)
+        self.assertNotIn("chrM", set(auto.chromosome))
+        self.assertIn("chrX", set(auto.chromosome))
+        # guess_xx returns None when there's no X/Y to compare.
+        self.assertIsNone(yeast.guess_xx(verbose=False))
+
     def test_basic(self):
         """Test basic container functionality and magic methods."""
         cna = cnvlib.read("formats/reference-tr.cnn")
