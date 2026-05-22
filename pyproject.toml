@@ -117,7 +117,6 @@ select = [
     "PD", # pandas-vet
     "RUF", # ruff's extra rules
     "TC", # flake8-type-checking
-    #"SIM", # flake8-simplify
     #"ANN", # flake8-annotations
 ]
 ignore = [
@@ -131,10 +130,7 @@ ignore = [
     "B007",  # loop variable not used in body
     "B023",  # def closing over loop variable
     "PD009", # use .iloc instead of .iat (iat is actually faster for scalar access)
-    "PD901", # avoid generic variable name 'df' (acceptable in scientific code)
     "RUF100", # unneeded noqa
-    #"SIM108", # ternary if-else
-    #"SIM401", # use dict.get
 ]
 
 [tool.ruff.format]

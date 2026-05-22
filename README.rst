@@ -210,9 +210,9 @@ Quick start for development::
 
 The project uses modern development tools:
 
-- **Pre-commit hooks**: Automatic code formatting and linting (see ``PRE-COMMIT-SETUP.md``)
+- **Pre-commit hooks**: Automatic code formatting and linting
 - **Makefile**: Convenient shortcuts (``make help`` for options)
-- **Docker**: Automated builds for reproducible execution (see ``DOCKER.md``)
+- **Docker**: Automated builds for reproducible execution
 - **GitHub Actions**: CI/CD with tests across Python 3.11-3.14
 
 For VS Code users, a DevContainer configuration is available with all
@@ -221,10 +221,10 @@ Container".
 
 Resources for developers:
 
-- Development guide: ``CONTRIBUTING.md``
-- Docker information: ``DOCKER.md``
+- Contributing guide: ``CONTRIBUTING.md``
+- Full development guide: `doc/development.rst <https://cnvkit.readthedocs.io/en/latest/development.html>`_
+- Running CNVkit with Docker: `doc/docker.rst <https://cnvkit.readthedocs.io/en/latest/docker.html>`_
 - Architecture details: ``CLAUDE.md``
-- Pre-commit setup: ``PRE-COMMIT-SETUP.md``
 
 
 Example workflow
