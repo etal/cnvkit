@@ -287,6 +287,15 @@ def _do_segmentation(
             raise ValueError(f"Unknown method {method!r}")
 
     segarr.meta = cnarr.meta.copy()
+    if not len(segarr):
+        # No segments produced -- e.g. every bin in this arm was unsegmentable
+        # in R (missing chromosome or non-finite start), so DNAcopy emitted an
+        # empty SEG table. Return the empty array rather than crashing in
+        # variant re-segmentation or transfer_fields, which both assume at
+        # least one segment (#868).
+        if save_dataframe:
+            return segarr, seg_out
+        return segarr
     if variants and not method.startswith("hmm"):
         # Re-segment the variant allele freqs within each segment
         # TODO train on all segments together
@@ -404,9 +413,7 @@ def transfer_fields(
             seg_wt = float(np.nansum(wt))
             if seg_wt > 0:
                 valid = ~np.isnan(wt)
-                seg_dp = np.average(
-                    bin_depths[bin_idx][valid], weights=wt[valid]
-                )
+                seg_dp = np.average(bin_depths[bin_idx][valid], weights=wt[valid])
             else:
                 seg_dp = 0.0
         else:

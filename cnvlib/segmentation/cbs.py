@@ -21,6 +21,17 @@ if ((sum(is.na(tbl$log2)) > 0)) {
     # Drop any bins with null/missing log2 ratios
     tbl = tbl[!is.na(tbl$log2),]
 }
+# Drop bins CNA() would silently remove (missing chromosome or non-finite
+# start) so the 'weights' vector below stays aligned with the probes (#868)
+tbl = tbl[!is.na(tbl$chromosome) & is.finite(tbl$start),]
+if (nrow(tbl) == 0) {
+    # Every bin was unsegmentable; emit an empty SEG table so the caller
+    # substitutes a placeholder segment instead of crashing (#868)
+    empty = data.frame(ID=character(), chrom=character(), loc.start=numeric(),
+                       loc.end=numeric(), num.mark=integer(), seg.mean=numeric())
+    write.table(empty, '', sep='\t', row.names=FALSE)
+    quit(save="no", status=0)
+}
 
 cna = CNA(cbind(tbl$log2), tbl$chromosome, tbl$start,
           data.type="logratio", presorted=T)

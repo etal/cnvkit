@@ -2,6 +2,7 @@
 """Unit tests for the CNVkit library, cnvlib."""
 
 import unittest
+from io import StringIO
 
 from skgenome import tabio
 
@@ -87,6 +88,17 @@ class IOTests(unittest.TestCase):
             for _sample_id, dframe in tabio.seg.parse_seg(fname, *args):
                 seen_lines += len(dframe)
             self.assertEqual(seen_lines, expect_lines)
+
+    def test_read_seg_empty(self):
+        """A header-only SEG (no segment rows) reads as an empty table (#868)."""
+        header = '"ID"\t"chrom"\t"loc.start"\t"loc.end"\t"num.mark"\t"seg.mean"\n'
+        samples = list(tabio.seg.parse_seg(StringIO(header)))
+        self.assertEqual(len(samples), 1)
+        _sample_id, dframe = samples[0]
+        self.assertEqual(len(dframe), 0)
+        self.assertIn("chromosome", dframe.columns)
+        # The high-level reader returns an empty table rather than raising
+        self.assertEqual(len(tabio.read(StringIO(header), "seg")), 0)
 
     def test_read_text(self):
         """Read the text region format."""
