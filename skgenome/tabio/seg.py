@@ -176,6 +176,12 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
     dframe["gene"] = "-"
     dframe["start"] -= 1
     keep_columns = dframe.columns.drop(["sample_id"])
+    if dframe.empty:
+        # Header-only SEG (no segment rows): yield one empty sample so callers
+        # receive an empty table instead of nothing (e.g. DNAcopy emits this
+        # when every bin is unsegmentable; see issue #868)
+        yield "", dframe.loc[:, keep_columns]
+        return
     for sid, sample in dframe.groupby(by="sample_id", sort=False):
         yield sid, sample.loc[:, keep_columns]
 

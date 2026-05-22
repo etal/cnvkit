@@ -155,6 +155,7 @@ enable_error_code = ["ignore-without-code"]
 [tool.bandit]
 # Skip security rules inappropriate for bioinformatics toolkit that needs to call external tools
 skips = [
+    "B101",  # assert_used - asserts are an intentional idiom here, incl. type narrowing
     "B404",  # subprocess module - needed for calling bioinformatics tools like samtools, R
     "B603",  # subprocess without shell=True - this is actually good security practice
     "B607",  # partial executable path - standard practice for bioinformatics pipelines
