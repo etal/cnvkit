@@ -104,21 +104,32 @@ def biweight_location(
         # Weight the observations by distance from initial estimate
         d = a - initial
         mad = np.median(np.abs(d))
-        w = d / max(c * mad, epsilon)
-        w = (1 - w**2) ** 2
+        if mad == 0:
+            # More than half the values equal the median: no robust spread to
+            # weight by, so the location is that dominant value. (An absolute
+            # scale floor here would not be scale-equivariant.)
+            return initial, 0.0
+        scale = c * mad
+        # Standardized residuals of far outliers overflow when squared; the
+        # mask below rejects them anyway, so silence that benign warning.
+        with np.errstate(over="ignore"):
+            w = (1 - (d / scale) ** 2) ** 2
         # Omit the outlier points
         mask = w < 1
         weightsum = w[mask].sum()
         if weightsum == 0:
             # Insufficient variation to improve the initial estimate
-            return initial
-        return initial + (d[mask] * w[mask]).sum() / weightsum
+            return initial, scale
+        return initial + (d[mask] * w[mask]).sum() / weightsum, scale
 
     if initial is None:
         initial = np.median(a)
     for _i in range(max_iter):
-        result = biloc_iter(a, initial)
-        if abs(result - initial) <= epsilon:
+        result, scale = biloc_iter(a, initial)
+        # Stop on the *standardized* step so convergence is scale-equivariant:
+        # an absolute threshold would stop scaled and unscaled inputs after
+        # different iteration counts, breaking biweight_location(k*a) == k*...
+        if abs(result - initial) <= epsilon * scale:
             break
         initial = result
     return result  # type: ignore[no-any-return]
