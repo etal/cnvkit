@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from skgenome import tabio
+from skgenome.chromnames import detect_chr_prefix
 
 from . import call
 from .cmdutil import read_cna
@@ -638,11 +639,8 @@ def theta_read_counts(
 def export_theta_snps(varr: VariantArray) -> Iterator[pd.DataFrame]:
     """Generate THetA's SNP per-allele read count "formatted.txt" files."""
     # Drop any chromosomes that are not integer or XY
-    varr = varr.autosomes(
-        also=(
-            ["chrX", "chrY"] if varr.chromosome.iat[0].startswith("chr") else ["X", "Y"]
-        )
-    )
+    prefix = detect_chr_prefix(varr.chromosome.unique())
+    varr = varr.autosomes(also=[f"{prefix}X", f"{prefix}Y"])
     # Skip indels
     varr = varr[(varr["ref"].str.len() == 1) & (varr["alt"].str.len() == 1)]
     # Drop rows with any NaN

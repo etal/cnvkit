@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 import logging
-import re
 
 from skgenome import GenomicArray as GA
+from skgenome.chromnames import is_alternative_contig, is_mitochondrial
 
 from .params import INSERT_SIZE, MIN_REF_COVERAGE, ANTITARGET_NAME
+
+
+def _is_canonical_for_antitarget(name: str) -> bool:
+    """Identify chromosomes the antitarget step should consider canonical.
+
+    Excludes alternative/unplaced contigs and mitochondria. Roman-numeral
+    chromosomes (e.g. yeast) are treated as canonical.
+    """
+    return not (is_alternative_contig(name) or is_mitochondrial(name))
 
 
 def do_antitarget(
@@ -95,8 +104,10 @@ def drop_noncanonical_contigs(accessible: GA, targets: GA, verbose: bool = True)
     # Filter out untargeted alternative contigs and mitochondria
     untgt_chroms = access_chroms - target_chroms
     # Autosomes typically have numeric names, allosomes are X and Y
-    if any(is_canonical_contig_name(c) for c in target_chroms):
-        chroms_to_skip = [c for c in untgt_chroms if not is_canonical_contig_name(c)]
+    if any(_is_canonical_for_antitarget(c) for c in target_chroms):
+        chroms_to_skip = [
+            c for c in untgt_chroms if not _is_canonical_for_antitarget(c)
+        ]
     else:
         # Alternative contigs have longer names -- skip them
         max_tgt_chr_name_len = max(map(len, target_chroms))
@@ -143,32 +154,6 @@ def guess_chromosome_regions(targets: GA, telomere_size: int) -> GA:
         }
     )
     return whole_chroms
-
-
-# TODO - move to skgenome.chromsort
-
-# CNVkit's original inclusion regex
-re_canonical = re.compile(r"(chr)?(\d+|[XYxy])$")
-# goleft indexcov's exclusion regex
-re_noncanonical = re.compile(
-    "|".join(
-        (
-            r"^chrEBV$",
-            r"^NC|_random$",
-            r"Un_",
-            r"^HLA\-",
-            r"_alt$",
-            r"hap\d$",
-            r"chrM",
-            r"MT",
-        )
-    )
-)
-
-
-def is_canonical_contig_name(name: str) -> bool:
-    # return bool(re_canonical.match(name))
-    return not re_noncanonical.search(name)
 
 
 def _drop_short_contigs(garr: GA) -> GA:
