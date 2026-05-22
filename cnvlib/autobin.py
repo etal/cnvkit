@@ -92,7 +92,11 @@ def do_autobin(
 
     # Closes over bp_per_bin
     def depth2binsize(depth: float | None, min_size: int, max_size: int) -> int | None:
-        if not depth:
+        if depth is None or not np.isfinite(depth) or depth <= 0:
+            # Guards the antitarget path (anti_depth may be None, or NaN when no
+            # reads fall off-target): a bare `if not depth` misses NaN, since
+            # `not np.nan` is False, letting it reach round() -> ValueError.
+            # (do_autobin already raises on a bad *target* depth before here.)
             return None
         bin_size = round(bp_per_bin / depth)
         if bin_size < min_size:
@@ -138,6 +142,21 @@ def do_autobin(
             tgt_depth = average_depth(rc_table, read_len)  # type: ignore[arg-type]
             anti_depth = None  # type: ignore[assignment]
 
+    # A non-finite or non-positive target depth means no reads were found in
+    # the sampled/accessible regions -- give an actionable error rather than a
+    # cryptic "cannot convert float NaN to integer" downstream (gh#421).
+    if tgt_depth is None or not np.isfinite(tgt_depth) or tgt_depth <= 0:
+        raise ValueError(
+            f"Could not estimate read depth in the target regions of "
+            f"{bam_fname!r} (method {method!r}): got {tgt_depth!r}. This "
+            "usually means no reads mapped to those regions -- most often "
+            "because the chromosome names in the BAM file don't match those "
+            "in the reference, --access, or --targets regions (e.g. 'chr1' "
+            "vs. '1'), or the regions are empty. Check that the BAM, reference "
+            "FASTA, and any --access/--targets files use consistent chromosome "
+            "names."
+        )
+
     # Clip bin sizes to specified ranges
     tgt_bin_size = depth2binsize(tgt_depth, target_min_size, target_max_size)
     anti_bin_size = depth2binsize(anti_depth, antitarget_min_size, antitarget_max_size)
@@ -182,8 +201,11 @@ def average_depth(rc_table: pd.DataFrame, read_length: int | float) -> float:
     -------
     float
         Median of the per-chromosome mean read depths, weighted by chromosome
-        size.
+        size. NaN if no chromosomes remain (e.g. the BAM and region chromosome
+        names don't overlap), which the caller turns into an actionable error.
     """
+    if rc_table.empty:
+        return float("nan")
     mean_depths = read_length * rc_table.mapped / rc_table.length
     return weighted_median(mean_depths, rc_table.length)  # type: ignore[no-any-return]
 
@@ -200,10 +222,17 @@ def sample_region_cov(
 ) -> float:
     """Calculate read depth in a randomly sampled subset of regions."""
     midsize_regions = sample_midsize_regions(regions, max_num)
+    bam_chroms = samutil.get_bam_chroms(bam_fname, fasta)
     with tempfile.NamedTemporaryFile(suffix=".bed", mode="w+t") as f:
         tabio.write(regions.as_dataframe(midsize_regions), f, "bed4")
         f.flush()
-        table = coverage.bedcov(f.name, bam_fname, 0, fasta)
+        table = coverage.bedcov(
+            f.name, bam_fname, 0, fasta, allow_empty=True, bam_chroms=bam_chroms
+        )
+    if not len(table):
+        # No sampled region overlaps a BAM contig -- depth is undefined; let
+        # the caller (do_autobin) raise an actionable chrom-name-mismatch error.
+        return float("nan")
     # Mean read depth across all sampled regions
     return table.basecount.sum() / (table.end - table.start).sum()  # type: ignore[no-any-return]
 

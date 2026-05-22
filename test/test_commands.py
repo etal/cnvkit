@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import matplotlib
 import numpy as np
 import pandas as pd
-from skgenome import tabio
+from skgenome import tabio, GenomicArray as GA
 
 matplotlib.use("Agg")
 
@@ -52,6 +52,7 @@ from cnvlib import (
     purity,
     reference,
     reports,
+    samutil,
     scatter,
     segfilters,
     segmentation,
@@ -112,6 +113,101 @@ class PreprocessingTests(unittest.TestCase):
             )
             self.assertGreater(cov, 0)
             self.assertGreater(bs, 0)
+
+    def test_autobin_chrom_name_mismatch(self):
+        """WGS autobin gives a clear, actionable error -- not the cryptic
+        'cannot convert float NaN to integer' -- when the BAM and access
+        regions share no chromosome names (gh#421)."""
+        bam_fname = "formats/na12878-chrM-Y-trunc.bam"
+        # Access regions on a contig absent from the BAM => no shared chroms,
+        # so the estimated read depth is NaN.
+        access_arr = GA.from_columns(
+            {"chromosome": ["nonexistent_contig"], "start": [0], "end": [100000]}
+        )
+        with self.assertRaises(ValueError) as cm:
+            autobin.do_autobin(bam_fname, "wgs", access=access_arr)
+        msg = str(cm.exception)
+        self.assertNotIn("NaN", msg)
+        self.assertIn("chromosome", msg.lower())
+
+    def test_bedcov_filters_absent_contigs(self):
+        """bedcov keeps regions on BAM contigs and drops those on absent
+        contigs instead of erroring out entirely (gh#620)."""
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        bam_chroms = samutil.get_bam_chroms(bam)
+        with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
+            f.write("chrM\t251\t277\tfoo\n")
+            f.write("absent_contig\t100\t200\tbar\n")
+            bed = f.name
+        try:
+            table = coverage.bedcov(bed, bam, 0, bam_chroms=bam_chroms)
+            self.assertEqual(list(table.chromosome.unique()), ["chrM"])
+            self.assertEqual(len(table), 1)
+        finally:
+            os.unlink(bed)
+
+    def test_bedcov_all_absent_contigs(self):
+        """bedcov on an all-absent BED: raise a clear error by default, but
+        return empty when allow_empty=True (the per-chunk parallel path)."""
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        bam_chroms = samutil.get_bam_chroms(bam)
+        with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
+            f.write("absent_contig\t100\t200\tbar\n")
+            bed = f.name
+        try:
+            with self.assertRaises(ValueError) as cm:
+                coverage.bedcov(bed, bam, 0, bam_chroms=bam_chroms)
+            self.assertIn("don't match", str(cm.exception))
+            empty = coverage.bedcov(
+                bed, bam, 0, bam_chroms=bam_chroms, allow_empty=True
+            )
+            self.assertEqual(len(empty), 0)
+        finally:
+            os.unlink(bed)
+
+    def test_coverage_partial_chrom_mismatch(self):
+        """coverage tolerates a BED mixing present and absent contigs,
+        returning only the present-contig regions, for any process count and
+        either depth/count method (gh#620: failure was process-count- and
+        method-dependent)."""
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
+            f.write("chrM\t251\t277\tfoo\n")
+            f.write("chrY\t11170\t11213\tbar\n")
+            f.write("absent_contig\t100\t200\tbaz\n")
+            bed = f.name
+        try:
+            for by_count in (False, True):
+                for nprocs in (1, 2):
+                    with self.subTest(by_count=by_count, processes=nprocs):
+                        cna = commands.do_coverage(
+                            bed, bam, by_count=by_count, processes=nprocs
+                        )
+                        self.assertEqual(
+                            sorted(cna.chromosome.unique()), ["chrM", "chrY"]
+                        )
+                        self.assertEqual(len(cna), 2)
+        finally:
+            os.unlink(bed)
+
+    def test_coverage_all_chrom_mismatch(self):
+        """coverage raises a clear error when no BED chromosome matches the
+        BAM, for any process count or method (gh#620)."""
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
+            f.write("absent_contig\t100\t200\tbaz\n")
+            bed = f.name
+        try:
+            for by_count in (False, True):
+                for nprocs in (1, 2):
+                    with self.subTest(by_count=by_count, processes=nprocs):
+                        with self.assertRaises(ValueError) as cm:
+                            commands.do_coverage(
+                                bed, bam, by_count=by_count, processes=nprocs
+                            )
+                        self.assertIn("don't match", str(cm.exception))
+        finally:
+            os.unlink(bed)
 
     @pytest.mark.slow
     def test_coverage(self):

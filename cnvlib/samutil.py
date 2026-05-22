@@ -46,6 +46,17 @@ def idxstats(
     return table
 
 
+def get_bam_chroms(bam_fname: str, fasta: str | None = None) -> set[str]:
+    """Return the set of reference (chromosome/contig) names in a BAM header.
+
+    Includes contigs with zero mapped reads, since samtools accepts BED regions
+    on any header contig (they simply yield zero coverage) -- only contigs
+    *absent* from the header cause errors downstream.
+    """
+    table = idxstats(bam_fname, drop_unmapped=False, fasta=fasta)
+    return set(table.chromosome) - {"*"}
+
+
 def bam_total_reads(bam_fname: str, fasta: str | None = None) -> int64:
     """Count the total number of mapped reads in a BAM file.
 

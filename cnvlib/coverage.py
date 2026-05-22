@@ -1,9 +1,11 @@
 """Supporting functions for the 'antitarget' command."""
 
 from __future__ import annotations
+import gzip
 import logging
 import math
 import os.path
+import tempfile
 import time
 from concurrent import futures
 from io import StringIO
@@ -403,9 +405,20 @@ def interval_coverages_count(
             f"pysam is required for BAM read counting. {PYSAM_INSTALL_MSG}"
         ) from None
     regions = tabio.read_auto(bed_fname)
+    # Skip regions on contigs absent from the BAM: pysam.fetch raises
+    # "invalid contig" on them, same chrom-name-mismatch class as gh#620.
+    bam_chroms = samutil.get_bam_chroms(bam_fname, fasta)
+    present = [
+        (chrom, subr) for chrom, subr in regions.by_chromosome() if chrom in bam_chroms
+    ]
+    if not present:
+        raise ValueError(
+            f"BED file {bed_fname!r} chromosome names don't match any in "
+            f"BAM file {bam_fname!r}"
+        )
     if procs == 1:
         bamfile = pysam.AlignmentFile(bam_fname, "rb", reference_filename=fasta)
-        for chrom, subregions in regions.by_chromosome():
+        for chrom, subregions in present:
             logging.info(
                 "Processing chromosome %s of %s", chrom, os.path.basename(bam_fname)
             )
@@ -413,10 +426,7 @@ def interval_coverages_count(
                 yield [count, row]
     else:
         with futures.ProcessPoolExecutor(procs) as pool:
-            args_iter = (
-                (bam_fname, subr, min_mapq, fasta)
-                for _c, subr in regions.by_chromosome()
-            )
+            args_iter = ((bam_fname, subr, min_mapq, fasta) for _c, subr in present)
             for chunk in pool.map(_rdc, args_iter):
                 for count, row in chunk:
                     yield [count, row]
@@ -499,18 +509,29 @@ def interval_coverages_pileup(
 ) -> pd.DataFrame:
     """Calculate log2 coverages in the BAM file at each interval."""
     logging.info("Processing reads in %s", os.path.basename(bam_fname))
+    # Regions on contigs absent from the BAM header make samtools bedcov fail;
+    # filter them out per call so a chrom-name mismatch on some (but not all)
+    # regions doesn't abort the run -- and so the result is independent of how
+    # the BED is split across processes (gh#620).
+    bam_chroms = samutil.get_bam_chroms(bam_fname, fasta)
     if procs == 1:
-        table = bedcov(bed_fname, bam_fname, min_mapq, fasta)
+        table = bedcov(bed_fname, bam_fname, min_mapq, fasta, bam_chroms=bam_chroms)
     else:
         chunks = []
         with futures.ProcessPoolExecutor(procs) as pool:
             args_iter = (
-                (bed_chunk, bam_fname, min_mapq, fasta)
+                (bed_chunk, bam_fname, min_mapq, fasta, bam_chroms)
                 for bed_chunk in to_chunks(bed_fname)
             )
             for bed_chunk_fname, table in pool.map(_bedcov, args_iter):
-                chunks.append(table)
+                if len(table):
+                    chunks.append(table)
                 rm(bed_chunk_fname)
+        if not chunks:
+            raise ValueError(
+                f"BED file {bed_fname!r} chromosome names don't match any in "
+                f"BAM file {bam_fname!r}"
+            )
         table = pd.concat(chunks, ignore_index=True)
     # Fill in CNA required columns
     if "gene" in table:
@@ -528,10 +549,37 @@ def interval_coverages_pileup(
 
 
 def _bedcov(args):
-    """Wrapper for parallel."""
-    bed_fname = args[0]
-    table = bedcov(*args)
+    """Wrapper for parallel: filter each chunk to BAM contigs, tolerate empties.
+
+    Per-chunk emptiness is expected (a chunk may land entirely on contigs
+    absent from the BAM); the caller raises if *all* chunks come back empty.
+    """
+    bed_fname, bam_fname, min_mapq, fasta, bam_chroms = args
+    table = bedcov(
+        bed_fname, bam_fname, min_mapq, fasta, allow_empty=True, bam_chroms=bam_chroms
+    )
     return bed_fname, table
+
+
+def _filter_bed_to_chroms(bed_fname: str, keep_chroms: set[str]) -> tuple[str, int]:
+    """Copy `bed_fname` keeping only lines on chromosomes in `keep_chroms`.
+
+    Returns the path to a new temporary BED file and the number of lines kept.
+    The caller is responsible for removing the temporary file.
+    """
+    fd, tmp_path = tempfile.mkstemp(suffix=".bed", prefix="cnvkit-filt.")
+    opener = gzip.open if bed_fname.endswith(".gz") else open
+    n_kept = 0
+    # fdopen first so the temp fd is always closed even if opening the input
+    # raises (e.g. a malformed .gz).
+    with os.fdopen(fd, "w") as out, opener(bed_fname, "rt") as infile:
+        for line in infile:
+            if not line.strip() or line[0] == "#":
+                continue
+            if line.split("\t", 1)[0] in keep_chroms:
+                out.write(line)
+                n_kept += 1
+    return tmp_path, n_kept
 
 
 def bedcov(
@@ -540,10 +588,33 @@ def bedcov(
     min_mapq: int,
     fasta: str | None = None,
     max_depth: int | None = None,
+    allow_empty: bool = False,
+    bam_chroms: set[str] | None = None,
 ) -> pd.DataFrame:
     """Calculate depth of all regions in a BED file via samtools (pysam) bedcov.
 
     i.e. mean pileup depth across each region.
+
+    Parameters
+    ----------
+    bed_fname : str
+        Path to BED file defining regions to measure.
+    bam_fname : str
+        Path to the indexed BAM/CRAM file.
+    min_mapq : int
+        Minimum read mapping quality to count.
+    fasta : str, optional
+        Reference FASTA, required for CRAM input.
+    max_depth : int, optional
+        Cap pileup depth at this value (samtools -d).
+    allow_empty : bool
+        If True, return an empty DataFrame instead of raising when no regions
+        remain to measure (e.g. a parallel chunk landing entirely on contigs
+        absent from the BAM). Caller validates global chrom-name concordance.
+    bam_chroms : set of str, optional
+        Reference names present in the BAM header. When given, BED regions on
+        any other contig are dropped before calling samtools, which otherwise
+        aborts on regions whose contig is absent from the BAM (gh#620).
     """
     try:
         import pysam
@@ -551,23 +622,41 @@ def bedcov(
         raise ImportError(
             f"pysam is required for BAM coverage calculation. {PYSAM_INSTALL_MSG}"
         ) from None
-    # Count bases in each region; exclude low-MAPQ reads
-    cmd = []
-    if max_depth is not None:
-        cmd.extend(["-d", str(max_depth)])
-    if min_mapq and min_mapq > 0:
-        cmd.extend(["-Q", str(min_mapq)])
-    if fasta:
-        cmd.extend(["--reference", fasta])
-    cmd.extend([bed_fname, bam_fname])
+    # Drop regions on contigs absent from the BAM so samtools doesn't abort
+    filtered_fname = None
+    if bam_chroms is not None:
+        filtered_fname, n_kept = _filter_bed_to_chroms(bed_fname, bam_chroms)
+        if not n_kept:
+            rm(filtered_fname)
+            if allow_empty:
+                return pd.DataFrame()
+            raise ValueError(
+                f"BED file {bed_fname!r} chromosome names don't match any in "
+                f"BAM file {bam_fname!r}"
+            )
     try:
-        raw = pysam.bedcov(*cmd, split_lines=False)  # type: ignore[attr-defined]
-    except pysam.SamtoolsError as exc:
-        raise ValueError(
-            f"Failed processing {bam_fname!r} coverages in {bed_fname!r} regions. "
-            f"PySAM error: {exc}"
-        ) from exc
+        # Count bases in each region; exclude low-MAPQ reads
+        cmd = []
+        if max_depth is not None:
+            cmd.extend(["-d", str(max_depth)])
+        if min_mapq and min_mapq > 0:
+            cmd.extend(["-Q", str(min_mapq)])
+        if fasta:
+            cmd.extend(["--reference", fasta])
+        cmd.extend([filtered_fname or bed_fname, bam_fname])
+        try:
+            raw = pysam.bedcov(*cmd, split_lines=False)  # type: ignore[attr-defined]
+        except pysam.SamtoolsError as exc:
+            raise ValueError(
+                f"Failed processing {bam_fname!r} coverages in {bed_fname!r} "
+                f"regions. PySAM error: {exc}"
+            ) from exc
+    finally:
+        if filtered_fname is not None:
+            rm(filtered_fname)
     if not raw:
+        if allow_empty:
+            return pd.DataFrame()
         raise ValueError(
             f"BED file {bed_fname!r} chromosome names don't match any in "
             f"BAM file {bam_fname!r}"
