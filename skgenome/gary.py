@@ -10,6 +10,12 @@ import bioframe
 import numpy as np
 import pandas as pd
 
+from .chromnames import (
+    infer_sex_chrom_labels,
+    is_alternative_contig,
+    is_autosome,
+    is_mitochondrial,
+)
 from .chromsort import sorter_chrom
 from .cut import cut
 from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices, Numeric
@@ -259,10 +265,32 @@ class GenomicArray:
     # Traversal
 
     def autosomes(self, also: str | list[str] | pd.Series | None = None) -> Self:
-        """Select chromosomes w/ integer names, ignoring any 'chr' prefixes."""
-        is_auto = self.chromosome.str.match(r"(chr)?\d+$", na=False)
+        """Select autosomal rows, excluding sex chromosomes and alternative contigs.
+
+        Accepts both arabic-numeral chromosome names (e.g. ``chr1``) and
+        Roman-numeral names (e.g. ``chrI``, ``chrXVI``). Sex chromosomes are
+        inferred from the chromosome set and excluded, so ``chrX`` is treated
+        as a sex chromosome in human data and as autosome 10 in yeast data.
+
+        Mitochondrial and alternative/unplaced contigs are always excluded.
+
+        If no autosomes can be recognized (e.g. an unfamiliar custom assembly),
+        emits a warning and returns the whole array unchanged.
+        """
+        unique = self.chromosome.unique()
+        sex_x, sex_y = infer_sex_chrom_labels(unique)
+        is_auto = self.chromosome.map(
+            lambda n: is_autosome(n, sex_x, sex_y)
+            and not is_mitochondrial(n)
+            and not is_alternative_contig(n)
+        )
         if not is_auto.any():
-            # The autosomes, if any, are not named with plain integers
+            logging.warning(
+                "GenomicArray.autosomes(): no autosomes recognized in %d "
+                "chromosomes (sample: %s); returning the array unchanged.",
+                len(unique),
+                sorted(map(str, unique))[:8],
+            )
             return self
         if also is not None:
             if isinstance(also, pd.Series):
