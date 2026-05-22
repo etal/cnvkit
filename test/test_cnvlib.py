@@ -395,6 +395,65 @@ class OtherTests(unittest.TestCase):
         result = fix.apply_weights(cnarr, ref_nan, "log2", "spread")
         self.assertFalse(np.isnan(result["weight"]).any())
 
+    @staticmethod
+    def _cna_with_nan_log2():
+        """A CopyNumArray whose middle bins carry NaN / sentinel log2 values."""
+        log2 = [0.1, np.nan, params.NULL_LOG2_COVERAGE, 0.2, np.nan, -0.1]
+        n = len(log2)
+        return cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["G"] * n,
+                    "log2": log2,
+                    "depth": [100.0, 100.0, 0.0, 100.0, np.nan, 100.0],
+                    "weight": [1.0] * n,
+                }
+            )
+        )
+
+    def test_drop_low_coverage_drops_nan(self):
+        """drop_low_coverage removes NaN-log2 bins, not just the sentinel (gh#521).
+
+        A bare ``log2 < min_cvg`` comparison is False for NaN, so without
+        explicit NaN handling, NaN bins survive into segmentation and trigger
+        the 'invalid value encountered in greater' RuntimeWarning / CBS crash.
+        """
+        cnarr = self._cna_with_nan_log2()
+        kept = cnarr.drop_low_coverage()
+        # No NaN and no sentinel survives
+        self.assertFalse(np.isnan(kept["log2"]).any())
+        self.assertTrue((kept["log2"] > params.NULL_LOG2_COVERAGE).all())
+        # The three good bins remain (0.1, 0.2, -0.1)
+        self.assertEqual(len(kept), 3)
+
+    def test_mask_bad_bins_flags_nan(self):
+        """mask_bad_bins treats NaN log2/spread reference bins as bad (gh#521)."""
+        n = 5
+        ref = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["G"] * n,
+                    "log2": [0.0, np.nan, 0.0, 0.0, 0.0],
+                    "spread": [0.1, 0.1, np.nan, 0.1, 0.1],
+                    "depth": [100.0, 100.0, 100.0, 100.0, 100.0],
+                }
+            )
+        )
+        mask = fix.mask_bad_bins(ref)
+        # NaN-log2 (idx 1) and NaN-spread (idx 2) bins must be flagged bad
+        self.assertTrue(mask.iloc[1])
+        self.assertTrue(mask.iloc[2])
+        # The clean bins are kept
+        self.assertFalse(mask.iloc[0])
+        self.assertFalse(mask.iloc[3])
+        self.assertFalse(mask.iloc[4])
+
     def test_transfer_fields_nan_gene(self):
         """transfer_fields handles NaN gene names without crashing (issue #900)."""
         n = 10

@@ -131,6 +131,11 @@ numbers are emitted unless the ``-m none`` option is used to skip it.
     # Or, using a custom set of cutoffs
     cnvkit.py call -t=-1.1,-0.4,0.3,0.7 Sample.cns -y -o Sample.call.cns
 
+Absolute copy number is floored at 0: for a deeply deleted segment in a
+low-purity sample, the purity-rescaling formula can extrapolate to a negative
+value, which is reported as a homozygous deletion (copy number 0) rather than a
+nonsensical negative count.
+
 
 Export integer copy numbers as BED or VCF
 -----------------------------------------

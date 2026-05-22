@@ -526,6 +526,16 @@ def _log2_ratio_to_absolute(
     """
     if purity and purity < 1.0:
         ncopies = (ref_copies * 2**log2_ratio - expect_copies * (1 - purity)) / purity
+        # Absolute copy number is physically >= 0. For a segment deleted below
+        # the (1 - purity) normal-contamination floor (e.g. a homozygous
+        # deletion, or the NULL_LOG2_COVERAGE sentinel from zero-coverage bins),
+        # this formula extrapolates to a negative count; clamp it to 0 so the
+        # 'call' command never emits a nonsensical negative copy number (#503).
+        # A NaN log2 (malformed input) is left to propagate rather than silently
+        # floored to 0 -- a false homozygous-deletion call would be worse than a
+        # surfaced error (cf. the np.isnan guard in absolute_threshold).
+        if not np.isnan(ncopies):
+            ncopies = max(0.0, ncopies)
     else:
         ncopies = _log2_ratio_to_absolute_pure(log2_ratio, ref_copies)
     return ncopies

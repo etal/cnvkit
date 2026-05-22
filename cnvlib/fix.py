@@ -231,8 +231,11 @@ def load_adjust_coverages(
 
     ref_matched = match_ref_to_sample(ref_cnarr, cnarr)
 
-    # Drop bins that had poor coverage in the pooled reference
-    ok_cvg_indices = ~mask_bad_bins(ref_matched)
+    # Drop bins that had poor coverage in the pooled reference, or whose own
+    # sample coverage is degenerate (NaN log2 from a malformed input file).
+    # mask_bad_bins only inspects the reference, so a NaN in the sample itself
+    # would otherwise survive and propagate into segmentation/smoothing (#521).
+    ok_cvg_indices = ~(mask_bad_bins(ref_matched) | cnarr["log2"].isna())
     logging.info("Keeping %d of %d bins", sum(ok_cvg_indices), len(ref_matched))
     cnarr = cnarr[ok_cvg_indices]
     ref_matched = ref_matched[ok_cvg_indices]
@@ -289,9 +292,14 @@ def mask_bad_bins(cnarr: CopyNumArray) -> Series:
         (cnarr["log2"] < params.MIN_REF_COVERAGE)
         | (cnarr["log2"] > -params.MIN_REF_COVERAGE)
         | (cnarr["spread"] > params.MAX_REF_SPREAD)
+        # NaN log2/spread (degenerate reference bins) compare False above, so
+        # flag them explicitly -- otherwise NaN propagates into the sample after
+        # reference subtraction and crashes segmentation (#521).
+        | cnarr["log2"].isna()
+        | cnarr["spread"].isna()
     )
     if "depth" in cnarr:
-        mask |= cnarr["depth"] == 0
+        mask |= (cnarr["depth"] == 0) | cnarr["depth"].isna()
     if "gc" in cnarr:
         assert params.GC_MIN_FRACTION >= 0 and params.GC_MIN_FRACTION <= 1
         assert params.GC_MAX_FRACTION >= 0 and params.GC_MAX_FRACTION <= 1
