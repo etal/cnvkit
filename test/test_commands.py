@@ -1942,10 +1942,10 @@ class BatchTests(unittest.TestCase):
         antitarget_fnames = male_antitarget_fnames + female_antitarget_fnames
         # Only process male02 (index 1) and female01 (index 2) — the samples
         # actually checked below — to avoid redundant CBS segmentation.
-        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(
+        _ref_probes1, _cnrs1, _cnss1, clls1, _sex_df1 = run_samples(
             target_fnames, antitarget_fnames, None, sample_indices=[1, 2]
         )
-        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(
+        _ref_probes2, _cnrs2, _cnss2, clls2, _sex_df2 = run_samples(
             target_fnames, antitarget_fnames, genome_build, sample_indices=[1, 2]
         )
 
@@ -1987,10 +1987,10 @@ class BatchTests(unittest.TestCase):
         target_fnames = male_target_fnames
         antitarget_fnames = male_antitarget_fnames
         # Only process male02 (index 1) — the sample actually checked below.
-        ref_probes1, cnrs1, cnss1, clls1, sex_df1 = run_samples(
+        _ref_probes1, _cnrs1, _cnss1, clls1, _sex_df1 = run_samples(
             target_fnames, antitarget_fnames, None, sample_indices=[1]
         )
-        ref_probes2, cnrs2, cnss2, clls2, sex_df2 = run_samples(
+        _ref_probes2, _cnrs2, _cnss2, clls2, _sex_df2 = run_samples(
             target_fnames, antitarget_fnames, genome_build, sample_indices=[1]
         )
 
