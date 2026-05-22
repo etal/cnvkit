@@ -592,6 +592,48 @@ class IntervalTests(unittest.TestCase):
         iresult = target.subtract(access)
         self._compare_regions(iresult, invert)
 
+    def test_subtract_multichrom(self):
+        """Regression for #471: target regions are subtracted on every chromosome.
+
+        The old custom interval arithmetic indexed a chromosome-filtered table
+        with a non-reset index, so on chromosomes after the first the
+        subtraction silently dropped and target regions leaked back into the
+        antitarget. The bioframe-based ``subtract`` must remove the target on
+        the later chromosome too, not only the first.
+        """
+
+        def _multichrom(rows):
+            garr = GA(
+                pd.DataFrame(
+                    list(rows), columns=["chromosome", "start", "end", "gene"]
+                )
+            )
+            garr.sort_columns()
+            return garr
+
+        access = _multichrom([("chr1", 0, 100, ""), ("chr2", 0, 100, "")])
+        target = _multichrom([("chr1", 40, 60, ""), ("chr2", 40, 60, "")])
+        expect = _multichrom(
+            [
+                ("chr1", 0, 40, ""),
+                ("chr1", 60, 100, ""),
+                ("chr2", 0, 40, ""),
+                ("chr2", 60, 100, ""),
+            ]
+        )
+        result = access.subtract(target)
+        self._compare_regions(result, expect)
+        # The invariant the bug violated: no leftover region overlaps a target,
+        # including on chr2 (the chromosome that previously leaked).
+        for chrom, start, end in zip(
+            result["chromosome"], result["start"], result["end"], strict=True
+        ):
+            for t_chrom, t_start, t_end in target.coords():
+                overlaps = chrom == t_chrom and start < t_end and end > t_start
+                self.assertFalse(
+                    overlaps, f"{chrom}:{start}-{end} overlaps target on {chrom}"
+                )
+
     def test_cut(self):
         # Simple: one interval split by two boundary regions
         regions = self._from_intervals([(1, 20, "A")])
