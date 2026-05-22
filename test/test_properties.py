@@ -156,20 +156,25 @@ class TestBiweightLocation:
         assert abs(shifted - (base + c)) < tol
 
     @given(
-        # min_size=20: biweight outlier-rejection weights are unstable for
-        # small samples, breaking scale equivariance even for well-conditioned
-        # data.  20+ points give enough mass for stable convergence.
+        # min_size=20: for very small samples the windowed biweight iteration
+        # can fall into a 2-cycle (different single points enter the window each
+        # step) and never converge, so the max_iter cutoff -- and thus
+        # equivariance -- becomes sensitive to floating-point noise.  20+ points
+        # give enough mass for the iteration to converge.
         _non_constant_array(min_size=20),
         st.floats(min_value=0.5, max_value=10.0, allow_nan=False, allow_infinity=False),
     )
     def test_scale_equivariance(self, a, k):
-        """biweight_location(a * k) == biweight_location(a) * k."""
+        """biweight_location(a * k) == biweight_location(a) * k.
+
+        The convergence rule stops on the standardized step, so scaled and
+        unscaled inputs take the same iterations and equivariance holds up to
+        floating-point rounding only.
+        """
         assume(np.all(np.isfinite(a * k)))
         base = biweight_location(a)
         scaled = biweight_location(a * k)
-        # Iterative convergence (epsilon=1e-3 per run) + floating-point
-        # arithmetic across scales can compound to ~3 * epsilon.
-        tol = max(0.02 * abs(base * k), 0.004)
+        tol = 1e-9 * (abs(base * k) + 1)
         assert abs(scaled - base * k) < tol
 
 
