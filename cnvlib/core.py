@@ -30,8 +30,9 @@ def call_quiet(*args):
             f"\n(Original error: {exc})"
         ) from exc
     except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode(errors="replace") if exc.stderr else ""
         raise RuntimeError(
-            f"Subprocess command failed:\n$ {' '.join(args)}\n\n{exc}"
+            f"Subprocess command failed:\n$ {' '.join(args)}\n\n{exc}\n\n{stderr}"
         ) from exc
     return proc.stdout
 
