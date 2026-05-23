@@ -5,6 +5,7 @@ import tempfile
 import unittest
 import logging
 
+import numpy as np
 import pytest
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
@@ -61,6 +62,25 @@ class RTests(unittest.TestCase):
                 )
         # No exception means the weights stayed aligned with the kept probes.
         self.assertIn("test868", seg_out.decode())
+
+    @pytest.mark.slow
+    def test_cbs_nan_log2_in_memory(self):
+        """CBS segments an in-memory .cnr with NaN log2 values (gh#881).
+
+        The reporter ran ``segment`` (no --drop-low-coverage) on a .cnr with NaN
+        values and hit ``subprocess.CalledProcessError``. The file-read path is
+        guarded by read_tab, but an in-memory CopyNumArray (e.g. from batch)
+        reaches segmentation with the NaN bins intact. They must be dropped
+        before the Savitzky-Golay outlier filter and DNAcopy, not crash.
+        """
+        cnr = self.tas_cnr.copy()
+        log2 = cnr["log2"].to_numpy().copy()
+        # Scatter a few NaN values across the bins, as a degenerate .cnr would
+        log2[[3, 50, 120, len(log2) - 2]] = np.nan
+        cnr["log2"] = log2
+        cns = segmentation.do_segmentation(cnr, "cbs", processes=1)
+        self.assertGreater(len(cns), 0)
+        self.assertFalse(np.isnan(cns["log2"].to_numpy()).any())
 
     @pytest.mark.slow
     def test_cbs_all_bins_unsegmentable(self):
