@@ -871,6 +871,15 @@ def variants_in_segment(varr, segment, min_variants=MIN_VARIANTS_THRESHOLD):
     results = None
 
     if len(varr) > min_variants:
+        # Process variants in genomic order. The 2-state HMM's transition model
+        # assumes a position-sorted observation sequence, and squash_by_groups
+        # merges by row adjacency -- so out-of-order rows (e.g. from an unsorted
+        # input VCF, which nothing upstream sorts) produce genomically
+        # overlapping segments whose midpoint breakpoints come out non-monotonic,
+        # yielding start >= end downstream (#893). Copy first so we don't
+        # mutate the caller's array.
+        varr = varr.copy()
+        varr.sort()
         observations = varr.mirrored_baf(above_half=True)
 
         if len(observations) > 0:
