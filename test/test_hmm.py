@@ -10,6 +10,8 @@ from numpy.testing import assert_allclose, assert_array_equal
 from scipy.special import betaln, gammaln
 from scipy.stats import betabinom as sp_betabinom
 
+from cnvlib import segmentation
+from cnvlib.cnary import CopyNumArray as CNA
 from cnvlib.segmentation.hmm import (
     BETABINOM_RHO,
     _batched_emission_baf,
@@ -406,6 +408,57 @@ class VariantsInSegmentTests(unittest.TestCase):
         result = variants_in_segment(varr, segment)
         self.assertEqual(result.iloc[0]["gene"], "TP53")
         self.assertAlmostEqual(result.iloc[0]["log2"], -0.5)
+
+
+class VariantReSegmentationIntegrationTests(unittest.TestCase):
+    """Integration tests for the BAF re-segmentation glue in _do_segmentation.
+
+    The reporter of gh#1004 ran ``segment --method cbs --vcf ... --smooth-cbs``
+    and crashed inside ``variants_in_segment`` with ``'Series' object has no
+    attribute 'reshape'`` -- the pre-rewrite code called ``observations.reshape``
+    on a pandas Series. That call is reached for *any* non-HMM method via
+    ``variants.by_ranges(segarr)`` in ``_do_segmentation``, so we drive the same
+    path R-free with ``method="none"``. The unit tests above exercise
+    ``variants_in_segment`` in isolation; this covers the ``by_ranges`` ->
+    ``pd.concat`` -> ``baf_by_ranges`` integration the pool actually hits.
+    """
+
+    def test_variant_resegmentation_no_crash(self):
+        nbins = 60
+        starts = np.arange(0, nbins * 1000, 1000)
+        cnr = CNA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * nbins,
+                    "start": starts,
+                    "end": starts + 1000,
+                    "gene": ["-"] * nbins,
+                    "log2": np.zeros(nbins),
+                    "depth": np.full(nbins, 100.0),
+                    "weight": np.ones(nbins),
+                }
+            )
+        )
+        # 120 SNVs whose BAF shifts 0.5 -> 0.67 midway, so re-segmentation runs
+        # the Viterbi path (>50 variants) that used to crash on Series.reshape.
+        rng = np.random.default_rng(0)
+        n = 120
+        alt_freqs = np.concatenate(
+            [rng.normal(0.5, 0.02, n // 2), rng.normal(0.67, 0.02, n // 2)]
+        ).clip(0.01, 0.99)
+        vstart = np.linspace(0, nbins * 1000 - 2, n).astype(int)
+        varr = _make_variant_array(
+            ["chr1"] * n, vstart.tolist(), (vstart + 1).tolist(), alt_freqs.tolist()
+        )
+
+        segarr = segmentation._do_segmentation(
+            cnr, "none", None, None, variants=varr, skip_outliers=0
+        )
+        # The BAF shift splits the single 'none' segment into >= 2 pieces ...
+        self.assertGreaterEqual(len(segarr), 2)
+        # ... with valid coordinates and a populated BAF column (gh#1004).
+        self.assertTrue((segarr["start"] < segarr["end"]).all())
+        self.assertIn("baf", segarr.data.columns)
 
 
 if __name__ == "__main__":
