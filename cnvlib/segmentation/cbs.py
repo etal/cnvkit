@@ -7,8 +7,14 @@ CBS_RSCRIPT = """\
 
 library('DNAcopy')
 
+args <- commandArgs(trailingOnly=TRUE)
+probes_fname <- args[1]
+sample_id <- args[2]
+threshold <- as.numeric(args[3])
+smooth_cbs <- as.logical(args[4])
+
 write("Loading probe coverages into a data frame", stderr())
-tbl = read.delim("%(probes_fname)s")
+tbl = read.delim(probes_fname)
 # Filter the original .cnr to valid rows (usually they're all valid)
 if (!is.null(tbl$weight) && (sum(!is.na(tbl$weight)) > 0)) {
     # Drop any null or 0-weight bins
@@ -40,12 +46,12 @@ write("Segmenting the probe data", stderr())
 set.seed(0xA5EED)
 
 # additional smoothing (if --smooth-cbs provided)
-if (%(smooth_cbs)g) {
+if (smooth_cbs) {
     write("Performing smoothing of the data", stderr())
     cna = smooth.CNA(cna)
 }
 
-fit = segment(cna, weights=tbl$weight, alpha=%(threshold)g)
+fit = segment(cna, weights=tbl$weight, alpha=threshold)
 
 write("Setting segment endpoints to original bin start/end positions", stderr())
 write("and recalculating segment means with bin weights", stderr())
@@ -61,6 +67,6 @@ for (idx in 1:nrow(fit$output)) {
 }
 
 write("Printing the CBS table to standard output", stderr())
-fit$output$ID = '%(sample_id)s'
+fit$output$ID = sample_id
 write.table(fit$output, '', sep='\t', row.names=FALSE)
 """
