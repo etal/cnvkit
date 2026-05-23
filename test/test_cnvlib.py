@@ -536,6 +536,39 @@ class OtherTests(unittest.TestCase):
         self.assertEqual(result2["weight"].iat[0], 0.0)
         self.assertEqual(result2["depth"].iat[0], 0.0)
 
+    def test_do_segmentation_drops_nan_log2(self):
+        """do_segmentation tolerates NaN-log2 bins on the default path (gh#881).
+
+        Without --drop-low-coverage (skip_low=False), NaN-log2 bins are never
+        filtered before drop_outliers' Savitzky-Golay smoother, whose scipy
+        lstsq rejects non-finite input ("array must not contain infs or NaNs"),
+        crashing segmentation long before reaching DNAcopy. The NaN bins must be
+        dropped first. Uses the pure-Python 'haar' method so no R is required;
+        the savgol outlier path that crashed is shared by every method.
+        """
+        n = 120  # > drop_outliers' width (50) so savgol actually runs
+        rng = np.random.default_rng(0)
+        log2 = rng.normal(0, 0.2, n)
+        log2[5] = np.nan  # inside the leading savgol edge window
+        log2[60] = np.nan
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["G"] * n,
+                    "log2": log2,
+                    "depth": np.ones(n) * 100.0,
+                    "weight": np.ones(n),
+                }
+            )
+        )
+        # Must not raise, and no NaN should leak into the segment log2 values
+        cns = segmentation.do_segmentation(cnarr, "haar", processes=1)
+        self.assertGreater(len(cns), 0)
+        self.assertFalse(np.isnan(cns["log2"].to_numpy()).any())
+
     def test_squash_region_nan_weights(self):
         """squash_region handles NaN weights without NaN in output."""
         df = pd.DataFrame(
