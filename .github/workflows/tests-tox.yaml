@@ -31,14 +31,14 @@ jobs:
           - {name: Security, python: '3.12', os: ubuntu-latest, tox: security}
           - {name: Coverage, python: '3.12', os: ubuntu-latest, tox: coverage}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
           cache: 'pip'
           cache-dependency-path: 'requirements/*.txt'
       - name: Cache tox environments
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .tox
           key: tox-${{ matrix.tox }}-${{ matrix.python }}-${{ hashFiles('requirements/*.txt', 'pyproject.toml') }}
@@ -62,7 +62,7 @@ jobs:
         run: tox -e ${{ matrix.tox }}
       - name: Upload coverage to Codecov
         if: matrix.tox == 'coverage'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           files: ./coverage.xml
           flags: unittests
