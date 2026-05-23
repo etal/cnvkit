@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Callable
     from cnvlib.cnary import CopyNumArray
+    from numpy.typing import NDArray
     from pandas.core.frame import DataFrame
     from pandas.core.series import Series
 
@@ -52,35 +53,38 @@ def require_column(*colnames) -> Callable:
 def squash_by_groups(
     cnarr: CopyNumArray, levels: Series, by_arm: bool = False
 ) -> CopyNumArray:
-    """Reduce CopyNumArray rows to a single row within each given level."""
-    # Enumerate runs of identical values
-    change_levels = enumerate_changes(levels)
-    assert (change_levels.index == levels.index).all()
+    """Reduce CopyNumArray rows to a single row within each run of equal values.
+
+    A new segment begins wherever the level changes, the chromosome (or arm, if
+    `by_arm`) changes, or -- for allele-specific data -- cn1/cn2 changes.  Each
+    boundary is detected by *adjacency* (comparing a row with its predecessor),
+    so only consecutive like rows are merged.  This stays correct when the input
+    is not sorted by genomic position -- e.g. .cns files from several segmenters
+    concatenated together -- which previously collided under integer run-id
+    arithmetic and merged non-contiguous bins into segments with start > end
+    (gh#677).  For sorted input the grouping is identical to the legacy
+    behavior, including its NaN handling.
+    """
     assert cnarr.data.index.is_unique
     assert levels.index.is_unique
-    assert change_levels.index.is_unique
+    assert len(levels) == len(cnarr)
     if by_arm:
-        # Enumerate chromosome arms
-        arm_levels = []
+        # Per-row arm id, kept in this array's row order so unsorted input is
+        # handled correctly (not just chromosome-contiguous input).
+        arm_id = pd.Series(0, index=cnarr.data.index)
         for i, (_chrom, cnarm) in enumerate(cnarr.by_arm()):
-            arm_levels.append(np.repeat(i, len(cnarm)))
-        change_levels += np.concatenate(arm_levels)
+            arm_id.loc[cnarm.data.index] = i
+        boundary = _starts_new_run(arm_id.to_numpy())
     else:
-        # Enumerate chromosomes
-        chrom_names = cnarr["chromosome"].unique()
-        chrom_col = cnarr["chromosome"].map(
-            pd.Series(np.arange(len(chrom_names)), index=chrom_names)
-        )
-        change_levels += chrom_col
-    data = cnarr.data.assign(_group=change_levels)
-    groupkey = ["_group"]
+        boundary = _starts_new_run(cnarr["chromosome"].to_numpy())
+    boundary |= _changed_between_known(levels.to_numpy())
     if "cn1" in cnarr:
         # Keep allele-specific CNAs separate
-        data["_g1"] = enumerate_changes(cnarr["cn1"])
-        data["_g2"] = enumerate_changes(cnarr["cn2"])
-        groupkey.extend(["_g1", "_g2"])
+        boundary |= _changed_between_known(cnarr["cn1"].to_numpy())
+        boundary |= _changed_between_known(cnarr["cn2"].to_numpy())
+    data = cnarr.data.assign(_group=np.cumsum(boundary))
     data = (
-        data.groupby(groupkey, as_index=False, group_keys=False, sort=False)[
+        data.groupby("_group", as_index=False, group_keys=False, sort=False)[
             data.columns
         ]
         .apply(squash_region)
@@ -89,12 +93,31 @@ def squash_by_groups(
     return cnarr.as_dataframe(data)
 
 
-def enumerate_changes(levels: Series) -> Series:
-    """Assign a unique integer to each run of identical values.
+def _starts_new_run(values: np.ndarray) -> NDArray[np.bool_]:
+    """Boolean mask, True where ``values[i]`` differs from ``values[i - 1]``.
 
-    Repeated but non-consecutive values will be assigned different integers.
+    Index 0 is always True (it starts the first run).  For never-missing keys
+    like chromosome name or arm index.
     """
-    return levels.diff().fillna(0).abs().cumsum().astype(int)
+    mask = np.ones(len(values), dtype=bool)
+    mask[1:] = values[1:] != values[:-1]
+    return mask
+
+
+def _changed_between_known(values: np.ndarray) -> NDArray[np.bool_]:
+    """Boolean mask, True where ``values[i]`` and ``values[i - 1]`` are both
+    non-NaN and differ.  Index 0 is always False.
+
+    NaN is treated as "no change" (matching the legacy run-length grouping), so
+    a row with an unknown value -- e.g. cn1/cn2 = NaN where BAF data is missing
+    -- is merged by the remaining keys instead of being split off on its own.
+    """
+    mask = np.zeros(len(values), dtype=bool)
+    if len(values) > 1:
+        v = values.astype(float)
+        known = ~np.isnan(v)
+        mask[1:] = (v[1:] != v[:-1]) & known[1:] & known[:-1]
+    return mask
 
 
 def squash_region(cnarr: DataFrame) -> DataFrame:
@@ -123,8 +146,10 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
 
     out: dict = {
         "chromosome": [cnarr["chromosome"].iat[0]],
-        "start": cnarr["start"].iat[0],
-        "end": cnarr["end"].iat[-1],
+        # Span the full run via min/max (not first/last) so a run whose bins are
+        # not in ascending order can't yield start > end (gh#677).
+        "start": cnarr["start"].min(),
+        "end": cnarr["end"].max(),
     }
     out["log2"] = _wavg("log2")
     out["gene"] = join_strings(cnarr["gene"])
@@ -151,7 +176,7 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
         out["p_bintest"] = cnarr["p_bintest"].max()
 
     # Preserve any remaining columns (e.g. segmetrics: sem, ci_lo, ci_hi, stdev)
-    handled = set(out.keys()) | {"_group", "_g1", "_g2"}
+    handled = set(out.keys()) | {"_group"}
     for col in cnarr.columns:
         if col in handled:
             continue
