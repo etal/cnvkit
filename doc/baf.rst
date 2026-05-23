@@ -58,9 +58,14 @@ SNP sites to extract likely germline SNVs from a tumor-only VCF and use just
 those sites. Note that without a paired normal, sample-level somatic filtering
 is weaker (see below).
 
-If you already have somatic calls produced by GATK Mutect2, you can re-run with
-``--genotype-germline-sites true --genotype-pon-sites true`` to retain the
-germline SNP sites in the same VCF -- this gives CNVkit something to work with.
+If you are calling somatic variants, configure the caller to also emit germline
+genotypes -- a somatic-only VCF gives CNVkit no heterozygous SNPs to use:
+
+- **GATK Mutect2:** re-run with ``--genotype-germline-sites true
+  --genotype-pon-sites true`` to keep the germline SNP sites in the same VCF.
+- **Strelka:** run its *germline* workflow, not the somatic one. Strelka's
+  somatic VCF contains only somatic variants and omits the ``GT`` field, so it
+  has no usable germline SNPs.
 
 An `example VCF
 <https://github.com/etal/cnvkit/blob/master/test/formats/na12878_na12882_mix.vcf?raw=true>`_

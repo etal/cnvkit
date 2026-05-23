@@ -3,6 +3,7 @@
 from __future__ import annotations
 import collections
 import logging
+import os
 
 from itertools import chain
 
@@ -23,6 +24,10 @@ if TYPE_CHECKING:
     )
 
 
+# Strelka reports per-base counts (tier1, tier2) instead of GT/AD (gh#943)
+_STRELKA_TIER1_FIELD = {"A": "AU", "C": "CU", "G": "GU", "T": "TU"}
+
+
 def read_vcf(
     infile: str,
     sample_id: str | None = None,
@@ -37,6 +42,9 @@ def read_vcf(
     file.  If `sample_id` is a string identifier, return the (paired or single)
     sample  matching that ID.  If `sample_id` is a positive integer, return the
     sample or pair at that index position, counting from 0.
+
+    Samples without a ``GT`` genotype field (e.g. Strelka somatic calls) are
+    tolerated: zygosity is then inferred from the alternate-allele frequency.
     """
     try:
         import pysam
@@ -44,12 +52,16 @@ def read_vcf(
         raise ImportError(
             f"pysam is required for reading VCF files. {PYSAM_INSTALL_MSG}"
         ) from None
+    if not isinstance(infile, (str, os.PathLike)):
+        # pysam requires a path on disk; an open file handle can't be parsed
+        raise ValueError(
+            f"Must give a VCF filename, not an open file handle: {infile!r}"
+        )
     try:
         vcf_reader = pysam.VariantFile(infile)
-    except Exception as exc:
-        raise ValueError(
-            f"Must give a VCF filename, not open file handle: {exc}"
-        ) from exc
+    except (OSError, ValueError) as exc:
+        # e.g. a malformed header (FORMAT column declared but no samples, gh#680)
+        raise ValueError(f"Could not read VCF file {infile!r}: {exc}") from exc
     if vcf_reader.header.samples:
         sid, nid = _choose_samples(vcf_reader, sample_id, normal_id)
         logging.info(
@@ -269,17 +281,12 @@ def _parse_records(
                 raise
         else:
             # Assume unpaired tumor; take DP, AF from INFO (e.g. LoFreq)
-            depth = record.info.get("DP", 0.0) if "DP" in record.info else 0.0  # type: ignore[assignment,arg-type]
+            depth = record.info.get("DP", 0.0)  # type: ignore[assignment,arg-type]
             if "AF" in record.info:
                 alt_freq = record.info["AF"]
                 alt_count = round(alt_freq * depth)
                 # NB: No genotype, so crudely guess from allele frequency
-                if alt_freq < 0.25:
-                    zygosity = 0.0
-                elif alt_freq < 0.75:
-                    zygosity = 0.5
-                else:
-                    zygosity = 1.0
+                zygosity = _zygosity_from_freq(alt_freq)
             else:
                 alt_count = 0
                 zygosity = 0.0
@@ -315,33 +322,68 @@ def _parse_records(
 
 def _extract_genotype(
     sample: VariantRecordSample, record: VariantRecord
-) -> (
-    tuple[None, float, int]
-    | tuple[int, float, int]
-    | tuple[None, float, float]
-    | tuple[int, float, float]
-):
-    if "DP" in sample:
-        depth = sample["DP"]
-    elif "AD" in sample and isinstance(sample["AD"], tuple):
-        depth = _safesum(sample["AD"])
-    elif "DP" in record.info:
-        depth = record.info["DP"]
-    else:
-        # SV or not called, probably
-        depth = np.nan  # 0.0
-    gts = set(sample["GT"])
-    if len(gts) > 1:
-        zygosity = 0.5
-    elif gts.pop() == 0:
-        zygosity = 0.0
-    else:
-        zygosity = 1.0
-    alt_count = _get_alt_count(sample)
+) -> tuple[int | float, float, int | float]:
+    depth = _get_depth(sample, record)
+    alt_count = _get_alt_count(sample, record)
+    zygosity = _get_zygosity(sample, depth, alt_count)
     return depth, zygosity, alt_count
 
 
-def _get_alt_count(sample: VariantRecordSample) -> int | float:
+def _get_depth(sample: VariantRecordSample, record: VariantRecord) -> int | float:
+    """Get the total read depth at a sample's locus."""
+    if "DP" in sample:
+        return sample["DP"]  # type: ignore[no-any-return]
+    if "AD" in sample and isinstance(sample["AD"], tuple):
+        return _safesum(sample["AD"])
+    if "DP" in record.info:
+        return record.info["DP"]  # type: ignore[no-any-return]
+    # SV or not called, probably
+    return np.nan
+
+
+def _get_zygosity(
+    sample: VariantRecordSample, depth: int | float, alt_count: int | float
+) -> float:
+    """Get the zygosity (0=hom-ref, 0.5=het, 1=hom-alt) of a sample's genotype.
+
+    Use the explicit GT call when present and complete; otherwise -- when GT is
+    absent (e.g. Strelka, gh#943) or a no-call (``./.``) -- infer it from the
+    alternate-allele frequency.
+    """
+    if "GT" in sample:
+        gts = set(sample["GT"])
+        # A complete no-call ('./.', i.e. {None}) carries no genotype, so fall
+        # through to frequency inference rather than misreading it as hom-alt.
+        # Partial calls (e.g. '1/.', {1, None}) keep their existing handling.
+        if gts != {None}:
+            if len(gts) > 1:
+                return 0.5
+            if gts.pop() == 0:
+                return 0.0
+            return 1.0
+    # No (complete) genotype call -- guess from allele frequency, if we have it
+    if (
+        depth
+        and not np.isnan(depth)
+        and alt_count is not None
+        and not np.isnan(alt_count)
+    ):
+        return _zygosity_from_freq(alt_count / depth)
+    return 0.0
+
+
+def _zygosity_from_freq(alt_freq: float) -> float:
+    """Crudely guess zygosity from an alternate-allele frequency."""
+    if alt_freq < 0.25:
+        return 0.0
+    if alt_freq < 0.75:
+        return 0.5
+    return 1.0
+
+
+def _get_alt_count(
+    sample: VariantRecordSample, record: VariantRecord
+) -> int | float:
     """Get the alternative allele count from a sample in a VCF record."""
     if sample.get("AD") not in (None, (None,)):
         # GATK and other callers: (ref depth, alt depth)
@@ -364,8 +406,27 @@ def _get_alt_count(sample: VariantRecordSample) -> int | float:
         else:
             alt_count = 0.0
     else:
-        alt_count = np.nan
+        alt_count = _strelka_alt_count(sample, record)
     return alt_count
+
+
+def _strelka_alt_count(
+    sample: VariantRecordSample, record: VariantRecord
+) -> int | float:
+    """Get the alt-allele count from Strelka's per-base tier-1 counts.
+
+    Strelka SNV VCFs report AU/CU/GU/TU (counts of A/C/G/T alleles in tiers
+    1,2) rather than AD. Return the tier-1 count for the (first) ALT base, or
+    NaN if unavailable (e.g. indels, which use a different layout).
+    """
+    if not record.alts:
+        return np.nan
+    field = _STRELKA_TIER1_FIELD.get(record.alts[0].upper())
+    if field is not None and field in sample:
+        value = sample[field]
+        # tier-1 count is the first of the (tier1, tier2) pair
+        return value[0] if isinstance(value, tuple) else value  # type: ignore[no-any-return]
+    return np.nan
 
 
 def _safesum(tup: tuple[None] | tuple[int, int] | tuple[int]) -> int:

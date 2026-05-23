@@ -142,6 +142,61 @@ class IOTests(unittest.TestCase):
         v6 = tabio.read("formats/gatk-emptyalt.vcf", "vcf", sample_id="sample1")
         self.assertEqual(len(v6), 0)
 
+    def test_read_vcf_strelka(self):
+        """Read a Strelka somatic-SNV VCF, which has no GT FORMAT field.
+
+        Strelka reports per-base allele counts via AU/CU/GU/TU instead of an
+        explicit genotype. The reader must tolerate the missing GT (gh#943).
+        """
+        fname = "formats/strelka.vcf"
+        # Tumor/normal pair
+        pair = tabio.read(fname, "vcf", sample_id="TUMOR", normal_id="NORMAL")
+        self.assertEqual(len(pair), 3)
+        self.assertEqual(pair.sample_id, "TUMOR")
+        # Alt counts come from the tier-1 count of the ALT base
+        self.assertEqual(list(pair["alt_count"]), [16, 28, 5])
+        self.assertEqual(list(pair["depth"]), [33, 30, 20])
+        # Zygosity inferred from allele frequency (no GT available)
+        self.assertEqual(list(pair["zygosity"]), [0.5, 1.0, 0.5])
+        # Normal-sample columns are present and populated
+        self.assertEqual(list(pair["n_alt_count"]), [10, 1, 0])
+        self.assertEqual(list(pair["n_depth"]), [20, 25, 20])
+        self.assertEqual(list(pair["n_zygosity"]), [0.5, 0.0, 0.0])
+        # Single unpaired sample also works
+        solo = tabio.read(fname, "vcf", sample_id="TUMOR")
+        self.assertEqual(len(solo), 3)
+        self.assertNotIn("n_depth", solo.data.columns)
+        # Default selection (first sample) does not crash
+        default = tabio.read(fname, "vcf")
+        self.assertEqual(len(default), 3)
+
+    def test_read_vcf_nocall(self):
+        """A GT no-call ('./.') is inferred from frequency, not called hom-alt.
+
+        pysam reports './.' as (None, None); the reader must treat it as a
+        missing genotype and fall back to the allele frequency rather than
+        misreading it as homozygous-alt.
+        """
+        v = tabio.read("formats/gt-nocall.vcf", "vcf")
+        self.assertEqual(len(v), 3)
+        self.assertEqual(list(v["alt_count"]), [10, 12, 1])
+        self.assertEqual(list(v["depth"]), [20, 20, 20])
+        # ./. with balanced reads -> het; explicit 0/1 -> het; ./. ref-heavy -> hom-ref
+        self.assertEqual(list(v["zygosity"]), [0.5, 0.5, 0.0])
+
+    def test_read_vcf_malformed(self):
+        """A VCF declaring a FORMAT column but no samples gives a clear error.
+
+        pysam rejects such files; the reader must not mislabel the failure as
+        an open-file-handle mistake (gh#680).
+        """
+        with self.assertRaises(ValueError) as ctx:
+            tabio.read("formats/format-no-sample.vcf", "vcf")
+        msg = str(ctx.exception)
+        self.assertIn("format-no-sample.vcf", msg)
+        # Should not be mislabeled as a "passed an open file handle" mistake
+        self.assertNotIn("file handle", msg)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

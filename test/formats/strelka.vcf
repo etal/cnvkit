@@ -1,0 +1,20 @@
+##fileformat=VCFv4.1
+##source=strelka
+##content=strelka somatic snv calls
+##FILTER=<ID=LowEVS,Description="Somatic Empirical Variant Score (SomaticEVS) is below threshold">
+##FORMAT=<ID=AU,Number=2,Type=Integer,Description="Number of 'A' alleles used in tiers 1,2">
+##FORMAT=<ID=CU,Number=2,Type=Integer,Description="Number of 'C' alleles used in tiers 1,2">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth for tier1 (used+filtered)">
+##FORMAT=<ID=FDP,Number=1,Type=Integer,Description="Number of basecalls filtered from original read depth for tier1">
+##FORMAT=<ID=GU,Number=2,Type=Integer,Description="Number of 'G' alleles used in tiers 1,2">
+##FORMAT=<ID=SDP,Number=1,Type=Integer,Description="Number of reads with deletions spanning this site at tier1">
+##FORMAT=<ID=SUBDP,Number=1,Type=Integer,Description="Number of reads below tier1 mapping quality threshold aligned across this site">
+##FORMAT=<ID=TU,Number=2,Type=Integer,Description="Number of 'T' alleles used in tiers 1,2">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Combined depth across samples">
+##INFO=<ID=NT,Number=1,Type=String,Description="Genotype of the normal in all data tiers.">
+##INFO=<ID=SOMATIC,Number=0,Type=Flag,Description="Somatic mutation">
+##contig=<ID=chr1>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL	TUMOR
+chr1	221367	.	G	C	.	PASS	DP=53;NT=het;SOMATIC	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	20:0:0:0:0,0:10,12:10,11:0,0	33:0:0:0:0,0:16,18:17,20:0,0
+chr1	300000	.	G	C	.	PASS	DP=55;NT=ref;SOMATIC	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	25:0:0:0:0,0:1,1:24,26:0,0	30:0:0:0:0,0:28,30:1,2:0,0
+chr1	400000	.	A	T	.	PASS	DP=40;NT=ref;SOMATIC	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	20:0:0:0:20,22:0,0:0,0:0,0	20:0:0:0:15,17:0,0:0,0:5,6
