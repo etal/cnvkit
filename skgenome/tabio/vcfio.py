@@ -351,16 +351,26 @@ def _get_zygosity(
     alternate-allele frequency.
     """
     if "GT" in sample:
-        gts = set(sample["GT"])
-        # A complete no-call ('./.', i.e. {None}) carries no genotype, so fall
-        # through to frequency inference rather than misreading it as hom-alt.
-        # Partial calls (e.g. '1/.', {1, None}) keep their existing handling.
-        if gts != {None}:
-            if len(gts) > 1:
+        gt = tuple(sample["GT"])
+        # pysam reports a no-call allele as None; it is a missing-allele
+        # placeholder, not a distinct allele, so don't count it as one
+        # (gh-9vv). Classify by the alleles that were actually called.
+        called = set(gt) - {None}
+        has_nocall = None in gt
+        # A complete no-call ('./.', i.e. nothing called) carries no genotype,
+        # so fall through to frequency inference rather than guessing.
+        if called:
+            if 0 in called:
+                # A REF allele was called -- het only if an ALT was too
+                # ('0/1'); '0/0' and the partial '0/.' (no ALT evidence)
+                # are hom-ref.
+                return 0.5 if len(called) > 1 else 0.0
+            # Only ALT allele(s) called. '1/1' (and '1/2') are unambiguous,
+            # but a partial '1/.' leaves the other allele unknown; real
+            # ensemble VCFs show these lean heterozygous, so keep them het.
+            if has_nocall:
                 return 0.5
-            if gts.pop() == 0:
-                return 0.0
-            return 1.0
+            return 0.5 if len(called) > 1 else 1.0
     # No (complete) genotype call -- guess from allele frequency, if we have it
     if (
         depth

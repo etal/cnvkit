@@ -184,6 +184,23 @@ class IOTests(unittest.TestCase):
         # ./. with balanced reads -> het; explicit 0/1 -> het; ./. ref-heavy -> hom-ref
         self.assertEqual(list(v["zygosity"]), [0.5, 0.5, 0.0])
 
+    def test_read_vcf_partial_gt(self):
+        """A partial genotype ('1/.', '0/.') is read from the called allele.
+
+        pysam reports a no-call allele as None, so '1/.' is (1, None) and '0/.'
+        is (0, None). The missing-allele placeholder must not be counted as a
+        distinct allele (gh-9vv): '0/.' has no ALT evidence and is hom-ref,
+        while '1/.' carries an ALT allele and is kept heterozygous (consistent
+        with the read evidence in real ensemble VCFs). Read depths here diverge
+        from the GT classification (e.g. '1/.' with AF=0.1) to prove the result
+        comes from the genotype, not from frequency inference.
+        """
+        v = tabio.read("formats/gt-partial.vcf", "vcf")
+        self.assertEqual(len(v), 6)
+        # 0/. -> hom-ref; 1/. -> het; ./. -> freq (balanced=het);
+        # 0/0 -> hom-ref; 1/1 -> hom-alt; 0/1 -> het
+        self.assertEqual(list(v["zygosity"]), [0.0, 0.5, 0.5, 0.0, 1.0, 0.5])
+
     def test_read_vcf_malformed(self):
         """A VCF declaring a FORMAT column but no samples gives a clear error.
 

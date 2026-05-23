@@ -126,6 +126,16 @@ matched tumor/normal samples with the tumor identified via the PEDIGREE
 header tag or ``-i``/``-n`` command-line options. See :doc:`baf` for full
 guidance on VCF preparation, sample identification, and troubleshooting.
 
+CNVkit reads each sample's zygosity from the ``GT`` genotype field when it is
+present: a call with both a reference and an alternate allele (e.g. ``0/1``) is
+heterozygous, ``0/0`` is homozygous reference, and ``1/1`` is homozygous
+alternate. A no-call allele (``.``) is treated as missing rather than as a
+distinct allele, so a complete no-call (``./.``) and a genotype with no ``GT``
+field at all (e.g. Strelka somatic output) fall back to inferring zygosity from
+the alternate-allele frequency. A partial call keeps its called allele: ``0/.``
+(no alternate observed) is homozygous reference, while ``1/.`` retains the
+alternate allele and is treated as heterozygous.
+
 
 .. _cnxformat:
 
