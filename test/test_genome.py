@@ -365,6 +365,54 @@ class IntervalTests(unittest.TestCase):
             expect = self._from_intervals(merged_coords)
             self._compare_regions(result, expect)
 
+    def test_nan_gene_names(self):
+        """merge/flatten/subdivide tolerate NaN-float gene names (issue #850).
+
+        A bait BED whose 'gene' column holds NaN floats (e.g. a ragged name
+        column) once crashed ``target --annotate --split`` two ways:
+        ``TypeError: expected str instance, numpy.float64 found`` inside
+        ``join_strings`` (``",".join`` over NaN), and an ``AttributeError`` in
+        the old ``groupby.apply`` merge path on newer pandas.  Both are fixed
+        upstream -- by the bioframe rewrite (#982) and the ``join_strings`` NaN
+        filter (#900) -- but the skgenome merge/subdivide path that the 'target'
+        command exercises had no regression guard.  Use the default combiner
+        (``join_strings``), not the ``"".join`` test combiner, so the real
+        production code path is tested.
+
+        Regions 0+1 overlap (NaN skipped -> "BRCA1"); regions 2+3 overlap and
+        are all-NaN (-> "-"); region 4 is isolated and all-NaN.  The isolated
+        region exercises the singleton/early-return paths, where merge & co.
+        emit rows verbatim -- those NaN floats are normalized to "-" so no
+        unjoined NaN survives in a gene/accession column.
+        """
+        regions = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [100, 150, 700, 800, 5000],
+                    "end": [400, 600, 900, 1000, 8000],
+                    "gene": [np.nan, "BRCA1", np.nan, np.nan, np.nan],
+                }
+            )
+        )
+        merged = regions.merge()
+        self.assertEqual(list(merged["gene"]), ["BRCA1", "-", "-"])
+
+        # Single-row fast paths (merge/flatten/squash all short-circuit on a
+        # lone region) must normalize too, not pass the NaN float through.
+        isolated = GA(regions.data.iloc[[4]])
+        self.assertEqual(list(isolated.merge()["gene"]), ["-"])
+        self.assertEqual(list(isolated.flatten()["gene"]), ["-"])
+        self.assertEqual(list(isolated.squash()["gene"]), ["-"])
+
+        # flatten() splits at breakpoints and re-joins per sub-interval.
+        # subdivide() (the 'target --split' path) merges then splits big bins.
+        for result in (regions.flatten(), regions.subdivide(100, 0)):
+            self.assertGreater(len(result), 0)
+            for gene in result["gene"]:
+                self.assertIsInstance(gene, str)
+                self.assertNotIn("nan", gene.lower())
+
     def test_intersect(self):
         selections1 = self._from_intervals(
             [

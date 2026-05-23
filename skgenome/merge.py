@@ -17,12 +17,37 @@ import numpy as np
 import pandas as pd
 
 from .chromsort import sorter_chrom
-from .combiners import first_of, get_combiners
+from .combiners import first_of, get_combiners, join_strings
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
 _BF_COLS = ("chromosome", "start", "end")
+
+
+def _fill_unnamed(table: pd.DataFrame, cmb: dict[str, Callable]) -> pd.DataFrame:
+    """Fill non-string values in string-join columns with the "-" placeholder.
+
+    ``merge``/``flatten``/``squash`` emit singleton (non-overlapping) rows
+    verbatim, so a NaN-float gene/accession from a ragged input survives
+    unjoined. Bring those into line with the multi-row output of
+    :func:`join_strings`, which renders missing names as ``"-"``. Only columns
+    that actually use ``join_strings`` are touched, so caller-supplied combiners
+    are respected. A no-op returning the input unchanged when every value is
+    already a string, so well-formed data is neither copied nor altered.
+    """
+    fix = {}
+    for col, fn in cmb.items():
+        if fn is join_strings and col in table.columns:
+            nonstr = ~table[col].map(lambda v: isinstance(v, str)).to_numpy()
+            if nonstr.any():
+                fix[col] = nonstr
+    if not fix:
+        return table
+    table = table.copy()
+    for col, nonstr in fix.items():
+        table.loc[nonstr, col] = "-"
+    return table
 
 
 def flatten(
@@ -33,11 +58,11 @@ def flatten(
     """Combine overlapping regions into single rows, similar to bedtools merge."""
     if table.empty:
         return table
+    cmb = get_combiners(table, False, combine)
     if (table.start.to_numpy()[1:] >= table.end.cummax().to_numpy()[:-1]).all():
-        return table
+        return _fill_unnamed(table, cmb)
     # NB: Input rows and columns should already be sorted like this
     table = table.sort_values(["chromosome", "start", "end"])
-    cmb = get_combiners(table, False, combine)
     clustered = bioframe.cluster(
         table, min_dist=0, cols=_BF_COLS, return_cluster_ids=True
     )
@@ -48,9 +73,10 @@ def flatten(
         )
         all_rows.extend(_flatten_tuples(group_rows, cmb))
     out = pd.DataFrame.from_records(all_rows, columns=table.columns)
-    return out.reindex(
+    out = out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
     )
+    return _fill_unnamed(out, cmb)
 
 
 def _flatten_tuples(
@@ -88,15 +114,15 @@ def merge(
     """Merge overlapping rows in a DataFrame."""
     if table.empty:
         return table
+    cmb = get_combiners(table, stranded, combine)
     gap_sizes = table.start.to_numpy()[1:] - table.end.cummax().to_numpy()[:-1]
     if (gap_sizes > -bp).all():
-        return table
+        return _fill_unnamed(table, cmb)
     if stranded:
         groupkey = ["chromosome", "strand"]
     else:
         groupkey = ["chromosome"]
     table = table.sort_values([*groupkey, "start", "end"])
-    cmb = get_combiners(table, stranded, combine)
     min_dist = max(0, -bp)
     on = ["strand"] if stranded else None
     clustered = bioframe.cluster(
@@ -130,9 +156,10 @@ def merge(
             result_rows.append(pd.Series(vals))
     out = pd.DataFrame(result_rows, columns=data_cols).reset_index(drop=True)
     # Re-sort chromosomes cleverly instead of lexicographically
-    return out.reindex(
+    out = out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
     )
+    return _fill_unnamed(out, cmb)
 
 
 def squash(
@@ -160,7 +187,7 @@ def squash(
     DataFrame
         A new DataFrame with consecutive adjacent rows combined.
     """
-    if table.empty or len(table) == 1:
+    if table.empty:
         return table
 
     cmb = get_combiners(table, stranded=False, combine=combine)
@@ -179,7 +206,7 @@ def squash(
 
     # Nothing to squash -- short-circuit
     if not is_adjacent.any():
-        return table
+        return _fill_unnamed(table, cmb)
 
     # Assign group IDs: increment when rows are *not* adjacent
     group_ids = np.concatenate([[0], np.cumsum(~is_adjacent)])
@@ -200,4 +227,5 @@ def squash(
                 else:
                     vals[col] = group[col].iloc[0]
             result_rows.append(pd.Series(vals))
-    return pd.DataFrame(result_rows, columns=table.columns).reset_index(drop=True)
+    out = pd.DataFrame(result_rows, columns=table.columns).reset_index(drop=True)
+    return _fill_unnamed(out, cmb)
