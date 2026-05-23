@@ -4,6 +4,7 @@
 import tempfile
 import unittest
 import logging
+from unittest import mock
 
 import numpy as np
 import pytest
@@ -81,6 +82,38 @@ class RTests(unittest.TestCase):
         cns = segmentation.do_segmentation(cnr, "cbs", processes=1)
         self.assertGreater(len(cns), 0)
         self.assertFalse(np.isnan(cns["log2"].to_numpy()).any())
+
+    def test_cbs_invocation_omits_vanilla(self):
+        """Regression test for issue #491.
+
+        ``--vanilla`` bundles ``--no-init-file``/``--no-site-file``, so R skips
+        the user's ``.Rprofile``/``Rprofile.site`` -- breaking custom installs
+        that set ``.libPaths()`` there. The segmentation R call must pass only
+        ``--no-restore --no-environ``. We mock ``call_quiet`` to capture the
+        argv before R runs, so this test needs no R installation (hence it is
+        not marked ``slow``).
+        """
+        captured = []
+
+        class _StopBeforeR(Exception):
+            pass
+
+        def fake_call_quiet(*args):
+            captured.append(args)
+            raise _StopBeforeR
+
+        with mock.patch.object(core, "call_quiet", fake_call_quiet):
+            with self.assertRaises(_StopBeforeR):
+                segmentation._do_segmentation(
+                    self.tas_cnr, "cbs", None, 0.0001, skip_outliers=0
+                )
+
+        argv = captured[0]
+        self.assertNotIn("--vanilla", argv)
+        self.assertNotIn("--no-init-file", argv)
+        self.assertNotIn("--no-site-file", argv)
+        self.assertIn("--no-restore", argv)
+        self.assertIn("--no-environ", argv)
 
     @pytest.mark.slow
     def test_cbs_all_bins_unsegmentable(self):
