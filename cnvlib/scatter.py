@@ -24,6 +24,11 @@ POINT_COLOR = "#606060"
 SEG_COLOR = "darkorange"
 TREND_COLOR = "#A0A0A0"
 
+# Floor for the auto-scaled y-axis lower limit, so a single deep homozygous
+# deletion (log2 far below 0) can't compress the rest of the plot into a sliver.
+# Segments below this are flagged; override with the --y-min option. (gh#385)
+AUTO_Y_MIN_FLOOR = -5.0
+
 
 def _sex_labels(arr) -> tuple[str | None, str | None]:
     """Best-effort ``(x_label, y_label)`` from any genomic array.
@@ -216,7 +221,7 @@ def cnv_on_genome(
             seg_auto_vals = segments[~low_chroms]["log2"].dropna()
             if not y_min:
                 y_min = (
-                    np.nanmin([seg_auto_vals.min() - 0.2, -1.5])
+                    max(AUTO_Y_MIN_FLOOR, np.nanmin([seg_auto_vals.min() - 0.2, -1.5]))
                     if len(seg_auto_vals)
                     else -2.5
                 )
@@ -232,6 +237,18 @@ def cnv_on_genome(
             if not y_max:
                 y_max = 2.5
     axis.set_ylim(y_min, y_max)
+    if segments:
+        # Flag segments clipped below the (possibly floored) y-axis, so a deep
+        # homozygous deletion isn't silently dropped off the bottom (gh#385).
+        hidden_seg = segments["log2"] < y_min
+        if hidden_seg.sum():
+            logging.warning(
+                "With y_min=%s, %d genome-wide segment(s) are hidden below the "
+                "plot --> add '--y-min %s' to see them",
+                y_min,
+                int(hidden_seg.sum()),
+                int(np.floor(segments["log2"].min())),
+            )
 
     # Group probes by chromosome (to calculate plotting coordinates)
     if probes:
@@ -580,7 +597,7 @@ def cnv_on_chromosome(
 
     # Configure axes
     if not y_min:
-        y_min = max(-5.0, min(y.min() - 0.1, -0.3)) if len(y) else -1.1
+        y_min = max(AUTO_Y_MIN_FLOOR, min(y.min() - 0.1, -0.3)) if len(y) else -1.1
     if not y_max:
         y_max = max(0.3, y.max() + (0.25 if genes else 0.1)) if len(y) else 1.1
     if x_limits:
