@@ -184,6 +184,30 @@ The targets do not need to be genes, but for convenience CNVkit's documentation
 and source code generally refer to consecutive targeted regions with the same
 label as "genes".
 
+.. note::
+    **The annotation must match your targets' genome build and chromosome
+    naming.** Gene names are assigned by *coordinate overlap*, so a refFlat (or
+    other annotation) from a different assembly -- or one using ``1`` where your
+    targets use ``chr1`` -- will leave regions mislabeled or unlabeled. CNVkit
+    raises an error when the chromosome names don't overlap at all, and warns
+    when an annotation shares chromosome names but matches no coordinates (the
+    usual sign of a wrong-build file).
+
+    **Review the annotated output before relying on it.** The ``target`` command
+    writes a 4-column BED whose fourth column is the gene label; spot-check that
+    most regions are named (not the ``-`` placeholder) and that your genes of
+    interest are present::
+
+        cnvkit.py target my_baits.bed --annotate refFlat_hg38.txt -o my_targets.bed
+        # How many regions are unlabeled ("-") vs. total?
+        cut -f4 my_targets.bed | grep -c -x -- '-'
+        wc -l my_targets.bed
+        # Is a gene of interest present?
+        grep -w EGFR my_targets.bed
+
+    These labels carry through to the ``.cnn``/``.cnr``/``.cns`` files and the
+    final calls, so a region left unlabeled here stays unlabeled downstream.
+
 
 .. _access:
 

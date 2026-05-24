@@ -388,6 +388,46 @@ class PreprocessingTests(unittest.TestCase):
         self.assertGreater(cna.log2.nunique(), 1)
 
     @pytest.mark.slow
+    def test_target_annotate_refflat_assigns_genes(self):
+        """'target --annotate refFlat' actually populates gene names (#688).
+
+        The refFlat reader parses the gene column, tabio sorts the annotation,
+        and into_ranges overlaps it onto the baits. Guards against silent
+        annotation failures: a real bait set should come back almost entirely
+        gene-named, with names drawn from the refFlat's first column.
+        """
+        annot_fname = "formats/refflat-mini.txt"
+        baits = tabio.read_auto("formats/baits-funky.bed")
+        out = commands.do_target(baits, do_split=True, avg_size=200, annotate=annot_fname)
+        named = [g for g in out["gene"] if g != "-"]
+        # Nearly all bins on these gene-dense baits should be annotated
+        self.assertGreater(len(named), 0.9 * len(out))
+        # Names come from the refFlat first column (gene symbols)
+        all_names = {n for g in named for n in g.split(",")}
+        self.assertIn("DDX11L1", all_names)
+        self.assertIn("WASH7P", all_names)
+
+    def test_target_annotate_wrong_build_warns(self):
+        """Warn when annotation shares chrom names but assigns no genes (#688).
+
+        Mimics a wrong-genome-build refFlat: chromosome names match (so
+        compare_chrom_names passes), but no coordinates overlap, leaving every
+        region unnamed. Without the warning this failure is silent.
+        """
+        annot_fname = "formats/refflat-mini.txt"  # chr1 genes end well before 210 Mb
+        baits = GA.from_columns(
+            {
+                "chromosome": ["chr1", "chr1"],
+                "start": [210_000_000, 210_010_000],
+                "end": [210_001_000, 210_011_000],
+                "gene": ["-", "-"],
+            }
+        )
+        with self.assertLogs(level="WARNING") as cm:
+            out = commands.do_target(baits, annotate=annot_fname)
+        self.assertTrue(all(g == "-" for g in out["gene"]))
+        self.assertTrue(any("different genome build" in m for m in cm.output))
+
     def test_target(self):
         """The 'target' command."""
         annot_fname = "formats/refflat-mini.txt"

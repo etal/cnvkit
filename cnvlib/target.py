@@ -55,6 +55,19 @@ def do_target(
         annotation = tabio.read_auto(annotate)
         antitarget.compare_chrom_names(tgt_arr, annotation)
         tgt_arr["gene"] = annotation.into_ranges(tgt_arr, "gene", "-")
+        # compare_chrom_names only catches *fully* disjoint chromosome names
+        # (e.g. 'chr1' vs '1'). If the names overlap but no coordinates do --
+        # most often an annotation file for a different genome build -- every
+        # region is left unnamed. Flag that rather than failing silently (#688).
+        if len(tgt_arr) and not (tgt_arr["gene"] != "-").any():
+            logging.warning(
+                "No target regions were assigned a gene name from %s, even "
+                "though its chromosome names match the targets. This usually "
+                "means the annotation file is for a different genome build -- "
+                "check that its assembly and chromosome naming match your "
+                "targets.",
+                annotate,
+            )
     if do_short_names:
         logging.info("Shortening target interval labels")
         tgt_arr["gene"] = list(shorten_labels(tgt_arr["gene"]))
