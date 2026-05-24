@@ -36,6 +36,8 @@ from cnvlib.smoothing import (
     _width2wing,
     kaiser,
     rolling_median,
+    rolling_quantile,
+    rolling_std,
     savgol,
 )
 
@@ -371,6 +373,33 @@ class TestRollingMedian:
         x, width = args
         result = rolling_median(x, width)
         assert not np.any(np.isnan(result))
+
+
+class TestRollingShortInput:
+    """Degenerate short-signal inputs must not crash (#891).
+
+    Near-zero coverage can leave 0 or 1 surviving bins. With 1 bin the
+    caller's fraction is ``1 ** -0.5 == 1.0`` (an invalid width); with 0 bins
+    ``_width2wing`` would compute a negative wing. Both previously raised
+    out of ``rolling_*``, unlike the guarded ``savgol``/``kaiser``.
+    """
+
+    @pytest.mark.parametrize("func", [rolling_median, rolling_std])
+    @pytest.mark.parametrize("n", [0, 1])
+    @pytest.mark.parametrize("width", [1.0, 0.5, 7])
+    def test_short_input_returns_input_unchanged(self, func, n, width):
+        x = np.arange(n, dtype=float)
+        result = func(x, width)
+        assert len(result) == n
+        assert np.array_equal(result, x)
+
+    @pytest.mark.parametrize("n", [0, 1])
+    @pytest.mark.parametrize("width", [1.0, 0.5, 7])
+    def test_rolling_quantile_short_input(self, n, width):
+        x = np.arange(n, dtype=float)
+        result = rolling_quantile(x, width, 0.5)
+        assert len(result) == n
+        assert np.array_equal(result, x)
 
 
 class TestKaiser:
