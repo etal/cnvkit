@@ -335,6 +335,15 @@ duplicates with a program such as `SAMBLASTER
 `Picard tools <http://picard.sourceforge.net/>`_, so that CNVkit will skip
 these reads when calculating read depth.
 
+.. note::
+    **Marking duplicates is enough -- you don't need to remove them.** CNVkit
+    excludes reads flagged as duplicates (along with unmapped, secondary, and
+    QC-failed reads) from both the depth and ``--count`` coverage calculations.
+    A BAM with duplicates *marked* by Picard MarkDuplicates (or SAMBLASTER,
+    SAMBAMBA) therefore yields the same coverage as one with the duplicates
+    physically removed. (Exception: for amplicon sequencing, do *not* mark
+    duplicates at all -- see :doc:`nonhybrid`.)
+
 You will probably want to index the finished BAM file using `samtools
 <http://samtools.sourceforge.net/>`_ or SAMBAMBA.  But if you haven't done this
 beforehand, CNVkit will automatically do it for you.

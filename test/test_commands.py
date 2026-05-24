@@ -18,6 +18,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import matplotlib
 import numpy as np
 import pandas as pd
+import pysam
 from skgenome import tabio, GenomicArray as GA
 
 matplotlib.use("Agg")
@@ -164,6 +165,49 @@ class PreprocessingTests(unittest.TestCase):
             self.assertEqual(len(empty), 0)
         finally:
             os.unlink(bed)
+
+    def test_coverage_skips_marked_duplicates(self):
+        """Coverage ignores reads flagged as duplicates in both the depth
+        (bedcov) and by-count paths, so marking duplicates (e.g. Picard
+        MarkDuplicates) is equivalent to physically removing them (#689)."""
+        seqlen = 50
+        n_total, n_dup = 10, 6  # 4 reads survive the duplicate filter
+        header = {
+            "HD": {"VN": "1.6", "SO": "coordinate"},
+            "SQ": [{"SN": "chr1", "LN": 1000}],
+        }
+        tmpdir = tempfile.mkdtemp()
+        bam = os.path.join(tmpdir, "dup.bam")
+        with pysam.AlignmentFile(bam, "wb", header=header) as out:
+            for i in range(n_total):
+                a = pysam.AlignedSegment()
+                a.query_name = f"r{i}"
+                a.query_sequence = "A" * seqlen
+                a.flag = 0
+                a.reference_id = 0
+                a.reference_start = 100
+                a.mapping_quality = 60
+                a.cigarstring = f"{seqlen}M"
+                a.query_qualities = pysam.qualitystring_to_array("I" * seqlen)
+                a.is_duplicate = i >= (n_total - n_dup)
+                out.write(a)
+        pysam.index(bam)
+        bed = os.path.join(tmpdir, "region.bed")
+        with open(bed, "w") as fh:
+            fh.write("chr1\t90\t160\tregionA\n")
+        n_kept = n_total - n_dup
+        try:
+            # Depth path (default): basecount counts only non-duplicate reads
+            table = coverage.bedcov(bed, bam, 0)
+            self.assertEqual(float(table["basecount"].iloc[0]), n_kept * seqlen)
+            # By-count path: same surviving read count
+            bamfile = pysam.AlignmentFile(bam, "rb")
+            count, _row = coverage.region_depth_count(
+                bamfile, "chr1", 90, 160, "regionA", 0
+            )
+            self.assertEqual(count, n_kept)
+        finally:
+            shutil.rmtree(tmpdir)
 
     def test_coverage_partial_chrom_mismatch(self):
         """coverage tolerates a BED mixing present and absent contigs,

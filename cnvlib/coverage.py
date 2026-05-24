@@ -27,6 +27,16 @@ if TYPE_CHECKING:
     from skgenome import GenomicArray
 
 
+# SAM flags for reads excluded from coverage: unmapped (0x4), secondary (0x100),
+# QC-fail (0x200), and duplicate (0x400), i.e. 0x704. This mirrors the
+# `filter_read` predicate used by the by-count path (`region_depth_count`) and
+# happens to equal `samtools bedcov`'s own default exclude set -- but we pass it
+# to bedcov explicitly so the depth path keeps ignoring marked duplicates even
+# if a samtools version changes that default (#689). Picard MarkDuplicates sets
+# the duplicate flag, so marking duplicates is equivalent to removing them.
+COVERAGE_EXCLUDE_FLAGS = 0x704
+
+
 def is_bedgraph_format(fname: str) -> bool:
     """Check if input file is bedGraph format (.bed.gz)."""
     return fname.endswith(".bed.gz")
@@ -472,7 +482,11 @@ def region_depth_count(
     """
 
     def filter_read(read) -> bool:
-        """True if the given read should be counted towards coverage."""
+        """True if the given read should be counted towards coverage.
+
+        Excludes the same reads as ``COVERAGE_EXCLUDE_FLAGS`` (0x704) in the
+        depth/bedcov path, plus low-MAPQ reads (#689).
+        """
         return not (
             read.is_duplicate
             or read.is_secondary
@@ -635,8 +649,11 @@ def bedcov(
                 f"BAM file {bam_fname!r}"
             )
     try:
-        # Count bases in each region; exclude low-MAPQ reads
-        cmd = []
+        # Count bases in each region; exclude low-MAPQ and flagged reads.
+        # `-G` *adds* to bedcov's default exclude set, so this guarantees
+        # unmapped/secondary/QC-fail/duplicate reads are skipped regardless of
+        # the samtools default (#689).
+        cmd = ["-G", hex(COVERAGE_EXCLUDE_FLAGS)]
         if max_depth is not None:
             cmd.extend(["-d", str(max_depth)])
         if min_mapq and min_mapq > 0:
