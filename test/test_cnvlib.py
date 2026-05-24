@@ -503,8 +503,18 @@ class OtherTests(unittest.TestCase):
                     "gene": ["GeneA"] * n,
                     "log2": np.zeros(n),
                     "depth": np.ones(n) * 100.0,
-                    "weight": [1.0, np.nan, 1.0, np.nan, 1.0,
-                               1.0, np.nan, 1.0, 1.0, 1.0],
+                    "weight": [
+                        1.0,
+                        np.nan,
+                        1.0,
+                        np.nan,
+                        1.0,
+                        1.0,
+                        np.nan,
+                        1.0,
+                        1.0,
+                        1.0,
+                    ],
                 }
             )
         )
@@ -586,7 +596,9 @@ class OtherTests(unittest.TestCase):
         self.assertFalse(np.isnan(result["weight"].iat[0]))
         self.assertAlmostEqual(result["weight"].iat[0], 2.0)
         # log2 should be weighted average of bins with valid weights
-        self.assertAlmostEqual(result["log2"].iat[0], np.average([0.1, 0.3], weights=[1.0, 1.0]))
+        self.assertAlmostEqual(
+            result["log2"].iat[0], np.average([0.1, 0.3], weights=[1.0, 1.0])
+        )
 
         # All-NaN weights: should fall through to unweighted mean
         df_allnan = df.copy()
@@ -628,18 +640,14 @@ class OtherTests(unittest.TestCase):
             )
         )
         # Partial NaN: should produce valid CI
-        stats = reports.compute_gene_stats(
-            bins, 0.15, interval_stats=["ci"]
-        )
+        stats = reports.compute_gene_stats(bins, 0.15, interval_stats=["ci"])
         self.assertIn("ci_lo", stats)
         self.assertFalse(np.isnan(stats["ci_lo"]))
 
         # All NaN: should return empty stats (no crash)
         bins_allnan = bins.copy()
         bins_allnan["weight"] = np.nan
-        stats2 = reports.compute_gene_stats(
-            bins_allnan, 0.15, interval_stats=["ci"]
-        )
+        stats2 = reports.compute_gene_stats(bins_allnan, 0.15, interval_stats=["ci"])
         self.assertNotIn("ci_lo", stats2)
 
     def test_squash_region_nan_gene(self):

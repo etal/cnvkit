@@ -391,9 +391,7 @@ def _zygosity_from_freq(alt_freq: float) -> float:
     return 1.0
 
 
-def _get_alt_count(
-    sample: VariantRecordSample, record: VariantRecord
-) -> int | float:
+def _get_alt_count(sample: VariantRecordSample, record: VariantRecord) -> int | float:
     """Get the alternative allele count from a sample in a VCF record."""
     if sample.get("AD") not in (None, (None,)):
         # GATK and other callers: (ref depth, alt depth)

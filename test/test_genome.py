@@ -69,8 +69,7 @@ class GaryTests(unittest.TestCase):
     def test_autosomes_yeast(self):
         """Roman-numeral chromosomes (yeast) are recognized as autosomes."""
         rows = [
-            (f"chr{r}", 0, 1000)
-            for r in ("I", "II", "VIII", "IX", "X", "XI", "XVI")
+            (f"chr{r}", 0, 1000) for r in ("I", "II", "VIII", "IX", "X", "XI", "XVI")
         ] + [("chrM", 0, 1000)]
         yeast = GA.from_rows(rows)
         auto = yeast.autosomes()
@@ -652,9 +651,7 @@ class IntervalTests(unittest.TestCase):
 
         def _multichrom(rows):
             garr = GA(
-                pd.DataFrame(
-                    list(rows), columns=["chromosome", "start", "end", "gene"]
-                )
+                pd.DataFrame(list(rows), columns=["chromosome", "start", "end", "gene"])
             )
             garr.sort_columns()
             return garr

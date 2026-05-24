@@ -1336,12 +1336,8 @@ class CallTests(unittest.TestCase):
     def test_log2_ratio_to_absolute_floored_at_zero(self):
         """_log2_ratio_to_absolute never returns a negative absolute (#503)."""
         # Impure path: deep deletion below the (1-p) contamination floor
-        self.assertEqual(
-            call._log2_ratio_to_absolute(-20.0, 2, 2, purity=0.5), 0.0
-        )
-        self.assertEqual(
-            call._log2_ratio_to_absolute(-3.0, 2, 2, purity=0.5), 0.0
-        )
+        self.assertEqual(call._log2_ratio_to_absolute(-20.0, 2, 2, purity=0.5), 0.0)
+        self.assertEqual(call._log2_ratio_to_absolute(-3.0, 2, 2, purity=0.5), 0.0)
         # A real single-copy gain is unaffected
         self.assertAlmostEqual(
             call._log2_ratio_to_absolute(0.585, 2, 2, purity=1.0), 3.0, places=2

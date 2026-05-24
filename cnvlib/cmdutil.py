@@ -81,9 +81,7 @@ def load_het_snps(
     orig_len = len(varr)
     varr = varr.heterozygous()  # type: ignore[attr-defined]
     logging.info("Kept %d heterozygous of %d VCF records", len(varr), orig_len)
-    _warn_if_baf_input_suspicious(
-        varr["alt_freq"] if "alt_freq" in varr else None
-    )
+    _warn_if_baf_input_suspicious(varr["alt_freq"] if "alt_freq" in varr else None)
     # TODO use/explore tumor_boost option
     if tumor_boost:
         varr["alt_freq"] = varr.tumor_boost()

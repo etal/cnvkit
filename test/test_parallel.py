@@ -52,7 +52,10 @@ class ParallelTests(unittest.TestCase):
         future = pool.submit(success_func, 2, 3)
 
         # No exception should be stored
-        self.assertIsNone(future._exception, "SerialFuture should not have exception for successful execution")
+        self.assertIsNone(
+            future._exception,
+            "SerialFuture should not have exception for successful execution",
+        )
 
         # Result should be available
         result = future.result()
@@ -83,8 +86,11 @@ class ParallelTests(unittest.TestCase):
 
             with self.assertRaises(ValueError) as ctx:
                 future.result()
-            self.assertEqual(str(ctx.exception), "Worker process error",
-                           "ProcessPoolExecutor should propagate ValueError from worker process")
+            self.assertEqual(
+                str(ctx.exception),
+                "Worker process error",
+                "ProcessPoolExecutor should propagate ValueError from worker process",
+            )
 
     def test_pick_pool_with_multiple_processes(self):
         """Test pick_pool correctly creates ProcessPoolExecutor for multiple processes."""
@@ -92,7 +98,9 @@ class ParallelTests(unittest.TestCase):
         with parallel.pick_pool(2) as pool:
             future = pool.submit(_simple_task, 21)
             result = future.result()
-            self.assertEqual(result, 42, "ProcessPoolExecutor should execute _simple_task(21) = 42")
+            self.assertEqual(
+                result, 42, "ProcessPoolExecutor should execute _simple_task(21) = 42"
+            )
 
     def test_pick_pool_with_single_process(self):
         """Test pick_pool correctly creates SerialPool for single process."""
@@ -102,11 +110,16 @@ class ParallelTests(unittest.TestCase):
 
         # Test with 1 process (should use SerialPool)
         with parallel.pick_pool(1) as pool:
-            self.assertIsInstance(pool, parallel.SerialPool,
-                                "pick_pool(1) should return SerialPool for single-process execution")
+            self.assertIsInstance(
+                pool,
+                parallel.SerialPool,
+                "pick_pool(1) should return SerialPool for single-process execution",
+            )
             future = pool.submit(simple_task, 21)
             result = future.result()
-            self.assertEqual(result, 42, "SerialPool should execute simple_task(21) = 42")
+            self.assertEqual(
+                result, 42, "SerialPool should execute simple_task(21) = 42"
+            )
 
 
 class CNAryByGeneTests(unittest.TestCase):

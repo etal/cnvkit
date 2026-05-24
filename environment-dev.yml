@@ -24,7 +24,7 @@ dependencies:
   - pytest-xdist
   - coverage
   - hypothesis
-  - ruff
+  - ruff >=0.15
   - pip-audit
   - bandit
   # Development tools

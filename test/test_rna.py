@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Unit tests for RNA import functionality (cnvlib.rna)."""
+
 import logging
 import unittest
 
@@ -23,7 +24,13 @@ class RNAImportTests(unittest.TestCase):
                 "sample2": [120, 180, 45, 0, 140],
                 "sample3": [90, 210, 55, 0, 160],
             },
-            index=["ENSG00000001", "ENSG00000002", "ENSG00000003", "ENSG00000004", "ENSG00000005"],
+            index=[
+                "ENSG00000001",
+                "ENSG00000002",
+                "ENSG00000003",
+                "ENSG00000004",
+                "ENSG00000005",
+            ],
         )
 
         # Gene info DataFrame
@@ -36,20 +43,38 @@ class RNAImportTests(unittest.TestCase):
                 "gc": [0.5, 0.6, 0.4, 0.55, 0.45],
                 "tx_length": [1000, 1200, 800, 1100, 900],
             },
-            index=["ENSG00000001", "ENSG00000002", "ENSG00000003", "ENSG00000004", "ENSG00000005"],
+            index=[
+                "ENSG00000001",
+                "ENSG00000002",
+                "ENSG00000003",
+                "ENSG00000004",
+                "ENSG00000005",
+            ],
         )
 
         # Transcript lengths Series
         self.tx_lengths = pd.Series(
             [1000, 1200, 800, 1100, 900],
-            index=["ENSG00000001", "ENSG00000002", "ENSG00000003", "ENSG00000004", "ENSG00000005"],
+            index=[
+                "ENSG00000001",
+                "ENSG00000002",
+                "ENSG00000003",
+                "ENSG00000004",
+                "ENSG00000005",
+            ],
         )
 
     def test_align_gene_info_empty_intersection(self):
         """Test error when no genes match between sample data and gene resource."""
         # Create gene_info with completely different gene IDs
         mismatched_gene_info = self.gene_info.copy()
-        mismatched_gene_info.index = ["ENSG99990001", "ENSG99990002", "ENSG99990003", "ENSG99990004", "ENSG99990005"]
+        mismatched_gene_info.index = [
+            "ENSG99990001",
+            "ENSG99990002",
+            "ENSG99990003",
+            "ENSG99990004",
+            "ENSG99990005",
+        ]
 
         with self.assertRaises(ValueError) as cm:
             rna.align_gene_info_to_samples(
@@ -181,7 +206,9 @@ class RNAImportTests(unittest.TestCase):
         )
 
         # Should not raise an assertion error
-        cnrs = list(rna.attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info))
+        cnrs = list(
+            rna.attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info)
+        )
 
         # Should have one CNR per sample
         self.assertEqual(len(cnrs), 3)
