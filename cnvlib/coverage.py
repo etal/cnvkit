@@ -406,7 +406,7 @@ def interval_coverages_count(
         ) from None
     regions = tabio.read_auto(bed_fname)
     # Skip regions on contigs absent from the BAM: pysam.fetch raises
-    # "invalid contig" on them, same chrom-name-mismatch class as gh#620.
+    # "invalid contig" on them, same chrom-name-mismatch class as #620.
     bam_chroms = samutil.get_bam_chroms(bam_fname, fasta)
     present = [
         (chrom, subr) for chrom, subr in regions.by_chromosome() if chrom in bam_chroms
@@ -512,7 +512,7 @@ def interval_coverages_pileup(
     # Regions on contigs absent from the BAM header make samtools bedcov fail;
     # filter them out per call so a chrom-name mismatch on some (but not all)
     # regions doesn't abort the run -- and so the result is independent of how
-    # the BED is split across processes (gh#620).
+    # the BED is split across processes (#620).
     bam_chroms = samutil.get_bam_chroms(bam_fname, fasta)
     if procs == 1:
         table = bedcov(bed_fname, bam_fname, min_mapq, fasta, bam_chroms=bam_chroms)
@@ -614,7 +614,7 @@ def bedcov(
     bam_chroms : set of str, optional
         Reference names present in the BAM header. When given, BED regions on
         any other contig are dropped before calling samtools, which otherwise
-        aborts on regions whose contig is absent from the BAM (gh#620).
+        aborts on regions whose contig is absent from the BAM (#620).
     """
     try:
         import pysam

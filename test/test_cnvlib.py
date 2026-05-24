@@ -415,7 +415,7 @@ class OtherTests(unittest.TestCase):
         )
 
     def test_drop_low_coverage_drops_nan(self):
-        """drop_low_coverage removes NaN-log2 bins, not just the sentinel (gh#521).
+        """drop_low_coverage removes NaN-log2 bins, not just the sentinel (#521).
 
         A bare ``log2 < min_cvg`` comparison is False for NaN, so without
         explicit NaN handling, NaN bins survive into segmentation and trigger
@@ -430,7 +430,7 @@ class OtherTests(unittest.TestCase):
         self.assertEqual(len(kept), 3)
 
     def test_mask_bad_bins_flags_nan(self):
-        """mask_bad_bins treats NaN log2/spread reference bins as bad (gh#521)."""
+        """mask_bad_bins treats NaN log2/spread reference bins as bad (#521)."""
         n = 5
         ref = cnary.CopyNumArray(
             pd.DataFrame(
@@ -537,7 +537,7 @@ class OtherTests(unittest.TestCase):
         self.assertEqual(result2["depth"].iat[0], 0.0)
 
     def test_do_segmentation_drops_nan_log2(self):
-        """do_segmentation tolerates NaN-log2 bins on the default path (gh#881).
+        """do_segmentation tolerates NaN-log2 bins on the default path (#881).
 
         Without --drop-low-coverage (skip_low=False), NaN-log2 bins are never
         filtered before drop_outliers' Savitzky-Golay smoother, whose scipy
@@ -668,7 +668,7 @@ class OtherTests(unittest.TestCase):
         self.assertEqual(result2["gene"].iat[0], "-")
 
     def test_squash_by_groups_no_cross_region_merge(self):
-        """squash_by_groups merges only contiguous runs (gh#677).
+        """squash_by_groups merges only contiguous runs (#677).
 
         The old code combined a run-id cumsum with an integer chromosome
         index by *addition*, which collided on position-unsorted input and
@@ -702,7 +702,7 @@ class OtherTests(unittest.TestCase):
         self.assertEqual(out["probes"].sum(), 3)
 
     def test_squash_region_unsorted_span(self):
-        """squash_region spans [min start, max end] (gh#677).
+        """squash_region spans [min start, max end] (#677).
 
         A run whose bins are not in ascending order must not yield start > end.
         """
@@ -723,7 +723,7 @@ class OtherTests(unittest.TestCase):
 
     def test_squash_by_groups_cn1_cn2_nan(self):
         """Allele-specific squash splits on known cn1/cn2 changes but treats
-        NaN (missing BAF) as 'no change', matching legacy grouping (gh#677).
+        NaN (missing BAF) as 'no change', matching legacy grouping (#677).
 
         Without this, the adjacency check would split every NaN row off on its
         own (NaN != NaN), changing .cns output for `call`/`ampdel` on segments
@@ -754,7 +754,7 @@ class OtherTests(unittest.TestCase):
         self.assertTrue((out_nan.start < out_nan.end).all())
 
     def test_squash_by_groups_empty_and_single(self):
-        """squash_by_groups handles empty and single-row input (gh#677)."""
+        """squash_by_groups handles empty and single-row input (#677)."""
         cols = ["chromosome", "start", "end", "gene", "log2", "probes", "weight"]
         empty = cnary.CopyNumArray(pd.DataFrame({c: [] for c in cols}))
         self.assertEqual(len(segfilters.squash_by_groups(empty, empty["log2"])), 0)

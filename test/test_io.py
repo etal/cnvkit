@@ -146,7 +146,7 @@ class IOTests(unittest.TestCase):
         """Read a Strelka somatic-SNV VCF, which has no GT FORMAT field.
 
         Strelka reports per-base allele counts via AU/CU/GU/TU instead of an
-        explicit genotype. The reader must tolerate the missing GT (gh#943).
+        explicit genotype. The reader must tolerate the missing GT (#943).
         """
         fname = "formats/strelka.vcf"
         # Tumor/normal pair
@@ -205,7 +205,7 @@ class IOTests(unittest.TestCase):
         """A VCF declaring a FORMAT column but no samples gives a clear error.
 
         pysam rejects such files; the reader must not mislabel the failure as
-        an open-file-handle mistake (gh#680).
+        an open-file-handle mistake (#680).
         """
         with self.assertRaises(ValueError) as ctx:
             tabio.read("formats/format-no-sample.vcf", "vcf")

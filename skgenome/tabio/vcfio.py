@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     )
 
 
-# Strelka reports per-base counts (tier1, tier2) instead of GT/AD (gh#943)
+# Strelka reports per-base counts (tier1, tier2) instead of GT/AD (#943)
 _STRELKA_TIER1_FIELD = {"A": "AU", "C": "CU", "G": "GU", "T": "TU"}
 
 
@@ -60,7 +60,7 @@ def read_vcf(
     try:
         vcf_reader = pysam.VariantFile(infile)
     except (OSError, ValueError) as exc:
-        # e.g. a malformed header (FORMAT column declared but no samples, gh#680)
+        # e.g. a malformed header (FORMAT column declared but no samples, #680)
         raise ValueError(f"Could not read VCF file {infile!r}: {exc}") from exc
     if vcf_reader.header.samples:
         sid, nid = _choose_samples(vcf_reader, sample_id, normal_id)
@@ -347,7 +347,7 @@ def _get_zygosity(
     """Get the zygosity (0=hom-ref, 0.5=het, 1=hom-alt) of a sample's genotype.
 
     Use the explicit GT call when present and complete; otherwise -- when GT is
-    absent (e.g. Strelka, gh#943) or a no-call (``./.``) -- infer it from the
+    absent (e.g. Strelka, #943) or a no-call (``./.``) -- infer it from the
     alternate-allele frequency.
     """
     if "GT" in sample:

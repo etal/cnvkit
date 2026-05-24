@@ -510,7 +510,7 @@ class VariantReSegmentationOrderTests(unittest.TestCase):
 class VariantReSegmentationIntegrationTests(unittest.TestCase):
     """Integration tests for the BAF re-segmentation glue in _do_segmentation.
 
-    The reporter of gh#1004 ran ``segment --method cbs --vcf ... --smooth-cbs``
+    The reporter of #1004 ran ``segment --method cbs --vcf ... --smooth-cbs``
     and crashed inside ``variants_in_segment`` with ``'Series' object has no
     attribute 'reshape'`` -- the pre-rewrite code called ``observations.reshape``
     on a pandas Series. That call is reached for *any* non-HMM method via
@@ -553,7 +553,7 @@ class VariantReSegmentationIntegrationTests(unittest.TestCase):
         )
         # The BAF shift splits the single 'none' segment into >= 2 pieces ...
         self.assertGreaterEqual(len(segarr), 2)
-        # ... with valid coordinates and a populated BAF column (gh#1004).
+        # ... with valid coordinates and a populated BAF column (#1004).
         self.assertTrue((segarr["start"] < segarr["end"]).all())
         self.assertIn("baf", segarr.data.columns)
 

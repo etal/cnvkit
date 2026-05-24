@@ -144,7 +144,7 @@ def do_autobin(
 
     # A non-finite or non-positive target depth means no reads were found in
     # the sampled/accessible regions -- give an actionable error rather than a
-    # cryptic "cannot convert float NaN to integer" downstream (gh#421).
+    # cryptic "cannot convert float NaN to integer" downstream (#421).
     if tgt_depth is None or not np.isfinite(tgt_depth) or tgt_depth <= 0:
         raise ValueError(
             f"Could not estimate read depth in the target regions of "
