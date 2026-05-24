@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from skgenome import tabio
 from skgenome._pysam import PYSAM_INSTALL_MSG
+from skgenome.chromnames import detect_chr_prefix
 
 from . import core, samutil
 from .cnary import CopyNumArray as CNA
@@ -102,6 +103,11 @@ def bedgraph_to_basecount(
     try:
         rows = []
         chromosomes_in_bedgraph = set(tbx.contigs)
+        # Detect each file's 'chr'-prefix convention so a name absent from the
+        # bedGraph can be retried under the bedGraph's convention, regardless of
+        # which side carries the prefix (chr1<->1, chrM<->M, etc.).
+        bedgraph_prefix = detect_chr_prefix(chromosomes_in_bedgraph)
+        bed_prefix = detect_chr_prefix(bed_data.chromosome.unique())
 
         for region in bed_data:
             chrom = region.chromosome
@@ -110,12 +116,8 @@ def bedgraph_to_basecount(
 
             # Handle chromosome naming mismatches or missing chromosomes
             if chrom not in chromosomes_in_bedgraph:
-                # Try adding/removing 'chr' prefix
-                alt_chrom = (
-                    f"chr{chrom}"
-                    if not chrom.startswith("chr")
-                    else chrom.removeprefix("chr")
-                )
+                # Retry under the bedGraph's prefix convention (e.g. chr1<->1)
+                alt_chrom = bedgraph_prefix + chrom.removeprefix(bed_prefix)
                 if alt_chrom in chromosomes_in_bedgraph:
                     chrom = alt_chrom
                 else:
