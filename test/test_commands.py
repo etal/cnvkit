@@ -1786,6 +1786,45 @@ class PlotTests(unittest.TestCase):
         fig = scatter.do_scatter(cnarr, segarr, show_gene="BRAF")
         self.assertIsNotNone(fig)
 
+    def test_scatter_genome_y_floor(self):
+        """Genome-wide autoscale floors y_min so a single deep homozygous
+        deletion can't compress the whole plot (gh#385)."""
+        from matplotlib import pyplot
+
+        probes = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100, 200, "A", 0.0],
+                ["chr1", 200, 300, "A", -0.1],
+                ["chr1", 300, 400, "A", -12.0],
+                ["chr2", 100, 200, "B", 0.05],
+                ["chr2", 200, 300, "B", -0.2],
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        segments = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100, 400, "A", -12.0],
+                ["chr2", 100, 300, "B", 0.0],
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        segments.data["probes"] = [3, 2]
+        _fig, ax = pyplot.subplots()
+        scatter.cnv_on_genome(ax, probes, segments)
+        y_lo, _y_hi = ax.get_ylim()
+        pyplot.close(_fig)
+        self.assertGreaterEqual(
+            y_lo,
+            scatter.AUTO_Y_MIN_FLOOR,
+            "Deep deletion must not pull the genome-wide y-axis below the floor",
+        )
+        # An explicit --y-min still overrides the floor
+        _fig, ax = pyplot.subplots()
+        scatter.cnv_on_genome(ax, probes, segments, y_min=-15.0, y_max=2.0)
+        y_lo, _y_hi = ax.get_ylim()
+        pyplot.close(_fig)
+        self.assertAlmostEqual(y_lo, -15.0)
+
     def test_heatmap(self):
         """The 'heatmap' command."""
         cnarrs = [cnvlib.read("formats/amplicon.cnr")]
