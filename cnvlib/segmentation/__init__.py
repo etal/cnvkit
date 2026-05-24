@@ -204,7 +204,7 @@ def _do_segmentation(
         return cnarr
 
     filtered_cn = cnarr.copy()
-    # Drop bins with no log2 value before any analysis (gh#881). They carry no
+    # Drop bins with no log2 value before any analysis (#881). They carry no
     # signal and cannot be segmented, but a bare comparison treats NaN as False,
     # so without this they survive the gates below and reach either the
     # Savitzky-Golay outlier filter (scipy's lstsq rejects non-finite input) or

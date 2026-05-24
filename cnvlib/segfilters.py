@@ -62,7 +62,7 @@ def squash_by_groups(
     is not sorted by genomic position -- e.g. .cns files from several segmenters
     concatenated together -- which previously collided under integer run-id
     arithmetic and merged non-contiguous bins into segments with start > end
-    (gh#677).  For sorted input the grouping is identical to the legacy
+    (#677).  For sorted input the grouping is identical to the legacy
     behavior, including its NaN handling.
     """
     assert cnarr.data.index.is_unique
@@ -147,7 +147,7 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
     out: dict = {
         "chromosome": [cnarr["chromosome"].iat[0]],
         # Span the full run via min/max (not first/last) so a run whose bins are
-        # not in ascending order can't yield start > end (gh#677).
+        # not in ascending order can't yield start > end (#677).
         "start": cnarr["start"].min(),
         "end": cnarr["end"].max(),
     }

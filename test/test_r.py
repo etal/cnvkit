@@ -66,7 +66,7 @@ class RTests(unittest.TestCase):
 
     @pytest.mark.slow
     def test_cbs_nan_log2_in_memory(self):
-        """CBS segments an in-memory .cnr with NaN log2 values (gh#881).
+        """CBS segments an in-memory .cnr with NaN log2 values (#881).
 
         The reporter ran ``segment`` (no --drop-low-coverage) on a .cnr with NaN
         values and hit ``subprocess.CalledProcessError``. The file-read path is

@@ -117,7 +117,7 @@ class PreprocessingTests(unittest.TestCase):
     def test_autobin_chrom_name_mismatch(self):
         """WGS autobin gives a clear, actionable error -- not the cryptic
         'cannot convert float NaN to integer' -- when the BAM and access
-        regions share no chromosome names (gh#421)."""
+        regions share no chromosome names (#421)."""
         bam_fname = "formats/na12878-chrM-Y-trunc.bam"
         # Access regions on a contig absent from the BAM => no shared chroms,
         # so the estimated read depth is NaN.
@@ -132,7 +132,7 @@ class PreprocessingTests(unittest.TestCase):
 
     def test_bedcov_filters_absent_contigs(self):
         """bedcov keeps regions on BAM contigs and drops those on absent
-        contigs instead of erroring out entirely (gh#620)."""
+        contigs instead of erroring out entirely (#620)."""
         bam = "formats/na12878-chrM-Y-trunc.bam"
         bam_chroms = samutil.get_bam_chroms(bam)
         with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
@@ -168,7 +168,7 @@ class PreprocessingTests(unittest.TestCase):
     def test_coverage_partial_chrom_mismatch(self):
         """coverage tolerates a BED mixing present and absent contigs,
         returning only the present-contig regions, for any process count and
-        either depth/count method (gh#620: failure was process-count- and
+        either depth/count method (#620: failure was process-count- and
         method-dependent)."""
         bam = "formats/na12878-chrM-Y-trunc.bam"
         with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
@@ -192,7 +192,7 @@ class PreprocessingTests(unittest.TestCase):
 
     def test_coverage_all_chrom_mismatch(self):
         """coverage raises a clear error when no BED chromosome matches the
-        BAM, for any process count or method (gh#620)."""
+        BAM, for any process count or method (#620)."""
         bam = "formats/na12878-chrM-Y-trunc.bam"
         with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
             f.write("absent_contig\t100\t200\tbaz\n")
@@ -585,7 +585,7 @@ class ReferenceTests(unittest.TestCase):
         self.assertTrue(0 < len(cnr) <= len(tgt_bins))
 
     def test_fix_degenerate_no_nan(self):
-        """do_fix never emits NaN log2/weight from degenerate input (gh#521/#524).
+        """do_fix never emits NaN log2/weight from degenerate input (#521/#524).
 
         Zero-coverage sentinel and NaN bins (from malformed inputs or dead
         regions in WGS) must not survive into the .cnr, where they would crash
@@ -1309,7 +1309,7 @@ class CallTests(unittest.TestCase):
     def test_call_clonal_no_negative_cn(self):
         """Clonal calling with impure samples never emits negative copy number.
 
-        Regression for gh#503/#516: with purity < 1, the purity-rescale formula
+        Regression for #503/#516: with purity < 1, the purity-rescale formula
         n = (r*2^log2 - x*(1-p)) / p extrapolates to negative absolute copies
         for deeply deleted (or zero-coverage sentinel) segments. Absolute copy
         number is physically >= 0, so it must be floored at 0.
@@ -1334,7 +1334,7 @@ class CallTests(unittest.TestCase):
                 self.assertEqual(called["cn"].iloc[2], 0)
 
     def test_log2_ratio_to_absolute_floored_at_zero(self):
-        """_log2_ratio_to_absolute never returns a negative absolute (gh#503)."""
+        """_log2_ratio_to_absolute never returns a negative absolute (#503)."""
         # Impure path: deep deletion below the (1-p) contamination floor
         self.assertEqual(
             call._log2_ratio_to_absolute(-20.0, 2, 2, purity=0.5), 0.0
