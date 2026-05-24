@@ -1,0 +1,9 @@
+##fileformat=VCFv4.2
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Total read depth">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
+##contig=<ID=chr1,length=249250621>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	TUMOR	NORMAL
+chr1	100	.	G	A	50	PASS	DP=40	GT:DP	0/1:42	0/1:38
+chr1	200	.	C	T	50	PASS	DP=36	GT:DP	0/1:36	0/1:34
+chr1	300	.	A	G	50	PASS	DP=30	GT:DP	0/1:30	0/1:30

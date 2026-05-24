@@ -95,7 +95,13 @@ def read_vcf(
     table["alt_freq"] = table["alt_count"] / table["depth"]
     if nid:
         table["n_alt_freq"] = table["n_alt_count"] / table["n_depth"]
-    table = table.fillna({col: 0.0 for col in table.columns[6:]})
+    # Fill missing genotype/depth/count fields with 0, but leave allele
+    # *frequencies* as NaN: a het call with no allele counts has an unknown
+    # (not zero) frequency, and coercing it to 0 pins mirrored BAF to 0 over
+    # the whole region (#407). NaN is excluded by the np.nanmedian aggregation.
+    freq_cols = {"alt_freq", "n_alt_freq"}
+    fill_cols = [c for c in table.columns[6:] if c not in freq_cols]
+    table = table.fillna({col: 0.0 for col in fill_cols})
     # Filter out records as requested
     cnt_depth = cnt_som = 0
     if min_depth:
