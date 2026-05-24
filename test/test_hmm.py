@@ -409,6 +409,103 @@ class VariantsInSegmentTests(unittest.TestCase):
         self.assertEqual(result.iloc[0]["gene"], "TP53")
         self.assertAlmostEqual(result.iloc[0]["log2"], -0.5)
 
+    def test_unsorted_variants_no_crash(self):
+        """Regression test for #893.
+
+        An input VCF that isn't position-sorted reaches variants_in_segment
+        with rows out of genomic order -- nothing in the pipeline sorts
+        variants. The 2-state HMM must process observations in genomic order;
+        otherwise squash_by_groups (which groups by row adjacency) emits
+        genomically overlapping segments, the midpoint breakpoints come out
+        non-monotonic, and post-processing produces a segment with
+        ``start >= end`` -- the "Improper post-processing of segment"
+        RuntimeError the reporter hit.
+        """
+        rng = np.random.default_rng(1)
+        n = 120
+        alt_freqs = np.concatenate(
+            [rng.normal(0.5, 0.02, n // 2), rng.normal(0.67, 0.02, n // 2)]
+        ).clip(0.01, 0.99)
+        pos = np.linspace(1000, 190000, n).astype(int)
+        perm = np.arange(n)
+        rng.shuffle(perm)  # scramble row order: rows no longer position-sorted
+        varr = _make_variant_array(
+            ["chr1"] * n,
+            pos[perm].tolist(),
+            (pos[perm] + 1).tolist(),
+            alt_freqs[perm].tolist(),
+        )
+        segment = _make_segment("chr1", 0, 200000, log2=-0.03, probes=n)
+        result = variants_in_segment(varr, segment, min_variants=50)
+        # No RuntimeError, and every output segment has valid coordinates ...
+        self.assertTrue((result["start"] < result["end"]).all())
+        # ... and the BAF shift is still recovered as a breakpoint despite the
+        # scrambled input, spanning the full parent segment.
+        self.assertGreaterEqual(len(result), 2)
+        self.assertEqual(result.iloc[0]["start"], 0)
+        self.assertEqual(result.iloc[-1]["end"], 200000)
+
+
+class VariantReSegmentationOrderTests(unittest.TestCase):
+    """#893: variant re-segmentation must not depend on input VCF row order.
+
+    by_ranges/baf_by_ranges slice variants by binary search, so an unsorted
+    input VCF mis-assigns variants to segments (silently wrong BAF) and crashes
+    variants_in_segment. do_segmentation must sort variants up front, making its
+    output invariant to the order in which variants are supplied. This drives
+    the full do_segmentation pipeline R-free via method="none".
+    """
+
+    def test_segmentation_invariant_to_variant_order(self):
+        nbins = 60
+        starts = np.arange(0, nbins * 1000, 1000)
+        cnr = CNA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * nbins,
+                    "start": starts,
+                    "end": starts + 1000,
+                    "gene": ["-"] * nbins,
+                    "log2": np.zeros(nbins),
+                    "depth": np.full(nbins, 100.0),
+                    "weight": np.ones(nbins),
+                }
+            )
+        )
+        rng = np.random.default_rng(0)
+        n = 200
+        alt_freqs = np.concatenate(
+            [rng.normal(0.5, 0.02, n // 2), rng.normal(0.67, 0.02, n // 2)]
+        ).clip(0.01, 0.99)
+        pos = np.linspace(0, nbins * 1000 - 2, n).astype(int)
+        sorted_varr = _make_variant_array(
+            ["chr1"] * n, pos.tolist(), (pos + 1).tolist(), alt_freqs.tolist()
+        )
+        perm = rng.permutation(n)
+        shuffled_varr = _make_variant_array(
+            ["chr1"] * n,
+            pos[perm].tolist(),
+            (pos[perm] + 1).tolist(),
+            alt_freqs[perm].tolist(),
+        )
+
+        seg_sorted = segmentation.do_segmentation(
+            cnr, "none", variants=sorted_varr, processes=1
+        )
+        seg_shuffled = segmentation.do_segmentation(
+            cnr, "none", variants=shuffled_varr, processes=1
+        )
+
+        # Same breakpoints and BAF regardless of input variant order (#893) ...
+        assert_array_equal(
+            seg_sorted["start"].to_numpy(), seg_shuffled["start"].to_numpy()
+        )
+        assert_array_equal(seg_sorted["end"].to_numpy(), seg_shuffled["end"].to_numpy())
+        assert_allclose(seg_sorted["baf"].to_numpy(), seg_shuffled["baf"].to_numpy())
+        # ... and the BAF shift actually split the single 'none' segment.
+        self.assertGreaterEqual(len(seg_sorted), 2)
+        self.assertTrue((seg_sorted["start"] < seg_sorted["end"]).all())
+
 
 class VariantReSegmentationIntegrationTests(unittest.TestCase):
     """Integration tests for the BAF re-segmentation glue in _do_segmentation.
