@@ -196,6 +196,11 @@ class VariantArray(GenomicArray):
 def _mirrored_baf(vals: pd.Series, above_half: bool | None = None) -> pd.Series:
     shift = (vals - 0.5).abs()
     if above_half is None:
+        if vals.isna().all():
+            # No usable frequencies: the median is undefined and np.nanmedian
+            # warns ("Mean of empty slice") on an all-NaN slice under older
+            # numpy. The mirrored result is all-NaN regardless of direction. (#407)
+            return shift
         above_half = vals.median() > 0.5
     if above_half:
         return 0.5 + shift
