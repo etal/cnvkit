@@ -836,6 +836,27 @@ class OtherTests(unittest.TestCase):
             result = rangelabel.unpack_range(region)
             self.assertEqual(result, expect)
 
+    def test_rangelabel_ncbi_chrom(self):
+        # NCBI-style chromosome names contain a '.' version suffix (gh#602)
+        row = rangelabel.from_label("NC_039902.1:10000000-15000000", keep_gene=False)
+        self.assertEqual(tuple(row), ("NC_039902.1", 9999999, 15000000))
+        self.assertEqual(rangelabel.to_label(row), "NC_039902.1:10000000-15000000")
+        # Open-ended start/end are still parsed with a dotted chromosome name
+        self.assertEqual(
+            tuple(rangelabel.from_label("NC_039902.1:10000000-", keep_gene=False)),
+            ("NC_039902.1", 9999999, None),
+        )
+        self.assertEqual(
+            tuple(rangelabel.from_label("NC_039902.1:-15000000", keep_gene=False)),
+            ("NC_039902.1", None, 15000000),
+        )
+        # unpack_range: whole dotted chromosome (no colon) and a region of it
+        for region, expect in (
+            ["NC_039902.1", ("NC_039902.1", None, None)],
+            ["NC_039902.1:10000000-15000000", ("NC_039902.1", 9999999, 15000000)],
+        ):
+            self.assertEqual(rangelabel.unpack_range(region), expect)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
