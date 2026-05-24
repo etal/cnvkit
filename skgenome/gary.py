@@ -280,9 +280,11 @@ class GenomicArray:
         unique = self.chromosome.unique()
         sex_x, sex_y = infer_sex_chrom_labels(unique)
         is_auto = self.chromosome.map(
-            lambda n: is_autosome(n, sex_x, sex_y)
-            and not is_mitochondrial(n)
-            and not is_alternative_contig(n)
+            lambda n: (
+                is_autosome(n, sex_x, sex_y)
+                and not is_mitochondrial(n)
+                and not is_alternative_contig(n)
+            )
         )
         if not is_auto.any():
             logging.warning(

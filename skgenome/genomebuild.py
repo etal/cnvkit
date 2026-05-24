@@ -62,9 +62,7 @@ GRCH38 = GenomeBuild(
 )
 
 
-REGISTERED_BUILDS: dict[str, GenomeBuild] = {
-    b.name: b for b in (GRCH37, GRCH38)
-}
+REGISTERED_BUILDS: dict[str, GenomeBuild] = {b.name: b for b in (GRCH37, GRCH38)}
 
 
 def get_genome_build(name: str) -> GenomeBuild:
@@ -77,8 +75,7 @@ def get_genome_build(name: str) -> GenomeBuild:
         return REGISTERED_BUILDS[key]
     except KeyError:
         raise KeyError(
-            f"Unknown genome build {name!r}; "
-            f"supported: {sorted(REGISTERED_BUILDS)}"
+            f"Unknown genome build {name!r}; supported: {sorted(REGISTERED_BUILDS)}"
         ) from None
 
 

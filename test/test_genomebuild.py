@@ -56,9 +56,7 @@ class GenomeBuildTests(unittest.TestCase):
         from cnvlib import params
 
         # Every registered build appears as a top-level key
-        self.assertEqual(
-            set(params.PSEUDO_AUTSOMAL_REGIONS), set(REGISTERED_BUILDS)
-        )
+        self.assertEqual(set(params.PSEUDO_AUTSOMAL_REGIONS), set(REGISTERED_BUILDS))
         # All four PAR keys round-trip equally for every build
         for build in (GRCH37, GRCH38):
             for key in ("PAR1X", "PAR2X", "PAR1Y", "PAR2Y"):

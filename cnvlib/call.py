@@ -573,9 +573,7 @@ def rescale_baf(purity: float, observed_baf: Series, normal_baf: float = 0.5) ->
     # NaN comparisons yield False, so NaN segments are not counted or clamped.
     # The tolerance avoids spurious warnings for values within float noise of 0/1.
     n_bad = int(
-        (
-            (tumor_baf < -_BAF_RANGE_TOL) | (tumor_baf > 1.0 + _BAF_RANGE_TOL)
-        ).sum()
+        ((tumor_baf < -_BAF_RANGE_TOL) | (tumor_baf > 1.0 + _BAF_RANGE_TOL)).sum()
     )
     if n_bad:
         logging.warning(

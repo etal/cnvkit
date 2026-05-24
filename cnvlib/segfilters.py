@@ -141,7 +141,9 @@ def squash_region(cnarr: DataFrame) -> DataFrame:
 
     def _wavg(col: str) -> float:
         if region_weight > 0 and valid_wt.any():
-            return float(np.average(cnarr[col].to_numpy()[valid_wt], weights=wt[valid_wt]))
+            return float(
+                np.average(cnarr[col].to_numpy()[valid_wt], weights=wt[valid_wt])
+            )
         return float(np.mean(cnarr[col]))
 
     out: dict = {
