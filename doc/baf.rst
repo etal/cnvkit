@@ -200,3 +200,29 @@ or::
 Both indicate the loaded variants don't look like germline heterozygous
 SNPs. Re-check the VCF preparation (see :ref:`baf-vcf-prep`) and sample
 identification.
+
+``baf`` is 0 across (nearly) every segment
+``````````````````````````````````````````
+
+Symptom: the ``.cns`` output has ``baf`` of exactly 0 in most or all
+segments, even though the VCF clearly contains heterozygous SNPs (the load
+log reports many records "kept heterozygous").
+
+Cause: CNVkit derives each SNP's allele frequency from per-sample
+allele-*count* FORMAT fields, not from the genotype alone. It reads, in order
+of preference, ``AD`` (GATK, VarScan2), ``CLCAD2`` (Qiagen CLC), ``AO`` with
+``RO`` (FreeBayes), Strelka's per-base tier counts (``AU``/``CU``/``GU``/``TU``),
+or -- for an unpaired VCF with no per-sample genotypes -- the INFO ``AF``
+field. If a record has a genotype (``GT``) but *none* of these count fields,
+its allele frequency is unknown.
+
+Such sites are now treated as missing (NaN) rather than as a 0% alt-allele
+frequency, so they are excluded from the per-segment BAF instead of pinning it
+to 0. (Previously the unknown frequency was coerced to 0, which kept the het
+site and forced its mirrored BAF to 0; see issue #407.) If *all* het SNPs in a
+segment lack counts, that segment's ``baf`` is written as missing (NaN).
+
+The fix is to call variants with a tool that emits allele depths, or re-run the
+caller so that one of the fields above is present. For example, VarScan2 emits
+``AD``/``RD`` and VarDict/FreeBayes emit ``AD``/``AF``; a ``GT``-only VCF does
+not carry enough information for BAF.

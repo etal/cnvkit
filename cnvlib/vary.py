@@ -53,7 +53,13 @@ class VariantArray(GenomicArray):
             return pd.Series(np.repeat(np.nan, len(ranges)), index=self.data.index)
 
         def summarize(vals):
-            return summary_func(_mirrored_baf(vals, above_half))
+            mirrored = _mirrored_baf(vals, above_half)
+            # A bin whose het SNPs all lack allele frequencies (NaN) has no
+            # usable BAF; return NaN directly rather than letting np.nanmedian
+            # warn on an all-NaN slice (#407).
+            if mirrored.isna().all():
+                return np.nan
+            return summary_func(mirrored)
 
         cnarr = self.heterozygous()
         if tumor_boost and "n_alt_freq" in self:

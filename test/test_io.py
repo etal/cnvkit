@@ -201,6 +201,45 @@ class IOTests(unittest.TestCase):
         # 0/0 -> hom-ref; 1/1 -> hom-alt; 0/1 -> het
         self.assertEqual(list(v["zygosity"]), [0.0, 0.5, 0.5, 0.0, 1.0, 0.5])
 
+    def test_read_vcf_het_no_alt_count(self):
+        """A het call with no allele-count field gets NaN alt_freq, not 0 (#407).
+
+        When a VCF has genotypes (GT=0/1 -> het) but no AD/AO/DP4/AF to derive
+        an alternate-allele count, the frequency is unknown. It must stay NaN so
+        BAF aggregation (np.nanmedian) excludes it, rather than being coerced to
+        0.0 -- which would keep the het site yet pin its mirrored BAF to exactly
+        0 over the whole region.
+        """
+        import math
+
+        from cnvlib.cnary import CopyNumArray as CNA
+
+        varr = tabio.read(
+            "formats/vcf-het-no-altcount.vcf",
+            "vcf",
+            sample_id="TUMOR",
+            normal_id="NORMAL",
+        )
+        self.assertEqual(len(varr), 3)
+        # Genotype is read as heterozygous, so these sites are kept...
+        self.assertEqual(list(varr["zygosity"]), [0.5, 0.5, 0.5])
+        # ...but with no allele counts the frequency is unknown, not zero
+        self.assertTrue(all(math.isnan(f) for f in varr["alt_freq"]))
+        self.assertTrue(all(math.isnan(f) for f in varr["n_alt_freq"]))
+        # A bin spanning all three het SNPs gets NaN BAF, not a spurious 0.0
+        seg = CNA.from_columns(
+            {
+                "chromosome": ["chr1"],
+                "start": [0],
+                "end": [1000],
+                "gene": ["-"],
+                "log2": [0.0],
+            }
+        )
+        baf = varr.baf_by_ranges(seg)
+        self.assertEqual(len(baf), 1)
+        self.assertTrue(math.isnan(baf.iloc[0]))
+
     def test_read_vcf_malformed(self):
         """A VCF declaring a FORMAT column but no samples gives a clear error.
 
