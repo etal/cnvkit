@@ -520,6 +520,49 @@ class OtherTests(unittest.TestCase):
         self.assertIn("GeneA", gene_val)
         self.assertIn("GeneB", gene_val)
 
+    def test_transfer_fields_genes_near_segment_end(self):
+        """Genes from bins near a segment's end are kept in its label (#688).
+
+        Uses the reported EGFR geometry: bins at chr7:55,018,770-55,019,423
+        fall inside the segment chr7:54,246,732-55,031,592 (well before its
+        end), and more EGFR bins fall in the adjacent segment. EGFR must appear
+        in *both* segment labels -- the original report dropped it from the
+        first, where the gene-bearing bins sit near the segment's end.
+        """
+        bins = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr7"] * 6,
+                    "start": [54246732, 54800000, 55018770, 55019096,
+                              55032092, 55088166],
+                    "end": [54300000, 54900000, 55019096, 55019423,
+                            55032193, 55088469],
+                    "gene": ["VSTM2A", "SEC61G", "EGFR", "EGFR",
+                             "EGFR", "EGFR"],
+                    "log2": np.zeros(6),
+                    "depth": np.ones(6) * 100.0,
+                    "weight": np.ones(6),
+                }
+            )
+        )
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr7", "chr7"],
+                    "start": [54246732, 55032092],
+                    "end": [55031592, 55365525],
+                    "gene": ["-", "-"],
+                    "log2": [0.0, 0.0],
+                    "probes": [4, 2],
+                    "weight": [0.0, 0.0],
+                }
+            )
+        )
+        result = segmentation.transfer_fields(segarr, bins)
+        self.assertIn("EGFR", result["gene"].iat[0])
+        self.assertIn("VSTM2A", result["gene"].iat[0])
+        self.assertIn("EGFR", result["gene"].iat[1])
+
     def test_transfer_fields_nan_weights(self):
         """transfer_fields handles NaN bin weights without NaN in .cns output."""
         n = 10
