@@ -334,6 +334,35 @@ class OtherTests(unittest.TestCase):
             2 * fix.edge_gains(target_size, gap_size, insert_size),
         )
 
+    def test_center_by_window_single_bin(self):
+        """center_by_window survives one surviving bin (#891).
+
+        Near-zero antitarget coverage can leave a single bin after the
+        bad-bin/NaN filters in load_adjust_coverages. The bias-correction
+        smoothing (rolling_median) then received len-1 input, where the
+        fraction ``max(0.01, len ** -0.5) == 1.0`` is an invalid width that
+        crashed ``_width2wing`` (and len-0 tripped its ``wing >= 1`` assert),
+        terminating ``batch`` silently without ever writing a .cnr.
+        """
+        one_bin = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"],
+                    "start": [1000],
+                    "end": [2000],
+                    "gene": ["G"],
+                    "log2": [0.42],
+                    "depth": [50.0],
+                }
+            )
+        )
+        # frac as computed in load_adjust_coverages for one surviving bin
+        frac = max(0.01, len(one_bin) ** -0.5)
+        self.assertEqual(frac, 1.0)
+        result = fix.center_by_window(one_bin, frac, np.array([0.5]))
+        self.assertEqual(len(result), 1)
+        self.assertFalse(np.isnan(result["log2"]).any())
+
     # call
     # Test: convert_clonal(x, 1, 2) == convert_diploid(x)
 
