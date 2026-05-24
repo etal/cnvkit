@@ -15,7 +15,17 @@ import pandas as pd
 from skgenome import GenomicArray, tabio
 
 import cnvlib
-from cnvlib import cnary, fix, params, reports, segfilters, segmentation, segmetrics, vary
+from cnvlib import (
+    cnary,
+    fix,
+    params,
+    plots,
+    reports,
+    segfilters,
+    segmentation,
+    segmetrics,
+    vary,
+)
 from conftest import linecount
 
 
@@ -149,6 +159,36 @@ class CNATests(unittest.TestCase):
             par2y_overlapping_gene not in par_on_y["gene"].tolist(),
             "The overlapping region is not part of the filter.",
         )
+
+    def test_gene_coords_by_name(self):
+        """`-g` labels only requested genes, not co-binned neighbors (gh#458).
+
+        A bin whose `gene` column packs several names (e.g. "ERBB2,MIR4728")
+        must not surface the unrequested neighbor (MIR4728) when only ERBB2
+        is selected.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [
+                ["chr17", 37800000, 37850000, "STARD3", 0.0],
+                ["chr17", 37850000, 37860000, "ERBB2,MIR4728", 0.0],
+                ["chr17", 37860000, 37870000, "ERBB2", 0.0],
+                ["chr17", 37880000, 37890000, "GRB7", 0.0],
+            ]
+        )
+        # Single requested gene: co-binned MIR4728 must be hidden
+        coords = plots.gene_coords_by_name(cnarr, ["ERBB2"])
+        self.assertEqual(list(coords.keys()), ["chr17"])
+        self.assertEqual(len(coords["chr17"]), 1)
+        start, end, name = coords["chr17"][0]
+        self.assertEqual(name, "ERBB2")
+        self.assertEqual((start, end), (37850000, 37870000))
+        # When MIR4728 *is* requested, it should appear
+        names_seen = set()
+        for _s, _e, label in plots.gene_coords_by_name(
+            cnarr, ["ERBB2", "MIR4728"]
+        )["chr17"]:
+            names_seen.update(label.split(","))
+        self.assertEqual(names_seen, {"ERBB2", "MIR4728"})
 
     def test_autosomes(self):
         """Test selection of autosomes specific to CNA."""

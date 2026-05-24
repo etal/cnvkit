@@ -283,10 +283,13 @@ def gene_coords_by_name(probes, names):
         start = gene_probes["start"].min()
         end = gene_probes["end"].max()
         chrom = core.check_unique(gene_probes["chromosome"], name)
-        # Deduce the unique set of gene names for this region
-        uniq_names = set()
+        # Deduce the unique set of *requested* gene names for this region.
+        # A bin label may pack several genes (e.g. "ERBB2,MIR4728"); only the
+        # names the caller asked for should be surfaced, never co-binned
+        # neighbors (gh#458).
+        uniq_names: set[str] = set()
         for oname in gene_probes["gene"].dropna().unique():
-            uniq_names.update(oname.split(","))
+            uniq_names.update(g for g in oname.split(",") if g in names)
         all_coords[chrom][start, end].update(uniq_names)
     # Consolidate each region's gene names into a string
     uniq_coords = {}
