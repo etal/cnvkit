@@ -608,6 +608,19 @@ is provided (``-v``), BAF information is jointly modeled with log2 ratios.
 The methods ``haar`` and ``none`` do not have any additional dependencies beyond
 the basic CNVkit installation.
 
+.. note::
+   **Smoothing.** By default, ``cbs`` segments the log2 ratios directly, without
+   any pre-smoothing. The ``--smooth-cbs`` option enables an additional smoothing
+   pass before CBS (via DNAcopy's ``smooth.CNA``), which can increase sensitivity
+   on noisy data; it is opt-in and applies only to the ``cbs`` method.
+
+   A separate Savitzky-Golay smoother draws the grey trend line in :ref:`scatter`
+   plots and is used internally by the ``haar`` and ``hmm`` methods. When that
+   smoother produces a value slightly outside the input range it logs a
+   ``Smoothing overshot ...`` message. This is informational only and does not
+   affect ``cbs`` segmentation, so seeing it after a ``scatter`` plot or an
+   ``haar``/``hmm`` run is expected.
+
 
 Bin filtering
 `````````````
