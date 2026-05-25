@@ -9,11 +9,13 @@ from numpy.testing import assert_allclose, assert_array_equal
 from scipy import stats
 
 from cnvlib.segmentation.haar import (
+    SIGMA_FLOOR,
     FDRThres,
     FindLocalPeaks,
     HaarConv,
     PulseConv,
     SegmentByPeaks,
+    _baf_signal_and_sigma,
     haarSeg,
 )
 
@@ -226,9 +228,7 @@ class HaarSegIntegrationTests(unittest.TestCase):
         yielding 2 segments instead of 3 (scq.2). Real noisy data is unaffected
         (noise keeps peakSigmaEst > 0).
         """
-        signal = np.concatenate(
-            [np.zeros(30), np.full(30, -2.0), np.full(30, -2.3)]
-        )
+        signal = np.concatenate([np.zeros(30), np.full(30, -2.0), np.full(30, -2.3)])
         result = haarSeg(signal, breaksFdrQ=0.001)
         self.assertEqual(len(result["start"]), 3)
         assert_allclose(result["mean"], [0.0, -2.0, -2.3], atol=1e-9)
@@ -237,6 +237,55 @@ class HaarSegIntegrationTests(unittest.TestCase):
         """The peakSigmaEst floor must not over-segment a constant signal."""
         result = haarSeg(np.zeros(100), breaksFdrQ=0.01)
         self.assertEqual(len(result["start"]), 1)
+
+
+class HaarBafTests(unittest.TestCase):
+    """Tests for the depth+BAF breakpoint-union building blocks (cnvkit-ugh)."""
+
+    def test_baf_signal_and_sigma_observed_only(self):
+        # Noisy observed bins -> the bin-to-bin variation gives a real MAD
+        minor = np.array([12.0, 15.0, 11.0, 16.0, 13.0, 14.0, 10.0, 17.0])
+        depth = np.full(8, 30.0)
+        signal, weights, sigma = _baf_signal_and_sigma(minor, depth)
+        assert_allclose(signal, minor / depth)
+        assert_allclose(weights, depth)  # depth = binomial precision
+        self.assertGreater(sigma, SIGMA_FLOOR)  # real BAF noise, not deflated
+
+    def test_baf_sigma_not_deflated_by_neutral_fills(self):
+        # Same observed bins, but interleaved with many SNP-less (filled) bins.
+        # Computing the noise over observed bins only must keep sigma realistic;
+        # a full-grid (contaminated) estimate would collapse toward the floor.
+        obs_minor = np.array([12.0, 15.0, 11.0, 16.0, 13.0, 14.0, 10.0, 17.0])
+        minor = np.zeros(40)
+        depth = np.zeros(40)
+        minor[::5] = obs_minor
+        depth[::5] = 30.0
+        _s, _w, sigma_sparse = _baf_signal_and_sigma(minor, depth)
+        _s2, _w2, sigma_dense = _baf_signal_and_sigma(obs_minor, np.full(8, 30.0))
+        # Sparse layout's observed-only noise matches the dense one (not deflated)
+        self.assertAlmostEqual(sigma_sparse, sigma_dense)
+
+    def test_baf_signal_and_sigma_no_snps(self):
+        signal, weights, sigma = _baf_signal_and_sigma(
+            np.array([0.0, 5.0, 0.0]), np.array([0.0, 10.0, 0.0])
+        )
+        assert_allclose(signal, [0.5, 0.5, 0.5])  # depth=0 -> neutral fill
+        assert_allclose(weights, [0.0, 10.0, 0.0])
+        # Only 1 observed bin -> noise floor, computed over observed bins only
+        self.assertEqual(sigma, SIGMA_FLOOR)
+
+    def test_haarseg_sigma_override(self):
+        # Noisy signal with many local peaks (so FDRThres actually thresholds,
+        # not the M<2 short-circuit). The override controls FDR sensitivity;
+        # default (None) is byte-identical to the computed estimate.
+        rng = np.random.default_rng(0)
+        sig = rng.normal(0, 1.0, 120)
+        same = haarSeg(sig, 0.001, sigma_override=None)
+        assert_array_equal(haarSeg(sig, 0.001)["start"], same["start"])
+        tiny = haarSeg(sig, 0.001, sigma_override=1e-6)  # everything significant
+        huge = haarSeg(sig, 0.001, sigma_override=1e3)  # nothing significant
+        self.assertGreater(len(tiny["start"]), len(huge["start"]))
+        self.assertEqual(len(huge["start"]), 1)  # reject-all -> one segment
 
 
 class SegmentByPeaksTests(unittest.TestCase):

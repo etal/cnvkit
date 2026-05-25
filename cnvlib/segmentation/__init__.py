@@ -272,7 +272,9 @@ def _do_segmentation(
     seg_out = ""
     match method:
         case "haar":
-            segarr = haar.segment_haar(filtered_cn, threshold)  # type: ignore[arg-type]
+            # With variants, segment jointly on depth+BAF (breakpoint union) to
+            # catch copy-neutral LOH; without, depth-only (byte-identical).
+            segarr = haar.segment_haar(filtered_cn, threshold, variants)  # type: ignore[arg-type]
         case "none":
             segarr = none.segment_none(filtered_cn)
         case "cbs" | "flasso":
@@ -333,18 +335,20 @@ def _do_segmentation(
             return segarr, seg_out
         return segarr
     if variants and method not in _HMM_METHODS:
-        # Re-segment the variant allele freqs within each segment.
-        # BAF re-segmentation intentionally uses the HMM (a 2-state Viterbi on
-        # mirrored BAF) for every non-HMM method, per commit 692d5a5; the older
-        # Haar-on-BAF path was removed as dead code. See bead for selectable/
-        # upgraded BAF refinement (beta-binomial) if this is revisited.
-        # TODO train on all segments together
-        logging.info("Re-segmenting on variant allele frequency")
-        newsegs = [
-            hmm.variants_in_segment(subvarr, segment)
-            for segment, subvarr in variants.by_ranges(segarr)
-        ]
-        segarr = segarr.as_dataframe(pd.concat(newsegs))
+        # ('hmm*' models BAF jointly in segment_hmm, so it's excluded here.)
+        if method != "haar":
+            # R backends (cbs/flasso) and 'none': re-segment the variant allele
+            # freqs within each segment using a 2-state Viterbi HMM on mirrored
+            # BAF (per commit 692d5a5).
+            # TODO train on all segments together
+            logging.info("Re-segmenting on variant allele frequency")
+            newsegs = [
+                hmm.variants_in_segment(subvarr, segment)
+                for segment, subvarr in variants.by_ranges(segarr)
+            ]
+            segarr = segarr.as_dataframe(pd.concat(newsegs))
+        # else: 'haar' already incorporated BAF via its depth+BAF breakpoint
+        # union, so no re-segmentation -- just attach the per-segment BAF below.
         segarr["baf"] = variants.baf_by_ranges(segarr)
 
     segarr = transfer_fields(segarr, cnarr)

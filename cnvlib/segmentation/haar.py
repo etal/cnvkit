@@ -32,6 +32,7 @@ from scipy import stats
 
 if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
+    from cnvlib.vary import VariantArray
     from numpy import float64, ndarray
 
 # Lower bound for the wavelet-coefficient noise estimate, so a degenerate
@@ -39,8 +40,15 @@ if TYPE_CHECKING:
 # threshold's normal CDF. Far below any real log2/BAF step magnitude.
 SIGMA_FLOOR = 1e-10
 
+# Floor for per-bin BAF weights (read depths) so a window of all SNP-less bins
+# can't divide by zero in the weighted Haar convolution. Negligible vs real
+# read depths (~30-100x), so observed bins still dominate. (cnvkit-ugh)
+WEIGHT_FLOOR = 1e-6
 
-def segment_haar(cnarr: CopyNumArray, fdr_q: float) -> CopyNumArray:
+
+def segment_haar(
+    cnarr: CopyNumArray, fdr_q: float, variants: VariantArray | None = None
+) -> CopyNumArray:
     """Do segmentation for CNVkit.
 
     Calculate copy number segmentation by HaarSeg
@@ -52,6 +60,12 @@ def segment_haar(cnarr: CopyNumArray, fdr_q: float) -> CopyNumArray:
         Binned, normalized copy ratios.
     fdr_q : float
         False discovery rate q-value.
+    variants : VariantArray, optional
+        Heterozygous SNP allele frequencies. When given, segment jointly on
+        depth and B-allele frequency by taking the *union* of breakpoints from
+        haar applied to log2 and to per-bin BAF -- a fast way to catch
+        copy-neutral LOH on WGS (depth flat, BAF shifts). Without variants this
+        is byte-identical to the depth-only segmentation.
 
     Returns
     -------
@@ -60,32 +74,161 @@ def segment_haar(cnarr: CopyNumArray, fdr_q: float) -> CopyNumArray:
     """
     # Segment each chromosome individually
     # ENH - skip large gaps (segment chrom. arms separately)
-    chrom_tables = [
-        one_chrom(subprobes, fdr_q, chrom) for chrom, subprobes in cnarr.by_arm()
-    ]
+    if variants is None:
+        chrom_tables = [
+            one_chrom(subprobes, fdr_q, chrom) for chrom, subprobes in cnarr.by_arm()
+        ]
+    else:
+        chrom_tables = [
+            one_chrom_baf(subprobes, fdr_q, chrom, variants)
+            for chrom, subprobes in cnarr.by_arm()
+        ]
     segarr = cnarr.as_dataframe(pd.concat(chrom_tables))
     segarr.sort_columns()
     return segarr
 
 
+def _bin_weights(cnarr: CopyNumArray) -> ndarray | None:
+    return cnarr["weight"].to_numpy() if "weight" in cnarr else None
+
+
 def one_chrom(cnarr: CopyNumArray, fdr_q: float, chrom: str) -> pd.DataFrame:
     logging.debug("Segmenting %s", chrom)
-    results = haarSeg(
-        cnarr.smooth_log2(),
-        fdr_q,
-        weights=(cnarr["weight"].to_numpy() if "weight" in cnarr else None),
-    )
-    table = pd.DataFrame(
+    signal = cnarr.smooth_log2()
+    weights = _bin_weights(cnarr)
+    breakpoints = _haar_breakpoints(signal, fdr_q, weights)
+    return _segments_from_breakpoints(cnarr, signal, weights, breakpoints, chrom)
+
+
+def _haar_breakpoints(
+    signal: ndarray,
+    fdr_q: float,
+    weights: ndarray | None = None,
+    sigma_override: float | None = None,
+) -> ndarray:
+    """Bin-index breakpoints from haarSeg (i.e. ``results['start'][1:]``)."""
+    results = haarSeg(signal, fdr_q, weights=weights, sigma_override=sigma_override)
+    return results["start"][1:]
+
+
+def _baf_signal_and_sigma(
+    minor_counts: ndarray, depths: ndarray
+) -> tuple[ndarray, ndarray, float]:
+    """Build the BAF haar signal, per-bin weights, and noise floor.
+
+    The signal is the pooled minor-allele fraction ``minor/depth`` per bin
+    (already mirrored into [0, 0.5]); bins with no het SNP (depth 0) are
+    neutral-filled at 0.5 and given weight 0. Weights are read depth, which is
+    proportional to binomial precision (BAF variance ~= 0.25/depth).
+
+    The noise floor is the MAD of level-1 Haar coefficients computed over
+    *observed* bins only -- haarSeg's own ``peakSigmaEst`` is unweighted, so
+    the neutral fills would otherwise deflate it and trip the SIGMA_FLOOR path.
+    """
+    observed = depths > 0
+    baf_signal = np.where(observed, minor_counts / np.maximum(depths, 1.0), 0.5)
+    baf_weights = depths.astype(np.float64)
+    return baf_signal, baf_weights, _observed_baf_sigma(baf_signal, observed)
+
+
+def _observed_baf_sigma(baf_signal: ndarray, observed: ndarray) -> float:
+    """Noise floor from level-1 Haar coefficients of the *compacted* observed
+    BAF values.
+
+    Computing over the compacted observed values (not the full grid sampled at
+    observed positions) means SNP-less neutral-fill bins neither deflate the
+    estimate (flat 0.5 runs -> 0) nor inflate it (an observed LOH value vs its
+    0.5-filled neighbors), which would otherwise raise the FDR threshold and
+    suppress the LOH breakpoint we are trying to detect.
+    """
+    obs_vals = baf_signal[observed]
+    if len(obs_vals) < 2:
+        return SIGMA_FLOOR
+    level1 = HaarConv(obs_vals, None, 1)
+    return max(float(pd.Series(level1).abs().median() * 1.4826), SIGMA_FLOOR)
+
+
+def _baf_signal_from_frequencies(
+    baf_series: pd.Series,
+) -> tuple[ndarray, ndarray, float]:
+    """Fallback BAF signal/weights/noise when the VCF lacks allele counts.
+
+    Uses the per-bin mirrored BAF (NaN where no SNP) with binary observed/not
+    weights, and the same observed-only noise estimate as the count-based path.
+    """
+    vals = baf_series.to_numpy(dtype=np.float64)
+    observed = ~np.isnan(vals)
+    baf_signal = np.where(observed, vals, 0.5)
+    baf_weights = observed.astype(np.float64)
+    return baf_signal, baf_weights, _observed_baf_sigma(baf_signal, observed)
+
+
+def one_chrom_baf(
+    cnarr: CopyNumArray, fdr_q: float, chrom: str, variants: VariantArray
+) -> pd.DataFrame:
+    """Joint depth+BAF haar segmentation of one chromosome arm.
+
+    Union the breakpoints from haar on log2 (depth) and haar on per-bin BAF,
+    then rebuild segments. Detects copy-neutral LOH (BAF shift, flat depth).
+    """
+    logging.debug("Segmenting (depth+BAF) %s", chrom)
+    signal = cnarr.smooth_log2()
+    weights = _bin_weights(cnarr)
+    log2_bps = _haar_breakpoints(signal, fdr_q, weights)
+
+    # Build the BAF signal: prefer count-aware (depth-weighted) over frequencies,
+    # and skip BAF entirely if the VCF carries neither counts nor frequencies.
+    counts = variants.baf_counts_by_ranges(cnarr)
+    if counts is not None:
+        minor_counts, depths = (c.to_numpy(dtype=np.float64) for c in counts)
+        baf_signal, baf_weights, baf_sigma = _baf_signal_and_sigma(minor_counts, depths)
+    elif "alt_freq" in variants:
+        baf_signal, baf_weights, baf_sigma = _baf_signal_from_frequencies(
+            variants.baf_by_ranges(cnarr)
+        )
+    else:
+        baf_weights = None  # no usable allele data -> depth-only below
+
+    if baf_weights is not None and np.count_nonzero(baf_weights) >= 2:
+        baf_bps = _haar_breakpoints(
+            baf_signal,
+            fdr_q,
+            weights=np.maximum(baf_weights, WEIGHT_FLOOR),
+            sigma_override=baf_sigma,
+        )
+        breakpoints = UnifyLevels(log2_bps, baf_bps, 1)
+    else:
+        # Too few informative bins on this arm -> depth-only (no BAF breaks)
+        breakpoints = log2_bps
+    return _segments_from_breakpoints(cnarr, signal, weights, breakpoints, chrom)
+
+
+def _segments_from_breakpoints(
+    cnarr: CopyNumArray,
+    signal: ndarray,
+    weights: ndarray | None,
+    breakpoints: ndarray,
+    chrom: str,
+) -> pd.DataFrame:
+    """Build a segment table from breakpoint bin indices (shared by haar paths).
+
+    `signal` is the smoothed log2 used to find the breakpoints; reuse it (rather
+    than re-smoothing) so the segment means come from the same signal.
+    """
+    n = len(cnarr)
+    seg_starts = np.insert(breakpoints, 0, 0)
+    seg_ends = np.append(breakpoints, n)
+    log2_means = SegmentByPeaks(signal, breakpoints, weights)
+    return pd.DataFrame(
         {
             "chromosome": chrom,
-            "start": cnarr["start"].to_numpy().take(results["start"]),
-            "end": cnarr["end"].to_numpy().take(results["end"]),
-            "log2": results["mean"],
+            "start": cnarr["start"].to_numpy().take(seg_starts),
+            "end": cnarr["end"].to_numpy().take(seg_ends - 1),
+            "log2": log2_means[seg_starts],
             "gene": "-",
-            "probes": results["size"],
+            "probes": seg_ends - seg_starts,
         }
     )
-    return table
 
 
 def haarSeg(
@@ -95,6 +238,7 @@ def haarSeg(
     raw_signal: ndarray | None = None,
     haarStartLevel: int = 1,
     haarEndLevel: int = 5,
+    sigma_override: float | None = None,
 ) -> dict[str, ndarray]:
     r"""Perform segmentation according to the HaarSeg algorithm.
 
@@ -164,6 +308,12 @@ def haarSeg(
     # Real continuous log2/BAF data has noise, so peakSigmaEst >> the floor and
     # this is a no-op there.
     peakSigmaEst = max(peakSigmaEst, SIGMA_FLOOR)
+    if sigma_override is not None:
+        # Caller supplies a noise estimate computed over informative bins only
+        # (the BAF pass: peakSigmaEst above is contaminated by neutral-filled,
+        # SNP-less bins because it is computed unweighted). Default None keeps
+        # the depth pass byte-identical. (cnvkit-ugh)
+        peakSigmaEst = max(sigma_override, SIGMA_FLOOR)
 
     breakpoints = np.array([], dtype=np.int_)
     for level in range(haarStartLevel, haarEndLevel + 1):
