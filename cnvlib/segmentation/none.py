@@ -1,29 +1,34 @@
-"""Trivial segmentation: one segment per chromosome (or arm).
+"""Trivial segmentation: one segment per chromosome arm.
 
-Assume the input CopyNumArray has already been split by chromosome and arm (if
-the centromere location can be inferred) via CNA.by_arm().
-
-This procedure calculates a single segment's mean and coordinates across the
-given array.
+This procedure calculates a single segment's mean and coordinates for each
+chromosome arm in the given array (splitting via CNA.by_arm()).
 """
+
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from ..segmetrics import segment_mean
 
+if TYPE_CHECKING:
+    from ..cnary import CopyNumArray
 
-def segment_none(cnarr):
-    """Return a single segment for the given region."""
+
+def segment_none(cnarr: CopyNumArray) -> CopyNumArray:
+    """Return one trivial segment per chromosome arm in the given array."""
     colnames = ["chromosome", "start", "end", "log2", "gene", "probes"]
     rows = [
         (
-            cnarr.chromosome.iat[0],
-            cnarr.start.iat[0],
-            cnarr.end.iat[-1],
-            segment_mean(cnarr),
+            arm.chromosome.iat[0],
+            arm.start.iat[0],
+            arm.end.iat[-1],
+            segment_mean(arm),
             "-",
-            len(cnarr),
+            len(arm),
         )
+        for _label, arm in cnarr.by_arm()
+        if len(arm)
     ]
     table = pd.DataFrame.from_records(rows, columns=colnames)
     segarr = cnarr.as_dataframe(table)

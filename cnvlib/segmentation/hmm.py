@@ -66,12 +66,15 @@ def enumerate_states(
 
 def _expected_log2(
     cn: NDArray[np.float64],
-    purity: float,
-    ploidy: float,
+    purity: float | NDArray[np.float64],
+    ploidy: float | NDArray[np.float64],
 ) -> NDArray[np.float64]:
     """Expected log2 ratio for given CN, purity, ploidy.
 
     Formula: log2((p*cn + (1-p)*2) / (p*ploidy + (1-p)*2))
+
+    All arguments broadcast together, so this serves both the per-state (1-D)
+    and the batched grid-search (3-D) emission paths.
     """
     p = purity
     numerator = p * cn + (1 - p) * 2.0
@@ -84,12 +87,14 @@ def _expected_log2(
 def _expected_minor_freq(
     minor: NDArray[np.float64],
     cn: NDArray[np.float64],
-    purity: float,
+    purity: float | NDArray[np.float64],
 ) -> NDArray[np.float64]:
     """Expected minor allele frequency (<= 0.5) for given minor allele count, CN, purity.
 
     Formula: (p*minor + (1-p)*1) / (p*cn + (1-p)*2)
     For cn=0, return 0.5 (no allelic information).
+
+    All arguments broadcast together (per-state and batched grid paths).
     """
     p = purity
     numerator = p * minor + (1 - p) * 1.0
@@ -97,7 +102,15 @@ def _expected_minor_freq(
     # Avoid division by zero for cn=0 at high purity
     with np.errstate(divide="ignore", invalid="ignore"):
         baf = np.where(denominator > 0, numerator / denominator, 0.5)
-    return baf
+    return baf  # type: ignore[no-any-return]
+
+
+def _gaussian_log_pdf(diff: NDArray[np.float64], stdev: float) -> NDArray[np.float64]:
+    """Log of the Gaussian density N(diff | 0, stdev), elementwise.
+
+    log N(x|mu,s) = -0.5*((x-mu)/s)^2 - log(s*sqrt(2*pi)); pass diff = x - mu.
+    """
+    return -0.5 * (diff / stdev) ** 2 - np.log(stdev * np.sqrt(2.0 * np.pi))  # type: ignore[no-any-return]
 
 
 def _betabinom_logpmf(
@@ -159,9 +172,7 @@ def log_emission_probs(
     # Log2 component: N(obs | expected, stdev)
     # log N(x|mu,s) = -0.5*((x-mu)/s)^2 - log(s) - 0.5*log(2*pi)
     diff_l2 = log2_obs[:, np.newaxis] - expected_l2[np.newaxis, :]  # (T, N)
-    log_p = -0.5 * (diff_l2 / log2_stdev) ** 2 - np.log(
-        log2_stdev * np.sqrt(2.0 * np.pi)
-    )
+    log_p = _gaussian_log_pdf(diff_l2, log2_stdev)
 
     # BAF component: beta-binomial on aggregated allele counts
     if minor_counts is not None and depths is not None:
@@ -474,10 +485,7 @@ def _batched_emission_log2(
     plo = ploidies[np.newaxis, :, np.newaxis]  # (1, G_l, 1)
     cn = cn_arr[np.newaxis, np.newaxis, :]  # (1, 1, N)
 
-    numerator = p * cn + (1.0 - p) * 2.0
-    denominator = p * plo + (1.0 - p) * 2.0
-    ratio = np.maximum(numerator, 1e-4) / denominator
-    expected_l2 = np.log2(ratio)  # (G_p, G_l, N)
+    expected_l2 = _expected_log2(cn, p, plo)  # (G_p, G_l, N)
 
     # Reshape to (G, N) where G = G_p * G_l
     G_p, G_l, N = expected_l2.shape
@@ -486,8 +494,8 @@ def _batched_emission_log2(
     # Compute log emission: N(obs | expected, stdev)
     # log2_obs: (T,), expected_l2: (G, N) -> diff: (G, T, N)
     diff = log2_obs[np.newaxis, :, np.newaxis] - expected_l2[:, np.newaxis, :]
-    log_p = -0.5 * (diff / log2_stdev) ** 2 - np.log(log2_stdev * np.sqrt(2.0 * np.pi))
-    return log_p  # type: ignore[no-any-return]  # (G, T, N)
+    log_p = _gaussian_log_pdf(diff, log2_stdev)
+    return log_p  # (G, T, N)
 
 
 def _batched_emission_baf(
@@ -509,11 +517,7 @@ def _batched_emission_baf(
     cn = cn_arr[np.newaxis, :]  # (1, N)
     mn = minor_arr[np.newaxis, :]  # (1, N)
 
-    numerator = p * mn + (1.0 - p) * 1.0
-    denominator = p * cn + (1.0 - p) * 2.0
-    with np.errstate(divide="ignore", invalid="ignore"):
-        expected_freq = np.where(denominator > 0, numerator / denominator, 0.5)
-    # (G_p, N)
+    expected_freq = _expected_minor_freq(mn, cn, p)  # (G_p, N)
 
     # Repeat for each ploidy (BAF doesn't depend on ploidy)
     expected_freq = np.repeat(expected_freq, n_ploidies, axis=0)  # (G, N)
@@ -670,7 +674,7 @@ def grid_search_purity_ploidy(
 # --- Method parameters ---
 
 
-def _method_params(method: str) -> dict:
+def _method_params(method: str) -> dict[str, float | int]:
     """Get HMM parameters for the given method variant."""
     match method:
         case "hmm-germline":
@@ -724,7 +728,7 @@ def segment_hmm(
     """
     params = _method_params(method)
     include_baf = variants is not None
-    max_copies: int = params["max_copies"]
+    max_copies = int(params["max_copies"])
 
     # 1. Smooth log2
     orig_log2 = cnarr["log2"].to_numpy().copy()
@@ -860,7 +864,9 @@ def segment_hmm(
 # --- BAF re-segmentation (for non-HMM methods) ---
 
 
-def variants_in_segment(varr, segment, min_variants=MIN_VARIANTS_THRESHOLD):
+def variants_in_segment(
+    varr: VariantArray, segment, min_variants: int = MIN_VARIANTS_THRESHOLD
+) -> pd.DataFrame:
     """Re-segment a segment based on variant allele frequencies.
 
     Uses a simple 2-state HMM (neutral BAF=0.5 vs alt BAF=0.67) with
@@ -891,7 +897,7 @@ def variants_in_segment(varr, segment, min_variants=MIN_VARIANTS_THRESHOLD):
 
             # Log emission: N(obs | mean, stdev)
             diff = obs[:, np.newaxis] - means[np.newaxis, :]  # (T, 2)
-            log_emit = -0.5 * (diff / stdev) ** 2 - np.log(stdev * np.sqrt(2.0 * np.pi))
+            log_emit = _gaussian_log_pdf(diff, stdev)
 
             # Homogeneous transitions: strongly prefer staying
             p_stay = 0.99
