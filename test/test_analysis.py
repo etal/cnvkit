@@ -252,6 +252,43 @@ class AnalysisTests(unittest.TestCase):
         for val in values:
             self.assertGreater(val, 0)
 
+    def test_metrics_multisample_and_nan(self):
+        """metrics over multiple samples, and with NaN bins, stays finite."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segments = cnvlib.read("formats/amplicon.cns")
+        # Multiple samples -> one row each
+        multi = metrics.do_metrics([cnarr, cnarr], [segments, segments], skip_low=True)
+        self.assertEqual(multi.shape, (2, 6))
+        # A NaN log2 bin must not poison the residual-scale estimators
+        nan_cnarr = cnarr.copy()
+        nan_cnarr.data.loc[nan_cnarr.data.index[0], "log2"] = np.nan
+        res = metrics.do_metrics(nan_cnarr, segments, skip_low=True)
+        scale_vals = res.loc[0, res.columns[2:]].to_numpy(dtype=float)
+        self.assertTrue(np.all(np.isfinite(scale_vals)))
+
+    def test_segmetrics_single_bin(self):
+        """Single-probe segments get finite CIs bracketing the mean (no crash)."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        sm = segmetrics.do_segmetrics(
+            cnarr,
+            segarr,
+            location_stats=["mean", "median"],
+            spread_stats=["stdev"],
+            interval_stats=["pi", "ci"],
+            bootstraps=50,
+            smoothed=True,
+        )
+        one = sm.data[sm.data["probes"] == 1]
+        self.assertGreater(len(one), 0, "amplicon.cns has single-probe segments")
+        self.assertTrue(
+            ((one["ci_lo"] <= one["mean"]) & (one["mean"] <= one["ci_hi"])).all()
+        )
+        finite = np.isfinite(
+            one[["mean", "ci_lo", "ci_hi", "pi_lo", "pi_hi"]].to_numpy(dtype=float)
+        )
+        self.assertTrue(finite.all())
+
     def test_segmetrics(self):
         """The 'segmetrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")

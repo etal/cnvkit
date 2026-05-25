@@ -72,11 +72,13 @@ class SegmentationTests(unittest.TestCase):
         )
         self.assertGreater(len(segments), n_chroms)
         self.assertTrue((segments.start < segments.end).all())
+        # haar segmentation with variants re-segments by BAF (routed through
+        # hmm.variants_in_segment); previously broken, working since the HMM
+        # rewrite. See bead cnvkit-scq.1 re: the unused haar.variants_in_segment.
         varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
-        # TODO - This test is failing... commenting it out for now!
-        # segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
-        # self.assertGreater(len(segments), n_chroms)
-        # self.assertTrue((segments.start < segments.end).all())
+        segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
+        self.assertGreater(len(segments), n_chroms)
+        self.assertTrue((segments.start < segments.end).all())
 
     @pytest.mark.slow
     def test_segment_hmm(self):
@@ -112,6 +114,25 @@ class SegmentationTests(unittest.TestCase):
         ssegments = segmentation.do_segmentation(cnarr, "haar", processes=1)
         self.assertEqual(psegments.data.shape, ssegments.data.shape)
         self.assertEqual(len(psegments.meta), len(ssegments.meta))
+        # Parallel and serial must agree on segment boundaries and values, not
+        # just shape -- a chromosome-ordering or result-assembly bug would slip
+        # past a shape-only check.
+        psorted = psegments.data.sort_values(["chromosome", "start"]).reset_index(
+            drop=True
+        )
+        ssorted = ssegments.data.sort_values(["chromosome", "start"]).reset_index(
+            drop=True
+        )
+        self.assertEqual(list(psorted["chromosome"]), list(ssorted["chromosome"]))
+        np.testing.assert_array_equal(
+            psorted["start"].to_numpy(), ssorted["start"].to_numpy()
+        )
+        np.testing.assert_array_equal(
+            psorted["end"].to_numpy(), ssorted["end"].to_numpy()
+        )
+        np.testing.assert_allclose(
+            psorted["log2"].to_numpy(), ssorted["log2"].to_numpy(), atol=1e-9
+        )
 
     def test_segment_empty_input(self):
         """Test segmentation with empty CNR input (issue #970)."""

@@ -21,7 +21,6 @@ class RTests(unittest.TestCase):
 
     def setUp(self):
         self.tas_cnr = cnvlib.read("formats/amplicon.cnr")
-        self.wgs_cnr = cnvlib.read("formats/wgs-chr17.cnr")
 
     @pytest.mark.slow
     def test_cbs(self):
