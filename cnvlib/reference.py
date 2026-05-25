@@ -218,28 +218,18 @@ def do_reference(
         logging.info("No FASTA reference genome provided; skipping GC, RM calculations")
 
     if female_samples is None:
-        # NB: Antitargets are usually preferred for inferring sex, but might be
-        # empty files, in which case no inference can be done. Since targets are
-        # guaranteed to exist, infer from those first, then replace those
-        # values where antitargets are suitable.
+        # Infer each sample's sex from coverage. Antitargets sample chrX broadly,
+        # but their chrY is often too sparse to tell male from female, so a naive
+        # antitarget guess can flip a genuine male to female. Reconcile the two
+        # sources by chrX confidence rather than always trusting antitargets
+        # (#846, #863).
         logging.info("Sample sex not provided; inferring from samples. ")
-        sexes = infer_sexes(target_fnames, False, diploid_parx_genome)
+        t_guesses = _guess_sexes(target_fnames, False, diploid_parx_genome)
         if antitarget_fnames:
-            a_sexes = infer_sexes(antitarget_fnames, False, diploid_parx_genome)
-            for sid, a_is_xx in a_sexes.items():
-                t_is_xx = sexes.get(sid)
-                if t_is_xx is None:
-                    sexes[sid] = a_is_xx
-                elif t_is_xx != a_is_xx and a_is_xx is not None:
-                    logging.warning(
-                        "Sample %s chromosomal X/Y ploidy looks "
-                        "like %s in targets but %s in antitargets; "
-                        "preferring antitargets",
-                        sid,
-                        "female" if t_is_xx else "male",
-                        "female" if a_is_xx else "male",
-                    )
-                    sexes[sid] = a_is_xx
+            a_guesses = _guess_sexes(antitarget_fnames, False, diploid_parx_genome)
+            sexes = _reconcile_sex_guesses(t_guesses, a_guesses)
+        else:
+            sexes = {sid: is_xx for sid, (is_xx, _lr) in t_guesses.items()}
     else:
         # In this case the gender of the samples is provided and won't be inferred
         logging.info(
@@ -276,13 +266,113 @@ def infer_sexes(
     For samples where the source file is empty or does not include either sex
     chromosome, that sample ID will not be in the returned dictionary.
     """
-    sexes = {}
+    return {
+        sid: is_xx
+        for sid, (is_xx, _lr) in _guess_sexes(
+            cnn_fnames, is_haploid_x, diploid_parx_genome
+        ).items()
+    }
+
+
+def _guess_sexes(
+    cnn_fnames: list[str],
+    is_haploid_x: bool,
+    diploid_parx_genome: str | None,
+    verbose: bool = True,
+) -> dict[str, tuple[bool_, float]]:
+    """Map sample IDs to ``(is_xx, chrx_male_lr)`` where sex is determinable.
+
+    ``chrx_male_lr`` is the chromosome-X "maleness" ratio (> 1 favors male);
+    it is the confidence signal used to reconcile conflicting target/antitarget
+    guesses, since chrX is well-sampled in both whereas antitarget chrY is not.
+    Samples whose source file is empty or lacks a sex chromosome are omitted.
+    """
+    guesses: dict[str, tuple[bool_, float]] = {}
     for fname in cnn_fnames:
         cnarr = read_cna(fname)
-        if cnarr:
-            is_xx = cnarr.guess_xx(is_haploid_x, diploid_parx_genome)
-            if is_xx is not None:
-                sexes[cnarr.sample_id] = is_xx
+        if not cnarr:
+            continue
+        is_xy, stats = cnarr.compare_sex_chromosomes(is_haploid_x, diploid_parx_genome)
+        if is_xy is None:
+            continue
+        if verbose:
+            # Mirrors CopyNumArray.guess_xx's per-sample log; kept here so the
+            # reference command still reports inference when it bypasses guess_xx.
+            logging.info(
+                "Relative log2 coverage of %s=%.3g, %s=%.3g "
+                "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
+                cnarr.chr_x_label or "chrX",
+                stats["chrx_ratio"],
+                cnarr.chr_y_label or "chrY",
+                stats["chry_ratio"],
+                stats["chrx_male_lr"],
+                stats["chry_male_lr"],
+                stats["combined_score"],
+                "male" if is_xy else "female",
+            )
+        guesses[cnarr.sample_id] = (~is_xy, stats["chrx_male_lr"])
+    return guesses
+
+
+def _chrx_maleness_confidence(chrx_male_lr: float) -> float:
+    """Confidence of a chrX-based sex call: distance from the boundary (1.0).
+
+    Measured in log space so that, e.g., a ratio of 2 and 1/2 are equally
+    confident. Non-positive or non-finite ratios carry no information.
+    """
+    if not (chrx_male_lr > 0.0 and np.isfinite(chrx_male_lr)):
+        return 0.0
+    return abs(float(np.log(chrx_male_lr)))
+
+
+def _reconcile_sex_guesses(
+    target_guesses: dict[str, tuple[bool_, float]],
+    antitarget_guesses: dict[str, tuple[bool_, float]],
+) -> dict[str, bool_]:
+    """Merge target- and antitarget-based sex guesses into one per sample.
+
+    Each guess is ``(is_xx, chrx_male_lr)``. When the two sources agree (or only
+    one made a call), that call stands. When they disagree, the antitarget guess
+    is no longer trusted unconditionally: antitarget chrY is frequently too
+    sparse to carry signal and can drag a real male call to female (#846, #863).
+
+    chrX is well-sampled in both sources, so the conflict is resolved by chrX
+    confidence. The handling is deliberately asymmetric, mirroring chrY coverage
+    quality: the target's full chrX+chrY call stands unless the antitarget's chrX
+    signal is strictly more decisive, in which case only the antitarget's chrX
+    call is adopted (its chrY is discarded as unreliable). Ties favor the target,
+    whose sex chromosomes are deliberately baited.
+    """
+    sexes: dict[str, bool_] = {
+        sid: is_xx for sid, (is_xx, _lr) in target_guesses.items()
+    }
+    for sid, (a_is_xx, a_lr) in antitarget_guesses.items():
+        if sid not in target_guesses:
+            # Target couldn't tell (no chrX / empty); fall back to antitarget.
+            sexes[sid] = a_is_xx
+            continue
+        t_is_xx, t_lr = target_guesses[sid]
+        if t_is_xx == a_is_xx:
+            continue
+        # Disagreement. chrX is well-sampled in both sources, but antitarget chrY
+        # is frequently too sparse to carry signal, so let the antitarget win only
+        # when its chrX signal is strictly more decisive than the target's -- and
+        # then trust only its chrX call (chrx_male_lr > 1 == male), discarding its
+        # unreliable chrY. Otherwise the target's full chrX+chrY call stands.
+        if _chrx_maleness_confidence(a_lr) > _chrx_maleness_confidence(t_lr):
+            sexes[sid] = a_lr <= 1.0  # type: ignore[assignment]
+            preferred = "antitargets"
+        else:
+            sexes[sid] = t_is_xx
+            preferred = "targets"
+        logging.warning(
+            "Sample %s chromosomal X/Y ploidy looks like %s in targets but %s "
+            "in antitargets; preferring %s (more decisive chrX coverage)",
+            sid,
+            "female" if t_is_xx else "male",
+            "female" if a_is_xx else "male",
+            preferred,
+        )
     return sexes
 
 

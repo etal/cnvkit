@@ -56,6 +56,56 @@ from cnvlib import (
 )
 
 
+def _write_coverage_cnn(
+    path, chrx_log2, chry_log2, chrx_sd, chry_sd, n_auto=200, n_x=40, n_y=40, seed=7
+):
+    """Write a synthetic coverage .cnn with tunable sex-chromosome signal.
+
+    Used to reproduce target/antitarget sex-inference conflicts: autosomes sit
+    at log2 0, and chrX/chrY are drawn around the given means so a caller can
+    make, e.g., a haploid chrX with a near-empty (deeply negative) chrY.
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+    for chrom, n in [("chr1", n_auto), ("chr2", n_auto)]:
+        for i in range(n):
+            rows.append(
+                (
+                    chrom,
+                    i * 1000,
+                    i * 1000 + 1000,
+                    "Background",
+                    100,
+                    float(rng.normal(0, 0.2)),
+                )
+            )
+    for i in range(n_x):
+        rows.append(
+            (
+                "chrX",
+                i * 1000,
+                i * 1000 + 1000,
+                "Background",
+                50,
+                float(rng.normal(chrx_log2, chrx_sd)),
+            )
+        )
+    for i in range(n_y):
+        rows.append(
+            (
+                "chrY",
+                i * 1000,
+                i * 1000 + 1000,
+                "Background",
+                2,
+                float(rng.normal(chry_log2, chry_sd)),
+            )
+        )
+    pd.DataFrame(
+        rows, columns=["chromosome", "start", "end", "gene", "depth", "log2"]
+    ).to_csv(path, sep="\t", index=False)
+
+
 class ReferenceTests(unittest.TestCase):
     """Tests for the reference and fix commands."""
 
@@ -164,7 +214,7 @@ class ReferenceTests(unittest.TestCase):
         determined (preserving a None signal for target/antitarget
         reconciliation), so `shift_sex_chroms` must apply the safe default
         itself: no +1 shift on chrX. The old code fell through to the male
-        branch and silently inflated chrX (Defect A / gh#360 family).
+        branch and silently inflated chrX (Defect A / #360 family).
         """
         cnarr = cnvlib.read("formats/ref_test_female.cnn")
         is_chr_x = cnarr.chr_x_filter()
@@ -175,6 +225,100 @@ class ReferenceTests(unittest.TestCase):
         after_x = cnarr["log2"][is_chr_x].to_numpy()
         # Female default: chrX unchanged (would be +1 under the None->male bug).
         np.testing.assert_allclose(after_x, before_x)
+
+    def test_reconcile_sex_guesses(self):
+        """Target/antitarget sex conflicts resolve by chrX confidence (#846).
+
+        chrX is well-sampled in both targets and antitargets, whereas
+        antitarget chrY is frequently too sparse to carry signal -- an empty
+        antitarget chrY can drag a real male call to female. So when the two
+        sources disagree, trust whichever source's chrX 'maleness' ratio is
+        furthest from the male/female boundary (1.0). Each guess is
+        ``(is_xx, chrx_male_lr)``; ``chrx_male_lr > 1`` favors male.
+        """
+        reconcile = reference._reconcile_sex_guesses
+        MALE, FEMALE = np.False_, np.True_  # is_xx: True == female
+
+        # The #846 bug: target clearly male, antitarget flipped female by an
+        # empty chrY (its chrX is far less decisive). Keep the target's male call.
+        out = reconcile({"S1": (MALE, 499.0)}, {"S1": (FEMALE, 0.29)})
+        self.assertFalse(out["S1"])
+
+        # The legitimate rescue this reconciliation must preserve: target chrX
+        # was too sparse to look male, antitarget chrX decisively haploid.
+        out = reconcile({"S2": (FEMALE, 0.9)}, {"S2": (MALE, 5.0)})
+        self.assertFalse(out["S2"])
+
+        # Agreement is untouched; confidence is irrelevant.
+        out = reconcile({"S3": (FEMALE, 0.5)}, {"S3": (FEMALE, 0.6)})
+        self.assertTrue(out["S3"])
+
+        # Target couldn't tell (absent) -> fall back to the antitarget guess.
+        out = reconcile({}, {"S4": (MALE, 3.0)})
+        self.assertFalse(out["S4"])
+
+        # A tie favors the target (its sex chromosomes are deliberately baited).
+        out = reconcile({"S5": (FEMALE, 0.5)}, {"S5": (MALE, 2.0)})
+        self.assertTrue(out["S5"])
+
+        # When the target wins, its FULL chrX+chrY call stands -- we must not
+        # re-derive sex from chrX alone. Here the target's chrX is weak (0.8,
+        # chrX-only would say female) but its reliable chrY made the combined
+        # call male; the sparse antitarget must not strip that chrY evidence.
+        out = reconcile({"S6": (MALE, 0.8)}, {"S6": (FEMALE, 0.9)})
+        self.assertFalse(out["S6"])
+
+        # When the antitarget wins, only its chrX counts (its chrY is junk): both
+        # sources' chrX read male, but the antitarget's sparse chrY flipped its
+        # combined call to female. Trusting that combined call would re-break #846.
+        out = reconcile({"S7": (MALE, 1.1)}, {"S7": (FEMALE, 1.5)})
+        self.assertFalse(out["S7"])
+
+    def test_reference_antitarget_empty_chry_keeps_male(self):
+        """do_reference's inference must not flip a male sample to female when
+        the antitarget chrY is near-empty (#846, #863).
+
+        Builds a clearly-male target (haploid chrX, covered chrY) and an
+        antitarget whose chrY is near-absent -- the configuration that made
+        antitarget inference report 'female' and override the target. The fix
+        keeps the male call without users having to delete antitarget chrY.
+        """
+        tmpdir = tempfile.mkdtemp()
+        try:
+            tgt = os.path.join(tmpdir, "S1.targetcoverage.cnn")
+            anti = os.path.join(tmpdir, "S1.antitargetcoverage.cnn")
+            _write_coverage_cnn(
+                tgt,
+                chrx_log2=-1.0,
+                chry_log2=-1.0,
+                chrx_sd=0.2,
+                chry_sd=0.3,
+                n_x=60,
+                n_y=40,
+            )
+            # Antitarget chrY: deep, scattered -> looks absent (female-leaning),
+            # even though the antitarget chrX still reads haploid (male). The
+            # empty chrY alone is what flips the combined guess to female.
+            _write_coverage_cnn(
+                anti,
+                chrx_log2=-0.5,
+                chry_log2=-4.0,
+                chrx_sd=0.6,
+                chry_sd=2.0,
+                n_x=40,
+                n_y=80,
+            )
+
+            t_guesses = reference._guess_sexes([tgt], False, None, verbose=False)
+            a_guesses = reference._guess_sexes([anti], False, None, verbose=False)
+            # Precondition: this fixture really does trigger the conflict.
+            self.assertFalse(t_guesses["S1"][0])  # target -> male
+            self.assertTrue(a_guesses["S1"][0])  # antitarget -> female (the trap)
+
+            sexes = reference._reconcile_sex_guesses(t_guesses, a_guesses)
+            self.assertFalse(sexes["S1"])  # reconciled -> male, not flipped
+        finally:
+            shutil.rmtree(tmpdir)
 
     def test_fix(self):
         """The 'fix' command."""
