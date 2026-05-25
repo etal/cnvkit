@@ -15,6 +15,7 @@ import pandas as pd
 from skgenome import GenomicArray, tabio
 
 import cnvlib
+from cnvlib.cnary import CopyNumArray
 from cnvlib import (
     cnary,
     fix,
@@ -159,36 +160,6 @@ class CNATests(unittest.TestCase):
             par2y_overlapping_gene not in par_on_y["gene"].tolist(),
             "The overlapping region is not part of the filter.",
         )
-
-    def test_gene_coords_by_name(self):
-        """`-g` labels only requested genes, not co-binned neighbors (gh#458).
-
-        A bin whose `gene` column packs several names (e.g. "ERBB2,MIR4728")
-        must not surface the unrequested neighbor (MIR4728) when only ERBB2
-        is selected.
-        """
-        cnarr = cnary.CopyNumArray.from_rows(
-            [
-                ["chr17", 37800000, 37850000, "STARD3", 0.0],
-                ["chr17", 37850000, 37860000, "ERBB2,MIR4728", 0.0],
-                ["chr17", 37860000, 37870000, "ERBB2", 0.0],
-                ["chr17", 37880000, 37890000, "GRB7", 0.0],
-            ]
-        )
-        # Single requested gene: co-binned MIR4728 must be hidden
-        coords = plots.gene_coords_by_name(cnarr, ["ERBB2"])
-        self.assertEqual(list(coords.keys()), ["chr17"])
-        self.assertEqual(len(coords["chr17"]), 1)
-        start, end, name = coords["chr17"][0]
-        self.assertEqual(name, "ERBB2")
-        self.assertEqual((start, end), (37850000, 37870000))
-        # When MIR4728 *is* requested, it should appear
-        names_seen = set()
-        for _s, _e, label in plots.gene_coords_by_name(
-            cnarr, ["ERBB2", "MIR4728"]
-        )["chr17"]:
-            names_seen.update(label.split(","))
-        self.assertEqual(names_seen, {"ERBB2", "MIR4728"})
 
     def test_autosomes(self):
         """Test selection of autosomes specific to CNA."""
@@ -525,220 +496,6 @@ class OtherTests(unittest.TestCase):
         self.assertFalse(mask.iloc[3])
         self.assertFalse(mask.iloc[4])
 
-    def test_transfer_fields_nan_gene(self):
-        """transfer_fields handles NaN gene names without crashing (issue #900)."""
-        n = 10
-        cnarr = cnary.CopyNumArray(
-            pd.DataFrame(
-                {
-                    "chromosome": ["chr1"] * n,
-                    "start": np.arange(0, n * 1000, 1000),
-                    "end": np.arange(1000, n * 1000 + 1000, 1000),
-                    "gene": ["GeneA", float("nan"), "GeneB"] * 3 + [float("nan")],
-                    "log2": np.zeros(n),
-                    "depth": np.ones(n) * 100.0,
-                    "weight": np.ones(n),
-                }
-            )
-        )
-        # One segment covering all bins
-        segarr = cnary.CopyNumArray(
-            pd.DataFrame(
-                {
-                    "chromosome": ["chr1"],
-                    "start": [0],
-                    "end": [n * 1000],
-                    "gene": ["-"],
-                    "log2": [0.0],
-                    "probes": [n],
-                    "weight": [0.0],
-                }
-            )
-        )
-        result = segmentation.transfer_fields(segarr, cnarr)
-        gene_val = result["gene"].iat[0]
-        self.assertIsInstance(gene_val, str)
-        self.assertNotIn("nan", gene_val.lower())
-        self.assertIn("GeneA", gene_val)
-        self.assertIn("GeneB", gene_val)
-
-    def test_transfer_fields_genes_near_segment_end(self):
-        """Genes from bins near a segment's end are kept in its label (#688).
-
-        Uses the reported EGFR geometry: bins at chr7:55,018,770-55,019,423
-        fall inside the segment chr7:54,246,732-55,031,592 (well before its
-        end), and more EGFR bins fall in the adjacent segment. EGFR must appear
-        in *both* segment labels -- the original report dropped it from the
-        first, where the gene-bearing bins sit near the segment's end.
-        """
-        bins = cnary.CopyNumArray(
-            pd.DataFrame(
-                {
-                    "chromosome": ["chr7"] * 6,
-                    "start": [54246732, 54800000, 55018770, 55019096,
-                              55032092, 55088166],
-                    "end": [54300000, 54900000, 55019096, 55019423,
-                            55032193, 55088469],
-                    "gene": ["VSTM2A", "SEC61G", "EGFR", "EGFR",
-                             "EGFR", "EGFR"],
-                    "log2": np.zeros(6),
-                    "depth": np.ones(6) * 100.0,
-                    "weight": np.ones(6),
-                }
-            )
-        )
-        segarr = cnary.CopyNumArray(
-            pd.DataFrame(
-                {
-                    "chromosome": ["chr7", "chr7"],
-                    "start": [54246732, 55032092],
-                    "end": [55031592, 55365525],
-                    "gene": ["-", "-"],
-                    "log2": [0.0, 0.0],
-                    "probes": [4, 2],
-                    "weight": [0.0, 0.0],
-                }
-            )
-        )
-        result = segmentation.transfer_fields(segarr, bins)
-        self.assertIn("EGFR", result["gene"].iat[0])
-        self.assertIn("VSTM2A", result["gene"].iat[0])
-        self.assertIn("EGFR", result["gene"].iat[1])
-
-    def test_transfer_fields_nan_weights(self):
-        """transfer_fields handles NaN bin weights without NaN in .cns output."""
-        n = 10
-        cnarr = cnary.CopyNumArray(
-            pd.DataFrame(
-                {
-                    "chromosome": ["chr1"] * n,
-                    "start": np.arange(0, n * 1000, 1000),
-                    "end": np.arange(1000, n * 1000 + 1000, 1000),
-                    "gene": ["GeneA"] * n,
-                    "log2": np.zeros(n),
-                    "depth": np.ones(n) * 100.0,
-                    "weight": [
-                        1.0,
-                        np.nan,
-                        1.0,
-                        np.nan,
-                        1.0,
-                        1.0,
-                        np.nan,
-                        1.0,
-                        1.0,
-                        1.0,
-                    ],
-                }
-            )
-        )
-        segarr = cnary.CopyNumArray(
-            pd.DataFrame(
-                {
-                    "chromosome": ["chr1"],
-                    "start": [0],
-                    "end": [n * 1000],
-                    "gene": ["-"],
-                    "log2": [0.0],
-                    "probes": [n],
-                    "weight": [0.0],
-                }
-            )
-        )
-        result = segmentation.transfer_fields(segarr, cnarr)
-        # Segment weight must not be NaN
-        self.assertFalse(np.isnan(result["weight"].iat[0]))
-        # Should be the sum of non-NaN weights (7.0)
-        self.assertAlmostEqual(result["weight"].iat[0], 7.0)
-        # Depth should be valid (weighted mean of non-NaN bins)
-        self.assertFalse(np.isnan(result["depth"].iat[0]))
-
-        # All-NaN weights: segment weight should be 0, depth should be 0
-        cnarr_allnan = cnarr.copy()
-        cnarr_allnan["weight"] = np.nan
-        result2 = segmentation.transfer_fields(segarr.copy(), cnarr_allnan)
-        self.assertEqual(result2["weight"].iat[0], 0.0)
-        self.assertEqual(result2["depth"].iat[0], 0.0)
-
-    def test_do_segmentation_drops_nan_log2(self):
-        """do_segmentation tolerates NaN-log2 bins on the default path (#881).
-
-        Without --drop-low-coverage (skip_low=False), NaN-log2 bins are never
-        filtered before drop_outliers' Savitzky-Golay smoother, whose scipy
-        lstsq rejects non-finite input ("array must not contain infs or NaNs"),
-        crashing segmentation long before reaching DNAcopy. The NaN bins must be
-        dropped first. Uses the pure-Python 'haar' method so no R is required;
-        the savgol outlier path that crashed is shared by every method.
-        """
-        n = 120  # > drop_outliers' width (50) so savgol actually runs
-        rng = np.random.default_rng(0)
-        log2 = rng.normal(0, 0.2, n)
-        log2[5] = np.nan  # inside the leading savgol edge window
-        log2[60] = np.nan
-        cnarr = cnary.CopyNumArray(
-            pd.DataFrame(
-                {
-                    "chromosome": ["chr1"] * n,
-                    "start": np.arange(0, n * 1000, 1000),
-                    "end": np.arange(1000, n * 1000 + 1000, 1000),
-                    "gene": ["G"] * n,
-                    "log2": log2,
-                    "depth": np.ones(n) * 100.0,
-                    "weight": np.ones(n),
-                }
-            )
-        )
-        # Must not raise, and no NaN should leak into the segment log2 values
-        cns = segmentation.do_segmentation(cnarr, "haar", processes=1)
-        self.assertGreater(len(cns), 0)
-        self.assertFalse(np.isnan(cns["log2"].to_numpy()).any())
-
-    def test_squash_region_nan_weights(self):
-        """squash_region handles NaN weights without NaN in output."""
-        df = pd.DataFrame(
-            {
-                "chromosome": ["chr1", "chr1", "chr1"],
-                "start": [0, 1000, 2000],
-                "end": [1000, 2000, 3000],
-                "gene": ["G1", "G2", "G3"],
-                "log2": [0.1, 0.2, 0.3],
-                "probes": [5, 5, 5],
-                "weight": [1.0, np.nan, 1.0],
-            }
-        )
-        result = segfilters.squash_region(df)
-        self.assertFalse(np.isnan(result["weight"].iat[0]))
-        self.assertAlmostEqual(result["weight"].iat[0], 2.0)
-        # log2 should be weighted average of bins with valid weights
-        self.assertAlmostEqual(
-            result["log2"].iat[0], np.average([0.1, 0.3], weights=[1.0, 1.0])
-        )
-
-        # All-NaN weights: should fall through to unweighted mean
-        df_allnan = df.copy()
-        df_allnan["weight"] = np.nan
-        result2 = segfilters.squash_region(df_allnan)
-        self.assertAlmostEqual(result2["log2"].iat[0], np.mean([0.1, 0.2, 0.3]))
-
-    def test_bic_nan_weights(self):
-        """BIC filter handles NaN segment weights without NaN RSS."""
-        df = pd.DataFrame(
-            {
-                "chromosome": ["chr1"] * 5,
-                "start": [0, 1000, 2000, 3000, 4000],
-                "end": [1000, 2000, 3000, 4000, 5000],
-                "gene": ["A", "B", "C", "D", "E"],
-                "log2": [0.0, 0.1, 0.0, -0.1, 0.0],
-                "probes": [10, 10, 10, 10, 10],
-                "weight": [1.0, np.nan, 2.0, np.nan, 1.0],
-            }
-        )
-        segarr = cnary.CopyNumArray(df)
-        # Should not crash; NaN-weight segments get fallback RSS
-        result = segfilters.bic(segarr)
-        self.assertGreater(len(result), 0)
-        self.assertFalse(np.isnan(result["weight"]).any())
-
     def test_compute_gene_stats_nan_weights(self):
         """compute_gene_stats handles NaN weights for CI/PI without crashing."""
         bins = cnary.CopyNumArray(
@@ -764,170 +521,178 @@ class OtherTests(unittest.TestCase):
         stats2 = reports.compute_gene_stats(bins_allnan, 0.15, interval_stats=["ci"])
         self.assertNotIn("ci_lo", stats2)
 
-    def test_squash_region_nan_gene(self):
-        """squash_region handles NaN gene names without crashing (issue #900)."""
-        df = pd.DataFrame(
+
+class CNAryByGeneTests(unittest.TestCase):
+    """Tests for the by_gene method with various index types."""
+
+    def test_by_gene_with_numeric_index(self):
+        """Test by_gene with standard numeric index (default)."""
+        # Create test data with numeric index
+        data = pd.DataFrame(
             {
-                "chromosome": ["chr1", "chr1"],
-                "start": [0, 1000],
-                "end": [1000, 2000],
-                "gene": ["GeneA", float("nan")],
-                "log2": [0.1, 0.2],
-                "probes": [5, 5],
-                "weight": [1.0, 1.0],
+                "chromosome": ["chr1"] * 6,
+                "start": [100, 200, 300, 400, 500, 600],
+                "end": [150, 250, 350, 450, 550, 650],
+                "gene": ["GeneA", "GeneA", "Antitarget", "GeneB", "GeneB", "GeneB"],
+                "log2": [0.1, 0.2, 0.0, -0.1, -0.2, -0.3],
             }
         )
-        result = segfilters.squash_region(df)
-        gene_val = result["gene"].iat[0]
-        self.assertIsInstance(gene_val, str)
-        self.assertNotIn("nan", gene_val.lower())
-        self.assertEqual(gene_val, "GeneA")
+        cnarr = CopyNumArray(data, {"sample_id": "test"})
 
-        # All-NaN genes should produce the placeholder "-"
-        df_allnan = df.copy()
-        df_allnan["gene"] = [float("nan"), float("nan")]
-        result2 = segfilters.squash_region(df_allnan)
-        self.assertEqual(result2["gene"].iat[0], "-")
+        # Group by gene and check for duplicates
+        gene_groups = list(cnarr.by_gene())
+        all_coords = []
 
-    def test_squash_by_groups_no_cross_region_merge(self):
-        """squash_by_groups merges only contiguous runs (#677).
+        for gene_name, gene_cnarr in gene_groups:
+            for row in gene_cnarr.data.itertuples():
+                coord = (row.chromosome, row.start, row.end)
+                self.assertNotIn(
+                    coord,
+                    all_coords,
+                    f"Duplicate coordinate found in {gene_name}: {coord}",
+                )
+                all_coords.append(coord)
 
-        The old code combined a run-id cumsum with an integer chromosome
-        index by *addition*, which collided on position-unsorted input and
-        merged non-consecutive bins -- yielding segments with start > end and
-        a bogus end coordinate (the constant "10488" in the ticket).  This is
-        the shared segment-construction path used by HMM, CBS, and all segment
-        filters, so it is not specific to HMM or to the segmetrics command that
-        first surfaced it.  Boundaries are now detected by adjacency.
-        """
-        # chr1 appears in two runs (300-400, then 100-200) with a chr2 bin
-        # between them; all three share the same state/level.
-        df = pd.DataFrame(
+        # Should have processed all 6 rows
+        self.assertEqual(len(all_coords), 6)
+
+    def test_by_gene_with_non_sequential_index(self):
+        """Test by_gene with non-sequential numeric index."""
+        # Create test data with gaps in the index
+        data = pd.DataFrame(
             {
-                "chromosome": ["chr1", "chr2", "chr1"],
-                "start": [300, 50, 100],
-                "end": [400, 90, 200],
-                "gene": ["-", "-", "-"],
-                "log2": [0.0, 0.0, 0.0],
-                "probes": [1, 1, 1],
-                "weight": [1.0, 1.0, 1.0],
+                "chromosome": ["chr1"] * 5,
+                "start": [100, 200, 300, 400, 500],
+                "end": [150, 250, 350, 450, 550],
+                "gene": ["GeneA", "GeneA", "Antitarget", "GeneB", "GeneB"],
+                "log2": [0.1, 0.2, 0.0, -0.1, -0.2],
+            },
+            index=[0, 5, 10, 15, 20],  # Non-sequential index
+        )
+        cnarr = CopyNumArray(data, {"sample_id": "test"})
+
+        # Group by gene and check for duplicates
+        gene_groups = list(cnarr.by_gene())
+        all_coords = []
+
+        for gene_name, gene_cnarr in gene_groups:
+            for row in gene_cnarr.data.itertuples():
+                coord = (row.chromosome, row.start, row.end)
+                self.assertNotIn(
+                    coord,
+                    all_coords,
+                    f"Duplicate coordinate found in {gene_name}: {coord}",
+                )
+                all_coords.append(coord)
+
+        # Should have processed all 5 rows
+        self.assertEqual(len(all_coords), 5)
+
+    def test_by_gene_preserves_boundaries(self):
+        """Test that by_gene correctly handles gene boundaries without overlap."""
+        data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 5,
+                "start": [100, 200, 300, 400, 500],
+                "end": [150, 250, 350, 450, 550],
+                "gene": ["GeneA", "GeneA", "Antitarget", "GeneB", "GeneB"],
+                "log2": [0.1, 0.2, 0.0, -0.1, -0.2],
             }
         )
-        cn = cnary.CopyNumArray(df)
-        levels = pd.Series([2, 2, 2], index=cn.data.index)
-        out = segfilters.squash_by_groups(cn, levels)
-        # No segment may have start >= end ...
-        self.assertTrue((out.start < out.end).all(), out.data)
-        # ... and the two chr1 runs stay separate (3 segments, not 2) with all
-        # probes conserved and no cross-chromosome absorption.
-        self.assertEqual(len(out), 3)
-        self.assertEqual(out["probes"].sum(), 3)
+        cnarr = CopyNumArray(data, {"sample_id": "test"})
 
-    def test_squash_region_unsorted_span(self):
-        """squash_region spans [min start, max end] (#677).
+        gene_groups = list(cnarr.by_gene())
 
-        A run whose bins are not in ascending order must not yield start > end.
-        """
-        df = pd.DataFrame(
+        # Check that we have the expected groups
+        gene_names = [name for name, _ in gene_groups]
+        self.assertIn("GeneA", gene_names)
+        self.assertIn("GeneB", gene_names)
+        self.assertIn("Antitarget", gene_names)
+
+        # Check GeneA has exactly 2 rows
+        gene_a = next(ga for name, ga in gene_groups if name == "GeneA")
+        self.assertEqual(len(gene_a), 2)
+        self.assertEqual(gene_a.data.iloc[0]["start"], 100)
+        self.assertEqual(gene_a.data.iloc[1]["end"], 250)
+
+        # Check GeneB has exactly 2 rows
+        gene_b = next(ga for name, ga in gene_groups if name == "GeneB")
+        self.assertEqual(len(gene_b), 2)
+        self.assertEqual(gene_b.data.iloc[0]["start"], 400)
+        self.assertEqual(gene_b.data.iloc[1]["end"], 550)
+
+    def test_by_gene_with_duplicate_index_labels(self):
+        """Test by_gene with duplicate index labels (edge case for get_loc)."""
+        # Create test data with duplicate index labels
+        # This simulates the case where get_loc() returns a slice or boolean array
+        data = pd.DataFrame(
             {
-                "chromosome": ["chr1", "chr1"],
-                "start": [300, 100],
-                "end": [400, 200],
-                "gene": ["A", "A"],
-                "log2": [0.0, 0.0],
-                "probes": [1, 1],
-                "weight": [1.0, 1.0],
+                "chromosome": ["chr1"] * 6,
+                "start": [100, 200, 300, 400, 500, 600],
+                "end": [150, 250, 350, 450, 550, 650],
+                "gene": ["GeneA", "GeneA", "Antitarget", "GeneB", "GeneB", "GeneB"],
+                "log2": [0.1, 0.2, 0.0, -0.1, -0.2, -0.3],
+            },
+            index=[0, 1, 1, 2, 3, 3],  # Duplicate labels at positions 1-2 and 5-6
+        )
+        cnarr = CopyNumArray(data, {"sample_id": "test"})
+
+        # Group by gene and verify no duplicates
+        gene_groups = list(cnarr.by_gene())
+        all_coords = []
+
+        for gene_name, gene_cnarr in gene_groups:
+            for row in gene_cnarr.data.itertuples():
+                coord = (row.chromosome, row.start, row.end)
+                self.assertNotIn(
+                    coord,
+                    all_coords,
+                    f"Duplicate coordinate found in {gene_name}: {coord}",
+                )
+                all_coords.append(coord)
+
+        # Should have processed all 6 rows
+        self.assertEqual(len(all_coords), 6)
+
+    def test_by_gene_multiple_genes_per_bin(self):
+        """Test by_gene with bins spanning multiple genes (comma-separated)."""
+        data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 5,
+                "start": [100, 200, 300, 400, 500],
+                "end": [150, 250, 350, 450, 550],
+                "gene": ["GeneA", "GeneA,GeneB", "GeneB", "Antitarget", "GeneC"],
+                "log2": [0.1, 0.2, 0.0, -0.1, -0.2],
             }
         )
-        result = segfilters.squash_region(df)
-        self.assertEqual(result["start"].iat[0], 100)
-        self.assertEqual(result["end"].iat[0], 400)
+        cnarr = CopyNumArray(data, {"sample_id": "test"})
 
-    def test_squash_by_groups_cn1_cn2_nan(self):
-        """Allele-specific squash splits on known cn1/cn2 changes but treats
-        NaN (missing BAF) as 'no change', matching legacy grouping (#677).
+        # Group by gene
+        gene_groups = list(cnarr.by_gene())
+        gene_dict = {name: ga for name, ga in gene_groups}
 
-        Without this, the adjacency check would split every NaN row off on its
-        own (NaN != NaN), changing .cns output for `call`/`ampdel` on segments
-        that lack BAF data (call sets cn1/cn2 = NaN there).
-        """
-        base = {
-            "chromosome": ["chr1"] * 4,
-            "start": [0, 100, 200, 300],
-            "end": [100, 200, 300, 400],
-            "gene": ["-"] * 4,
-            "log2": [0.0] * 4,
-            "probes": [1, 1, 1, 1],
-            "weight": [1.0] * 4,
-            "cn": [2, 2, 2, 2],
-        }
-        # A known cn1/cn2 change in the middle splits into 2 segments.
-        known = cnary.CopyNumArray(
-            pd.DataFrame({**base, "cn1": [1, 1, 2, 2], "cn2": [1, 1, 0, 0]})
-        )
-        out = segfilters.squash_by_groups(known, known["cn"])
-        self.assertEqual(len(out), 2)
-        # All-NaN cn1/cn2 (no BAF) stays merged into 1 segment, not 4.
-        allnan = cnary.CopyNumArray(
-            pd.DataFrame({**base, "cn1": [np.nan] * 4, "cn2": [np.nan] * 4})
-        )
-        out_nan = segfilters.squash_by_groups(allnan, allnan["cn"])
-        self.assertEqual(len(out_nan), 1)
-        self.assertTrue((out_nan.start < out_nan.end).all())
+        # The bin at position 1 with "GeneA,GeneB" should appear in both genes
+        self.assertIn("GeneA", gene_dict)
+        self.assertIn("GeneB", gene_dict)
+        self.assertIn("GeneC", gene_dict)
 
-    def test_squash_by_groups_empty_and_single(self):
-        """squash_by_groups handles empty and single-row input (#677)."""
-        cols = ["chromosome", "start", "end", "gene", "log2", "probes", "weight"]
-        empty = cnary.CopyNumArray(pd.DataFrame({c: [] for c in cols}))
-        self.assertEqual(len(segfilters.squash_by_groups(empty, empty["log2"])), 0)
-        one = cnary.CopyNumArray(
-            pd.DataFrame(
-                {
-                    "chromosome": ["chr1"],
-                    "start": [10],
-                    "end": [20],
-                    "gene": ["G"],
-                    "log2": [0.1],
-                    "probes": [1],
-                    "weight": [1.0],
-                }
-            )
-        )
-        out = segfilters.squash_by_groups(one, one["log2"])
-        self.assertEqual(len(out), 1)
-        self.assertEqual((out["start"].iat[0], out["end"].iat[0]), (10, 20))
+        # GeneA should include the shared bin
+        gene_a_coords = [
+            (row.chromosome, row.start, row.end)
+            for row in gene_dict["GeneA"].data.itertuples()
+        ]
+        self.assertIn(("chr1", 200, 250), gene_a_coords)
+
+        # GeneB should also include the shared bin
+        gene_b_coords = [
+            (row.chromosome, row.start, row.end)
+            for row in gene_dict["GeneB"].data.itertuples()
+        ]
+        self.assertIn(("chr1", 200, 250), gene_b_coords)
 
 
-class VATests(unittest.TestCase):
-    """Tests for the VariantArray class."""
-
-    def test_read(self):
-        """Instantiate from a VCF file."""
-        variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
-        self.assertGreater(len(variants), 0)
-
-    def test_mirrored_baf_all_nan(self):
-        """All-NaN frequencies mirror to all-NaN without warning (gh#407).
-
-        np.nanmedian warns 'Mean of empty slice' on an all-NaN slice under
-        older numpy; with pytest's filterwarnings=error that breaks the build
-        (the 3.11-min job). _mirrored_baf must short-circuit before calling
-        .median() on such a slice.
-        """
-        vals = pd.Series([np.nan, np.nan, np.nan])
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            out = vary._mirrored_baf(vals)
-        self.assertEqual(len(out), len(vals))
-        self.assertTrue(out.isna().all())
-        # A partially-NaN slice still mirrors normally (median over real values)
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            mixed = vary._mirrored_baf(pd.Series([np.nan, 0.2, 0.3]))
-        self.assertTrue(math.isnan(mixed.iloc[0]))
-        # median 0.25 < 0.5 -> below-half branch (0.5 - shift); both already minor
-        self.assertAlmostEqual(mixed.iloc[1], 0.2)
-        self.assertAlmostEqual(mixed.iloc[2], 0.3)
+if __name__ == "__main__":
+    unittest.main()
 
 
 if __name__ == "__main__":

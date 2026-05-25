@@ -1,4 +1,9 @@
+import matplotlib
 import pytest
+
+# Use a headless backend for all plotting tests (set once, before any test
+# module imports pyplot via cnvlib.scatter/plots).
+matplotlib.use("Agg")
 
 
 # Change pytest working directory to test case directory
