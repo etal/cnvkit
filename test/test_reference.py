@@ -157,6 +157,25 @@ class ReferenceTests(unittest.TestCase):
             expected_haploid_log2,
         )
 
+    def test_shift_sex_chroms_unknown_defaults_female(self):
+        """A sample absent from the inferred-sexes dict is treated as female.
+
+        `infer_sexes` deliberately omits samples whose sex couldn't be
+        determined (preserving a None signal for target/antitarget
+        reconciliation), so `shift_sex_chroms` must apply the safe default
+        itself: no +1 shift on chrX. The old code fell through to the male
+        branch and silently inflated chrX (Defect A / gh#360 family).
+        """
+        cnarr = cnvlib.read("formats/ref_test_female.cnn")
+        is_chr_x = cnarr.chr_x_filter()
+        is_chr_y = cnarr.chr_y_filter()
+        before_x = cnarr["log2"][is_chr_x].to_numpy().copy()
+        # Empty sexes dict => this sample's sex is unknown.
+        reference.shift_sex_chroms(cnarr, {}, np.zeros(len(cnarr)), is_chr_x, is_chr_y)
+        after_x = cnarr["log2"][is_chr_x].to_numpy()
+        # Female default: chrX unchanged (would be +1 under the None->male bug).
+        np.testing.assert_allclose(after_x, before_x)
+
     def test_fix(self):
         """The 'fix' command."""
         # Extract fake target/antitarget bins from a combined file

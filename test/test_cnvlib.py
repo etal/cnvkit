@@ -17,6 +17,7 @@ from skgenome import GenomicArray, tabio
 import cnvlib
 from cnvlib.cnary import CopyNumArray
 from cnvlib import (
+    cmdutil,
     cnary,
     fix,
     params,
@@ -293,6 +294,43 @@ class CNATests(unittest.TestCase):
                 sample_is_f,
                 f"{fname}: guessed XX {guess} but is {sample_is_f}",
             )
+
+    def test_guess_xx_indeterminate_defaults_female(self):
+        """Indeterminate sex (no chrX) defaults to female, never silently male.
+
+        `guess_xx` still returns None -- an honest "can't tell" that the
+        reference target/antitarget reconciliation relies on -- but the
+        decision-level helper `is_female_default` and `verify_sample_sex`
+        collapse None to female. Female is the safe default: guessing male
+        for a sample whose X is actually diploid would spuriously inflate
+        chrX by +1 (the gh#360 failure family).
+        """
+        from cnvlib.cnary import is_female_default
+
+        # The helper: None -> female; real guesses pass through as plain bool.
+        self.assertIs(is_female_default(None), True)
+        self.assertIs(is_female_default(np.bool_(True)), True)
+        self.assertIs(is_female_default(np.bool_(False)), False)
+
+        # An autosomes-only sample: guess_xx genuinely can't tell (None) ...
+        auto_only = CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 5 + ["chr2"] * 5,
+                    "start": list(range(0, 5000, 1000)) * 2,
+                    "end": list(range(1000, 6000, 1000)) * 2,
+                    "gene": ["-"] * 10,
+                    "log2": [0.0] * 10,
+                    "weight": [1.0] * 10,
+                }
+            )
+        )
+        self.assertIsNone(auto_only.guess_xx(verbose=False))
+        # ... but verify_sample_sex returns female (a real bool), not None/male.
+        result = cmdutil.verify_sample_sex(auto_only, None, False, None)
+        self.assertIs(result, True)
+        # An explicit override still wins, with no misleading mismatch warning.
+        self.assertIs(cmdutil.verify_sample_sex(auto_only, "male", False, None), False)
 
     def test_residuals(self):
         cnarr = cnvlib.read("formats/amplicon.cnr")

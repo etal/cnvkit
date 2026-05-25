@@ -13,6 +13,7 @@ import pandas as pd
 from scipy import stats
 
 from . import params, descriptives, segmetrics
+from .cnary import is_female_default
 from .segmetrics import segment_mean
 
 if TYPE_CHECKING:
@@ -194,9 +195,11 @@ def do_genemetrics(
         chromosome, log2 ratio, and probe counts.
     """
     if is_sample_female is None:
-        is_sample_female = cnarr.guess_xx(  # type: ignore[assignment]
-            is_haploid_x_reference=is_haploid_x_reference,
-            diploid_parx_genome=diploid_parx_genome,
+        is_sample_female = is_female_default(
+            cnarr.guess_xx(
+                is_haploid_x_reference=is_haploid_x_reference,
+                diploid_parx_genome=diploid_parx_genome,
+            )
         )
     cnarr = cnarr.shift_xx(
         is_haploid_x_reference, is_sample_female, diploid_parx_genome
