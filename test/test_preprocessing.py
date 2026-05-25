@@ -128,6 +128,7 @@ class PreprocessingTests(unittest.TestCase):
         """bedcov keeps regions on BAM contigs and drops those on absent
         contigs instead of erroring out entirely (#620)."""
         bam = "formats/na12878-chrM-Y-trunc.bam"
+        samutil.ensure_bam_index(bam)  # self-contained: don't rely on test order
         bam_chroms = samutil.get_bam_chroms(bam)
         with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
             f.write("chrM\t251\t277\tfoo\n")
@@ -144,6 +145,7 @@ class PreprocessingTests(unittest.TestCase):
         """bedcov on an all-absent BED: raise a clear error by default, but
         return empty when allow_empty=True (the per-chunk parallel path)."""
         bam = "formats/na12878-chrM-Y-trunc.bam"
+        samutil.ensure_bam_index(bam)  # self-contained: don't rely on test order
         bam_chroms = samutil.get_bam_chroms(bam)
         with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
             f.write("absent_contig\t100\t200\tbar\n")
