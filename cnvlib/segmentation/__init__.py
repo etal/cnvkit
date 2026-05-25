@@ -318,7 +318,11 @@ def _do_segmentation(
             return segarr, seg_out
         return segarr
     if variants and not method.startswith("hmm"):
-        # Re-segment the variant allele freqs within each segment
+        # Re-segment the variant allele freqs within each segment.
+        # BAF re-segmentation intentionally uses the HMM (a 2-state Viterbi on
+        # mirrored BAF) for every non-HMM method, per commit 692d5a5; the older
+        # Haar-on-BAF path was removed as dead code. See bead for selectable/
+        # upgraded BAF refinement (beta-binomial) if this is revisited.
         # TODO train on all segments together
         logging.info("Re-segmenting on variant allele frequency")
         newsegs = [

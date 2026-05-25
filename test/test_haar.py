@@ -13,6 +13,7 @@ from cnvlib.segmentation.haar import (
     FindLocalPeaks,
     HaarConv,
     PulseConv,
+    SegmentByPeaks,
     haarSeg,
 )
 
@@ -67,6 +68,26 @@ class FDRThresTests(unittest.TestCase):
         # With larger stdev, same x values have larger p-values (less significant),
         # so fewer pass the FDR criterion, resulting in a higher threshold
         self.assertGreaterEqual(T2, T1)
+
+    def test_fdr_thres_zero_stdev(self):
+        """stdev=0 must not yield NaN p-values; all peaks are admitted (scq.2).
+
+        norm.cdf(scale=0) returns NaN, which previously made every p-value NaN
+        and silently dropped real breakpoints.
+        """
+        T = FDRThres(np.array([1.0, 0.5, 0.2]), 0.05, 0.0)
+        self.assertFalse(np.isnan(T))
+        self.assertEqual(T, 0.0)
+
+    def test_fdr_thres_rejects_all_when_none_significant(self):
+        """When no peak is significant, T strictly exceeds max|x| (scq.2).
+
+        The old fallback `x_sorted[0] + 1e-16` is a no-op near magnitude 1.0
+        (1e-16 < ULP), so the largest peak slipped through `>=`.
+        """
+        x = np.array([1.0, 0.9, 0.8])
+        T = FDRThres(x, 1e-12, 10.0)  # tiny q, large stdev -> nothing significant
+        self.assertGreater(T, np.max(np.abs(x)))
 
 
 class HaarConvTests(unittest.TestCase):
@@ -196,6 +217,46 @@ class HaarSegIntegrationTests(unittest.TestCase):
         self.assertIn("start", result)
         self.assertIn("end", result)
         self.assertEqual(result["start"][0], 0)
+
+    def test_haarseg_mostly_flat_keeps_small_breakpoint(self):
+        """Mostly-flat (zero-noise) input must not drop a smaller breakpoint.
+
+        Here median(|level-1 Haar coef|) == 0 so peakSigmaEst was 0, which made
+        FDR p-values NaN and silently dropped the small -2 -> -2.3 step,
+        yielding 2 segments instead of 3 (scq.2). Real noisy data is unaffected
+        (noise keeps peakSigmaEst > 0).
+        """
+        signal = np.concatenate(
+            [np.zeros(30), np.full(30, -2.0), np.full(30, -2.3)]
+        )
+        result = haarSeg(signal, breaksFdrQ=0.001)
+        self.assertEqual(len(result["start"]), 3)
+        assert_allclose(result["mean"], [0.0, -2.0, -2.3], atol=1e-9)
+
+    def test_haarseg_constant_signal_stays_one_segment(self):
+        """The peakSigmaEst floor must not over-segment a constant signal."""
+        result = haarSeg(np.zeros(100), breaksFdrQ=0.01)
+        self.assertEqual(len(result["start"]), 1)
+
+
+class SegmentByPeaksTests(unittest.TestCase):
+    """Tests for weighted segment-mean computation."""
+
+    def test_segment_by_peaks_nan_weight_single_segment(self):
+        """A NaN weight is excluded, not treated as 'no valid weights' (scq.3)."""
+        data = np.array([1.0, 3.0])
+        weights = np.array([1.0, np.nan])
+        out = SegmentByPeaks(data, np.array([], dtype=int), weights)
+        # Exclude the NaN-weighted bin -> mean is just the first value (1.0);
+        # the old code fell back to the unweighted mean (2.0).
+        assert_allclose(out, [1.0, 1.0])
+
+    def test_segment_by_peaks_nan_weight_per_segment(self):
+        """Per-segment weighted means also exclude NaN weights (scq.3)."""
+        data = np.array([1.0, 3.0, 10.0, 10.0])
+        weights = np.array([1.0, np.nan, 1.0, 1.0])
+        out = SegmentByPeaks(data, np.array([2]), weights)
+        assert_allclose(out, [1.0, 1.0, 10.0, 10.0])
 
 
 if __name__ == "__main__":
