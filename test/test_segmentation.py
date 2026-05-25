@@ -160,6 +160,19 @@ class SegmentationTests(unittest.TestCase):
         self.assertEqual(len(segments_df), 0)
         self.assertEqual(rstr, "")
 
+    def test_threshold_zero_not_overridden(self):
+        """threshold=0.0 is honored, not treated as 'unset' (scq.4).
+
+        'if not threshold' replaced the valid value 0.0 with the method default;
+        'if threshold is None' keeps it.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        with self.assertLogs(level="INFO") as cm:
+            segmentation.do_segmentation(cnarr, "haar", threshold=0.0, processes=1)
+        msg = " ".join(cm.output)
+        self.assertIn("significance threshold 0.0,", msg)
+        self.assertNotIn("0.0001", msg)
+
 
 class TransferFieldsTests(unittest.TestCase):
     """Tests for transfer_fields and do_segmentation NaN handling."""

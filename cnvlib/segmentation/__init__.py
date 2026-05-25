@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 
 
 SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", "hmm", "hmm-tumor", "hmm-germline")
+# HMM method variants, for dispatch (replaces scattered method.startswith("hmm"))
+_HMM_METHODS = frozenset({"hmm", "hmm-tumor", "hmm-germline"})
 
 
 def do_segmentation(
@@ -107,7 +109,7 @@ def do_segmentation(
         variants = variants.copy()
         variants.sort()
 
-    if not threshold:
+    if threshold is None:
         threshold = {
             "cbs": 0.0001,
             "flasso": 0.0001,
@@ -115,7 +117,7 @@ def do_segmentation(
         }.get(method)
     msg = "Segmenting with method " + repr(method)
     if threshold is not None:
-        if method.startswith("hmm"):
+        if method in _HMM_METHODS:
             msg += f", smoothing window size {threshold},"
         else:
             msg += f", significance threshold {threshold},"
@@ -124,7 +126,7 @@ def do_segmentation(
 
     # NB: parallel cghFLasso segfaults in R ('memory not mapped'),
     # even when run on a single chromosome
-    if method == "flasso" or method.startswith("hmm"):
+    if method == "flasso" or method in _HMM_METHODS:
         # ENH segment p/q arms separately
         # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(
@@ -138,6 +140,7 @@ def do_segmentation(
             min_weight,
             save_dataframe,
             rscript_path,
+            smooth_cbs,
         )
         if save_dataframe:
             cna, rstr = cna  # type: ignore[misc]
@@ -190,7 +193,19 @@ def _to_str(s, enc=locale.getpreferredencoding()):  # noqa: B008
 
 
 def _ds(
-    args: tuple[CNA, str, None, float, None, bool, int, int, bool, str, bool],
+    args: tuple[
+        CNA,
+        str,
+        str | None,
+        float | None,
+        VariantArray | None,
+        bool,
+        int,
+        int,
+        bool,
+        str,
+        bool,
+    ],
 ) -> CNA | tuple[CNA, str]:
     """Wrapper for parallel map"""
     return _do_segmentation(*args)
@@ -317,7 +332,7 @@ def _do_segmentation(
         if save_dataframe:
             return segarr, seg_out
         return segarr
-    if variants and not method.startswith("hmm"):
+    if variants and method not in _HMM_METHODS:
         # Re-segment the variant allele freqs within each segment.
         # BAF re-segmentation intentionally uses the HMM (a 2-state Viterbi on
         # mirrored BAF) for every non-HMM method, per commit 692d5a5; the older
