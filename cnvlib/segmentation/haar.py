@@ -34,6 +34,11 @@ if TYPE_CHECKING:
     from cnvlib.cnary import CopyNumArray
     from numpy import float64, ndarray
 
+# Lower bound for the wavelet-coefficient noise estimate, so a degenerate
+# (all-flat / quantized) signal can't drive it to exactly 0 and break the FDR
+# threshold's normal CDF. Far below any real log2/BAF step magnitude.
+SIGMA_FLOOR = 1e-10
+
 
 def segment_haar(cnarr: CopyNumArray, fdr_q: float) -> CopyNumArray:
     """Do segmentation for CNVkit.
@@ -81,114 +86,6 @@ def one_chrom(cnarr: CopyNumArray, fdr_q: float, chrom: str) -> pd.DataFrame:
         }
     )
     return table
-
-
-def variants_in_segment(varr, segment, fdr_q):
-    """Segment a single genomic interval based on B-allele frequencies.
-
-    Applies HaarSeg segmentation to variant allele frequencies within a segment
-    to detect sub-clonal changes or allelic imbalances. This is used for
-    allele-specific copy number analysis.
-
-    Parameters
-    ----------
-    varr : VariantArray
-        Variant allele frequency data (from VCF) within the segment region.
-        Contains SNV positions and their B-allele frequencies.
-    segment : Row or CopyNumArray
-        A single segment from copy number segmentation results.
-        Must have 'chromosome', 'start', 'end', 'gene', 'log2', 'probes' fields.
-    fdr_q : float
-        False discovery rate q-value for HaarSeg breakpoint detection.
-        Typical values: 0.01, 0.001, 0.0001. Lower = less sensitive.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Segmentation results as a table with columns:
-        - chromosome, start, end: Genomic coordinates
-        - gene: Gene name from parent segment
-        - log2: Copy ratio from parent segment (not re-calculated)
-        - probes: Number of variants in each sub-segment
-
-        If no sub-segmentation is detected (≤1 breakpoint), returns the
-        original segment as a single-row DataFrame.
-
-    Notes
-    -----
-    The function:
-
-    1. Transforms B-allele frequencies to mirrored values (0.5-1.0 range)
-       with tumor purity boosting
-    2. Applies HaarSeg to detect breakpoints in allele frequencies
-    3. If multiple segments found, places breakpoints midway between SNVs
-    4. If no segmentation needed, returns original segment unchanged
-
-    The log2 copy ratio is inherited from the parent segment and not
-    recalculated, as this function focuses on allelic changes.
-
-    This is primarily used internally by the `call` command when VCF data
-    is provided to refine segment boundaries based on heterozygous SNPs.
-
-    See Also
-    --------
-    haarSeg : The underlying HaarSeg segmentation algorithm
-    VariantArray.mirrored_baf : Transforms BAF values for segmentation
-    """
-    if len(varr):
-        values = varr.mirrored_baf(above_half=True, tumor_boost=True)
-        results = haarSeg(values, fdr_q, weights=None)  # ENH weight by sqrt(DP)
-    else:
-        values = pd.Series()
-        results = None
-    if results is not None and len(results["start"]) > 1:
-        logging.info(
-            "Segmented on allele freqs in %s:%d-%d",
-            segment.chromosome,
-            segment.start,
-            segment.end,
-        )
-        # Ensure breakpoint locations make sense
-        # - Keep original segment start, end positions
-        # - Place breakpoints midway between SNVs, I guess?
-        # NB: 'results' are indices, i.e. enumerated bins
-        gap_rights = varr["start"].to_numpy().take(results["start"][1:])
-        gap_lefts = varr["end"].to_numpy().take(results["end"][:-1])
-        mid_breakpoints = (gap_lefts + gap_rights) // 2
-        starts = np.concatenate([[segment.start], mid_breakpoints])
-        ends = np.concatenate([mid_breakpoints, [segment.end]])
-        table = pd.DataFrame(
-            {
-                "chromosome": segment.chromosome,
-                "start": starts,
-                "end": ends,
-                # 'baf': results['mean'],
-                "gene": segment.gene,  # '-'
-                "log2": segment.log2,
-                "probes": results["size"],
-                # 'weight': (segment.weight * results['size']
-                #            / (segment.end - segment.start)),
-            }
-        )
-    else:
-        table = pd.DataFrame(
-            {
-                "chromosome": segment.chromosome,
-                "start": segment.start,
-                "end": segment.end,
-                # 'baf': values.median(),
-                "gene": segment.gene,  # '-',
-                "log2": segment.log2,
-                "probes": segment.probes,
-                # 'weight': segment.weight,
-            },
-            index=[0],
-        )
-
-    return table
-
-
-# ---- from HaarSeg R code -- the API ----
 
 
 def haarSeg(
@@ -259,6 +156,15 @@ def haarSeg(
     else:
         peakSigmaEst = med_abs_diff(diff_signal)
 
+    # Floor the noise estimate: for mostly-flat / quantized input (>=50% of
+    # adjacent bins bit-identical) the median absolute coefficient is exactly 0,
+    # which would make FDRThres' norm.cdf(scale=0) return NaN p-values and
+    # silently drop real breakpoints. A tiny positive floor keeps genuine steps
+    # (magnitude >> SIGMA_FLOOR) significant without admitting numerical noise.
+    # Real continuous log2/BAF data has noise, so peakSigmaEst >> the floor and
+    # this is a no-op there.
+    peakSigmaEst = max(peakSigmaEst, SIGMA_FLOOR)
+
     breakpoints = np.array([], dtype=np.int_)
     for level in range(haarStartLevel, haarEndLevel + 1):
         stepHalfSize = 2**level
@@ -297,6 +203,11 @@ def FDRThres(x: ndarray, q: float, stdev: float64) -> int | float64:
     M = len(x)
     if M < 2:
         return 0
+    if stdev <= 0:
+        # Zero/negative noise: norm.cdf(scale<=0) is NaN. Against a zero noise
+        # floor every nonzero peak is infinitely significant, so admit them all
+        # (threshold 0); the caller floors stdev (SIGMA_FLOOR) so this is a guard.
+        return np.float64(0.0)
 
     m = np.arange(1, M + 1) / M
     x_sorted = np.sort(np.abs(x))[::-1]
@@ -310,7 +221,11 @@ def FDRThres(x: ndarray, q: float, stdev: float64) -> int | float64:
         logging.debug(
             "No passing p-values: min p=%.4g, min m=%.4g, q=%s", p[0], m[0], q
         )
-        T = x_sorted[0] + 1e-16  # ~= 2^-52, like MATLAB "eps"
+        # No peak is significant -> set the threshold just above the largest so
+        # the '>=' test admits nothing. Use nextafter, not '+1e-16': near
+        # magnitude 1 that addend is below the float64 ULP (~2.22e-16) and is a
+        # no-op, which let the largest peak slip through.
+        T = np.nextafter(x_sorted[0], np.inf)
     return T  # type: ignore[no-any-return]
 
 
@@ -330,8 +245,9 @@ def SegmentByPeaks(
     """
     if len(peaks) == 0:
         # Single segment spanning all data
-        if weights is not None and weights.sum() > 0:
-            mean_val = np.average(data, weights=weights)
+        if weights is not None and np.nansum(weights) > 0:
+            valid = ~np.isnan(weights)
+            mean_val = np.average(data[valid], weights=weights[valid])
         else:
             mean_val = np.mean(data)
         return np.full_like(data, mean_val)
@@ -350,11 +266,13 @@ def SegmentByPeaks(
         seg_means = np.empty(n_segs, dtype=np.float64)
         for i in range(n_segs):
             start, end = bounds[i], bounds[i + 1]
+            seg_data = data[start:end]
             w = weights[start:end]
-            if w.sum() > 0:
-                seg_means[i] = np.average(data[start:end], weights=w)
+            if np.nansum(w) > 0:
+                valid = ~np.isnan(w)
+                seg_means[i] = np.average(seg_data[valid], weights=w[valid])
             else:
-                seg_means[i] = np.mean(data[start:end])
+                seg_means[i] = np.mean(seg_data)
 
     # Expand segment means to full array using repeat
     return np.repeat(seg_means, seg_lengths)
@@ -364,6 +282,8 @@ def SegmentByPeaks(
 
 
 # --- HaarSeg.h
+
+
 def HaarConv(
     signal: ndarray,  # const double * signal,
     weight: ndarray | None,  # const double * weight,
@@ -628,6 +548,8 @@ def PulseConv(
 
 
 # XXX Apply afterward to the segmentation result? (not currently used)
+
+
 def AdjustBreaks(
     signal,  # const double * signal,
     peakLoc,  # const int * peakLoc,
@@ -679,40 +601,3 @@ def AdjustBreaks(
 
 
 # Testing
-
-
-def table2coords(seg_table):
-    """Return x, y arrays for plotting."""
-    x = []
-    y = []
-    for start, size, val in seg_table:
-        x.append(start)
-        x.append(start + size)
-        y.append(val)
-        y.append(val)
-    return x, y
-
-
-if __name__ == "__main__":
-    real_data = np.concatenate(
-        (np.zeros(800), np.ones(200), np.zeros(800), 0.8 * np.ones(200), np.zeros(800))
-    )
-    # rng = np.random.default_rng(0x5EED)
-    rng = np.random.default_rng()
-    noisy_data = real_data + rng.standard_normal(len(real_data)) * 0.2
-
-    # # Run using default parameters
-    seg_table = haarSeg(noisy_data, 0.005)
-
-    logging.info("%s", seg_table)
-
-    from matplotlib import pyplot
-
-    indices = np.arange(len(noisy_data))
-    pyplot.scatter(indices, noisy_data, alpha=0.2, color="gray")
-    x, y = table2coords(seg_table)
-    pyplot.plot(x, y, color="r", marker="x", lw=2, snap=False)
-    pyplot.show()
-
-    # # The complete segmented signal
-    # lines(seg.data$Segmented, col="red", lwd=3)
