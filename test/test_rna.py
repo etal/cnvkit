@@ -7,7 +7,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from cnvlib import rna
+from cnvlib import import_rna, rna
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -231,6 +231,40 @@ class RNAImportTests(unittest.TestCase):
         self.assertTrue(result[1] > min_log2)
         self.assertTrue(result[2] > result[1])
         self.assertTrue(result[3] > result[2])
+
+
+class ImportRnaIntegrationTests(unittest.TestCase):
+    """End-to-end `import-rna` from count files + gene resource to .cnr."""
+
+    COUNT_FILES = (
+        "formats/rna-sample-A.counts.txt",
+        "formats/rna-sample-B.counts.txt",
+        "formats/rna-sample-C.counts.txt",
+    )
+    GENE_RESOURCE = "formats/rna-gene-resource.tsv"
+
+    def test_do_import_rna_counts_to_cnr(self):
+        """do_import_rna turns per-gene counts into one finite-log2 .cnr/sample."""
+        all_data, cnrs = import_rna.do_import_rna(
+            self.COUNT_FILES, "counts", self.GENE_RESOURCE
+        )
+        cnrs = list(cnrs)
+        self.assertEqual(len(cnrs), len(self.COUNT_FILES))
+        for cnr in cnrs:
+            # Valid CopyNumArray: expected columns, finite log2, valid coords
+            for col in ("chromosome", "start", "end", "gene", "log2", "depth"):
+                self.assertIn(col, cnr.data.columns)
+            self.assertGreater(len(cnr), 0)
+            self.assertTrue(np.isfinite(cnr["log2"]).all())
+            self.assertTrue((cnr.start < cnr.end).all())
+            self.assertEqual(list(cnr.chromosome.unique()), ["1"])
+        # Summary table has one row per retained gene
+        self.assertEqual(len(all_data), len(cnrs[0]))
+        self.assertEqual(cnrs[0].sample_id, "rna-sample-A")
+
+    def test_do_import_rna_unknown_format_raises(self):
+        with self.assertRaises(RuntimeError):
+            import_rna.do_import_rna(self.COUNT_FILES[:1], "bogus", self.GENE_RESOURCE)
 
 
 if __name__ == "__main__":
