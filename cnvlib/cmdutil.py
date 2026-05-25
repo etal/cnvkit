@@ -8,7 +8,7 @@ import numpy as np
 
 from skgenome import tabio
 
-from .cnary import CopyNumArray as CNA
+from .cnary import CopyNumArray as CNA, is_female_default
 from skgenome import GenomicArray as GA
 from typing import TYPE_CHECKING
 
@@ -128,18 +128,20 @@ def verify_sample_sex(
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
 ) -> bool:
-    is_sample_female: bool = cnarr.guess_xx(  # type: ignore[assignment]
-        is_haploid_x_reference, diploid_parx_genome, verbose=False
-    )
+    guess = cnarr.guess_xx(is_haploid_x_reference, diploid_parx_genome, verbose=False)
+    # None means "couldn't tell" (no chrX / degenerate); default to female so an
+    # indeterminate sample is never silently treated as male (gh#360 family).
+    is_sample_female = is_female_default(guess)
     if sex_arg:
         is_sample_female_given = sex_arg.lower() not in ["y", "m", "male"]
-        if is_sample_female != is_sample_female_given:
+        # Only warn on a real disagreement -- not when we merely defaulted.
+        if guess is not None and is_sample_female != is_sample_female_given:
             logging.warning(
                 "Sample sex specified as %s but chromosomal X/Y ploidy looks like %s",
                 "female" if is_sample_female_given else "male",
                 "female" if is_sample_female else "male",
             )
-            is_sample_female = is_sample_female_given
+        is_sample_female = is_sample_female_given
     logging.info(
         "Treating sample %s as %s",
         cnarr.sample_id or "",

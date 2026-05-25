@@ -22,6 +22,20 @@ if TYPE_CHECKING:
     from pandas.core.series import Series
 
 
+def is_female_default(is_xx: bool | bool_ | None) -> bool:
+    """Resolve an indeterminate chromosomal-sex guess to the safe default.
+
+    `CopyNumArray.guess_xx` returns None when sex can't be determined (no X
+    chromosome present, or a degenerate coverage comparison). For copy-number
+    purposes the only effect of a "male" call is that a haploid X is treated as
+    the expected baseline; assuming male for a sample whose X is actually
+    diploid would spuriously inflate chrX by +1 (the gh#360 failure family). So
+    when there isn't positive evidence either way, default to female (diploid-X
+    baseline). A real (non-None) guess is returned unchanged as a plain ``bool``.
+    """
+    return True if is_xx is None else bool(is_xx)
+
+
 class CopyNumArray(GenomicArray):
     """An array of genomic intervals, treated like aCGH probes.
 
@@ -401,9 +415,13 @@ class CopyNumArray(GenomicArray):
         """
         outprobes = self.copy()
         if is_xx is None:
-            is_xx = self.guess_xx(
-                is_haploid_x_reference=is_haploid_x_reference,
-                diploid_parx_genome=diploid_parx_genome,
+            # guess_xx may still return None (no chrX); default to female so an
+            # indeterminate sample is never silently given the male +1 shift.
+            is_xx = is_female_default(
+                self.guess_xx(
+                    is_haploid_x_reference=is_haploid_x_reference,
+                    diploid_parx_genome=diploid_parx_genome,
+                )
             )
         if is_xx and is_haploid_x_reference:
             # Female: divide X coverages by 2 (in log2: subtract 1)
@@ -612,8 +630,10 @@ class CopyNumArray(GenomicArray):
         chromosomes based on whether the reference is male (XX or XY).
         """
         if is_haploid_x_reference is None:
-            is_haploid_x_reference = not self.guess_xx(
-                diploid_parx_genome=diploid_parx_genome, verbose=False
+            # Default to a female (diploid-X) reference when sex is unknown,
+            # rather than letting a None guess become a male (haploid-X) one.
+            is_haploid_x_reference = not is_female_default(
+                self.guess_xx(diploid_parx_genome=diploid_parx_genome, verbose=False)
             )
         cvg = np.zeros(len(self), dtype=np.float64)
         if is_haploid_x_reference:

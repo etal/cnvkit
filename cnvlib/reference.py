@@ -11,7 +11,7 @@ import pyfaidx
 from skgenome import tabio, GenomicArray as GA
 from . import core, fix, descriptives, params
 from .cmdutil import read_cna
-from .cnary import CopyNumArray as CNA
+from .cnary import CopyNumArray as CNA, is_female_default
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -586,7 +586,16 @@ def shift_sex_chroms(
         xy sample, xy ref: 0    (from -1)   +1
 
     """
-    is_xx = sexes.get(cnarr.sample_id)
+    # infer_sexes omits samples whose sex couldn't be determined, so a missing
+    # entry means "unknown" -- default to female (diploid X) rather than letting
+    # None fall through to the male branch and silently add +1 to chrX (gh#360).
+    known_sex = sexes.get(cnarr.sample_id)
+    if known_sex is None:
+        logging.warning(
+            "Cannot determine sex for sample %s; treating chrX as diploid (female)",
+            cnarr.sample_id or "",
+        )
+    is_xx = is_female_default(known_sex)
     cnarr["log2"] += ref_flat_logr
     if is_xx:
         # chrX has same ploidy as autosomes; chrY is just unusable noise

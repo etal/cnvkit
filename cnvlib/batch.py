@@ -25,6 +25,7 @@ from . import (
     target,
 )
 from .cmdutil import read_cna
+from .cnary import is_female_default
 
 
 def batch_make_reference(
@@ -529,7 +530,9 @@ def batch_run_sample(
         logging.info("Wrote %s-scatter.png", sample_pfx)
 
     if plot_diagram:
-        is_xx = cnarr.guess_xx(is_haploid_x_reference, diploid_parx_genome)
+        is_xx = is_female_default(
+            cnarr.guess_xx(is_haploid_x_reference, diploid_parx_genome)
+        )
         outfname = sample_pfx + "-diagram.pdf"
         diagram.create_diagram(
             cnarr.shift_xx(is_haploid_x_reference, is_xx, diploid_parx_genome),
