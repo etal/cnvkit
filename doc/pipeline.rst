@@ -672,9 +672,23 @@ SNP allele frequencies
 
 If a :ref:`vcfformat` file is given with the
 ``--vcf`` option (and accompanying options ``-i``, ``-n``, ``-z``, and
-``--min-variant-depth``, which work as in other commands), then after segmenting
-log2 ratios, a second pass of segmentation will run within each log2-ratio-based
-segment on the SNP allele frequencies loaded from the VCF.
+``--min-variant-depth``, which work as in other commands), the b-allele
+frequencies (BAFs) of heterozygous SNPs are used to refine segmentation, so that
+allelic imbalance -- including copy-neutral loss of heterozygosity (LOH), where
+the log2 ratio is flat but one allele is lost -- produces its own breakpoints. A
+``baf`` column (the mean mirrored BAF per segment) is added to the output.
+
+How the BAF is incorporated depends on the method:
+
+- ``hmm``, ``hmm-tumor``, ``hmm-germline``: BAF is modeled *jointly* with the
+  log2 ratio in a single pass (allele-specific copy-number states).
+- ``haar``: a fast path for whole-genome sequencing -- HaarSeg is run separately
+  on the log2 signal and on the per-bin BAF, and the **union** of their
+  breakpoints is taken. A BAF shift with flat depth thus yields a breakpoint
+  (catching copy-neutral LOH) without the cost of the HMM.
+- ``cbs``, ``flasso``, ``none``: after segmenting log2 ratios, a second pass
+  re-segments the SNP allele frequencies within each log2-ratio-based segment
+  (a 2-state HMM on the mirrored BAF).
 
 See also :doc:`calling` for suggestions on how to interpret and post-process the
 resulting segments.

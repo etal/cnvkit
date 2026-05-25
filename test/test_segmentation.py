@@ -72,9 +72,9 @@ class SegmentationTests(unittest.TestCase):
         )
         self.assertGreater(len(segments), n_chroms)
         self.assertTrue((segments.start < segments.end).all())
-        # haar segmentation with variants re-segments by BAF (routed through
-        # hmm.variants_in_segment); previously broken, working since the HMM
-        # rewrite. See bead cnvkit-scq.1 re: the unused haar.variants_in_segment.
+        # haar segmentation with variants unions depth+BAF breakpoints
+        # (cnvkit-ugh); see test_haar_vcf_detects_copy_neutral_loh for the LOH
+        # behavior. Here just confirm it runs and yields valid segments.
         varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
         self.assertGreater(len(segments), n_chroms)
@@ -172,6 +172,86 @@ class SegmentationTests(unittest.TestCase):
         msg = " ".join(cm.output)
         self.assertIn("significance threshold 0.0,", msg)
         self.assertNotIn("0.0001", msg)
+
+    def test_haar_vcf_detects_copy_neutral_loh(self):
+        """`-m haar --vcf` unions depth+BAF breakpoints -> catches copy-neutral
+        LOH (flat depth, BAF shift), and adds a 'baf' column (cnvkit-ugh)."""
+        n = 120
+        rng = np.random.default_rng(0)
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(n) * 1000,
+                    "end": np.arange(n) * 1000 + 1000,
+                    "gene": "-",
+                    "log2": rng.normal(0.0, 0.05, n),  # flat depth, no CN change
+                    "weight": np.ones(n),
+                }
+            )
+        )
+        # Het SNPs: balanced (minor/depth=0.5) first half, LOH (0.3) second half
+        alt = np.concatenate([np.full(60, 15.0), np.full(60, 9.0)])
+        varr = vary.VariantArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(n) * 1000 + 500,
+                    "end": np.arange(n) * 1000 + 501,
+                    "ref": ["A"] * n,
+                    "alt": ["G"] * n,
+                    "zygosity": np.full(n, 0.5),
+                    "alt_count": alt,
+                    "depth": np.full(n, 30.0),
+                    "alt_freq": alt / 30.0,
+                }
+            )
+        )
+        # Depth-only: flat -> no BAF breakpoint, no 'baf' column
+        depth_only = segmentation.do_segmentation(cnarr, "haar")
+        self.assertNotIn("baf", depth_only.data.columns)
+        # Joint: the BAF shift at bin 60 must introduce a breakpoint there
+        joint = segmentation.do_segmentation(cnarr, "haar", variants=varr)
+        self.assertIn("baf", joint.data.columns)
+        self.assertGreater(len(joint), len(depth_only))
+        boundaries = set(joint.start.tolist()) | set(joint.end.tolist())
+        self.assertTrue(
+            any(55000 <= b <= 65000 for b in boundaries),
+            f"expected a breakpoint near the BAF shift (~60000); got {sorted(boundaries)}",
+        )
+
+    def test_haar_vcf_without_allele_info_falls_back(self):
+        """`-m haar --vcf` on a VCF lacking AF and AD/DP must not crash; it
+        falls back to depth-only segmentation (cnvkit-ugh)."""
+        n = 30
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(n) * 1000,
+                    "end": np.arange(n) * 1000 + 1000,
+                    "gene": "-",
+                    "log2": np.zeros(n),
+                    "weight": np.ones(n),
+                }
+            )
+        )
+        # Genotype-only VCF: het zygosity, but no alt_freq / alt_count / depth
+        varr = vary.VariantArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 10,
+                    "start": np.arange(10) * 100,
+                    "end": np.arange(10) * 100 + 1,
+                    "ref": ["A"] * 10,
+                    "alt": ["G"] * 10,
+                    "zygosity": np.full(10, 0.5),
+                }
+            )
+        )
+        seg = segmentation.do_segmentation(cnarr, "haar", variants=varr)
+        self.assertGreater(len(seg), 0)
+        self.assertTrue((seg.start < seg.end).all())
 
 
 class TransferFieldsTests(unittest.TestCase):

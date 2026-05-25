@@ -36,6 +36,29 @@ class VariantArrayTests(unittest.TestCase):
         variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         self.assertGreater(len(variants), 0)
 
+    def test_baf_by_ranges_no_alt_freq_matches_ranges_length(self):
+        """Without an alt_freq column, baf_by_ranges returns one NaN per *range*
+        (not per variant), so callers assigning it as a column don't crash."""
+        varr = vary.VariantArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 5,
+                    "start": np.arange(5) * 100,
+                    "end": np.arange(5) * 100 + 1,
+                    "ref": ["A"] * 5,
+                    "alt": ["G"] * 5,
+                    "zygosity": np.full(5, 0.5),
+                }
+            )
+        )
+        ranges = cnary.CopyNumArray.from_rows(
+            [["chr1", i * 100, i * 100 + 100, "-", 0.0] for i in range(3)],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        baf = varr.baf_by_ranges(ranges)
+        self.assertEqual(len(baf), len(ranges))  # 3, not 5 (the variant count)
+        self.assertTrue(baf.isna().all())
+
     def test_mirrored_baf_all_nan(self):
         """All-NaN frequencies mirror to all-NaN without warning (gh#407).
 
@@ -82,9 +105,7 @@ class VariantArrayTests(unittest.TestCase):
 
     def test_tumor_boost_branches(self):
         # t<n -> 0.5*t/n ; t>=n -> 1 - 0.5*(1-t)/(1-n); equal -> stays
-        out = vary._tumor_boost(
-            np.array([0.3, 0.7, 0.5]), np.array([0.5, 0.5, 0.5])
-        )
+        out = vary._tumor_boost(np.array([0.3, 0.7, 0.5]), np.array([0.5, 0.5, 0.5]))
         np.testing.assert_allclose(out.to_numpy(), [0.3, 0.7, 0.5])
 
     def test_tumor_boost_requires_matched_normal(self):
