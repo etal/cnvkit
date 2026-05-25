@@ -96,8 +96,6 @@ class GaryTests(unittest.TestCase):
                 row_count += len(rows)
             self.assertEqual(row_count, len(cnarr))
 
-    # def test_concat(self):
-
     def test_filter(self):
         """Test sugary selection of a subset of the data array."""
         num_bg_rows = len(self.ex_cnr[self.ex_cnr["gene"] == "Background"])
@@ -246,6 +244,8 @@ class GaryTests(unittest.TestCase):
 
     def test_shuffle_sort(self):
         """Test shuffling and re-sorting the data array."""
+        # NB: GenomicArray.shuffle() seeds its own Generator, so this is
+        # deterministic -- the "order changed" assertion below can't flake.
         orig_cvg = tuple(self.ex_cnr["log2"][:10])
         self.assertEqual(tuple(self.ex_cnr["log2"].to_numpy()[:10]), orig_cvg)
         self.ex_cnr.shuffle()

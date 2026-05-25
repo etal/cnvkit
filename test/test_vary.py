@@ -1,0 +1,125 @@
+#!/usr/bin/env python
+"""Tests for the VariantArray class (cnvlib.vary)."""
+
+import logging
+import math
+import unittest
+import warnings
+
+import pytest
+
+logging.basicConfig(level=logging.ERROR, format="%(message)s")
+
+import numpy as np
+import pandas as pd
+from skgenome import tabio, GenomicArray as GA
+
+import cnvlib
+from cnvlib import (
+    cnary,
+    fix,
+    params,
+    plots,
+    reports,
+    segfilters,
+    segmentation,
+    segmetrics,
+    vary,
+)
+
+
+class VariantArrayTests(unittest.TestCase):
+    """Tests for the VariantArray class."""
+
+    def test_read(self):
+        """Instantiate from a VCF file."""
+        variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
+        self.assertGreater(len(variants), 0)
+
+    def test_mirrored_baf_all_nan(self):
+        """All-NaN frequencies mirror to all-NaN without warning (gh#407).
+
+        np.nanmedian warns 'Mean of empty slice' on an all-NaN slice under
+        older numpy; with pytest's filterwarnings=error that breaks the build
+        (the 3.11-min job). _mirrored_baf must short-circuit before calling
+        .median() on such a slice.
+        """
+        vals = pd.Series([np.nan, np.nan, np.nan])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            out = vary._mirrored_baf(vals)
+        self.assertEqual(len(out), len(vals))
+        self.assertTrue(out.isna().all())
+        # A partially-NaN slice still mirrors normally (median over real values)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            mixed = vary._mirrored_baf(pd.Series([np.nan, 0.2, 0.3]))
+        self.assertTrue(math.isnan(mixed.iloc[0]))
+        # median 0.25 < 0.5 -> below-half branch (0.5 - shift); both already minor
+        self.assertAlmostEqual(mixed.iloc[1], 0.2)
+        self.assertAlmostEqual(mixed.iloc[2], 0.3)
+
+    @staticmethod
+    def _make_varr(**cols):
+        """Build a VariantArray of `chr1` loci from extra-column keyword lists."""
+        n = len(next(iter(cols.values())))
+        base = {
+            "chromosome": ["chr1"] * n,
+            "start": list(range(100, 100 + n * 10, 10)),
+            "end": list(range(101, 101 + n * 10, 10)),
+            "ref": ["A"] * n,
+            "alt": ["G"] * n,
+        }
+        base.update(cols)
+        return vary.VariantArray(pd.DataFrame(base))
+
+    @staticmethod
+    def _one_bin(start, end):
+        return cnary.CopyNumArray.from_rows(
+            [["chr1", start, end, "-", 0.0]],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+
+    def test_tumor_boost_branches(self):
+        # t<n -> 0.5*t/n ; t>=n -> 1 - 0.5*(1-t)/(1-n); equal -> stays
+        out = vary._tumor_boost(
+            np.array([0.3, 0.7, 0.5]), np.array([0.5, 0.5, 0.5])
+        )
+        np.testing.assert_allclose(out.to_numpy(), [0.3, 0.7, 0.5])
+
+    def test_tumor_boost_requires_matched_normal(self):
+        varr = self._make_varr(zygosity=[0.5, 0.5], alt_freq=[0.4, 0.6])
+        with self.assertRaises(ValueError):
+            varr.tumor_boost()
+
+    def test_baf_counts_by_ranges_clamps_alt_count(self):
+        # minor = min(alt, depth-alt); the 20 alt_count is clamped to depth (10)
+        varr = self._make_varr(
+            zygosity=[0.5, 0.5, 0.5],
+            alt_count=[4.0, 6.0, 20.0],
+            depth=[10.0, 10.0, 10.0],
+        )
+        minor, depths = varr.baf_counts_by_ranges(self._one_bin(90, 130))
+        self.assertEqual(int(minor.iloc[0]), 8)  # 4 + 4 + 0
+        self.assertEqual(int(depths.iloc[0]), 30)
+
+    def test_baf_counts_by_ranges_missing_columns(self):
+        varr = self._make_varr(zygosity=[0.5, 0.5])
+        self.assertIsNone(varr.baf_counts_by_ranges(self._one_bin(90, 130)))
+
+    def test_het_frac_by_ranges(self):
+        # 2 of 4 SNVs heterozygous (zygosity not in {0.0, 1.0})
+        varr = self._make_varr(zygosity=[0.5, 0.0, 0.5, 1.0])
+        frac = varr.het_frac_by_ranges(self._one_bin(90, 200))
+        self.assertAlmostEqual(frac.iloc[0], 0.5)
+
+    def test_zygosity_from_freq(self):
+        varr = self._make_varr(alt_freq=[0.0, 0.5, 1.0], zygosity=[0.5, 0.5, 0.5])
+        out = varr.zygosity_from_freq(het_freq=0.25, hom_freq=0.95)
+        self.assertEqual(list(out["zygosity"]), [0.0, 0.5, 1.0])
+        # Original is unmodified (method copies)
+        self.assertEqual(list(varr["zygosity"]), [0.5, 0.5, 0.5])
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
