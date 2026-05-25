@@ -29,6 +29,17 @@ female control samples' X coverage depth is automatically halved so that it
 appears as haploid in the CNVkit pipeline. Chromosome Y is always treated as
 haploid in either case.
 
+When building a reference, each control sample's sex is inferred separately from
+its target and antitarget coverage. These can disagree: antitarget bins on
+chromosome Y are often too sparse to distinguish a male's Y from a female's
+absent Y, which can make a genuinely male sample look female in the antitargets.
+When the two sources conflict, CNVkit no longer simply defers to the antitargets;
+instead it trusts whichever source has the more decisive chromosome-X coverage
+(targets, by default, for capture panels). The status log reports the conflict
+and the chosen source, e.g. ``...looks like male in targets but female in
+antitargets; preferring targets``. You can always bypass inference by passing the
+sample sex explicitly with ``-x``/``--sample-sex``.
+
 Chromosomal sex in calling absolute copy number
 -----------------------------------------------
 
