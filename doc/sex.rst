@@ -153,8 +153,18 @@ Sex-chromosome handling is *only* activated when both an ``X``/``chrX`` and
 a ``Y``/``chrY`` (or just an ``X``/``chrX`` in a clearly arabic-numeral
 genome) are detected in the data. In yeast — where ``chrX`` is the 10th
 chromosome by Roman numeral rather than a sex chromosome —
-sex-chromosome inference is automatically disabled and ``cnvkit.py sex``
-will report no result.
+sex-chromosome inference is automatically disabled. The same applies to
+ZW-sex species (birds, reptiles, butterflies) whose chrZ/chrW are not
+currently recognized, and to any custom assembly that doesn't include an
+X/Y pair. In all these cases:
+
+* ``cnvkit.py sex`` reports the sample as ``Unknown`` with ``NA`` for
+  both log-ratios, rather than silently presenting the safe female
+  default as a positive call.
+* Commands that consume the inference internally (e.g. :ref:`call`,
+  :ref:`diagram`) fall back to the safe female default and the
+  per-sample ``Relative log2 coverage ...`` status line is simply
+  omitted; nothing alarming is logged.
 
 FAQ
 ---

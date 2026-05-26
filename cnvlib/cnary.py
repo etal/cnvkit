@@ -542,10 +542,20 @@ class CopyNumArray(GenomicArray):
 
         chrx = self[self.chr_x_filter(diploid_parx_genome)]
         if not len(chrx):
-            logging.warning(
-                "No %s found in sample; is the input truncated?",
-                self.chr_x_label or "X chromosome",
-            )
+            # No usable chrX rows for inference. Two shapes both land here:
+            # (a) the context-aware classifier
+            # (``skgenome.chromnames.infer_sex_chrom_labels``) returned
+            # ``chr_x_label is None`` -- the assembly has no chrX (yeast
+            # and other Roman-numeral genomes, where ``chrX`` is autosome
+            # 10; ZW-sex species; custom non-human assemblies, #669); and
+            # (b) ``chr_x_label`` is set but the filter still yielded no
+            # rows -- e.g. all chrX bins fall inside PAR under
+            # ``--diploid-parx-genome``, or the data has been pre-filtered
+            # to autosomes only. Both correctly map to "sex inference is
+            # not applicable here"; the honest ``None`` propagates to
+            # ``is_female_default`` at decision consumers. The pre-#669
+            # WARNING ("is the input truncated?") falsely framed the
+            # structurally-correct cases as data corruption.
             return None, {}
 
         auto = self.autosomes(diploid_parx_genome=diploid_parx_genome)
