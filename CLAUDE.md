@@ -105,6 +105,15 @@ All chromosome-name classification goes through `skgenome.chromnames` -- do NOT 
 - `GenomicArray.autosomes()` falls back to returning the whole array (with a warning) when no autosomes are recognized -- be permissive on unfamiliar assemblies rather than silently dropping data.
 - PAR coordinates live in `skgenome.genomebuild`; `cnvlib.params.PSEUDO_AUTSOMAL_REGIONS` is a back-compat re-export.
 
+### Sex inference (compare_sex_chromosomes + is_female_default)
+Per-chromosome maleness is a **ratio of residuals** to the two expected log2 positions: `chrx_male_lr = abs(chrx_ratio + female_shift) / max(abs(chrx_ratio + male_shift), 1e-6)`, and the same shape for chrY. >1 means closer to the male expected position; the 1.0 boundary is the geometric midpoint between expectations, so the decision is threshold-free up to that geometry.
+- chrX shifts follow `is_haploid_x_reference` (the existing `-y` flag): `(female=-1, male=0)` with `-y`, `(female=0, male=+1)` without.
+- chrY female expected position is `params.NULL_LOG2_COVERAGE` (the no-reads sentinel ≈ -20); male expected is autosome-median. This wide separation makes the chrY check a presence/absence detector with a generous margin.
+- Decision is an **AND-gate**: male iff `chrx_male_lr > 1 AND chry_male_lr > 1`. Monotonic toward the safe female default; chrY noise cannot push a diploid-looking chrX to male and vice versa.
+- When chrY data is absent entirely (yeast, female-only reference, panel with no chrY targets), the AND-gate collapses cleanly to `is_male = chrx_male_lr > 1.0`. The strict `>` ties the exact-midpoint case to female.
+- `guess_xx` / `infer_sexes` still return `None` when sex is undeterminable (yeast, autosome-only inputs). The decision-level helper `cnary.is_female_default(guess) -> bool` collapses `None` → `True`; apply it at every consumer that needs a concrete bool. The honest `None` is preserved so the target/antitarget reconciliation in `do_reference` can do its asymmetric chrX-confidence merge (target full call wins unless antitarget chrX is strictly more decisive, then antitarget chrX-only call wins).
+- Do NOT re-introduce a multiplicative `combined_score` or chi-square test statistic; the median is already robust, and a chi-square wrapped around it brings sample-size dependence (.cnr vs .cns inconsistency).
+
 ### File Formats
 - `.cnn` - Coverage/reference data
 - `.cnr` - Copy number ratio data
