@@ -19,6 +19,7 @@ from cnvlib.cnary import CopyNumArray
 from cnvlib import (
     cmdutil,
     cnary,
+    commands,
     fix,
     params,
     plots,
@@ -554,6 +555,80 @@ class CNATests(unittest.TestCase):
             ".cnr-like (many bins) and .cns-like (few segments) with same "
             "chrX/chrY medians must agree on sex (#785).",
         )
+
+    @staticmethod
+    def _make_cna_no_sex_chroms(chrom_names):
+        """Build a small CopyNumArray with the given non-sex chromosome names."""
+        rng = np.random.default_rng(0)
+        rows = []
+        for c in chrom_names:
+            for i in range(20):
+                rows.append(
+                    (c, i * 100, i * 100 + 50, "-", float(rng.normal(0, 0.05)), 1.0)
+                )
+        return CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=["chromosome", "start", "end", "gene", "log2", "weight"],
+            )
+        )
+
+    def test_guess_xx_silent_on_non_human_assembly(self):
+        """No false 'is the input truncated?' warning on a custom genome that
+        legitimately lacks chrX (#669).
+
+        ``infer_sex_chrom_labels`` (in ``skgenome.chromnames``) returns
+        ``(None, None)`` for assemblies with no chrX/chrY (custom non-human
+        genomes; ZW-sex species like birds/reptiles; Roman-numeral genomes
+        like yeast where ``chrX`` is autosome 10). In those cases the
+        ``compare_sex_chromosomes`` short-circuit must return ``(None, {})``
+        *without* the alarmist warning -- the warning's premise (that "no
+        chrX" implies truncated input) predates context-aware sex-chromosome
+        detection.
+        """
+        # Three legitimate "no sex chromosome" shapes; each must return None
+        # silently (no WARNING-level records mentioning truncation).
+        for chrom_names in (
+            ("chrA", "chrB", "chrC"),  # custom non-human / scaffold names
+            ("chrI", "chrII", "chrX"),  # yeast: chrX is autosome 10
+            ("chr1", "chr2", "chrZ", "chrW"),  # ZW species (chickens, reptiles)
+        ):
+            cna = self._make_cna_no_sex_chroms(chrom_names)
+            # Sanity: the context-aware classifier already returns None here.
+            self.assertIsNone(cna.chr_x_label)
+            with self.assertLogs(level="WARNING") as captured:
+                # Force at least one WARNING record so assertLogs doesn't
+                # error; assert that NONE of them are the truncation warning.
+                logging.warning("sentinel")
+                result = cna.guess_xx()
+            self.assertIsNone(result)
+            self.assertFalse(
+                any("truncated" in m for m in captured.output),
+                f"Spurious truncation warning on {chrom_names}: {captured.output}",
+            )
+
+    def test_sex_command_reports_unknown_on_non_human_assembly(self):
+        """``cnvkit.py sex`` (``do_sex``) reports 'Unknown' -- not a misleading
+        'Female' default -- when the assembly lacks sex chromosomes (#669).
+
+        ``compare_sex_chromosomes`` returns ``(None, {})`` for these inputs.
+        The previous report path collapsed ``None`` to 'Female' via Python
+        truthiness, which silently presented the safe-default as a positive
+        inference. The reporting layer should be honest about indeterminacy
+        even though decision consumers (like ``shift_xx``) still collapse
+        ``None`` -> female via ``is_female_default``.
+        """
+        cna = self._make_cna_no_sex_chroms(("chrA", "chrB", "chrC"))
+        cna.meta["filename"] = "fungus.cnr"
+
+        df = commands.do_sex(
+            [cna], is_haploid_x_reference=False, diploid_parx_genome=None
+        )
+        # One row, columns: sample, sex, X_logratio, Y_logratio
+        self.assertEqual(len(df), 1)
+        self.assertEqual(df.iloc[0]["sex"], "Unknown")
+        self.assertEqual(df.iloc[0]["X_logratio"], "NA")
+        self.assertEqual(df.iloc[0]["Y_logratio"], "NA")
 
     def test_residuals(self):
         cnarr = cnvlib.read("formats/amplicon.cnr")
