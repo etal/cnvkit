@@ -296,15 +296,18 @@ class ReferenceTests(unittest.TestCase):
                 n_x=60,
                 n_y=40,
             )
-            # Antitarget chrY: deep, scattered -> looks absent (female-leaning),
-            # even though the antitarget chrX still reads haploid (male). The
-            # empty chrY alone is what flips the combined guess to female.
+            # Antitarget chrY: deep below the NULL_LOG2_COVERAGE-leaning floor
+            # for "absent" (well past the female/male midpoint at log2=-10), so
+            # the chrY maleness gate flips the antitarget call to female even
+            # though the antitarget chrX still reads haploid. This is the
+            # configuration that fooled the pre-#1087 reconciliation into
+            # preferring the antitarget (#846).
             _write_coverage_cnn(
                 anti,
                 chrx_log2=-0.5,
-                chry_log2=-4.0,
+                chry_log2=-15.0,
                 chrx_sd=0.6,
-                chry_sd=2.0,
+                chry_sd=1.5,
                 n_x=40,
                 n_y=80,
             )

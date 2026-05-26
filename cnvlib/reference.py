@@ -300,14 +300,13 @@ def _guess_sexes(
             # reference command still reports inference when it bypasses guess_xx.
             logging.info(
                 "Relative log2 coverage of %s=%.3g, %s=%.3g "
-                "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
+                "(maleness chrX=%.3g, chrY=%.3g) --> assuming %s",
                 cnarr.chr_x_label or "chrX",
                 stats["chrx_ratio"],
                 cnarr.chr_y_label or "chrY",
                 stats["chry_ratio"],
                 stats["chrx_male_lr"],
                 stats["chry_male_lr"],
-                stats["combined_score"],
                 "male" if is_xy else "female",
             )
         guesses[cnarr.sample_id] = (~is_xy, stats["chrx_male_lr"])
