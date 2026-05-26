@@ -120,6 +120,81 @@ class ExportTests(unittest.TestCase):
         gain_idx = int(np.argmax(cns["log2"].to_numpy()))
         self.assertGreater(bed["ncopies"].iloc[gain_idx], 2)
 
+    def test_export_male_chrx_gain_surfaces(self):
+        """A male sample's chrX gain must surface through call/VCF/BED (#883).
+
+        Synthetic male-sample segments built against a female (diploid)
+        reference: neutral male chrX sits at log2=-1, and a true chrX
+        duplication to 2 copies sits at log2=0. The whole point of the
+        sex-aware machinery is that this duplication is a *variant* for a
+        male sample even though cn=2 looks "neutral" on autosomal ploidy.
+
+        Guards two failure modes the original report (#883) and the
+        show/don't-mute principle care about:
+
+        - The `.cns` cn column and `export vcf` (sex-aware) must EMIT the
+          chrX gain. (`ncopies==abs_exp` filter must not falsely drop it.)
+        - `export bed --show variant` must emit it; `--show ploidy` (the
+          default, intentionally sex-agnostic for FreeBayes ``--cnv-map``
+          compatibility) must omit cn==ploidy regions and emit the neutral
+          haploid chrX as cn=1 -- absent-means-default per cnv-map's
+          contract, so a cn=2 region is recoverable as "default ploidy 2".
+        """
+        rows = [
+            ("chr1", 1, 1000, "-", 0.0, 50),  # autosome neutral, cn=2
+            ("chr1", 1000, 2000, "-", 0.58, 50),  # autosome gain, cn=3
+            ("chrX", 1, 1000, "-", -1.0, 50),  # male chrX neutral, cn=1
+            ("chrX", 1000, 2000, "-", 0.0, 50),  # male chrX 1->2 (the gain)
+            ("chrX", 2000, 3000, "-", 1.4, 50),  # male chrX big gain (#883's log2)
+        ]
+        cns = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=["chromosome", "start", "end", "gene", "log2", "probes"],
+            ),
+            {"sample_id": "M1"},
+        )
+        called = call.do_call(
+            cns,
+            method="threshold",
+            is_haploid_x_reference=False,
+            is_sample_female=False,
+        )
+        cn = dict(zip(called["start"].to_numpy(), called["cn"].to_numpy(), strict=True))
+        # do_call's rounding must not collapse a male chrX gain to abs_exp=1.
+        self.assertEqual(cn[1], 1)  # neutral haploid -> cn=1 (abs_exp=1)
+        self.assertGreater(cn[1000], 1)  # 1->2 gain shows
+        self.assertGreater(cn[2000], 1)  # #883's log2=1.4 shows (was reported as cn=1)
+
+        # VCF: sex-aware filter must emit both chrX gains and skip the neutral.
+        _, vcf_body = export.export_vcf(called, 2, False, None, False)
+        body = vcf_body.splitlines()
+        chrx_records = [ln for ln in body if ln.startswith("chrX\t")]
+        chrx_starts = {int(ln.split("\t")[1]) for ln in chrx_records}
+        self.assertIn(1000, chrx_starts)  # the 1->2 gain emitted
+        self.assertIn(2000, chrx_starts)  # the big gain emitted
+        self.assertNotIn(1, chrx_starts)  # neutral haploid NOT emitted
+
+        # BED --show variant: sex-aware, same shape as VCF.
+        bed_variant = export.export_bed(called, 2, False, None, False, "M1", "variant")
+        chrx_variant_starts = set(
+            bed_variant.loc[bed_variant["chromosome"] == "chrX", "start"].to_numpy()
+        )
+        self.assertEqual(chrx_variant_starts, {1000, 2000})
+
+        # BED --show ploidy (default): the cnv-map contract -- skip cn==ploidy(2),
+        # emit raw integer cn for everything else. So the 1->2 chrX gain is
+        # OMITTED (absent <=> default ploidy 2, losslessly recoverable by the
+        # consumer); the neutral haploid chrX is EMITTED as cn=1; the big chrX
+        # gain (cn != 2) is EMITTED.
+        bed_ploidy = export.export_bed(called, 2, False, None, False, "M1", "ploidy")
+        ploidy_rows = {
+            (row.chromosome, row.start): row.ncopies for row in bed_ploidy.itertuples()
+        }
+        self.assertEqual(ploidy_rows.get(("chrX", 1)), 1)  # neutral haploid emitted
+        self.assertNotIn(("chrX", 1000), ploidy_rows)  # cn=2 omitted by contract
+        self.assertGreater(ploidy_rows[("chrX", 2000)], 2)  # big gain emitted
+
     def test_export_vcf_values(self):
         """VCF export emits well-formed, non-degenerate SV records.
 

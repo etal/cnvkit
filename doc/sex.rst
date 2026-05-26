@@ -53,6 +53,14 @@ haploid-X reference, segments on chromosome X with log2-ratio +1 will be treated
 as copy-number-neutral, because that's the expected copy number, while an
 X-chromosome segment with log2-ratio 0 will be treated as a hemizygous loss.
 
+For surfacing chrX/chrY variants in exports, the sex-aware view lives in VCF
+and in BED via ``export bed --show variant``; both filter against the
+sex-aware expected copy number (e.g. 1 on chrX in a male). The BED default
+``--show ploidy`` is sex-agnostic by design (so a male's neutral haploid
+chrX appears as ``cn=1`` rows and a chrX duplication to 2 copies is omitted
+as "default ploidy" -- the format FreeBayes ``--cnv-map`` expects). See
+:ref:`export` for the full rationale.
+
 PAR handling
 ------------
 
