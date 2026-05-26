@@ -415,6 +415,75 @@ class CNATests(unittest.TestCase):
         cna = _make(chrx_ratio=-1.0, chry_ratio=-1.0)
         self.assertIs(cna.guess_xx(verbose=False), np.False_)
 
+    def test_guess_xx_no_chry_data_falls_back_to_chrx_alone(self):
+        """When chrY is entirely absent (e.g. a female reference excluded chrY
+        from the panel, or a target list with no chrY bins), the decision
+        simplifies cleanly to a chrX-only check.
+
+        ``compare_sex_chromosomes`` skips the AND-gate when ``len(chry) == 0``
+        and uses ``is_male = chrx_male_lr > 1.0`` directly, so:
+
+        - Clearly haploid chrX (clear male signal) -> male.
+        - Clearly diploid chrX (clear female signal) -> female.
+        - Borderline chrX sitting exactly at the midpoint between expectations
+          (i.e. chrx_ratio = -0.5 on a diploid-X reference, where chrx_male_lr
+          evaluates to 1.0) -> female, via the strict ``>`` tie-break that
+          encodes "female is the safe default with no positive male evidence".
+
+        This is the female-reference / no-chrY-data shape that motivated the
+        original noisy-bin discussion: the answer is "chrX alone, threshold-free
+        at the same geometric midpoint as the AND-gate path".
+        """
+
+        def _no_y(chrx_ratio, n_x=50):
+            rng = np.random.default_rng(0)
+            rows = []
+            for c in ("chr1", "chr2"):
+                for i in range(200):
+                    rows.append(
+                        (c, i * 100, i * 100 + 50, "-", float(rng.normal(0, 0.05)), 1.0)
+                    )
+            for i in range(n_x):
+                rows.append(
+                    (
+                        "chrX",
+                        i * 100,
+                        i * 100 + 50,
+                        "-",
+                        float(rng.normal(chrx_ratio, 0.05)),
+                        1.0,
+                    )
+                )
+            # Deliberately no chrY rows.
+            return CopyNumArray(
+                pd.DataFrame(
+                    rows,
+                    columns=["chromosome", "start", "end", "gene", "log2", "weight"],
+                )
+            )
+
+        # Female sample on a diploid-X reference, no chrY in the data:
+        # chrX matches autosomes -> chrx_male_lr ~ 0 -> female.
+        cna = _no_y(chrx_ratio=0.0)
+        is_xy, stats = cna.compare_sex_chromosomes(is_haploid_x_reference=False)
+        self.assertFalse(bool(is_xy))
+        self.assertTrue(np.isnan(stats["chry_male_lr"]))
+        self.assertLess(stats["chrx_male_lr"], 1.0)
+
+        # Male sample on the same reference: chrX haploid -> chrx_male_lr >> 1 -> male.
+        cna = _no_y(chrx_ratio=-1.0)
+        is_xy, stats = cna.compare_sex_chromosomes(is_haploid_x_reference=False)
+        self.assertTrue(bool(is_xy))
+        self.assertTrue(np.isnan(stats["chry_male_lr"]))
+        self.assertGreater(stats["chrx_male_lr"], 1.0)
+
+        # Borderline chrX sitting at the midpoint -- the safe-default tie-break
+        # must give female (chrx_male_lr at the boundary is 1.0, and the strict
+        # ``>`` comparison rejects "equal" as evidence of male).
+        cna = _no_y(chrx_ratio=-0.5)
+        is_xy, _ = cna.compare_sex_chromosomes(is_haploid_x_reference=False)
+        self.assertFalse(bool(is_xy))
+
     def test_guess_xx_consistent_between_cnr_and_cns(self):
         """Same chrX/chrY medians must give the same sex call regardless of
         bin/segment count (#785).

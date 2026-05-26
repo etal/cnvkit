@@ -128,6 +128,13 @@ female default. The 1.0 boundary is the midpoint between the two expected
 positions in log-space, so the decision is threshold-free up to that
 geometry.
 
+When no chromosome-Y data is present at all -- for example, a female
+reference profile that excluded chrY from the panel, or a target list with
+no chrY bins -- the AND-gate naturally collapses to a chrX-only check
+(``is_male = chrx_male_lr > 1.0``). The same 1.0 midpoint boundary still
+applies, and the strict inequality means a sample sitting exactly at the
+chrX midpoint ties to female (the safe default).
+
 Non-human and Roman-numeral genomes
 -----------------------------------
 
