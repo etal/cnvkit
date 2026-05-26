@@ -6,13 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
-from scipy.stats import median_test
 
 from skgenome import GenomicArray
 from skgenome.chromnames import infer_sex_chrom_labels
 from skgenome.genomebuild import get_genome_build
 from . import core, descriptives, params, smoothing
-from .segmetrics import segment_mean
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -465,16 +463,18 @@ class CopyNumArray(GenomicArray):
         if is_xy is None:
             return None
         if verbose:
+            # Decision is AND of the two maleness ratios -- show each ratio
+            # separately so the log accurately reflects which axis carried
+            # the call (a multiplicative product would be misleading here).
             logging.info(
                 "Relative log2 coverage of %s=%.3g, %s=%.3g "
-                "(maleness=%.3g x %.3g = %.3g) --> assuming %s",
-                self.chr_x_label,
+                "(maleness chrX=%.3g, chrY=%.3g) --> assuming %s",
+                self.chr_x_label or "chrX",
                 stats["chrx_ratio"],
-                self.chr_y_label,
+                self.chr_y_label or "chrY",
                 stats["chry_ratio"],
                 stats["chrx_male_lr"],
                 stats["chry_male_lr"],
-                stats["chrx_male_lr"] * stats["chry_male_lr"],
                 "male" if is_xy else "female",
             )
         return ~is_xy
@@ -491,24 +491,42 @@ class CopyNumArray(GenomicArray):
     ):
         """Compare coverage ratios of sex chromosomes versus autosomes.
 
-        Perform 4 Mood's median tests of the log2 coverages on chromosomes X and
-        Y, separately shifting for assumed male and female chromosomal sex.
-        Compare the chi-squared values obtained to infer whether the male or
-        female assumption fits the data better.
+        For each sex chromosome, compute a "maleness" ratio that asks how
+        close the observed median log2 ratio (chromosome minus autosomes)
+        sits to the male expectation versus the female expectation. The
+        observed quantity is a *median difference* -- robust to noisy
+        low-coverage bins on its own without further test-statistic
+        machinery -- and the expected positions follow the standard
+        haploid/diploid conventions for chrX (depending on
+        ``is_haploid_x_reference``) and an absent-versus-present convention
+        for chrY (female chrY at ``params.NULL_LOG2_COVERAGE``, male chrY
+        at autosome-median). A ratio > 1 means the male hypothesis fits
+        better; the 1.0 boundary is the midpoint between the two expected
+        positions, so the decision is threshold-free up to that geometry.
+
+        The two ratios combine with an AND-gate: the sample is male only
+        when *both* chrX and chrY independently look more male than female.
+        This is monotonic toward the safe female default (the design
+        principle's "female default when no positive male evidence") and
+        treats chrX and chrY symmetrically rather than letting one
+        multiplicatively dominate the other -- chrY routinely beats chrX
+        by 30-300x in real data, so a multiplicative combination let chrY
+        decide the call (#954) and let representation noise on either axis
+        flip the inference between ``.cnr`` and ``.cns`` (#785).
 
         Parameters
         ----------
         is_haploid_x_reference : bool
             Whether a male reference copy number profile was used to normalize
-            the data. If so, a male sample should have log2 values of 0 on X and
-            Y, and female +1 on X, deep negative (below -3) on Y. Otherwise, a
-            male sample should have log2 values of -1 on X and 0 on
-            Y, and female 0 on X, deep negative (below -3) on Y.
+            the data. If so, a male sample should have log2 values of 0 on X
+            and Y, and female +1 on X, deep negative on Y. Otherwise, a male
+            sample should have log2 values of -1 on X and 0 on Y, and female
+            0 on X, deep negative on Y.
         skip_low : bool
             If True, drop very-low-coverage bins (via `drop_low_coverage`)
             before comparing log2 coverage ratios. Included for completeness,
-            but shouldn't affect the result much since the M-W test is
-            nonparametric and p-values are not used here.
+            but shouldn't affect the result much since the maleness ratios
+            use medians.
 
         Returns
         -------
@@ -516,9 +534,8 @@ class CopyNumArray(GenomicArray):
             True if the sample appears male.
         dict
             Calculated values used for the inference: relative log2 ratios of
-            chromosomes X and Y versus the autosomes; the Mann-Whitney U values
-            from each test; and ratios of U values for male vs. female
-            assumption on chromosomes X and Y.
+            chromosomes X and Y versus the autosomes, and the per-chromosome
+            maleness ratios.
         """
         if not len(self):
             return None, {}
@@ -535,83 +552,69 @@ class CopyNumArray(GenomicArray):
         if skip_low:
             chrx = chrx.drop_low_coverage()
             auto = auto.drop_low_coverage()
-        auto_l = auto["log2"].to_numpy()
         use_weight = "weight" in self
+
+        def _median(values, weights):
+            if use_weight and len(values):
+                return float(descriptives.weighted_median(values, weights))
+            return float(np.median(values))
+
+        auto_l = auto["log2"].to_numpy()
         auto_w = auto["weight"].to_numpy() if use_weight else None
+        auto_med = _median(auto_l, auto_w)
 
-        def compare_to_auto(vals, weights):
-            # Mood's median test stat is chisq -- near 0 for similar median
-            try:
-                stat, _p, _med, cont = median_test(
-                    auto_l, vals, ties="ignore", lambda_="log-likelihood"
-                )
-            except ValueError:
-                # "All values are below the grand median (0.0)"
-                stat = None
-            else:
-                if stat == 0 and 0 in cont:
-                    stat = None
-            # In case Mood's test failed for either sex
-            if use_weight:
-                med_diff = abs(
-                    descriptives.weighted_median(auto_l, auto_w)
-                    - descriptives.weighted_median(vals, weights)
-                )
-            else:
-                med_diff = abs(np.median(auto_l) - np.median(vals))
-            return (stat, med_diff)
+        def _maleness(observed_med, female_shift, male_shift):
+            """Ratio of residuals to the female vs. male expected positions.
 
-        def compare_chrom(vals, weights, female_shift, male_shift):
-            """Calculate "maleness" ratio of test statistics.
-
-            The ratio is of the female vs. male chi-square test statistics from
-            the median test. If the median test fails for either sex, (due to
-            flat/trivial input), use the ratio of the absolute difference in
-            medians.
+            ``female_shift`` / ``male_shift`` are what would be added to a
+            true-female / true-male observation to bring it to the autosome
+            median, so the implied expected positions on the observed log2
+            ratio scale are ``-female_shift`` and ``-male_shift``. Returns
+            ``f_resid / m_resid``; > 1 ⇔ closer to the male expected position.
             """
-            female_stat, f_diff = compare_to_auto(vals + female_shift, weights)
-            male_stat, m_diff = compare_to_auto(vals + male_shift, weights)
-            # Statistic is smaller for similar-median sets
-            if female_stat is not None and male_stat is not None:
-                return female_stat / max(male_stat, 0.01)
-            # Difference in medians is also smaller for similar-median sets
-            return f_diff / max(m_diff, 0.01)
+            ratio = observed_med - auto_med
+            f_resid = abs(ratio + female_shift)
+            m_resid = abs(ratio + male_shift)
+            # Tiny floor so the ratio doesn't explode to inf when an observed
+            # median sits exactly at the male expected position.
+            return f_resid / max(m_resid, 1e-6)
 
+        chrx_l = chrx["log2"].to_numpy()
+        chrx_w = chrx["weight"].to_numpy() if use_weight else None
+        chrx_med = _median(chrx_l, chrx_w)
         female_x_shift, male_x_shift = (-1, 0) if is_haploid_x_reference else (0, +1)
-        chrx_male_lr = compare_chrom(
-            chrx["log2"].to_numpy(),
-            (chrx["weight"].to_numpy() if use_weight else None),
-            female_x_shift,
-            male_x_shift,
-        )
-        combined_score = chrx_male_lr
-        # Similar for chrY if it's present
+        chrx_male_lr = _maleness(chrx_med, female_x_shift, male_x_shift)
+
+        # Female chrY sits at NULL_LOG2_COVERAGE (the no-reads sentinel; that
+        # negation flips it to a positive ``female_shift`` because _maleness
+        # adds the shift to the observed ratio to align it with autosomes).
+        # Male chrY sits at autosome-median (mapping-suppressed) or above. The
+        # wide absence/presence separation makes the chrY maleness check act
+        # as a presence/absence detector while keeping the 1.0 boundary
+        # principled (midpoint between the two expectations).
         chry = self[self.chr_y_filter(diploid_parx_genome)]
+        if skip_low and len(chry):
+            chry = chry.drop_low_coverage()
         if len(chry):
-            if skip_low:
-                chry = chry.drop_low_coverage()
-            chry_male_lr = compare_chrom(
-                chry["log2"].to_numpy(),
-                (chry["weight"].to_numpy() if use_weight else None),
-                +3,
-                0,
-            )
-            if np.isfinite(chry_male_lr):
-                combined_score *= chry_male_lr
+            chry_l = chry["log2"].to_numpy()
+            chry_w = chry["weight"].to_numpy() if use_weight else None
+            chry_med = _median(chry_l, chry_w)
+            chry_male_lr = _maleness(chry_med, -params.NULL_LOG2_COVERAGE, 0.0)
+            is_male = chrx_male_lr > 1.0 and chry_male_lr > 1.0
+            chry_ratio = chry_med - auto_med
         else:
-            # If chrY is missing, don't sabotage the inference
+            # No chrY data at all (or all dropped as low-coverage) -- can't
+            # gate on Y, so fall back to chrX-only, same as the pre-redesign
+            # behavior for this edge case.
             chry_male_lr = np.nan
-        # Relative log2 values, for convenient reporting
-        auto_mean = segment_mean(auto, skip_low=skip_low)
-        chrx_mean = segment_mean(chrx, skip_low=skip_low)
-        chry_mean = segment_mean(chry, skip_low=skip_low)
+            chry_ratio = np.nan
+            is_male = chrx_male_lr > 1.0
+
         return (
-            combined_score > 1.0,
+            np.bool_(is_male),
             dict(
-                chrx_ratio=chrx_mean - auto_mean,
-                chry_ratio=chry_mean - auto_mean,
-                combined_score=combined_score,
-                # For debugging, mainly
+                chrx_ratio=chrx_med - auto_med,
+                chry_ratio=chry_ratio,
                 chrx_male_lr=chrx_male_lr,
                 chry_male_lr=chry_male_lr,
             ),

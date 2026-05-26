@@ -97,6 +97,37 @@ appropriately.
 :ref:`scatter` and :ref:`heatmap` do not adjust the sex chromosomes for sample
 or reference sex.
 
+How sex is inferred from coverage
+---------------------------------
+
+For each input sample, CNVkit computes the difference between the median
+log2 ratio of chromosome X and the median of the autosomes (and the same
+for chromosome Y) and asks, for each chromosome, how close that observed
+difference sits to the male expected position versus the female expected
+position. On chromosome X the two expected positions are determined by
+``-y`` / ``--haploid-x-reference``: a male reference puts male at log2=0
+and female at log2=+1, while the default (diploid X) reference puts male
+at log2=-1 and female at log2=0. On chromosome Y the female expected
+position is the "no reads" sentinel (``NULL_LOG2_COVERAGE = -20``) and the
+male expected position is autosome-median, which makes the chrY check act
+as a wide-margin presence/absence detector.
+
+The two per-chromosome "maleness" ratios are combined with an AND-gate: a
+sample is called male only when *both* chrX and chrY independently look
+more male than female. Female is the safe default when there isn't
+positive evidence on both axes -- this is why a sample whose chrY is
+masked or stripped (e.g. WGS with ``--diploid-parx-genome``) is called
+female on chrX evidence alone only when there's still a Y signal to
+gate on. Each sample's status log line shows both ratios, e.g.::
+
+    Relative log2 coverage of chrX=-1.05, chrY=-21.4
+    (maleness chrX=21, chrY=0.09) --> assuming female
+
+Two ratios above 1.0 are required for male; either below 1.0 keeps the
+female default. The 1.0 boundary is the midpoint between the two expected
+positions in log-space, so the decision is threshold-free up to that
+geometry.
+
 Non-human and Roman-numeral genomes
 -----------------------------------
 

@@ -332,6 +332,160 @@ class CNATests(unittest.TestCase):
         # An explicit override still wins, with no misleading mismatch warning.
         self.assertIs(cmdutil.verify_sample_sex(auto_only, "male", False, None), False)
 
+    def test_guess_xx_y_presence_required_for_male(self):
+        """Without positive chrY evidence, even a haploid-looking chrX defers to female (#954).
+
+        WGS with ``--diploid-parx-genome grch38`` strips chrY to NULL_LOG2_COVERAGE
+        for every sample, so chrY carries no signal. The published log in #954
+        shows female samples whose chrX ratios drifted into the male hemisphere
+        (~ -0.5 to -1.2) getting mis-called male by the old multiplicative
+        combination of chrX and chrY maleness ratios. Per the design principle
+        "Y-presence is the best proxy for the germline baseline", a sample
+        with no detectable chrY should not be called male on chrX noise alone.
+
+        The boundary cases below mirror the actual #954 ratios; ground truth for
+        all of them is female.
+        """
+
+        def _make(chrx_ratio, chry_ratio):
+            # 200 autosome bins around log2=0 (anchors the autosome median),
+            # 50 chrX bins around chrx_ratio, 50 chrY bins around chry_ratio.
+            rng = np.random.default_rng(0)
+            rows = []
+            for c in ("chr1", "chr2"):
+                for i in range(200):
+                    rows.append(
+                        (
+                            c,
+                            i * 1000,
+                            i * 1000 + 100,
+                            "-",
+                            float(rng.normal(0, 0.1)),
+                            1.0,
+                        )
+                    )
+            for i in range(50):
+                rows.append(
+                    (
+                        "chrX",
+                        i * 1000,
+                        i * 1000 + 100,
+                        "-",
+                        float(rng.normal(chrx_ratio, 0.1)),
+                        1.0,
+                    )
+                )
+            for i in range(50):
+                rows.append(
+                    (
+                        "chrY",
+                        i * 1000,
+                        i * 1000 + 100,
+                        "-",
+                        float(rng.normal(chry_ratio, 0.1)),
+                        1.0,
+                    )
+                )
+            return CopyNumArray(
+                pd.DataFrame(
+                    rows,
+                    columns=["chromosome", "start", "end", "gene", "log2", "weight"],
+                )
+            )
+
+        # #954's mis-called samples: chrX between -0.5 and -1.2, chrY effectively
+        # NULL (-21 to -23). All should now be female.
+        for chrx, chry in [
+            (-0.501, -22.0),  # the knife-edge sample in #954
+            (-0.843, -23.1),
+            (-0.838, -22.0),
+            (-1.05, -21.3),
+            (-1.21, -23.3),
+        ]:
+            with self.subTest(chrx=chrx, chry=chry):
+                cna = _make(chrx, chry)
+                self.assertIs(
+                    cna.guess_xx(verbose=False),
+                    np.True_,
+                    f"chrX={chrx} chrY={chry} should be female (no Y evidence)",
+                )
+
+        # Sanity: a sample with a haploid-looking chrX AND real chrY signal
+        # (~ -1, i.e. half-coverage, not the NULL floor) is still confidently male.
+        cna = _make(chrx_ratio=-1.0, chry_ratio=-1.0)
+        self.assertIs(cna.guess_xx(verbose=False), np.False_)
+
+    def test_guess_xx_consistent_between_cnr_and_cns(self):
+        """Same chrX/chrY medians must give the same sex call regardless of
+        bin/segment count (#785).
+
+        The pre-existing Mood's-median-test maleness ratios depended on the
+        chi-square magnitude, which scales with cell counts, so a .cnr with
+        thousands of bins and a .cns with a handful of segments could produce
+        different chrx_male_lr / chry_male_lr for identical chrx_ratio /
+        chry_ratio. The ratio-based maleness uses only the median differences,
+        so identical summaries -> identical sex call.
+        """
+        rng = np.random.default_rng(0)
+
+        def _build(n_auto, n_x, n_y, *, x_log2=-1.03, y_log2=0.236):
+            rows = []
+            for c in ("chr1", "chr2"):
+                for i in range(n_auto):
+                    rows.append(
+                        (
+                            c,
+                            i * 1000,
+                            i * 1000 + 100,
+                            "-",
+                            float(rng.normal(0, 0.05)),
+                            1.0,
+                        )
+                    )
+            for i in range(n_x):
+                rows.append(
+                    (
+                        "chrX",
+                        i * 1000,
+                        i * 1000 + 100,
+                        "-",
+                        float(rng.normal(x_log2, 0.05)),
+                        1.0,
+                    )
+                )
+            for i in range(n_y):
+                rows.append(
+                    (
+                        "chrY",
+                        i * 1000,
+                        i * 1000 + 100,
+                        "-",
+                        float(rng.normal(y_log2, 0.05)),
+                        1.0,
+                    )
+                )
+            return CopyNumArray(
+                pd.DataFrame(
+                    rows,
+                    columns=["chromosome", "start", "end", "gene", "log2", "weight"],
+                )
+            )
+
+        # The "many-bin" view (think .cnr) and the "few-segment" view (think
+        # .cns) of the same sample. With X log2 ~ -1.03 and Y log2 ~ +0.236,
+        # this is the clearly-male case from #785 -- both representations must
+        # agree.
+        cnr_like = _build(n_auto=500, n_x=200, n_y=80)
+        cns_like = _build(n_auto=20, n_x=5, n_y=3)
+        self.assertIs(cnr_like.guess_xx(verbose=False), np.False_)  # male
+        self.assertIs(cns_like.guess_xx(verbose=False), np.False_)  # male
+        self.assertEqual(
+            cnr_like.guess_xx(verbose=False),
+            cns_like.guess_xx(verbose=False),
+            ".cnr-like (many bins) and .cns-like (few segments) with same "
+            "chrX/chrY medians must agree on sex (#785).",
+        )
+
     def test_residuals(self):
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segments = cnvlib.read("formats/amplicon.cns")
