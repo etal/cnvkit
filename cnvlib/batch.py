@@ -24,8 +24,7 @@ from . import (
     segmetrics,
     target,
 )
-from .cmdutil import read_cna
-from .cnary import is_female_default
+from .cmdutil import read_cna, verify_sample_sex
 
 
 def batch_make_reference(
@@ -457,8 +456,15 @@ def batch_run_sample(
     processes: int,
     do_cluster: bool,
     fasta: str | None = None,
+    sample_sex: str | None = None,
 ) -> None:
-    """Run the pipeline on one sample (BAM or bedGraph file)."""
+    """Run the pipeline on one sample (BAM or bedGraph file).
+
+    ``sample_sex``, when given, overrides per-sample sex inference from
+    coverage and is passed through to copy-number calling and (if enabled)
+    diagram plotting; it accepts the same strings as ``--sample-sex`` on
+    the ``call`` / ``diagram`` / ``genemetrics`` subcommands.
+    """
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", sample_fname)
     sample_id = core.fbase(sample_fname)
@@ -486,6 +492,15 @@ def batch_run_sample(
     )
     tabio.write(cnarr, sample_pfx + ".cnr")
 
+    # Resolve per-sample sex once: user-supplied --sample-sex wins, otherwise
+    # infer from chrX/chrY coverage. Used by both do_call invocations below
+    # AND by the diagram path -- previously the do_call calls silently used
+    # ``False`` defaults, so ``batch -y`` produced incorrect chrX cn in
+    # ``.call.cns`` and ``batch -x`` would have been ignored (had it existed).
+    is_sample_female = verify_sample_sex(
+        cnarr, sample_sex, is_haploid_x_reference, diploid_parx_genome
+    )
+
     logging.info("Segmenting %s.cnr ...", sample_pfx)
     segments = segmentation.do_segmentation(
         cnarr,
@@ -509,15 +524,31 @@ def batch_run_sample(
     )
     tabio.write(seg_metrics, sample_pfx + ".cns")
 
-    # Remove likely false-positive breakpoints
-    seg_call = call.do_call(seg_metrics, method="none", filters=["ci"])
+    # Remove likely false-positive breakpoints (the "ci" filter doesn't
+    # touch chrX, so sex args are inert here -- but pass them anyway so the
+    # call site is self-documenting and a future filter that does need them
+    # won't silently miscall chrX).
+    seg_call = call.do_call(
+        seg_metrics,
+        method="none",
+        filters=["ci"],
+        is_haploid_x_reference=is_haploid_x_reference,
+        is_sample_female=is_sample_female,
+        diploid_parx_genome=diploid_parx_genome,
+    )
     # Calculate another segment-level test p-value
     seg_alltest = segmetrics.do_segmetrics(
         cnarr, seg_call, location_stats=["p_ttest"], skip_low=skip_low
     )
     # Finally, assign absolute copy number values to each segment
     seg_alltest.center_all("median", diploid_parx_genome=diploid_parx_genome)
-    seg_final = call.do_call(seg_alltest, method="threshold")
+    seg_final = call.do_call(
+        seg_alltest,
+        method="threshold",
+        is_haploid_x_reference=is_haploid_x_reference,
+        is_sample_female=is_sample_female,
+        diploid_parx_genome=diploid_parx_genome,
+    )
     tabio.write(seg_final, sample_pfx + ".call.cns")
 
     # Test for single-bin CNVs separately
@@ -530,13 +561,17 @@ def batch_run_sample(
         logging.info("Wrote %s-scatter.png", sample_pfx)
 
     if plot_diagram:
-        is_xx = is_female_default(
-            cnarr.guess_xx(is_haploid_x_reference, diploid_parx_genome)
-        )
+        # Reuse the per-sample sex already resolved above (which honors
+        # ``--sample-sex``); previously the diagram path ran ``guess_xx``
+        # again, ignoring the user's override.
         outfname = sample_pfx + "-diagram.pdf"
         diagram.create_diagram(
-            cnarr.shift_xx(is_haploid_x_reference, is_xx, diploid_parx_genome),
-            seg_final.shift_xx(is_haploid_x_reference, is_xx, diploid_parx_genome),
+            cnarr.shift_xx(
+                is_haploid_x_reference, is_sample_female, diploid_parx_genome
+            ),
+            seg_final.shift_xx(
+                is_haploid_x_reference, is_sample_female, diploid_parx_genome
+            ),
             0.5,
             3,
             outfname,

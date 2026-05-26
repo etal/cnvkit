@@ -230,6 +230,98 @@ class BatchTests(unittest.TestCase):
             # The error message should mention duplicates
             self.assertIn("Duplicated genomic coordinates", str(ctx.exception))
 
+    def test_batch_accepts_sample_sex_arg(self):
+        """``cnvkit.py batch`` accepts ``-x/--sample-sex`` (#500, #635).
+
+        Users running the full pipeline via ``batch`` need a way to override
+        the auto-inferred sex when the inference goes wrong on their data,
+        without having to hand-build the equivalent multi-step pipeline.
+        The ``call``/``diagram``/``export`` commands have always accepted
+        ``--sample-sex``; ``batch`` was the documented gap.
+        """
+        args = commands.AP.parse_args(
+            [
+                "batch",
+                "dummy.bam",
+                "-r",
+                "dummy.cnn",
+                "-d",
+                "outdir",
+                "-x",
+                "female",
+            ]
+        )
+        self.assertEqual(args.sample_sex, "female")
+        # Long form also resolves to sample_sex. (The legacy ``-g/--gender``
+        # alias supplied by ``add_sample_sex`` elsewhere is deliberately
+        # omitted on batch because ``-g`` is already taken by ``--access``.)
+        args2 = commands.AP.parse_args(
+            [
+                "batch",
+                "dummy.bam",
+                "-r",
+                "dummy.cnn",
+                "-d",
+                "outdir",
+                "--sample-sex",
+                "male",
+            ]
+        )
+        self.assertEqual(args2.sample_sex, "male")
+
+    def test_batch_run_sample_propagates_sex_to_do_call(self):
+        """``batch_run_sample`` must pass ``is_haploid_x_reference`` AND
+        ``is_sample_female`` to every ``call.do_call`` invocation, not silently
+        fall through to ``do_call``'s ``False/False`` defaults.
+
+        Previously the ``do_call`` calls inside ``batch_run_sample`` used the
+        function defaults regardless of ``batch -y``, so ``.call.cns`` chrX
+        cn values were computed against a diploid-X reference even when the
+        user built a male reference (normal female chrX at log2 ~ +1 was
+        called as GAIN). The fix consolidates the per-sample sex decision
+        via ``verify_sample_sex`` and passes the result explicitly to both
+        ``do_call`` calls and the diagram path.
+
+        AST-level guard so source rearrangements still catch the regression
+        cleanly without needing a full BAM fixture per case.
+        """
+        import ast
+        import inspect
+
+        src = inspect.getsource(batch.batch_run_sample)
+        tree = ast.parse(src)
+        do_call_invocations = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "do_call"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "call"
+            ):
+                do_call_invocations.append(node)
+        self.assertGreater(
+            len(do_call_invocations),
+            0,
+            "Expected at least one call.do_call() invocation in batch_run_sample",
+        )
+        for inv in do_call_invocations:
+            kw_names = {kw.arg for kw in inv.keywords}
+            self.assertIn(
+                "is_haploid_x_reference",
+                kw_names,
+                "call.do_call inside batch_run_sample must pass "
+                "is_haploid_x_reference explicitly (#500/#635-adjacent latent bug).",
+            )
+            self.assertIn(
+                "is_sample_female",
+                kw_names,
+                "call.do_call inside batch_run_sample must pass "
+                "is_sample_female explicitly so batch -x is honored.",
+            )
+
     @pytest.mark.slow
     def test_diploid_parx_genome(self):
         genome_build = "grch37"

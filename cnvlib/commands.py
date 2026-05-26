@@ -118,6 +118,9 @@ def add_haploid_x_reference(P: argparse._ActionsContainer) -> None:
     )
 
 
+_SAMPLE_SEX_CHOICES = ("m", "y", "male", "Male", "f", "x", "female", "Female")
+
+
 def add_sample_sex(P: argparse._ActionsContainer) -> None:
     P.add_argument(
         "-x",
@@ -125,7 +128,7 @@ def add_sample_sex(P: argparse._ActionsContainer) -> None:
         "-g",
         "--gender",
         dest="sample_sex",
-        choices=("m", "y", "male", "Male", "f", "x", "female", "Female"),
+        choices=_SAMPLE_SEX_CHOICES,
         help="""Specify the sample's chromosomal sex as male or female. (Otherwise
                 guessed from X and Y coverage).""",
     )
@@ -323,6 +326,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     procs_per_sample,
                     args.cluster,
                     args.fasta,
+                    args.sample_sex,
                 )
                 futures.append((bam, future))
             # Wait for all tasks to complete and raise any exceptions
@@ -370,6 +374,18 @@ P_batch.add_argument(
     help="""Method used in the 'segment' step. [Default: %(default)s]""",
 )
 add_haploid_x_reference(P_batch)
+# ``-g`` on batch is already taken by ``--access`` (see below); register
+# only the long form here. The legacy ``-g/--gender`` aliases supplied by
+# ``add_sample_sex`` are intentionally omitted on this subcommand.
+P_batch.add_argument(
+    "-x",
+    "--sample-sex",
+    dest="sample_sex",
+    choices=_SAMPLE_SEX_CHOICES,
+    help="""Specify the sample's chromosomal sex as male or female; passed
+            through to copy-number calling and (if --diagram is set) to the
+            diagram. Otherwise inferred from chrX/chrY coverage.""",
+)
 P_batch.add_argument(
     "-c",
     "--count-reads",
