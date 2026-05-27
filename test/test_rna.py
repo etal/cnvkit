@@ -3,6 +3,7 @@
 
 import logging
 import unittest
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -123,6 +124,41 @@ class RNAImportTests(unittest.TestCase):
 
         error_msg = str(cm.exception)
         self.assertIn("All genes have invalid transcript lengths", error_msg)
+
+    def test_align_gene_info_zero_spread_cohort(self):
+        """Degenerate cohort (uniform counts across samples) yields uniform weights without a RuntimeWarning.
+
+        Regression for the divide-by-zero at ``weight / weight.max()``: when every
+        sample has identical counts, ``gene_spreads = std(axis=1)`` collapses to
+        zero, so ``gmean(weights)`` is all-zero and ``weight.max() == 0`` would
+        produce ``0 / 0`` → NaN with ``RuntimeWarning: invalid value encountered
+        in divide``. The guard must short-circuit to uniform 1.0 weights.
+        """
+        uniform_counts = pd.DataFrame(
+            {
+                "sample1": [100, 200, 50, 150, 75],
+                "sample2": [100, 200, 50, 150, 75],
+                "sample3": [100, 200, 50, 150, 75],
+            },
+            index=[
+                "ENSG00000001",
+                "ENSG00000002",
+                "ENSG00000003",
+                "ENSG00000004",
+                "ENSG00000005",
+            ],
+        )
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            result_gi, _result_sc, _result_log2 = rna.align_gene_info_to_samples(
+                self.gene_info, uniform_counts, self.tx_lengths, normal_ids=[]
+            )
+
+        # No NaN weights, and the degenerate case falls back to uniform 1.0.
+        self.assertFalse(result_gi["weight"].isna().any())
+        self.assertTrue(np.isfinite(result_gi["weight"]).all())
+        self.assertTrue((result_gi["weight"] == 1.0).all())
 
     def test_normalize_read_depths_empty(self):
         """Test error when sample depths are empty."""
