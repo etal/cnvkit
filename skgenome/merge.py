@@ -118,10 +118,7 @@ def merge(
     gap_sizes = table.start.to_numpy()[1:] - table.end.cummax().to_numpy()[:-1]
     if (gap_sizes > -bp).all():
         return _fill_unnamed(table, cmb)
-    if stranded:
-        groupkey = ["chromosome", "strand"]
-    else:
-        groupkey = ["chromosome"]
+    groupkey = ["chromosome", "strand"] if stranded else ["chromosome"]
     table = table.sort_values([*groupkey, "start", "end"])
     min_dist = max(0, -bp)
     on = ["strand"] if stranded else None

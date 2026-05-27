@@ -1,17 +1,20 @@
 """Functions reused within command-line implementations."""
 
 from __future__ import annotations
+
 import logging
 import sys
+from typing import TYPE_CHECKING
 
 import numpy as np
 
+from skgenome import GenomicArray as GA
 from skgenome import tabio
 from skgenome.chromnames import infer_sex_chrom_labels
 
-from .cnary import CopyNumArray as CNA, is_female_default
-from skgenome import GenomicArray as GA
-from typing import TYPE_CHECKING
+from .cnary import CopyNumArray as CNA
+from .cnary import is_female_default
+from .vary import chrx_het_density_rejects_haploid
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -187,8 +190,6 @@ def verify_sample_sex(
         # Coverage-based call stays untouched when the test isn't decisive,
         # so this is a one-way upgrade toward female (the safe direction
         # for #360-family indeterminacy).
-        from .vary import chrx_het_density_rejects_haploid
-
         n_total = variants.meta.get("chrx_snp_total", 0)
         n_het = variants.meta.get("chrx_het_count", 0)
         rejected, p_value = chrx_het_density_rejects_haploid(n_total, n_het)

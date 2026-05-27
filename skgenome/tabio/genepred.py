@@ -17,8 +17,10 @@ See:
 """
 
 from __future__ import annotations
-import pandas as pd
+
 from typing import TYPE_CHECKING, NoReturn
+
+import pandas as pd
 
 if TYPE_CHECKING:
     from pandas.core.frame import DataFrame
@@ -172,7 +174,7 @@ def read_refflat(infile: str, cds: bool = False, exons: bool = False) -> DataFra
         na_filter=False,
         names=colnames,
         usecols=usecols,
-        dtype={c: str for c in cols_shared},
+        dtype=dict.fromkeys(cols_shared, str),
         converters=converters,
     )
 

@@ -1,6 +1,7 @@
 """I/O for tabular formats of genomic data (regions or features)."""
 
 from __future__ import annotations
+
 import collections
 import contextlib
 import logging
@@ -28,10 +29,11 @@ from . import (
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from cnvlib.cnary import CopyNumArray
-    from cnvlib.vary import VariantArray
     from io import TextIOWrapper
     from tempfile import _TemporaryFileWrapper
+
+    from cnvlib.cnary import CopyNumArray
+    from cnvlib.vary import VariantArray
 
 
 def read(
@@ -72,7 +74,9 @@ def read(
         The data from the given file instantiated as `into`, if specified, or
         the default base class for the given file format (usually GenomicArray).
     """
-    from cnvlib.core import fbase
+    # lazy: skgenome -> cnvlib is a layer inversion; importing at module top
+    # creates a circular import. See skgenome package boundary in CLAUDE.md.
+    from cnvlib.core import fbase  # noqa: PLC0415
 
     if fmt == "auto":
         return read_auto(infile)
@@ -105,7 +109,8 @@ def read(
         logging.info("Blank %s file?: %s", fmt, infile)
         dframe = []
     if fmt == "vcf":
-        from cnvlib.vary import VariantArray as VA
+        # lazy: skgenome -> cnvlib is a layer inversion; see note in read() above.
+        from cnvlib.vary import VariantArray as VA  # noqa: PLC0415
 
         suggest_into = VA  # type: ignore[assignment]
     result = (into or suggest_into)(dframe, meta)
@@ -268,7 +273,7 @@ def sniff_region_format(infile: str) -> str | None:
             if not line.strip():
                 # Skip blank lines
                 continue
-            if line.startswith("track") or line.startswith("browser "):
+            if line.startswith(("track", "browser ")):
                 # NB: Could be UCSC BED or Ensembl GFF
                 # has_track = True
                 continue

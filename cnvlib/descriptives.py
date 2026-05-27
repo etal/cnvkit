@@ -7,6 +7,7 @@ See:
 """
 
 from __future__ import annotations
+
 import sys
 from functools import wraps
 from typing import TYPE_CHECKING
@@ -16,6 +17,7 @@ from scipy import stats
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
     from numpy import float64, ndarray
 
 
@@ -308,10 +310,7 @@ def q_n(a):
 
     """
     # First quartile of: (|x_i - x_j|: i < j)
-    vals = []
-    for i, x_i in enumerate(a):
-        for x_j in a[i + 1 :]:
-            vals.append(abs(x_i - x_j))
+    vals = [abs(x_i - x_j) for i, x_i in enumerate(a) for x_j in a[i + 1 :]]
     quartile = np.percentile(vals, 25)
 
     # Cn: a scaling factor determined by sample size

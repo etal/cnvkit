@@ -1,19 +1,21 @@
 """Call copy number variants from segmented log2 ratios."""
 
 from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from . import segfilters
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from cnvlib.cnary import CopyNumArray
-    from cnvlib.vary import VariantArray
     from numpy import ndarray
     from pandas.core.frame import DataFrame
     from pandas.core.series import Series
+
+    from cnvlib.cnary import CopyNumArray
+    from cnvlib.vary import VariantArray
 
 # Filters/merges applied before copy number calling (operate on log2 values)
 PRE_CN_FILTERS = ("ci", "sem")

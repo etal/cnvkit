@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from typing import Any, Self, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Self
 
 import bioframe
 import numpy as np
@@ -18,19 +18,20 @@ from .chromnames import (
 )
 from .chromsort import sorter_chrom
 from .cut import cut
-from .intersect import by_ranges, into_ranges, iter_ranges, iter_slices, Numeric
+from .intersect import Numeric, by_ranges, into_ranges, iter_ranges, iter_slices
 
 _BF_COLS = ("chromosome", "start", "end")
 from .merge import flatten, merge, squash
 from .rangelabel import to_label
-from .subtract import subtract
 from .subdivide import subdivide
+from .subtract import subtract
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 
-    from cnvlib.cnary import CopyNumArray
     from numpy import ndarray
+
+    from cnvlib.cnary import CopyNumArray
 
 
 class GenomicArray:
@@ -703,10 +704,9 @@ class GenomicArray:
 
     def sort_columns(self) -> None:
         """Sort this array's columns in-place, per class definition."""
-        extra_cols = []
-        for col in self.data.columns:
-            if col not in self._required_columns:
-                extra_cols.append(col)
+        extra_cols = [
+            col for col in self.data.columns if col not in self._required_columns
+        ]
         sorted_colnames = list(self._required_columns) + sorted(extra_cols)
         assert len(sorted_colnames) == len(self.data.columns)
         self.data = self.data.reindex(columns=sorted_colnames)

@@ -1,6 +1,7 @@
 """Export CNVkit objects and files to other formats."""
 
 from __future__ import annotations
+
 import logging
 import time
 from collections import OrderedDict as OD
@@ -8,18 +9,21 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+
 from skgenome import tabio
 from skgenome.chromnames import detect_chr_prefix
 
 from . import call
-from .cmdutil import read_cna
 from ._version import __version__
+from .cmdutil import read_cna
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from numpy import ndarray
+
     from cnvlib.cnary import CopyNumArray
     from cnvlib.vary import VariantArray
-    from numpy import ndarray
 
 
 def merge_samples(filenames: list[str]) -> pd.DataFrame:

@@ -12,7 +12,6 @@ logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import numpy as np
 import pandas as pd
-from skgenome import tabio, GenomicArray as GA
 
 import cnvlib
 from cnvlib import (
@@ -26,6 +25,8 @@ from cnvlib import (
     segmetrics,
     vary,
 )
+from skgenome import GenomicArray as GA
+from skgenome import tabio
 
 
 class VariantArrayTests(unittest.TestCase):

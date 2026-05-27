@@ -22,8 +22,8 @@ import logging
 import sys
 from contextlib import nullcontext
 
-from ..cmdutil import read_cna
 from ..call import do_call
+from ..cmdutil import read_cna
 
 
 def argument_parsing():

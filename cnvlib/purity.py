@@ -152,10 +152,11 @@ def _score_grid(
         # BAF expected values depend only on purity, not ploidy -- compute once
         baf_score = 0.0
         if baf_kde is not None:
-            baf_points = []
-            for total_cn in cn_states[cn_states >= 1]:
-                for minor in range(total_cn // 2 + 1):
-                    baf_points.append(_expected_baf(minor, total_cn, purity))
+            baf_points = [
+                _expected_baf(minor, total_cn, purity)
+                for total_cn in cn_states[cn_states >= 1]
+                for minor in range(total_cn // 2 + 1)
+            ]
             baf_score = float(np.sum(baf_kde(baf_points)))
 
         for ploidy in ploidies:

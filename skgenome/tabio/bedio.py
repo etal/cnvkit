@@ -1,13 +1,14 @@
 """I/O for UCSC Browser Extensible Data (BED)."""
 
 from __future__ import annotations
+
 import shlex
+from typing import TYPE_CHECKING
 
 import pandas as pd
 from Bio.File import as_handle
 
 from .util import report_bad_line
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pandas.core.frame import DataFrame

@@ -1,6 +1,7 @@
 """Plotting utilities."""
 
 from __future__ import annotations
+
 import collections
 import itertools
 import logging
@@ -9,12 +10,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from skgenome.rangelabel import unpack_range, Region
+from skgenome.rangelabel import Region, unpack_range
+
 from . import core, params
 
 if TYPE_CHECKING:
-    from cnvlib.cnary import CopyNumArray
     from matplotlib.axes._axes import Axes
+
+    from cnvlib.cnary import CopyNumArray
 
 
 MB = 1e-6  # To rescale from bases to megabases

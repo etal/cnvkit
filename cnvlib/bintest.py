@@ -1,18 +1,20 @@
 """Z-test for single-bin copy number alterations."""
 
 from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
 from . import params, segfilters
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from cnvlib.cnary import CopyNumArray
     from numpy import ndarray
+
+    from cnvlib.cnary import CopyNumArray
 
 
 def do_bintest(
@@ -83,9 +85,7 @@ def do_bintest(
     cnarr["p_bintest"] = z_prob(cnarr)
     is_sig = cnarr["p_bintest"] < alpha
     logging.info(
-        "Significant hits in {}/{} bins ({:.3g}%)".format(
-            is_sig.sum(), len(is_sig), 100 * is_sig.sum() / len(is_sig)
-        )
+        f"Significant hits in {is_sig.sum()}/{len(is_sig)} bins ({100 * is_sig.sum() / len(is_sig):.3g}%)"
     )
     # if segments:
     #     return spike_into_segments(cnarr, segments, is_sig)

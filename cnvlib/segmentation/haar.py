@@ -22,6 +22,7 @@ segmentation result.
 """
 
 from __future__ import annotations
+
 import logging
 import math
 from typing import TYPE_CHECKING
@@ -31,9 +32,10 @@ import pandas as pd
 from scipy import stats
 
 if TYPE_CHECKING:
+    from numpy import float64, ndarray
+
     from cnvlib.cnary import CopyNumArray
     from cnvlib.vary import VariantArray
-    from numpy import float64, ndarray
 
 # Lower bound for the wavelet-coefficient noise estimate, so a degenerate
 # (all-flat / quantized) signal can't drive it to exactly 0 and break the FDR

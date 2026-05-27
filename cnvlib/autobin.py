@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 
 import numpy as np
 import pandas as pd
-from skgenome import tabio, GenomicArray as GA
+
+from skgenome import GenomicArray as GA
+from skgenome import tabio
 
 from . import coverage, samutil
 from .antitarget import compare_chrom_names

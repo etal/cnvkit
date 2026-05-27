@@ -43,14 +43,6 @@ class FDRThresTests(unittest.TestCase):
         """FDRThres p-values match R's pnorm(x, 0, stdev) * 2."""
         # Reference: In R, two-tailed p-value is 2 * pnorm(-abs(x), 0, sd)
         # or equivalently 2 * (1 - pnorm(abs(x), 0, sd))
-        stdev = 0.5
-        x_vals = np.array([1.0, 0.8, 0.6, 0.4, 0.2])
-
-        # Compute expected p-values the way R would
-        expected_p = 2 * (1 - stats.norm.cdf(np.abs(x_vals), loc=0, scale=stdev))
-
-        # For q=1.0, all should pass, so threshold should be min
-        # We verify the p-value calculation is correct by checking specific values
         # At x=1.0, stdev=0.5: p = 2*(1 - Phi(2)) ≈ 0.0455
         p_at_1 = 2 * (1 - stats.norm.cdf(1.0, loc=0, scale=0.5))
         assert_allclose(p_at_1, 0.0455, atol=0.001)
@@ -130,8 +122,10 @@ class HaarConvTests(unittest.TestCase):
         # With uniform weights, results should be similar in shape
         # (but not identical due to different normalization)
         self.assertEqual(len(result_weighted), len(signal))
+        self.assertEqual(len(result_unweighted), len(signal))
         # Both should detect the step
         self.assertGreater(np.abs(result_weighted).max(), 0)
+        self.assertGreater(np.abs(result_unweighted).max(), 0)
 
 
 class PulseConvTests(unittest.TestCase):

@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 
 from skgenome.rangelabel import unpack_range
+
 from . import plots
 
 

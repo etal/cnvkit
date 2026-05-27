@@ -6,8 +6,10 @@ import logging
 
 from skgenome import GenomicArray as GA
 from skgenome.chromnames import is_alternative_contig, is_mitochondrial
+from skgenome.chromsort import detect_big_chroms
 
-from .params import INSERT_SIZE, MIN_REF_COVERAGE, ANTITARGET_NAME
+from .params import ANTITARGET_NAME, INSERT_SIZE, MIN_REF_COVERAGE
+from .plots import chromosome_sizes
 
 
 def _is_canonical_for_antitarget(name: str) -> bool:
@@ -162,9 +164,6 @@ def _drop_short_contigs(garr: GA) -> GA:
     Cutoff is where a contig is less than half the size of the next-shortest
     contig.
     """
-    from .plots import chromosome_sizes
-    from skgenome.chromsort import detect_big_chroms
-
     chrom_sizes = chromosome_sizes(garr)  # type: ignore[arg-type]
     n_big, thresh = detect_big_chroms(chrom_sizes.values())
     chrom_names_to_keep = {c for c, s in chrom_sizes.items() if s >= thresh}

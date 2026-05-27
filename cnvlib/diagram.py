@@ -6,6 +6,7 @@ CNVkit will run without it. (And also to keep the codebase tidy.)
 """
 
 from __future__ import annotations
+
 import collections
 import math
 import warnings
@@ -22,11 +23,13 @@ from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
 from skgenome.rangelabel import unpack_range
+
 from . import params, plots, reports
 
 if TYPE_CHECKING:
-    from cnvlib.cnary import CopyNumArray
     from reportlab.graphics.shapes import Drawing
+
+    from cnvlib.cnary import CopyNumArray
 
 TELOMERE_LENGTH = 6e6  # For illustration only
 CHROM_FATNESS = 0.3

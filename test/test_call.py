@@ -16,10 +16,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from skgenome import tabio, GenomicArray as GA
+from conftest import linecount
 
 import cnvlib
-from conftest import linecount
 from cnvlib import (
     access,
     antitarget,
@@ -53,6 +52,8 @@ from cnvlib import (
     smoothing,
     vary,
 )
+from skgenome import GenomicArray as GA
+from skgenome import tabio
 
 
 class CallTests(unittest.TestCase):
@@ -780,37 +781,36 @@ class VerifySampleSexHetConfirmerTests(unittest.TestCase):
     def _make_male_cnarr(self):
         """Build a tiny .cnr that the coverage inference will call male."""
         rng = np.random.default_rng(0)
-        rows = []
         # 200 autosome bins centered on log2=0
-        for c in ("chr1", "chr2"):
-            for i in range(100):
-                rows.append(
-                    (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
-                )
+        rows = [
+            (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+            for c in ("chr1", "chr2")
+            for i in range(100)
+        ]
         # 50 chrX bins at log2 ~ -1 (haploid-X relative to a diploid-X reference)
-        for i in range(50):
-            rows.append(
-                (
-                    "chrX",
-                    i * 1000,
-                    i * 1000 + 100,
-                    "-",
-                    float(rng.normal(-1.0, 0.05)),
-                    1.0,
-                )
+        rows.extend(
+            (
+                "chrX",
+                i * 1000,
+                i * 1000 + 100,
+                "-",
+                float(rng.normal(-1.0, 0.05)),
+                1.0,
             )
+            for i in range(50)
+        )
         # 30 chrY bins around log2=0 (presence, autosome-like = male)
-        for i in range(30):
-            rows.append(
-                (
-                    "chrY",
-                    i * 1000,
-                    i * 1000 + 100,
-                    "-",
-                    float(rng.normal(0.0, 0.05)),
-                    1.0,
-                )
+        rows.extend(
+            (
+                "chrY",
+                i * 1000,
+                i * 1000 + 100,
+                "-",
+                float(rng.normal(0.0, 0.05)),
+                1.0,
             )
+            for i in range(30)
+        )
         return cnary.CopyNumArray(
             pd.DataFrame(
                 rows,
@@ -898,13 +898,12 @@ class VerifySampleSexHetConfirmerTests(unittest.TestCase):
         unfamiliar assemblies.
         """
         rng = np.random.default_rng(0)
-        rows = []
         # Autosome-only (custom non-human assembly)
-        for c in ("chrA", "chrB"):
-            for i in range(50):
-                rows.append(
-                    (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
-                )
+        rows = [
+            (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+            for c in ("chrA", "chrB")
+            for i in range(50)
+        ]
         cnarr = cnary.CopyNumArray(
             pd.DataFrame(
                 rows,
@@ -933,16 +932,15 @@ class VerifySampleSexHetConfirmerTests(unittest.TestCase):
         """If coverage already says female, the confirmer doesn't run / matter."""
         # A female-coverage fixture: chrX at autosome median, chrY missing.
         rng = np.random.default_rng(0)
-        rows = []
-        for c in ("chr1", "chr2"):
-            for i in range(100):
-                rows.append(
-                    (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
-                )
-        for i in range(50):
-            rows.append(
-                ("chrX", i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
-            )
+        rows = [
+            (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+            for c in ("chr1", "chr2")
+            for i in range(100)
+        ]
+        rows.extend(
+            ("chrX", i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+            for i in range(50)
+        )
         cnarr = cnary.CopyNumArray(
             pd.DataFrame(
                 rows,

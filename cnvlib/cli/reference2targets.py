@@ -13,8 +13,9 @@ are correct.
 import argparse
 import logging
 
-from .. import reference, read
 from skgenome import tabio
+
+from .. import read, reference
 
 
 def argument_parsing():

@@ -6,6 +6,7 @@ import logging
 import sys
 
 from skgenome import tabio
+
 from ..cmdutil import read_cna
 
 

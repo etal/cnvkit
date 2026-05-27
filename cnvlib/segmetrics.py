@@ -1,7 +1,9 @@
 """Robust metrics to evaluate performance of copy number estimates."""
 
 from __future__ import annotations
+
 import logging
+import warnings
 from typing import TYPE_CHECKING, Any
 
 # import pandas as pd
@@ -11,11 +13,12 @@ from scipy import stats
 from . import descriptives
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from collections.abc import Iterator
-    from cnvlib.cnary import CopyNumArray
+    from collections.abc import Callable, Iterator
+
     from numpy import float64, ndarray
     from pandas.core.series import Series
+
+    from cnvlib.cnary import CopyNumArray
 
 
 def do_segmetrics(
@@ -65,8 +68,6 @@ def do_segmetrics(
         Segmented data with additional statistical columns.
     """
     # Silence sem's "Degrees of freedom <= 0 for slice"; NaN is OK
-    import warnings
-
     warnings.simplefilter("ignore", RuntimeWarning)
 
     stat_funcs = {
@@ -217,12 +218,9 @@ def confidence_interval_bootstrap(
     if k < 2:
         return np.repeat(values[0], 2)
 
-    # Determine whether to use smoothed bootstrap
-    if isinstance(smoothed, bool):
-        use_smoothing = smoothed
-    else:
-        # smoothed is a threshold (integer)
-        use_smoothing = k <= smoothed
+    # Determine whether to use smoothed bootstrap.
+    # If `smoothed` is a bool, use it directly; if an int threshold, use it when k <= threshold.
+    use_smoothing = smoothed if isinstance(smoothed, bool) else k <= smoothed
 
     rng = np.random.default_rng(0xA5EED)
     rand_indices = rng.integers(0, k, size=(bootstraps, k))

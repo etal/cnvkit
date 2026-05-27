@@ -16,10 +16,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from skgenome import tabio, GenomicArray as GA
+from conftest import linecount
 
 import cnvlib
-from conftest import linecount
 from cnvlib import (
     access,
     antitarget,
@@ -54,6 +53,8 @@ from cnvlib import (
     smoothing,
     vary,
 )
+from skgenome import GenomicArray as GA
+from skgenome import tabio
 
 
 class PlotTests(unittest.TestCase):
@@ -72,7 +73,8 @@ class PlotTests(unittest.TestCase):
     def test_scatter_genome_y_floor(self):
         """Genome-wide autoscale floors y_min so a single deep homozygous
         deletion can't compress the whole plot (gh#385)."""
-        from matplotlib import pyplot
+        # lazy: defer matplotlib import to keep headless test collection fast
+        from matplotlib import pyplot  # noqa: PLC0415
 
         probes = cnary.CopyNumArray.from_rows(
             [

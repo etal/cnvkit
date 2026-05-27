@@ -23,7 +23,7 @@ ANTITARGET_ALIASES = (ANTITARGET_NAME, "Background")
 # imports them from cnvlib.params. Inner coordinate values are returned
 # as mutable lists (matching the historical type) so any caller that
 # treated them as such continues to work.
-from skgenome.genomebuild import REGISTERED_BUILDS as _REGISTERED_BUILDS  # noqa: E402
+from skgenome.genomebuild import REGISTERED_BUILDS as _REGISTERED_BUILDS
 
 PSEUDO_AUTSOMAL_REGIONS = {
     name: {region: list(coords) for region, coords in b.par_regions.items()}

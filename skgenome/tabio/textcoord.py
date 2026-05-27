@@ -4,6 +4,7 @@ import pandas as pd
 from Bio.File import as_handle
 
 from skgenome.rangelabel import from_label, to_label
+
 from .util import report_bad_line
 
 

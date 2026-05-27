@@ -1,10 +1,12 @@
 """An array of genomic intervals, treated as variant loci."""
 
 from __future__ import annotations
+
 import logging
 
 import numpy as np
 import pandas as pd
+
 from skgenome import GenomicArray
 
 
@@ -277,7 +279,7 @@ def chrx_het_density_rejects_haploid(
         return False, None
     # Imported locally so that callers that never touch sex inference don't
     # pay the scipy import cost.
-    from scipy.stats import binom
+    from scipy.stats import binom  # noqa: PLC0415
 
     # binom.sf(k-1, n, p) = P(X >= k | n, p); a small value means the
     # observation is unlikely under haploid X, so we reject the null.

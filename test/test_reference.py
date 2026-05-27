@@ -16,10 +16,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from skgenome import tabio, GenomicArray as GA
+from conftest import linecount
 
 import cnvlib
-from conftest import linecount
 from cnvlib import (
     access,
     antitarget,
@@ -54,6 +53,8 @@ from cnvlib import (
     smoothing,
     vary,
 )
+from skgenome import GenomicArray as GA
+from skgenome import tabio
 
 
 def _write_coverage_cnn(
@@ -66,41 +67,40 @@ def _write_coverage_cnn(
     make, e.g., a haploid chrX with a near-empty (deeply negative) chrY.
     """
     rng = np.random.default_rng(seed)
-    rows = []
-    for chrom, n in [("chr1", n_auto), ("chr2", n_auto)]:
-        for i in range(n):
-            rows.append(
-                (
-                    chrom,
-                    i * 1000,
-                    i * 1000 + 1000,
-                    "Background",
-                    100,
-                    float(rng.normal(0, 0.2)),
-                )
-            )
-    for i in range(n_x):
-        rows.append(
-            (
-                "chrX",
-                i * 1000,
-                i * 1000 + 1000,
-                "Background",
-                50,
-                float(rng.normal(chrx_log2, chrx_sd)),
-            )
+    rows = [
+        (
+            chrom,
+            i * 1000,
+            i * 1000 + 1000,
+            "Background",
+            100,
+            float(rng.normal(0, 0.2)),
         )
-    for i in range(n_y):
-        rows.append(
-            (
-                "chrY",
-                i * 1000,
-                i * 1000 + 1000,
-                "Background",
-                2,
-                float(rng.normal(chry_log2, chry_sd)),
-            )
+        for chrom, n in [("chr1", n_auto), ("chr2", n_auto)]
+        for i in range(n)
+    ]
+    rows.extend(
+        (
+            "chrX",
+            i * 1000,
+            i * 1000 + 1000,
+            "Background",
+            50,
+            float(rng.normal(chrx_log2, chrx_sd)),
         )
+        for i in range(n_x)
+    )
+    rows.extend(
+        (
+            "chrY",
+            i * 1000,
+            i * 1000 + 1000,
+            "Background",
+            2,
+            float(rng.normal(chry_log2, chry_sd)),
+        )
+        for i in range(n_y)
+    )
     pd.DataFrame(
         rows, columns=["chromosome", "start", "end", "gene", "depth", "log2"]
     ).to_csv(path, sep="\t", index=False)
@@ -413,8 +413,6 @@ class ClusterTests(unittest.TestCase):
 
     def test_cluster_hierarchical(self):
         """Test hierarchical clustering on synthetic data with 2 clear groups."""
-        from cnvlib.cluster import hierarchical
-
         rng = np.random.default_rng(42)
         n_bins = 100
         # Group A: 5 samples with similar pattern
@@ -425,7 +423,7 @@ class ClusterTests(unittest.TestCase):
         group_b = np.array([base_b + rng.normal(0, 0.1, n_bins) for _ in range(5)])
         samples = np.vstack([group_a, group_b])
 
-        clusters = hierarchical(samples, min_cluster_size=3)
+        clusters = cluster.hierarchical(samples, min_cluster_size=3)
         # Should produce exactly 2 clusters; all samples must be assigned
         self.assertEqual(len(clusters), 2)
         all_indices = sorted(idx for c in clusters for idx in c)
@@ -442,8 +440,6 @@ class ClusterTests(unittest.TestCase):
 
     def test_cluster_kmedoids(self):
         """Test k-medoids clustering produces valid clusters."""
-        from cnvlib.cluster import kmedoids
-
         rng = np.random.default_rng(42)
         n_bins = 100
         samples = np.vstack(
@@ -452,7 +448,7 @@ class ClusterTests(unittest.TestCase):
                 rng.standard_normal((5, n_bins)) + 3,
             ]
         )
-        clusters = kmedoids(samples, k=2)
+        clusters = cluster.kmedoids(samples, k=2)
         self.assertEqual(len(clusters), 2)
         all_indices = sorted(idx for c in clusters for idx in c)
         self.assertEqual(all_indices, list(range(10)))

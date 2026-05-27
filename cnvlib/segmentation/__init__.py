@@ -1,6 +1,7 @@
 """Segmentation of copy number values."""
 
 from __future__ import annotations
+
 import locale
 import logging
 import tempfile
@@ -9,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+
 from skgenome import tabio
 from skgenome.combiners import join_strings
 from skgenome.intersect import iter_slices
