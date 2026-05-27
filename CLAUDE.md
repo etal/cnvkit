@@ -19,60 +19,37 @@ CNVkit is a command-line toolkit and Python library for detecting copy number va
 
 ## Development Commands
 
-### Development Environment
+See `doc/development.rst` for the full developer guide (environment
+setup, pre-commit hooks, code style, testing matrix, PR process, Docker
+release flow). The notes below are the AI-session-specific quirks not
+already in that guide.
 
-**Conda (recommended):**
-```bash
-conda env create -f environment-dev.yml   # All deps, R, testing tools
-conda activate cnvkit
-```
+**Conda env quirk:** `conda run -n cnvkit <command>` is unreliable in
+this repo (the dev tools sometimes fail to find their dependencies).
+Use `conda activate cnvkit && <command>` instead — including inside
+scripts and parallel agent runs.
 
-**Note:** The conda env must be activated before running pytest, mypy, or other dev tools -- they are not installed globally. The conda env includes R with DNAcopy for segmentation. Use `conda activate cnvkit && <command>` in scripts; `conda run` is unreliable here.
+**`# type: ignore` requirement:** `pyproject.toml` sets
+`enable_error_code = ["ignore-without-code"]`, so every `# type: ignore`
+must specify the error code (e.g. `# type: ignore[return-value]`). Bare
+`# type: ignore` fails mypy.
 
-### Testing
-
-Run tests directly with pytest (not tox):
-```bash
-pytest test/                           # Run all tests
-pytest test/test_cnvlib.py            # Run specific test file
-pytest test/test_commands.py::CommandTests::test_batch  # Run specific test
-pytest test/test_commands.py -k "batch or coverage"  # Run tests matching patterns
-```
-
-**Comprehensive testing:**
-- `tox` - Full matrix: Python 3.11-3.14, linting, security, coverage, docs
-- `cd test/ && make mini` - Integration tests with real genomic data (used in CI)
-
-### Type Checking
-
-```bash
-mypy                              # Check both cnvlib and skgenome
-mypy cnvlib/batch.py              # Check a single file
-```
-
-**mypy configuration** (`pyproject.toml [tool.mypy]`):
-- `check_untyped_defs = true`, `warn_unreachable = true`, `warn_return_any = true`
-- `enable_error_code = ["ignore-without-code"]` - All `# type: ignore` must include error codes
-
-**Common type patterns in this codebase:**
-- `tabio.read()` returns union types -- use `# type: ignore[return-value]` at call sites
-- Pandas operations often return `Any` -- use `# type: ignore[no-any-return]`
-- Closures don't narrow types in mypy -- use `# type: ignore[index]` or local asserts
-- Parameters typed `param: None = None` cause unreachable blocks -- use `Optional[Type] = None` instead
-- Generator functions must use `-> Generator[YieldType, SendType, ReturnType]`, not `-> Iterator` or `-> None`
-- When a variable changes type (e.g. `str` → `list[int]`), rename it to avoid shadowing (e.g. `copies` → `copy_strs`)
-- Use `assert x is not None` to narrow `Optional` types when control flow guarantees non-None
-- `numpy.bool_` is not assignable to `bool` in mypy -- use `# type: ignore[assignment]` or widen parameters to `bool | bool_ | None`
-
-### Code Quality & Security
-
-Pre-commit hooks run automatically on `git commit` (ruff, bandit, whitespace, YAML/TOML checks). Install with `pre-commit install`.
-
-**Manual commands:**
-- `make lint` / `make format` - Ruff linting and formatting
-- `make security` - Safety + Bandit scans
-- `tox -e lint` / `tox -e security` / `tox -e coverage` / `tox -e doc`
-- `make help` - Show all Makefile targets
+**Common type-ignore patterns in this codebase** (the footguns mypy
+flags most often here):
+- `tabio.read()` returns union types — `# type: ignore[return-value]`
+  at call sites.
+- Pandas operations often return `Any` — `# type: ignore[no-any-return]`.
+- Closures don't narrow types in mypy — `# type: ignore[index]` or a
+  local `assert`.
+- Parameters typed `param: None = None` produce unreachable blocks —
+  use `Optional[Type] = None` (or `Type | None = None`) instead.
+- Generator functions must use `-> Generator[YieldType, SendType,
+  ReturnType]`, not `-> Iterator` or `-> None`.
+- When a variable changes type (e.g. `str` → `list[int]`), rename it to
+  avoid shadowing (e.g. `copies` → `copy_strs`).
+- `numpy.bool_` is not assignable to `bool` in mypy — use
+  `# type: ignore[assignment]` or widen parameters to
+  `bool | bool_ | None`.
 
 ## Architecture
 
