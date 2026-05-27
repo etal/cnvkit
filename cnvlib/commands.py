@@ -2140,11 +2140,11 @@ def do_sex(
         is_xy, stats = cna.compare_sex_chromosomes(
             is_haploid_x_reference, diploid_parx_genome
         )
-        # Indeterminate -- e.g. an assembly with no chrX (#669). Report
-        # 'Unknown' honestly rather than collapsing to the safe female default
-        # at the reporting layer; consumers that need a concrete bool still get
-        # one via `cnary.is_female_default`.
-        if is_xy is None:  # noqa: SIM108  # explanatory comment above
+        if is_xy is None:
+            # Indeterminate -- e.g. an assembly with no chrX (#669). Report
+            # 'Unknown' honestly rather than collapsing to the safe female
+            # default at the reporting layer; consumers that need a concrete
+            # bool still get one via `cnary.is_female_default`.
             sex = "Unknown"
         else:
             sex = "Male" if is_xy else "Female"

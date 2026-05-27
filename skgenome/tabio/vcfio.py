@@ -229,7 +229,7 @@ def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
                     normal_id,
                 )
                 yield sample_id, normal_id  # type: ignore[misc]
-    elif "GATKCommandLine.MuTect2" in meta:  # noqa: SIM102  # comments belong inside
+    elif "GATKCommandLine.MuTect2" in meta:
         # GATK 3+ metadata is suboptimal.
         # Apparent T/N convention: The samples are just renamed TUMOR and
         # NORMAL, listed in arbitrary order. Metadata is data! We have always

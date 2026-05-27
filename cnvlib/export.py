@@ -403,8 +403,12 @@ def segments2vcf(
             genotype = f"0/1:0:{out_row.ncopies}:{out_row.probes}"
         elif out_row.ncopies < abs_exp:
             # TODO XXX handle non-diploid ploidies, haploid chroms
-            # Complete deletion (0 copies) -> hom-alt; single-copy deletion -> het.
-            gt = "1/1" if out_row.ncopies == 0 else "0/1"
+            if out_row.ncopies == 0:
+                # Complete deletion, 0 copies
+                gt = "1/1"
+            else:
+                # Single copy deletion
+                gt = "0/1"
             genotype = f"{gt}:{out_row.probes}"
 
         fields = [

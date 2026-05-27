@@ -248,8 +248,10 @@ def cvg2rgb(cvg: float, desaturate: bool) -> tuple[float, float, float]:
         s = x**1.2
     else:
         s = x
-    # Blueish for negative log2 (loss), reddish for positive (gain).
-    rgb = (1 - s, 1 - s, 1 - 0.25 * x) if cvg < 0 else (1 - 0.25 * x, 1 - s, 1 - s)
+    if cvg < 0:
+        rgb = (1 - s, 1 - s, 1 - 0.25 * x)  # Blueish
+    else:
+        rgb = (1 - 0.25 * x, 1 - s, 1 - s)  # Reddish
     return rgb
 
 

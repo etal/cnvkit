@@ -117,14 +117,18 @@ select = [
     "PD",      # pandas-vet
     "RUF",     # ruff's extra rules (incl. RUF100 unused-noqa)
     "TC",      # flake8-type-checking
-    "SIM",     # flake8-simplify
     "PERF",    # perflint (numpy/loop performance)
     "C4",      # flake8-comprehensions
     "PIE",     # flake8-pie (misc. quality)
     "I",       # isort (import ordering)
     "Q",       # flake8-quotes (defensive: format.quote-style enforces double)
     "PLC0415", # pylint: imports outside top level (lazy imports must justify with noqa)
-    # Evaluated and deferred to a focused follow-up PR:
+    # Evaluated and deferred -- noqa cost outweighs the signal here, the
+    # 3-reviewer code-review protocol catches the real cases better:
+    #   "SIM" -- flake8-simplify; SIM401/SIM115 produce false positives on
+    #            domain types (GenomicArray has no .get(); ctx-via-with is
+    #            invisible to it) and SIM108 compresses readable per-branch
+    #            comments into inline annotations.
     #   "PT"  -- flake8-pytest-style; requires unittest.TestCase -> pytest migration
     #   "N"   -- pep8-naming; collides with scientific names (X, Y, log2, chi2)
     #   "D"   -- pydocstyle; needs a docs-style policy decision

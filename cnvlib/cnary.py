@@ -721,10 +721,8 @@ class CopyNumArray(GenomicArray):
             Smoothed log2 values from `self`, the same length as `self`.
         """
         if bandwidth is None:
-            # GenomicArray has no .get(); SIM401 would suggest it but break.
             bandwidth = smoothing.guess_window_size(
-                self.log2,
-                weights=(self["weight"] if "weight" in self else None),  # noqa: SIM401
+                self.log2, weights=(self["weight"] if "weight" in self else None)
             )
 
         parts = self.by_arm() if by_arm else self.by_chromosome()
