@@ -1273,12 +1273,18 @@ def _cmd_call(args: argparse.Namespace) -> None:
         args.min_variant_depth,
         args.zygosity_freq,
     )
-    is_sample_female = (
-        verify_sample_sex(
-            cnarr, args.sample_sex, args.male_reference, args.diploid_parx_genome
-        )
-        if args.purity and args.purity < 1.0
-        else None
+    # Resolve per-sample sex unconditionally so the VCF het-density confirmer
+    # (#341) and the audit log line ("Treating sample X as ...") apply
+    # uniformly, not only on the purity-rescaled path. The threshold-method
+    # branch of do_call doesn't consume ``is_sample_female`` directly
+    # (chrX reference copies come from ``-y`` alone in ``_reference_copies_pure``),
+    # so this is output-neutral in the common germline case.
+    is_sample_female = verify_sample_sex(
+        cnarr,
+        args.sample_sex,
+        args.male_reference,
+        args.diploid_parx_genome,
+        variants=varr,
     )
     cnarr = call.do_call(
         cnarr,

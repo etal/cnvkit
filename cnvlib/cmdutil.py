@@ -7,6 +7,7 @@ import sys
 import numpy as np
 
 from skgenome import tabio
+from skgenome.chromnames import infer_sex_chrom_labels
 
 from .cnary import CopyNumArray as CNA, is_female_default
 from skgenome import GenomicArray as GA
@@ -78,6 +79,33 @@ def load_het_snps(
                 + "based on T/N genotypes",
             )
         varr = varr[~somatic_idx]
+    # Count chrX SNPs (and chrX hets) BEFORE the global het filter, so the
+    # downstream chrX-het-density confirmer (verify_sample_sex with VCF, #341)
+    # has both numerator and denominator. Detect the chrX label via
+    # skgenome's context-aware classifier rather than an inline regex.
+    chrx_label, _ = infer_sex_chrom_labels(set(varr.chromosome.unique()))
+    if chrx_label is not None:
+        on_chrx = varr.chromosome == chrx_label
+        n_chrx_total = int(on_chrx.sum())
+        # Match VariantArray.heterozygous()'s column-selection: when a matched
+        # normal VCF is loaded both ``zygosity`` (tumor) and ``n_zygosity``
+        # (normal) are present, and the germline-het signal lives in the
+        # normal. Use the same precedence so the binomial test's numerator
+        # comes from the same population the het-filter would have selected.
+        if "n_zygosity" in varr:
+            zyg = varr["n_zygosity"]
+        elif "zygosity" in varr:
+            zyg = varr["zygosity"]
+        else:
+            zyg = None
+        if zyg is not None:
+            n_chrx_het = int((on_chrx & (zyg != 0.0) & (zyg != 1.0)).sum())
+        else:
+            n_chrx_het = 0
+    else:
+        n_chrx_total = 0
+        n_chrx_het = 0
+
     orig_len = len(varr)
     varr = varr.heterozygous()  # type: ignore[attr-defined]
     logging.info("Kept %d heterozygous of %d VCF records", len(varr), orig_len)
@@ -85,6 +113,10 @@ def load_het_snps(
     # TODO use/explore tumor_boost option
     if tumor_boost:
         varr["alt_freq"] = varr.tumor_boost()
+    # Stash the pre-filter chrX counts so verify_sample_sex can run the
+    # chrX-het-density confirmer below.
+    varr.meta["chrx_snp_total"] = n_chrx_total
+    varr.meta["chrx_het_count"] = n_chrx_het
     return varr  # type: ignore[no-any-return]
 
 
@@ -127,10 +159,11 @@ def verify_sample_sex(
     sex_arg: str | None,
     is_haploid_x_reference: bool,
     diploid_parx_genome: str | None,
+    variants: VariantArray | None = None,
 ) -> bool:
     guess = cnarr.guess_xx(is_haploid_x_reference, diploid_parx_genome, verbose=False)
     # None means "couldn't tell" (no chrX / degenerate); default to female so an
-    # indeterminate sample is never silently treated as male (gh#360 family).
+    # indeterminate sample is never silently treated as male (#360 family).
     is_sample_female = is_female_default(guess)
     if sex_arg:
         is_sample_female_given = sex_arg.lower() not in ["y", "m", "male"]
@@ -142,6 +175,36 @@ def verify_sample_sex(
                 "female" if is_sample_female else "male",
             )
         is_sample_female = is_sample_female_given
+    elif (
+        variants is not None and not is_sample_female and cnarr.chr_x_label is not None
+    ):
+        # No user override + coverage inferred male: ask the VCF for an
+        # independent chrX-heterozygous-SNP confirmer. True haploid X has
+        # ~no het SNPs, so observing many of them rejects the haploid-X
+        # null and we override to female -- the chrX expected ploidy used
+        # downstream (purity rescaling, diagram shift_xx, etc.) is then
+        # diploid, which is the correct baseline for calls and LOH (#341).
+        # Coverage-based call stays untouched when the test isn't decisive,
+        # so this is a one-way upgrade toward female (the safe direction
+        # for #360-family indeterminacy).
+        from .vary import chrx_het_density_rejects_haploid
+
+        n_total = variants.meta.get("chrx_snp_total", 0)
+        n_het = variants.meta.get("chrx_het_count", 0)
+        rejected, p_value = chrx_het_density_rejects_haploid(n_total, n_het)
+        if rejected:
+            logging.warning(
+                "Coverage inferred male, but chrX heterozygous-SNP density "
+                "(%d het of %d total chrX SNPs in the VCF) rejects the "
+                "haploid-X null at binomial p=%.2g; treating sample as "
+                "female so chrX copy-number calls use a diploid-X "
+                "baseline. Pass --sample-sex male to suppress this "
+                "override.",
+                n_het,
+                n_total,
+                p_value,
+            )
+            is_sample_female = True
     logging.info(
         "Treating sample %s as %s",
         cnarr.sample_id or "",
