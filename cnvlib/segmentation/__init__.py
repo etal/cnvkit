@@ -229,17 +229,21 @@ def _do_segmentation(
         return cnarr
 
     filtered_cn = cnarr.copy()
-    # Drop bins with no log2 value before any analysis (#881). They carry no
-    # signal and cannot be segmented, but a bare comparison treats NaN as False,
-    # so without this they survive the gates below and reach either the
-    # Savitzky-Golay outlier filter (scipy's lstsq rejects non-finite input) or
-    # DNAcopy's CBS -- both of which then crash. read_tab drops them on the file
-    # path; do it here too for the in-memory/API path (e.g. batch).
-    log2_missing = filtered_cn["log2"].isna()
-    n_log2_missing = int(log2_missing.sum())
-    if n_log2_missing:
-        filtered_cn = filtered_cn[~log2_missing]
-        logging.info("Dropped %d bins with missing log2 values", n_log2_missing)
+    # Drop bins with non-finite log2 (NaN or +/-inf) before any analysis
+    # (#881, gh#508). They carry no signal and cannot be segmented, but a
+    # bare comparison treats NaN as False, so without this they survive the
+    # gates below and reach either the Savitzky-Golay outlier filter (scipy's
+    # lstsq rejects non-finite input with "array must not contain infs or
+    # NaNs") or DNAcopy's CBS -- both of which then crash. ``.isna()`` only
+    # catches NaN; broadening to ``~np.isfinite`` covers the flat-reference
+    # WGS path of gh#508 where degenerate reference subtraction can yield
+    # +/-inf. read_tab drops them on the file path; do it here too for the
+    # in-memory/API path (e.g. batch).
+    log2_bad = ~np.isfinite(filtered_cn["log2"])
+    n_log2_bad = int(log2_bad.sum())
+    if n_log2_bad:
+        filtered_cn = filtered_cn[~log2_bad]
+        logging.info("Dropped %d bins with non-finite log2 values", n_log2_bad)
     # Filter out bins with no or near-zero sequencing coverage
     if skip_low:
         filtered_cn = filtered_cn.drop_low_coverage(verbose=False)

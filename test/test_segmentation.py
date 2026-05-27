@@ -428,3 +428,38 @@ class TransferFieldsTests(unittest.TestCase):
         cns = segmentation.do_segmentation(cnarr, "haar", processes=1)
         self.assertGreater(len(cns), 0)
         self.assertFalse(np.isnan(cns["log2"].to_numpy()).any())
+
+    def test_do_segmentation_drops_inf_log2(self):
+        """do_segmentation tolerates ±inf-log2 bins (gh#508, sibling to #881).
+
+        The #881 fix dropped NaN-log2 bins before drop_outliers' Savitzky-Golay
+        smoother because scipy's lstsq rejects non-finite input ("array must
+        not contain infs or NaNs"). But pandas ``.isna()`` does NOT catch
+        ±inf, so degenerate flat-reference WGS data (gh#508) -- where some
+        bins can land at ±inf after reference subtraction -- still crashed
+        on the same path. Broadening the prefilter from ``.isna()`` to
+        ``~np.isfinite`` covers both.
+        """
+        n = 120  # > drop_outliers' width (50) so savgol actually runs
+        rng = np.random.default_rng(0)
+        log2 = rng.normal(0, 0.2, n)
+        log2[5] = np.inf  # inside the leading savgol edge window
+        log2[60] = -np.inf
+        log2[80] = np.nan  # confirm NaN is still handled alongside ±inf
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["G"] * n,
+                    "log2": log2,
+                    "depth": np.ones(n) * 100.0,
+                    "weight": np.ones(n),
+                }
+            )
+        )
+        # Must not raise, and the segment log2 must be finite (no inf/nan leaks).
+        cns = segmentation.do_segmentation(cnarr, "haar", processes=1)
+        self.assertGreater(len(cns), 0)
+        self.assertTrue(np.isfinite(cns["log2"].to_numpy()).all())

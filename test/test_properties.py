@@ -439,6 +439,43 @@ class TestSavgol:
         result = savgol(x, total_width=width)
         assert np.allclose(result, c, atol=1e-6)
 
+    def test_linalg_error_falls_back_to_nearest(self, monkeypatch):
+        """Savgol recovers when scipy's edge polyfit raises LinAlgError (gh#508).
+
+        scipy's ``savgol_filter(mode='interp')`` invokes ``np.polyfit`` at
+        the array edges; on numerically degenerate inputs ``lstsq`` can raise
+        ``LinAlgError: SVD did not converge`` (and MKL prints the
+        ``Parameter 6 was incorrect on entry to DGELSD`` message that
+        originally surfaced gh#508 on WGS flat-reference data). The wrapper
+        must catch the error and retry with a non-polyfit mode rather than
+        let it propagate up through ``do_segmentation`` and crash the run.
+        """
+        import cnvlib.smoothing as smoothing_mod
+
+        real_savgol_filter = smoothing_mod.savgol_filter
+        calls = {"interp": 0, "fallback": 0}
+
+        def flaky_savgol_filter(*args, **kwargs):
+            mode = kwargs.get("mode", "interp")
+            if mode == "interp":
+                calls["interp"] += 1
+                raise np.linalg.LinAlgError(
+                    "SVD did not converge in Linear Least Squares"
+                )
+            calls["fallback"] += 1
+            return real_savgol_filter(*args, **kwargs)
+
+        monkeypatch.setattr(smoothing_mod, "savgol_filter", flaky_savgol_filter)
+
+        rng = np.random.default_rng(0)
+        x = np.linspace(-1.0, 1.0, 60) + rng.normal(0, 0.1, 60)
+        result = savgol(x, total_width=11)
+
+        assert len(result) == len(x)
+        assert np.isfinite(result).all()
+        assert calls["interp"] >= 1, "Interp path should have been attempted"
+        assert calls["fallback"] >= 1, "Fallback (non-polyfit) path should have run"
+
 
 # ---------------------------------------------------------------------------
 # Tests: cnvlib/call.py (pure arithmetic helpers)
