@@ -22,8 +22,8 @@ import logging
 import sys
 from contextlib import nullcontext
 
-from ..cmdutil import read_cna
 from ..call import do_call
+from ..cmdutil import read_cna
 
 
 def argument_parsing():
@@ -52,8 +52,9 @@ def cna_stats(cnarr, diploid_parx_genome):
 
 
 def genome_instability_index(args) -> None:
-    # Open output file or use stdout
-    ctx = open(args.output, "w") if args.output else nullcontext(sys.stdout)
+    # Open output file or use stdout. SIM115 misses the indirect `with ctx`
+    # context-manager use below; the file is properly closed via that block.
+    ctx = open(args.output, "w") if args.output else nullcontext(sys.stdout)  # noqa: SIM115
     with ctx as outfile:
         print("Sample", "CNA_Fraction", "CNA_Count", sep="\t", file=outfile)
         for fname in args.cnv_files:

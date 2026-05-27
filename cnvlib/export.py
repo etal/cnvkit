@@ -1,6 +1,7 @@
 """Export CNVkit objects and files to other formats."""
 
 from __future__ import annotations
+
 import logging
 import time
 from collections import OrderedDict as OD
@@ -8,18 +9,21 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+
 from skgenome import tabio
 from skgenome.chromnames import detect_chr_prefix
 
 from . import call
-from .cmdutil import read_cna
 from ._version import __version__
+from .cmdutil import read_cna
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from numpy import ndarray
+
     from cnvlib.cnary import CopyNumArray
     from cnvlib.vary import VariantArray
-    from numpy import ndarray
 
 
 def merge_samples(filenames: list[str]) -> pd.DataFrame:
@@ -399,12 +403,8 @@ def segments2vcf(
             genotype = f"0/1:0:{out_row.ncopies}:{out_row.probes}"
         elif out_row.ncopies < abs_exp:
             # TODO XXX handle non-diploid ploidies, haploid chroms
-            if out_row.ncopies == 0:
-                # Complete deletion, 0 copies
-                gt = "1/1"
-            else:
-                # Single copy deletion
-                gt = "0/1"
+            # Complete deletion (0 copies) -> hom-alt; single-copy deletion -> het.
+            gt = "1/1" if out_row.ncopies == 0 else "0/1"
             genotype = f"{gt}:{out_row.probes}"
 
         fields = [

@@ -1,6 +1,7 @@
 """CNVkit's core data structure, a copy number array."""
 
 from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -10,11 +11,12 @@ import pandas as pd
 from skgenome import GenomicArray
 from skgenome.chromnames import infer_sex_chrom_labels
 from skgenome.genomebuild import get_genome_build
+
 from . import core, descriptives, params, smoothing
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
+
     from numpy import bool_, float64, ndarray
     from pandas.core.frame import DataFrame
     from pandas.core.series import Series
@@ -622,12 +624,12 @@ class CopyNumArray(GenomicArray):
 
         return (
             np.bool_(is_male),
-            dict(
-                chrx_ratio=chrx_med - auto_med,
-                chry_ratio=chry_ratio,
-                chrx_male_lr=chrx_male_lr,
-                chry_male_lr=chry_male_lr,
-            ),
+            {
+                "chrx_ratio": chrx_med - auto_med,
+                "chry_ratio": chry_ratio,
+                "chrx_male_lr": chrx_male_lr,
+                "chry_male_lr": chry_male_lr,
+            },
         )
 
     def expect_flat_log2(
@@ -719,8 +721,10 @@ class CopyNumArray(GenomicArray):
             Smoothed log2 values from `self`, the same length as `self`.
         """
         if bandwidth is None:
+            # GenomicArray has no .get(); SIM401 would suggest it but break.
             bandwidth = smoothing.guess_window_size(
-                self.log2, weights=(self["weight"] if "weight" in self else None)
+                self.log2,
+                weights=(self["weight"] if "weight" in self else None),  # noqa: SIM401
             )
 
         parts = self.by_arm() if by_arm else self.by_chromosome()

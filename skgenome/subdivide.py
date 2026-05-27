@@ -58,9 +58,7 @@ def _split_targets(regions, avg_size: int, min_size: int, verbose: bool):
                         else f"{row.chromosome}:{row.start}-{row.end}"
                     )
                     logging.info(
-                        "Splitting: {:30} {:7} / {} = {:.2f}".format(
-                            label, span, nbins, bin_size
-                        )
+                        f"Splitting: {label:30} {span:7} / {nbins} = {bin_size:.2f}"
                     )
                 for i in range(1, nbins):
                     bin_end = row.start + int(i * bin_size)

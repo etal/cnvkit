@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Unit tests for CNVkit that require an R installation."""
 
+import logging
 import tempfile
 import unittest
-import logging
 from unittest import mock
 
 import numpy as np
@@ -101,11 +101,13 @@ class RTests(unittest.TestCase):
             captured.append(args)
             raise _StopBeforeR
 
-        with mock.patch.object(core, "call_quiet", fake_call_quiet):
-            with self.assertRaises(_StopBeforeR):
-                segmentation._do_segmentation(
-                    self.tas_cnr, "cbs", None, 0.0001, skip_outliers=0
-                )
+        with (
+            mock.patch.object(core, "call_quiet", fake_call_quiet),
+            self.assertRaises(_StopBeforeR),
+        ):
+            segmentation._do_segmentation(
+                self.tas_cnr, "cbs", None, 0.0001, skip_outliers=0
+            )
 
         argv = captured[0]
         self.assertNotIn("--vanilla", argv)

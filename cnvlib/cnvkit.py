@@ -2,6 +2,7 @@
 """Command-line interface for CNVkit, the Copy Number Variation toolkit."""
 
 import logging
+
 from . import commands
 
 

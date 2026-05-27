@@ -1,6 +1,7 @@
 """Plotting utilities."""
 
 from __future__ import annotations
+
 import collections
 import itertools
 import logging
@@ -9,12 +10,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from skgenome.rangelabel import unpack_range, Region
+from skgenome.rangelabel import Region, unpack_range
+
 from . import core, params
 
 if TYPE_CHECKING:
-    from cnvlib.cnary import CopyNumArray
     from matplotlib.axes._axes import Axes
+
+    from cnvlib.cnary import CopyNumArray
 
 
 MB = 1e-6  # To rescale from bases to megabases
@@ -245,10 +248,8 @@ def cvg2rgb(cvg: float, desaturate: bool) -> tuple[float, float, float]:
         s = x**1.2
     else:
         s = x
-    if cvg < 0:
-        rgb = (1 - s, 1 - s, 1 - 0.25 * x)  # Blueish
-    else:
-        rgb = (1 - 0.25 * x, 1 - s, 1 - s)  # Reddish
+    # Blueish for negative log2 (loss), reddish for positive (gain).
+    rgb = (1 - s, 1 - s, 1 - 0.25 * x) if cvg < 0 else (1 - 0.25 * x, 1 - s, 1 - s)
     return rgb
 
 

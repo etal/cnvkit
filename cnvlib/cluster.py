@@ -18,6 +18,9 @@ References:
 import logging
 
 import numpy as np
+from scipy.cluster.hierarchy import cophenet, fcluster, inconsistent, linkage
+from scipy.spatial.distance import pdist, squareform
+from sklearn.metrics import silhouette_score
 
 _MAX_PAM_ITERATIONS = 100
 
@@ -41,9 +44,6 @@ def hierarchical(samples, min_cluster_size=4):
     list of numpy arrays
         Each array contains the indices of samples in that cluster.
     """
-    from scipy.cluster.hierarchy import cophenet, fcluster, inconsistent, linkage
-    from scipy.spatial.distance import pdist, squareform
-
     n_samples = len(samples)
     if n_samples < 2:
         return [np.array(range(n_samples))]
@@ -82,8 +82,6 @@ def _find_inconsistency_threshold(Z, incon, min_cluster_size, n_samples, depth):
     min_cluster_size samples. Returns None if no valid split is found,
     indicating all samples should be in a single cluster.
     """
-    from scipy.cluster.hierarchy import fcluster
-
     # Use actual inconsistency values from the linkage as candidate thresholds
     candidates = np.unique(incon[:, 3])
     candidates = candidates[candidates > 0]
@@ -179,8 +177,6 @@ def kmedoids(samples, k=None, min_cluster_size=4):
     list of numpy arrays
         Each array contains the indices of samples in that cluster.
     """
-    from scipy.spatial.distance import pdist, squareform
-
     n_samples = len(samples)
     if n_samples < 2:
         return [np.array(range(n_samples))]
@@ -281,8 +277,6 @@ def _select_k(dist_matrix, n_samples):
     overall. The max_k=10 cap and early stopping keep this tractable for typical
     reference panels (n < 100).
     """
-    from sklearn.metrics import silhouette_score
-
     max_k = min(10, n_samples - 1)
     if max_k < 2:
         return 1

@@ -1,21 +1,21 @@
 """Variant Call Format (VCF) for SNV loci."""
 
 from __future__ import annotations
+
 import collections
 import logging
 import os
-
 from itertools import chain
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
-from typing import TYPE_CHECKING, Any
 
 from skgenome._pysam import PYSAM_INSTALL_MSG
 
 if TYPE_CHECKING:
-    import pysam
     from collections.abc import Iterator
+
     from pysam.libcbcf import (
         VariantFile,
         VariantRecord,
@@ -47,7 +47,7 @@ def read_vcf(
     tolerated: zygosity is then inferred from the alternate-allele frequency.
     """
     try:
-        import pysam
+        import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
     except ImportError:
         raise ImportError(
             f"pysam is required for reading VCF files. {PYSAM_INSTALL_MSG}"
@@ -101,7 +101,7 @@ def read_vcf(
     # the whole region (#407). NaN is excluded by the np.nanmedian aggregation.
     freq_cols = {"alt_freq", "n_alt_freq"}
     fill_cols = [c for c in table.columns[6:] if c not in freq_cols]
-    table = table.fillna({col: 0.0 for col in fill_cols})
+    table = table.fillna(dict.fromkeys(fill_cols, 0.0))
     # Filter out records as requested
     cnt_depth = cnt_som = 0
     if min_depth:
@@ -229,7 +229,7 @@ def _parse_pedigrees(vcf_reader: VariantFile) -> Iterator[tuple[str, str]]:
                     normal_id,
                 )
                 yield sample_id, normal_id  # type: ignore[misc]
-    elif "GATKCommandLine.MuTect2" in meta:
+    elif "GATKCommandLine.MuTect2" in meta:  # noqa: SIM102  # comments belong inside
         # GATK 3+ metadata is suboptimal.
         # Apparent T/N convention: The samples are just renamed TUMOR and
         # NORMAL, listed in arbitrary order. Metadata is data! We have always

@@ -1,6 +1,7 @@
 """Unit tests for the parallel module."""
 
 import unittest
+from concurrent import futures
 
 import numpy as np
 import pandas as pd
@@ -78,8 +79,6 @@ class ParallelTests(unittest.TestCase):
 
     def test_process_pool_exception_propagation(self):
         """Test that ProcessPoolExecutor properly propagates exceptions from workers."""
-        from concurrent import futures
-
         # Test that exceptions from worker processes are propagated
         with futures.ProcessPoolExecutor(max_workers=2) as pool:
             future = pool.submit(_failing_worker)

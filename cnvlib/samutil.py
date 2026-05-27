@@ -1,6 +1,7 @@
 """BAM utilities."""
 
 from __future__ import annotations
+
 import logging
 import os
 from io import StringIO
@@ -14,7 +15,6 @@ import pandas as pd
 from skgenome._pysam import PYSAM_INSTALL_MSG
 
 if TYPE_CHECKING:
-    import pysam
     from numpy import float64, int64
 
 
@@ -27,7 +27,7 @@ def idxstats(
     chromosome. Contigs with no mapped reads are skipped.
     """
     try:
-        import pysam
+        import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
     except ImportError:
         raise ImportError(
             f"pysam is required for reading BAM index stats. {PYSAM_INSTALL_MSG}"
@@ -75,7 +75,7 @@ def ensure_bam_index(bam_fname: str) -> str:
     - MySample.bai
     """
     try:
-        import pysam
+        import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
     except ImportError:
         raise ImportError(
             f"pysam is required for BAM/CRAM indexing. {PYSAM_INSTALL_MSG}"
@@ -119,7 +119,7 @@ def ensure_bam_sorted(
     increasing position.
     """
     try:
-        import pysam
+        import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
     except ImportError:
         raise ImportError(
             f"pysam is required for checking BAM sort order. {PYSAM_INSTALL_MSG}"
@@ -167,7 +167,7 @@ def get_read_length(
         Number of reads used to calculate median read length.
     """
     try:
-        import pysam
+        import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
     except ImportError:
         raise ImportError(
             f"pysam is required for reading BAM files. {PYSAM_INSTALL_MSG}"

@@ -1,23 +1,26 @@
 """The 'scatter' command for rendering copy number as scatter plots."""
 
 from __future__ import annotations
+
 import collections
 import logging
+from typing import TYPE_CHECKING
 
 import numpy as np
 from matplotlib import pyplot
+
 from skgenome.chromnames import detect_chr_prefix, diagnose_missing_chromosome
 from skgenome.rangelabel import unpack_range
 
 from . import core, params, plots
-from .plots import MB
 from .cnary import CopyNumArray as CNA
-from typing import TYPE_CHECKING
+from .plots import MB
 
 if TYPE_CHECKING:
-    from cnvlib.cnary import CopyNumArray
     from matplotlib.axes._axes import Axes
     from matplotlib.figure import Figure
+
+    from cnvlib.cnary import CopyNumArray
 
 HIGHLIGHT_COLOR = "gold"
 POINT_COLOR = "#606060"
@@ -254,11 +257,6 @@ def cnv_on_genome(
     if probes:
         chrom_sizes = plots.chromosome_sizes(probes)
         chrom_probes = dict(probes.by_chromosome())
-        # Precalculate smoothing window size so all chromosomes have similar
-        # degree of smoothness
-        # NB: Target panel has ~1k bins/chrom. -> 250-bin window
-        #     Exome: ~10k bins/chrom. -> 2500-bin window
-        window_size = round(0.15 * len(probes) / probes.chromosome.nunique())
     else:
         chrom_sizes = plots.chromosome_sizes(segments)
     # Same for segment calls
@@ -321,7 +319,7 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color
         chrom_segs = dict(segments.by_chromosome())
     elif do_trend:
         # Pretend a single segment covers each chromosome
-        chrom_segs = {chrom: None for chrom in chrom_snvs}
+        chrom_segs = dict.fromkeys(chrom_snvs)
     else:
         chrom_segs = {}
 
@@ -590,10 +588,7 @@ def cnv_on_chromosome(
     # Get scatter plot coordinates
     x = 0.5 * (probes["start"] + probes["end"]) * MB  # bin midpoints
     y = probes["log2"]
-    if "weight" in probes:
-        w = 46 * probes["weight"] ** 2 + 2
-    else:
-        w = np.repeat(30, len(x))
+    w = 46 * probes["weight"] ** 2 + 2 if "weight" in probes else np.repeat(30, len(x))
 
     # Configure axes
     if not y_min:
@@ -843,11 +838,8 @@ def get_segment_vafs(variants, segments):
     tuple
         (segment, value)
     """
-    if segments:
-        chunks = variants.by_ranges(segments)
-    else:
-        # Fake segments cover the whole region
-        chunks = [(None, variants)]
+    # No segments -> one fake segment covering the whole region.
+    chunks = variants.by_ranges(segments) if segments else [(None, variants)]
     for seg, seg_snvs in chunks:
         # ENH: seg_snvs.tumor_boost()
         freqs = seg_snvs["alt_freq"].values

@@ -4,13 +4,13 @@
 Data source for both inputs is TCGA via cBioPortal.
 """
 
+import argparse
 import logging
 import sys
 import warnings
-import argparse
 
 import pandas as pd
-from scipy.stats import spearmanr, kendalltau
+from scipy.stats import kendalltau, spearmanr
 
 from ..rna import before
 

@@ -18,6 +18,7 @@ import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
+import cnvlib.smoothing as smoothing_mod
 from cnvlib.call import (
     _log2_ratio_to_absolute,
     _log2_ratio_to_absolute_pure,
@@ -451,8 +452,6 @@ class TestSavgol:
         must catch the error and retry with a non-polyfit mode rather than
         let it propagate up through ``do_segmentation`` and crash the run.
         """
-        import cnvlib.smoothing as smoothing_mod
-
         real_savgol_filter = smoothing_mod.savgol_filter
         calls = {"interp": 0, "fallback": 0}
 

@@ -1,6 +1,7 @@
 """Supporting functions for the 'fix' command."""
 
 from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -10,9 +11,10 @@ import pandas as pd
 from . import descriptives, params, smoothing
 
 if TYPE_CHECKING:
-    from cnvlib.cnary import CopyNumArray
     from numpy import ndarray
     from pandas.core.series import Series
+
+    from cnvlib.cnary import CopyNumArray
 
 
 def do_fix(
@@ -559,10 +561,8 @@ def apply_weights(
         if frac_anti_low > 0.5:
             # Off-target bins are mostly garbage -- skip reweighting
             logging.warning(
-                "WARNING: Most antitarget bins ({:.2f}%, {:d}/{:d})"
-                " have low or no coverage; is this amplicon/WGS?".format(
-                    100 * frac_anti_low, len(anti_cna) - len(anti_ok), len(anti_cna)
-                )
+                f"WARNING: Most antitarget bins ({100 * frac_anti_low:.2f}%, {len(anti_cna) - len(anti_ok):d}/{len(anti_cna):d})"
+                " have low or no coverage; is this amplicon/WGS?"
             )
 
         anti_var = descriptives.biweight_midvariance(anti_ok.residuals()) ** 2

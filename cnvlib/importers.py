@@ -1,16 +1,19 @@
 """Import from other formats to the CNVkit format."""
 
 from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
 from skgenome import tabio
 
 from . import params
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
     from cnvlib.cnary import CopyNumArray
 
 

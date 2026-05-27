@@ -1,20 +1,25 @@
 """Supporting functions for the 'reference' command."""
 
 from __future__ import annotations
+
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
 import pyfaidx
 
-from skgenome import tabio, GenomicArray as GA
-from . import core, fix, descriptives, params
+from skgenome import GenomicArray as GA
+from skgenome import tabio
+
+from . import core, descriptives, fix, params
 from .cmdutil import read_cna
-from .cnary import CopyNumArray as CNA, is_female_default
+from .cnary import CopyNumArray as CNA
+from .cnary import is_female_default
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
     from numpy import bool_, ndarray
 
 
@@ -74,7 +79,7 @@ def bed2probes(bed_fname: str) -> CNA:
     """Create a neutral-coverage CopyNumArray from a file of regions."""
     regions = tabio.read_auto(bed_fname)
     table = regions.data.loc[:, ("chromosome", "start", "end")]
-    table["gene"] = regions.data["gene"] if "gene" in regions.data else "-"
+    table["gene"] = regions.data.get("gene", "-")
     table["log2"] = 0.0
     table["spread"] = 0.0
     return CNA(table, {"sample_id": core.fbase(bed_fname)})
@@ -236,7 +241,7 @@ def do_reference(
         logging.info(
             f"Provided sample sex is {'female' if female_samples else 'male'}. "
         )
-        sexes = dict()
+        sexes = {}
         for fname in target_fnames:
             sexes[read_cna(fname).sample_id] = female_samples  # type: ignore[assignment]
 
@@ -754,7 +759,9 @@ def create_clusters(
     Return a dict of columns: ``log2_i``, ``spread_i``, and ``depth_i``
     where i=1,2,... .
     """
-    from . import cluster
+    # lazy: defers scipy.cluster / scipy.spatial / sklearn.metrics imports
+    # to callers that actually request clustering.
+    from . import cluster  # noqa: PLC0415
 
     # Drop the pseudocount sample (first row is the flat-reference expectation)
     logr_matrix = logr_matrix[1:, :]

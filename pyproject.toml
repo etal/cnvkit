@@ -108,30 +108,47 @@ line-length = 88
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "UP", # pyupgrade
-    "B",  # flake8-bugbear
-    "NPY", # numpy rules
-    "PD", # pandas-vet
-    "RUF", # ruff's extra rules
-    "TC", # flake8-type-checking
-    #"ANN", # flake8-annotations
+    "E",       # pycodestyle errors
+    "W",       # pycodestyle warnings
+    "F",       # pyflakes (incl. F401 unused-import, F841 unused-variable)
+    "UP",      # pyupgrade
+    "B",       # flake8-bugbear
+    "NPY",     # numpy rules
+    "PD",      # pandas-vet
+    "RUF",     # ruff's extra rules (incl. RUF100 unused-noqa)
+    "TC",      # flake8-type-checking
+    "SIM",     # flake8-simplify
+    "PERF",    # perflint (numpy/loop performance)
+    "C4",      # flake8-comprehensions
+    "PIE",     # flake8-pie (misc. quality)
+    "I",       # isort (import ordering)
+    "Q",       # flake8-quotes (defensive: format.quote-style enforces double)
+    "PLC0415", # pylint: imports outside top level (lazy imports must justify with noqa)
+    # Evaluated and deferred to a focused follow-up PR:
+    #   "PT"  -- flake8-pytest-style; requires unittest.TestCase -> pytest migration
+    #   "N"   -- pep8-naming; collides with scientific names (X, Y, log2, chi2)
+    #   "D"   -- pydocstyle; needs a docs-style policy decision
+    #   "ERA" -- commented-out code; needs per-occurrence judgment in this codebase
+    #   "RET" -- return-statement style; RET504 (assign-then-return) is stylistic
+    #   "ARG" -- unused-args; mix of real bugs and intentional API contracts (ABC methods, plugin hooks)
+    #   "ANN" -- flake8-annotations; defer until full annotation coverage decided
 ]
 ignore = [
-    "E402",  # import not at top
-    "E501",  # line too long
-    "E731",  # inline lambda
-    "F401",  # unused import
-    "F841",  # unused variable
-    "UP031", # % format
-    "UP032", # format call vs. f-string
-    "B007",  # loop variable not used in body
-    "B023",  # def closing over loop variable
-    "PD009", # use .iloc instead of .iat (iat is actually faster for scalar access)
-    "RUF100", # unneeded noqa
+    "E402",  # import not at top -- some lazy imports remain legitimate
+    "E501",  # line too long -- too noisy without a reflow pass
+    "E731",  # inline lambda -- common in argparse setups
+    "UP031", # % format -- kept; modernization is a separate focused PR
+    "B007",  # loop variable not used in body -- common idiom in this code
+    "B023",  # def closing over loop variable -- intentional in some places
+    "PD009", # use .iloc instead of .iat -- iat is faster for scalar access
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Test suites use `from cnvlib import (access, antitarget, ...)` smoke-test
+# blocks (see CLAUDE.md "Imports in Tests"). The imports are intentionally
+# "unused" -- they verify each submodule loads cleanly. F401 must not fire
+# on these blocks but should still catch real unused imports in cnvlib/.
+"test/*" = ["F401"]
 
 [tool.ruff.format]
 quote-style = "double"

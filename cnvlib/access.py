@@ -10,9 +10,10 @@ import logging
 from collections.abc import Generator, Iterable
 
 import numpy as np
-from skgenome import tabio, GenomicArray as GA
+
+from skgenome import GenomicArray as GA
+from skgenome import tabio
 from skgenome.chromnames import is_alternative_contig, is_mitochondrial
-from typing import TYPE_CHECKING
 
 
 def do_access(

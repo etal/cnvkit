@@ -4,22 +4,26 @@ Namely: breaks, genemetrics.
 """
 
 from __future__ import annotations
+
 import collections
 import math
+import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from . import params, descriptives, segmetrics
+from . import descriptives, params, segmetrics
 from .cnary import is_female_default
 from .segmetrics import segment_mean
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from cnvlib.cnary import CopyNumArray
+
     from numpy import float64
+
+    from cnvlib.cnary import CopyNumArray
 
 
 # _____________________________________________________________________________
@@ -363,8 +367,6 @@ def compute_gene_stats(
     dict
         Dictionary of computed statistics.
     """
-    import warnings
-
     warnings.simplefilter("ignore", RuntimeWarning)
 
     stats_dict: dict[str, float] = {}

@@ -16,10 +16,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from skgenome import tabio, GenomicArray as GA
+from conftest import linecount
 
 import cnvlib
-from conftest import linecount
 from cnvlib import (
     access,
     antitarget,
@@ -54,6 +53,8 @@ from cnvlib import (
     smoothing,
     vary,
 )
+from skgenome import GenomicArray as GA
+from skgenome import tabio
 
 
 class PreprocessingTests(unittest.TestCase):

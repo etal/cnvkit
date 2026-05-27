@@ -1,17 +1,17 @@
 """Utilities for multi-core parallel processing."""
 
 from __future__ import annotations
+
 import atexit
-import tempfile
 import gzip
 import os
-from contextlib import contextmanager, suppress
+import tempfile
 from concurrent import futures
+from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
     from concurrent.futures.process import ProcessPoolExecutor
 
 
@@ -35,7 +35,6 @@ class SerialPool:
 
     def shutdown(self, wait=True) -> None:
         """Do nothing."""
-        pass
 
 
 class SerialFuture:

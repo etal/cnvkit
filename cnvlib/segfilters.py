@@ -1,22 +1,26 @@
 """Filter copy number segments."""
 
 from __future__ import annotations
+
 import functools
 import logging
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
 from skgenome.combiners import join_strings
+
 from .descriptives import weighted_median
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from cnvlib.cnary import CopyNumArray
+
     from numpy.typing import NDArray
     from pandas.core.frame import DataFrame
     from pandas.core.series import Series
+
+    from cnvlib.cnary import CopyNumArray
 
 
 def require_column(*colnames) -> Callable:
@@ -246,10 +250,7 @@ def bic(segarr: CopyNumArray) -> CopyNumArray:
         # Fallback for segments with stdev=0 or probes=1: use median stdev
         needs_fallback = (sd == 0) | (n <= 1)
         valid = ~needs_fallback
-        if valid.any():
-            fallback_sd = float(np.median(sd[valid]))
-        else:
-            fallback_sd = 0.0
+        fallback_sd = float(np.median(sd[valid])) if valid.any() else 0.0
         sd[needs_fallback] = fallback_sd
         # stdev is the SD of individual bin log2 values within the segment,
         # so RSS = variance * n_observations = stdev^2 * probes
@@ -337,9 +338,7 @@ def bic(segarr: CopyNumArray) -> CopyNumArray:
         del chrom_list[i + 1]
 
     # Build result by squashing each group of original rows
-    result_rows = []
-    for group in groups:
-        result_rows.append(squash_region(data.iloc[group]))
+    result_rows = [squash_region(data.iloc[group]) for group in groups]
     result = pd.concat(result_rows, ignore_index=True)
     return segarr.as_dataframe(result)
 

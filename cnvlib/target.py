@@ -1,6 +1,7 @@
 """Transform bait intervals into targets more suitable for CNVkit."""
 
 from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -10,7 +11,9 @@ from . import antitarget
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
     from pandas.core.series import Series
+
     from skgenome.gary import GenomicArray
 
 
@@ -131,7 +134,7 @@ def shorten_labels(gene_labels: Series) -> Iterator[str]:
 def filter_names(names: set[str], exclude: tuple[str] = ("mRNA",)) -> set[str]:
     """Remove less-meaningful accessions from the given set."""
     if len(names) > 1:
-        ok_names = set(n for n in names if not any(n.startswith(ex) for ex in exclude))
+        ok_names = {n for n in names if not any(n.startswith(ex) for ex in exclude)}
         if ok_names:
             return ok_names
     # Names are not filter-worthy; leave them as they are for now

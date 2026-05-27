@@ -5,6 +5,7 @@ chromosome arm in the given array (splitting via CNA.by_arm()).
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 import pandas as pd

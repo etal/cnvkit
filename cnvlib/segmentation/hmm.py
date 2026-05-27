@@ -18,8 +18,9 @@ from ..descriptives import biweight_midvariance
 from ..segfilters import squash_by_groups
 
 if TYPE_CHECKING:
-    from cnvlib.vary import VariantArray
     from numpy.typing import NDArray
+
+    from cnvlib.vary import VariantArray
 
 # Configuration constants
 DEFAULT_LENGTH_SCALE = 5e6  # bp; p_stay(d) = exp(-d/L)
@@ -50,14 +51,12 @@ def enumerate_states(
     list of (int, int | None)
         Each entry is (cn, minor) where minor is None when BAF is not used.
     """
-    states: list[tuple[int, int | None]] = []
     if include_baf:
-        for cn in range(max_copies + 1):
-            for minor in range(cn // 2 + 1):
-                states.append((cn, minor))
+        states: list[tuple[int, int | None]] = [
+            (cn, minor) for cn in range(max_copies + 1) for minor in range(cn // 2 + 1)
+        ]
     else:
-        for cn in range(max_copies + 1):
-            states.append((cn, None))
+        states = [(cn, None) for cn in range(max_copies + 1)]
     return states
 
 
@@ -164,8 +163,6 @@ def log_emission_probs(
     ndarray (T, N)
         Log probability of each observation under each state.
     """
-    N = len(states)
-
     cn_arr = np.array([s[0] for s in states], dtype=np.float64)
     expected_l2 = _expected_log2(cn_arr, purity, ploidy)  # (N,)
 

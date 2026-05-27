@@ -12,7 +12,6 @@ from scipy.stats import gmean
 from .cnary import CopyNumArray as CNA
 from .fix import center_by_window
 
-
 NULL_LOG2_COVERAGE = -5
 
 
@@ -308,10 +307,7 @@ def locate_entrez_dupes(dframe):
             yield from group.index[~match_gene_idx]
         else:
             # Keep the lowest Ensemble ID (of the matched, if any)
-            if match_gene_cnt:  # >1
-                keepable = group[match_gene_idx]
-            else:
-                keepable = group
+            keepable = group[match_gene_idx] if match_gene_cnt else group
             idx_to_keep = keepable.sort_values("gene_id").index.to_numpy()[0]
             for idx in group.index:
                 if idx != idx_to_keep:

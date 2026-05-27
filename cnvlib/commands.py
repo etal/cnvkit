@@ -35,7 +35,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 pyplot.ioff()
 
 import pandas as pd
-from skgenome import tabio, GenomicArray as _GA
+
+from skgenome import GenomicArray as _GA
+from skgenome import tabio
 from skgenome.rangelabel import to_label
 
 from . import (
@@ -63,19 +65,20 @@ from . import (
     segmetrics,
     target,
 )
+from ._version import __version__
 from .cmdutil import (
     load_het_snps,
     read_cna,
     verify_sample_sex,
-    write_tsv,
-    write_text,
     write_dataframe,
+    write_text,
+    write_tsv,
 )
-
-from ._version import __version__
+from .cnary import CopyNumArray as _CNA
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
     from cnvlib.cnary import CopyNumArray
 
 
@@ -2137,11 +2140,11 @@ def do_sex(
         is_xy, stats = cna.compare_sex_chromosomes(
             is_haploid_x_reference, diploid_parx_genome
         )
-        if is_xy is None:
-            # Indeterminate -- e.g. an assembly with no chrX (#669). Report
-            # 'Unknown' honestly rather than collapsing to the safe female
-            # default at the reporting layer; consumers that need a concrete
-            # bool still get one via `cnary.is_female_default`.
+        # Indeterminate -- e.g. an assembly with no chrX (#669). Report
+        # 'Unknown' honestly rather than collapsing to the safe female default
+        # at the reporting layer; consumers that need a concrete bool still get
+        # one via `cnary.is_female_default`.
+        if is_xy is None:  # noqa: SIM108  # explanatory comment above
             sex = "Unknown"
         else:
             sex = "Male" if is_xy else "Female"
@@ -2606,8 +2609,6 @@ P_import_picard.set_defaults(func=_cmd_import_picard)
 
 def _cmd_import_seg(args: argparse.Namespace) -> None:
     """Convert a SEG file to CNVkit .cns files."""
-    from .cnary import CopyNumArray as _CNA
-
     if args.chromosomes:
         if args.chromosomes == "human":
             chrom_names = {"23": "X", "24": "Y", "25": "M"}

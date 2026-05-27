@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 """Unit tests for the CNVkit library, cnvlib."""
 
+import math
 import unittest
 from io import StringIO
 
-from skgenome import tabio
-
 from conftest import linecount
+
+from cnvlib.cnary import CopyNumArray as CNA
+from skgenome import tabio
 
 
 class IOTests(unittest.TestCase):
@@ -210,10 +212,6 @@ class IOTests(unittest.TestCase):
         0.0 -- which would keep the het site yet pin its mirrored BAF to exactly
         0 over the whole region.
         """
-        import math
-
-        from cnvlib.cnary import CopyNumArray as CNA
-
         varr = tabio.read(
             "formats/vcf-het-no-altcount.vcf",
             "vcf",

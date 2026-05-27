@@ -8,6 +8,7 @@ GenomicArray types.
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 import numpy as np
@@ -16,8 +17,8 @@ import pandas as pd
 from .combiners import first_of, join_strings, make_const
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Callable, Generator, Iterator, Sequence
+
     from numpy import ndarray
     from pandas.core.indexes.base import Index
 
@@ -56,7 +57,11 @@ def by_shared_chroms(
         yield table["chromosome"].iat[0], table, other
         # yield None, table, other
     else:
-        other_chroms = {c: o for c, o in other.groupby("chromosome", sort=False)}
+        # C416 would suggest `dict(...)`, but `dict()` on a pandas
+        # DataFrameGroupBy follows the mapping protocol (via __getitem__),
+        # not the iterable-of-pairs protocol, so it fails at runtime with
+        # `'str' object is not callable`. Keep the comprehension.
+        other_chroms = {c: o for c, o in other.groupby("chromosome", sort=False)}  # noqa: C416
         for chrom, ctable in table.groupby("chromosome", sort=False):
             if chrom in other_chroms:
                 otable = other_chroms[chrom]

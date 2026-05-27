@@ -1,6 +1,7 @@
 """Supporting functions for the 'antitarget' command."""
 
 from __future__ import annotations
+
 import gzip
 import logging
 import math
@@ -13,6 +14,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+
 from skgenome import tabio
 from skgenome._pysam import PYSAM_INSTALL_MSG
 from skgenome.chromnames import detect_chr_prefix
@@ -23,8 +25,10 @@ from .parallel import rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 if TYPE_CHECKING:
-    import pysam
     from collections.abc import Iterator
+
+    import pysam
+
     from skgenome import GenomicArray
 
 
@@ -81,7 +85,7 @@ def bedgraph_to_basecount(
         end, gene (if present in BED), and basecount.
     """
     try:
-        import pysam
+        import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
     except ImportError:
         raise ImportError(
             f"pysam is required for reading bedGraph files. {PYSAM_INSTALL_MSG}"
@@ -411,7 +415,7 @@ def interval_coverages_count(
 ) -> Iterator[list[int | tuple[str, int, int, str, float, float]]]:
     """Calculate log2 coverages in the BAM file at each interval."""
     try:
-        import pysam
+        import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
     except ImportError:
         raise ImportError(
             f"pysam is required for BAM read counting. {PYSAM_INSTALL_MSG}"
@@ -457,7 +461,7 @@ def _rdc_chunk(
 ) -> Iterator[tuple[int, tuple[str, int, int, str, float, float]]]:
     if isinstance(bamfile, str):  # type: ignore[unreachable]
         try:  # type: ignore[unreachable]
-            import pysam
+            import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
         except ImportError:
             raise ImportError(
                 f"pysam is required for BAM read counting. {PYSAM_INSTALL_MSG}"
@@ -633,7 +637,7 @@ def bedcov(
         aborts on regions whose contig is absent from the BAM (#620).
     """
     try:
-        import pysam
+        import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
     except ImportError:
         raise ImportError(
             f"pysam is required for BAM coverage calculation. {PYSAM_INSTALL_MSG}"

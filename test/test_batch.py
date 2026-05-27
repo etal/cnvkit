@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Tests for the batch command."""
 
+import ast
+import inspect
 import logging
 import os
 import shutil
@@ -16,10 +18,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from skgenome import tabio, GenomicArray as GA
+from conftest import linecount
 
 import cnvlib
-from conftest import linecount
 from cnvlib import (
     access,
     antitarget,
@@ -54,6 +55,8 @@ from cnvlib import (
     smoothing,
     vary,
 )
+from skgenome import GenomicArray as GA
+from skgenome import tabio
 
 
 class BatchTests(unittest.TestCase):
@@ -181,54 +184,52 @@ class BatchTests(unittest.TestCase):
         This tests that when coverage data contains duplicate coordinates,
         the error is properly detected and reported with sample context.
         """
-        # Create a temporary directory for output
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create mock coverage data with duplicate coordinates
-            # This simulates the issue from GitHub issue #971
-            target_data = pd.DataFrame(
-                {
-                    "chromosome": ["chr1"] * 4,
-                    "start": [100, 200, 200, 300],  # Duplicate start at position 200
-                    "end": [150, 250, 250, 350],  # Duplicate end at position 250
-                    "gene": ["GeneA", "GeneB", "GeneB", "GeneC"],
-                    "log2": [0.1, 0.2, 0.2, 0.3],
-                    "depth": [100.0, 200.0, 200.0, 150.0],
-                }
-            )
-            target_cnarr = cnary.CopyNumArray(target_data, {"sample_id": "test_sample"})
+        # Build in-memory cnarrs with duplicate target coordinates; the test
+        # exercises do_fix's duplicate-detection branch, no disk I/O needed.
+        target_data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 4,
+                "start": [100, 200, 200, 300],  # Duplicate start at position 200
+                "end": [150, 250, 250, 350],  # Duplicate end at position 250
+                "gene": ["GeneA", "GeneB", "GeneB", "GeneC"],
+                "log2": [0.1, 0.2, 0.2, 0.3],
+                "depth": [100.0, 200.0, 200.0, 150.0],
+            }
+        )
+        target_cnarr = cnary.CopyNumArray(target_data, {"sample_id": "test_sample"})
 
-            antitarget_data = pd.DataFrame(
-                {
-                    "chromosome": ["chr1"] * 2,
-                    "start": [50, 400],
-                    "end": [90, 450],
-                    "gene": ["Antitarget", "Antitarget"],
-                    "log2": [0.0, 0.0],
-                    "depth": [50.0, 50.0],
-                }
-            )
-            antitarget_cnarr = cnary.CopyNumArray(
-                antitarget_data, {"sample_id": "test_sample"}
-            )
+        antitarget_data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 2,
+                "start": [50, 400],
+                "end": [90, 450],
+                "gene": ["Antitarget", "Antitarget"],
+                "log2": [0.0, 0.0],
+                "depth": [50.0, 50.0],
+            }
+        )
+        antitarget_cnarr = cnary.CopyNumArray(
+            antitarget_data, {"sample_id": "test_sample"}
+        )
 
-            # Create a simple reference without duplicates
-            ref_data = pd.DataFrame(
-                {
-                    "chromosome": ["chr1"] * 5,
-                    "start": [50, 100, 200, 300, 400],
-                    "end": [90, 150, 250, 350, 450],
-                    "gene": ["Antitarget", "GeneA", "GeneB", "GeneC", "Antitarget"],
-                    "log2": [0.0, 0.0, 0.0, 0.0, 0.0],
-                }
-            )
-            ref_cnarr = cnary.CopyNumArray(ref_data, {"sample_id": "reference"})
+        # Create a simple reference without duplicates
+        ref_data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 5,
+                "start": [50, 100, 200, 300, 400],
+                "end": [90, 150, 250, 350, 450],
+                "gene": ["Antitarget", "GeneA", "GeneB", "GeneC", "Antitarget"],
+                "log2": [0.0, 0.0, 0.0, 0.0, 0.0],
+            }
+        )
+        ref_cnarr = cnary.CopyNumArray(ref_data, {"sample_id": "reference"})
 
-            # Test that do_fix detects duplicate coordinates and raises ValueError
-            with self.assertRaises(ValueError) as ctx:
-                fix.do_fix(target_cnarr, antitarget_cnarr, ref_cnarr)
+        # Test that do_fix detects duplicate coordinates and raises ValueError
+        with self.assertRaises(ValueError) as ctx:
+            fix.do_fix(target_cnarr, antitarget_cnarr, ref_cnarr)
 
-            # The error message should mention duplicates
-            self.assertIn("Duplicated genomic coordinates", str(ctx.exception))
+        # The error message should mention duplicates
+        self.assertIn("Duplicated genomic coordinates", str(ctx.exception))
 
     def test_batch_accepts_sample_sex_arg(self):
         """``cnvkit.py batch`` accepts ``-x/--sample-sex`` (#500, #635).
@@ -285,9 +286,6 @@ class BatchTests(unittest.TestCase):
         AST-level guard so source rearrangements still catch the regression
         cleanly without needing a full BAM fixture per case.
         """
-        import ast
-        import inspect
-
         src = inspect.getsource(batch.batch_run_sample)
         tree = ast.parse(src)
         do_call_invocations = []
@@ -334,9 +332,6 @@ class BatchTests(unittest.TestCase):
         AST-level guard so source rearrangements still catch the regression
         cleanly without needing a full BAM fixture.
         """
-        import ast
-        import inspect
-
         src = inspect.getsource(batch.batch_run_sample)
         tree = ast.parse(src)
         do_fix_invocations = []
@@ -376,9 +371,6 @@ class BatchTests(unittest.TestCase):
         AST-level guard, paired with
         ``test_batch_run_sample_passes_bias_smoother_to_do_fix``.
         """
-        import ast
-        import inspect
-
         src = inspect.getsource(batch.batch_make_reference)
         tree = ast.parse(src)
         do_reference_invocations = []

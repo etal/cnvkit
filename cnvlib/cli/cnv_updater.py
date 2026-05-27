@@ -18,8 +18,9 @@ import os.path
 
 import numpy as np
 
-from .. import read, params
 from skgenome import tabio
+
+from .. import params, read
 
 
 def argument_parsing():

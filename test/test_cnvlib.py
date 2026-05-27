@@ -12,10 +12,9 @@ logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import numpy as np
 import pandas as pd
-from skgenome import GenomicArray, tabio
+from conftest import linecount
 
 import cnvlib
-from cnvlib.cnary import CopyNumArray
 from cnvlib import (
     cmdutil,
     cnary,
@@ -29,7 +28,8 @@ from cnvlib import (
     segmetrics,
     vary,
 )
-from conftest import linecount
+from cnvlib.cnary import CopyNumArray, is_female_default
+from skgenome import GenomicArray, tabio
 
 
 class CNATests(unittest.TestCase):
@@ -306,8 +306,6 @@ class CNATests(unittest.TestCase):
         for a sample whose X is actually diploid would spuriously inflate
         chrX by +1 (the gh#360 failure family).
         """
-        from cnvlib.cnary import is_female_default
-
         # The helper: None -> female; real guesses pass through as plain bool.
         self.assertIs(is_female_default(None), True)
         self.assertIs(is_female_default(np.bool_(True)), True)
@@ -352,41 +350,33 @@ class CNATests(unittest.TestCase):
             # 200 autosome bins around log2=0 (anchors the autosome median),
             # 50 chrX bins around chrx_ratio, 50 chrY bins around chry_ratio.
             rng = np.random.default_rng(0)
-            rows = []
-            for c in ("chr1", "chr2"):
-                for i in range(200):
-                    rows.append(
-                        (
-                            c,
-                            i * 1000,
-                            i * 1000 + 100,
-                            "-",
-                            float(rng.normal(0, 0.1)),
-                            1.0,
-                        )
-                    )
-            for i in range(50):
-                rows.append(
-                    (
-                        "chrX",
-                        i * 1000,
-                        i * 1000 + 100,
-                        "-",
-                        float(rng.normal(chrx_ratio, 0.1)),
-                        1.0,
-                    )
+            rows = [
+                (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.1)), 1.0)
+                for c in ("chr1", "chr2")
+                for i in range(200)
+            ]
+            rows.extend(
+                (
+                    "chrX",
+                    i * 1000,
+                    i * 1000 + 100,
+                    "-",
+                    float(rng.normal(chrx_ratio, 0.1)),
+                    1.0,
                 )
-            for i in range(50):
-                rows.append(
-                    (
-                        "chrY",
-                        i * 1000,
-                        i * 1000 + 100,
-                        "-",
-                        float(rng.normal(chry_ratio, 0.1)),
-                        1.0,
-                    )
+                for i in range(50)
+            )
+            rows.extend(
+                (
+                    "chrY",
+                    i * 1000,
+                    i * 1000 + 100,
+                    "-",
+                    float(rng.normal(chry_ratio, 0.1)),
+                    1.0,
                 )
+                for i in range(50)
+            )
             return CopyNumArray(
                 pd.DataFrame(
                     rows,
@@ -438,23 +428,22 @@ class CNATests(unittest.TestCase):
 
         def _no_y(chrx_ratio, n_x=50):
             rng = np.random.default_rng(0)
-            rows = []
-            for c in ("chr1", "chr2"):
-                for i in range(200):
-                    rows.append(
-                        (c, i * 100, i * 100 + 50, "-", float(rng.normal(0, 0.05)), 1.0)
-                    )
-            for i in range(n_x):
-                rows.append(
-                    (
-                        "chrX",
-                        i * 100,
-                        i * 100 + 50,
-                        "-",
-                        float(rng.normal(chrx_ratio, 0.05)),
-                        1.0,
-                    )
+            rows = [
+                (c, i * 100, i * 100 + 50, "-", float(rng.normal(0, 0.05)), 1.0)
+                for c in ("chr1", "chr2")
+                for i in range(200)
+            ]
+            rows.extend(
+                (
+                    "chrX",
+                    i * 100,
+                    i * 100 + 50,
+                    "-",
+                    float(rng.normal(chrx_ratio, 0.05)),
+                    1.0,
                 )
+                for i in range(n_x)
+            )
             # Deliberately no chrY rows.
             return CopyNumArray(
                 pd.DataFrame(
@@ -499,41 +488,33 @@ class CNATests(unittest.TestCase):
         rng = np.random.default_rng(0)
 
         def _build(n_auto, n_x, n_y, *, x_log2=-1.03, y_log2=0.236):
-            rows = []
-            for c in ("chr1", "chr2"):
-                for i in range(n_auto):
-                    rows.append(
-                        (
-                            c,
-                            i * 1000,
-                            i * 1000 + 100,
-                            "-",
-                            float(rng.normal(0, 0.05)),
-                            1.0,
-                        )
-                    )
-            for i in range(n_x):
-                rows.append(
-                    (
-                        "chrX",
-                        i * 1000,
-                        i * 1000 + 100,
-                        "-",
-                        float(rng.normal(x_log2, 0.05)),
-                        1.0,
-                    )
+            rows = [
+                (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+                for c in ("chr1", "chr2")
+                for i in range(n_auto)
+            ]
+            rows.extend(
+                (
+                    "chrX",
+                    i * 1000,
+                    i * 1000 + 100,
+                    "-",
+                    float(rng.normal(x_log2, 0.05)),
+                    1.0,
                 )
-            for i in range(n_y):
-                rows.append(
-                    (
-                        "chrY",
-                        i * 1000,
-                        i * 1000 + 100,
-                        "-",
-                        float(rng.normal(y_log2, 0.05)),
-                        1.0,
-                    )
+                for i in range(n_x)
+            )
+            rows.extend(
+                (
+                    "chrY",
+                    i * 1000,
+                    i * 1000 + 100,
+                    "-",
+                    float(rng.normal(y_log2, 0.05)),
+                    1.0,
                 )
+                for i in range(n_y)
+            )
             return CopyNumArray(
                 pd.DataFrame(
                     rows,
@@ -560,12 +541,11 @@ class CNATests(unittest.TestCase):
     def _make_cna_no_sex_chroms(chrom_names):
         """Build a small CopyNumArray with the given non-sex chromosome names."""
         rng = np.random.default_rng(0)
-        rows = []
-        for c in chrom_names:
-            for i in range(20):
-                rows.append(
-                    (c, i * 100, i * 100 + 50, "-", float(rng.normal(0, 0.05)), 1.0)
-                )
+        rows = [
+            (c, i * 100, i * 100 + 50, "-", float(rng.normal(0, 0.05)), 1.0)
+            for c in chrom_names
+            for i in range(20)
+        ]
         return CopyNumArray(
             pd.DataFrame(
                 rows,
@@ -1005,7 +985,7 @@ class CNAryByGeneTests(unittest.TestCase):
 
         # Group by gene
         gene_groups = list(cnarr.by_gene())
-        gene_dict = {name: ga for name, ga in gene_groups}
+        gene_dict = dict(gene_groups)
 
         # The bin at position 1 with "GeneA,GeneB" should appear in both genes
         self.assertIn("GeneA", gene_dict)

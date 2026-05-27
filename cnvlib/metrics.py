@@ -1,17 +1,21 @@
 """Robust metrics to evaluate performance of copy number estimates."""
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
 
 from . import descriptives
+from .cnary import CopyNumArray as CNA
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from cnvlib.cnary import CopyNumArray
+
     from numpy import float64, ndarray
+
+    from cnvlib.cnary import CopyNumArray
 
 
 def do_metrics(
@@ -38,8 +42,6 @@ def do_metrics(
         Each row contains quality metrics for one sample.
     """
     # Catch if passed args are single CopyNumArrays instead of lists
-    from .cnary import CopyNumArray as CNA
-
     if isinstance(cnarrs, CNA):
         cnarrs = [cnarrs]  # type: ignore[assignment]
     if isinstance(segments, CNA):

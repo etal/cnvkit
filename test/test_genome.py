@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 
 from cnvlib import read_ga
-from skgenome import chromsort, rangelabel
-from skgenome import tabio, GenomicArray as GA
+from skgenome import GenomicArray as GA
+from skgenome import chromsort, rangelabel, tabio
 
 
 class GaryTests(unittest.TestCase):
@@ -309,9 +309,7 @@ class IntervalTests(unittest.TestCase):
         for col in expect.data.columns:
             self.assertTrue(
                 (expect[col].to_numpy() == result[col].to_numpy()).all(),
-                "Col '{}' differs:\nExpect:\n{}\nGot:\n{}".format(
-                    col, expect.data, result.data
-                ),
+                f"Col '{col}' differs:\nExpect:\n{expect.data}\nGot:\n{result.data}",
             )
 
     def setUp(self):

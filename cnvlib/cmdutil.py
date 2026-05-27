@@ -1,17 +1,20 @@
 """Functions reused within command-line implementations."""
 
 from __future__ import annotations
+
 import logging
 import sys
+from typing import TYPE_CHECKING
 
 import numpy as np
 
+from skgenome import GenomicArray as GA
 from skgenome import tabio
 from skgenome.chromnames import infer_sex_chrom_labels
 
-from .cnary import CopyNumArray as CNA, is_female_default
-from skgenome import GenomicArray as GA
-from typing import TYPE_CHECKING
+from .cnary import CopyNumArray as CNA
+from .cnary import is_female_default
+from .vary import chrx_het_density_rejects_haploid
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -109,7 +112,10 @@ def load_het_snps(
     orig_len = len(varr)
     varr = varr.heterozygous()  # type: ignore[attr-defined]
     logging.info("Kept %d heterozygous of %d VCF records", len(varr), orig_len)
-    _warn_if_baf_input_suspicious(varr["alt_freq"] if "alt_freq" in varr else None)
+    # GenomicArray has no .get(); SIM401 would suggest it but break.
+    _warn_if_baf_input_suspicious(
+        varr["alt_freq"] if "alt_freq" in varr else None  # noqa: SIM401
+    )
     # TODO use/explore tumor_boost option
     if tumor_boost:
         varr["alt_freq"] = varr.tumor_boost()
@@ -187,8 +193,6 @@ def verify_sample_sex(
         # Coverage-based call stays untouched when the test isn't decisive,
         # so this is a one-way upgrade toward female (the safe direction
         # for #360-family indeterminacy).
-        from .vary import chrx_het_density_rejects_haploid
-
         n_total = variants.meta.get("chrx_snp_total", 0)
         n_het = variants.meta.get("chrx_het_count", 0)
         rejected, p_value = chrx_het_density_rejects_haploid(n_total, n_het)

@@ -26,10 +26,12 @@ import sys
 import numpy as np
 import pandas as pd
 
+from skgenome import GenomicArray as GA
+from skgenome import tabio
+
 from .. import parallel
 from ..coverage import do_coverage
 from ..descriptives import modal_location
-from skgenome import tabio, GenomicArray as GA
 
 
 def argument_parsing():

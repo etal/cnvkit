@@ -4,6 +4,7 @@
 import unittest
 from dataclasses import FrozenInstanceError
 
+from cnvlib import params
 from skgenome.genomebuild import (
     GRCH37,
     GRCH38,
@@ -53,8 +54,6 @@ class GenomeBuildTests(unittest.TestCase):
 
     def test_back_compat_via_params(self):
         """cnvlib.params.PSEUDO_AUTSOMAL_REGIONS preserves the historical API."""
-        from cnvlib import params
-
         # Every registered build appears as a top-level key
         self.assertEqual(set(params.PSEUDO_AUTSOMAL_REGIONS), set(REGISTERED_BUILDS))
         # All four PAR keys round-trip equally for every build
