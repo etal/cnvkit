@@ -181,6 +181,36 @@ no chrY bins -- the AND-gate naturally collapses to a chrX-only check
 applies, and the strict inequality means a sample sitting exactly at the
 chrX midpoint ties to female (the safe default).
 
+VCF heterozygous-SNP confirmer
+``````````````````````````````
+
+When a VCF is supplied to :ref:`call`, CNVkit additionally runs an
+independent confirmer of chrX ploidy. A diploid X chromosome has
+heterozygous SNPs at roughly the same population rate as autosomes
+(~30% of polymorphic sites in panel-typical populations); a haploid X
+has essentially zero heterozygous calls, modulo sequencing-error noise.
+Observing many het SNPs on chrX is therefore strong evidence that chrX
+is diploid -- evidence that the presence of a chromosome Y *cannot
+fake* (a chrY+haploid-chrX male has no chrX het sites; a Klinefelter
+XXY does).
+
+CNVkit runs a one-sided binomial test of the observed chrX het count
+against a permissive haploid-X null (5% error-rate ceiling) at
+α = 0.001. If the haploid-X null is rejected and coverage had
+inferred male, the sample is upgraded to female so chrX expected
+ploidy is diploid in downstream calls (purity-rescaled copy number,
+diagram chrX shift, etc.). The override is logged at WARNING level
+with the het/total counts and the p-value, and is suppressed when the
+user supplies ``--sample-sex`` explicitly. The test requires at least
+10 chrX SNPs in the VCF; smaller panels skip the test silently
+(non-evidence in either direction).
+
+This is a one-way upgrade toward female (the safe direction in the
+"no positive male evidence" sense of the AND-gate above); a no-het
+VCF never flips a coverage-female call to male, because absent het
+SNPs are consistent with either true haploid X or simply not enough
+data.
+
 PAR handling
 ------------
 
