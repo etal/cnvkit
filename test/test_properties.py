@@ -35,6 +35,7 @@ from cnvlib.descriptives import (
 from cnvlib.smoothing import (
     _width2wing,
     kaiser,
+    loess,
     rolling_median,
     rolling_quantile,
     rolling_std,
@@ -475,6 +476,84 @@ class TestSavgol:
         assert np.isfinite(result).all()
         assert calls["interp"] >= 1, "Interp path should have been attempted"
         assert calls["fallback"] >= 1, "Fallback (non-polyfit) path should have run"
+
+
+class TestLoess:
+    """Invariants for the LOESS (lowess) smoother (gh#1028).
+
+    LOESS exists alongside rolling_median as an opt-in alternative bias
+    smoother that, unlike a mirror-padded rolling median, does not collapse
+    its boundary values to the inner-window median. The properties here
+    cover the same shape/finiteness invariants as TestRollingMedian /
+    TestSavgol, plus a direct check that LOESS tracks a monotone trend
+    into the tails rather than flattening at the edges (the #1028
+    motivation).
+    """
+
+    @given(_smoothing_input())
+    def test_output_length_preserved(self, args):
+        x, frac = args
+        result = loess(x, frac)
+        assert len(result) == len(x)
+
+    @given(_smoothing_input())
+    def test_no_nans_on_finite_input(self, args):
+        x, frac = args
+        result = loess(x, frac)
+        assert not np.any(np.isnan(result))
+
+    @given(
+        st.integers(min_value=10, max_value=100),
+        _LOG2_FLOATS,
+        st.floats(min_value=0.1, max_value=0.9, allow_nan=False, allow_infinity=False),
+    )
+    def test_constant_array_unchanged(self, n, c, frac):
+        """LOESS of a constant array returns the same constant."""
+        x = np.full(n, c)
+        result = loess(x, frac)
+        assert np.allclose(result, c, atol=1e-6)
+
+    def test_short_input_returns_input_unchanged(self):
+        """A single-element array has nothing to smooth; return it unchanged."""
+        result = loess(np.array([0.5]), 0.5)
+        assert len(result) == 1
+        assert result[0] == 0.5
+
+    def test_tracks_linear_trend_at_edges_better_than_rolling_median(self):
+        """LOESS extrapolates a monotone trend into the tails; rolling_median plateaus (gh#1028).
+
+        Construct a linear bias-vs-position signal with light noise and a
+        large window fraction. The rolling-median smoother collapses its
+        boundary values toward the inner-window median (flat-edge artifact
+        of mirror-padding). LOESS, in contrast, retains the slope at the
+        boundary. The test asserts that LOESS' boundary error against the
+        underlying trend is smaller than rolling-median's by a clear
+        margin, which is the precise property gh#1028 requests.
+        """
+        n = 200
+        rng = np.random.default_rng(1028)
+        x_axis = np.linspace(0.0, 1.0, n)
+        true_trend = 2.0 * x_axis - 1.0  # linear from -1 to +1
+        signal = true_trend + rng.normal(0.0, 0.15, n)
+
+        frac = 0.3
+        loess_smoothed = loess(signal, frac)
+        median_smoothed = rolling_median(signal, frac)
+
+        # Compare boundary error against the underlying trend, over the
+        # outermost 5% of bins on each side (where the edge artifact lives).
+        edge = max(1, n // 20)
+        boundary_idx = np.r_[np.arange(edge), np.arange(n - edge, n)]
+        loess_err = np.abs(
+            loess_smoothed[boundary_idx] - true_trend[boundary_idx]
+        ).mean()
+        median_err = np.abs(
+            median_smoothed[boundary_idx] - true_trend[boundary_idx]
+        ).mean()
+        assert loess_err < median_err, (
+            f"LOESS should track the boundary trend better than rolling_median; "
+            f"loess_err={loess_err:.4f}, median_err={median_err:.4f}"
+        )
 
 
 # ---------------------------------------------------------------------------

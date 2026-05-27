@@ -934,6 +934,7 @@ def _cmd_reference(args: argparse.Namespace) -> None:
             args.cluster,
             args.min_cluster_size,
             args.cluster_method,
+            bias_smoother=args.bias_smoother,
         )
     else:
         raise ValueError(usage_err_msg)
@@ -1014,6 +1015,18 @@ P_reference_bias.add_argument(
     action="store_false",
     help="Skip RepeatMasker correction.",
 )
+P_reference_bias.add_argument(
+    "--bias-smoother",
+    choices=("median", "loess"),
+    default="median",
+    help=(
+        "Smoother used for trait-based bias correction. 'median' is the "
+        "historical default; 'loess' (locally weighted regression) retains "
+        "the trend slope at the boundaries of the sort axis rather than "
+        "plateauing at the extremes, addressing the under-correction "
+        "described in GitHub issue #1028. Default: median."
+    ),
+)
 P_reference.set_defaults(func=_cmd_reference)
 
 
@@ -1046,6 +1059,7 @@ def _cmd_fix(args: argparse.Namespace) -> None:
         args.do_rmask,
         args.cluster,
         args.smoothing_window_fraction,
+        bias_smoother=args.bias_smoother,
     )
     tabio.write(target_table, args.output or tgt_raw.sample_id + ".cnr")
 
@@ -1089,6 +1103,18 @@ P_fix.add_argument(
     dest="do_rmask",
     action="store_false",
     help="Skip RepeatMasker correction.",
+)
+P_fix.add_argument(
+    "--bias-smoother",
+    choices=("median", "loess"),
+    default="median",
+    help=(
+        "Smoother used for trait-based bias correction (see --no-gc, --no-edge, "
+        "--no-rmask). 'median' is the historical default; 'loess' (locally "
+        "weighted regression) retains the trend slope at the boundaries of the "
+        "sort axis rather than plateauing at the extremes, addressing the "
+        "under-correction described in GitHub issue #1028. Default: median."
+    ),
 )
 P_fix.add_argument("-o", "--output", metavar="FILENAME", help="Output file name.")
 add_diploid_parx_genome(P_fix)

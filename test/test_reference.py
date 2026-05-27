@@ -341,6 +341,48 @@ class ReferenceTests(unittest.TestCase):
         cnr = commands.do_fix(tgt_bins, blank_bins, ref[~is_bg])
         self.assertTrue(0 < len(cnr) <= len(tgt_bins))
 
+    def test_fix_bias_smoother_loess(self):
+        """do_fix accepts bias_smoother='loess' end-to-end (gh#1028).
+
+        Exercises the full plumb-through: do_fix -> load_adjust_coverages ->
+        center_by_window -> smoothing.loess. The LOESS path must produce a
+        finite .cnr of the same length as the default median path, and the
+        log2 values must actually differ -- otherwise the parameter is being
+        silently dropped somewhere in the stack.
+        """
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        tgt_bins = ref[~is_bg]
+        rng = np.random.default_rng(1028)
+        tgt_bins.log2 += rng.standard_normal(len(tgt_bins)) / 5
+        anti_bins = ref[is_bg]
+        anti_bins.log2 += rng.standard_normal(len(anti_bins)) / 5
+
+        cnr_median = commands.do_fix(tgt_bins, anti_bins, ref, bias_smoother="median")
+        cnr_loess = commands.do_fix(tgt_bins, anti_bins, ref, bias_smoother="loess")
+
+        # Both paths produce same-length, finite output
+        self.assertEqual(len(cnr_loess), len(cnr_median))
+        self.assertTrue(np.isfinite(cnr_loess["log2"]).all())
+        self.assertFalse(cnr_loess["log2"].isna().any())
+        # ...but the actual log2 values differ -- otherwise the smoother
+        # choice is being silently ignored somewhere in the call stack.
+        self.assertFalse(
+            np.allclose(cnr_loess["log2"], cnr_median["log2"]),
+            "loess smoother produced identical log2 to median; "
+            "the bias_smoother parameter is not reaching center_by_window.",
+        )
+
+    def test_fix_bias_smoother_unknown_raises(self):
+        """Unknown bias_smoother values raise a clear ValueError, not silently default."""
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        tgt_bins = ref[~is_bg]
+        anti_bins = ref[is_bg]
+        with self.assertRaises(ValueError) as cm:
+            commands.do_fix(tgt_bins, anti_bins, ref, bias_smoother="bogus")
+        self.assertIn("bogus", str(cm.exception))
+
     def test_fix_degenerate_no_nan(self):
         """do_fix never emits NaN log2/weight from degenerate input (#521/#524).
 

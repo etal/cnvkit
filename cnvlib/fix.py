@@ -25,6 +25,7 @@ def do_fix(
     do_rmask: bool = True,
     do_cluster: bool = False,
     smoothing_window_fraction: None = None,
+    bias_smoother: str = "median",
 ) -> CopyNumArray:
     """Normalize tumor/test sample coverage using a reference and correct biases.
 
@@ -151,6 +152,7 @@ def do_fix(
         False,
         diploid_parx_genome,
         smoothing_window_fraction=smoothing_window_fraction,
+        bias_smoother=bias_smoother,
     )
     logging.info("Processing antitarget: %s", antitarget_raw.sample_id)
     anti_cnarr, ref_anti = load_adjust_coverages(
@@ -162,6 +164,7 @@ def do_fix(
         do_rmask,
         diploid_parx_genome,
         smoothing_window_fraction=smoothing_window_fraction,
+        bias_smoother=bias_smoother,
     )
     if len(anti_cnarr):
         # Combine target and antitarget bins
@@ -219,6 +222,7 @@ def load_adjust_coverages(
     fix_rmask: bool,
     diploid_parx_genome: str | None,
     smoothing_window_fraction: None = None,
+    bias_smoother: str = "median",
 ) -> tuple[CopyNumArray, CopyNumArray]:
     """Load and filter probe coverages; correct using reference and GC."""
     if "gc" in cnarr:
@@ -259,19 +263,25 @@ def load_adjust_coverages(
         if fix_gc:
             if "gc" in ref_matched:
                 logging.info("Correcting for GC bias...")
-                cnarr = center_by_window(cnarr, frac, ref_matched["gc"])
+                cnarr = center_by_window(
+                    cnarr, frac, ref_matched["gc"], bias_smoother=bias_smoother
+                )
                 cnarr_index_reset = True
             else:
                 logging.warning("WARNING: Skipping correction for GC bias")
         if fix_edge:
             logging.info("Correcting for density bias...")
             edge_bias = get_edge_bias(cnarr, params.INSERT_SIZE)
-            cnarr = center_by_window(cnarr, frac, edge_bias)
+            cnarr = center_by_window(
+                cnarr, frac, edge_bias, bias_smoother=bias_smoother
+            )
             cnarr_index_reset = True
         if fix_rmask:
             if "rmask" in ref_matched:
                 logging.info("Correcting for RepeatMasker bias...")
-                cnarr = center_by_window(cnarr, frac, ref_matched["rmask"])
+                cnarr = center_by_window(
+                    cnarr, frac, ref_matched["rmask"], bias_smoother=bias_smoother
+                )
                 cnarr_index_reset = True
             else:
                 logging.warning("WARNING: Skipping correction for RepeatMasker bias")
@@ -344,12 +354,31 @@ def match_ref_to_sample(
 
 
 def center_by_window(
-    cnarr: CopyNumArray, fraction: float, sort_key: Series | ndarray
+    cnarr: CopyNumArray,
+    fraction: float,
+    sort_key: Series | ndarray,
+    bias_smoother: str = "median",
 ) -> CopyNumArray:
     """Smooth out biases according to the trait specified by sort_key.
 
     E.g. correct GC-biased bins by windowed averaging across similar-GC
     bins; or for similar interval sizes.
+
+    Parameters
+    ----------
+    cnarr : CopyNumArray
+        Coverage data to bias-correct.
+    fraction : float
+        Smoothing window as a fraction of ``len(cnarr)``.
+    sort_key : Series or ndarray
+        Per-bin values defining the sort axis along which to smooth
+        (e.g. GC content, target size).
+    bias_smoother : str, optional
+        Choice of smoother. ``"median"`` (default) uses
+        ``smoothing.rolling_median``, preserving CNVkit's historical
+        behavior. ``"loess"`` uses ``smoothing.loess`` (LOWESS), which
+        retains the trend slope at the boundaries of the sort axis
+        instead of plateauing -- see gh#1028.
     """
     # Separate neighboring bins that could have the same key
     # (to avoid re-centering actual CNV regions -- only want an independently
@@ -367,8 +396,14 @@ def center_by_window(
     # Sort the data according to the specified parameter
     order = np.argsort(sort_key, kind="mergesort")
     df = df.iloc[order]
-    biases = smoothing.rolling_median(df["log2"], fraction)
-    # biases = smoothing.savgol(df['log2'], fraction)
+    if bias_smoother == "median":
+        biases = smoothing.rolling_median(df["log2"], fraction)
+    elif bias_smoother == "loess":
+        biases = smoothing.loess(df["log2"], fraction)
+    else:
+        raise ValueError(
+            f"Unknown bias_smoother {bias_smoother!r}; expected 'median' or 'loess'"
+        )
     df["log2"] -= biases
     fixarr = cnarr.as_dataframe(df)
     fixarr.sort()
