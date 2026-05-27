@@ -279,6 +279,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             args.seq_method,
             args.cluster,
             args.cluster_method,
+            bias_smoother=args.bias_smoother,
         )
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
@@ -327,6 +328,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     args.cluster,
                     args.fasta,
                     args.sample_sex,
+                    args.bias_smoother,
                 )
                 futures.append((bam, future))
             # Wait for all tasks to complete and raise any exceptions
@@ -512,6 +514,22 @@ P_batch_report.add_argument(
     "--diagram",
     action="store_true",
     help="Create an ideogram of copy ratios on chromosomes as a PDF.",
+)
+P_batch.add_argument(
+    "--bias-smoother",
+    choices=("median", "loess"),
+    default="median",
+    help=(
+        "Smoother used for trait-based bias correction during reference "
+        "construction and `fix`. 'median' is the historical default; 'loess' "
+        "(locally weighted regression) retains the trend slope at the "
+        "boundaries of the sort axis rather than plateauing at the extremes, "
+        "addressing the under-correction described in GitHub issue #1028. "
+        "Default: median. Unlike the protocol-specific --no-gc / --no-edge / "
+        "--no-rmask family (which `batch` sets automatically based on "
+        "seq-method), the smoother choice is orthogonal to protocol and is "
+        "useful to evaluate on any pipeline."
+    ),
 )
 
 P_batch.set_defaults(func=_cmd_batch)

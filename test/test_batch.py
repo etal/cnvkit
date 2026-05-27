@@ -322,6 +322,94 @@ class BatchTests(unittest.TestCase):
                 "is_sample_female explicitly so batch -x is honored.",
             )
 
+    def test_batch_run_sample_passes_bias_smoother_to_do_fix(self):
+        """``batch_run_sample`` must forward its ``bias_smoother`` argument
+        to every ``fix.do_fix`` invocation it makes (gh#1028).
+
+        Without this, ``cnvkit batch --bias-smoother loess`` would silently
+        fall back to ``rolling_median`` and users would have no way to
+        evaluate LOESS through the high-level ``batch`` entry point even
+        though the CLI flag was accepted.
+
+        AST-level guard so source rearrangements still catch the regression
+        cleanly without needing a full BAM fixture.
+        """
+        import ast
+        import inspect
+
+        src = inspect.getsource(batch.batch_run_sample)
+        tree = ast.parse(src)
+        do_fix_invocations = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "do_fix"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "fix"
+            ):
+                do_fix_invocations.append(node)
+        self.assertGreater(
+            len(do_fix_invocations),
+            0,
+            "Expected at least one fix.do_fix() invocation in batch_run_sample",
+        )
+        for inv in do_fix_invocations:
+            kw_names = {kw.arg for kw in inv.keywords}
+            self.assertIn(
+                "bias_smoother",
+                kw_names,
+                "fix.do_fix inside batch_run_sample must pass bias_smoother "
+                "explicitly so `cnvkit batch --bias-smoother loess` reaches "
+                "center_by_window (gh#1028).",
+            )
+
+    def test_batch_make_reference_passes_bias_smoother_to_do_reference(self):
+        """``batch_make_reference`` must forward ``bias_smoother`` to
+        ``reference.do_reference`` for the pooled-reference path (gh#1028).
+
+        ``do_reference_flat`` is exempt because a flat reference performs no
+        bias-vs-trait smoothing.
+
+        AST-level guard, paired with
+        ``test_batch_run_sample_passes_bias_smoother_to_do_fix``.
+        """
+        import ast
+        import inspect
+
+        src = inspect.getsource(batch.batch_make_reference)
+        tree = ast.parse(src)
+        do_reference_invocations = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "do_reference"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "reference"
+            ):
+                do_reference_invocations.append(node)
+        self.assertGreater(
+            len(do_reference_invocations),
+            0,
+            "Expected at least one reference.do_reference() invocation "
+            "in batch_make_reference",
+        )
+        for inv in do_reference_invocations:
+            kw_names = {kw.arg for kw in inv.keywords}
+            self.assertIn(
+                "bias_smoother",
+                kw_names,
+                "reference.do_reference inside batch_make_reference must "
+                "pass bias_smoother explicitly so `cnvkit batch "
+                "--bias-smoother loess` reaches center_by_window during "
+                "reference construction (gh#1028).",
+            )
+
     @pytest.mark.slow
     def test_diploid_parx_genome(self):
         genome_build = "grch37"

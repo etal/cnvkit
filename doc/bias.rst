@@ -37,12 +37,12 @@ following the trend. The bins with the most extreme GC content (or other
 biasing trait) are therefore the bins whose correction is least informed by
 the surrounding data.
 
-As an alternative, the ``--bias-smoother loess`` option on ``cnvkit fix`` and
-``cnvkit reference`` fits the relationship with a locally weighted regression
-(LOWESS). LOWESS retains the slope of the underlying trend at the boundaries
-rather than plateauing, which can improve correction at extreme-GC or
-low-complexity regions where the rolling median's flat-edge artifact
-under-corrects systematic bias.
+As an alternative, the ``--bias-smoother loess`` option on ``cnvkit fix``,
+``cnvkit reference``, and ``cnvkit batch`` fits the relationship with a
+locally weighted regression (LOWESS). LOWESS retains the slope of the
+underlying trend at the boundaries rather than plateauing, which can improve
+correction at extreme-GC or low-complexity regions where the rolling median's
+flat-edge artifact under-corrects systematic bias.
 
 The LOWESS option is opt-in. The default remains ``median`` so that existing
 pipelines and validated outputs are unchanged. Whether LOWESS produces better
