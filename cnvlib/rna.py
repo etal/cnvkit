@@ -393,9 +393,20 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
         weights.append(np.vstack(corr_weights).mean(axis=0))
 
     weight = gmean(np.vstack(weights), axis=0)
-    gi["weight"] = weight / weight.max()
-    if gi["weight"].isna().all():
+    # Guard against degenerate cohorts: if every per-gene weight collapses to
+    # zero (e.g. zero cross-sample spread from uniform counts -> gmean is 0)
+    # or any NaN leaks into the weights (numpy's .max() does NOT skip NaN),
+    # ``weight / weight.max()`` would emit a RuntimeWarning and produce NaN.
+    # Fall back to uniform weights instead.
+    max_weight = weight.max()
+    if not np.isfinite(max_weight) or max_weight <= 0:
+        logging.warning(
+            "Per-gene weights are degenerate (max=%s); using uniform weights",
+            max_weight,
+        )
         gi["weight"] = 1.0
+    else:
+        gi["weight"] = weight / max_weight
     logging.debug(" --> final zeros: %d / %d", (gi["weight"] == 0).sum(), len(gi))
     return gi, sc, sample_depths_log2
 
