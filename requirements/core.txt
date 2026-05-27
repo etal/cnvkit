@@ -8,4 +8,4 @@ pysam >= 0.23.3
 reportlab >= 4.4.10
 scikit-learn >= 1.7.2
 scipy >= 1.16.3
-statsmodels >= 0.14.0
+statsmodels >= 0.14.6
