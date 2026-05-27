@@ -93,6 +93,7 @@ def do_reference(
     do_cluster: bool = False,
     min_cluster_size: int = 4,
     cluster_method: str = "hierarchical",
+    bias_smoother: str = "median",
 ) -> CNA:
     """Compile a pooled coverage reference from normal samples.
 
@@ -253,6 +254,7 @@ def do_reference(
         do_cluster,
         min_cluster_size,
         cluster_method,
+        bias_smoother=bias_smoother,
     )
     warn_bad_bins(ref_probes)
     return ref_probes
@@ -388,6 +390,7 @@ def combine_probes(
     do_cluster: bool,
     min_cluster_size: int,
     cluster_method: str = "hierarchical",
+    bias_smoother: str = "median",
 ) -> CNA:
     """Calculate the median coverage of each bin across multiple samples.
 
@@ -426,6 +429,7 @@ def combine_probes(
         fix_gc,
         fix_edge,
         False,
+        bias_smoother=bias_smoother,
     )
     if antitarget_fnames:
         # XXX TODO ensure ordering matches targets!
@@ -440,6 +444,7 @@ def combine_probes(
             fix_gc,
             False,
             fix_rmask,
+            bias_smoother=bias_smoother,
         )
         if not anti_ref_df.empty:
             ref_df = pd.concat([ref_df, anti_ref_df], ignore_index=True)
@@ -494,6 +499,7 @@ def load_sample_block(
     fix_gc: bool,
     fix_edge: bool,
     fix_rmask: bool,
+    bias_smoother: str = "median",
 ) -> tuple[pd.DataFrame, ndarray, ndarray]:
     r"""Load and summarize a pool of \*coverage.cnn files.
 
@@ -571,6 +577,7 @@ def load_sample_block(
             fix_rmask,
             skip_low,
             diploid_parx_genome,
+            bias_smoother=bias_smoother,
         ),
     ]
 
@@ -601,6 +608,7 @@ def load_sample_block(
                 fix_rmask,
                 skip_low,
                 diploid_parx_genome,
+                bias_smoother=bias_smoother,
             )
         )
     all_logr = np.vstack(all_logr)  # type: ignore[assignment]
@@ -622,6 +630,7 @@ def bias_correct_logr(
     fix_rmask: bool,
     skip_low: bool,
     diploid_parx_genome: str | None,
+    bias_smoother: str = "median",
 ) -> pd.Series:
     """Perform bias corrections on the sample."""
     cnarr.center_all(skip_low=skip_low, diploid_parx_genome=diploid_parx_genome)
@@ -637,13 +646,19 @@ def bias_correct_logr(
     else:
         if "gc" in ref_columns and fix_gc:
             logging.info(f"Correcting for GC bias for {cnarr.sample_id}...")
-            cnarr = fix.center_by_window(cnarr, 0.1, ref_columns["gc"])
+            cnarr = fix.center_by_window(
+                cnarr, 0.1, ref_columns["gc"], bias_smoother=bias_smoother
+            )
         if "rmask" in ref_columns and fix_rmask:
             logging.info(f"Correcting for RepeatMasker bias for {cnarr.sample_id}...")
-            cnarr = fix.center_by_window(cnarr, 0.1, ref_columns["rmask"])
+            cnarr = fix.center_by_window(
+                cnarr, 0.1, ref_columns["rmask"], bias_smoother=bias_smoother
+            )
         if fix_edge:
             logging.info(f"Correcting for density bias for {cnarr.sample_id}...")
-            cnarr = fix.center_by_window(cnarr, 0.1, ref_edge_bias)
+            cnarr = fix.center_by_window(
+                cnarr, 0.1, ref_edge_bias, bias_smoother=bias_smoother
+            )
     return cnarr["log2"]
 
 

@@ -12,9 +12,9 @@ reference is available.
 
 To correct each of these known effects, CNVkit calculates the relationship
 between observed bin-level read depths and the values of some known biasing
-factor, such as GC content. This relationship is fitted using a simple rolling
-median, then subtracted from the original read depths in a sample to yield
-corrected estimates.
+factor, such as GC content. This relationship is fitted using a smoothing
+method -- a rolling median by default -- and then subtracted from the original
+read depths in a sample to yield corrected estimates.
 
 In the case of many similarly sized target regions, there is the potential for
 the bias value to be identical for many targets, including some spatially near
@@ -25,6 +25,31 @@ probes are randomly shuffled before being sorted by bias value.
 The GC content and repeat-masked fraction of each bin are calculated during
 generation of the :ref:`reference` from the user-supplied genome. The bias
 corrections are then performed in the :ref:`reference` and :ref:`fix` commands.
+
+
+Smoother choice
+---------------
+
+By default, CNVkit fits the bias-vs-trait relationship with a rolling median,
+which is robust to outlier bins but plateaus at the extremes of the sort axis:
+the boundary values collapse toward the inner-window median rather than
+following the trend. The bins with the most extreme GC content (or other
+biasing trait) are therefore the bins whose correction is least informed by
+the surrounding data.
+
+As an alternative, the ``--bias-smoother loess`` option on ``cnvkit fix``,
+``cnvkit reference``, and ``cnvkit batch`` fits the relationship with a
+locally weighted regression (LOWESS). LOWESS retains the slope of the
+underlying trend at the boundaries rather than plateauing, which can improve
+correction at extreme-GC or low-complexity regions where the rolling median's
+flat-edge artifact under-corrects systematic bias.
+
+The LOWESS option is opt-in. The default remains ``median`` so that existing
+pipelines and validated outputs are unchanged. Whether LOWESS produces better
+calls on a given dataset depends on the capture kit, library prep, and the
+extent of vendor-side GC-bias mitigation already applied upstream; users are
+encouraged to compare the two options on representative samples from their
+own data.
 
 
 GC content

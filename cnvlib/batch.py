@@ -48,6 +48,7 @@ def batch_make_reference(
     method: str,
     do_cluster: bool,
     cluster_method: str = "hierarchical",
+    bias_smoother: str = "median",
 ) -> tuple[str, str, str]:
     """Build a complete copy number reference from normal samples.
 
@@ -412,6 +413,7 @@ def batch_make_reference(
             do_rmask=True,
             do_cluster=do_cluster,
             cluster_method=cluster_method,
+            bias_smoother=bias_smoother,
         )
     if not output_reference:
         output_reference = os.path.join(output_dir, "reference.cnn")
@@ -457,6 +459,7 @@ def batch_run_sample(
     do_cluster: bool,
     fasta: str | None = None,
     sample_sex: str | None = None,
+    bias_smoother: str = "median",
 ) -> None:
     """Run the pipeline on one sample (BAM or bedGraph file).
 
@@ -489,6 +492,7 @@ def batch_run_sample(
         do_edge=(seq_method == "hybrid"),
         do_rmask=True,
         do_cluster=do_cluster,
+        bias_smoother=bias_smoother,
     )
     tabio.write(cnarr, sample_pfx + ".cnr")
 

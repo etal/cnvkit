@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 from scipy.signal import savgol_coeffs, savgol_filter
+from statsmodels.nonparametric.smoothers_lowess import lowess as _sm_lowess
 
 from . import descriptives
 
@@ -83,6 +84,51 @@ def rolling_median(x: pd.Series, width: float) -> ndarray:
     # if rolled.hasnans:
     #     rolled = rolled.interpolate()
     return np.asarray(rolled[wing:-wing], dtype=float)
+
+
+def loess(x: pd.Series | ndarray, frac: float) -> ndarray:
+    """Locally weighted scatterplot smoothing (LOWESS / LOESS).
+
+    Provides an alternative to ``rolling_median`` for bias-vs-trait
+    smoothing in ``cnvlib.fix.center_by_window``. Unlike a mirror-padded
+    rolling median, LOESS retains the slope of the underlying trend at
+    the boundaries of the sort axis rather than collapsing to the
+    inner-window median. This is the property requested by gh#1028,
+    where the rolling-median's flat-edge artifact under-corrects bias
+    at the most GC-extreme or low-complexity bins.
+
+    Parameters
+    ----------
+    x : pd.Series or ndarray
+        Values to smooth, ordered along the sort axis (e.g. by GC
+        content). The caller is responsible for sorting; this function
+        smooths along sequential index for consistency with
+        ``rolling_median``.
+    frac : float
+        Fraction of the data used when estimating each smoothed value,
+        in the same family as ``rolling_median``'s ``width`` argument.
+
+    Returns
+    -------
+    ndarray
+        Smoothed values, same length and order as input.
+    """
+    if len(x) < 2:
+        # Single-bin guard, matching rolling_median's behavior (#891).
+        return np.asarray(x, dtype=float)
+    x_arr = np.asarray(x, dtype=float)
+    # Use sequential index as the predictor so behavior matches
+    # rolling_median's position-based smoothing rather than depending on the
+    # value of the caller's sort key (which has already been used to order x).
+    # return_sorted=False preserves input order; missing=='drop' replicates
+    # rolling_median's NaN tolerance.
+    return _sm_lowess(  # type: ignore[no-any-return]
+        endog=x_arr,
+        exog=np.arange(len(x_arr), dtype=float),
+        frac=frac,
+        return_sorted=False,
+        missing="drop",
+    )
 
 
 def rolling_quantile(x: pd.Series, width: int, quantile: float) -> ndarray:
