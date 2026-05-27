@@ -238,7 +238,23 @@ def savgol(
     if weights is None:
         y = signal
         for _i in range(n_iter):
-            y = savgol_filter(y, window_width, order, mode="interp")
+            try:
+                y = savgol_filter(y, window_width, order, mode="interp")
+            except np.linalg.LinAlgError as exc:
+                # mode='interp' uses np.polyfit at the array edges; lstsq can
+                # fail on numerically degenerate inputs (gh#508: WGS
+                # flat-reference data triggered an MKL DGELSD error -- and
+                # the non-MKL path raised "SVD did not converge in Linear
+                # Least Squares" -- on the edge polyfit). Fall back to
+                # mode='nearest', which extends the boundary value instead
+                # of polyfitting it, so the smoother degrades gracefully
+                # instead of crashing the whole segmentation run.
+                logging.warning(
+                    "Savitzky-Golay edge polyfit failed (%s); "
+                    "falling back to mode='nearest'",
+                    exc,
+                )
+                y = savgol_filter(y, window_width, order, mode="nearest")
         # y = convolve_unweighted(window, signal, wing)
     else:
         # TODO fit edges here, too
