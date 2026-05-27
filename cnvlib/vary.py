@@ -227,6 +227,64 @@ def _tumor_boost(t_freqs, n_freqs):
     return out
 
 
+#: Maximum chrX heterozygous-SNP rate allowed under the "haploid X" null.
+#: True haploid X has zero het SNPs in principle; a small ceiling allows for
+#: sequencing-error het calls without rejecting the null on every panel.
+_HAPLOID_X_HET_RATE_CEILING = 0.05
+
+#: Minimum total chrX SNP count required to power the binomial test. With
+#: fewer than this many SNPs the test is too uncertain to override the
+#: coverage-based sex call, and the helper returns ``(False, None)``.
+_MIN_CHRX_SNPS_FOR_HET_TEST = 10
+
+#: One-sided p-value threshold for rejecting the haploid-X null. Set
+#: conservatively because rejection flips ``is_sample_female`` and so
+#: changes the chrX expected ploidy downstream of ``verify_sample_sex``.
+_HET_TEST_ALPHA = 0.001
+
+
+def chrx_het_density_rejects_haploid(
+    n_chrx_total: int,
+    n_chrx_het: int,
+    *,
+    haploid_x_het_rate_ceiling: float = _HAPLOID_X_HET_RATE_CEILING,
+    min_snps: int = _MIN_CHRX_SNPS_FOR_HET_TEST,
+    alpha: float = _HET_TEST_ALPHA,
+) -> tuple[bool, float | None]:
+    """One-sided binomial test of chrX heterozygous-SNP density vs. haploid X.
+
+    True diploid X has SNP heterozygosity comparable to autosomes
+    (~30% in panel-typical populations); true haploid X has essentially
+    zero heterozygous calls modulo sequencing-error noise. This test
+    compares the observed chrX het count against a permissive haploid-X
+    null (``haploid_x_het_rate_ceiling`` = 5% by default, generous enough
+    to absorb sequencing-error het calls), and rejects if the observation
+    exceeds what the null allows at the chosen ``alpha``.
+
+    Used by :func:`cnvlib.cmdutil.verify_sample_sex` as an independent
+    confirmer of chrX ploidy when the user supplies a VCF (gh#341). The
+    test only fires when coverage already inferred a male call -- a
+    rejected null means the VCF says diploid X, which overrides to
+    female. (A non-rejected null leaves the coverage call alone; "no
+    het signal" is consistent with either true haploid X or simply not
+    enough data, so it is non-evidence in the female direction.)
+
+    Returns ``(rejected, p_value)``. ``rejected`` is False when
+    ``n_chrx_total < min_snps`` because the test is then underpowered,
+    and ``p_value`` is None in that case to signal "no test was run."
+    """
+    if n_chrx_total < min_snps:
+        return False, None
+    # Imported locally so that callers that never touch sex inference don't
+    # pay the scipy import cost.
+    from scipy.stats import binom
+
+    # binom.sf(k-1, n, p) = P(X >= k | n, p); a small value means the
+    # observation is unlikely under haploid X, so we reject the null.
+    p_value = float(binom.sf(n_chrx_het - 1, n_chrx_total, haploid_x_het_rate_ceiling))
+    return p_value < alpha, p_value
+
+
 def _allele_specific_copy_numbers(segarr, varr, ploidy=2):
     """Split total copy number between alleles based on BAF.
 

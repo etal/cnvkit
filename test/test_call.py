@@ -745,3 +745,219 @@ class LoadHetSnpsTests(unittest.TestCase):
             any("Median allele frequency" in msg for msg in ctx.output),
             ctx.output,
         )
+
+    def test_load_het_snps_records_chrx_counts_in_meta(self):
+        """``cmdutil.load_het_snps`` stashes pre-filter chrX SNP and het counts
+        in ``varr.meta`` so the chrX-het-density confirmer (#341) can compare
+        chrX het rate against the haploid-X null.
+
+        NA12878 is XX, so the test VCF should have a non-trivial chrX het
+        count if the panel covers chrX at all. We don't pin exact numbers
+        (those depend on the fixture VCF's chrX content) -- we just verify
+        the meta keys are populated as ints, in the right ordering
+        (het count <= total).
+        """
+        varr = cmdutil.load_het_snps(
+            "formats/na12878_na12882_mix.vcf", "NA12878", "NA12882", 15, None
+        )
+        self.assertIn("chrx_snp_total", varr.meta)
+        self.assertIn("chrx_het_count", varr.meta)
+        self.assertIsInstance(varr.meta["chrx_snp_total"], int)
+        self.assertIsInstance(varr.meta["chrx_het_count"], int)
+        self.assertLessEqual(varr.meta["chrx_het_count"], varr.meta["chrx_snp_total"])
+
+
+class VerifySampleSexHetConfirmerTests(unittest.TestCase):
+    """Integration tests for the chrX-het-density confirmer plumbing inside
+    ``cmdutil.verify_sample_sex`` (#341).
+
+    The confirmer fires only when (a) the user did NOT pass --sample-sex,
+    (b) coverage inferred male, and (c) the VCF supplies enough chrX SNPs
+    to power a binomial test of the haploid-X null. A rejected null flips
+    is_sample_female to True; otherwise the coverage-based call stands.
+    """
+
+    def _make_male_cnarr(self):
+        """Build a tiny .cnr that the coverage inference will call male."""
+        rng = np.random.default_rng(0)
+        rows = []
+        # 200 autosome bins centered on log2=0
+        for c in ("chr1", "chr2"):
+            for i in range(100):
+                rows.append(
+                    (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+                )
+        # 50 chrX bins at log2 ~ -1 (haploid-X relative to a diploid-X reference)
+        for i in range(50):
+            rows.append(
+                (
+                    "chrX",
+                    i * 1000,
+                    i * 1000 + 100,
+                    "-",
+                    float(rng.normal(-1.0, 0.05)),
+                    1.0,
+                )
+            )
+        # 30 chrY bins around log2=0 (presence, autosome-like = male)
+        for i in range(30):
+            rows.append(
+                (
+                    "chrY",
+                    i * 1000,
+                    i * 1000 + 100,
+                    "-",
+                    float(rng.normal(0.0, 0.05)),
+                    1.0,
+                )
+            )
+        return cnary.CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=["chromosome", "start", "end", "gene", "log2", "weight"],
+            ),
+            {"sample_id": "synthetic_male"},
+        )
+
+    def _make_varr(self, n_total, n_het):
+        """Build a VariantArray with pre-stamped chrX meta counts."""
+        # Minimal VariantArray with the required schema (chromosome/start/end/ref/alt).
+        # Row contents don't matter for the confirmer -- only meta counts do.
+        varr = vary.VariantArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chrX"],
+                    "start": [100],
+                    "end": [101],
+                    "ref": ["A"],
+                    "alt": ["G"],
+                }
+            )
+        )
+        varr.meta["chrx_snp_total"] = n_total
+        varr.meta["chrx_het_count"] = n_het
+        return varr
+
+    def test_high_chrx_het_density_overrides_male_to_female(self):
+        """Many chrX hets in the VCF flip a coverage-inferred male call."""
+        cnarr = self._make_male_cnarr()
+        # Sanity: coverage alone calls this sample male.
+        self.assertFalse(
+            cmdutil.is_female_default(cnarr.guess_xx(verbose=False)),
+            "Synthetic fixture must be male by coverage before the confirmer.",
+        )
+        varr = self._make_varr(n_total=50, n_het=15)  # ~30% het rate, clearly diploid
+        with self.assertLogs(level="WARNING") as ctx:
+            is_female = cmdutil.verify_sample_sex(
+                cnarr,
+                sex_arg=None,
+                is_haploid_x_reference=False,
+                diploid_parx_genome=None,
+                variants=varr,
+            )
+        self.assertTrue(is_female)
+        self.assertTrue(
+            any("rejects the haploid-X null" in msg for msg in ctx.output),
+            ctx.output,
+        )
+
+    def test_low_chrx_het_density_keeps_male_call(self):
+        """Few/no chrX hets do not override -- the male call stands."""
+        cnarr = self._make_male_cnarr()
+        varr = self._make_varr(n_total=50, n_het=1)  # consistent with haploid + noise
+        is_female = cmdutil.verify_sample_sex(
+            cnarr,
+            sex_arg=None,
+            is_haploid_x_reference=False,
+            diploid_parx_genome=None,
+            variants=varr,
+        )
+        self.assertFalse(is_female)
+
+    def test_user_override_wins_over_het_confirmer(self):
+        """``--sample-sex male`` suppresses the confirmer even with clear het signal."""
+        cnarr = self._make_male_cnarr()
+        varr = self._make_varr(n_total=50, n_het=15)  # would otherwise flip to female
+        is_female = cmdutil.verify_sample_sex(
+            cnarr,
+            sex_arg="male",
+            is_haploid_x_reference=False,
+            diploid_parx_genome=None,
+            variants=varr,
+        )
+        self.assertFalse(is_female)
+
+    def test_confirmer_inert_when_no_chrx_label(self):
+        """A non-human / yeast / autosome-only cnarr (chr_x_label is None)
+        short-circuits the confirmer regardless of VCF meta counts (#669).
+
+        The ``elif`` guard in verify_sample_sex requires
+        ``cnarr.chr_x_label is not None``. Independently, load_het_snps
+        wouldn't have set non-zero meta counts on such a VCF either, but
+        defending both sides keeps the confirmer safely inert on
+        unfamiliar assemblies.
+        """
+        rng = np.random.default_rng(0)
+        rows = []
+        # Autosome-only (custom non-human assembly)
+        for c in ("chrA", "chrB"):
+            for i in range(50):
+                rows.append(
+                    (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+                )
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=["chromosome", "start", "end", "gene", "log2", "weight"],
+            ),
+            {"sample_id": "fungus"},
+        )
+        self.assertIsNone(cnarr.chr_x_label)
+        # Even with VCF meta that WOULD reject haploid-X for a chrX-having
+        # sample, the confirmer must not fire here.
+        varr = self._make_varr(n_total=50, n_het=15)
+        is_female = cmdutil.verify_sample_sex(
+            cnarr,
+            sex_arg=None,
+            is_haploid_x_reference=False,
+            diploid_parx_genome=None,
+            variants=varr,
+        )
+        # is_female_default(None) -> True; the female default is preserved,
+        # not because the confirmer overrode anything but because the
+        # coverage layer returned None (no determination) for an assembly
+        # without sex chromosomes.
+        self.assertTrue(is_female)
+
+    def test_confirmer_inert_for_female_coverage_call(self):
+        """If coverage already says female, the confirmer doesn't run / matter."""
+        # A female-coverage fixture: chrX at autosome median, chrY missing.
+        rng = np.random.default_rng(0)
+        rows = []
+        for c in ("chr1", "chr2"):
+            for i in range(100):
+                rows.append(
+                    (c, i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+                )
+        for i in range(50):
+            rows.append(
+                ("chrX", i * 1000, i * 1000 + 100, "-", float(rng.normal(0, 0.05)), 1.0)
+            )
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=["chromosome", "start", "end", "gene", "log2", "weight"],
+            ),
+            {"sample_id": "synthetic_female"},
+        )
+        varr = self._make_varr(n_total=50, n_het=15)
+        # Whether the confirmer "fired" is invisible here -- the only observable
+        # is the final is_sample_female, which stays True (female) regardless.
+        is_female = cmdutil.verify_sample_sex(
+            cnarr,
+            sex_arg=None,
+            is_haploid_x_reference=False,
+            diploid_parx_genome=None,
+            variants=varr,
+        )
+        self.assertTrue(is_female)
