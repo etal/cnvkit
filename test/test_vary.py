@@ -142,5 +142,67 @@ class VariantArrayTests(unittest.TestCase):
         self.assertEqual(list(varr["zygosity"]), [0.5, 0.5, 0.5])
 
 
+class ChrXHetDensityTests(unittest.TestCase):
+    """Tests for ``vary.chrx_het_density_rejects_haploid`` (gh#341).
+
+    A diploid X chromosome has SNP heterozygosity comparable to autosomes
+    (~30% in panel-typical populations); a haploid X has essentially zero
+    heterozygous calls modulo sequencing-error noise. The helper runs a
+    one-sided binomial test of the observed chrX het count against a
+    permissive haploid-X null (5% error-rate ceiling), rejecting when
+    the observation cannot be reconciled with haploid X at the chosen
+    alpha. This is the independent sex confirmer used in
+    ``verify_sample_sex`` when a VCF is supplied.
+    """
+
+    def test_diploid_x_population_het_rate_rejects_haploid(self):
+        """Realistic diploid-X panel (~30% het) confidently rejects haploid."""
+        rejected, p = vary.chrx_het_density_rejects_haploid(
+            n_chrx_total=50, n_chrx_het=15
+        )
+        self.assertTrue(rejected)
+        self.assertIsNotNone(p)
+        self.assertLess(p, 0.001)
+
+    def test_haploid_x_with_sequencing_noise_does_not_reject(self):
+        """True haploid X with a sprinkling of error-rate hets is not rejected."""
+        # 50 total chrX SNPs, 1 het (matches the 5% ceiling, well within noise)
+        rejected, _ = vary.chrx_het_density_rejects_haploid(
+            n_chrx_total=50, n_chrx_het=1
+        )
+        self.assertFalse(rejected)
+
+    def test_underpowered_below_min_snps(self):
+        """Fewer than the min-snps floor returns (False, None) regardless."""
+        # Even with 100% het rate, can't reject with only 5 SNPs.
+        rejected, p = vary.chrx_het_density_rejects_haploid(
+            n_chrx_total=5, n_chrx_het=5
+        )
+        self.assertFalse(rejected)
+        self.assertIsNone(p)
+
+    def test_borderline_n10_needs_strong_signal(self):
+        """With only 10 SNPs the test demands a very high het rate to reject.
+
+        Per calibration (binom.sf at alpha=0.001, p_null=0.05): n=10 needs
+        k>=5 (50% het rate) to reject; k=4 (40%) is not enough.
+        """
+        rejected_at_5, _ = vary.chrx_het_density_rejects_haploid(
+            n_chrx_total=10, n_chrx_het=5
+        )
+        rejected_at_4, _ = vary.chrx_het_density_rejects_haploid(
+            n_chrx_total=10, n_chrx_het=4
+        )
+        self.assertTrue(rejected_at_5)
+        self.assertFalse(rejected_at_4)
+
+    def test_zero_hets_never_rejects(self):
+        """No observed hets → cannot reject haploid (the null prediction)."""
+        rejected, _ = vary.chrx_het_density_rejects_haploid(
+            n_chrx_total=100, n_chrx_het=0
+        )
+        self.assertFalse(rejected)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
