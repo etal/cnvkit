@@ -259,12 +259,17 @@ VCF_HEADER = """\
 ##INFO=<ID=FOLD_CHANGE,Number=1,Type=Float,Description="Fold change">
 ##INFO=<ID=FOLD_CHANGE_LOG,Number=1,Type=Float,Description="Log fold change">
 ##INFO=<ID=PROBES,Number=1,Type=Integer,Description="Number of probes in CNV">
+##INFO=<ID=BAF,Number=1,Type=Float,Description="Segment median mirrored B-allele frequency from heterozygous SNPs (0.5 = balanced; 1.0 = full LOH)">
+##INFO=<ID=BAFN,Number=1,Type=Integer,Description="Number of heterozygous SNPs supporting the BAF estimate for this segment">
+##INFO=<ID=LOH,Number=0,Type=Flag,Description="Loss of heterozygosity: one parental allele is entirely lost (CN1==0 or CN2==0), regardless of total copy number">
 ##ALT=<ID=DEL,Description="Deletion">
 ##ALT=<ID=DUP,Description="Duplication">
 ##ALT=<ID=CNV,Description="Copy number variable region">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=GQ,Number=1,Type=Float,Description="Genotype quality">
 ##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Copy number genotype for imprecise events">
+##FORMAT=<ID=CN1,Number=1,Type=Integer,Description="Major allele copy number (>= CN2); CN1 + CN2 = CN">
+##FORMAT=<ID=CN2,Number=1,Type=Integer,Description="Minor allele copy number (<= CN1); 0 indicates LOH for this segment">
 ##FORMAT=<ID=CNQ,Number=1,Type=Float,Description="Copy number genotype quality for imprecise events">
 """.format(date=time.strftime("%Y%m%d"), version=__version__)
 # #CHROM  POS   ID  REF ALT   QUAL  FILTER  INFO  FORMAT  NA00001
@@ -341,7 +346,18 @@ def segments2vcf(
     diploid_parx_genome: str | None,
     is_sample_female: bool,
 ) -> Iterator[tuple[str, int, str, str, str, str, str, str, str, str]]:
-    """Convert copy number segments to VCF records."""
+    """Convert copy number segments to VCF records.
+
+    When the input ``segments`` carry allele-specific columns ``cn1``/``cn2``
+    (and optionally ``baf``/``nbaf``) — produced by ``cnvkit.py call`` with
+    ``-v VCF`` — the resulting records additionally expose CN1/CN2 as FORMAT
+    fields and BAF/BAFN as INFO fields. Segments whose total copy number
+    matches the expected ploidy but whose alleles show complete loss
+    (``cn1 == 0`` or ``cn2 == 0``) are emitted as ``SVTYPE=CNV`` (``<CNV>``
+    ALT) with an ``LOH`` INFO flag, surfacing copy-neutral loss of
+    heterozygosity that the DUP/DEL-only schema previously hid. See
+    ``doc/importexport.rst`` § VCF.
+    """
     out_dframe = segments.data.reindex(columns=["chromosome", "end", "log2", "probes"])
     out_dframe["start"] = segments.start.replace(0, 1)
 
@@ -370,8 +386,20 @@ def segments2vcf(
     out_dframe["svtype"] = "DUP"
     out_dframe.loc[idx_losses, "svtype"] = "DEL"
 
-    out_dframe["format"] = "GT:GQ:CN:CNQ"
-    out_dframe.loc[idx_losses, "format"] = "GT:GQ"  # :CN:CNQ ?
+    # FORMAT/genotype shapes are decided per-row inside the emission loop —
+    # they depend on whether allele-specific columns are present AND on the
+    # per-row SVTYPE (legacy `GT:GQ`-only DEL shape is preserved for the
+    # common no-allele-specific case). Project the per-row inputs we need.
+    has_allele_specific = "cn1" in segments and "cn2" in segments
+    has_baf = "baf" in segments
+    has_baf_count = "nbaf" in segments
+    if has_allele_specific:
+        out_dframe["cn1"] = segments["cn1"]
+        out_dframe["cn2"] = segments["cn2"]
+    if has_baf:
+        out_dframe["baf"] = segments["baf"]
+    if has_baf_count:
+        out_dframe["nbaf"] = segments["nbaf"]
 
     if "ci_left" in segments and "ci_right" in segments:
         has_ci = True
@@ -390,36 +418,78 @@ def segments2vcf(
     for out_row, abs_exp in zip(
         out_dframe.itertuples(index=False), abs_expect, strict=True
     ):
-        if (
-            out_row.ncopies == abs_exp
-            or
-            # Survive files from buggy v0.7.1 (#53)
-            not str(out_row.probes).isdigit()
-        ):
-            # Skip regions of neutral copy number
-            continue  # or "CNV" for subclonal?
+        # Survive files from buggy v0.7.1 (#53)
+        if not str(out_row.probes).isdigit():
+            continue
 
-        if out_row.ncopies > abs_exp:
-            genotype = f"0/1:0:{out_row.ncopies}:{out_row.probes}"
-        elif out_row.ncopies < abs_exp:
+        cn_changed = out_row.ncopies != abs_exp
+        # Strict LOH: one parental allele is entirely lost. Allelic imbalance
+        # without complete loss (e.g. cn1=2, cn2=1 in a triploid gain) is
+        # still surfaced via CN1/CN2, but only true LOH gets the flag —
+        # downstream clinical consumers (AnnotSV, etc.) key on that meaning.
+        is_loh = (
+            has_allele_specific
+            and not pd.isna(out_row.cn1)
+            and not pd.isna(out_row.cn2)
+            and (int(out_row.cn1) == 0 or int(out_row.cn2) == 0)
+        )
+        if not cn_changed and not is_loh:
+            # Skip regions of neutral copy number with no allelic imbalance.
+            continue
+
+        # Per-record SVTYPE: copy-neutral LOH is its own CNV record so
+        # existing DUP/DEL parsers do not misclassify it.
+        if cn_changed:
+            svtype = out_row.svtype  # "DUP" or "DEL", set above
+            svlen_out = out_row.svlen
+        else:
+            svtype = "CNV"
+            svlen_out = 0
+
+        if cn_changed and out_row.ncopies > abs_exp:
+            gt = "0/1"
+            gq = "0"
+        elif cn_changed and out_row.ncopies < abs_exp:
             # TODO XXX handle non-diploid ploidies, haploid chroms
-            if out_row.ncopies == 0:
-                # Complete deletion, 0 copies
-                gt = "1/1"
-            else:
-                # Single copy deletion
-                gt = "0/1"
-            genotype = f"{gt}:{out_row.probes}"
+            gt = "1/1" if out_row.ncopies == 0 else "0/1"
+            gq = str(out_row.probes)
+        else:
+            # Copy-neutral LOH: same diploid genotype call, allele identity
+            # encoded by CN1/CN2.
+            gt = "0/1"
+            gq = "0"
+
+        if has_allele_specific:
+            cn1_str = "." if pd.isna(out_row.cn1) else str(int(out_row.cn1))
+            cn2_str = "." if pd.isna(out_row.cn2) else str(int(out_row.cn2))
+            genotype = (
+                f"{gt}:{gq}:{out_row.ncopies}:{cn1_str}:{cn2_str}:{out_row.probes}"
+            )
+            fmt_str = "GT:GQ:CN:CN1:CN2:CNQ"
+        elif svtype == "DEL":
+            # Preserve legacy GT:GQ-only shape for losses when no
+            # allele-specific data is present.
+            genotype = f"{gt}:{gq}"
+            fmt_str = "GT:GQ"
+        else:
+            genotype = f"{gt}:{gq}:{out_row.ncopies}:{out_row.probes}"
+            fmt_str = "GT:GQ:CN:CNQ"
 
         fields = [
             "IMPRECISE",
-            f"SVTYPE={out_row.svtype}",
+            f"SVTYPE={svtype}",
             f"END={out_row.end}",
-            f"SVLEN={out_row.svlen}",
+            f"SVLEN={svlen_out}",
             f"FOLD_CHANGE={2.0**out_row.log2}",
             f"FOLD_CHANGE_LOG={out_row.log2}",
             f"PROBES={out_row.probes}",
         ]
+        if has_baf and not pd.isna(out_row.baf):
+            fields.append(f"BAF={out_row.baf:.4g}")
+        if has_baf_count and not pd.isna(out_row.nbaf):
+            fields.append(f"BAFN={int(out_row.nbaf)}")
+        if is_loh:
+            fields.append("LOH")
         if has_ci:
             fields.extend(
                 [
@@ -434,11 +504,11 @@ def segments2vcf(
             out_row.start,
             ".",
             "N",
-            f"<{out_row.svtype}>",
+            f"<{svtype}>",
             ".",
             ".",
             info,
-            out_row.format,
+            fmt_str,
             genotype,
         )
 
