@@ -62,9 +62,10 @@ def do_call(
         command. Should contain 'log2' column with copy ratio values.
     variants : VariantArray, optional
         Variant allele frequency data from VCF, used to call allele-specific
-        copy numbers. If provided, 'baf' (B-allele frequency) will be added
-        to the output, and 'cn1'/'cn2' (major/minor allele copy numbers) will
-        be calculated.
+        copy numbers. If provided, 'baf' (median B-allele frequency) and
+        'nbaf' (count of heterozygous SNPs supporting the BAF) are added to
+        each segment, and 'cn1'/'cn2' (major/minor allele copy numbers) are
+        calculated.
     method : str, optional
         Calling method to use. Options:
         - 'threshold': Apply log2 ratio thresholds (default)
@@ -111,7 +112,8 @@ def do_call(
     CopyNumArray
         Copy of input array with added 'cn' column (absolute copy number).
         If variants provided, also includes:
-        - 'baf': B-allele frequency per segment
+        - 'baf': Median B-allele frequency per segment
+        - 'nbaf': Count of heterozygous SNPs supporting the BAF per segment
         - 'cn1': Major allele copy number (>= cn2)
         - 'cn2': Minor allele copy number (<= cn1)
 
@@ -169,6 +171,17 @@ def do_call(
 
     if variants:
         outarr["baf"] = variants.baf_by_ranges(outarr)
+        # Persist the het-SNP count per segment alongside the median BAF.
+        # `export vcf` surfaces this as the BAFN INFO field so downstream
+        # consumers can weight LOH evidence by sample support.
+        hets = variants.heterozygous()
+        if len(hets) and len(outarr):
+            hets = hets.add_columns(_one=np.ones(len(hets), dtype=int))
+            outarr["nbaf"] = (
+                hets.into_ranges(outarr, "_one", 0, np.sum).astype(int).to_numpy()
+            )
+        else:
+            outarr["nbaf"] = 0
 
     if purity and purity < 1.0:
         logging.info("Rescaling sample with purity %g, ploidy %g", purity, ploidy)

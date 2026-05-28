@@ -225,6 +225,126 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(svtypes, {"DUP", "DEL"})  # tr95t has both gains and losses
         self.assertGreater(len(set(fold_changes)), 1)  # not a stuck/degenerate value
 
+    def test_export_vcf_loh_allele_specific_fields(self):
+        """VCF export surfaces allele-specific CN and BAF for LOH evidence (gh#892).
+
+        Two clinically meaningful regimes must round-trip through ``export vcf``:
+
+        - Copy-LOSS LOH (cn=1, cn1=1, cn2=0): a hemizygous deletion that also
+          shows allelic imbalance. The DEL record must carry CN1/CN2 in FORMAT
+          and BAF/BAFN in INFO so downstream LOH-aware tools see the evidence.
+        - Copy-NEUTRAL LOH (cn=2, cn1=2, cn2=0): clinically actionable but
+          *invisible* before this change because total cn matches expected
+          diploid. Must emit as ``SVTYPE=CNV`` with an explicit ``LOH`` flag
+          so existing DUP/DEL-only consumers still recognize "something here"
+          and LOH-aware consumers can act on the flag.
+
+        Synthetic fixture: a female autosomal segment set with cn1/cn2/baf/nbaf
+        already populated (skipping the variant-VCF round trip that ``call``
+        does, so the assertions stay focused on the export step).
+        """
+        rows = [
+            # cn=2 segment with balanced alleles -> not emitted (neutral, no LOH)
+            ("chr1", 1, 1000, "-", 0.0, 50, 2, 1, 1, 0.50, 30),
+            # copy-loss LOH: hemizygous deletion with allelic imbalance
+            ("chr1", 1000, 2000, "-", -1.0, 50, 1, 1, 0, 1.00, 20),
+            # copy-neutral LOH: cn matches expected but one allele lost
+            ("chr1", 2000, 3000, "-", 0.0, 50, 2, 2, 0, 1.00, 30),
+            # copy-GAIN with balanced alleles (no LOH) -> DUP, CN1/CN2 still emitted
+            ("chr1", 3000, 4000, "-", 0.58, 50, 3, 2, 1, 0.33, 25),
+        ]
+        cns = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=[
+                    "chromosome",
+                    "start",
+                    "end",
+                    "gene",
+                    "log2",
+                    "probes",
+                    "cn",
+                    "cn1",
+                    "cn2",
+                    "baf",
+                    "nbaf",
+                ],
+            ),
+            {"sample_id": "T1"},
+        )
+        _vheader, vcf_body = export.export_vcf(cns, 2, False, None, True)
+        var_lines = [ln for ln in vcf_body.splitlines() if not ln.startswith("#")]
+        # Three records: cn=1 LOH, cn=2 copy-neutral LOH, cn=3 gain. The
+        # cn=2/cn1=cn2=1 balanced-neutral segment is correctly suppressed.
+        self.assertEqual(len(var_lines), 3)
+        by_start = {int(ln.split("\t")[1]): ln for ln in var_lines}
+        self.assertEqual(set(by_start), {1000, 2000, 3000})
+
+        # All three records expose CN1/CN2 in FORMAT and BAF/BAFN in INFO.
+        for ln in var_lines:
+            fields = ln.split("\t")
+            fmt = fields[8].split(":")
+            self.assertIn("CN1", fmt)
+            self.assertIn("CN2", fmt)
+            info = dict(kv.split("=", 1) for kv in fields[7].split(";") if "=" in kv)
+            self.assertIn("BAF", info)
+            self.assertIn("BAFN", info)
+
+        # Copy-loss LOH: DEL with CN1=1, CN2=0.
+        del_fields = by_start[1000].split("\t")
+        self.assertEqual(del_fields[4], "<DEL>")
+        del_fmt = del_fields[8].split(":")
+        del_vals = del_fields[9].split(":")
+        self.assertEqual(del_vals[del_fmt.index("CN1")], "1")
+        self.assertEqual(del_vals[del_fmt.index("CN2")], "0")
+
+        # Copy-neutral LOH: SVTYPE=CNV with LOH flag, SVLEN=0, CN1=2, CN2=0.
+        cnv_fields = by_start[2000].split("\t")
+        self.assertEqual(cnv_fields[4], "<CNV>")
+        cnv_info_kvs = cnv_fields[7].split(";")
+        self.assertIn("LOH", cnv_info_kvs)
+        cnv_info = dict(kv.split("=", 1) for kv in cnv_info_kvs if "=" in kv)
+        self.assertEqual(cnv_info["SVTYPE"], "CNV")
+        self.assertEqual(int(cnv_info["SVLEN"]), 0)
+        cnv_fmt = cnv_fields[8].split(":")
+        cnv_vals = cnv_fields[9].split(":")
+        self.assertEqual(cnv_vals[cnv_fmt.index("CN1")], "2")
+        self.assertEqual(cnv_vals[cnv_fmt.index("CN2")], "0")
+
+        # Copy-GAIN without LOH: DUP, no LOH flag, CN1/CN2 still present.
+        dup_fields = by_start[3000].split("\t")
+        self.assertEqual(dup_fields[4], "<DUP>")
+        self.assertNotIn("LOH", dup_fields[7].split(";"))
+        dup_fmt = dup_fields[8].split(":")
+        dup_vals = dup_fields[9].split(":")
+        self.assertEqual(dup_vals[dup_fmt.index("CN1")], "2")
+        self.assertEqual(dup_vals[dup_fmt.index("CN2")], "1")
+
+    def test_export_vcf_no_allele_specific_columns_backwards_compatible(self):
+        """A .cns without cn1/cn2/baf still produces a valid VCF (no CN1/CN2/BAF).
+
+        The common workflow (``cnvkit call`` without ``-v VCF``) produces a .cns
+        with no allele-specific columns; the VCF must remain unchanged in shape
+        for those segments so existing downstream parsers do not break.
+        """
+        cns = cnvlib.read("formats/tr95t.cns")
+        self.assertNotIn("cn1", cns.data.columns)  # fixture confirms absence
+        _vheader, vcf_body = export.export_vcf(cns, 2, True, None, True)
+        for ln in vcf_body.splitlines():
+            if ln.startswith("#"):
+                continue
+            fields = ln.split("\t")
+            fmt = fields[8].split(":")
+            self.assertNotIn("CN1", fmt)
+            self.assertNotIn("CN2", fmt)
+            info_keys = {kv.split("=", 1)[0] for kv in fields[7].split(";")}
+            self.assertNotIn("BAF", info_keys)
+            self.assertNotIn("BAFN", info_keys)
+            self.assertNotIn("LOH", info_keys)
+            # SVTYPE remains DUP/DEL only — no spurious CNV records.
+            info = dict(kv.split("=", 1) for kv in fields[7].split(";") if "=" in kv)
+            self.assertIn(info["SVTYPE"], {"DUP", "DEL"})
+
     def test_export_cdt_jtv(self):
         """The 'export' command for CDT and Java TreeView formats."""
         fnames = ["formats/p2-20_1.cnr", "formats/p2-20_2.cnr"]

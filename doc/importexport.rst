@@ -151,7 +151,8 @@ Convert segments, ideally already adjusted by the :ref:`call` command, to a
 :ref:`vcfformat` file. Copy ratios are converted to absolute integers, as with
 BED export, and VCF records are created for the segments where the copy number
 is different from the expected ploidy (e.g. 2 on autosomes, 1 on haploid sex
-chromosomes, depending on sample sex).
+chromosomes, depending on sample sex), or where the segment shows loss of
+heterozygosity (see below).
 
 A sample's :doc:`chromosomal sex <sex>` can be specified with the
 ``-x``/``--sample-sex`` option, or will be guessed automatically.
@@ -161,6 +162,40 @@ to construct the :ref:`reference`, use it here, too.
 ::
 
     cnvkit.py export vcf Sample.cns -y -x female -i "SampleID" -o Sample.cnv.vcf
+
+Allele-specific copy number and LOH evidence
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the input ``.cns`` was produced by ``cnvkit.py call -v <variants.vcf>``,
+the segments carry allele-specific copy numbers (``cn1``, ``cn2``) and the
+per-segment median B-allele frequency (``baf``) with its supporting
+heterozygous-SNP count (``nbaf``). The VCF export surfaces these as:
+
+- ``CN1`` and ``CN2`` (FORMAT, Integer): major and minor allele copy numbers,
+  matching the convention used by ASCAT, Battenberg, and PURPLE. ``CN1 + CN2``
+  equals ``CN``. A value of ``.`` indicates the segment had no heterozygous
+  SNPs supporting an allele-specific estimate.
+- ``BAF`` (INFO, Float): segment median mirrored B-allele frequency. ``0.5``
+  is balanced; values approaching ``1.0`` indicate allelic imbalance up to
+  full LOH.
+- ``BAFN`` (INFO, Integer): count of heterozygous SNPs supporting the BAF for
+  this segment.
+- ``LOH`` (INFO, Flag): set when one parental allele is entirely lost for the
+  segment (``CN1 == 0`` or ``CN2 == 0``), regardless of total copy number.
+
+Copy-neutral LOH (total copy number matches expected ploidy, but one allele
+is entirely lost — ``CN1==0`` or ``CN2==0``) is emitted as ``SVTYPE=CNV``
+(ALT ``<CNV>``) with ``SVLEN=0`` and the ``LOH`` flag. Before this change,
+such segments were silently dropped by the VCF exporter; they are now visible
+to downstream LOH-aware annotators such as
+`AnnotSV <https://lbgi.fr/AnnotSV/>`_. Existing DUP/DEL records additionally
+carry ``LOH`` when a copy gain or hemizygous loss is accompanied by complete
+allele loss.
+
+A ``.cns`` produced without ``-v`` has no allele-specific columns; in that
+case the VCF export omits ``CN1``/``CN2``/``BAF``/``BAFN`` entirely and
+preserves the legacy ``GT:GQ:CN:CNQ`` (DUP) / ``GT:GQ`` (DEL) FORMAT shapes
+for backwards compatibility with existing downstream parsers.
 
 cdt, jtv
 ````````
