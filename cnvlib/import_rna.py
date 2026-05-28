@@ -79,6 +79,23 @@ def do_import_rna(
 
     logging.info("Aligning gene info to sample gene counts")
     normal_ids = [os.path.basename(f).split(".")[0] for f in normal_fnames]
+    if 0 < len(normal_ids) < 3:
+        # The normal-anchoring step in normalize_read_depths divides each gene's
+        # row by the median across normal samples. With fewer than three normals
+        # that median is a high-variance per-gene estimator, and in the single-
+        # normal case it reduces to a self-divide that drives the normal
+        # sample's own log2 .cnr to ~0 everywhere by construction. See
+        # doc/rna.rst "Considerations" for the recommended cohort design.
+        logging.warning(
+            "import-rna --normal: %d normal sample(s) provided. "
+            "With fewer than 3 normals, the per-gene normal-median used as the "
+            "anchor is a noisy estimator, and with exactly 1 normal the "
+            "anchored value is a tautological self-divide -- the normal "
+            "sample's .cnr will be ~0 everywhere by construction and cannot "
+            "be used for QC of that normal. Provide >=3 normals for robust "
+            "anchoring; see doc/rna.rst.",
+            len(normal_ids),
+        )
     gene_info, sample_counts, sample_data_log2 = rna.align_gene_info_to_samples(
         gene_info, sample_counts, tx_lengths, normal_ids
     )

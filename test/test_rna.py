@@ -2,6 +2,8 @@
 """Unit tests for RNA import functionality (cnvlib.rna)."""
 
 import logging
+import os
+import tempfile
 import unittest
 import warnings
 
@@ -301,6 +303,127 @@ class ImportRnaIntegrationTests(unittest.TestCase):
     def test_do_import_rna_unknown_format_raises(self):
         with self.assertRaises(RuntimeError):
             import_rna.do_import_rna(self.COUNT_FILES[:1], "bogus", self.GENE_RESOURCE)
+
+
+class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
+    """Pin the current --normal anchoring invariants surfaced in cnvkit-ccy.
+
+    These tests document what ``normalize_read_depths`` does *today* with
+    ``normal_ids`` set, as a regression baseline for any future redesign
+    (tracked in cnvkit-9wj). They exercise the suspected bug from GH #352
+    and confirm it does not reproduce at the unit level: the issue lies in
+    the design (small-normal-cohort information loss) rather than a numerical
+    error in the implementation.
+    """
+
+    @staticmethod
+    def _make_cohort(
+        n_tumor, n_normal, n_genes, altered_mask, tumor_alt_factor=2.0, seed=0
+    ):
+        rng = np.random.default_rng(seed)
+        baseline = rng.lognormal(mean=4.0, sigma=1.0, size=n_genes)
+        cols = {}
+        normal_ids = []
+        for i in range(n_normal):
+            sid = f"normal{i}"
+            normal_ids.append(sid)
+            cols[sid] = baseline * rng.lognormal(0, 0.05, n_genes)
+        for i in range(n_tumor):
+            v = baseline.copy()
+            v[altered_mask] *= tumor_alt_factor
+            cols[f"tumor{i}"] = v * rng.lognormal(0, 0.05, n_genes)
+        return (pd.DataFrame(cols, index=[f"g{i}" for i in range(n_genes)]), normal_ids)
+
+    def test_single_normal_is_self_divide(self):
+        """One normal => that normal's log2 is ~0 at every gene by construction.
+
+        With one normal sample, the per-gene "median of normals" reduces to
+        that single column, so the anchor divide is a self-divide. The normal
+        sample's resulting log2 row collapses to ``safe_log2(1.0)`` = a small
+        positive offset from the NULL_LOG2_COVERAGE shift, with vanishing
+        per-gene variance. This is the design behavior to pin until the
+        cnvkit-9wj redesign lands.
+        """
+        n_genes = 200
+        altered = np.zeros(n_genes, dtype=bool)
+        altered[:50] = True
+        depths, normal_ids = self._make_cohort(10, 1, n_genes, altered, seed=1)
+        log2 = rna.normalize_read_depths(depths.copy(), normal_ids)
+
+        normal_log2 = log2[normal_ids[0]]
+        # All values are within numerical noise of the safe_log2 floor offset.
+        expected_offset = np.log2(1.0 + 2**rna.NULL_LOG2_COVERAGE)
+        self.assertLess(abs(normal_log2.median() - expected_offset), 1e-3)
+        self.assertLess(normal_log2.std(), 1e-3)
+        # And the chrX-altered region in tumors is recovered at ~+1.0 (2x gain)
+        tumor_cols = [c for c in log2.columns if c.startswith("tumor")]
+        tumor_alt_med = log2[tumor_cols].loc[altered].median().median()
+        self.assertGreater(tumor_alt_med, 0.8)
+        self.assertLess(tumor_alt_med, 1.2)
+
+    def test_multi_normal_carries_residual_qc_signal(self):
+        """With >= 3 normals, individual normals' .cnr files retain non-zero spread.
+
+        This documents the design rationale for the >=3-normals recommendation:
+        the median-of-normals anchor leaves each normal with residual deviation
+        from peer normals (interpretable as QC signal), rather than collapsing
+        to a tautological zero.
+        """
+        n_genes = 200
+        altered = np.zeros(n_genes, dtype=bool)
+        altered[:50] = True
+        depths, normal_ids = self._make_cohort(10, 3, n_genes, altered, seed=2)
+        log2 = rna.normalize_read_depths(depths.copy(), normal_ids)
+
+        # Each normal retains a non-degenerate spread across genes; not flat-zero.
+        for nid in normal_ids:
+            self.assertGreater(log2[nid].std(), 1e-3)
+
+    def test_import_rna_warns_for_few_normals(self):
+        """do_import_rna emits a warning for 0 < n_normals < 3."""
+        with tempfile.TemporaryDirectory() as tmp:
+            gene_res = os.path.join(tmp, "genes.tsv")
+            rng = np.random.default_rng(7)
+            n_genes = 80
+            gene_ids = [f"ENSG{i:05d}.1" for i in range(n_genes)]
+            with open(gene_res, "w") as fh:
+                fh.write("# fixture\n")
+                fh.write(
+                    "Gene stable ID\tGC\tChr\tStart\tEnd\tName\tNCBI\tTxLen\tTSL\n"
+                )
+                for i, g in enumerate(gene_ids):
+                    fh.write(
+                        f"{g}\t{int(rng.integers(30, 65))}\t1\t"
+                        f"{100000 + i * 5000}\t{102000 + i * 5000}\t"
+                        f"G{i}\t{1000 + i}\t1500\ttsl1\n"
+                    )
+            baseline = rng.lognormal(mean=5.0, sigma=1.0, size=n_genes)
+            fnames = []
+            normal_fnames = []
+            # 1 normal + 5 tumors -> should warn
+            for tag, is_normal in [("normal-0", True)] + [
+                (f"tumor-{i}", False) for i in range(5)
+            ]:
+                vals = baseline * rng.lognormal(0, 0.1, n_genes)
+                f = os.path.join(tmp, f"{tag}.counts.txt")
+                with open(f, "w") as fh:
+                    for g, v in zip(gene_ids, vals, strict=True):
+                        fh.write(f"{g}\t{int(v)}\n")
+                fnames.append(f)
+                if is_normal:
+                    normal_fnames.append(f)
+
+            with self.assertLogs(level="WARNING") as cm:
+                _, cnrs = import_rna.do_import_rna(
+                    fnames,
+                    "counts",
+                    gene_res,
+                    normal_fnames=normal_fnames,
+                )
+                list(cnrs)  # exhaust generator so all logging fires
+            joined = "\n".join(cm.output)
+            self.assertIn("import-rna --normal", joined)
+            self.assertIn("3 normals", joined)
 
 
 if __name__ == "__main__":

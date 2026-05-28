@@ -84,3 +84,51 @@ Considerations
   per-gene and per-sample copy number and expression levels, typically retrieved
   from cBioPortal for TCGA cancer-specific cohorts.
 
+
+Using ``--normal`` to anchor against control samples
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``-n``/``--normal`` option accepts one or more count files representing
+process-matched control (non-neoplastic) samples. When provided, the
+normalization pipeline first applies a cohort-wide median polish to remove
+per-sample sequencing-depth differences and per-gene scale differences, then
+divides each gene's row by the median of the normal samples' values. Tumor
+sample ``.cnr`` files are then expressed as log2 ratios against that
+normal-anchored baseline.
+
+This recentering has several important consequences that affect cohort design:
+
+- **A single normal yields a non-informative ``.cnr`` for that sample.** With
+  one normal, the per-gene "normal median" is just that sample's own value, so
+  the anchoring step is a self-divide and the normal's output is approximately
+  zero at every gene by construction. The normal's ``.cnr`` cannot be used to
+  detect mislabelling, contamination, or copy-number events affecting the
+  normal sample itself. ``import-rna`` emits a ``logging.warning`` in this
+  case.
+- **Two normals are still fragile.** A median over two values reduces to the
+  arithmetic mean and remains a high-variance per-gene estimator. The output
+  for each normal then represents that sample's deviation from the other
+  normal, not a deviation from a stable biological baseline. ``import-rna``
+  also warns in this case.
+- **Three or more normals are recommended.** With ``n_normal >= 3``, the
+  per-gene median is a robust estimator and individual normal ``.cnr`` files
+  retain interpretable residuals (deviation from peer normals) usable for QC.
+- **Cohort composition affects intermediate values.** The cohort-wide polish
+  step uses the median across all samples in the cohort, so running the same
+  ``--normal X`` on two different tumor cohorts produces different intermediate
+  reference values. The final tumor log2 ratios are largely insensitive to
+  this for typical cohorts, but extreme cohort imbalance (for example, a small
+  number of tumors with shared, large-scale alterations) can perturb calls.
+- **Control samples must themselves be free of the alterations under study.**
+  Adjacent-tissue normals in solid-tumor settings frequently carry
+  tumor-derived expression patterns (stromal contamination, field effects).
+  When the normal cohort shares the same alterations as the tumors, the
+  normal-anchored divide cancels real tumor signal and reduces the dynamic
+  range of the resulting calls. Pure tissue-matched controls from independent
+  donors are preferred when available.
+
+If a suitable normal cohort is not available, run ``import-rna`` without
+``--normal``. The output ``.cnr`` files will then be expressed as log2 ratios
+against the cohort median, which carries its own assumption (that most genes
+in most samples are copy-neutral) that may also be violated in heavily altered
+cohorts.
