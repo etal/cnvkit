@@ -100,6 +100,12 @@ def do_segmentation(
             return cnarr, ""
         return cnarr
 
+    if cnarr.sample_id is None:
+        logging.warning(
+            "Input has no sample_id set; the segmented output will be "
+            "unlabeled (CLI usage derives sample_id from the input filename)."
+        )
+
     if variants is not None and len(variants):
         # Process variants in genomic order. by_ranges/baf_by_ranges slice via
         # binary search and the HMM expects an ordered observation sequence, so
