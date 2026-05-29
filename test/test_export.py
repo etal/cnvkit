@@ -226,7 +226,7 @@ class ExportTests(unittest.TestCase):
         self.assertGreater(len(set(fold_changes)), 1)  # not a stuck/degenerate value
 
     def test_export_vcf_loh_allele_specific_fields(self):
-        """VCF export surfaces allele-specific CN and BAF for LOH evidence (gh#892).
+        """VCF export surfaces allele-specific CN and BAF for LOH evidence (#892).
 
         Two clinically meaningful regimes must round-trip through ``export vcf``:
 
