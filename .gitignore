@@ -2,6 +2,7 @@
 .vscode/
 .serena/
 .claude/
+.omp/
 
 # Compiled python files (e.g. from running the unit tests):
 *.pyc
