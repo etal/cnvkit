@@ -1209,7 +1209,7 @@ P_segment.add_argument(
 P_segment.add_argument(
     "-d",
     "--dataframe",
-    help="""File name to save the raw R dataframe emitted by CBS or Fused Lasso. (Useful
+    help="""File name to save the raw R dataframe emitted by CBS. (Useful
             for debugging.)""",
 )
 P_segment.add_argument(

@@ -686,7 +686,7 @@ How the BAF is incorporated depends on the method:
   on the log2 signal and on the per-bin BAF, and the **union** of their
   breakpoints is taken. A BAF shift with flat depth thus yields a breakpoint
   (catching copy-neutral LOH) without the cost of the HMM.
-- ``cbs``, ``flasso``, ``none``: after segmenting log2 ratios, a second pass
+- ``cbs``, ``none``: after segmenting log2 ratios, a second pass
   re-segments the SNP allele frequencies within each log2-ratio-based segment
   (a 2-state HMM on the mirrored BAF).
 

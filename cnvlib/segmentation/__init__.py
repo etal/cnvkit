@@ -17,14 +17,13 @@ from skgenome.intersect import iter_slices
 
 from .. import core, parallel, params, smoothing
 from ..cnary import CopyNumArray as CNA
-from ..segfilters import squash_by_groups
-from . import cbs, flasso, haar, hmm, none
+from . import cbs, haar, hmm, none
 
 if TYPE_CHECKING:
     from cnvlib.vary import VariantArray
 
 
-SEGMENT_METHODS = ("cbs", "flasso", "haar", "none", "hmm", "hmm-tumor", "hmm-germline")
+SEGMENT_METHODS = ("cbs", "haar", "none", "hmm", "hmm-tumor", "hmm-germline")
 # HMM method variants, for dispatch (replaces scattered method.startswith("hmm"))
 _HMM_METHODS = frozenset({"hmm", "hmm-tumor", "hmm-germline"})
 
@@ -50,13 +49,13 @@ def do_segmentation(
     cnarr : CopyNumArray
         Bin-level copy number ratios (.cnr file).
     method : str
-        Segmentation algorithm: 'cbs', 'flasso', 'haar', 'hmm', 'hmm-tumor',
+        Segmentation algorithm: 'cbs', 'haar', 'hmm', 'hmm-tumor',
         or 'hmm-germline'.
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
         (e.g., 'hg19', 'hg38', 'mm10').
     threshold : float, optional
-        Significance threshold (for CBS/flasso/haar) or smoothing window size
+        Significance threshold (for CBS/haar) or smoothing window size
         (for HMM methods). If None, uses method-specific defaults.
     variants : VariantArray, optional
         Variant allele frequencies to incorporate into HMM segmentation.
@@ -70,7 +69,7 @@ def do_segmentation(
     save_dataframe : bool, optional
         Return the R dataframe as a string along with segments. Default is False.
     rscript_path : str, optional
-        Path to Rscript executable for CBS/flasso methods. Default is "Rscript".
+        Path to Rscript executable for the CBS method. Default is "Rscript".
     processes : int, optional
         Number of parallel processes to use. Default is 1.
     smooth_cbs : bool, optional
@@ -114,7 +113,6 @@ def do_segmentation(
     if threshold is None:
         threshold = {
             "cbs": 0.0001,
-            "flasso": 0.0001,
             "haar": 0.0001,
         }.get(method)
     msg = "Segmenting with method " + repr(method)
@@ -126,9 +124,10 @@ def do_segmentation(
     msg += f" in {processes} processes"
     logging.info(msg)
 
-    # NB: parallel cghFLasso segfaults in R ('memory not mapped'),
-    # even when run on a single chromosome
-    if method == "flasso" or method in _HMM_METHODS:
+    # HMM methods fit a single model across all bins (whole-genome Viterbi
+    # decode and parameter estimation), so they run on the full array rather
+    # than per chromosome arm in parallel.
+    if method in _HMM_METHODS:
         # ENH segment p/q arms separately
         # -> assign separate identifiers via chrom name suffix?
         cna = _do_segmentation(
@@ -283,12 +282,9 @@ def _do_segmentation(
             segarr = haar.segment_haar(filtered_cn, threshold, variants)  # type: ignore[arg-type]
         case "none":
             segarr = none.segment_none(filtered_cn)
-        case "cbs" | "flasso":
-            # Run R scripts to calculate copy number segments
-            rscript = {
-                "cbs": cbs.CBS_RSCRIPT,
-                "flasso": flasso.FLASSO_RSCRIPT,
-            }[method]
+        case "cbs":
+            # Run the R script (DNAcopy CBS) to calculate copy number segments
+            rscript = cbs.CBS_RSCRIPT
 
             filtered_cn["start"] += 1  # Convert to 1-indexed coordinates for R
             with tempfile.NamedTemporaryFile(suffix=".cnr", mode="w+t") as tmp:
@@ -317,13 +313,6 @@ def _do_segmentation(
             # Convert R dataframe contents (SEG) to a proper CopyNumArray
             # NB: Automatically shifts 'start' back from 1- to 0-indexed
             segarr = tabio.read(StringIO(seg_out.decode()), "seg", into=CNA)  # type: ignore[arg-type,assignment]
-            if method == "flasso":
-                # Merge adjacent bins with same log2 value into segments
-                if "weight" in filtered_cn:
-                    segarr["weight"] = filtered_cn["weight"]
-                else:
-                    segarr["weight"] = 1.0
-                segarr = squash_by_groups(segarr, segarr["log2"], by_arm=True)
         case "hmm" | "hmm-tumor" | "hmm-germline":
             segarr = hmm.segment_hmm(
                 filtered_cn,
@@ -348,7 +337,7 @@ def _do_segmentation(
     if variants and method not in _HMM_METHODS:
         # ('hmm*' models BAF jointly in segment_hmm, so it's excluded here.)
         if method != "haar":
-            # R backends (cbs/flasso) and 'none': re-segment the variant allele
+            # CBS and 'none': re-segment the variant allele
             # freqs within each segment using a 2-state Viterbi HMM on mirrored
             # BAF (per commit 692d5a5).
             # TODO train on all segments together
