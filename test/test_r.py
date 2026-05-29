@@ -2,6 +2,8 @@
 """Unit tests for CNVkit that require an R installation."""
 
 import logging
+import os
+import shutil
 import tempfile
 import unittest
 from unittest import mock
@@ -50,18 +52,72 @@ class RTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".cnr", mode="w+t") as tmp:
             tmp.write("\n".join(rows) + "\n")
             tmp.flush()
-            script = CBS_RSCRIPT % {
-                "probes_fname": tmp.name,
-                "sample_id": "test868",
-                "threshold": 0.0001,
-                "smooth_cbs": False,
-            }
-            with core.temp_write_text(script, mode="w+t") as script_fname:
+            with core.temp_write_text(CBS_RSCRIPT, mode="w+t") as script_fname:
                 seg_out = core.call_quiet(
-                    "Rscript", "--no-restore", "--no-environ", script_fname
+                    "Rscript",
+                    "--no-restore",
+                    "--no-environ",
+                    script_fname,
+                    tmp.name,
+                    "test868",
+                    "0.0001",
+                    "FALSE",
                 )
         # No exception means the weights stayed aligned with the kept probes.
         self.assertIn("test868", seg_out.decode())
+
+    @pytest.mark.slow
+    def test_cbs_sample_id_with_quote(self):
+        """Regression: a sample ID containing a single quote must not break R.
+
+        The ID used to be interpolated into a single-quoted R string literal,
+        so an apostrophe (e.g. ``O'Brien_001``) produced invalid R source and a
+        subprocess parse error. It is now passed as a command-line argument and
+        needs no escaping. Exercised end-to-end through ``do_segmentation`` so
+        the Python caller's argument plumbing is covered too.
+        """
+        cnr = self.tas_cnr.copy()
+        cnr.meta["sample_id"] = "O'Brien_001"
+        cns, raw_str = segmentation.do_segmentation(
+            cnr, "cbs", processes=1, save_dataframe=True
+        )
+        self.assertGreater(len(cns), 0)
+        self.assertIn("O'Brien_001", raw_str)
+
+    @pytest.mark.slow
+    def test_cbs_probes_path_with_awkward_chars(self):
+        """Regression: a probes-file path with a quote, space, or backslash must
+        not break R.
+
+        The path used to be interpolated into a double-quoted R string literal;
+        it is now passed as a command-line argument to ``read.delim``.
+        """
+        rows = [
+            "\t".join(("chromosome", "start", "end", "gene", "log2", "depth", "weight"))
+        ]
+        for i in range(20):
+            start = 100 * (i + 1)
+            log2 = 0.5 if i < 10 else -0.5
+            rows.append(f"chr1\t{start}\t{start + 50}\tG\t{log2}\t30\t0.6")
+        tmpdir = tempfile.mkdtemp()
+        try:
+            probes_fname = os.path.join(tmpdir, "O'Brien \\sample.cnr")
+            with open(probes_fname, "w") as fh:
+                fh.write("\n".join(rows) + "\n")
+            with core.temp_write_text(CBS_RSCRIPT, mode="w+t") as script_fname:
+                seg_out = core.call_quiet(
+                    "Rscript",
+                    "--no-restore",
+                    "--no-environ",
+                    script_fname,
+                    probes_fname,
+                    "sample",
+                    "0.0001",
+                    "FALSE",
+                )
+        finally:
+            shutil.rmtree(tmpdir)
+        self.assertIn("sample", seg_out.decode())
 
     @pytest.mark.slow
     def test_cbs_nan_log2_in_memory(self):

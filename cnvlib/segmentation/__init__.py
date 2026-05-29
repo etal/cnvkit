@@ -297,17 +297,22 @@ def _do_segmentation(
                     tmp, index=False, sep="\t", float_format="%.6g", mode="w+t"
                 )
                 tmp.flush()
-                script_strings = {
-                    "probes_fname": tmp.name,
-                    "sample_id": cnarr.sample_id,
-                    "threshold": threshold,
-                    "smooth_cbs": smooth_cbs,
-                }
-                with core.temp_write_text(
-                    rscript % script_strings, mode="w+t"
-                ) as script_fname:
+                with core.temp_write_text(rscript, mode="w+t") as script_fname:
+                    # Pass run parameters as positional command-line arguments
+                    # (read via commandArgs in the R script) instead of
+                    # interpolating them into the script source, so a sample ID
+                    # or tempfile path containing quotes or backslashes can't
+                    # produce invalid R. call_quiet runs Rscript without a shell,
+                    # so the values need no escaping.
                     seg_out = core.call_quiet(
-                        rscript_path, "--no-restore", "--no-environ", script_fname
+                        rscript_path,
+                        "--no-restore",
+                        "--no-environ",
+                        script_fname,
+                        tmp.name,
+                        str(cnarr.sample_id),
+                        str(threshold),
+                        "TRUE" if smooth_cbs else "FALSE",
                     )
             # Convert R dataframe contents (SEG) to a proper CopyNumArray
             # NB: Automatically shifts 'start' back from 1- to 0-indexed
