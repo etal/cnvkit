@@ -129,6 +129,15 @@ without breaking tests:
 
 Core dependencies are declared in `requirements/core.txt`; `min.txt` pins exact minimums for compatibility testing.
 
+## Packaging
+
+Packaging is deliberately conservative. CNVkit ships across PyPI, conda, Docker, and Galaxy, and that matrix is far more fragile than the numerical core, so the project avoids formal `package-data`:
+
+- Small, code-adjacent data stays inline (e.g. PAR coordinates as Python literals in `skgenome.genomebuild`; the CBS R script as a string in `cnvlib/segmentation/cbs.py`).
+- Large reference assets (genome access BEDs, refFlat, gene-info TSVs) are user-supplied or downloaded, not bundled in the wheel, keeping installs small and free of build-specific or licensing baggage.
+
+Introduce `package-data` only for a concrete need, and pair it with a CI test that installs the built wheel and loads the resource, so a missing data file fails loudly in CI rather than at a user's runtime.
+
 ## Code Style & Conventions
 
 ### Modern Python Style
