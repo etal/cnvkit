@@ -5,8 +5,8 @@ The :ref:`scatter` and :ref:`heatmap` plots can be used in two ways:
 
 1. Open the plot in an interactive window with zoom and other features. This
    is also compatible with Jupyter/IPython notebooks to render the plots inline.
-2. Generate a static image plot with the ``--output``/``-o`` option. 
-   
+2. Generate a static image plot with the ``--output``/``-o`` option.
+
     - While PDF is a good choice to generate publication-quality figures that
       can be easily edited in Inkscape or Adobe Illustrator, other formats will
       work, indicated by the output filename extension -- e.g. "-o myplot.png"
@@ -104,7 +104,7 @@ Chromosome-level views are controlled with the ``--chromosome``/``-c`` and
 - A region label with chromosome name and 1-based start and end coordinates
   (e.g. ``-c chr5:1000000-4000000``) plots the specified region, with the start
   and end coordinates as the x-axis limits. All genes in this region (that are
-  labeled in the input .cnr file) are highlighted and labeled. 
+  labeled in the input .cnr file) are highlighted and labeled.
 
     - If the start or end coordinate is left off (e.g. ``-c chr5:-4000000`` or
       ``-c chr7:140000000-``), the region is extended to the end of the
@@ -118,7 +118,7 @@ Chromosome-level views are controlled with the ``--chromosome``/``-c`` and
       and labeled. To not show any genes, specify an empty string: ``-g ''``
     - Special behavior occurs if there are no genes in the selected region:
       Instead, the selection itself is treated as a "gene", highlighted and
-      labeled with the string "Selection", with padding controlled by ``-w``. 
+      labeled with the string "Selection", with padding controlled by ``-w``.
       This behavior can be blocked by specifying an empty list of genes: ``-g
       ''`` -- then the specified region will be plotted as usual, with nothing
       highlighted and no padding.
@@ -179,6 +179,37 @@ Better results can be had by giving CNVkit more information:
   more amenable to LOH detection.
 
 
+Highlighting LOH evidence and somatic mutations
+```````````````````````````````````````````````
+
+By default, the VAF panel shows only heterozygous germline SNPs and the
+mean-VAF trend within each segment, which is the appropriate signal for
+detecting allelic imbalance. Two related variant classes are filtered out of
+this view because including them in the BAF segment-mean would bias it:
+
+- **Tumor-homozygous loci at germline-heterozygous positions** are evidence of
+  loss of heterozygosity (LOH), the canonical second-hit mechanism for
+  tumor-suppressor inactivation in genes such as ``TP53``, ``RB1``, ``PTEN``,
+  and the ``BRCA1``/``BRCA2`` family.
+- **Somatic SNVs** (VCF ``SOMATIC`` flag, or T/N-inferred when matched normal
+  data are present) can be useful visual context alongside copy-number calls,
+  for example to assess tumor mutation burden over deleted segments.
+
+The ``--show-snvs`` flag overlays these subsets in the VAF panel with
+distinct colors while leaving the segment-mean trend driven solely by the
+het subset (so the underlying BAF math is unchanged)::
+
+    cnvkit.py scatter Sample.cnr -s Sample.cns -v Sample.vcf --show-snvs with-loh
+    cnvkit.py scatter Sample.cnr -s Sample.cns -v Sample.vcf --show-snvs with-somatic
+    cnvkit.py scatter Sample.cnr -s Sample.cns -v Sample.vcf --show-snvs all
+
+When a matched normal sample is available, LOH evidence is restricted to loci
+that are heterozygous in the normal and homozygous in the tumor -- the
+stricter T/N-aware definition. In tumor-only flows the selector falls back to
+any tumor-homozygous locus, with the caveat that true germline-homozygous
+positions are then indistinguishable from LOH-induced homozygosity.
+
+
 .. _diagram:
 
 ``diagram``
@@ -232,7 +263,7 @@ alterations at least that exteme.
 To reduce the number of false-positive calls in the .cns file (see
 :doc:`calling`), consider:
 
-- Making the initial segmentation more stringent with `segment -t` or a larger
+- Making the initial segmentation more stringent with ``segment -t`` or a larger
   bin size
 - Filtering segments by confidence interval via :ref:`segmetrics --ci
   <segmetrics>` and :ref:`call --filter ci <call>`
@@ -300,7 +331,7 @@ The plots generated with the :ref:`scatter` and :ref:`heatmap` commands use the
 Python plotting library matplotlib.
 
 To quickly adjust the displayed area of the genome in a plot, run either
-plotting command without the `-o` option to generate an interactive plot in a
+plotting command without the ``-o`` option to generate an interactive plot in a
 new window. You can then resize that plot up to the full size of your screen,
 use the plot window's selection mode to select a smaller area of the genome, and
 use the plot window's save button to save the plot in your preferred format.
@@ -316,7 +347,7 @@ file::
     axes.labelsize      : small
 
 For more control, in the Python intepreter (or a script, or a Jupyter notebook),
-import the :doc:`cnvlib` module and call the `do_scatter` or `do_heatmap`
+import the :doc:`cnvlib` module and call the ``do_scatter`` or ``do_heatmap``
 function to create a plot. Then you can use matplotlib.pyplot to get the current
 axis and modify the plot elements, change font sizes, or anything else you
 like::

@@ -47,6 +47,7 @@ from . import (
     batch,
     bintest,
     call,
+    cmdutil,
     core,
     coverage,
     diagram,
@@ -1595,13 +1596,33 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
     """Plot probe log2 coverages and segmentation calls together."""
     cnarr = read_cna(args.filename, sample_id=args.sample_id) if args.filename else None
     segarr = read_cna(args.segment, sample_id=args.sample_id) if args.segment else None
-    varr = load_het_snps(
-        args.vcf,
-        args.sample_id,
-        args.normal_id,
-        args.min_variant_depth,
-        args.zygosity_freq,
-    )
+    # --show-snvs selects which SNV subsets to surface. The default ``het``
+    # path goes through load_het_snps so the result is byte-identical to
+    # historical scatter behavior. The other modes load LOH-evidence
+    # (tumor-homozygous) and/or somatic loci as separate overlays (#290).
+    show_snvs = args.show_snvs
+    loh_varr = None
+    som_varr = None
+    if args.vcf and show_snvs != "het":
+        include_loh = show_snvs in ("with-loh", "all")
+        include_somatic = show_snvs in ("with-somatic", "all")
+        varr, loh_varr, som_varr = cmdutil.load_snp_subsets(
+            args.vcf,
+            args.sample_id,
+            args.normal_id,
+            args.min_variant_depth,
+            args.zygosity_freq,
+            include_loh=include_loh,
+            include_somatic=include_somatic,
+        )
+    else:
+        varr = load_het_snps(
+            args.vcf,
+            args.sample_id,
+            args.normal_id,
+            args.min_variant_depth,
+            args.zygosity_freq,
+        )
     scatter_opts = {
         k: v
         for k, v in (
@@ -1613,6 +1634,8 @@ def _cmd_scatter(args: argparse.Namespace) -> None:
             ("fig_size", args.fig_size),
             ("antitarget_marker", args.antitarget_marker),
             ("segment_color", args.segment_color),
+            ("loh_variants", loh_varr),
+            ("somatic_variants", som_varr),
         )
         if v is not None
     }
@@ -1754,6 +1777,17 @@ P_scatter_vcf.add_argument(
     "--sample-id",
     help="""Name of the sample in the VCF to use for b-allele frequency extraction and
             as the default plot title.""",
+)
+P_scatter_vcf.add_argument(
+    "--show-snvs",
+    choices=("het", "with-loh", "with-somatic", "all"),
+    default="het",
+    help="""Which SNV subsets to plot in the VAF panel. ``het`` (default) shows only
+            heterozygous germline SNPs, as in earlier releases.
+            ``with-loh`` overlays tumor-homozygous loci as LOH evidence;
+            ``with-somatic`` overlays SOMATIC-flagged loci;
+            ``all`` overlays both. The segment-overlay (mean-VAF) trend still
+            uses only the het subset, so the BAF math is unchanged.""",
 )
 add_snp_vcf_args(P_scatter_vcf, short_min_depth=True)
 
