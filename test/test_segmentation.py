@@ -60,6 +60,27 @@ from skgenome import tabio
 class SegmentationTests(unittest.TestCase):
     """Tests for segmentation commands."""
 
+    def test_segment_warns_on_missing_sample_id(self):
+        """A CopyNumArray with no sample_id emits one warning and falls back to
+        the literal 'None' as the segment ID. The CLI never reaches this --
+        read() derives sample_id from the input filename -- but the raw
+        in-memory API can construct an array without one.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        cnarr.meta.pop("sample_id", None)
+        self.assertIsNone(cnarr.sample_id)
+        with self.assertLogs(level="WARNING") as cm:
+            segmentation.do_segmentation(cnarr, "haar")
+        self.assertTrue(any("sample_id" in line for line in cm.output))
+
+    def test_segment_no_warning_when_sample_id_present(self):
+        """The missing-sample_id warning stays silent when sample_id is set."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        self.assertIsNotNone(cnarr.sample_id)
+        with self.assertLogs(level="INFO") as cm:
+            segmentation.do_segmentation(cnarr, "haar")
+        self.assertFalse(any("no sample_id" in line.lower() for line in cm.output))
+
     def test_segment(self):
         """The 'segment' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
