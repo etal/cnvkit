@@ -46,6 +46,31 @@ def read_ga(
     return tabio.read(infile, into=GA, sample_id=sample_id, meta=meta)  # type: ignore[return-value]
 
 
+def _resolve_zygosity_freq(
+    germline_varr: VariantArray, zygosity_freq: float | None, *, warn: bool
+) -> float | None:
+    """Apply the Mutect2 all-zero-normal workaround heuristic.
+
+    When the VCF's normal-sample genotypes are all 0/0 or missing (Mutect2
+    quirk), infer zygosity from allele frequency by setting ``zygosity_freq``
+    to 0.25. Caller must pass the germline subset only (e.g. ``varr`` from a
+    ``skip_somatic=True`` read), so that the all-zero check reflects the
+    germline rows and is not masked by interleaved somatic calls.
+    """
+    if (
+        zygosity_freq is None
+        and "n_zygosity" in germline_varr
+        and not germline_varr["n_zygosity"].any()
+    ):
+        if warn:
+            logging.warning(
+                "VCF normal sample's genotypes are all 0/0 or missing; "
+                "inferring genotypes from allele frequency instead"
+            )
+        return 0.25
+    return zygosity_freq
+
+
 def load_het_snps(
     vcf_fname: str,
     sample_id: str | None = None,
@@ -64,13 +89,7 @@ def load_het_snps(
         min_depth=min_variant_depth,
         skip_somatic=True,
     )
-    if zygosity_freq is None and "n_zygosity" in varr and not varr["n_zygosity"].any():
-        # Mutect2 sets all normal genotypes to 0/0 -- work around it
-        logging.warning(
-            "VCF normal sample's genotypes are all 0/0 or missing; "
-            "inferring genotypes from allele frequency instead"
-        )
-        zygosity_freq = 0.25
+    zygosity_freq = _resolve_zygosity_freq(varr, zygosity_freq, warn=True)  # type: ignore[arg-type]
     if zygosity_freq is not None:
         varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)  # type: ignore[attr-defined]
     if "n_zygosity" in varr:
@@ -121,6 +140,106 @@ def load_het_snps(
     varr.meta["chrx_snp_total"] = n_chrx_total
     varr.meta["chrx_het_count"] = n_chrx_het
     return varr  # type: ignore[no-any-return]
+
+
+def _partition_snp_extras(
+    varr: VariantArray,
+    *,
+    include_loh: bool,
+    include_somatic: bool,
+) -> tuple[VariantArray | None, VariantArray | None]:
+    """Split a VariantArray into LOH-evidence and somatic-SNV subsets.
+
+    ``varr`` should be the full record set as returned by ``tabio.read`` with
+    ``skip_somatic=False`` (post-zygosity_freq inference if applicable). The
+    function does not modify ``varr``.
+
+    LOH evidence = tumor-homozygous loci excluding any somatic call. When a
+    matched normal column (``n_zygosity``) is present, additionally restrict
+    to normal-heterozygous loci (the stricter, T/N-aware definition). In
+    tumor-only flows the column is absent and any tumor-homozygous locus
+    qualifies; this is the same convention as the 2017 #290 request, which
+    treated tumor-homozygous SNVs as LOH evidence in tumor-only mode.
+
+    Somatic = the union of (a) the VCF ``SOMATIC`` flag and (b) T/N-inferred
+    somatic loci (tumor-het with normal-homref), matching the loci that
+    ``load_het_snps`` excludes when building the heterozygous subset.
+    """
+    if not (include_loh or include_somatic):
+        return None, None
+    vcf_somatic = varr["somatic"]
+    if "n_zygosity" in varr:
+        tn_somatic = (varr["zygosity"] != 0.0) & (varr["n_zygosity"] == 0.0)
+        all_somatic = vcf_somatic | tn_somatic
+    else:
+        all_somatic = vcf_somatic
+    loh: VariantArray | None = None
+    if include_loh:
+        non_somatic = varr[~all_somatic]
+        tumor_hom = (non_somatic["zygosity"] == 0.0) | (non_somatic["zygosity"] == 1.0)
+        if "n_zygosity" in non_somatic:
+            loh_mask = tumor_hom & (non_somatic["n_zygosity"] == 0.5)
+        else:
+            loh_mask = tumor_hom
+        loh = non_somatic[loh_mask]
+    somatic: VariantArray | None = None
+    if include_somatic:
+        somatic = varr[all_somatic]
+    return loh, somatic
+
+
+def load_snp_subsets(
+    vcf_fname: str,
+    sample_id: str | None = None,
+    normal_id: str | None = None,
+    min_variant_depth: int = 20,
+    zygosity_freq: float | None = None,
+    *,
+    include_loh: bool = False,
+    include_somatic: bool = False,
+) -> tuple[VariantArray, VariantArray | None, VariantArray | None]:
+    """Load heterozygous SNPs plus optional LOH-evidence and somatic subsets.
+
+    The ``het`` subset is identical to ``load_het_snps``'s return -- same BAF
+    distribution, same chrX-counting in ``.meta``, same warnings. The extras
+    are surfaced for display only (e.g. scatter plot ``--show-snvs`` modes,
+    #290) and are excluded from segment-overlay calculations to preserve the
+    BAF math that the het subset drives.
+
+    When both ``include_*`` flags are False, only ``het`` is loaded -- the
+    second VCF read is skipped. The extras are ``None`` in that case.
+    """
+    het = load_het_snps(
+        vcf_fname, sample_id, normal_id, min_variant_depth, zygosity_freq
+    )
+    if not (include_loh or include_somatic):
+        return het, None, None
+    # Re-read the VCF without skip_somatic to recover the SOMATIC-flagged
+    # loci. The chrX-counting and BAF-distribution warnings already fired
+    # during the load_het_snps call, so do not re-emit them here.
+    varr_all = tabio.read(
+        vcf_fname,
+        "vcf",
+        sample_id=sample_id,
+        normal_id=normal_id,
+        min_depth=min_variant_depth,
+        skip_somatic=False,
+    )
+    # Resolve the Mutect2 workaround against the germline subset only --
+    # interleaved somatic rows can mask the all-zero-normal heuristic that
+    # load_het_snps sees, which would leave germline rows with raw all-zero
+    # zygosity here while load_het_snps applied the workaround. Restricting
+    # to ~somatic mirrors load_het_snps's skip_somatic=True input.
+    germline = varr_all[~varr_all["somatic"]]  # type: ignore[index]
+    zygosity_freq = _resolve_zygosity_freq(germline, zygosity_freq, warn=False)  # type: ignore[arg-type]
+    if zygosity_freq is not None:
+        varr_all = varr_all.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)  # type: ignore[attr-defined]
+    loh, somatic = _partition_snp_extras(
+        varr_all,  # type: ignore[arg-type]
+        include_loh=include_loh,
+        include_somatic=include_somatic,
+    )
+    return het, loh, somatic
 
 
 def _warn_if_baf_input_suspicious(alt_freqs: pd.Series | None) -> None:

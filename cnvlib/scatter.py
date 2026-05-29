@@ -26,6 +26,17 @@ HIGHLIGHT_COLOR = "gold"
 POINT_COLOR = "#606060"
 SEG_COLOR = "darkorange"
 TREND_COLOR = "#A0A0A0"
+# Distinct colors and markers for ``--show-snvs`` overlays drawn on top of
+# the het SNP scatter. Colors picked from Wong's colorblind-friendly palette
+# so they remain discriminable from each other, from the gray het dots, and
+# from the darkorange segment overlay (Wong 2011, Nature Methods 8:441).
+# Markers are also distinct so the overlays read in grayscale prints. LOH
+# gets the higher-contrast reddish-purple + 'x' to ensure the typically rare
+# and low-VAF LOH dots are not visually buried by the bulk het scatter. (#290)
+LOH_SNV_COLOR = "#CC79A7"  # reddish purple
+LOH_SNV_MARKER = "x"
+SOMATIC_SNV_COLOR = "#0072B2"  # blue
+SOMATIC_SNV_MARKER = "+"
 
 # Floor for the auto-scaled y-axis lower limit, so a single deep homozygous
 # deletion (log2 far below 0) can't compress the rest of the plot into a sliver.
@@ -61,6 +72,8 @@ def do_scatter(
     antitarget_marker: str | None = None,
     segment_color: str = SEG_COLOR,
     title: str | None = None,
+    loh_variants: CopyNumArray | None = None,
+    somatic_variants: CopyNumArray | None = None,
 ) -> Figure:
     """Plot probe log2 coverages and segmentation calls together.
 
@@ -95,6 +108,14 @@ def do_scatter(
         Color for segment lines. Default is SEG_COLOR.
     title : str, optional
         Plot title.
+    loh_variants : VariantArray, optional
+        Tumor-homozygous loci to overlay as LOH evidence in the VAF panel
+        (#290). Plotted with a distinct color; excluded from the BAF
+        segment-overlay trend so the trend reflects only the het subset.
+    somatic_variants : VariantArray, optional
+        Somatic-SNV loci (VCF SOMATIC flag or T/N-inferred) to overlay in
+        the VAF panel with a distinct color (#290). Also excluded from the
+        BAF segment-overlay trend.
 
     Returns
     -------
@@ -105,8 +126,16 @@ def do_scatter(
         bp_per_bin = sum(c.end.iat[-1] for _, c in cnarr.by_chromosome()) / len(cnarr)
         window_width /= bp_per_bin
         show_range_bins = plots.translate_region_to_bins(show_range, cnarr)
-        cnarr, segments, variants = plots.update_binwise_positions(
-            cnarr, segments, variants
+        (
+            cnarr,
+            segments,
+            variants,
+            (
+                loh_variants,
+                somatic_variants,
+            ),
+        ) = plots.update_binwise_positions(
+            cnarr, segments, variants, extra_variants=[loh_variants, somatic_variants]
         )
         global MB
         orig_mb = MB
@@ -114,7 +143,16 @@ def do_scatter(
 
     if not show_gene and not show_range:
         fig = genome_scatter(
-            cnarr, segments, variants, do_trend, y_min, y_max, title, segment_color
+            cnarr,
+            segments,
+            variants,
+            do_trend,
+            y_min,
+            y_max,
+            title,
+            segment_color,
+            loh_variants=loh_variants,
+            somatic_variants=somatic_variants,
         )
     else:
         if by_bin:
@@ -133,6 +171,8 @@ def do_scatter(
             y_max,
             title,
             segment_color,
+            loh_variants=loh_variants,
+            somatic_variants=somatic_variants,
         )
 
     if by_bin:
@@ -156,6 +196,8 @@ def genome_scatter(
     y_max: float | None = None,
     title: str | None = None,
     segment_color: str = SEG_COLOR,
+    loh_variants: CopyNumArray | None = None,
+    somatic_variants: CopyNumArray | None = None,
 ) -> Figure:
     """Plot all chromosomes, concatenated on one plot."""
     if (cnarr or segments) and variants:
@@ -167,7 +209,14 @@ def genome_scatter(
         axis2.tick_params(labelbottom=False)
         chrom_sizes = plots.chromosome_sizes(cnarr or segments)  # type: ignore[arg-type]
         axis2 = snv_on_genome(
-            axis2, variants, chrom_sizes, segments, do_trend, segment_color
+            axis2,
+            variants,
+            chrom_sizes,
+            segments,
+            do_trend,
+            segment_color,
+            loh_variants=loh_variants,
+            somatic_variants=somatic_variants,
         )
     else:
         _fig, axis = pyplot.subplots()
@@ -191,7 +240,14 @@ def genome_scatter(
             for chrom, subarr in variants.by_chromosome()  # type: ignore[union-attr]
         )
         axis = snv_on_genome(
-            axis, variants, chrom_sizes, segments, do_trend, segment_color
+            axis,
+            variants,
+            chrom_sizes,
+            segments,
+            do_trend,
+            segment_color,
+            loh_variants=loh_variants,
+            somatic_variants=somatic_variants,
         )
     return axis.get_figure()  # type: ignore[return-value]
 
@@ -307,14 +363,30 @@ def cnv_on_genome(
     return axis
 
 
-def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color):
-    """Plot a scatter-plot of SNP chromosomal positions and shifts."""
+def snv_on_genome(
+    axis,
+    variants,
+    chrom_sizes,
+    segments,
+    do_trend,
+    segment_color,
+    loh_variants=None,
+    somatic_variants=None,
+):
+    """Plot a scatter-plot of SNP chromosomal positions and shifts.
+
+    Optional ``loh_variants`` and ``somatic_variants`` are overlaid in
+    distinct colors and excluded from the segment-overlay trend so the trend
+    continues to reflect only the het subset (#290).
+    """
     axis.set_ylim(0.0, 1.0)
     axis.set_ylabel("VAF")
     x_starts = plots.plot_chromosome_dividers(axis, chrom_sizes)
 
     # Calculate the coordinates of plot components
     chrom_snvs = dict(variants.by_chromosome())
+    chrom_loh = dict(loh_variants.by_chromosome()) if loh_variants else {}
+    chrom_som = dict(somatic_variants.by_chromosome()) if somatic_variants else {}
     if segments:
         chrom_segs = dict(segments.by_chromosome())
     elif do_trend:
@@ -338,7 +410,36 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color
             alpha=0.2,
             marker=".",
         )
-        # Trend bars: always calculated, only shown on request
+        # Overlay LOH-evidence and somatic markers on top of the het dots.
+        # Distinct color AND marker shape (set in module-level constants) so
+        # the overlays read in grayscale prints as well as in color. Higher
+        # alpha than het dots so they remain visible through dense het
+        # regions. Legend handles (``label=``) are attached only on the
+        # first per-chromosome draw to avoid N duplicate legend entries; the
+        # axis-level legend call at the end of the loop emits the legend.
+        if chrom in chrom_loh:
+            loh_snvs = chrom_loh[chrom]
+            axis.scatter(
+                loh_snvs["start"].values + x_offset,
+                loh_snvs["alt_freq"].values,
+                color=LOH_SNV_COLOR,
+                alpha=0.7,
+                marker=LOH_SNV_MARKER,
+                label=_overlay_label_once(axis, "LOH"),
+            )
+        if chrom in chrom_som:
+            som_snvs = chrom_som[chrom]
+            axis.scatter(
+                som_snvs["start"].values + x_offset,
+                som_snvs["alt_freq"].values,
+                color=SOMATIC_SNV_COLOR,
+                alpha=0.7,
+                marker=SOMATIC_SNV_MARKER,
+                label=_overlay_label_once(axis, "somatic"),
+            )
+        # Trend bars: always calculated, only shown on request.
+        # NB: trend uses only the het subset (snvs), never the overlays --
+        # the BAF math that drives the segment overlay must be unchanged.
         if chrom in chrom_segs:
             # Draw average VAF within each segment
             segs = chrom_segs[chrom]
@@ -363,7 +464,37 @@ def snv_on_genome(axis, variants, chrom_sizes, segments, do_trend, segment_color
                     solid_capstyle="round",
                     snap=False,
                 )
+    if loh_variants is not None or somatic_variants is not None:
+        # Legend lives outside the plot (anchored to the right edge of the
+        # VAF panel) so it doesn't occlude the dot field. Marker keys are
+        # de-duplicated by _overlay_label_once. ``bbox_inches="tight"`` at
+        # savefig captures the legend even though it sits past the axes.
+        axis.legend(
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1.0),
+            borderaxespad=0,
+            fontsize="small",
+            frameon=False,
+        )
     return axis
+
+
+def _overlay_label_once(axis: Axes, label: str) -> str | None:
+    """Return ``label`` the first time it's seen for this axis, else None.
+
+    Prevents matplotlib's legend from accumulating N duplicate entries when
+    the same overlay kind is plotted once per chromosome in genome view.
+    Uses the axis itself as the dedupe scope so different subplots get
+    independent legends.
+    """
+    seen = getattr(axis, "_cnvkit_overlay_labels_seen", None)
+    if seen is None:
+        seen = set()
+        axis._cnvkit_overlay_labels_seen = seen  # type: ignore[attr-defined]
+    if label in seen:
+        return None
+    seen.add(label)
+    return label
 
 
 # === Chromosome-level scatter plots ===
@@ -383,6 +514,8 @@ def chromosome_scatter(
     y_max,
     title,
     segment_color,
+    loh_variants=None,
+    somatic_variants=None,
 ):
     """Plot a specified region on one chromosome.
 
@@ -399,8 +532,24 @@ def chromosome_scatter(
         chr:s-e | +  | given | given
 
     """
-    sel_probes, sel_segs, sel_snvs, window_coords, genes, chrom = select_range_genes(
-        cnarr, segments, variants, show_range, show_gene, window_width
+    (
+        sel_probes,
+        sel_segs,
+        sel_snvs,
+        sel_loh,
+        sel_som,
+        window_coords,
+        genes,
+        chrom,
+    ) = select_range_genes(
+        cnarr,
+        segments,
+        variants,
+        show_range,
+        show_gene,
+        window_width,
+        loh_variants=loh_variants,
+        somatic_variants=somatic_variants,
     )
     # Create plots
     if cnarr or segments:
@@ -412,7 +561,15 @@ def chromosome_scatter(
             axis2 = pyplot.subplot(axgrid[3:], sharex=axis)
             # Plot allele freqs for only the selected region
             snv_on_chromosome(
-                axis2, sel_snvs, sel_segs, genes, do_trend, by_bin, segment_color
+                axis2,
+                sel_snvs,
+                sel_segs,
+                genes,
+                do_trend,
+                by_bin,
+                segment_color,
+                loh_variants=sel_loh,
+                somatic_variants=sel_som,
             )
         else:
             _fig, axis = pyplot.subplots()
@@ -436,7 +593,15 @@ def chromosome_scatter(
         # Only plot SNVs in a single-panel layout
         _fig, axis = pyplot.subplots()
         axis = snv_on_chromosome(
-            axis, sel_snvs, sel_segs, genes, do_trend, by_bin, segment_color
+            axis,
+            sel_snvs,
+            sel_segs,
+            genes,
+            do_trend,
+            by_bin,
+            segment_color,
+            loh_variants=sel_loh,
+            somatic_variants=sel_som,
         )
 
     if title is None:
@@ -445,7 +610,17 @@ def chromosome_scatter(
     return axis.get_figure()
 
 
-def select_range_genes(cnarr, segments, variants, show_range, show_gene, window_width):
+def select_range_genes(
+    cnarr,
+    segments,
+    variants,
+    show_range,
+    show_gene,
+    window_width,
+    *,
+    loh_variants=None,
+    somatic_variants=None,
+):
     """Determine which datapoints to show based on the given options.
 
     Behaviors::
@@ -547,6 +722,10 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene, window_
         segments.in_range(chrom, *window_coords, mode="trim") if segments else CNA([])
     )
     sel_snvs = variants.in_range(chrom, *window_coords) if variants else None
+    sel_loh = loh_variants.in_range(chrom, *window_coords) if loh_variants else None
+    sel_som = (
+        somatic_variants.in_range(chrom, *window_coords) if somatic_variants else None
+    )
     logging.info(
         "Showing %d probes and %d selected genes in region %s",
         len(sel_probes),
@@ -562,7 +741,16 @@ def select_range_genes(cnarr, segments, variants, show_range, show_gene, window_
             diagnose_missing_chromosome(chrom, cnarr.chromosome.unique()),
         )
 
-    return sel_probes, sel_segs, sel_snvs, window_coords, gene_ranges, chrom
+    return (
+        sel_probes,
+        sel_segs,
+        sel_snvs,
+        sel_loh,
+        sel_som,
+        window_coords,
+        gene_ranges,
+        chrom,
+    )
 
 
 def cnv_on_chromosome(
@@ -681,7 +869,23 @@ def cnv_on_chromosome(
     return axis
 
 
-def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin, segment_color):
+def snv_on_chromosome(
+    axis,
+    variants,
+    segments,
+    genes,
+    do_trend,
+    by_bin,
+    segment_color,
+    loh_variants=None,
+    somatic_variants=None,
+):
+    """Draw VAFs for a single-chromosome region.
+
+    Optional ``loh_variants`` and ``somatic_variants`` are overlaid in
+    distinct colors and excluded from the segment-overlay trend so the trend
+    continues to reflect only the het subset (#290).
+    """
     # TODO set x-limits if not already done for probes/segments
     # set_xlim_from(axis, None, segments, variants)
     # setup_chromosome(axis, 0.0, 1.0, "VAF")
@@ -698,8 +902,39 @@ def snv_on_chromosome(axis, variants, segments, genes, do_trend, by_bin, segment
     x_mb = variants["start"].values * MB
     y = variants["alt_freq"].values
     axis.scatter(x_mb, y, color=POINT_COLOR, alpha=0.3)
+    overlay_present = False
+    if loh_variants is not None and len(loh_variants):
+        axis.scatter(
+            loh_variants["start"].values * MB,
+            loh_variants["alt_freq"].values,
+            color=LOH_SNV_COLOR,
+            alpha=0.8,
+            marker=LOH_SNV_MARKER,
+            label="LOH",
+        )
+        overlay_present = True
+    if somatic_variants is not None and len(somatic_variants):
+        axis.scatter(
+            somatic_variants["start"].values * MB,
+            somatic_variants["alt_freq"].values,
+            color=SOMATIC_SNV_COLOR,
+            alpha=0.8,
+            marker=SOMATIC_SNV_MARKER,
+            label="somatic",
+        )
+        overlay_present = True
+    if overlay_present:
+        axis.legend(
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1.0),
+            borderaxespad=0,
+            fontsize="small",
+            frameon=False,
+        )
     if segments or do_trend:
-        # Draw average VAF within each segment
+        # Draw average VAF within each segment.
+        # NB: trend uses only the het subset (variants), never the overlays
+        # -- the BAF math driving the segment overlay must stay unchanged.
         sex_labels = _sex_labels(segments) if segments else (None, None)
         for seg, v_freq in get_segment_vafs(variants, segments):
             if seg:

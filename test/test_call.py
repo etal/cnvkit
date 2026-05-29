@@ -768,6 +768,152 @@ class LoadHetSnpsTests(unittest.TestCase):
         self.assertLessEqual(varr.meta["chrx_het_count"], varr.meta["chrx_snp_total"])
 
 
+class LoadSnpSubsetsTests(unittest.TestCase):
+    """Tests for cmdutil.load_snp_subsets and _partition_snp_extras.
+
+    The partition surfaces LOH-evidence (tumor-homozygous loci) and somatic
+    SNVs separately from the heterozygous germline subset that drives BAF and
+    segment-overlay computation. Used by the scatter plot's ``--show-snvs``
+    modes (#290) to visualize previously-hidden variant evidence.
+    """
+
+    _VCF_TN = "formats/na12878_na12882_mix.vcf"
+    _TUMOR_ID = "NA12882"
+    _NORMAL_ID = "NA12878"
+
+    def test_default_returns_none_extras(self):
+        """Both include flags False -> behaves like load_het_snps for the het
+        subset, and emits None for both extras (zero-cost default path)."""
+        het, loh, somatic = cmdutil.load_snp_subsets(
+            self._VCF_TN, self._TUMOR_ID, self._NORMAL_ID, 15, None
+        )
+        ref_het = cmdutil.load_het_snps(
+            self._VCF_TN, self._TUMOR_ID, self._NORMAL_ID, 15, None
+        )
+        self.assertEqual(len(het), len(ref_het))
+        self.assertIsNone(loh)
+        self.assertIsNone(somatic)
+
+    def test_with_loh_matched_normal(self):
+        """With matched normal, LOH = (normal-het & tumor-hom & not somatic).
+
+        load_het_snps filters by *normal* zygosity when matched normal is
+        present, so a normal-het + tumor-hom locus is already in ``het`` (and
+        already drives the BAF trend correctly). LOH thus forms a *subset* of
+        ``het`` in matched-normal mode -- the visual layer overlays distinct
+        markers without changing the BAF math. Somatic remains disjoint from
+        het (load_het_snps drops somatic loci at read time).
+        """
+        het, loh, somatic = cmdutil.load_snp_subsets(
+            self._VCF_TN,
+            self._TUMOR_ID,
+            self._NORMAL_ID,
+            15,
+            None,
+            include_loh=True,
+            include_somatic=True,
+        )
+        self.assertIsNotNone(loh)
+        self.assertIsNotNone(somatic)
+        # LOH-evidence must be tumor-homozygous (zygosity in {0, 1}) and,
+        # when matched normal is present, normal-heterozygous (n_zyg == 0.5).
+        loh_zyg = loh["zygosity"]  # type: ignore[index]
+        self.assertTrue(((loh_zyg == 0.0) | (loh_zyg == 1.0)).all())
+        self.assertIn("n_zygosity", loh)  # type: ignore[operator]
+        self.assertTrue((loh["n_zygosity"] == 0.5).all())  # type: ignore[index]
+        # Somatic loci must carry the somatic flag (or be inferred via T/N).
+        self.assertGreater(len(somatic), 0)
+        # Identify each record uniquely by (chr, start, ref, alt) -- the VCF
+        # contains multiallelic sites decomposed into separate biallelic rows,
+        # so (chr, start) alone is not unique.
+        het_keys = {(r.chromosome, r.start, r.ref, r.alt) for r in het}
+        loh_keys = {(r.chromosome, r.start, r.ref, r.alt) for r in loh}  # type: ignore[union-attr]
+        som_keys = {(r.chromosome, r.start, r.ref, r.alt) for r in somatic}  # type: ignore[union-attr]
+        # loh is a strict subset of het: every LOH locus already drives the
+        # BAF trend; we just want to draw a distinct marker on top.
+        self.assertTrue(loh_keys.issubset(het_keys))
+        # Somatic is disjoint from both other subsets.
+        self.assertEqual(het_keys & som_keys, set())
+        self.assertEqual(loh_keys & som_keys, set())
+
+    def test_with_somatic_only(self):
+        """include_somatic=True surfaces the SOMATIC-flagged loci that
+        load_het_snps drops at read time via skip_somatic=True."""
+        _het, loh, somatic = cmdutil.load_snp_subsets(
+            self._VCF_TN,
+            self._TUMOR_ID,
+            self._NORMAL_ID,
+            15,
+            None,
+            include_loh=False,
+            include_somatic=True,
+        )
+        self.assertIsNone(loh)
+        self.assertIsNotNone(somatic)
+        self.assertGreater(len(somatic), 0)
+
+    def test_partition_tumor_only_loh_fallback(self):
+        """In tumor-only flows (no n_zygosity column), the LOH selector falls
+        back to tumor-homozygous regardless of normal genotype. Unit-tested
+        on _partition_snp_extras to avoid needing a tumor-only VCF fixture."""
+        # Build a synthetic VariantArray: 2 het, 2 tumor-hom, 1 somatic-flagged.
+        # No n_zygosity column (tumor-only flow).
+        varr = vary.VariantArray.from_rows(
+            [
+                ("chr1", 100, 101, "A", "G", False, 0.5),
+                ("chr1", 200, 201, "A", "G", False, 0.5),
+                ("chr1", 300, 301, "A", "G", False, 1.0),
+                ("chr1", 400, 401, "A", "G", False, 0.0),
+                ("chr1", 500, 501, "A", "G", True, 0.5),
+            ],
+            columns=[
+                "chromosome",
+                "start",
+                "end",
+                "ref",
+                "alt",
+                "somatic",
+                "zygosity",
+            ],
+        )
+        loh, somatic = cmdutil._partition_snp_extras(
+            varr, include_loh=True, include_somatic=True
+        )
+        self.assertEqual(len(loh), 2)  # type: ignore[arg-type]
+        self.assertEqual(len(somatic), 1)  # type: ignore[arg-type]
+        # The LOH subset captures both zygosity==0 and zygosity==1 rows.
+        loh_zyg = sorted(loh["zygosity"].tolist())  # type: ignore[index]
+        self.assertEqual(loh_zyg, [0.0, 1.0])
+
+    def test_partition_disjoint_when_both_requested(self):
+        """When both include flags are True the function must not double-count:
+        a somatic-flagged tumor-hom locus belongs to ``somatic``, not LOH."""
+        varr = vary.VariantArray.from_rows(
+            [
+                # A non-somatic tumor-hom locus -> LOH
+                ("chr1", 100, 101, "A", "G", False, 1.0),
+                # A somatic tumor-hom locus -> somatic only, NOT LOH
+                ("chr1", 200, 201, "A", "G", True, 1.0),
+            ],
+            columns=[
+                "chromosome",
+                "start",
+                "end",
+                "ref",
+                "alt",
+                "somatic",
+                "zygosity",
+            ],
+        )
+        loh, somatic = cmdutil._partition_snp_extras(
+            varr, include_loh=True, include_somatic=True
+        )
+        self.assertEqual(len(loh), 1)  # type: ignore[arg-type]
+        self.assertEqual(loh.start.iat[0], 100)  # type: ignore[union-attr]
+        self.assertEqual(len(somatic), 1)  # type: ignore[arg-type]
+        self.assertEqual(somatic.start.iat[0], 200)  # type: ignore[union-attr]
+
+
 class VerifySampleSexHetConfirmerTests(unittest.TestCase):
     """Integration tests for the chrX-het-density confirmer plumbing inside
     ``cmdutil.verify_sample_sex`` (#341).

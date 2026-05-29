@@ -110,6 +110,109 @@ class PlotTests(unittest.TestCase):
         pyplot.close(_fig)
         self.assertAlmostEqual(y_lo, -15.0)
 
+    def test_scatter_show_snvs_extras(self):
+        """`scatter` overlays LOH and somatic markers on the VAF panel and
+        leaves the segment-VAF trend driven solely by the het subset (#290).
+
+        The structural-correctness invariant: introducing the overlays must
+        NOT pull the segment-mean VAF toward the homozygous-allele extremes,
+        because clinical interpretation of segment VAFs depends on the trend
+        being the mean of the het BAFs only. We verify by monkey-patching
+        ``get_segment_vafs`` to capture its first positional argument (the
+        VariantArray driving the trend) and asserting it's the het subset
+        with no LOH rows mixed in -- the test catches a regression where
+        ``snv_on_chromosome`` accidentally concatenates LOH into the trend.
+        """
+        # lazy: defer matplotlib import to keep headless test collection fast
+        from matplotlib import pyplot  # noqa: PLC0415
+
+        het = vary.VariantArray.from_rows(
+            [
+                ("chr1", 100, 101, "A", "G", False, 0.5, 0.5, 100, 50),
+                ("chr1", 200, 201, "A", "G", False, 0.5, 0.55, 100, 55),
+                ("chr1", 300, 301, "A", "G", False, 0.5, 0.45, 100, 45),
+            ],
+            columns=[
+                "chromosome",
+                "start",
+                "end",
+                "ref",
+                "alt",
+                "somatic",
+                "zygosity",
+                "alt_freq",
+                "depth",
+                "alt_count",
+            ],
+        )
+        loh = vary.VariantArray.from_rows(
+            [
+                ("chr1", 150, 151, "A", "G", False, 1.0, 0.95, 100, 95),
+                ("chr1", 250, 251, "A", "G", False, 0.0, 0.05, 100, 5),
+            ],
+            columns=[
+                "chromosome",
+                "start",
+                "end",
+                "ref",
+                "alt",
+                "somatic",
+                "zygosity",
+                "alt_freq",
+                "depth",
+                "alt_count",
+            ],
+        )
+        seg = cnary.CopyNumArray.from_rows(
+            [("chr1", 50, 400, "A", -0.5)],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        # Monkey-patch get_segment_vafs to capture the variants array it sees.
+        captured = []
+        orig_get_segment_vafs = scatter.get_segment_vafs
+
+        def recording_get_segment_vafs(variants, segments):
+            captured.append(variants)
+            return orig_get_segment_vafs(variants, segments)
+
+        scatter.get_segment_vafs = recording_get_segment_vafs
+        try:
+            _fig, ax = pyplot.subplots()
+            scatter.snv_on_chromosome(
+                ax,
+                het,
+                seg,
+                [],
+                do_trend=True,
+                by_bin=False,
+                segment_color="darkorange",
+                loh_variants=loh,
+            )
+            pyplot.close(_fig)
+        finally:
+            scatter.get_segment_vafs = orig_get_segment_vafs
+
+        # snv_on_chromosome must drive the trend from the het subset only.
+        self.assertEqual(len(captured), 1)
+        trend_input = captured[0]
+        self.assertEqual(len(trend_input), len(het))
+        # The LOH rows' VAF extremes (0.95, 0.05) must NOT be among the
+        # values the trend was computed from. If they were, the test caught
+        # a regression where the overlay leaked into the BAF math.
+        for loh_freq in loh["alt_freq"].tolist():
+            self.assertNotIn(loh_freq, trend_input["alt_freq"].tolist())
+        # And as a sanity check on the test's premise: a "broken" trend
+        # input that concatenates LOH would produce a clearly different
+        # segment mean.
+        broken_input = het.concat([loh])
+        broken_trend = [
+            v_freq for _seg, v_freq in orig_get_segment_vafs(broken_input, seg)
+        ]
+        correct_trend = [
+            v_freq for _seg, v_freq in orig_get_segment_vafs(trend_input, seg)
+        ]
+        self.assertNotEqual(broken_trend, correct_trend)
+
     def test_heatmap(self):
         """The 'heatmap' command."""
         cnarrs = [cnvlib.read("formats/amplicon.cnr")]

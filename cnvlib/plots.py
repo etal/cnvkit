@@ -131,7 +131,7 @@ def translate_segments_to_bins(segments, bins):
         bins.sample_id,
     )
     # Must re-align segments to .cnr bins
-    _x, segments, _v = update_binwise_positions(bins, segments)
+    _x, segments, _v, _extras = update_binwise_positions(bins, segments)
     return segments
 
 
@@ -160,7 +160,9 @@ def update_binwise_positions_simple(cnarr):
     )
 
 
-def update_binwise_positions(cnarr, segments=None, variants=None):
+def update_binwise_positions(
+    cnarr, segments=None, variants=None, *, extra_variants=None
+):
     """Convert start/end positions from genomic to bin-wise coordinates.
 
     Instead of chromosomal basepairs, the positions indicate enumerated bins.
@@ -170,15 +172,26 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
     `variants` are grouped into `cnarr` bins as well -- if multiple `variants`
     rows fall within a single bin, equally-spaced fractional positions are used.
 
-    Returns copies of the 3 input objects with revised `start` and `end` arrays.
+    ``extra_variants`` is an optional list of additional VariantArray (or None)
+    instances to translate against the same bin enumeration as ``variants``
+    -- used by the scatter plot's ``--show-snvs`` overlays (#290) so the LOH
+    and somatic markers stay aligned with the het dots under ``--by-bin``.
+
+    Returns a 4-tuple ``(cnarr, segments, variants, extras)`` where ``extras``
+    is the list of translated extra arrays in input order (empty list if no
+    extras were passed).
     """
     cnarr = cnarr.copy()
     if segments:
         segments = segments.copy()
         seg_chroms = set(segments.chromosome.unique())
-    if variants:
-        variants = variants.copy()
-        var_chroms = set(variants.chromosome.unique())
+    # Bundle the primary `variants` and any extras so the per-chrom loop
+    # iterates them uniformly. Copy each so the caller's arrays are unmodified.
+    var_arrs = [variants, *(list(extra_variants) if extra_variants else [])]
+    var_arrs = [v.copy() if v is not None else None for v in var_arrs]
+    var_chroms_per = [
+        set(v.chromosome.unique()) if v is not None else None for v in var_arrs
+    ]
 
     # ENH: look into pandas groupby innards to get group indices
     for chrom in cnarr.chromosome.unique():
@@ -196,11 +209,13 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
             segments.data.loc[c_seg_idx, "start"] = seg_starts
             segments.data.loc[c_seg_idx, "end"] = seg_ends
 
-        if variants and chrom in var_chroms:
+        for varr, vchroms in zip(var_arrs, var_chroms_per, strict=True):
+            if varr is None or vchroms is None or chrom not in vchroms:
+                continue
             # Match variant positions to enumerated bins, and
             # add fractional increments to multiple variants within 1 bin
-            c_varr_idx = (variants.chromosome == chrom).values
-            c_varr_df = variants.data[c_varr_idx]
+            c_varr_idx = (varr.chromosome == chrom).values
+            c_varr_df = varr.data[c_varr_idx]
             # Get binwise start indices of the variants
             v_starts = np.searchsorted(c_bins.start.values, c_varr_df.start.values)
             # Overwrite runs of repeats with fractional increments,
@@ -208,15 +223,15 @@ def update_binwise_positions(cnarr, segments=None, variants=None):
             for idx, size in list(get_repeat_slices(v_starts)):
                 v_starts[idx] += np.arange(size) / size
             variant_sizes = c_varr_df.end - c_varr_df.start
-            variants.data.loc[c_varr_idx, "start"] = v_starts
-            variants.data.loc[c_varr_idx, "end"] = v_starts + variant_sizes
+            varr.data.loc[c_varr_idx, "start"] = v_starts
+            varr.data.loc[c_varr_idx, "end"] = v_starts + variant_sizes
 
         c_starts = np.arange(len(c_bins))  # c_idx.sum())
         c_ends = np.arange(1, len(c_bins) + 1)
         cnarr.data.loc[c_idx, "start"] = c_starts
         cnarr.data.loc[c_idx, "end"] = c_ends
 
-    return cnarr, segments, variants
+    return cnarr, segments, var_arrs[0], var_arrs[1:]
 
 
 def get_repeat_slices(values):
