@@ -395,6 +395,16 @@ beforehand, CNVkit will automatically do it for you.
     to update the timestamp on the index files after all files have been
     downloaded.
 
+.. note::
+    **Long-chromosome genomes are indexed automatically with CSI.** The BAI
+    index format cannot address chromosomes longer than about 537 Mb, which
+    excludes some plant and amphibian
+    genomes such as wheat, barley, and salamander. When CNVkit indexes such a
+    BAM it builds a CSI index (``.csi``) rather than BAI, and an existing
+    ``.csi`` file is detected and reused just like ``.bai``. No extra options
+    or manual indexing are required (equivalent to running ``samtools index
+    -c`` yourself).
+
 
 .. _reference:
 
