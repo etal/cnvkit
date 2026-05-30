@@ -66,13 +66,33 @@ def bam_total_reads(bam_fname: str, fasta: str | None = None) -> int64:
     return table.mapped.sum()  # type: ignore[no-any-return]
 
 
+# BAI's binning scheme cannot address coordinates beyond 2**29 bp, so a
+# reference contig longer than this requires a CSI index instead.
+_BAI_MAX_CONTIG_LENGTH = 1 << 29  # 536_870_912
+
+
+def _bam_needs_csi(bam_fname: str, pysam: Any) -> bool:
+    """Return True if any reference contig is too long for a BAI index.
+
+    Long-chromosome genomes (e.g. wheat, barley) have contigs exceeding the BAI
+    coordinate limit of 2**29 bp and must use a CSI index. Reads only the BAM
+    header, so no index is required.
+    """
+    with pysam.AlignmentFile(bam_fname, "rb") as bam:
+        return any(length > _BAI_MAX_CONTIG_LENGTH for length in bam.lengths)
+
+
 def ensure_bam_index(bam_fname: str) -> str:
-    """Ensure a BAM file is indexed, to enable fast traversal & lookup.
+    """Ensure a BAM/CRAM file is indexed, to enable fast traversal & lookup.
 
-    For MySample.bam, samtools will look for an index in these files, in order:
+    For MySample.bam, samtools looks for an index in these files, in order:
 
-    - MySample.bam.bai
-    - MySample.bai
+    - MySample.bam.bai / MySample.bam.csi
+    - MySample.bai / MySample.csi
+
+    A CSI index is built automatically when any reference contig is longer than
+    the BAI coordinate limit (2**29 bp), as in long-chromosome genomes such as
+    wheat or barley.
     """
     try:
         import pysam  # noqa: PLC0415  # lazy: keep targeted ImportError message
@@ -83,28 +103,52 @@ def ensure_bam_index(bam_fname: str) -> str:
     if PurePath(bam_fname).suffix == ".cram":
         if os.path.isfile(bam_fname + ".crai"):
             # MySample.cram.crai
-            bai_fname = bam_fname + ".crai"
+            index_fname = bam_fname + ".crai"
         else:
             # MySample.crai
-            bai_fname = bam_fname[:-1] + "i"
-        if not is_newer_than(bai_fname, bam_fname):
+            index_fname = bam_fname[:-1] + "i"
+        if not is_newer_than(index_fname, bam_fname):
             logging.info("Indexing CRAM file %s", bam_fname)
             pysam.index(bam_fname)  # type: ignore[attr-defined]
-            bai_fname = bam_fname + ".crai"
-        assert os.path.isfile(bai_fname), "Failed to generate cram index " + bai_fname
+            index_fname = bam_fname + ".crai"
+        assert os.path.isfile(index_fname), (
+            "Failed to generate cram index " + index_fname
+        )
+    elif _bam_needs_csi(bam_fname, pysam):
+        # Long-chromosome genome: a contig exceeds the BAI 2**29 bp coordinate
+        # limit, so a CSI index is required instead of BAI.
+        if os.path.isfile(bam_fname + ".csi"):
+            # MySample.bam.csi
+            index_fname = bam_fname + ".csi"
+        else:
+            # MySample.csi
+            index_fname = bam_fname[:-3] + "csi"
+        if not is_newer_than(index_fname, bam_fname):
+            logging.info("Indexing BAM file %s (CSI; long contigs)", bam_fname)
+            pysam.index("-c", bam_fname)  # type: ignore[attr-defined]
+            index_fname = bam_fname + ".csi"
+            # A stale .bai cannot index this BAM and would shadow the new .csi.
+            for stale_bai in (bam_fname + ".bai", bam_fname[:-1] + "i"):
+                if os.path.isfile(stale_bai):
+                    os.remove(stale_bai)
+        assert os.path.isfile(index_fname), (
+            "Failed to generate bam csi index " + index_fname
+        )
     else:
         if os.path.isfile(bam_fname + ".bai"):
             # MySample.bam.bai
-            bai_fname = bam_fname + ".bai"
+            index_fname = bam_fname + ".bai"
         else:
             # MySample.bai
-            bai_fname = bam_fname[:-1] + "i"
-        if not is_newer_than(bai_fname, bam_fname):
+            index_fname = bam_fname[:-1] + "i"
+        if not is_newer_than(index_fname, bam_fname):
             logging.info("Indexing BAM file %s", bam_fname)
             pysam.index(bam_fname)  # type: ignore[attr-defined]
-            bai_fname = bam_fname + ".bai"
-        assert os.path.isfile(bai_fname), "Failed to generate bam index " + bai_fname
-    return bai_fname
+            index_fname = bam_fname + ".bai"
+        assert os.path.isfile(index_fname), (
+            "Failed to generate bam index " + index_fname
+        )
+    return index_fname
 
 
 def ensure_bam_sorted(
