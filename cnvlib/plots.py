@@ -94,7 +94,11 @@ def chromosome_sizes(
     """Create an ordered mapping of chromosome names to sizes."""
     chrom_sizes = collections.OrderedDict()
     for chrom, rows in probes.by_chromosome():
-        chrom_sizes[chrom] = rows["end"].max()
+        # Use the rightmost coordinate from either column so reverse-oriented
+        # intervals (start > end, e.g. reverse-direction PCR primers) still set
+        # the chromosome's extent. For well-formed intervals end.max() already
+        # dominates, so this is a no-op there.
+        chrom_sizes[chrom] = max(rows["end"].max(), rows["start"].max())
         if to_mb:
             chrom_sizes[chrom] *= MB
     return chrom_sizes

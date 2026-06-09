@@ -45,8 +45,22 @@ def create_diagram(
     show_range: str | None = None,
     title: str | None = None,
     show_labels: bool = True,
+    *,
+    threshold_low: float | None = None,
+    threshold_high: float | None = None,
+    gene_names: list[str] | None = None,
 ) -> str:
-    """Create the diagram."""
+    """Create the diagram.
+
+    Gene labels are drawn for segments whose log2 ratio passes a threshold.
+    By default the symmetric ``threshold`` is used (label when
+    ``abs(log2) >= threshold``). Passing ``threshold_high`` and/or
+    ``threshold_low`` switches to directional thresholds: label gains at or
+    above ``threshold_high`` and losses at or below ``threshold_low``; a side
+    left as ``None`` disables labeling in that direction. ``gene_names``, if
+    given, restricts labels to those genes (among the ones passing the
+    threshold), dropping co-binned neighbors.
+    """
     if cnarr and segarr:
         do_both = True  # Draw segments on left, probes on right.
         cnarr_is_seg = False  # Are probes actually the segmented values?
@@ -71,7 +85,18 @@ def create_diagram(
             cnarr = cnarr.in_range(chrom=chrom, start=None, end=None)
         if segarr:
             segarr = segarr.in_range(chrom=chrom, start=None, end=None)
-    gene_labels = _get_gene_labels(cnarr, segarr, cnarr_is_seg, threshold, min_probes)
+    # The symmetric -t/--threshold maps to the pair (-threshold, +threshold),
+    # for which "log2 >= high or log2 <= low" is exactly "abs(log2) >= threshold"
+    # -- so the default output is unchanged. Directional flags override one or
+    # both sides; a None side disables labeling in that direction.
+    low: float | None
+    high: float | None
+    if threshold_low is None and threshold_high is None:
+        low, high = -threshold, threshold
+    else:
+        low, high = threshold_low, threshold_high
+    gene_labels = _get_gene_labels(cnarr, segarr, cnarr_is_seg, low, high, min_probes)
+    requested = set(gene_names) if gene_names else None
 
     # NB: If multiple segments cover the same gene (gene contains breakpoints),
     # all those segments are marked as "hits".  We'll uniquify them.
@@ -85,21 +110,19 @@ def create_diagram(
     if not cnarr_is_seg:
         cnarr = cnarr.squash_genes()
     for row in cnarr:
-        if (
-            row.start - 1 >= 0 and row.end <= chrom_sizes[row.chromosome]
-        ):  # Sanity check
+        span = _feature_span(row.start, row.end, chrom_sizes[row.chromosome])
+        if span is not None:
+            lo, hi = span
             if show_labels and row.gene in gene_labels and row.gene not in seen_genes:
                 seen_genes.add(row.gene)
-                feat_name = row.gene
-                if "," in feat_name:
-                    # TODO - line-wrap multi-gene labels (reportlab won't do \n)
-                    feat_name = feat_name.replace(",", ", ")
+                # TODO - line-wrap multi-gene labels (reportlab won't do \n)
+                feat_name = _gene_feature_label(row.gene, requested)
             else:
                 feat_name = None
             features[row.chromosome].append(
                 (
-                    row.start - 1,
-                    row.end,
+                    lo,
+                    hi,
                     strand,
                     feat_name,
                     colors.Color(*plots.cvg2rgb(row.log2, not cnarr_is_seg)),
@@ -109,13 +132,13 @@ def create_diagram(
         # Draw segments in the left half of each chromosome (strand -1)
         for chrom, segrows in segarr.by_chromosome():
             for srow in segrows:
-                if (
-                    srow.start - 1 >= 0 and srow.end <= chrom_sizes[chrom]
-                ):  # Sanity check
+                span = _feature_span(srow.start, srow.end, chrom_sizes[chrom])
+                if span is not None:
+                    lo, hi = span
                     features[chrom].append(
                         (
-                            srow.start - 1,
-                            srow.end,
+                            lo,
+                            hi,
                             -1,
                             None,
                             colors.Color(*plots.cvg2rgb(srow.log2, False)),
@@ -137,27 +160,94 @@ def _get_gene_labels(
     cnarr: CopyNumArray,
     segarr: CopyNumArray,
     cnarr_is_seg: bool,
-    threshold: float,
+    threshold_low: float | None,
+    threshold_high: float | None,
     min_probes: int,
 ) -> list[Any]:
-    """Label genes where copy ratio value exceeds threshold."""
+    """Label genes whose copy ratio passes a directional threshold.
+
+    A gene qualifies when its log2 value is at or above ``threshold_high``
+    (a gain) or at or below ``threshold_low`` (a loss). Either bound may be
+    ``None`` to disable labeling in that direction.
+    """
     if cnarr_is_seg:
-        # Only segments (.cns)
-        sel = cnarr.data[
-            (cnarr.data.log2.abs() >= threshold)
-            & ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)
-        ]
+        # Only segments (.cns): build the directional mask directly.
+        mask = cnarr.data["log2"].map(
+            lambda v: _passes(v, threshold_low, threshold_high)
+        )
+        sel = cnarr.data[mask & ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
         rows = sel.itertuples(index=False)
         probes_attr = "probes"
     elif segarr:
-        # Both segments and bin-level ratios
-        rows = reports.gene_metrics_by_segment(cnarr, segarr, threshold)
+        # Both segments and bin-level ratios. gene_metrics_by_segment filters on
+        # abs(log2) >= t, so feed it the least-restrictive magnitude covering
+        # both bounds and refine the direction afterward.
+        rows = (
+            row
+            for row in reports.gene_metrics_by_segment(
+                cnarr, segarr, _min_magnitude(threshold_low, threshold_high)
+            )
+            if _passes(row.log2, threshold_low, threshold_high)
+        )
         probes_attr = "segment_probes"
     else:
         # Only bin-level ratios (.cnr)
-        rows = reports.gene_metrics_by_gene(cnarr, threshold)
+        rows = (
+            row
+            for row in reports.gene_metrics_by_gene(
+                cnarr, _min_magnitude(threshold_low, threshold_high)
+            )
+            if _passes(row.log2, threshold_low, threshold_high)
+        )
         probes_attr = "probes"
     return [row.gene for row in rows if getattr(row, probes_attr) >= min_probes]
+
+
+def _passes(
+    log2: float, threshold_low: float | None, threshold_high: float | None
+) -> bool:
+    """True if ``log2`` is a gain (>= high) or loss (<= low); None disables a side."""
+    return (threshold_high is not None and log2 >= threshold_high) or (
+        threshold_low is not None and log2 <= threshold_low
+    )
+
+
+def _min_magnitude(threshold_low: float | None, threshold_high: float | None) -> float:
+    """Least-restrictive symmetric cutoff covering both directional bounds."""
+    mags = [abs(t) for t in (threshold_low, threshold_high) if t is not None]
+    return min(mags) if mags else 0.0
+
+
+def _feature_span(start: int, end: int, chrom_size: int) -> tuple[int, int] | None:
+    """0-based half-open span ``[lo, hi)`` for a feature, or None if out of range.
+
+    Normalizes reverse-oriented intervals: reverse-direction PCR primers are
+    sometimes stored with ``start > end`` in the input BED, so the interval is
+    taken to span ``[min, max]`` regardless of column order. Biopython's
+    chromosome renderer asserts ``0 <= start <= end <= length``, so an
+    un-normalized reversed interval would otherwise crash the diagram.
+    """
+    lo = min(start, end) - 1
+    hi = max(start, end)
+    if lo >= 0 and hi <= chrom_size:
+        return lo, hi
+    return None
+
+
+def _gene_feature_label(gene: str, requested: set[str] | None) -> str | None:
+    """Build the on-plot label for a qualifying segment or gene.
+
+    Without ``requested`` (no --gene), expand the bin's comma-joined gene
+    string for display, preserving legacy output. With ``requested``, show only
+    the requested genes -- dropping co-binned neighbors the user did not ask for
+    and collapsing duplicate names.
+    """
+    if requested is None:
+        return gene.replace(",", ", ")
+    names = list(
+        dict.fromkeys(n.strip() for n in gene.split(",") if n.strip() in requested)
+    )
+    return ", ".join(names) if names else None
 
 
 def build_chrom_diagram(
