@@ -74,7 +74,7 @@ class PlotTests(unittest.TestCase):
 
     def test_scatter_genome_y_floor(self):
         """Genome-wide autoscale floors y_min so a single deep homozygous
-        deletion can't compress the whole plot (gh#385)."""
+        deletion can't compress the whole plot (#385)."""
         # lazy: defer matplotlib import to keep headless test collection fast
         from matplotlib import pyplot  # noqa: PLC0415
 
@@ -229,7 +229,7 @@ class GeneCoordsTests(unittest.TestCase):
     """Tests for plots.gene_coords_by_name gene-label selection."""
 
     def test_gene_coords_by_name(self):
-        """`-g` labels only requested genes, not co-binned neighbors (gh#458).
+        """`-g` labels only requested genes, not co-binned neighbors (#458).
 
         A bin whose `gene` column packs several names (e.g. "ERBB2,MIR4728")
         must not surface the unrequested neighbor (MIR4728) when only ERBB2
