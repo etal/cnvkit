@@ -1504,6 +1504,23 @@ def _cmd_diagram(args: argparse.Namespace) -> None:
             "the '-s' option, or both. You did neither."
         )
 
+    # Directional thresholds (--threshold-low/--threshold-high) are mutually
+    # exclusive with the symmetric -t/--threshold. -t defaults to None so an
+    # explicit value can be distinguished from the documented 0.5 default.
+    threshold = args.threshold if args.threshold is not None else 0.5
+    if args.threshold_low is not None or args.threshold_high is not None:
+        if args.threshold is not None:
+            raise ValueError(
+                "-t/--threshold (symmetric) is mutually exclusive with the "
+                "directional --threshold-low/--threshold-high options."
+            )
+        # Directional bounds drive labeling; the symmetric `threshold` is unused.
+        threshold_low = args.threshold_low
+        threshold_high = args.threshold_high
+    else:
+        threshold_low = threshold_high = None
+    gene_names = _split_gene_names(args.gene)
+
     cnarr = read_cna(args.filename) if args.filename else None
     segarr = read_cna(args.segment) if args.segment else None
     if args.adjust_xy:
@@ -1521,14 +1538,25 @@ def _cmd_diagram(args: argparse.Namespace) -> None:
     outfname = diagram.create_diagram(
         cnarr,  # type: ignore[arg-type]
         segarr,  # type: ignore[arg-type]
-        args.threshold,
+        threshold,
         args.min_probes,
         args.output,
         args.chromosome,
         args.title,
         args.show_labels,
+        threshold_low=threshold_low,
+        threshold_high=threshold_high,
+        gene_names=gene_names,
     )
     logging.info("Wrote %s", outfname)
+
+
+def _split_gene_names(gene: str | None) -> list[str] | None:
+    """Split the --gene value (comma-separated) into a list of gene names."""
+    if not gene:
+        return None
+    names = [name.strip() for name in gene.split(",") if name.strip()]
+    return names or None
 
 
 P_diagram = AP_subparsers.add_parser("diagram", help=_cmd_diagram.__doc__)
@@ -1552,8 +1580,32 @@ P_diagram.add_argument(
     "-t",
     "--threshold",
     type=float,
-    default=0.5,
-    help="""Copy number change threshold to label genes. [Default: %(default)s]""",
+    default=None,
+    help="""Symmetric copy number change threshold to label genes: label when
+            abs(log2) is at or above this value. [Default: 0.5]""",
+)
+P_diagram.add_argument(
+    "--threshold-high",
+    type=float,
+    metavar="LOG2",
+    help="""Label only gain segments with log2 ratio at or above this value.
+            Directional; mutually exclusive with -t/--threshold.""",
+)
+P_diagram.add_argument(
+    "--threshold-low",
+    type=float,
+    metavar="LOG2",
+    help="""Label only loss segments with log2 ratio at or below this value
+            (typically negative). Directional; mutually exclusive with
+            -t/--threshold.""",
+)
+P_diagram.add_argument(
+    "--gene",
+    metavar="GENE",
+    help="""Name of gene or genes (comma-separated) to label, among those passing
+            the threshold. Restricts diagram's default behavior of labeling every
+            gene that meets the threshold. (Note: -g is the deprecated alias for
+            --sample-sex, so --gene has no short form here, unlike scatter.)""",
 )
 P_diagram.add_argument(
     "-m",

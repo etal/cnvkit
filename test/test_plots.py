@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Tests for plotting commands: scatter, heatmap, diagram."""
 
+import ast
+import inspect
 import logging
 import os
 import shutil
@@ -72,7 +74,7 @@ class PlotTests(unittest.TestCase):
 
     def test_scatter_genome_y_floor(self):
         """Genome-wide autoscale floors y_min so a single deep homozygous
-        deletion can't compress the whole plot (gh#385)."""
+        deletion can't compress the whole plot (#385)."""
         # lazy: defer matplotlib import to keep headless test collection fast
         from matplotlib import pyplot  # noqa: PLC0415
 
@@ -227,7 +229,7 @@ class GeneCoordsTests(unittest.TestCase):
     """Tests for plots.gene_coords_by_name gene-label selection."""
 
     def test_gene_coords_by_name(self):
-        """`-g` labels only requested genes, not co-binned neighbors (gh#458).
+        """`-g` labels only requested genes, not co-binned neighbors (#458).
 
         A bin whose `gene` column packs several names (e.g. "ERBB2,MIR4728")
         must not surface the unrequested neighbor (MIR4728) when only ERBB2
@@ -255,3 +257,187 @@ class GeneCoordsTests(unittest.TestCase):
         ]:
             names_seen.update(label.split(","))
         self.assertEqual(names_seen, {"ERBB2", "MIR4728"})
+
+
+class DiagramGeneLabelTests(unittest.TestCase):
+    """`diagram` --gene and directional --threshold-low/-high (#248)."""
+
+    @staticmethod
+    def _segments():
+        """A .cns with one clear gain, one clear loss, and a co-binned label."""
+        seg = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100, 200, "GAINER", 1.0],
+                ["chr2", 100, 200, "LOSER", -1.0],
+                ["chr3", 100, 200, "FLAT", 0.1],
+                ["chr17", 100, 200, "NF1,ERBB2,ERBB2,MIR4728", 0.8],
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        seg.data["probes"] = [5, 5, 5, 5]
+        return seg
+
+    def test_symmetric_threshold_unchanged(self):
+        """Default symmetric threshold labels both gains and losses."""
+        seg = self._segments()
+        labels = diagram._get_gene_labels(seg, None, True, -0.5, 0.5, 3)
+        self.assertIn("GAINER", labels)
+        self.assertIn("LOSER", labels)
+        self.assertNotIn("FLAT", labels)
+
+    def test_threshold_high_labels_only_gains(self):
+        """--threshold-high (loss side disabled) labels only gains."""
+        seg = self._segments()
+        labels = diagram._get_gene_labels(seg, None, True, None, 0.5, 3)
+        self.assertIn("GAINER", labels)
+        self.assertNotIn("LOSER", labels)
+
+    def test_threshold_low_labels_only_losses(self):
+        """--threshold-low (gain side disabled) labels only losses."""
+        seg = self._segments()
+        labels = diagram._get_gene_labels(seg, None, True, -0.5, None, 3)
+        self.assertIn("LOSER", labels)
+        self.assertNotIn("GAINER", labels)
+
+    def test_threshold_low_suppresses_deletions(self):
+        """A very low loss cutoff (e.g. -25) suppresses all loss labels while a
+        gain cutoff still surfaces gains (maintainer's 2018 example)."""
+        seg = self._segments()
+        labels = diagram._get_gene_labels(seg, None, True, -25.0, 0.5, 3)
+        self.assertIn("GAINER", labels)
+        self.assertNotIn("LOSER", labels)
+
+    def test_min_probes_filters(self):
+        """Below-min-probes segments are not labeled regardless of threshold."""
+        seg = self._segments()
+        seg.data["probes"] = [1, 1, 1, 1]
+        labels = diagram._get_gene_labels(seg, None, True, -0.5, 0.5, 3)
+        self.assertEqual(labels, [])
+
+    def test_gene_feature_label_default(self):
+        """Without -g, the comma-joined gene string is expanded verbatim."""
+        self.assertEqual(
+            diagram._gene_feature_label("NF1,ERBB2,ERBB2,MIR4728", None),
+            "NF1, ERBB2, ERBB2, MIR4728",
+        )
+        self.assertEqual(diagram._gene_feature_label("GAINER", None), "GAINER")
+
+    def test_gene_feature_label_restricts_to_requested(self):
+        """-g shows only requested genes, dropping co-binned neighbors and dups."""
+        # ERBB2 requested: NF1/MIR4728 neighbors dropped; duplicate ERBB2 collapsed
+        self.assertEqual(
+            diagram._gene_feature_label("NF1,ERBB2,ERBB2,MIR4728", {"ERBB2"}),
+            "ERBB2",
+        )
+        # Multiple requested genes sharing the bin all appear, in order
+        self.assertEqual(
+            diagram._gene_feature_label("NF1,ERBB2,MIR4728", {"ERBB2", "MIR4728"}),
+            "ERBB2, MIR4728",
+        )
+        # A segment with no requested gene yields no label
+        self.assertIsNone(diagram._gene_feature_label("STARD3", {"ERBB2"}))
+        # Whitespace around comma-separated names is tolerated when matching
+        self.assertEqual(
+            diagram._gene_feature_label("NF1, ERBB2", {"ERBB2"}),
+            "ERBB2",
+        )
+
+    def test_create_diagram_smoke_with_flags(self):
+        """End-to-end: the new flags drive create_diagram and write a PDF."""
+        seg = self._segments()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, "diagram.pdf")
+            result = diagram.create_diagram(
+                None,
+                seg,
+                0.5,
+                3,
+                out,
+                title="Test sample",
+                threshold_high=0.5,
+                gene_names=["ERBB2"],
+            )
+            self.assertTrue(os.path.exists(result))
+
+    def test_cmd_diagram_threshold_mutually_exclusive(self):
+        """Explicit -t with a directional threshold is rejected up front."""
+        args = commands.parse_args(
+            ["diagram", "formats/amplicon.cns", "-t", "0.5", "--threshold-low", "-0.5"]
+        )
+        with self.assertRaises(ValueError):
+            args.func(args)
+
+    def test_cmd_diagram_plumbs_new_args_to_create_diagram(self):
+        """`_cmd_diagram` forwards gene_names and directional thresholds.
+
+        AST-walk plumbing check (no fixtures): assert the create_diagram call
+        site passes the new keyword arguments, so a dropped kwarg fails fast.
+        """
+        tree = ast.parse(inspect.getsource(commands._cmd_diagram))
+        kwargs_seen = set()
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "create_diagram"
+            ):
+                kwargs_seen = {kw.arg for kw in node.keywords}
+        self.assertLessEqual(
+            {"threshold_low", "threshold_high", "gene_names"}, kwargs_seen
+        )
+
+
+class DiagramCoordinateTests(unittest.TestCase):
+    """diagram renders reverse-oriented intervals (start > end) gracefully.
+
+    Reverse-direction PCR primers are sometimes saved in the input BED with
+    start > end; CNVkit should treat the interval as spanning [min, max] rather
+    than crashing Biopython's renderer, which asserts start <= end <= length.
+    """
+
+    def test_feature_span_normalizes_orientation(self):
+        # Forward interval: 1-based start -> 0-based half-open, unchanged
+        self.assertEqual(diagram._feature_span(100, 200, 300), (99, 200))
+        # Reversed interval (start > end): normalized to [min-1, max)
+        self.assertEqual(diagram._feature_span(400, 300, 400), (299, 400))
+        # Out of range (beyond chromosome) is rejected
+        self.assertIsNone(diagram._feature_span(100, 500, 300))
+        # start == 0 -> lo == -1 is rejected, preserving prior lower-bound guard
+        self.assertIsNone(diagram._feature_span(0, 50, 300))
+
+    def test_chromosome_sizes_counts_reversed_intervals(self):
+        seg = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100, 200, "FWD", 0.0],
+                ["chr1", 400, 300, "REV", 0.0],  # reversed: rightmost pos is 400
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        sizes = plots.chromosome_sizes(seg)
+        self.assertEqual(sizes["chr1"], 400)
+
+    def test_create_diagram_renders_reversed_interval(self):
+        seg = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100, 200, "FWD", 1.0],
+                ["chr1", 400, 300, "REV", 1.0],  # reverse-primer style
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        seg.data["probes"] = [5, 5]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, "diagram.pdf")
+            # Must not raise the Biopython start<=end<=length assertion
+            result = diagram.create_diagram(None, seg, 0.5, 3, out, title="t")
+            self.assertTrue(os.path.exists(result))
+
+    def test_create_diagram_amplicon_fixture(self):
+        """Regression: the amplicon fixture has several reverse-oriented
+        segments (e.g. chr2 212578209-212576985) that previously crashed the
+        renderer. It must now produce a diagram."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out = os.path.join(tmpdir, "diagram.pdf")
+            result = diagram.create_diagram(cnarr, segarr, 0.5, 3, out)
+            self.assertTrue(os.path.exists(result))

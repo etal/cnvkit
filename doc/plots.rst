@@ -257,8 +257,33 @@ extremely cluttered with hundreds or thousands of genes labeled.
 You can reduce the number of labels by using a higher threshold (``diagram -t``)
 to limit labeling to deep deletions and high-level amplifications. The
 :ref:`genemetrics` command can help you determine the log2 value of genes of
-interest, and then a ``-t`` value slightly below that will disply only
-alterations at least that exteme.
+interest, and then a ``-t`` value slightly below that will display only
+alterations at least that extreme.
+
+The ``-t``/``--threshold`` option is symmetric: it labels any gene whose
+absolute log2 ratio meets the threshold. To label only gains or only losses,
+use the directional options instead:
+
+- ``--threshold-high`` labels only gain segments at or above the given log2
+  ratio (e.g. ``--threshold-high 0.5`` shows amplifications only).
+- ``--threshold-low`` labels only loss segments at or below the given log2
+  ratio, which is normally negative (e.g. ``--threshold-low -0.5`` shows
+  deletions only). Setting it very low, such as ``--threshold-low -25``,
+  suppresses loss labels entirely.
+
+Both directional options may be given together to apply asymmetric cutoffs to
+gains and losses. The directional options are mutually exclusive with the
+symmetric ``-t``/``--threshold``.
+
+To label a specific set of genes rather than every gene that meets the
+threshold, pass their names (comma-separated) to ``--gene``::
+
+    cnvkit.py diagram -s Sample.cns --gene MYC,ERBB2,KRAS
+
+Only the named genes are labeled, among those that pass the threshold; other
+genes co-binned with a requested gene are not shown. (Unlike :ref:`scatter`,
+``diagram`` has no ``-g`` short form for this option, because ``-g`` is the
+deprecated alias for ``--sample-sex``.)
 
 To reduce the number of false-positive calls in the .cns file (see
 :doc:`calling`), consider:
