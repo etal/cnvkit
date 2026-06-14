@@ -448,8 +448,10 @@ class ImportRnaIntegrationTests(unittest.TestCase):
         self.assertEqual(cnrs[0].sample_id, "rna-sample-A")
 
     def test_do_import_rna_unknown_format_raises(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as cm:
             import_rna.do_import_rna(self.COUNT_FILES[:1], "bogus", self.GENE_RESOURCE)
+        # The offending format name is interpolated into the message (not literal).
+        self.assertIn("bogus", str(cm.exception))
 
 
 class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):

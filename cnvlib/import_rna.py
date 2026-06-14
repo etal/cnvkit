@@ -74,7 +74,7 @@ def do_import_rna(
         sample_counts = aggregate_gene_counts(gene_count_fnames)
         tx_lengths = None
     else:
-        raise RuntimeError("Unrecognized input format name: {in_format!r}")
+        raise RuntimeError(f"Unrecognized input format name: {in_format!r}")
     sample_counts = rna.filter_probes(
         sample_counts, min_sample_fraction=min_sample_fraction
     )
