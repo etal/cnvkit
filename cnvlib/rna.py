@@ -49,7 +49,7 @@ def before(char):
     return selector
 
 
-def filter_probes(sample_counts):
+def filter_probes(sample_counts, min_sample_fraction=0.5):
     """Filter probes to only include high-quality, transcribed genes.
 
     The human genome has ~25,000 protein coding genes, yet the RSEM output
@@ -58,14 +58,41 @@ def filter_probes(sample_counts):
     mapped genes in contigs that have not been linked to the 24 chromosomes
     (e.g. HLA region). Others correspond to pseudo-genes and non-coding genes.
     For the purposes of copy number inference, these rows are best removed.
+
+    A gene is retained when it has a detectable transcript (count >= 1) in at
+    least ``min_sample_fraction`` of the samples. This is expressed as a
+    quantile threshold rather than a literal sample count: the gene's
+    ``(1 - min_sample_fraction)`` quantile of per-sample counts must be >= 1.
+
+    Parameters
+    ----------
+    sample_counts : pandas.DataFrame
+        Per-gene (rows) read counts across samples (columns).
+    min_sample_fraction : float, optional
+        Minimum fraction of samples in which a gene must be expressed for it to
+        be retained, in [0, 1]. The default 0.5 reproduces the historical
+        ``median(counts) >= 1`` rule bit-exact (the median is the 0.5 quantile).
+        Lower values are more permissive, which is appropriate for single-cell
+        or otherwise sparse cohorts where most genes are expressed in fewer than
+        half of cells.
     """
-    gene_medians = sample_counts.median(axis=1)
-    # Make sure the gene has detectable transcript in at least half of samples
-    is_mostly_transcribed = gene_medians >= 1.0
+    if not 0.0 <= min_sample_fraction <= 1.0:
+        raise ValueError(
+            f"min_sample_fraction must be in [0, 1], got {min_sample_fraction!r}"
+        )
+    if sample_counts.empty:
+        # Nothing to filter; DataFrame.quantile(axis=1) raises on an empty frame
+        # whereas the legacy median(axis=1) returned an empty result.
+        return sample_counts
+    # The (1 - f) quantile >= 1 means at least fraction f of samples express the
+    # gene. At f=0.5 this is the median, preserving the legacy behavior exactly.
+    gene_quantiles = sample_counts.quantile(1.0 - min_sample_fraction, axis=1)
+    is_mostly_transcribed = gene_quantiles >= 1.0
     logging.info(
-        "Dropping %d / %d rarely expressed genes from input samples",
+        "Dropping %d / %d genes expressed in fewer than %g%% of input samples",
         (~is_mostly_transcribed).sum(),
         len(is_mostly_transcribed),
+        100 * min_sample_fraction,
     )
     return sample_counts[is_mostly_transcribed]
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 """Unit tests for RNA import functionality (cnvlib.rna)."""
 
+import ast
+import inspect
 import logging
 import os
 import tempfile
@@ -10,7 +12,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from cnvlib import import_rna, rna
+from cnvlib import commands, import_rna, rna
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -271,6 +273,151 @@ class RNAImportTests(unittest.TestCase):
         self.assertTrue(result[3] > result[2])
 
 
+class FilterProbesTests(unittest.TestCase):
+    """``filter_probes`` keeps a gene when enough samples express it.
+
+    The filter is a quantile threshold, not a literal sample count: a gene is
+    retained when the ``(1 - min_sample_fraction)`` quantile of its per-sample
+    counts is >= 1. At the default ``min_sample_fraction=0.5`` this is exactly
+    the legacy ``median(counts) >= 1`` rule, preserved bit-exact (#448).
+    """
+
+    @staticmethod
+    def _counts_expressed_in(n_expressed, n_samples=10, level=100):
+        """A 3-gene matrix; the middle gene is expressed in exactly N samples.
+
+        The flanking genes are expressed everywhere / nowhere so the frame is
+        never empty and the assertions isolate the middle gene's fate.
+        """
+        rows = {
+            "gene_all": [level] * n_samples,  # always kept
+            "gene_mid": [level] * n_expressed + [0] * (n_samples - n_expressed),
+            "gene_none": [0] * n_samples,  # always dropped
+        }
+        return pd.DataFrame.from_dict(
+            rows, orient="index", columns=[f"s{i}" for i in range(n_samples)]
+        )
+
+    def test_default_matches_legacy_median_rule(self):
+        """Default fraction reproduces the historical ``median >= 1`` filter bit-exact."""
+        rng = np.random.default_rng(0)
+        counts = pd.DataFrame(
+            rng.poisson(2, size=(500, 7)),
+            index=[f"g{i}" for i in range(500)],
+        )
+        legacy = counts[counts.median(axis=1) >= 1.0]
+        new = rna.filter_probes(counts)
+        self.assertTrue(new.equals(legacy))
+
+    def test_retained_iff_fraction_meets_threshold(self):
+        """Gene kept iff (N expressed / M samples) >= min_sample_fraction."""
+        m = 10
+        for n in range(m + 1):
+            counts = self._counts_expressed_in(n, n_samples=m)
+            for f in (0.1, 0.2, 0.3, 0.5, 0.7, 0.9, 1.0):
+                kept = (
+                    "gene_mid" in rna.filter_probes(counts, min_sample_fraction=f).index
+                )
+                expected = (n / m) >= f
+                self.assertEqual(
+                    kept,
+                    expected,
+                    f"N={n}/{m} (fraction {n / m}) with min_sample_fraction={f}: "
+                    f"expected kept={expected}, got {kept}",
+                )
+
+    def test_lower_fraction_is_more_permissive(self):
+        """Lowering the threshold never drops a gene the stricter run kept."""
+        counts = self._counts_expressed_in(3, n_samples=10)
+        strict = set(rna.filter_probes(counts, min_sample_fraction=0.5).index)
+        loose = set(rna.filter_probes(counts, min_sample_fraction=0.2).index)
+        self.assertTrue(strict.issubset(loose))
+        # The single-cell-style low threshold rescues the sparsely-expressed gene.
+        self.assertNotIn("gene_mid", strict)
+        self.assertIn("gene_mid", loose)
+
+    def test_invalid_fraction_raises(self):
+        counts = self._counts_expressed_in(5)
+        for bad in (-0.1, 1.5, 2.0):
+            with self.assertRaises(ValueError):
+                rna.filter_probes(counts, min_sample_fraction=bad)
+
+    def test_empty_input_returns_empty(self):
+        """Empty frame passes through unchanged (quantile(axis=1) raises on empty).
+
+        Regression guard: the legacy ``median(axis=1)`` path returned an empty
+        result on an empty frame, whereas ``quantile(axis=1)`` raises
+        ``ValueError: no types given``.
+        """
+        empty = pd.DataFrame()
+        self.assertEqual(rna.filter_probes(empty).shape, (0, 0))
+        self.assertEqual(
+            rna.filter_probes(empty, min_sample_fraction=0.2).shape, (0, 0)
+        )
+
+    def test_single_sample_uses_that_sample(self):
+        """With one sample, the quantile collapses to that sample's count."""
+        counts = pd.DataFrame({"s0": [0, 5, 1]}, index=["a", "b", "c"])
+        self.assertEqual(list(rna.filter_probes(counts).index), ["b", "c"])
+
+
+class FilterProbesPlumbingTests(unittest.TestCase):
+    """``min_sample_fraction`` is threaded CLI -> do_import_rna -> filter_probes.
+
+    AST-level guards (cheap, no fixtures) so a dropped kwarg fails at collection
+    rather than silently reverting single-cell cohorts to the 0.5 default.
+    """
+
+    @staticmethod
+    def _calls_to(source_obj, attr, value_id):
+        tree = ast.parse(inspect.getsource(source_obj))
+        return [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == attr
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == value_id
+        ]
+
+    def test_do_import_rna_passes_fraction_to_filter_probes(self):
+        calls = self._calls_to(import_rna.do_import_rna, "filter_probes", "rna")
+        self.assertGreater(len(calls), 0)
+        for call in calls:
+            self.assertIn(
+                "min_sample_fraction",
+                {kw.arg for kw in call.keywords},
+                "do_import_rna must forward min_sample_fraction to rna.filter_probes",
+            )
+
+    def test_cmd_import_rna_passes_fraction_to_do_import_rna(self):
+        calls = self._calls_to(commands._cmd_import_rna, "do_import_rna", "import_rna")
+        self.assertGreater(len(calls), 0)
+        for call in calls:
+            self.assertIn(
+                "min_sample_fraction",
+                {kw.arg for kw in call.keywords},
+                "_cmd_import_rna must forward args.min_sample_fraction to "
+                "do_import_rna",
+            )
+
+    def test_signatures_default_to_one_half(self):
+        """Default preserved at both layers so existing behavior is unchanged."""
+        self.assertEqual(
+            inspect.signature(rna.filter_probes)
+            .parameters["min_sample_fraction"]
+            .default,
+            0.5,
+        )
+        self.assertEqual(
+            inspect.signature(import_rna.do_import_rna)
+            .parameters["min_sample_fraction"]
+            .default,
+            0.5,
+        )
+
+
 class ImportRnaIntegrationTests(unittest.TestCase):
     """End-to-end `import-rna` from count files + gene resource to .cnr."""
 
@@ -301,8 +448,10 @@ class ImportRnaIntegrationTests(unittest.TestCase):
         self.assertEqual(cnrs[0].sample_id, "rna-sample-A")
 
     def test_do_import_rna_unknown_format_raises(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(RuntimeError) as cm:
             import_rna.do_import_rna(self.COUNT_FILES[:1], "bogus", self.GENE_RESOURCE)
+        # The offending format name is interpolated into the message (not literal).
+        self.assertIn("bogus", str(cm.exception))
 
 
 class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
