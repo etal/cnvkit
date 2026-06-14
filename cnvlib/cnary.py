@@ -29,7 +29,7 @@ def is_female_default(is_xx: bool | bool_ | None) -> bool:
     chromosome present, or a degenerate coverage comparison). For copy-number
     purposes the only effect of a "male" call is that a haploid X is treated as
     the expected baseline; assuming male for a sample whose X is actually
-    diploid would spuriously inflate chrX by +1 (the gh#360 failure family). So
+    diploid would spuriously inflate chrX by +1 (the #360 failure family). So
     when there isn't positive evidence either way, default to female (diploid-X
     baseline). A real (non-None) guess is returned unchanged as a plain ``bool``.
     """

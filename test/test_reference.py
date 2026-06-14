@@ -342,7 +342,7 @@ class ReferenceTests(unittest.TestCase):
         self.assertTrue(0 < len(cnr) <= len(tgt_bins))
 
     def test_fix_bias_smoother_loess(self):
-        """do_fix accepts bias_smoother='loess' end-to-end (gh#1028).
+        """do_fix accepts bias_smoother='loess' end-to-end (#1028).
 
         Exercises the full plumb-through: do_fix -> load_adjust_coverages ->
         center_by_window -> smoothing.loess. The LOESS path must produce a

@@ -380,7 +380,7 @@ def center_by_window(
         ``smoothing.rolling_median``, preserving CNVkit's historical
         behavior. ``"loess"`` uses ``smoothing.loess`` (LOWESS), which
         retains the trend slope at the boundaries of the sort axis
-        instead of plateauing -- see gh#1028.
+        instead of plateauing -- see #1028.
     """
     # Separate neighboring bins that could have the same key
     # (to avoid re-centering actual CNV regions -- only want an independently

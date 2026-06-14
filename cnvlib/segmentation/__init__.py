@@ -237,13 +237,13 @@ def _do_segmentation(
 
     filtered_cn = cnarr.copy()
     # Drop bins with non-finite log2 (NaN or +/-inf) before any analysis
-    # (#881, gh#508). They carry no signal and cannot be segmented, but a
+    # (#881, #508). They carry no signal and cannot be segmented, but a
     # bare comparison treats NaN as False, so without this they survive the
     # gates below and reach either the Savitzky-Golay outlier filter (scipy's
     # lstsq rejects non-finite input with "array must not contain infs or
     # NaNs") or DNAcopy's CBS -- both of which then crash. ``.isna()`` only
     # catches NaN; broadening to ``~np.isfinite`` covers the flat-reference
-    # WGS path of gh#508 where degenerate reference subtraction can yield
+    # WGS path of #508 where degenerate reference subtraction can yield
     # +/-inf. read_tab drops them on the file path; do it here too for the
     # in-memory/API path (e.g. batch).
     log2_bad = ~np.isfinite(filtered_cn["log2"])

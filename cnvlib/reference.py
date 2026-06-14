@@ -697,7 +697,7 @@ def shift_sex_chroms(
     """
     # infer_sexes omits samples whose sex couldn't be determined, so a missing
     # entry means "unknown" -- default to female (diploid X) rather than letting
-    # None fall through to the male branch and silently add +1 to chrX (gh#360).
+    # None fall through to the male branch and silently add +1 to chrX (#360).
     known_sex = sexes.get(cnarr.sample_id)
     if known_sex is None:
         logging.warning(
