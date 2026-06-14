@@ -249,7 +249,7 @@ def genome_scatter(
             loh_variants=loh_variants,
             somatic_variants=somatic_variants,
         )
-    return axis.get_figure()  # type: ignore[return-value]
+    return axis.get_figure()  # type: ignore[return-value, no-any-return]
 
 
 def cnv_on_genome(
