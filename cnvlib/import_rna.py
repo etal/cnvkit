@@ -19,6 +19,7 @@ def do_import_rna(
     do_txlen=True,
     max_log2=3,
     diploid_parx_genome=None,
+    min_sample_fraction=0.5,
 ):
     """Convert a cohort of per-gene read counts to CNVkit .cnr format.
 
@@ -46,6 +47,11 @@ def do_import_rna(
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
         (e.g., 'hg19', 'hg38').
+    min_sample_fraction : float, optional
+        Minimum fraction of samples in which a gene must be expressed
+        (count >= 1) for it to be retained. Default 0.5 preserves the legacy
+        filter. Lower it for single-cell or sparse cohorts. See
+        :func:`cnvlib.rna.filter_probes`.
 
     Returns
     -------
@@ -69,7 +75,9 @@ def do_import_rna(
         tx_lengths = None
     else:
         raise RuntimeError("Unrecognized input format name: {in_format!r}")
-    sample_counts = rna.filter_probes(sample_counts)
+    sample_counts = rna.filter_probes(
+        sample_counts, min_sample_fraction=min_sample_fraction
+    )
 
     logging.info(
         "Loading gene metadata%s",

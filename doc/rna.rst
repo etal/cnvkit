@@ -51,6 +51,27 @@ Input file sources:
   You can also create the equivalent on your own from the output of another RNA
   quantification tool like Salmon or Kallisto.
 
+Gene filtering
+~~~~~~~~~~~~~~
+
+Before normalization, ``import-rna`` discards genes that are rarely expressed
+across the cohort: a gene is kept only if it has a detectable transcript (read
+count of at least 1) in a minimum fraction of the input samples. By default this
+fraction is 0.5, i.e. a gene must be expressed in at least half of the samples,
+which reproduces the behavior of earlier CNVkit versions.
+
+The ``--min-sample-fraction`` option lowers this threshold for single-cell or
+otherwise sparse cohorts, where most genes are legitimately expressed in fewer
+than half of the cells and the default would discard informative genes::
+
+    cnvkit.py import-rna *.txt --gene-resource data/ensembl-gene-info.hg38.tsv \
+        --min-sample-fraction 0.2 --output-dir out/
+
+Lowering the threshold retains more genes in the output ``.cnr`` files, which can
+shift downstream segmentation; this is a deliberate trade-off for sparse data.
+Values below roughly 0.2 admit genes whose expression is detected in only a small
+minority of samples, so their log2 ratios are likely dominated by noise.
+
 
 Segmentation
 ------------

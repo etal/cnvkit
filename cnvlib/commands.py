@@ -2798,6 +2798,7 @@ def _cmd_import_rna(args: argparse.Namespace) -> None:
         args.do_gc,
         args.do_txlen,
         args.max_log2,
+        min_sample_fraction=args.min_sample_fraction,
     )
     logging.info("Writing output files")
     if args.output:
@@ -2849,6 +2850,16 @@ P_import_rna.add_argument(
     type=float,
     help="""Maximum log2 ratio in output. Observed values above this limit will be
             replaced with this value. [Default: %(default)s]""",
+)
+P_import_rna.add_argument(
+    "--min-sample-fraction",
+    metavar="FLOAT",
+    default=0.5,
+    type=float,
+    help="""Keep a gene only if it is expressed (read count >= 1) in at least this
+            fraction of samples. Lower this for single-cell or sparse cohorts, where
+            most genes are expressed in fewer than half of cells; values below ~0.2
+            admit genes whose log2 ratios are likely noise. [Default: %(default)s]""",
 )
 P_import_rna.add_argument(
     "-n",
