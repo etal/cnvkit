@@ -61,7 +61,7 @@ class VariantArrayTests(unittest.TestCase):
         self.assertTrue(baf.isna().all())
 
     def test_mirrored_baf_all_nan(self):
-        """All-NaN frequencies mirror to all-NaN without warning (gh#407).
+        """All-NaN frequencies mirror to all-NaN without warning (#407).
 
         np.nanmedian warns 'Mean of empty slice' on an all-NaN slice under
         older numpy; with pytest's filterwarnings=error that breaks the build
@@ -144,7 +144,7 @@ class VariantArrayTests(unittest.TestCase):
 
 
 class ChrXHetDensityTests(unittest.TestCase):
-    """Tests for ``vary.chrx_het_density_rejects_haploid`` (gh#341).
+    """Tests for ``vary.chrx_het_density_rejects_haploid`` (#341).
 
     A diploid X chromosome has SNP heterozygosity comparable to autosomes
     (~30% in panel-typical populations); a haploid X has essentially zero

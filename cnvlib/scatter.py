@@ -40,7 +40,7 @@ SOMATIC_SNV_MARKER = "+"
 
 # Floor for the auto-scaled y-axis lower limit, so a single deep homozygous
 # deletion (log2 far below 0) can't compress the rest of the plot into a sliver.
-# Segments below this are flagged; override with the --y-min option. (gh#385)
+# Segments below this are flagged; override with the --y-min option. (#385)
 AUTO_Y_MIN_FLOOR = -5.0
 
 
@@ -298,7 +298,7 @@ def cnv_on_genome(
     axis.set_ylim(y_min, y_max)
     if segments:
         # Flag segments clipped below the (possibly floored) y-axis, so a deep
-        # homozygous deletion isn't silently dropped off the bottom (gh#385).
+        # homozygous deletion isn't silently dropped off the bottom (#385).
         hidden_seg = segments["log2"] < y_min
         if hidden_seg.sum():
             logging.warning(

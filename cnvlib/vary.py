@@ -264,7 +264,7 @@ def chrx_het_density_rejects_haploid(
     exceeds what the null allows at the chosen ``alpha``.
 
     Used by :func:`cnvlib.cmdutil.verify_sample_sex` as an independent
-    confirmer of chrX ploidy when the user supplies a VCF (gh#341). The
+    confirmer of chrX ploidy when the user supplies a VCF (#341). The
     test only fires when coverage already inferred a male call -- a
     rejected null means the VCF says diploid X, which overrides to
     female. (A non-rejected null leaves the coverage call alone; "no

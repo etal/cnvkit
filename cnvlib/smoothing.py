@@ -94,7 +94,7 @@ def loess(x: pd.Series | ndarray, frac: float) -> ndarray:
     smoothing in ``cnvlib.fix.center_by_window``. Unlike a mirror-padded
     rolling median, LOESS retains the slope of the underlying trend at
     the boundaries of the sort axis rather than collapsing to the
-    inner-window median. This is the property requested by gh#1028,
+    inner-window median. This is the property requested by #1028,
     where the rolling-median's flat-edge artifact under-corrects bias
     at the most GC-extreme or low-complexity bins.
 
@@ -289,7 +289,7 @@ def savgol(
                 y = savgol_filter(y, window_width, order, mode="interp")
             except np.linalg.LinAlgError as exc:
                 # mode='interp' uses np.polyfit at the array edges; lstsq can
-                # fail on numerically degenerate inputs (gh#508: WGS
+                # fail on numerically degenerate inputs (#508: WGS
                 # flat-reference data triggered an MKL DGELSD error -- and
                 # the non-MKL path raised "SVD did not converge in Linear
                 # Least Squares" -- on the edge polyfit). Fall back to

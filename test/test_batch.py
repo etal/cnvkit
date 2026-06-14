@@ -322,7 +322,7 @@ class BatchTests(unittest.TestCase):
 
     def test_batch_run_sample_passes_bias_smoother_to_do_fix(self):
         """``batch_run_sample`` must forward its ``bias_smoother`` argument
-        to every ``fix.do_fix`` invocation it makes (gh#1028).
+        to every ``fix.do_fix`` invocation it makes (#1028).
 
         Without this, ``cnvkit batch --bias-smoother loess`` would silently
         fall back to ``rolling_median`` and users would have no way to
@@ -358,12 +358,12 @@ class BatchTests(unittest.TestCase):
                 kw_names,
                 "fix.do_fix inside batch_run_sample must pass bias_smoother "
                 "explicitly so `cnvkit batch --bias-smoother loess` reaches "
-                "center_by_window (gh#1028).",
+                "center_by_window (#1028).",
             )
 
     def test_batch_make_reference_passes_bias_smoother_to_do_reference(self):
         """``batch_make_reference`` must forward ``bias_smoother`` to
-        ``reference.do_reference`` for the pooled-reference path (gh#1028).
+        ``reference.do_reference`` for the pooled-reference path (#1028).
 
         ``do_reference_flat`` is exempt because a flat reference performs no
         bias-vs-trait smoothing.
@@ -399,7 +399,7 @@ class BatchTests(unittest.TestCase):
                 "reference.do_reference inside batch_make_reference must "
                 "pass bias_smoother explicitly so `cnvkit batch "
                 "--bias-smoother loess` reaches center_by_window during "
-                "reference construction (gh#1028).",
+                "reference construction (#1028).",
             )
 
     @pytest.mark.slow

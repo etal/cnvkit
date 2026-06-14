@@ -304,7 +304,7 @@ class CNATests(unittest.TestCase):
         decision-level helper `is_female_default` and `verify_sample_sex`
         collapse None to female. Female is the safe default: guessing male
         for a sample whose X is actually diploid would spuriously inflate
-        chrX by +1 (the gh#360 failure family).
+        chrX by +1 (the #360 failure family).
         """
         # The helper: None -> female; real guesses pass through as plain bool.
         self.assertIs(is_female_default(None), True)
