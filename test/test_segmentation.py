@@ -452,12 +452,12 @@ class TransferFieldsTests(unittest.TestCase):
         self.assertFalse(np.isnan(cns["log2"].to_numpy()).any())
 
     def test_do_segmentation_drops_inf_log2(self):
-        """do_segmentation tolerates ±inf-log2 bins (gh#508, sibling to #881).
+        """do_segmentation tolerates ±inf-log2 bins (#508, sibling to #881).
 
         The #881 fix dropped NaN-log2 bins before drop_outliers' Savitzky-Golay
         smoother because scipy's lstsq rejects non-finite input ("array must
         not contain infs or NaNs"). But pandas ``.isna()`` does NOT catch
-        ±inf, so degenerate flat-reference WGS data (gh#508) -- where some
+        ±inf, so degenerate flat-reference WGS data (#508) -- where some
         bins can land at ±inf after reference subtraction -- still crashed
         on the same path. Broadening the prefilter from ``.isna()`` to
         ``~np.isfinite`` covers both.

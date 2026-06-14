@@ -442,13 +442,13 @@ class TestSavgol:
         assert np.allclose(result, c, atol=1e-6)
 
     def test_linalg_error_falls_back_to_nearest(self, monkeypatch):
-        """Savgol recovers when scipy's edge polyfit raises LinAlgError (gh#508).
+        """Savgol recovers when scipy's edge polyfit raises LinAlgError (#508).
 
         scipy's ``savgol_filter(mode='interp')`` invokes ``np.polyfit`` at
         the array edges; on numerically degenerate inputs ``lstsq`` can raise
         ``LinAlgError: SVD did not converge`` (and MKL prints the
         ``Parameter 6 was incorrect on entry to DGELSD`` message that
-        originally surfaced gh#508 on WGS flat-reference data). The wrapper
+        originally surfaced #508 on WGS flat-reference data). The wrapper
         must catch the error and retry with a non-polyfit mode rather than
         let it propagate up through ``do_segmentation`` and crash the run.
         """
@@ -478,7 +478,7 @@ class TestSavgol:
 
 
 class TestLoess:
-    """Invariants for the LOESS (lowess) smoother (gh#1028).
+    """Invariants for the LOESS (lowess) smoother (#1028).
 
     LOESS exists alongside rolling_median as an opt-in alternative bias
     smoother that, unlike a mirror-padded rolling median, does not collapse
@@ -519,7 +519,7 @@ class TestLoess:
         assert result[0] == 0.5
 
     def test_tracks_linear_trend_at_edges_better_than_rolling_median(self):
-        """LOESS extrapolates a monotone trend into the tails; rolling_median plateaus (gh#1028).
+        """LOESS extrapolates a monotone trend into the tails; rolling_median plateaus (#1028).
 
         Construct a linear bias-vs-position signal with light noise and a
         large window fraction. The rolling-median smoother collapses its
@@ -527,7 +527,7 @@ class TestLoess:
         of mirror-padding). LOESS, in contrast, retains the slope at the
         boundary. The test asserts that LOESS' boundary error against the
         underlying trend is smaller than rolling-median's by a clear
-        margin, which is the precise property gh#1028 requests.
+        margin, which is the precise property #1028 requests.
         """
         n = 200
         rng = np.random.default_rng(1028)

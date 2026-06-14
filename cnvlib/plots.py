@@ -308,7 +308,7 @@ def gene_coords_by_name(probes, names):
         # Deduce the unique set of *requested* gene names for this region.
         # A bin label may pack several genes (e.g. "ERBB2,MIR4728"); only the
         # names the caller asked for should be surfaced, never co-binned
-        # neighbors (gh#458).
+        # neighbors (#458).
         uniq_names: set[str] = set()
         for oname in gene_probes["gene"].dropna().unique():
             uniq_names.update(g for g in oname.split(",") if g in names)

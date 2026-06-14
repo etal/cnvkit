@@ -835,7 +835,7 @@ class OtherTests(unittest.TestCase):
             self.assertEqual(result, expect)
 
     def test_rangelabel_ncbi_chrom(self):
-        # NCBI-style chromosome names contain a '.' version suffix (gh#602)
+        # NCBI-style chromosome names contain a '.' version suffix (#602)
         row = rangelabel.from_label("NC_039902.1:10000000-15000000", keep_gene=False)
         self.assertEqual(tuple(row), ("NC_039902.1", 9999999, 15000000))
         self.assertEqual(rangelabel.to_label(row), "NC_039902.1:10000000-15000000")
