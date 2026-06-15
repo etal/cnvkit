@@ -2798,6 +2798,7 @@ def _cmd_import_rna(args: argparse.Namespace) -> None:
         args.do_gc,
         args.do_txlen,
         args.max_log2,
+        diploid_parx_genome=args.diploid_parx_genome,
         min_sample_fraction=args.min_sample_fraction,
     )
     logging.info("Writing output files")
@@ -2895,6 +2896,7 @@ P_import_rna_bias.add_argument(
     help="Skip transcript length correction.",
 )
 
+add_diploid_parx_genome(P_import_rna)
 P_import_rna.set_defaults(func=_cmd_import_rna)
 
 

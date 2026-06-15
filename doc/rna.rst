@@ -73,6 +73,23 @@ Values below roughly 0.2 admit genes whose expression is detected in only a smal
 minority of samples, so their log2 ratios are likely dominated by noise.
 
 
+Pseudo-autosomal regions on chromosome X
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The pseudo-autosomal regions (PAR1 and PAR2) on chromosome X are diploid in both
+sexes, so genes there behave like autosomal genes rather than sex-linked ones.
+The ``--diploid-parx-genome`` option names a reference genome (e.g. ``grch38``)
+whose PAR coordinates are then treated as autosomal when ``import-rna`` re-centers
+each sample's log2 ratios::
+
+    cnvkit.py import-rna *.txt --gene-resource data/ensembl-gene-info.hg38.tsv \
+        --diploid-parx-genome grch38 --output-dir out/
+
+Including the PAR-X bins in the autosomal pool shifts the centering value and so
+changes the log2 output for the affected chromosome-X genes. When the option is
+omitted (the default), output is unchanged.
+
+
 Segmentation
 ------------
 

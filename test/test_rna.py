@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from cnvlib import commands, import_rna, rna
+from cnvlib.cnary import CopyNumArray
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -361,6 +362,25 @@ class FilterProbesTests(unittest.TestCase):
         self.assertEqual(list(rna.filter_probes(counts).index), ["b", "c"])
 
 
+def _ast_calls_to(source_obj, attr, value_id):
+    """Collect ``value_id.attr(...)`` call nodes in ``source_obj``'s AST.
+
+    Shared by the kwarg-plumbing guards below, which assert a specific keyword
+    survives a CLI -> dispatcher -> leaf call chain without paying any fixture
+    cost.
+    """
+    tree = ast.parse(inspect.getsource(source_obj))
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == attr
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == value_id
+    ]
+
+
 class FilterProbesPlumbingTests(unittest.TestCase):
     """``min_sample_fraction`` is threaded CLI -> do_import_rna -> filter_probes.
 
@@ -368,21 +388,8 @@ class FilterProbesPlumbingTests(unittest.TestCase):
     rather than silently reverting single-cell cohorts to the 0.5 default.
     """
 
-    @staticmethod
-    def _calls_to(source_obj, attr, value_id):
-        tree = ast.parse(inspect.getsource(source_obj))
-        return [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == attr
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == value_id
-        ]
-
     def test_do_import_rna_passes_fraction_to_filter_probes(self):
-        calls = self._calls_to(import_rna.do_import_rna, "filter_probes", "rna")
+        calls = _ast_calls_to(import_rna.do_import_rna, "filter_probes", "rna")
         self.assertGreater(len(calls), 0)
         for call in calls:
             self.assertIn(
@@ -392,7 +399,7 @@ class FilterProbesPlumbingTests(unittest.TestCase):
             )
 
     def test_cmd_import_rna_passes_fraction_to_do_import_rna(self):
-        calls = self._calls_to(commands._cmd_import_rna, "do_import_rna", "import_rna")
+        calls = _ast_calls_to(commands._cmd_import_rna, "do_import_rna", "import_rna")
         self.assertGreater(len(calls), 0)
         for call in calls:
             self.assertIn(
@@ -415,6 +422,138 @@ class FilterProbesPlumbingTests(unittest.TestCase):
             .parameters["min_sample_fraction"]
             .default,
             0.5,
+        )
+
+
+class DiploidParxPlumbingTests(unittest.TestCase):
+    """``diploid_parx_genome`` is threaded CLI -> do_import_rna -> correct_cnr.
+
+    The CLI layer was the missing link (cnvkit-d68): ``_cmd_import_rna`` never
+    forwarded ``args.diploid_parx_genome``, so PAR-aware centering was
+    unreachable from ``cnvkit import-rna``. AST guard so a dropped kwarg fails
+    at collection rather than silently disabling the flag again.
+    """
+
+    def test_cmd_import_rna_forwards_parx_to_do_import_rna(self):
+        calls = _ast_calls_to(commands._cmd_import_rna, "do_import_rna", "import_rna")
+        self.assertGreater(len(calls), 0)
+        for call in calls:
+            self.assertIn(
+                "diploid_parx_genome",
+                {kw.arg for kw in call.keywords},
+                "_cmd_import_rna must forward args.diploid_parx_genome to "
+                "do_import_rna",
+            )
+
+    def test_cli_registers_diploid_parx_genome_flag(self):
+        """The CLI parser exposes --diploid-parx-genome for import-rna."""
+        opt_strings = {
+            opt
+            for action in commands.P_import_rna._actions
+            for opt in action.option_strings
+        }
+        self.assertIn("--diploid-parx-genome", opt_strings)
+
+    def test_do_import_rna_signature_parx_default_none(self):
+        self.assertIsNone(
+            inspect.signature(import_rna.do_import_rna)
+            .parameters["diploid_parx_genome"]
+            .default,
+        )
+
+
+def _make_rna_cnr(seed, *, include_par):
+    """Build an hg38-style CopyNumArray for PAR-centering tests.
+
+    Autosomes (chr1) at log2 ~ 0, non-PAR chrX bins at log2 ~ -1, and -- when
+    ``include_par`` -- chrX bins inside grch38 PAR1X (10000-2781479) at a
+    distinctly higher log2 ~ +1, so reclassifying them as autosomal visibly
+    moves the centering value. ``gc`` is a fraction in [0, 1] to match the real
+    ``import-rna`` pipeline. Calling with the same ``seed`` yields identical
+    data, which ``correct_cnr`` mutates in place.
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+    for i in range(20):
+        s = 100000 * (i + 1)
+        rows.append(("1", s, s + 1500, f"A{i}", rng.normal(0, 0.05), 100, 0.5, 1500))
+    if include_par:
+        for i in range(8):
+            s = 20000 + 100000 * i
+            rows.append(
+                (
+                    "X",
+                    s,
+                    s + 1500,
+                    f"PARX{i}",
+                    1.0 + rng.normal(0, 0.05),
+                    100,
+                    0.5,
+                    1500,
+                )
+            )
+    for i in range(8):  # chrX outside grch38 PAR1/PAR2
+        s = 5_000_000 + 100000 * i
+        rows.append(
+            ("X", s, s + 1500, f"X{i}", -1.0 + rng.normal(0, 0.05), 100, 0.5, 1500)
+        )
+    df = pd.DataFrame(
+        rows,
+        columns=[
+            "chromosome",
+            "start",
+            "end",
+            "gene",
+            "log2",
+            "depth",
+            "gc",
+            "tx_length",
+        ],
+    )
+    return CopyNumArray(df, {"sample_id": "s"})
+
+
+class DiploidParxCenteringTests(unittest.TestCase):
+    """PAR-aware centering must actually shift output in the default path.
+
+    Regression guard for cnvkit-d68: ``correct_cnr`` applies GC/transcript-
+    length bias correction (on by default), which is invariant to a uniform
+    pre-shift. So unless the *second* ``center_all`` also carries
+    ``diploid_parx_genome``, the flag is silently neutralized whenever GC/txlen
+    correction runs. Build an hg38-style cohort with PAR-X bins and assert the
+    flag changes chrX/PAR log2 -- while confirming it touches only PAR bins, so
+    the ``None`` default (``center_all(None)`` == the prior code path) is
+    unchanged by construction.
+    """
+
+    def test_flag_shifts_par_centering_under_default_corrections(self):
+        """With GC/txlen correction on (the default), grch38 != None output."""
+        without = rna.correct_cnr(
+            _make_rna_cnr(0, include_par=True), True, True, 3, None
+        )
+        with_parx = rna.correct_cnr(
+            _make_rna_cnr(0, include_par=True), True, True, 3, "grch38"
+        )
+        max_diff = np.abs(
+            without["log2"].to_numpy() - with_parx["log2"].to_numpy()
+        ).max()
+        self.assertGreater(
+            max_diff,
+            1e-3,
+            "diploid_parx_genome must change centering even when GC/txlen "
+            "correction runs (second center_all must carry the flag)",
+        )
+
+    def test_none_path_unaffected_when_no_par_bins(self):
+        """No PAR-X bins -> the flag is inert, confirming it touches only PAR."""
+        none_out = rna.correct_cnr(
+            _make_rna_cnr(1, include_par=False), True, True, 3, None
+        )
+        parx_out = rna.correct_cnr(
+            _make_rna_cnr(1, include_par=False), True, True, 3, "grch38"
+        )
+        np.testing.assert_array_equal(
+            none_out["log2"].to_numpy(), parx_out["log2"].to_numpy()
         )
 
 

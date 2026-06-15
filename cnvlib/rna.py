@@ -560,7 +560,11 @@ def correct_cnr(cnr, do_gc, do_txlen, max_log2, diploid_parx_genome):
             cnr = center_by_window(cnr, 0.1, cnr["gc"])
         if do_txlen and "tx_length" in cnr:
             cnr = center_by_window(cnr, 0.1, cnr["tx_length"])
-        cnr.center_all()
+        # Re-center after bias correction. Carry diploid_parx_genome through:
+        # GC/transcript-length window correction is invariant to a uniform
+        # pre-shift, so without it the earlier center_all(diploid_parx_genome)
+        # is silently undone and the flag becomes a no-op (cnvkit-d68).
+        cnr.center_all(diploid_parx_genome=diploid_parx_genome)
     if max_log2:
         cnr[cnr["log2"] > max_log2, "log2"] = max_log2
     return cnr
