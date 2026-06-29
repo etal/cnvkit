@@ -160,7 +160,10 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.mypy]
-python_version = "3.11"
+# numpy >= 2.5 ships PEP 695 ``type`` aliases in its stubs, which mypy only
+# parses with a 3.12+ target; the type-check CI job runs on 3.12. (The runtime
+# baseline stays 3.11, enforced by ruff target-version and the py311 test job.)
+python_version = "3.12"
 packages = ["cnvlib", "skgenome"]
 ignore_missing_imports = true
 check_untyped_defs = true
