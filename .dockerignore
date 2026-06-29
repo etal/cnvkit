@@ -52,6 +52,4 @@ release-notes-*.md
 
 # Other development directories
 play/
-wdl/
-galaxy/
 devtools/
