@@ -62,15 +62,15 @@ whether or not segments were provided. Without segments (.cnr alone):
 - *depth*: Weighted mean of un-normalized read depths across all this gene's
   bins.
 - *weight*: Sum of this gene's bins' weights.
-- *nbins*: The number of bins assigned to this gene.
+- *probes*: The number of bins assigned to this gene.
 
 With segments (``-s``):
 
 - *log2*: The log2 ratio value of the segment covering the gene, i.e. weighted
   mean of all bins covered by the whole segment, not just this gene.
 - *depth*, *weight*, *probes*: As above.
-- *seg_weight*: The sum of the weights of the bins supporting the segment.
-- *seg_probes*: The number of probes supporting the segment.
+- *segment_weight*: The sum of the weights of the bins supporting the segment.
+- *segment_probes*: The number of probes supporting the segment.
 
 The ``-t``/``--threshold`` and ``-m``/``--min-probes`` options are used to
 control which genes are reported:
@@ -83,8 +83,8 @@ control which genes are reported:
   small number of bins, at the risk of missing some true positives.
   With ``-m 3``, the default, genes where only 1 or 2 bins show copy number
   change will not be reported.
-  This applies to the segment's bin count (*seg_probes*) if segments are
-  provided with ``-s``, otherwise it's the gene's bin count (*nbins*).
+  This applies to the segment's bin count (*segment_probes*) if segments are
+  provided with ``-s``, otherwise it's the gene's bin count (*probes*).
 
 Specify the reference X-chromosome ploidy (``-y`` if the same option was used
 when constructing the reference) to ensure CNVs on the X chromosome are reported
@@ -216,7 +216,7 @@ of each sample in a table is to multiply the number of segments by the biweight
 midvariance -- the value will tend to be higher for unreliable samples.
 Check questionable samples for poor coverage (using e.g. `bedtools
 <http://bedtools.readthedocs.io/>`_, `chanjo <http://www.chanjo.co/>`_,
-`IGV <http://www.broadinstitute.org/igv/>`_ or `Picard CollectHsMetrics
+`IGV <https://igv.org/>`_ or `Picard CollectHsMetrics
 <http://broadinstitute.github.io/picard/command-line-overview.html#CollectHsMetrics>`_).
 
 Finally, visualizing a sample with CNVkit's :ref:`scatter` command will often
@@ -244,14 +244,14 @@ with the stat names and calculated values printed in additional columns.
 Supported stats:
 
 - Alternative estimators of segment mean, which ignore bin weights: ``--mean``,
-  ``-median``, ``--mode``.
+  ``--median``, ``--mode``.
 
-- As in :ref:`metrics`: standard deviation (``--std``), median absolute
+- As in :ref:`metrics`: standard deviation (``--stdev``), median absolute
   deviation (``--mad``), inter-quartile range (``--iqr``), Tukey's biweight
   midvariance (``--bivar``)
 
 - Additionally: mean squared error (``--mse``), standard error of the mean
-  (``-sem``).
+  (``--sem``).
 
 - Confidence interval of the segment mean (``--ci``), estimated by bootstrap
   (100 resamplings) of the bin-level log2 ratio values within the segment. The

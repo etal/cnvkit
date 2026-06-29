@@ -34,7 +34,7 @@ commands:
 
 Use like this::
 
-    cnvkit.py import-rna [ *_rsem.genes.results | *.txt ] \
+    cnvkit.py import-rna -f rsem *_rsem.genes.results \
         --gene-resource data/ensembl-gene-info.hg38.tsv \
         --correlations data/tcga-skcm.cnv-expr-corr.tsv \
         --output out-summary.tsv --output-dir out/
@@ -42,16 +42,16 @@ Use like this::
 Each gene's read counts and average transcript length are taken from the input
 file for each sample. Normalized, bias-corrected ``*.cnr`` files are written to
 ``--output-dir``, and an optional summary table with all samples' data is
-written to ``-output``.
+written to ``--output``.
 
 Input file sources:
 
-- **RSEM:** The third-party RNA quantification program RSEM produces
-  ``*_rsem.genes.results`` output files that can be used as input to the
-  ``import-rna`` command.
-- **Gene counts:** Alternatively, the gene Ensembl IDs and per-gene read counts
-  can be read from a simple 2-column, tab-delimited file.
-  This format is used by TCGA level 2 RNA expression data.
+- **RSEM** (``-f rsem``): The third-party RNA quantification program RSEM
+  produces ``*_rsem.genes.results`` output files, which carry both per-gene read
+  counts and average transcript lengths.
+- **Gene counts** (``-f counts``, the default): Alternatively, the gene Ensembl
+  IDs and per-gene read counts can be read from a simple 2-column, tab-delimited
+  file. This format is used by TCGA level 2 RNA expression data.
   You can also create the equivalent on your own from the output of another RNA
   quantification tool like Salmon or Kallisto.
 

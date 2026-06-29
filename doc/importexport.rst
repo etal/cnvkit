@@ -248,7 +248,9 @@ This is a tabular format very similar to .cnr files, with the columns:
 #. chromosome
 #. start
 #. end
+#. gene
 #. log2
+#. probe
 
 
 nexus-ogt
@@ -300,13 +302,13 @@ in THetA2's calculations. We recommend providing these to ``export theta`` via
 the CNVkit pooled or paired reference file (.cnn) you created for your panel::
 
     # From an existing CNVkit reference
-    cnvkit.py export theta Sample_Tumor.cns reference.cnn -o Sample.theta2.interval_count
+    cnvkit.py export theta Sample_Tumor.cns -r reference.cnn -o Sample.theta2.interval_count
 
 The THetA2 normal read counts can also be derived from the normal sample's bin
 log2 ratios, if for some reason this is all you have::
 
     # From a paired normal sample
-    cnvkit.py export theta Sample_Tumor.cns Sample_Normal.cnr -o Sample.theta2.interval_count
+    cnvkit.py export theta Sample_Tumor.cns -r Sample_Normal.cnr -o Sample.theta2.interval_count
 
 If neither file is given, the THetA2 normal read counts will be calculated from
 the segment weight values in the given .cns file, or the number of probes if the
@@ -324,7 +326,7 @@ again prefer to bypass. CNVkit's ``export theta`` command produces these two
 additional files when given a VCF file of paired tumor-normal SNV calls with the
 ``-v``/``--vcf`` option::
 
-    cnvkit.py export theta Sample_Tumor.cns reference.cnn -v Sample_Paired.vcf
+    cnvkit.py export theta Sample_Tumor.cns -r reference.cnn -v Sample_Paired.vcf
 
 This produces three output files; ``-o`` will be used for the read count file,
 while the SNV allele count files will be named according to the .cns file, e.g.
