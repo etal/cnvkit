@@ -12,12 +12,16 @@ Samples are processed simultaneously as a cohort, and two additional input files
 are needed to complete the processing pipeline:
 
 - **Gene info** -- a table of per-transcript and per-gene metadata exported from
-  Ensembl BioMart. A snapshot of this file for the human transcriptome is
-  bundled with CNVkit under ``data/ensembl-gene-info.hg38.tsv``.
-- **CNV-expression correlation coefficients** -- calculated per gene via the
-  script ``cnv_expression_correlate.py`` included with CNVkit. A pre-calculated
-  set of coefficients calculated on TCGA melanoma datasets, obtained from
+  Ensembl BioMart. A snapshot of this file for the human transcriptome (hg38) is
+  bundled with CNVkit under ``data/ensembl-gene-info.hg38.tsv``; for other
+  reference genomes, build the equivalent table with ``cnv_gene_info.py`` (see
+  `Building reference assets for other genomes`_).
+- **CNV-expression correlation coefficients** -- per-gene coefficients
+  calculated with the bundled ``cnv_expression_correlate.py`` script. A
+  pre-calculated set computed on the TCGA melanoma cohort, obtained from
   cBioPortal, is bundled with CNVkit under ``data/tcga-skcm.cnv-expr-corr.tsv``.
+  This input is optional but recommended (see `Building reference assets for
+  other genomes`_).
 
 With the above files, the RNA analysis can be run with either of the following
 commands:
@@ -170,3 +174,90 @@ If a suitable normal cohort is not available, run ``import-rna`` without
 against the cohort median, which carries its own assumption (that most genes
 in most samples are copy-neutral) that may also be violated in heavily altered
 cohorts.
+
+
+
+Building reference assets for other genomes
+-------------------------------------------
+
+The bundled gene-info and correlation tables describe the human hg38 assembly.
+To run ``import-rna`` on a different reference genome -- hg19, a mouse assembly
+(mm10, mm39), or any other organism -- regenerate the equivalent inputs as
+described below. None of the human-specific options (such as
+``--diploid-parx-genome``) apply to non-human assemblies.
+
+Gene info
+~~~~~~~~~
+
+The gene-info table is per-gene metadata originally exported from Ensembl
+BioMart. To build one for your genome, open `Ensembl BioMart
+<https://www.ensembl.org/biomart/>`_, choose the Ensembl Genes database and the
+dataset for your species/assembly, and export these gene attributes (in any
+column order)::
+
+    Gene stable ID
+    Gene % GC content
+    Chromosome/scaffold name
+    Gene start (bp)
+    Gene end (bp)
+    Gene name
+    NCBI gene ID
+    Transcript length (including UTRs and CDS)
+    Transcript support level (TSL)
+
+Then normalize the export into CNVkit's gene-info format with the
+``cnv_gene_info.py`` script, which is installed on your PATH together with
+CNVkit::
+
+    cnv_gene_info.py mart_export.txt -g hg19 -o ensembl-gene-info.hg19.tsv
+
+Columns are matched by name, case-insensitively and with common aliases, so the
+exact BioMart attribute labels need not be reproduced. Of the attributes above,
+``Gene name``, ``NCBI gene ID``, and ``Transcript support level`` are optional
+and filled with defaults when absent; the rest are required. Use
+``--rename "Your header=key"`` to map any column the script does not recognize,
+and ``--chromosomes`` to keep only selected contigs (for example,
+``--chromosomes 1,2,3,...,22,X,Y,MT`` to drop unplaced scaffolds). Pass the
+resulting file to ``import-rna`` via ``--gene-resource``::
+
+    cnvkit.py import-rna *.txt --gene-resource ensembl-gene-info.hg19.tsv \
+        --output-dir out/
+
+Accessible regions (DNA pipeline)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The DNA pipeline's accessible-regions file does not need to be downloaded for a
+new genome: the :ref:`access` command computes it directly from any reference
+FASTA, regardless of organism or contig naming::
+
+    cnvkit.py access mm10.fa -o access-mm10.bed
+
+See :doc:`pipeline` for how the resulting BED file is used.
+
+CNV-expression correlations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``--correlations`` input weights each gene by how strongly its copy number
+predicts its expression. It is optional but recommended, and you have three
+options:
+
+- **Use the bundled table.** ``data/tcga-skcm.cnv-expr-corr.tsv`` was computed
+  on the TCGA melanoma (SKCM) cohort but works reasonably well across tissue
+  types, since this correlation is largely a property of the gene rather than
+  the cancer type. It is keyed by NCBI/Entrez gene ID, so it applies to any
+  gene-info table that carries Entrez IDs, including non-human genes with an
+  assigned NCBI ID.
+- **Build your own.** Given matched DNA copy number and RNA expression for a
+  cohort, ``cnv_expression_correlate.py`` (also installed on your PATH) computes
+  the per-gene Pearson, Spearman, and Kendall coefficients::
+
+      cnv_expression_correlate.py CNV_TABLE.tsv RNA_TABLE.tsv -o my-corr.tsv
+
+  Both inputs are tab-delimited gene-by-sample matrices keyed by an
+  ``Entrez_Gene_Id`` column, matching the cBioPortal/TCGA copy-number and
+  expression exports. To use a non-TCGA cohort, reformat your data to that
+  shape, or compute the coefficients yourself and emit a table with the same
+  columns the script produces (``Entrez_Gene_Id``, ``hugo_gene``,
+  ``kendall_t``, ``pearson_r``, ``spearman_r``).
+- **Skip it.** Omit ``--correlations`` entirely; genes are then weighted
+  equally on this axis.

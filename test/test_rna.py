@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from cnvlib import commands, import_rna, rna
+from cnvlib.cli import cnv_gene_info
 from cnvlib.cnary import CopyNumArray
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
@@ -712,6 +713,99 @@ class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
             joined = "\n".join(cm.output)
             self.assertIn("import-rna --normal", joined)
             self.assertIn("3 normals", joined)
+
+
+class BuildGeneInfoTests(unittest.TestCase):
+    """``cnv_gene_info`` normalizes a BioMart export into CNVkit gene-info format."""
+
+    # Raw BioMart-style export: columns reordered, standard display names, one
+    # gene missing its NCBI ID, no TSL column at all, and one row with an
+    # invalid (negative) transcript length that must be dropped.
+    BIOMART = (
+        "Chromosome/scaffold name\tGene start (bp)\tGene end (bp)\tGene stable ID\t"
+        "Gene name\tNCBI gene ID\tGene % GC content\t"
+        "Transcript length (including UTRs and CDS)\n"
+        "1\t300000\t301800\tENSG00000003\tGENEC\t1003\t50.0\t1800\n"
+        "1\t100000\t101500\tENSG00000001.4\tGENEA\t1001\t40.5\t1500\n"
+        "MT\t577\t647\tENSG00000210049\tMT-TF\t\t40.85\t71\n"
+        "X\t500000\t502000\tENSG00000005\tGENEX\t1005\t48.2\t2000\n"
+        "1\t200000\t202000\tENSG00000002\tGENEB\t\t45.0\t-3\n"
+    )
+
+    def _write(self, text):
+        fd, path = tempfile.mkstemp(suffix=".tsv")
+        os.close(fd)
+        with open(path, "w") as fh:
+            fh.write(text)
+        self.addCleanup(os.remove, path)
+        return path
+
+    def test_build_normalizes_columns_and_order(self):
+        df = cnv_gene_info.build_gene_info(self._write(self.BIOMART))
+        # Canonical short-key columns, in canonical order
+        self.assertEqual(list(df.columns), cnv_gene_info.CANONICAL_KEYS)
+        # Invalid-tx_length row (GENEB) dropped; the other four kept (version kept)
+        self.assertEqual(
+            set(df["gene_id"]),
+            {"ENSG00000003", "ENSG00000001.4", "ENSG00000210049", "ENSG00000005"},
+        )
+        # Missing optional column filled with its default
+        self.assertTrue((df["tx_support"] == "tslNA").all())
+        # Sorted by genomic position: chr1 (by start), then X, then MT (canonical)
+        self.assertEqual(list(df["chromosome"]), ["1", "1", "X", "MT"])
+        self.assertEqual(
+            list(df.loc[df["chromosome"] == "1", "gene_id"]),
+            ["ENSG00000001.4", "ENSG00000003"],
+        )
+
+    def test_output_roundtrips_through_load_gene_info(self):
+        out = self._write("")
+        df = cnv_gene_info.build_gene_info(self._write(self.BIOMART))
+        cnv_gene_info.write_gene_info(df, out, genome="hg19")
+        # Output starts with a provenance comment, then the BioMart header line.
+        with open(out) as fh:
+            first, second = fh.readline(), fh.readline()
+        self.assertTrue(first.startswith("# CNVkit gene info"))
+        self.assertEqual(second.split("\t")[0], "Gene stable ID")
+        # load_gene_info reads with header=1, so the leading comment means no
+        # gene is lost: all four survive, version stripped, gc scaled, blank->0.
+        gi = rna.load_gene_info(out, None)
+        self.assertEqual(
+            set(gi.index),
+            {"ENSG00000001", "ENSG00000003", "ENSG00000210049", "ENSG00000005"},
+        )
+        self.assertAlmostEqual(gi.loc["ENSG00000001", "gc"], 0.405)
+        self.assertEqual(gi.loc["ENSG00000210049", "entrez_id"], 0)
+
+    def test_rename_maps_unrecognized_header(self):
+        text = (
+            "weird_id\tGene % GC content\tChromosome/scaffold name\tGene start (bp)\t"
+            "Gene end (bp)\tTranscript length (including UTRs and CDS)\n"
+            "ENSG9\t44\t7\t10\t99\t500\n"
+        )
+        path = self._write(text)
+        # Without the rename, the required gene_id column is unmappable.
+        with self.assertRaises(SystemExit):
+            cnv_gene_info.build_gene_info(path)
+        df = cnv_gene_info.build_gene_info(path, renames={"weird_id": "gene_id"})
+        self.assertEqual(list(df["gene_id"]), ["ENSG9"])
+
+    def test_missing_required_column_errors(self):
+        # No GC column at all -> SystemExit naming the missing key.
+        text = (
+            "Gene stable ID\tChromosome/scaffold name\tGene start (bp)\tGene end (bp)\t"
+            "Transcript length (including UTRs and CDS)\n"
+            "ENSG9\t7\t10\t99\t500\n"
+        )
+        with self.assertRaises(SystemExit) as cm:
+            cnv_gene_info.build_gene_info(self._write(text))
+        self.assertIn("gc", str(cm.exception))
+
+    def test_leading_comment_input_is_skipped(self):
+        # A CNVkit-format file (leading comment + canonical header) re-normalizes.
+        df = cnv_gene_info.build_gene_info("formats/rna-gene-resource.tsv")
+        self.assertEqual(list(df.columns), cnv_gene_info.CANONICAL_KEYS)
+        self.assertGreater(len(df), 0)
 
 
 if __name__ == "__main__":
