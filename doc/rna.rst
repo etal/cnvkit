@@ -137,6 +137,9 @@ per-sample sequencing-depth differences and per-gene scale differences, then
 divides each gene's row by the median of the normal samples' values. Tumor
 sample ``.cnr`` files are then expressed as log2 ratios against that
 normal-anchored baseline.
+The normalization strategy is selected with ``--normalize-method`` (see
+`Choosing a normalization method`_ below); the default, ``polish``, is the
+procedure described here.
 
 This recentering has several important consequences that affect cohort design:
 
@@ -174,6 +177,52 @@ If a suitable normal cohort is not available, run ``import-rna`` without
 against the cohort median, which carries its own assumption (that most genes
 in most samples are copy-neutral) that may also be violated in heavily altered
 cohorts.
+
+
+.. _Choosing a normalization method:
+
+Choosing a normalization method (``--normalize-method``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``--normalize-method`` option selects how read depths are normalized before
+anchoring against the controls:
+
+- ``polish`` (default) is the historical procedure described above: a
+  cohort-wide multiplicative median polish followed by division by the per-gene
+  normal median. It is well-behaved for typical cohorts, but because the polish
+  re-centers each gene on the median across *all* samples, its intermediate
+  values depend on cohort composition.
+- ``size-factors`` derives the reference from the control samples alone. It
+  estimates per-sample size factors by the DESeq2 "median-of-ratios" method
+  (Love, Huber & Anders, *Genome Biology* 2014) -- the median across genes of
+  each sample's depth divided by the geometric-mean depth of the normals -- which
+  is robust to the large fraction of copy-number-altered genes typical of
+  aneuploid tumors. Each normal is then anchored against the median of the
+  *other* normals (leave-one-out), so its own ``.cnr`` reports its deviation from
+  its peers and stays usable for quality control instead of collapsing to zero.
+
+Because the ``size-factors`` reference depends only on the control set, a tumor's
+log2 ratios are unaffected by the number or composition of the other tumors in
+the run, removing the cohort-composition sensitivity of the polish. This follows
+the consensus for RNA-based copy-number inference: global "most genes are
+copy-neutral" normalization (as used by TMM and the cohort-wide polish) is biased
+in aneuploid cohorts, and the reference should instead be built from matched
+controls.
+
+The method is recommended when three or more control samples are available::
+
+    cnvkit.py import-rna *.txt --gene-resource data/ensembl-gene-info.hg38.tsv \
+        --normal normal1.txt normal2.txt normal3.txt \
+        --normalize-method size-factors --output-dir out/
+
+With one or two normals, ``size-factors`` still anchors the tumors against the
+controls, but the small-cohort caveats above apply: with a single normal that
+normal's own ``.cnr`` reduces to a self-divide (flat zero), and ``import-rna``
+warns. The method does not rescue control samples that share the tumors'
+alterations -- as with the polish, a contaminated normal cancels real tumor
+signal -- so the guidance on control selection above still holds. The default
+remains ``polish``, so the output of existing ``--normal`` workflows is unchanged
+unless ``--normalize-method size-factors`` is given.
 
 
 

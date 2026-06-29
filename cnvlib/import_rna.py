@@ -20,6 +20,7 @@ def do_import_rna(
     max_log2=3,
     diploid_parx_genome=None,
     min_sample_fraction=0.5,
+    normalize_method="polish",
 ):
     """Convert a cohort of per-gene read counts to CNVkit .cnr format.
 
@@ -52,6 +53,12 @@ def do_import_rna(
         (count >= 1) for it to be retained. Default 0.5 preserves the legacy
         filter. Lower it for single-cell or sparse cohorts. See
         :func:`cnvlib.rna.filter_probes`.
+    normalize_method : {'polish', 'size-factors'}, optional
+        Read-depth normalization strategy. 'polish' (default) is the historical
+        cohort-wide median polish anchored on the normal median. 'size-factors'
+        uses DESeq2-style median-of-ratios size factors estimated from the
+        control samples only, with leave-one-out anchoring for the normals. See
+        :func:`cnvlib.rna.normalize_read_depths`.
 
     Returns
     -------
@@ -105,7 +112,11 @@ def do_import_rna(
             len(normal_ids),
         )
     gene_info, sample_counts, sample_data_log2 = rna.align_gene_info_to_samples(
-        gene_info, sample_counts, tx_lengths, normal_ids
+        gene_info,
+        sample_counts,
+        tx_lengths,
+        normal_ids,
+        normalize_method=normalize_method,
     )
 
     # Summary table has log2-normalized values, not raw counts

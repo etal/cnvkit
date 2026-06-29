@@ -344,11 +344,14 @@ def locate_entrez_dupes(dframe):
                     yield idx
 
 
-def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids):
+def align_gene_info_to_samples(
+    gene_info, sample_counts, tx_lengths, normal_ids, normalize_method="polish"
+):
     """Align columns and sort.
 
     Also calculate weights and add to gene_info as 'weight', along with
-    transcript lengths as 'tx_length'.
+    transcript lengths as 'tx_length'. ``normalize_method`` selects the
+    read-depth normalization strategy; see :func:`normalize_read_depths`.
     """
     logging.debug(
         "Dimensions: gene_info=%s, sample_counts=%s",
@@ -403,7 +406,9 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
 
     logging.info("Calculating normalized gene read depths")
     sample_depths_log2 = normalize_read_depths(
-        sc.divide(gi["tx_length"], axis=0), normal_ids
+        sc.divide(gi["tx_length"], axis=0),
+        normal_ids,
+        normalize_method=normalize_method,
     )
 
     logging.info("Weighting genes by spread of read depths")
@@ -437,17 +442,29 @@ def align_gene_info_to_samples(gene_info, sample_counts, tx_lengths, normal_ids)
     return gi, sc, sample_depths_log2
 
 
-def normalize_read_depths(sample_depths, normal_ids):
-    """Normalize read depths within each sample.
+def normalize_read_depths(sample_depths, normal_ids, normalize_method="polish"):
+    """Normalize per-gene read depths within and across samples.
 
-    Some samples have higher sequencing depth and therefore read depths need to
-    be normalized within each sample. TCGA recommends an upper quartile
-    normalization.
+    Parameters
+    ----------
+    sample_depths : pandas.DataFrame
+        Per-gene (rows) read depths (counts / transcript length) across samples
+        (columns).
+    normal_ids : sequence of str
+        Column names of the control (normal) samples used to anchor the
+        baseline. Empty for the no-control case.
+    normalize_method : {"polish", "size-factors"}, optional
+        Normalization strategy. ``"polish"`` (default) is the historical
+        4-iteration multiplicative median polish followed by a normal-median
+        anchor; see :func:`_polish_normalize`. ``"size-factors"`` estimates
+        DESeq2-style median-of-ratios size factors from the control set only and
+        anchors each control with a leave-one-out peer median; see
+        :func:`_size_factor_normalize`.
 
-    After normalizing read depths within each sample, normalize (median-center)
-    within each gene, across samples.
-
-    Finally, convert to log2 ratios.
+    Returns
+    -------
+    pandas.DataFrame
+        Per-gene log2 ratios, one column per sample.
     """
     if sample_depths.to_numpy().sum() <= 0:
         raise ValueError(
@@ -459,46 +476,117 @@ def normalize_read_depths(sample_depths, normal_ids):
             f"has nan: {sample_depths.isna().any().any()}. "
             "This likely indicates a problem with gene alignment or transcript lengths."
         )
+    if normal_ids:
+        missing = pd.Index(normal_ids).difference(sample_depths.columns)
+        if len(missing):
+            raise ValueError(f"Normal sample IDs not in samples: {list(missing)}")
     sample_depths = sample_depths.fillna(0)
+    if normalize_method == "polish":
+        normalized = _polish_normalize(sample_depths, normal_ids)
+    elif normalize_method == "size-factors":
+        normalized = _size_factor_normalize(sample_depths, normal_ids)
+    else:
+        raise ValueError(
+            f"Unknown normalize method {normalize_method!r}; "
+            "expected 'polish' or 'size-factors'"
+        )
+    # Finally, convert normalized read depths to log2 scale
+    return safe_log2(normalized, NULL_LOG2_COVERAGE)
+
+
+def _polish_normalize(sample_depths, normal_ids):
+    """Historical multiplicative median polish with a normal-median anchor.
+
+    Four iterations alternately rescale each sample by its 75th-percentile depth
+    (TCGA-style upper-quartile normalization) and re-center each gene on the
+    median across *all* samples; then, when controls are given, divide each gene
+    by the median of the control samples. This forces every gene's cohort median
+    to 1, so intermediate values depend on cohort composition and a single
+    control reduces to a self-divide. The ``size-factors`` method avoids both
+    properties.
+    """
     for _i in range(4):
-        # By-sample: 75%ile  among all genes
+        # By-sample: 75%ile among all genes
         q3 = sample_depths.quantile(0.75)
         sample_depths /= q3
         # By-gene: median among all samples
         sm = sample_depths.median(axis=1)
         sample_depths = sample_depths.divide(sm, axis=0)
-        # print("  round", _i, "grand mean:", sample_depths.values.mean(),
-        #       ": sample-wise denom =", q3.mean(),
-        #       ", gene-wise denom =", sm.mean())
     if normal_ids:
-        # Use normal samples as a baseline for read depths
-        normal_ids = pd.Series(normal_ids)
-        if not normal_ids.isin(sample_depths.columns).all():
-            raise ValueError(
-                "Normal sample IDs not in samples: %s"
-                % normal_ids.drop(sample_depths.columns, errors="ignore")
-            )
-        normal_depths = sample_depths.loc[:, normal_ids]
-        use_median = True  # TODO - benchmark & pick one
-        if use_median:
-            # Simple approach: divide normalized (1=neutral) values by gene medians
-            normal_avg = normal_depths.median(axis=1)
-            sample_depths = sample_depths.divide(normal_avg, axis=0).clip(lower=0)
-        else:
-            # Alternate approach: divide their IQR
-            # At each gene, sample depths above the normal sample depth 75%ile
-            # are divided by the 75%ile, those below 25%ile are divided by
-            # 25%ile, and those in between are reset to neutral (=1.0)
-            n25, n75 = np.nanpercentile(normal_depths.to_numpy(), [25, 75], axis=1)
-            below_idx = sample_depths.to_numpy() < n25[:, np.newaxis]
-            above_idx = sample_depths.to_numpy() > n75[:, np.newaxis]
-            factor = np.zeros_like(sample_depths.to_numpy())
-            factor[below_idx] = (below_idx / n25[:, np.newaxis])[below_idx]
-            factor[above_idx] = (above_idx / n75[:, np.newaxis])[above_idx]
-            sample_depths *= factor
-            sample_depths[~(below_idx | above_idx)] = 1.0
-    # Finally, convert normalized read depths to log2 scale
-    return safe_log2(sample_depths, NULL_LOG2_COVERAGE)
+        # Use normal samples as a baseline: divide normalized (1=neutral) values
+        # by the per-gene median across the control samples.
+        normal_avg = sample_depths.loc[:, list(normal_ids)].median(axis=1)
+        sample_depths = sample_depths.divide(normal_avg, axis=0).clip(lower=0)
+    return sample_depths
+
+
+def _size_factor_normalize(sample_depths, normal_ids):
+    """DESeq2-style size factors with leave-one-out normal anchoring.
+
+    The reference set is the control samples when ``normal_ids`` is non-empty,
+    otherwise the full cohort. Per-sample size factors are the median across
+    genes of each sample's depth divided by the reference geometric mean
+    (DESeq2 "median of ratios"; Love, Huber & Anders, *Genome Biol* 2014), which
+    is robust to a large minority of copy-number-altered genes -- the property
+    the cohort-wide polish lacks. Genes with a zero in any reference sample are
+    excluded from size-factor estimation, as in DESeq2.
+
+    Each sample is divided by its size factor, then expressed as a log2 ratio
+    against the per-gene median of the size-factor-normalized controls. Controls
+    are anchored leave-one-out (against the median of their *peers*) so a
+    control's own .cnr retains QC signal rather than collapsing to zero. With a
+    single control this reduces to a self-divide (warned upstream in
+    :func:`cnvlib.import_rna.do_import_rna`). Because the per-gene reference
+    cancels any per-gene constant, both the size factors and the final ratios are
+    invariant to transcript length.
+    """
+    # 1. DESeq2 median-of-ratios size factors from the reference set.
+    normal_cols = list(normal_ids)
+    ref_cols = normal_cols if normal_cols else list(sample_depths.columns)
+    ref = sample_depths[ref_cols]
+    # Only genes detected in every reference sample inform the size factors.
+    usable = (ref > 0).all(axis=1)
+    geomean = np.exp(np.log(ref.loc[usable]).mean(axis=1))
+    # Each sample's size factor = median over usable genes of depth / geomean.
+    size_factors = sample_depths.loc[usable].divide(geomean, axis=0).median(axis=0)
+    # Size factors are undefined when too few genes are detected across all
+    # controls (no usable genes -> all NaN, or a sample too sparse for a positive
+    # median). Fall back to no library-size scaling for those samples, and surface
+    # it -- silent degradation is a clinical-output hazard.
+    degenerate = ~(np.isfinite(size_factors) & (size_factors > 0))
+    if degenerate.any():
+        logging.warning(
+            "size-factors: %d/%d sample(s) had an undefined or non-positive size "
+            "factor (too few genes detected across all controls); using no "
+            "library-size scaling for them",
+            int(degenerate.sum()),
+            len(size_factors),
+        )
+        size_factors = size_factors.where(~degenerate, 1.0)
+    norm = sample_depths.divide(size_factors, axis=1)
+
+    # 2. Anchor against the size-factor-normalized baseline. ``norm`` is a fresh
+    # frame and is mutated in place below; the per-gene baselines are taken from
+    # ``normal_norm`` (an independent copy of the controls) before any mutation,
+    # so anchoring is order-independent.
+    if not normal_cols:
+        baseline = norm.median(axis=1).replace(0, np.nan)
+        return norm.divide(baseline, axis=0)
+
+    normal_norm = norm[normal_cols]
+    normal_col_set = set(normal_cols)
+    # Tumors: divide by the per-gene median across all controls.
+    baseline = normal_norm.median(axis=1).replace(0, np.nan)
+    tumor_cols = [c for c in norm.columns if c not in normal_col_set]
+    if tumor_cols:
+        norm[tumor_cols] = norm[tumor_cols].divide(baseline, axis=0)
+    # Controls: leave-one-out -- anchor each to the median of its peers. With a
+    # lone control there are no peers, so it self-divides to a flat ~0 .cnr.
+    for col in normal_cols:
+        peers = normal_norm.drop(columns=col)
+        loo = peers.median(axis=1) if peers.shape[1] else normal_norm[col]
+        norm[col] = norm[col] / loo.replace(0, np.nan)
+    return norm
 
 
 def safe_log2(values, min_log2):
@@ -566,7 +654,7 @@ def correct_cnr(cnr, do_gc, do_txlen, max_log2, diploid_parx_genome):
         # Re-center after bias correction. Carry diploid_parx_genome through:
         # GC/transcript-length window correction is invariant to a uniform
         # pre-shift, so without it the earlier center_all(diploid_parx_genome)
-        # is silently undone and the flag becomes a no-op (cnvkit-d68).
+        # is silently undone and the flag becomes a no-op.
         cnr.center_all(diploid_parx_genome=diploid_parx_genome)
     if max_log2:
         cnr[cnr["log2"] > max_log2, "log2"] = max_log2

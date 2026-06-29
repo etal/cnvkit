@@ -433,7 +433,7 @@ class FilterProbesPlumbingTests(unittest.TestCase):
 class DiploidParxPlumbingTests(unittest.TestCase):
     """``diploid_parx_genome`` is threaded CLI -> do_import_rna -> correct_cnr.
 
-    The CLI layer was the missing link (cnvkit-d68): ``_cmd_import_rna`` never
+    The CLI layer was the missing link: ``_cmd_import_rna`` never
     forwarded ``args.diploid_parx_genome``, so PAR-aware centering was
     unreachable from ``cnvkit import-rna``. AST guard so a dropped kwarg fails
     at collection rather than silently disabling the flag again.
@@ -521,7 +521,7 @@ def _make_rna_cnr(seed, *, include_par):
 class DiploidParxCenteringTests(unittest.TestCase):
     """PAR-aware centering must actually shift output in the default path.
 
-    Regression guard for cnvkit-d68: ``correct_cnr`` applies GC/transcript-
+    Regression guard: ``correct_cnr`` applies GC/transcript-
     length bias correction (on by default), which is invariant to a uniform
     pre-shift. So unless the *second* ``center_all`` also carries
     ``diploid_parx_genome``, the flag is silently neutralized whenever GC/txlen
@@ -599,11 +599,11 @@ class ImportRnaIntegrationTests(unittest.TestCase):
 
 
 class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
-    """Pin the current --normal anchoring invariants surfaced in cnvkit-ccy.
+    """Pin the current --normal anchoring invariants.
 
     These tests document what ``normalize_read_depths`` does *today* with
-    ``normal_ids`` set, as a regression baseline for any future redesign
-    (tracked in cnvkit-9wj). They exercise the suspected bug from GH #352
+    ``normal_ids`` set, as a regression baseline for any future redesign.
+    They exercise the suspected bug from #352
     and confirm it does not reproduce at the unit level: the issue lies in
     the design (small-normal-cohort information loss) rather than a numerical
     error in the implementation.
@@ -634,8 +634,8 @@ class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
         that single column, so the anchor divide is a self-divide. The normal
         sample's resulting log2 row collapses to ``safe_log2(1.0)`` = a small
         positive offset from the NULL_LOG2_COVERAGE shift, with vanishing
-        per-gene variance. This is the design behavior to pin until the
-        cnvkit-9wj redesign lands.
+        per-gene variance. This pins the polish's single-normal degeneracy as a
+        regression baseline.
         """
         n_genes = 200
         altered = np.zeros(n_genes, dtype=bool)
@@ -717,6 +717,223 @@ class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
             joined = "\n".join(cm.output)
             self.assertIn("import-rna --normal", joined)
             self.assertIn("3 normals", joined)
+
+
+class SizeFactorNormalizeTests(unittest.TestCase):
+    """``--normalize-method size-factors`` behavior.
+
+    DESeq2-style median-of-ratios size factors from the control set only, with
+    leave-one-out anchoring for the normals. The headline property is
+    independence from cohort composition, which the polish lacks.
+    """
+
+    @staticmethod
+    def _cohort(
+        n_normal,
+        n_tumor,
+        n_genes=300,
+        alt_frac=0.2,
+        tumor_alt=2.0,
+        contaminate=False,
+        seed=0,
+    ):
+        rng = np.random.default_rng(seed)
+        baseline = rng.lognormal(4.0, 1.0, n_genes)
+        altered = np.zeros(n_genes, dtype=bool)
+        altered[: int(n_genes * alt_frac)] = True
+        cols, normal_ids = {}, []
+        for i in range(n_normal):
+            lib = rng.lognormal(0, 0.4)  # per-sample library-depth difference
+            v = baseline.copy()
+            if contaminate:
+                v[altered] *= tumor_alt
+            cols[f"normal{i}"] = v * rng.lognormal(0, 0.05, n_genes) * lib
+            normal_ids.append(f"normal{i}")
+        for i in range(n_tumor):
+            lib = rng.lognormal(0, 0.4)
+            v = baseline.copy()
+            v[altered] *= tumor_alt
+            cols[f"tumor{i}"] = v * rng.lognormal(0, 0.05, n_genes) * lib
+        df = pd.DataFrame(cols, index=[f"g{i}" for i in range(n_genes)])
+        return df, normal_ids, altered
+
+    @staticmethod
+    def _separation(log2, altered):
+        """Median (altered - neutral) log2 over tumor columns; the recovered gain.
+
+        Taken as a difference so it is invariant to any constant per-sample
+        offset (which downstream ``correct_cnr`` centering removes anyway).
+        """
+        tcols = [c for c in log2.columns if c.startswith("tumor")]
+        gain = log2[tcols].loc[altered].median().median()
+        neutral = log2[tcols].loc[~altered].median().median()
+        return gain - neutral
+
+    def test_recovers_tumor_gain(self):
+        """A 2x tumor gain becomes ~+1 log2 after normal anchoring.
+
+        This pins the per-gene anchoring/ratio step: the gain is read as a
+        within-tumor altered-minus-neutral difference, which is invariant to the
+        per-sample size factor. Size-factor *estimation* is exercised separately
+        by ``test_invariant_to_library_depth`` and
+        ``test_invariant_to_cohort_composition``.
+        """
+        depths, nids, altered = self._cohort(5, 10, seed=1)
+        log2 = rna.normalize_read_depths(depths, nids, normalize_method="size-factors")
+        sep = self._separation(log2, altered)
+        self.assertGreater(sep, 0.8)
+        self.assertLess(sep, 1.2)
+
+    def test_multi_normal_loo_carries_qc_signal(self):
+        """With >=3 normals, leave-one-out leaves each normal a non-flat .cnr."""
+        depths, nids, _altered = self._cohort(3, 8, seed=2)
+        log2 = rna.normalize_read_depths(depths, nids, normalize_method="size-factors")
+        for nid in nids:
+            self.assertGreater(log2[nid].std(), 1e-3)
+
+    def test_single_normal_self_divides_but_tumors_recover(self):
+        """One normal => its own .cnr collapses (self-divide); tumors still gain."""
+        depths, nids, altered = self._cohort(1, 10, seed=3)
+        log2 = rna.normalize_read_depths(depths, nids, normalize_method="size-factors")
+        self.assertLess(log2[nids[0]].std(), 1e-3)
+        self.assertGreater(self._separation(log2, altered), 0.8)
+
+    def test_invariant_to_cohort_composition(self):
+        """The defining property: a tumor's log2 does not depend on which *other*
+        tumors are in the cohort, because the reference is the normals alone.
+
+        Contrast with the polish, whose cohort-wide median centering shifts when
+        the cohort composition changes.
+        """
+        rng = np.random.default_rng(7)
+        n_genes = 300
+        baseline = rng.lognormal(4.0, 1.0, n_genes)
+        alt_bulk = np.zeros(n_genes, dtype=bool)
+        alt_bulk[150:280] = True  # a large alteration shared by the bulk tumors
+
+        def col(v):
+            return v * rng.lognormal(0, 0.05, n_genes) * rng.lognormal(0, 0.4)
+
+        normals = {f"normal{i}": col(baseline.copy()) for i in range(5)}
+        probe = baseline.copy()
+        probe[:60] *= 2.0
+        probe_col = col(probe)
+        nids = list(normals)
+
+        def build(n_bulk):
+            cols = dict(normals)
+            cols["tumorP"] = probe_col.copy()
+            for j in range(n_bulk):
+                v = baseline.copy()
+                v[alt_bulk] *= 3.0
+                cols[f"bulk{j}"] = col(v)
+            return pd.DataFrame(cols, index=[f"g{i}" for i in range(n_genes)])
+
+        small = rna.normalize_read_depths(
+            build(3), nids, normalize_method="size-factors"
+        )
+        large = rna.normalize_read_depths(
+            build(40), nids, normalize_method="size-factors"
+        )
+        self.assertLess((small["tumorP"] - large["tumorP"]).abs().max(), 1e-9)
+
+    def test_invariant_to_library_depth(self):
+        """A pure per-sample depth rescaling is absorbed by the size factor."""
+        depths, nids, _altered = self._cohort(4, 6, seed=5)
+        base = rna.normalize_read_depths(depths, nids, normalize_method="size-factors")
+        scaled = depths.copy()
+        scaled["tumor0"] = scaled["tumor0"] * 7.5  # deeper library, same biology
+        rescaled = rna.normalize_read_depths(
+            scaled, nids, normalize_method="size-factors"
+        )
+        self.assertLess((base["tumor0"] - rescaled["tumor0"]).abs().max(), 1e-9)
+
+    def test_invalid_method_raises(self):
+        depths, nids, _altered = self._cohort(3, 3, seed=6)
+        with self.assertRaises(ValueError) as cm:
+            rna.normalize_read_depths(depths, nids, normalize_method="bogus")
+        self.assertIn("bogus", str(cm.exception))
+
+    def test_warns_when_size_factors_degenerate(self):
+        """No gene detected in every control => warn and fall back to no scaling.
+
+        Every gene is zeroed in at least one control (round-robin), so no gene is
+        positive across all controls; the median-of-ratios is then undefined and
+        size factors fall back to 1.0. That degradation must be surfaced, not
+        silent, for a clinical-output path.
+        """
+        depths, nids, _altered = self._cohort(4, 4, n_genes=120, seed=8)
+        normal_locs = [depths.columns.get_loc(nid) for nid in nids]
+        for g in range(len(depths)):
+            depths.iloc[g, normal_locs[g % len(nids)]] = 0.0
+        with self.assertLogs(level="WARNING") as cm:
+            log2 = rna.normalize_read_depths(
+                depths, nids, normalize_method="size-factors"
+            )
+        self.assertIn("size factor", "\n".join(cm.output))
+        # Still returns a usable, fully finite result for every sample.
+        self.assertEqual(log2.shape, depths.shape)
+        self.assertFalse(log2.isna().all(axis=0).any())
+
+
+class NormalizeMethodPlumbingTests(unittest.TestCase):
+    """``normalize_method`` is threaded CLI -> do_import_rna -> align -> normalize.
+
+    AST-level guards (no fixtures) so a dropped kwarg fails at collection rather
+    than silently reverting size-factors runs to the polish default.
+    """
+
+    def test_cmd_passes_method_to_do_import_rna(self):
+        calls = _ast_calls_to(commands._cmd_import_rna, "do_import_rna", "import_rna")
+        self.assertGreater(len(calls), 0)
+        for call in calls:
+            self.assertIn(
+                "normalize_method",
+                {kw.arg for kw in call.keywords},
+                "_cmd_import_rna must forward args.normalize_method to do_import_rna",
+            )
+
+    def test_do_import_rna_passes_method_to_align(self):
+        calls = _ast_calls_to(
+            import_rna.do_import_rna, "align_gene_info_to_samples", "rna"
+        )
+        self.assertGreater(len(calls), 0)
+        for call in calls:
+            self.assertIn(
+                "normalize_method",
+                {kw.arg for kw in call.keywords},
+                "do_import_rna must forward normalize_method to "
+                "rna.align_gene_info_to_samples",
+            )
+
+    def test_align_passes_method_to_normalize(self):
+        tree = ast.parse(inspect.getsource(rna.align_gene_info_to_samples))
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "normalize_read_depths"
+        ]
+        self.assertGreater(len(calls), 0)
+        for call in calls:
+            self.assertIn(
+                "normalize_method",
+                {kw.arg for kw in call.keywords},
+                "align_gene_info_to_samples must forward normalize_method to "
+                "normalize_read_depths",
+            )
+
+    def test_signatures_default_to_polish(self):
+        """Default preserved at every layer so existing output is unchanged."""
+        for func, param in (
+            (rna.normalize_read_depths, "normalize_method"),
+            (rna.align_gene_info_to_samples, "normalize_method"),
+            (import_rna.do_import_rna, "normalize_method"),
+        ):
+            self.assertEqual(
+                inspect.signature(func).parameters[param].default, "polish"
+            )
 
 
 class _TempTsvTest(unittest.TestCase):
