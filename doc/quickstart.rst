@@ -1,10 +1,11 @@
 Quick start
 ===========
 
-If you would like to quickly try CNVkit without installing it, try one of the
+If you would like to quickly try CNVkit without installing it, run it through the
+CNVkit tools on `Galaxy <https://usegalaxy.eu/?tool_id=cnvkit_batch>`_ or one of the
 open-source `workflows on Dockstore
-<https://dockstore.org/search?entryType=workflows&search=cnvkit>` with your platform of
-choice. Separately maintained apps are also available on DNAnexus and Seven Bridges.
+<https://dockstore.org/search?entryType=workflows&search=cnvkit>`_ with your platform
+of choice.
 
 To run CNVkit on your own machine, keep reading.
 
@@ -182,4 +183,3 @@ See the command-line usage pages for additional
 :doc:`visualization <plots>`,
 :doc:`reporting <reports>` and
 :doc:`import/export <importexport>` commands in CNVkit.
-

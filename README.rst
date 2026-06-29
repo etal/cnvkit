@@ -39,11 +39,9 @@ https://github.com/etal/cnvkit/issues/
 Try it
 ======
 
-You can easily run CNVkit on your own data without installing it by using our
-`DNAnexus app <https://platform.dnanexus.com/app/cnvkit_batch>`_.
-
-A `Galaxy tool <https://testtoolshed.g2.bx.psu.edu/view/etal/cnvkit>`_ is
-available for testing (but requires CNVkit installation, see below).
+The CNVkit tool suite on `Galaxy <https://usegalaxy.eu/?tool_id=cnvkit_batch>`_,
+maintained by the Intergalactic Utilities Commission (IUC), runs the full
+pipeline through a web interface with no local installation required.
 
 A `Docker container <https://registry.hub.docker.com/r/etal/cnvkit/>`_ is also
 available on Docker Hub, and the BioContainers community provides another on
