@@ -9,7 +9,7 @@ Module ``cnvlib`` contents
     :undoc-members:
     :show-inheritance:
 
-The one function exposed at the top level, `read`, loads a file in CNVkit's
+The one function exposed at the top level, ``read``, loads a file in CNVkit's
 BED-like tabular format and returns a CopyNumArray instance. For your own
 scripting, you can usually accomplish what you need using just the CopyNumArray
 and GenomicArray methods available on this returned object (see
@@ -99,6 +99,15 @@ the CNVkit sub-commands.
     :show-inheritance:
 
 
+``bintest``
+~~~~~~~~~~~
+
+.. automodule:: cnvlib.bintest
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 ``call``
 ~~~~~~~~
 
@@ -172,6 +181,14 @@ the CNVkit sub-commands.
     :undoc-members:
     :show-inheritance:
 
+``purity``
+~~~~~~~~~~
+
+.. automodule:: cnvlib.purity
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 ``reference``
 ~~~~~~~~~~~~~
 
@@ -227,6 +244,14 @@ Supports the sub-commands :ref:`breaks` and :ref:`genemetrics`.
 
 Helper modules
 --------------
+
+``cluster``
+~~~~~~~~~~~
+
+.. automodule:: cnvlib.cluster
+    :members:
+    :undoc-members:
+    :show-inheritance:
 
 ``cmdutil``
 ~~~~~~~~~~~
@@ -309,4 +334,3 @@ Defines several constants used in the pipeline.
     :members:
     :undoc-members:
     :show-inheritance:
-

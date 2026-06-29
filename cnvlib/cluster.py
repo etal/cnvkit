@@ -7,6 +7,7 @@ References:
 
     Guo et al. 2019, "Comparative study of exome copy number variant detection
     tools using the K-means clustering algorithm" (PMC6537193):
+
     - k-means with Pearson correlation of read depth is ~200x faster than kNN
       with equivalent accuracy; optimal k=4-5; clusters correspond to
       sequencing batches/centers
