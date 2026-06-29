@@ -22,8 +22,8 @@ regions, with no off-target regions.
 The ``batch --method wgs`` option uses the given reference genome's
 sequencing-accessible regions ("access" BED) as the "targets" -- these will be
 calculated on the fly if not provided. No "antitarget" regions are used.
-Since the input does not contain useful per-target gene labels, a  gene
-annotation database is required and used to label genes in the outputs::
+Since the input does not contain useful per-target gene labels, a gene
+annotation database is recommended to label genes in the outputs::
 
     cnvkit.py batch Sample1.bam Sample2.bam -n Control1.bam Control2.bam \
             -m wgs -f hg38.fasta --annotate data/refFlat_hg38.txt
@@ -33,7 +33,7 @@ following:
 
 - Instead of analyzing the whole genome, use the "target" BED file
   to limit the analysis to just the genic regions. You can get such a BED file
-  from the [UCSC Genome Browser](https://genome.ucsc.edu/cgi-bin/hgTables), for
+  from the `UCSC Genome Browser <https://genome.ucsc.edu/cgi-bin/hgTables>`_, for
   example.
 - Increase the "target" average bin size (``--target-avg-size``), e.g. to at
   least 1000 bases for 30x coverage, or proportionally more for lower-coverage

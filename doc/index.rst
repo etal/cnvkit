@@ -31,8 +31,8 @@ Citation
 
 If you use this software in a publication, please cite our paper describing CNVkit:
 
-    Talevich, E., Shain, A.H., Botton, T., & Bastian, B.C. (2014).
-    `CNVkit: Genome-wide copy number detection and visualization from targeted sequencing.
+    Talevich, E., Shain, A.H., Botton, T., & Bastian, B.C. (2016).
+    `CNVkit: Genome-wide copy number detection and visualization from targeted DNA sequencing.
     <http://dx.doi.org/10.1371/journal.pcbi.1004873>`_
     *PLOS Computational Biology* 12(4):e1004873
 

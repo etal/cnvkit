@@ -74,7 +74,7 @@ jobs:
             # Tag with major.minor on release tags (e.g., v0.9.13 -> 0.9)
             type=semver,pattern={{major}}.{{minor}}
             # Tag as 'latest' on release tags
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             # Tag as 'devel' on master branch commits
             type=raw,value=devel,enable=${{ github.ref == 'refs/heads/master' }}
           labels: |

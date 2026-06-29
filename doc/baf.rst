@@ -31,6 +31,7 @@ is normal-cell contamination and/or :doc:`tumor heterogeneity <heterogeneity>`.
 
 Use SNP b-allele frequencies from a VCF in these commands:
 
+- :ref:`segment`
 - :ref:`call`
 - :ref:`scatter`
 - :ref:`export` ``nexus-ogt`` and ``theta``

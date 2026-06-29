@@ -28,12 +28,14 @@ are available to support this use case:
       probably based on dummy values corresponding to zero-coverage (perhaps
       unmappable) bins, and not real observations.
 
-- The :ref:`batch` command does not directly output integer copy number calls
-  (see :doc:`heterogeneity`). Instead, use the ``--ploidy`` and ``--purity``
-  options in :ref:`call` to calculate copy number for each sample individually
-  using known or estimated tumor-cell fractions. Also consider using ``--center
-  median`` in highly aneuploid samples to shift the log2 value of true neutral
-  regions closer to zero, as it may be slightly off initially.
+- The :ref:`batch` command emits default-threshold integer copy number calls in
+  each sample's ``.call.cns`` file, but it cannot apply tumor purity or ploidy
+  corrections (see :doc:`heterogeneity`). For purity-aware integer copy number,
+  re-run the :ref:`call` command with the ``--ploidy`` and ``--purity`` options
+  to calculate copy number for each sample individually using known or estimated
+  tumor-cell fractions. Also consider using ``--center median`` in highly
+  aneuploid samples to shift the log2 value of true neutral regions closer to
+  zero, as it may be slightly off initially.
 
 - If SNV calls are available in VCF format, use the ``-v``/``--vcf`` option in
   the :ref:`call` and :ref:`scatter` commands to calculate or plot b-allele

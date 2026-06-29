@@ -362,10 +362,11 @@ use the plot window's selection mode to select a smaller area of the genome, and
 use the plot window's save button to save the plot in your preferred format.
 
 You can customize font sizes and other aspects of the plots by `configuring
-matplotlib <http://matplotlib.org/users/customizing.html>`_.
+matplotlib <https://matplotlib.org/stable/users/explain/customizing.html>`_.
 If you're running CNVkit on the command line and not using it as a Python
-library, then you can just create a file in your home directory (or the same
-directory as ``cnvkit.py``) called ``.matplotlibrc``.  For example, to shrink
+library, you can place a ``matplotlibrc`` configuration file in the current
+working directory (matplotlib also reads one from
+``~/.config/matplotlib/matplotlibrc``).  For example, to shrink
 the font size of the x- and y-axis labels, put this line in the configuration
 file::
 

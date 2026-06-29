@@ -49,6 +49,14 @@ class.
 Genomic interval arithmetic
 ---------------------------
 
+``cut``
+~~~~~~~
+
+.. automodule:: skgenome.cut
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 ``intersect``
 ~~~~~~~~~~~~~
 

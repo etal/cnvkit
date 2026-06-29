@@ -100,7 +100,7 @@ The BED file should be the baited genomic regions for your target capture kit,
 as provided by your vendor. Since these regions (usually exons) may be of
 unequal size, the ``--split`` option divides the larger regions so that the
 average bin size after dividing is close to the size specified by
-``--average-size``.  If any of these three (``--split``, ``--annotate``, or
+``--avg-size``.  If any of these three (``--split``, ``--annotate``, or
 ``--short-names``) flags are used, a new target BED file will be created;
 otherwise, the provided target BED file will be used as-is.
 
@@ -840,7 +840,10 @@ more precise calls.
 The thresholds map to integer copy numbers in order, starting from zero:
 log2 ratios up to the first threshold value are assigned a copy number 0, log2
 ratios between the first and second threshold values get copy number 1, and so
-on.
+on. The example below keeps the safe outer cutoffs (-1.1 and +0.7) but uses
+tighter inner cutoffs (-0.4 and +0.3, close to the diploid midpoints derived at
+the end of this section) in place of the tumor-safe defaults of -0.25 and +0.2 --
+the kind of adjustment that suits a germline or otherwise homogeneous sample:
 
 =====================================   ===========
 If log2 value is up to                  Copy number

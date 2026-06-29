@@ -69,7 +69,7 @@ If you haven't done so already, use a sequence mapping/alignment program such as
 `BWA <http://bio-bwa.sourceforge.net/>`_ to map your sequencing reads to the
 reference genome sequence.
 
-You should now have one or BAM files corresponding to individual samples.
+You should now have one or more BAM files corresponding to individual samples.
 
 
 Build a reference from normal samples and infer tumor copy ratios
@@ -120,7 +120,7 @@ If your targets are missing gene names, you can add them here with the
 
     cnvkit.py batch *Tumor.bam -n *Normal.bam -t my_baits.bed -f hg38.fasta \
         --annotate data/refFlat_hg38.txt --access data/access-10kb.hg38.bed \
-        --output-reference my_flat_reference.cnn -d example3/
+        --output-reference my_reference.cnn -d example3/
 
 .. note:: **Which BED file should I use?**
 
