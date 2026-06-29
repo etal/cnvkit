@@ -2800,6 +2800,7 @@ def _cmd_import_rna(args: argparse.Namespace) -> None:
         args.max_log2,
         diploid_parx_genome=args.diploid_parx_genome,
         min_sample_fraction=args.min_sample_fraction,
+        normalize_method=args.normalize_method,
     )
     logging.info("Writing output files")
     if args.output:
@@ -2861,6 +2862,19 @@ P_import_rna.add_argument(
             fraction of samples. Lower this for single-cell or sparse cohorts, where
             most genes are expressed in fewer than half of cells; values below ~0.2
             admit genes whose log2 ratios are likely noise. [Default: %(default)s]""",
+)
+P_import_rna.add_argument(
+    "--normalize-method",
+    choices=("polish", "size-factors"),
+    default="polish",
+    metavar="NAME",
+    help="""Read-depth normalization strategy. 'polish' (default) is the historical
+            cohort-wide median polish anchored on the normal median. 'size-factors'
+            estimates DESeq2-style median-of-ratios size factors from the --normal
+            control samples only, with leave-one-out anchoring so each normal's .cnr
+            retains QC signal; this avoids the polish's cohort-composition
+            dependence and is recommended with three or more normals.
+            [Default: %(default)s]""",
 )
 P_import_rna.add_argument(
     "-n",
