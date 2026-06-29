@@ -82,6 +82,23 @@ pipelines are available on `Dockstore
 <https://dockstore.org/search?entryType=workflows&search=cnvkit>`_.
 
 
+Use on Galaxy
+-------------
+
+The Intergalactic Utilities Commission (IUC) maintains a complete suite of
+CNVkit tools for the `Galaxy <https://galaxyproject.org/>`_
+platform, with a separate wrapper for each CNVkit subcommand (``batch``,
+``access``, ``antitarget``, ``autobin``, ``coverage``, ``reference``, ``fix``,
+``segment``, ``call``, ``scatter``, ``diagram``, ``heatmap``, and others).
+The tools run on the public `usegalaxy.eu
+<https://usegalaxy.eu/?tool_id=cnvkit_batch>`_ server and can be installed into
+any Galaxy instance from the Tool Shed. Their dependencies, including CNVkit
+itself, are resolved automatically through Bioconda, so no manual installation
+is required. Source and issue tracking for these wrappers live in the
+`tools-iuc repository
+<https://github.com/galaxyproject/tools-iuc/tree/main/tools/cnvkit>`_.
+
+
 Image versioning
 ----------------
 
