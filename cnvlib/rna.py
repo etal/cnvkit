@@ -106,8 +106,10 @@ def load_gene_info(gene_resource, corr_fname, default_r=0.1):
     Y. The tool also outputs the GC content of the gene, chromosomal coordinates
     of the gene, and HUGO gene symbol.
 
-    The gene resource input can be obtained from a resource bundle we provide
-    (for reference genome hg19) or generated from BioMart.
+    The bundled hg38 table lives at ``data/ensembl-gene-info.hg38.tsv``; for
+    other reference genomes, build an equivalent table from a BioMart export
+    with the ``cnv_gene_info.py`` script. The first line is the column header;
+    an optional leading ``#`` comment line is ignored.
     """
     # Load the gene info file and clean up column names
     # Original columns:
@@ -134,8 +136,9 @@ def load_gene_info(gene_resource, corr_fname, default_r=0.1):
     gene_info = pd.read_csv(
         gene_resource,
         sep="\t",
-        header=1,
+        header=0,
         names=info_col_names,
+        comment="#",
         converters={
             "gene_id": before("."),
             "tx_support": tsl2int,

@@ -253,10 +253,9 @@ def build_gene_info(in_fname, renames=None, chromosomes=None):
 def write_gene_info(out_df, out_fname, genome=None, source=None):
     """Write the gene-info table with a provenance comment + BioMart header.
 
-    The leading comment line is required by ``cnvlib.rna.load_gene_info``, which
-    reads with ``header=1`` (i.e. it skips the first line before the column
-    header). Emitting it here keeps every gene; a file whose first line is the
-    column header instead would lose its first data row on load.
+    The first line records provenance (genome, source, gene count) as a ``#``
+    comment; ``cnvlib.rna.load_gene_info`` ignores it. The second line is the
+    canonical BioMart column header, followed by one row per gene.
     """
     n = len(out_df)
     comment = f"# CNVkit gene info | genome={genome or 'unknown'}"

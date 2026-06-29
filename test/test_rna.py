@@ -715,7 +715,19 @@ class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
             self.assertIn("3 normals", joined)
 
 
-class BuildGeneInfoTests(unittest.TestCase):
+class _TempTsvTest(unittest.TestCase):
+    """Base class providing a temp-TSV writer with automatic cleanup."""
+
+    def _write(self, text):
+        fd, path = tempfile.mkstemp(suffix=".tsv")
+        os.close(fd)
+        with open(path, "w") as fh:
+            fh.write(text)
+        self.addCleanup(os.remove, path)
+        return path
+
+
+class BuildGeneInfoTests(_TempTsvTest):
     """``cnv_gene_info`` normalizes a BioMart export into CNVkit gene-info format."""
 
     # Raw BioMart-style export: columns reordered, standard display names, one
@@ -731,14 +743,6 @@ class BuildGeneInfoTests(unittest.TestCase):
         "X\t500000\t502000\tENSG00000005\tGENEX\t1005\t48.2\t2000\n"
         "1\t200000\t202000\tENSG00000002\tGENEB\t\t45.0\t-3\n"
     )
-
-    def _write(self, text):
-        fd, path = tempfile.mkstemp(suffix=".tsv")
-        os.close(fd)
-        with open(path, "w") as fh:
-            fh.write(text)
-        self.addCleanup(os.remove, path)
-        return path
 
     def test_build_normalizes_columns_and_order(self):
         df = cnv_gene_info.build_gene_info(self._write(self.BIOMART))
@@ -767,8 +771,9 @@ class BuildGeneInfoTests(unittest.TestCase):
             first, second = fh.readline(), fh.readline()
         self.assertTrue(first.startswith("# CNVkit gene info"))
         self.assertEqual(second.split("\t")[0], "Gene stable ID")
-        # load_gene_info reads with header=1, so the leading comment means no
-        # gene is lost: all four survive, version stripped, gc scaled, blank->0.
+        # load_gene_info skips the leading "#" comment and reads the BioMart
+        # header as line 0, so no gene is lost: all four survive, version
+        # stripped, gc scaled, blank->0.
         gi = rna.load_gene_info(out, None)
         self.assertEqual(
             set(gi.index),
@@ -806,6 +811,38 @@ class BuildGeneInfoTests(unittest.TestCase):
         df = cnv_gene_info.build_gene_info("formats/rna-gene-resource.tsv")
         self.assertEqual(list(df.columns), cnv_gene_info.CANONICAL_KEYS)
         self.assertGreater(len(df), 0)
+
+
+class LoadGeneInfoHeaderTests(_TempTsvTest):
+    """``load_gene_info`` reads every gene regardless of an optional comment line.
+
+    Regression guard: a gene-info file whose first line is the column header
+    (the bundled ``ensembl-gene-info.hg38.tsv`` layout) previously lost its
+    first physical data row to a ``header=1`` off-by-one.
+    """
+
+    HEADER = (
+        "Gene stable ID\tGene % GC content\tChromosome/scaffold name\t"
+        "Gene start (bp)\tGene end (bp)\tGene name\tNCBI gene ID\t"
+        "Transcript length (including UTRs and CDS)\tTranscript support level (TSL)\n"
+    )
+    ROWS = (
+        "ENSGFIRST\t40\t1\t100\t200\tGFIRST\t1\t500\ttsl1\n"
+        "ENSGSECOND\t41\t1\t300\t400\tGSECOND\t2\t600\ttsl1\n"
+        "ENSGTHIRD\t42\t2\t100\t200\tGTHIRD\t3\t700\ttsl1\n"
+    )
+
+    def test_header_on_first_line_keeps_first_gene(self):
+        # Bundled-file layout: header on line 0, no leading comment.
+        gi = rna.load_gene_info(self._write(self.HEADER + self.ROWS), None)
+        self.assertEqual(set(gi.index), {"ENSGFIRST", "ENSGSECOND", "ENSGTHIRD"})
+
+    def test_optional_leading_comment_is_ignored(self):
+        # Generator layout: a leading "# ..." provenance comment before the header.
+        gi = rna.load_gene_info(
+            self._write("# provenance\n" + self.HEADER + self.ROWS), None
+        )
+        self.assertEqual(set(gi.index), {"ENSGFIRST", "ENSGSECOND", "ENSGTHIRD"})
 
 
 if __name__ == "__main__":
