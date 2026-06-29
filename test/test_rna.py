@@ -2,12 +2,16 @@
 """Unit tests for RNA import functionality (cnvlib.rna)."""
 
 import ast
+import contextlib
 import inspect
+import io
 import logging
 import os
+import sys
 import tempfile
 import unittest
 import warnings
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -812,6 +816,44 @@ class BuildGeneInfoTests(_TempTsvTest):
         self.assertEqual(list(df.columns), cnv_gene_info.CANONICAL_KEYS)
         self.assertGreater(len(df), 0)
 
+    def test_chromosomes_filter_keeps_only_listed_contigs(self):
+        df = cnv_gene_info.build_gene_info(self._write(self.BIOMART), chromosomes=["1"])
+        self.assertEqual(set(df["chromosome"]), {"1"})
+        self.assertNotIn("ENSG00000005", set(df["gene_id"]))  # the X gene is gone
+
+    def test_drops_nonnumeric_and_warns_on_suspect_rows(self):
+        # One non-numeric GC (dropped), one out-of-range GC, one start>end, and a
+        # duplicate gene_id (all kept, each warned about).
+        text = (
+            "Gene stable ID\tGene % GC content\tChromosome/scaffold name\t"
+            "Gene start (bp)\tGene end (bp)\tGene name\tNCBI gene ID\t"
+            "Transcript length (including UTRs and CDS)\t"
+            "Transcript support level (TSL)\n"
+            "ENSGOK\t40\t1\t100\t200\tGOK\t1\t500\ttsl1\n"
+            "ENSGNUM\tabc\t1\t100\t200\tGNUM\t2\t500\ttsl1\n"
+            "ENSGGC\t150\t1\t300\t400\tGGC\t3\t600\ttsl1\n"
+            "ENSGREV\t40\t1\t900\t800\tGREV\t4\t700\ttsl1\n"
+            "ENSGOK\t41\t2\t100\t200\tGOKDUP\t5\t800\ttsl1\n"
+        )
+        with self.assertLogs(level="WARNING") as cm:
+            df = cnv_gene_info.build_gene_info(self._write(text))
+        self.assertNotIn("ENSGNUM", set(df["gene_id"]))  # non-numeric GC dropped
+        self.assertEqual(len(df), 4)  # the rest are kept despite warnings
+        joined = "\n".join(cm.output)
+        self.assertIn("non-numeric", joined)
+        self.assertIn("outside [0, 100]", joined)
+        self.assertIn("start > end", joined)
+        self.assertIn("duplicate gene IDs", joined)
+
+    def test_writes_to_stdout_when_no_output_path(self):
+        df = cnv_gene_info.build_gene_info(self._write(self.BIOMART))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cnv_gene_info.write_gene_info(df, None, genome="hg19")
+        text = buf.getvalue()
+        self.assertTrue(text.startswith("# CNVkit gene info"))
+        self.assertEqual(text.splitlines()[1].split("\t")[0], "Gene stable ID")
+
 
 class LoadGeneInfoHeaderTests(_TempTsvTest):
     """``load_gene_info`` reads every gene regardless of an optional comment line.
@@ -843,6 +885,41 @@ class LoadGeneInfoHeaderTests(_TempTsvTest):
             self._write("# provenance\n" + self.HEADER + self.ROWS), None
         )
         self.assertEqual(set(gi.index), {"ENSGFIRST", "ENSGSECOND", "ENSGTHIRD"})
+
+
+class CnvGeneInfoCliTests(_TempTsvTest):
+    """The ``cnv_gene_info.py`` command-line entry point and arg parsing."""
+
+    def test_main_end_to_end(self):
+        inp = self._write(BuildGeneInfoTests.BIOMART)
+        out = self._write("")
+        argv = ["cnv_gene_info.py", inp, "-o", out, "-g", "hg19", "--chromosomes", "1"]
+        with mock.patch.object(sys, "argv", argv):
+            cnv_gene_info.main()
+        with open(out) as fh:
+            lines = fh.read().splitlines()
+        # Provenance comment records the genome label and source basename.
+        self.assertTrue(lines[0].startswith("# CNVkit gene info"))
+        self.assertIn("genome=hg19", lines[0])
+        self.assertIn("source=", lines[0])
+        self.assertEqual(lines[1].split("\t")[0], "Gene stable ID")
+        # --chromosomes 1 kept only chr1 genes (column index 2 = chromosome).
+        self.assertTrue(all(row.split("\t")[2] == "1" for row in lines[2:]))
+
+    def test_parse_renames_valid(self):
+        self.assertEqual(
+            cnv_gene_info.parse_renames(["Weird Header=gene_id", "X=gc"]),
+            {"Weird Header": "gene_id", "X": "gc"},
+        )
+
+    def test_parse_renames_rejects_missing_equals(self):
+        with self.assertRaises(SystemExit):
+            cnv_gene_info.parse_renames(["nope"])
+
+    def test_parse_renames_rejects_unknown_key(self):
+        with self.assertRaises(SystemExit) as cm:
+            cnv_gene_info.parse_renames(["Header=bogus"])
+        self.assertIn("bogus", str(cm.exception))
 
 
 if __name__ == "__main__":
