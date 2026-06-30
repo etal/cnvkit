@@ -50,13 +50,48 @@ class SerialFuture:
         return self._result
 
 
+def available_cpus() -> int:
+    """Number of CPUs this process may actually use.
+
+    Honors CPU affinity and cgroup limits (e.g. ``taskset``, container quotas,
+    or the kernel ``nr_cpus=1`` boot parameter) rather than the machine's total
+    core count, so a constrained single-CPU environment is reported as 1.
+    """
+    # Python 3.13+: respects affinity, cgroups, and -X cpu_count / PYTHON_CPU_COUNT.
+    process_cpu_count = getattr(os, "process_cpu_count", None)
+    if process_cpu_count is not None:
+        n = process_cpu_count()
+        if n:
+            return int(n)
+    # Linux/Unix: respects affinity set by taskset / sched_setaffinity.
+    sched_getaffinity = getattr(os, "sched_getaffinity", None)
+    if sched_getaffinity is not None:
+        try:
+            n = len(sched_getaffinity(0))
+        except OSError:
+            n = 0
+        if n:
+            return n
+    return os.cpu_count() or 1
+
+
 @contextmanager
 def pick_pool(nprocs: int) -> Iterator[SerialPool | ProcessPoolExecutor]:
-    if nprocs == 1:
+    """Yield a process pool, or a serial stand-in when parallelism is moot.
+
+    `nprocs` <= 0 means "use all available CPUs". The requested count is clamped
+    to the number of usable CPUs, so asking for more workers than cores never
+    oversubscribes. When the effective count is 1 -- which includes every
+    single-CPU host -- work runs in-process via `SerialPool` instead of forking
+    workers: real multiprocessing offers no speedup there, and on constrained
+    single-CPU build environments forking the pool can deadlock (#1103).
+    """
+    avail = available_cpus()
+    nprocs = avail if nprocs < 1 else min(nprocs, avail)
+    if nprocs <= 1:
         yield SerialPool()
     else:
-        max_workers = nprocs if nprocs >= 1 else None
-        with futures.ProcessPoolExecutor(max_workers=max_workers) as pool:
+        with futures.ProcessPoolExecutor(max_workers=nprocs) as pool:
             yield pool
 
 
