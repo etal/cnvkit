@@ -12,15 +12,17 @@ import math
 import warnings
 from typing import TYPE_CHECKING, Any
 
-# Reportlab on Py3.10 triggers a DeprecationWarning via load_module, which
-# becomes an error (ModuleNotFoundError) unless silenced here.
-warnings.simplefilter("ignore", DeprecationWarning)
-
-from Bio.Graphics import BasicChromosome as BC
-from reportlab.graphics import renderPDF
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-from reportlab.pdfgen import canvas
+# Reportlab triggers a DeprecationWarning via load_module on import, which can
+# become an error under `-W error`. Silence it for just these imports rather
+# than muzzling DeprecationWarning process-wide (which would hide every other
+# deprecation, including CNVkit's own).
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from Bio.Graphics import BasicChromosome as BC
+    from reportlab.graphics import renderPDF
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from reportlab.pdfgen import canvas
 
 from skgenome.rangelabel import unpack_range
 
