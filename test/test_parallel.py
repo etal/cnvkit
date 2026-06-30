@@ -2,6 +2,7 @@
 
 import unittest
 from concurrent import futures
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -77,6 +78,10 @@ class ParallelTests(unittest.TestCase):
             future.result()
         self.assertEqual(str(ctx.exception), "test exception")
 
+    @unittest.skipIf(
+        parallel.available_cpus() < 2,
+        "real multiprocessing requires more than one usable CPU (#1103)",
+    )
     def test_process_pool_exception_propagation(self):
         """Test that ProcessPoolExecutor properly propagates exceptions from workers."""
         # Test that exceptions from worker processes are propagated
@@ -92,14 +97,16 @@ class ParallelTests(unittest.TestCase):
             )
 
     def test_pick_pool_with_multiple_processes(self):
-        """Test pick_pool correctly creates ProcessPoolExecutor for multiple processes."""
-        # Test with 2 processes
+        """pick_pool(2) yields a real ProcessPoolExecutor when more than one CPU
+        is usable, and a SerialPool on a single-CPU host (#1103)."""
+        expected = (
+            futures.ProcessPoolExecutor
+            if parallel.available_cpus() > 1
+            else parallel.SerialPool
+        )
         with parallel.pick_pool(2) as pool:
-            future = pool.submit(_simple_task, 21)
-            result = future.result()
-            self.assertEqual(
-                result, 42, "ProcessPoolExecutor should execute _simple_task(21) = 42"
-            )
+            self.assertIsInstance(pool, expected)
+            self.assertEqual(pool.submit(_simple_task, 21).result(), 42)
 
     def test_pick_pool_with_single_process(self):
         """Test pick_pool correctly creates SerialPool for single process."""
@@ -119,3 +126,23 @@ class ParallelTests(unittest.TestCase):
             self.assertEqual(
                 result, 42, "SerialPool should execute simple_task(21) = 42"
             )
+
+    def test_pick_pool_single_cpu_never_forks(self):
+        """On a single-CPU host, pick_pool must run in-process rather than fork
+        workers, however many are requested (regression test for #1103)."""
+        with mock.patch.object(parallel, "available_cpus", return_value=1):
+            for nprocs in (2, 8, 0, -1):
+                with parallel.pick_pool(nprocs) as pool:
+                    self.assertIsInstance(
+                        pool,
+                        parallel.SerialPool,
+                        f"pick_pool({nprocs}) must be serial on a single CPU",
+                    )
+                    self.assertEqual(pool.submit(_simple_task, 21).result(), 42)
+
+    def test_pick_pool_clamps_to_available_cpus(self):
+        """pick_pool never starts more workers than there are usable CPUs."""
+        with mock.patch.object(parallel, "available_cpus", return_value=4):
+            with parallel.pick_pool(64) as pool:
+                self.assertIsInstance(pool, futures.ProcessPoolExecutor)
+                self.assertEqual(pool._max_workers, 4)

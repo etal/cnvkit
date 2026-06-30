@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import multiprocessing
 import os
 import sys
 import warnings
@@ -258,7 +257,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
         seen_sids[sid] = fname
 
     if args.processes < 1:
-        args.processes = multiprocessing.cpu_count()
+        args.processes = parallel.available_cpus()
 
     if not args.reference:
         # Build a copy number reference; update (anti)targets upon request

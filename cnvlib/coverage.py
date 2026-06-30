@@ -8,7 +8,6 @@ import math
 import os.path
 import tempfile
 import time
-from concurrent import futures
 from io import StringIO
 from typing import TYPE_CHECKING
 
@@ -21,7 +20,7 @@ from skgenome.chromnames import detect_chr_prefix
 
 from . import core, samutil
 from .cnary import CopyNumArray as CNA
-from .parallel import rm, to_chunks
+from .parallel import pick_pool, rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 if TYPE_CHECKING:
@@ -441,7 +440,7 @@ def interval_coverages_count(
             for count, row in _rdc_chunk(bamfile, subregions, min_mapq):
                 yield [count, row]
     else:
-        with futures.ProcessPoolExecutor(procs) as pool:
+        with pick_pool(procs) as pool:
             args_iter = ((bam_fname, subr, min_mapq, fasta) for _c, subr in present)
             for chunk in pool.map(_rdc, args_iter):
                 for count, row in chunk:
@@ -538,7 +537,7 @@ def interval_coverages_pileup(
         table = bedcov(bed_fname, bam_fname, min_mapq, fasta, bam_chroms=bam_chroms)
     else:
         chunks = []
-        with futures.ProcessPoolExecutor(procs) as pool:
+        with pick_pool(procs) as pool:
             args_iter = (
                 (bed_chunk, bam_fname, min_mapq, fasta, bam_chroms)
                 for bed_chunk in to_chunks(bed_fname)

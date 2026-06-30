@@ -160,7 +160,6 @@ def scan_targets(access_bed, sample_bams, min_depth, min_gap, min_length, procs)
     bait_chunks = []
     # ENH: context manager to call rm on bed chunks? with to_chunks as pool, ck?
     logging.info("Scanning for enriched regions in:\n  %s", "\n  ".join(sample_bams))
-    #  with futures.ProcessPoolExecutor(procs) as pool:
     with parallel.pick_pool(procs) as pool:
         args_iter = (
             (bed_chunk, sample_bams, min_depth, min_gap, min_length)
