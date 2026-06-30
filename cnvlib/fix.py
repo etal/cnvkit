@@ -346,8 +346,19 @@ def match_ref_to_sample(
     # Check for signs that the wrong reference was used
     num_missing = pd.isna(ref_matched.start).sum()
     if num_missing > 0:
+        if num_missing == len(samp_labeled):
+            # No bins in common at all -- almost certainly the wrong file was
+            # given as the reference (e.g. a raw coverage .cnn passed in place of
+            # a built reference), not merely a panel mismatch.
+            raise ValueError(
+                f"Reference shares no bins with {samp_cnarr.sample_id}. "
+                "Is the reference argument actually a reference .cnn built with "
+                "'cnvkit.py reference' (and not a coverage file or the wrong panel)?"
+            )
         raise ValueError(
-            f"Reference is missing {num_missing} bins found in {samp_cnarr.sample_id}"
+            f"Reference is missing {num_missing} of {len(samp_labeled)} bins found "
+            f"in {samp_cnarr.sample_id}; the reference was likely built for a "
+            "different target panel."
         )
     x = ref_cnarr.as_dataframe(
         ref_matched.reset_index(drop=True).set_index(samp_cnarr.data.index)
