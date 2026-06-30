@@ -1064,7 +1064,12 @@ def _cmd_fix(args: argparse.Namespace) -> None:
     """
     # Verify that target and antitarget are from the same sample
     tgt_raw = read_cna(args.target, sample_id=args.sample_id)
-    anti_raw = read_cna(args.antitarget, sample_id=args.sample_id)
+    if args.antitarget is not None:
+        anti_raw = read_cna(args.antitarget, sample_id=args.sample_id)
+    else:
+        # WGS/amplicon samples may have no antitarget bins; do_fix tolerates an
+        # empty antitarget array (the established blank-CNA idiom, cf. batch.py).
+        anti_raw = _CNA([])
     if len(anti_raw) and tgt_raw.sample_id != anti_raw.sample_id:
         raise ValueError(
             "Sample IDs do not match: "
@@ -1088,7 +1093,11 @@ def _cmd_fix(args: argparse.Namespace) -> None:
 P_fix = AP_subparsers.add_parser("fix", help=_cmd_fix.__doc__)
 P_fix.add_argument("target", help="Target coverage file (.targetcoverage.cnn).")
 P_fix.add_argument(
-    "antitarget", help="Antitarget coverage file (.antitargetcoverage.cnn)."
+    "antitarget",
+    nargs="?",
+    default=None,
+    help="Antitarget coverage file (.antitargetcoverage.cnn). "
+    "Omit for WGS/amplicon samples with no antitarget bins.",
 )
 P_fix.add_argument("reference", help="Reference coverage (.cnn).")
 P_fix.add_argument(

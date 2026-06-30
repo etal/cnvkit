@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Tests for the reference command (and clustering used to build references)."""
 
+import argparse
 import logging
 import os
 import shutil
@@ -406,6 +407,83 @@ class ReferenceTests(unittest.TestCase):
         cnr = commands.do_fix(tgt_bins, anti_bins, ref)
         self.assertFalse(np.isnan(cnr["log2"]).any())
         self.assertFalse(np.isnan(cnr["weight"]).any())
+
+    def test_fix_antitarget_optional_argparse(self):
+        """'fix' accepts the antitarget coverage as an optional positional (#894).
+
+        WGS/amplicon samples have no antitarget bins, so the CLI must let users
+        run `cnvkit.py fix target.cnn reference.cnn -o out.cnr` with two
+        positionals instead of fabricating a decoy antitarget file. This pins the
+        argparse contract that makes that workflow possible:
+          - 2 positionals  -> target, reference; antitarget defaults to None
+          - 3 positionals  -> target, antitarget, reference (backward compatible)
+          - reference stays mandatory (a lone positional is a usage error)
+        """
+        # Two-positional WGS form: antitarget omitted.
+        ns2 = commands.P_fix.parse_args(["tgt.cnn", "ref.cnn", "-o", "out.cnr"])
+        self.assertEqual(ns2.target, "tgt.cnn")
+        self.assertIsNone(ns2.antitarget)
+        self.assertEqual(ns2.reference, "ref.cnn")
+        self.assertEqual(ns2.output, "out.cnr")
+        # Three-positional hybrid-capture form: backward compatibility.
+        ns3 = commands.P_fix.parse_args(["tgt.cnn", "anti.cnn", "ref.cnn"])
+        self.assertEqual(ns3.target, "tgt.cnn")
+        self.assertEqual(ns3.antitarget, "anti.cnn")
+        self.assertEqual(ns3.reference, "ref.cnn")
+        # Reference is still required: a single positional is a usage error.
+        with self.assertRaises(SystemExit):
+            commands.P_fix.parse_args(["tgt.cnn"])
+
+    def test_cmd_fix_without_antitarget(self):
+        """`_cmd_fix` produces a valid .cnr when antitarget is None (#894).
+
+        Drives the full command path a WGS/amplicon user takes (target +
+        reference, no antitarget file). The None branch must synthesize an empty
+        antitarget and still write a usable .cnr -- not crash and not emit NaN
+        log2 (which would break downstream segmentation). Cross-checks that this
+        yields the same number of bins as the explicit blank-antitarget API call,
+        confirming the synthesized empty antitarget is equivalent to passing one.
+        """
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        tgt_bins = ref[~is_bg]
+        tmpdir = tempfile.mkdtemp()
+        try:
+            tgt_fname = os.path.join(tmpdir, "sample.targetcoverage.cnn")
+            ref_fname = os.path.join(tmpdir, "reference.cnn")
+            out_fname = os.path.join(tmpdir, "sample.cnr")
+            tabio.write(tgt_bins, tgt_fname)
+            tabio.write(ref[~is_bg], ref_fname)
+            namespace = argparse.Namespace(
+                target=tgt_fname,
+                antitarget=None,
+                reference=ref_fname,
+                sample_id=None,
+                diploid_parx_genome=None,
+                do_gc=True,
+                do_edge=False,
+                do_rmask=True,
+                cluster=False,
+                smoothing_window_fraction=None,
+                bias_smoother="median",
+                output=out_fname,
+            )
+            commands._cmd_fix(namespace)
+            cnr = cnvlib.read(out_fname)
+            # (a) Produced real bins, bounded by the target input.
+            self.assertTrue(0 < len(cnr) <= len(tgt_bins))
+            # (b) No NaN log2 leaked through (would crash downstream segmentation).
+            self.assertFalse(np.isnan(cnr["log2"]).any())
+            # (c) Same bin count as the explicit blank-antitarget API path.
+            #     (Value equality is intentionally not asserted: this namespace
+            #     sets do_edge=False while do_fix defaults to do_edge=True, so
+            #     the corrected log2 values legitimately differ.)
+            api_cnr = commands.do_fix(
+                tgt_bins, cnvlib.cnary.CopyNumArray([]), ref[~is_bg]
+            )
+            self.assertEqual(len(cnr), len(api_cnr))
+        finally:
+            shutil.rmtree(tmpdir)
 
 
 class ClusterTests(unittest.TestCase):
