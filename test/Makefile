@@ -38,6 +38,14 @@ test:
 	pytest
 
 
+# Regenerate the frozen numerical-regression fixtures for test_regression.py.
+# Run deliberately, never as part of the routine suite: a PR that regenerates
+# these must explain the intended numerical change (#1039).
+.PHONY: regression-fixtures
+regression-fixtures:
+	python test_regression.py --regenerate
+
+
 # ------------------------------------------------------------------------------
 # Minimal 'batch' command
 
