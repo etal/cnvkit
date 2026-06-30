@@ -71,7 +71,7 @@ Equivalently::
     # For each sample
     cnvkit.py coverage Sample.bam targets.split.bed -p 0 -o Sample.targetcoverage.cnn
     cnvkit.py reference *.targetcoverage.cnn --no-edge -o ref-tas.cnn
-    cnvkit.py fix Sample.targetcoverage.cnn ref-tas.cnn --no-edge
+    cnvkit.py fix Sample.targetcoverage.cnn -r ref-tas.cnn --no-edge
 
 This approach does not collect any copy number information between targeted
 regions, so it should only be used if you have in fact prepared your samples

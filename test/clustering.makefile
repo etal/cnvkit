@@ -13,7 +13,7 @@ $(cnr_of_interest): \
 	$(example_cnn_dir)/TR_%_T.targetcoverage.cnn \
 	$(example_cnn_dir)/TR_%_T.antitargetcoverage.cnn \
 	ref-clustered.cnn
-	cnvkit.py fix $^ --cluster -o $@
+	cnvkit.py fix $< $(word 2,$^) -r ref-clustered.cnn --cluster -o $@
 
 ref-clustered.cnn: $(wildcard $(example_cnn_dir)/TR_*targetcoverage.cnn)
 	cnvkit.py reference $^ --cluster -o $@

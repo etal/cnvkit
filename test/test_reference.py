@@ -408,41 +408,93 @@ class ReferenceTests(unittest.TestCase):
         self.assertFalse(np.isnan(cnr["log2"]).any())
         self.assertFalse(np.isnan(cnr["weight"]).any())
 
-    def test_fix_antitarget_optional_argparse(self):
-        """'fix' accepts the antitarget coverage as an optional positional (#894).
+    def test_fix_reference_grammar_argparse(self):
+        """`fix` parses the redesigned reference grammar (#894 follow-up).
 
-        WGS/amplicon samples have no antitarget bins, so the CLI must let users
-        run `cnvkit.py fix target.cnn reference.cnn -o out.cnr` with two
-        positionals instead of fabricating a decoy antitarget file. This pins the
-        argparse contract that makes that workflow possible:
-          - 2 positionals  -> target, reference; antitarget defaults to None
-          - 3 positionals  -> target, antitarget, reference (backward compatible)
-          - reference stays mandatory (a lone positional is a usage error)
+        The reference moved from a required positional to a canonical
+        ``-r/--reference`` flag plus a deprecated optional positional
+        (dest ``reference_arg``); the antitarget stays an optional positional.
+        This pins how each invocation maps onto the parsed attributes. Crucially,
+        the forgotten-reference case (``fix target antitarget``) now parses to an
+        *unresolved* reference (both sources None) instead of silently treating
+        the antitarget file as the reference -- the silent-misparse bug this
+        redesign closes. argparse no longer enforces the reference (that moved
+        into ``_cmd_fix``), so none of these forms raise SystemExit.
         """
-        # Two-positional WGS form: antitarget omitted.
-        ns2 = commands.P_fix.parse_args(["tgt.cnn", "ref.cnn", "-o", "out.cnr"])
-        self.assertEqual(ns2.target, "tgt.cnn")
-        self.assertIsNone(ns2.antitarget)
-        self.assertEqual(ns2.reference, "ref.cnn")
-        self.assertEqual(ns2.output, "out.cnr")
-        # Three-positional hybrid-capture form: backward compatibility.
-        ns3 = commands.P_fix.parse_args(["tgt.cnn", "anti.cnn", "ref.cnn"])
-        self.assertEqual(ns3.target, "tgt.cnn")
-        self.assertEqual(ns3.antitarget, "anti.cnn")
-        self.assertEqual(ns3.reference, "ref.cnn")
-        # Reference is still required: a single positional is a usage error.
-        with self.assertRaises(SystemExit):
-            commands.P_fix.parse_args(["tgt.cnn"])
+        # WGS form: target + -r reference, antitarget omitted.
+        ns = commands.P_fix.parse_args(["tgt.cnn", "-r", "ref.cnn"])
+        self.assertEqual(ns.target, "tgt.cnn")
+        self.assertIsNone(ns.antitarget)
+        self.assertIsNone(ns.reference_arg)
+        self.assertEqual(ns.reference, "ref.cnn")
+        # Hybrid-capture form: target + antitarget positional + -r reference.
+        ns = commands.P_fix.parse_args(["tgt.cnn", "anti.cnn", "-r", "ref.cnn"])
+        self.assertEqual(ns.target, "tgt.cnn")
+        self.assertEqual(ns.antitarget, "anti.cnn")
+        self.assertIsNone(ns.reference_arg)
+        self.assertEqual(ns.reference, "ref.cnn")
+        # Deprecated 3-positional form: reference lands in reference_arg, not -r.
+        ns = commands.P_fix.parse_args(["tgt.cnn", "anti.cnn", "ref.cnn"])
+        self.assertEqual(ns.target, "tgt.cnn")
+        self.assertEqual(ns.antitarget, "anti.cnn")
+        self.assertEqual(ns.reference_arg, "ref.cnn")
+        self.assertIsNone(ns.reference)
+        # Forgotten-reference trap: the old grammar took this as target+reference;
+        # the new one parses it as target+antitarget with the reference left
+        # unresolved (both reference sources None), to be rejected by _cmd_fix.
+        ns = commands.P_fix.parse_args(["tgt.cnn", "anti.cnn"])
+        self.assertEqual(ns.target, "tgt.cnn")
+        self.assertEqual(ns.antitarget, "anti.cnn")
+        self.assertIsNone(ns.reference_arg)
+        self.assertIsNone(ns.reference)
+        # Lone target: antitarget and both reference sources unset.
+        ns = commands.P_fix.parse_args(["tgt.cnn"])
+        self.assertEqual(ns.target, "tgt.cnn")
+        self.assertIsNone(ns.antitarget)
+        self.assertIsNone(ns.reference_arg)
+        self.assertIsNone(ns.reference)
+
+    @staticmethod
+    def _fix_namespace(
+        target,
+        *,
+        antitarget_fname=None,
+        reference=None,
+        reference_arg=None,
+        output=None,
+    ):
+        """Build a `fix` argparse.Namespace, varying only the reference inputs.
+
+        do_edge is held False so callers need not assert value equality against
+        do_fix's do_edge=True default; only bin counts and validity are compared.
+        """
+        return argparse.Namespace(
+            target=target,
+            antitarget=antitarget_fname,
+            reference_arg=reference_arg,
+            reference=reference,
+            sample_id=None,
+            diploid_parx_genome=None,
+            do_gc=True,
+            do_edge=False,
+            do_rmask=True,
+            cluster=False,
+            smoothing_window_fraction=None,
+            bias_smoother="median",
+            output=output,
+        )
 
     def test_cmd_fix_without_antitarget(self):
-        """`_cmd_fix` produces a valid .cnr when antitarget is None (#894).
+        """`_cmd_fix` produces a valid .cnr from the WGS `-r` form (#894).
 
-        Drives the full command path a WGS/amplicon user takes (target +
-        reference, no antitarget file). The None branch must synthesize an empty
-        antitarget and still write a usable .cnr -- not crash and not emit NaN
-        log2 (which would break downstream segmentation). Cross-checks that this
-        yields the same number of bins as the explicit blank-antitarget API call,
-        confirming the synthesized empty antitarget is equivalent to passing one.
+        Drives the full command path a WGS/amplicon user takes (target plus
+        ``-r reference``, no antitarget file): reference via the canonical
+        ``reference`` attribute, ``reference_arg`` None, ``antitarget`` None.
+        The None-antitarget branch must synthesize an empty antitarget and still
+        write a usable .cnr -- not crash and not emit NaN log2 (which would break
+        downstream segmentation). Cross-checks that this yields the same number
+        of bins as the explicit blank-antitarget API call, confirming the
+        synthesized empty antitarget is equivalent to passing one.
         """
         ref = cnvlib.read("formats/reference-tr.cnn")
         is_bg = ref["gene"] == "Background"
@@ -454,19 +506,8 @@ class ReferenceTests(unittest.TestCase):
             out_fname = os.path.join(tmpdir, "sample.cnr")
             tabio.write(tgt_bins, tgt_fname)
             tabio.write(ref[~is_bg], ref_fname)
-            namespace = argparse.Namespace(
-                target=tgt_fname,
-                antitarget=None,
-                reference=ref_fname,
-                sample_id=None,
-                diploid_parx_genome=None,
-                do_gc=True,
-                do_edge=False,
-                do_rmask=True,
-                cluster=False,
-                smoothing_window_fraction=None,
-                bias_smoother="median",
-                output=out_fname,
+            namespace = self._fix_namespace(
+                tgt_fname, reference=ref_fname, output=out_fname
             )
             commands._cmd_fix(namespace)
             cnr = cnvlib.read(out_fname)
@@ -484,6 +525,149 @@ class ReferenceTests(unittest.TestCase):
             self.assertEqual(len(cnr), len(api_cnr))
         finally:
             shutil.rmtree(tmpdir)
+
+    def test_cmd_fix_requires_reference(self):
+        """`_cmd_fix` exits when no reference is given by flag or positional (#894).
+
+        The forgotten-reference invocation (`fix target antitarget`) parses with
+        both reference sources None; _cmd_fix must refuse rather than proceed
+        referenceless. A real target file is provided so the exit is the
+        reference check, not file I/O.
+        """
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        tgt_bins = ref[~is_bg]
+        tmpdir = tempfile.mkdtemp()
+        try:
+            tgt_fname = os.path.join(tmpdir, "sample.targetcoverage.cnn")
+            tabio.write(tgt_bins, tgt_fname)
+            namespace = self._fix_namespace(
+                tgt_fname, reference=None, reference_arg=None
+            )
+            with self.assertRaisesRegex(SystemExit, "No reference"):
+                commands._cmd_fix(namespace)
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_cmd_fix_reference_specified_twice(self):
+        """`_cmd_fix` exits when the reference is given both ways (#894).
+
+        Supplying -r/--reference *and* the deprecated positional is ambiguous;
+        the command must refuse rather than silently pick one.
+        """
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        tgt_bins = ref[~is_bg]
+        tmpdir = tempfile.mkdtemp()
+        try:
+            tgt_fname = os.path.join(tmpdir, "sample.targetcoverage.cnn")
+            ref_fname = os.path.join(tmpdir, "reference.cnn")
+            tabio.write(tgt_bins, tgt_fname)
+            tabio.write(ref[~is_bg], ref_fname)
+            namespace = self._fix_namespace(
+                tgt_fname, reference=ref_fname, reference_arg=ref_fname
+            )
+            with self.assertRaisesRegex(SystemExit, "once"):
+                commands._cmd_fix(namespace)
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_cmd_fix_positional_reference_deprecated(self):
+        """The legacy positional reference still works but warns (#894).
+
+        Passing the reference as the third positional (reference_arg) must emit a
+        DeprecationWarning yet remain fully functional -- the deprecation is
+        non-fatal, so a valid .cnr is still written. Uses the full hybrid fixture
+        (target + antitarget + full reference) so do_fix succeeds.
+        """
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        tgt_bins = ref[~is_bg]
+        anti_bins = ref[is_bg]
+        tmpdir = tempfile.mkdtemp()
+        try:
+            tgt_fname = os.path.join(tmpdir, "sample.targetcoverage.cnn")
+            anti_fname = os.path.join(tmpdir, "sample.antitargetcoverage.cnn")
+            ref_fname = os.path.join(tmpdir, "reference.cnn")
+            out_fname = os.path.join(tmpdir, "sample.cnr")
+            tabio.write(tgt_bins, tgt_fname)
+            tabio.write(anti_bins, anti_fname)
+            tabio.write(ref, ref_fname)
+            namespace = self._fix_namespace(
+                tgt_fname,
+                antitarget_fname=anti_fname,
+                reference_arg=ref_fname,
+                output=out_fname,
+            )
+            with self.assertWarns(DeprecationWarning):
+                commands._cmd_fix(namespace)
+            cnr = cnvlib.read(out_fname)
+            self.assertTrue(0 < len(cnr) <= len(ref))
+            self.assertFalse(np.isnan(cnr["log2"]).any())
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_match_ref_to_sample_zero_overlap(self):
+        """Zero shared bins reads as a wrong-file error, not a panel mismatch.
+
+        When the reference and sample share *no* coordinates (e.g. a raw coverage
+        .cnn handed in where a built reference was expected, or the reference
+        omitted so the antitarget file gets misused), match_ref_to_sample must
+        say so explicitly rather than emit a misleading "missing N bins".
+        """
+        samp = cnary.CopyNumArray.from_columns(
+            {
+                "chromosome": ["chr1"] * 4,
+                "start": [0, 100, 200, 300],
+                "end": [100, 200, 300, 400],
+                "gene": list("ABCD"),
+                "log2": [0.0, 0.1, -0.1, 0.2],
+            },
+            {"sample_id": "Sample"},
+        )
+        # Disjoint coordinates: a different chromosome -> no bins in common.
+        ref = cnary.CopyNumArray.from_columns(
+            {
+                "chromosome": ["chr2"] * 4,
+                "start": [0, 100, 200, 300],
+                "end": [100, 200, 300, 400],
+                "gene": list("ABCD"),
+                "log2": [0.0, 0.0, 0.0, 0.0],
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "shares no bins"):
+            fix.match_ref_to_sample(ref, samp)
+
+    def test_match_ref_to_sample_partial_overlap(self):
+        """A reference missing *some* of the sample's bins flags a panel mismatch.
+
+        Partial overlap (the reference covers part but not all of the sample's
+        bins) is the "wrong target panel" case and must be distinguished from the
+        zero-overlap wrong-file case: the message reports how many of how many
+        bins are missing.
+        """
+        samp = cnary.CopyNumArray.from_columns(
+            {
+                "chromosome": ["chr1"] * 4,
+                "start": [0, 100, 200, 300],
+                "end": [100, 200, 300, 400],
+                "gene": list("ABCD"),
+                "log2": [0.0, 0.1, -0.1, 0.2],
+            },
+            {"sample_id": "Sample"},
+        )
+        # Reference covers only the first two of the sample's four bins.
+        ref = cnary.CopyNumArray.from_columns(
+            {
+                "chromosome": ["chr1", "chr1"],
+                "start": [0, 100],
+                "end": [100, 200],
+                "gene": ["A", "B"],
+                "log2": [0.0, 0.0],
+            }
+        )
+        with self.assertRaisesRegex(ValueError, r"missing \d+ of \d+"):
+            fix.match_ref_to_sample(ref, samp)
 
 
 class ClusterTests(unittest.TestCase):

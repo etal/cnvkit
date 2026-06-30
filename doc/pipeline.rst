@@ -62,7 +62,7 @@ The pipeline executed by the ``batch`` command is equivalent to::
     cnvkit.py reference *Normal.{,anti}targetcoverage.cnn --fasta hg38.fa -o my_reference.cnn
 
     # For each tumor sample...
-    cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn my_reference.cnn -o Sample.cnr
+    cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn -r my_reference.cnn -o Sample.cnr
     cnvkit.py segment Sample.cnr -o Sample.cns
 
     # Post-processing for each tumor sample...
@@ -557,7 +557,7 @@ the given reference. Output a table of copy number ratios (.cnr).
 
 ::
 
-    cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn Reference.cnn -o Sample.cnr
+    cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn -r Reference.cnn -o Sample.cnr
 
 How it works
 ````````````

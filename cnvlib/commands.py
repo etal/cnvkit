@@ -1062,6 +1062,33 @@ def _cmd_fix(args: argparse.Namespace) -> None:
     Adjust raw coverage data according to the given reference, correct potential
     biases and re-center.
     """
+    # Resolve the reference from -r/--reference (preferred) or the legacy
+    # positional. The positional is deprecated and will be removed in CNVkit 1.0.
+    if args.reference is not None and args.reference_arg is not None:
+        sys.exit(
+            "Specify the reference once: either with -r/--reference or as the "
+            "positional argument, not both.\n(See: cnvkit.py fix -h)"
+        )
+    reference_fname = (
+        args.reference if args.reference is not None else args.reference_arg
+    )
+    if reference_fname is None:
+        sys.exit(
+            "No reference specified. Provide one with -r/--reference, e.g.\n"
+            "    cnvkit.py fix Sample.targetcoverage.cnn -r reference.cnn\n"
+            "(See: cnvkit.py fix -h)"
+        )
+    if args.reference_arg is not None:
+        # DeprecationWarning is silent under CPython's default filters when
+        # raised from a library module, so routine pipeline runs stay quiet; it
+        # surfaces for anyone who opts in (python -W, PYTHONWARNINGS, pytest/CI).
+        warnings.warn(
+            "Passing the reference to `cnvkit.py fix` as a positional argument "
+            "is deprecated and will be removed in CNVkit 1.0; use -r/--reference "
+            "instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     # Verify that target and antitarget are from the same sample
     tgt_raw = read_cna(args.target, sample_id=args.sample_id)
     if args.antitarget is not None:
@@ -1078,7 +1105,7 @@ def _cmd_fix(args: argparse.Namespace) -> None:
     target_table = fix.do_fix(
         tgt_raw,
         anti_raw,
-        read_cna(args.reference),
+        read_cna(reference_fname),
         args.diploid_parx_genome,
         args.do_gc,
         args.do_edge,
@@ -1099,7 +1126,20 @@ P_fix.add_argument(
     help="Antitarget coverage file (.antitargetcoverage.cnn). "
     "Omit for WGS/amplicon samples with no antitarget bins.",
 )
-P_fix.add_argument("reference", help="Reference coverage (.cnn).")
+P_fix.add_argument(
+    "reference_arg",
+    metavar="reference",
+    nargs="?",
+    default=None,
+    help="Reference coverage (.cnn). Deprecated positional form; prefer "
+    "-r/--reference. Will be removed in CNVkit 1.0.",
+)
+P_fix.add_argument(
+    "-r",
+    "--reference",
+    default=None,
+    help="Reference coverage (.cnn). Preferred over the positional form.",
+)
 P_fix.add_argument(
     "-c",
     "--cluster",
