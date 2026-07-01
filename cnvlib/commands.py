@@ -208,6 +208,53 @@ def add_snp_vcf_args(
 # batch -----------------------------------------------------------------------
 
 
+def _resolve_batch_sample_ids(
+    sample_fnames: list[str], normal_fnames: list[str], building_reference: bool
+) -> set[str]:
+    """Validate sample-ID uniqueness; return tumor IDs reusable from the reference.
+
+    A sample ID (``core.fbase`` of the filename) names the per-sample outputs
+    (``{output_dir}/{sample_id}.*``), so two distinct inputs sharing an ID would
+    silently overwrite each other. A repeated ID *within* either the tumor set
+    or the normal set is therefore always an error.
+
+    The same file legitimately appearing in *both* sets is the intentional
+    self-reference workflow (#48): run presumed-normal samples against a
+    reference built from themselves. The reference build then already computed
+    that sample's (anti)target coverage to the very path ``batch_run_sample``
+    would write, so the tumor run can reuse it instead of recomputing. Such IDs
+    are returned for reuse, but only when a reference is being built this run
+    (with ``-r/--reference`` no coverage was precomputed).
+    """
+
+    def first_paths(fnames: list[str]) -> dict[str, str]:
+        seen: dict[str, str] = {}
+        for fname in fnames:
+            sid = core.fbase(fname)
+            if sid in seen:
+                sys.exit(f"Duplicate sample ID {sid!r} (from {fname} and {seen[sid]})")
+            seen[sid] = fname
+        return seen
+
+    tumor_paths = first_paths(sample_fnames)
+    normal_paths = first_paths(normal_fnames)
+
+    reusable: set[str] = set()
+    for sid, tumor_fname in tumor_paths.items():
+        normal_fname = normal_paths.get(sid)
+        if normal_fname is None:
+            continue
+        if os.path.realpath(tumor_fname) != os.path.realpath(normal_fname):
+            sys.exit(
+                f"Duplicate sample ID {sid!r} from different files "
+                f"({tumor_fname} and {normal_fname}); rename one to avoid "
+                "overwriting outputs."
+            )
+        if building_reference:
+            reusable.add(sid)
+    return reusable
+
+
 def _cmd_batch(args: argparse.Namespace) -> None:
     """Run the complete CNVkit pipeline on one or more BAM or bedGraph files."""
     logging.info("CNVkit %s", __version__)
@@ -248,13 +295,13 @@ def _cmd_batch(args: argparse.Namespace) -> None:
     if bad_args_msg:
         sys.exit(bad_args_msg + "\n(See: cnvkit.py batch -h)")
 
-    # Ensure sample IDs are unique to avoid overwriting outputs
-    seen_sids: dict[str, str] = {}
-    for fname in (args.sample_fnames or []) + (args.normal or []):
-        sid = core.fbase(fname)
-        if sid in seen_sids:
-            sys.exit(f"Duplicate sample ID {sid!r} (from {fname} and {seen_sids[sid]})")
-        seen_sids[sid] = fname
+    # Ensure sample IDs are unique to avoid overwriting outputs, allowing the
+    # same file in both the tumor and normal sets (self-reference, #48).
+    reusable_sids = _resolve_batch_sample_ids(
+        args.sample_fnames or [],
+        args.normal or [],
+        building_reference=not args.reference,
+    )
 
     if args.processes < 1:
         args.processes = parallel.available_cpus()
@@ -332,6 +379,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     args.fasta,
                     args.sample_sex,
                     args.bias_smoother,
+                    core.fbase(bam) in reusable_sids,
                 )
                 futures.append((bam, future))
             # Wait for all tasks to complete and raise any exceptions

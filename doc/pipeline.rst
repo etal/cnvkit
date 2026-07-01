@@ -40,10 +40,25 @@ Run the CNVkit pipeline on one or more BAM files::
         -t my_targets.bed -a my_antitargets.bed \
         -f hg38.fasta -g data/access-10kb.hg38.bed
 
+    # Self-reference QC: build a pooled reference from the normals and analyze
+    # each of them against it, computing each sample's coverage only once
+    cnvkit.py batch *Normal.bam --normal *Normal.bam \
+        --targets my_targets.bed -f hg38.fasta -g data/access-10kb.hg38.bed \
+        --output-reference normals_reference.cnn --output-dir qc/
+
 With the ``-p`` option, process each of the BAM files in parallel, as separate
 subprocesses. The status messages logged to the console will be somewhat
 disorderly, but the pipeline will take advantage of multiple CPU cores to
 complete sooner.
+
+A BAM file may appear in both the tumor/test set and the ``--normal`` set. This
+supports a self-reference quality-control workflow, in which presumed-normal
+samples are analyzed against a pooled reference built from themselves to identify
+noisy or aberrant samples. When a sample is supplied in both roles, its target
+and antitarget coverage are computed once, during reference construction, and
+reused for the per-sample analysis rather than recomputed. Supplying two distinct
+files that share a sample name (the filename without its extension) remains an
+error, since their per-sample outputs would overwrite each other.
 
 ::
 
