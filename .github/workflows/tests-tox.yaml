@@ -21,8 +21,7 @@ jobs:
       matrix:
         include:
           - {name: '3.14', python: '3.14', os: ubuntu-latest, tox: py314}
-          - {name: '3.13', python: '3.13', os: ubuntu-latest, tox: py313}
-          - {name: '3.12', python: '3.12', os: ubuntu-latest, tox: py312}
+          - {name: '3.14-MacOS', python: '3.14', os: macos-latest, tox: py314}
           - {name: '3.12-MacOS', python: '3.12', os: macos-latest, tox: py312}
           - {name: '3.11', python: '3.11', os: ubuntu-latest, tox: py311}
           - {name: '3.11-min', python: '3.11', os: ubuntu-latest, tox: "py311-min"}
