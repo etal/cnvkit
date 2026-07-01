@@ -8,6 +8,7 @@ import numpy as np
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy import stats
 
+import cnvlib
 from cnvlib.segmentation.haar import (
     SIGMA_FLOOR,
     FDRThres,
@@ -17,6 +18,7 @@ from cnvlib.segmentation.haar import (
     SegmentByPeaks,
     _baf_signal_and_sigma,
     haarSeg,
+    segment_haar,
 )
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
@@ -64,7 +66,7 @@ class FDRThresTests(unittest.TestCase):
         self.assertGreaterEqual(T2, T1)
 
     def test_fdr_thres_zero_stdev(self):
-        """stdev=0 must not yield NaN p-values; all peaks are admitted (scq.2).
+        """stdev=0 must not yield NaN p-values; all peaks are admitted.
 
         norm.cdf(scale=0) returns NaN, which previously made every p-value NaN
         and silently dropped real breakpoints.
@@ -74,7 +76,7 @@ class FDRThresTests(unittest.TestCase):
         self.assertEqual(T, 0.0)
 
     def test_fdr_thres_rejects_all_when_none_significant(self):
-        """When no peak is significant, T strictly exceeds max|x| (scq.2).
+        """When no peak is significant, T strictly exceeds max|x|.
 
         The old fallback `x_sorted[0] + 1e-16` is a no-op near magnitude 1.0
         (1e-16 < ULP), so the largest peak slipped through `>=`.
@@ -219,7 +221,7 @@ class HaarSegIntegrationTests(unittest.TestCase):
 
         Here median(|level-1 Haar coef|) == 0 so peakSigmaEst was 0, which made
         FDR p-values NaN and silently dropped the small -2 -> -2.3 step,
-        yielding 2 segments instead of 3 (scq.2). Real noisy data is unaffected
+        yielding 2 segments instead of 3. Real noisy data is unaffected
         (noise keeps peakSigmaEst > 0).
         """
         signal = np.concatenate([np.zeros(30), np.full(30, -2.0), np.full(30, -2.3)])
@@ -234,7 +236,7 @@ class HaarSegIntegrationTests(unittest.TestCase):
 
 
 class HaarBafTests(unittest.TestCase):
-    """Tests for the depth+BAF breakpoint-union building blocks (cnvkit-ugh)."""
+    """Tests for the depth+BAF breakpoint-union building blocks."""
 
     def test_baf_signal_and_sigma_observed_only(self):
         # Noisy observed bins -> the bin-to-bin variation gives a real MAD
@@ -282,11 +284,69 @@ class HaarBafTests(unittest.TestCase):
         self.assertEqual(len(huge["start"]), 1)  # reject-all -> one segment
 
 
+class HaarNoiseFloorTests(unittest.TestCase):
+    """HaarSeg must see the true per-bin noise, not a pre-smoothed signal.
+
+    HaarSeg is itself a denoising segmenter: its FDR step assumes the finest-
+    scale (level-1) MAD reflects real per-bin measurement noise. Feeding it a
+    Savitzky-Golay-smoothed signal deflates that noise floor (~8x on this
+    fixture), collapsing the FDR threshold so nearly every coarse-scale wiggle
+    passes -- the sample is fragmented into ~7-bin pieces and the fdr_q knob
+    stops controlling sensitivity. These tests pin the fix: haar
+    segments the raw log2, matching stock upstream HaarSeg and CNVkit's own
+    pre-2019 behavior.
+
+    Fixture: test/formats/regression/p2-9_2.cnr, the deterministic 18759-bin
+    targeted sample already frozen by the #1039 regression test.
+    """
+
+    FIXTURE = "formats/regression/p2-9_2.cnr"
+
+    def _n_segments(self, fdr_q):
+        cnarr = cnvlib.read(self.FIXTURE)
+        return len(segment_haar(cnarr, fdr_q))
+
+    def test_not_grossly_over_segmented(self):
+        """Default-q haar averages many bins per segment, not ~7.
+
+        Smoothed-input haar produced ~2000 segments (8.5 bins/seg); raw-input
+        haar produces a few hundred (>=15 bins/seg). Assert the average segment
+        spans at least 15 bins so the ~7-bin fragmentation cannot return.
+        """
+        cnarr = cnvlib.read(self.FIXTURE)
+        n_bins = len(cnarr)
+        n_segs = len(segment_haar(cnarr, 1e-4))
+        self.assertLessEqual(
+            n_segs,
+            n_bins / 15,
+            f"haar over-segmented: {n_segs} segments over {n_bins} bins "
+            f"({n_bins / n_segs:.1f} bins/seg); expected >=15 bins/seg.",
+        )
+
+    def test_fdr_q_controls_sensitivity(self):
+        """Tightening fdr_q must substantially reduce the segment count.
+
+        With a deflated noise floor every real peak is astronomically
+        significant, so the FDR procedure admits them all regardless of q and
+        the count barely moves (a 10-order-of-magnitude q sweep changed it by
+        ~30%). On the raw signal, tightening q from 1e-2 to 1e-8 more than
+        halves the count.
+        """
+        n_loose = self._n_segments(1e-2)
+        n_tight = self._n_segments(1e-8)
+        self.assertLess(
+            n_tight,
+            0.5 * n_loose,
+            f"fdr_q barely controls segmentation: q=1e-2 -> {n_loose}, "
+            f"q=1e-8 -> {n_tight} (expected tight-q count < half of loose-q).",
+        )
+
+
 class SegmentByPeaksTests(unittest.TestCase):
     """Tests for weighted segment-mean computation."""
 
     def test_segment_by_peaks_nan_weight_single_segment(self):
-        """A NaN weight is excluded, not treated as 'no valid weights' (scq.3)."""
+        """A NaN weight is excluded, not treated as 'no valid weights'."""
         data = np.array([1.0, 3.0])
         weights = np.array([1.0, np.nan])
         out = SegmentByPeaks(data, np.array([], dtype=int), weights)
@@ -295,7 +355,7 @@ class SegmentByPeaksTests(unittest.TestCase):
         assert_allclose(out, [1.0, 1.0])
 
     def test_segment_by_peaks_nan_weight_per_segment(self):
-        """Per-segment weighted means also exclude NaN weights (scq.3)."""
+        """Per-segment weighted means also exclude NaN weights."""
         data = np.array([1.0, 3.0, 10.0, 10.0])
         weights = np.array([1.0, np.nan, 1.0, 1.0])
         out = SegmentByPeaks(data, np.array([2]), weights)
