@@ -17,7 +17,7 @@ Pull the image from `Docker Hub <https://hub.docker.com/r/etal/cnvkit/>`_::
     docker pull etal/cnvkit:devel
 
     # A specific version
-    docker pull etal/cnvkit:0.9.13
+    docker pull etal/cnvkit:0.9.14
 
 Run CNVkit commands with your data mounted into the container::
 
@@ -107,13 +107,13 @@ CNVkit Docker images use the following tags:
 - ``latest`` -- the most recent stable release (built from git tags)
 - ``devel`` -- the development version (built from the ``master`` branch on
   each commit)
-- ``X.Y.Z`` -- a specific release (e.g. ``0.9.13``)
+- ``X.Y.Z`` -- a specific release (e.g. ``0.9.14``)
 - ``X.Y`` -- the latest patch for a minor version (e.g. ``0.9`` resolves to
-  ``0.9.13``)
+  ``0.9.14``)
 
 For reproducible analyses, pin a specific version tag rather than ``latest``::
 
-    docker pull etal/cnvkit:0.9.13
+    docker pull etal/cnvkit:0.9.14
 
 
 Image contents

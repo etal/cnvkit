@@ -20,10 +20,6 @@ LABEL org.opencontainers.image.title="CNVkit" \
 # Build argument for CNVkit version (passed from GHA or make)
 ARG CNVKIT_VERSION
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
 # Install CNVkit and dependencies via conda
 # This ensures R and DNAcopy are properly configured
 COPY conda-env.yml /tmp/conda-env.yml
