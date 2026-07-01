@@ -56,7 +56,9 @@ doc/
 
 # Development
 play/
-scripts/
+# scripts/ is intentionally NOT ignored: the Dockerfile does
+# `COPY scripts/* /opt/conda/bin` (snpfilter.sh), and BuildKit fails the build
+# if the COPY source is excluded from the build context.
 wdl/
 devtools/
 _notes.txt

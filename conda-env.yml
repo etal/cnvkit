@@ -17,7 +17,12 @@ dependencies:
     - matplotlib >=3.9.0
     - numpy >=2.2.3
     - pandas >=2.2.3
-    - pomegranate >=1.0.0
+    # NOTE: pomegranate (for HMM segmentation) is intentionally NOT installed
+    # via conda here. The conda-forge libtorch build pulled in as its
+    # dependency ships libtorch_cpu.so with an executable stack and a
+    # protobuf/abseil ABI mismatch, breaking `import torch` (GH #1003). It is
+    # instead installed from PyPI (a self-contained manylinux wheel) via
+    # cnvkit's own dependency on `pomegranate>=1.0.0` at `pip install` time.
     - pyparsing >=3.1.2,<3.3.0
     - pyfaidx >=0.8.1.3
     - pysam >=0.23.0

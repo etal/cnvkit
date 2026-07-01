@@ -1,0 +1,84 @@
+name: Backport Docker Image
+
+# Rebuilds and republishes the Docker image for an already-released maintenance
+# line (e.g. 0.9.13) from a maint/* branch. Used to ship image-only fixes when
+# the cnvkit code is unchanged but its container environment needs a patch
+# (GH #1003: broken conda-forge libtorch). Publishes ONLY the exact X.Y.Z tag --
+# it deliberately never moves `latest` or the `major.minor` tag, so backporting
+# an older line cannot clobber a newer release's tags.
+
+on:
+  push:
+    branches:
+      # Pinned to this exact maint line: VERSION below is hardcoded to 0.9.13,
+      # so this file must only ever republish the 0.9.13 image. A future
+      # maintenance line gets its own maint/<ver> branch carrying its own copy
+      # of this workflow with a matching VERSION (never a wildcard, so a push to
+      # one maint branch can't republish another line's public tag).
+      - 'maint/0.9.13'
+    paths:
+      - 'Dockerfile'
+      - 'conda-env.yml'
+      - 'scripts/**'
+      - '.github/workflows/docker-backport.yml'
+  workflow_dispatch:
+
+env:
+  DOCKER_IMAGE: etal/cnvkit
+  # The released version this maint line republishes. cnvkit==$VERSION is
+  # installed from PyPI; the image is tagged with exactly this and nothing else.
+  VERSION: '0.9.13'
+
+jobs:
+  backport-build:
+    name: Build, smoke-test, and push 0.9.13 image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout maint branch
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build image (amd64) and load locally
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: |
+            CNVKIT_VERSION=${{ env.VERSION }}
+          tags: ${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}
+          load: true
+          push: false
+
+      - name: Smoke test - torch/pomegranate import (the GH #1003 failure)
+        run: |
+          docker run --rm ${{ env.DOCKER_IMAGE }}:${{ env.VERSION }} python -c "
+          import torch, pomegranate, cnvlib
+          print('torch', torch.__version__)
+          print('pomegranate OK')
+          print('cnvkit', cnvlib.__version__)"
+
+      - name: Smoke test - end-to-end HMM segmentation
+        run: |
+          docker run --rm -v "$PWD/test/formats:/data:ro" \
+            ${{ env.DOCKER_IMAGE }}:${{ env.VERSION }} \
+            bash -c 'set -e
+              cnvkit.py segment -m hmm /data/wgs-chr17.cnr -o /tmp/out.cns
+              n=$(( $(wc -l < /tmp/out.cns) - 1 ))
+              echo "HMM produced $n segments"
+              test "$n" -ge 1'
+
+      - name: Push image (only after smoke tests pass)
+        run: docker push ${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}
+
+      - name: Report published digest
+        run: docker buildx imagetools inspect ${{ env.DOCKER_IMAGE }}:${{ env.VERSION }} || true
