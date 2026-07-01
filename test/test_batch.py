@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import unittest
 import warnings
+from unittest import mock
 
 import pytest
 
@@ -401,6 +402,203 @@ class BatchTests(unittest.TestCase):
                 "--bias-smoother loess` reaches center_by_window during "
                 "reference construction (#1028).",
             )
+
+    # -- batch coverage-dedup / self-reference (#48) --
+
+    def test_resolve_batch_sample_ids_self_reference_building(self):
+        """Self-reference returns the shared ID as reusable when building a
+        reference (#48).
+
+        The same file in both the tumor and normal sets is the intentional
+        self-reference workflow; its coverage is computed during the reference
+        build and must be flagged for reuse on the tumor pass. Compared via
+        ``os.path.realpath``, so two spellings of one file still match.
+        """
+        reusable = commands._resolve_batch_sample_ids(
+            ["d/s1.bam"], ["./d/s1.bam"], building_reference=True
+        )
+        self.assertEqual(reusable, {"s1"})
+
+    def test_resolve_batch_sample_ids_self_reference_existing_reference(self):
+        """Self-reference yields no reusable IDs when a reference is supplied
+        rather than built (#48).
+
+        With ``-r/--reference`` nothing was precomputed this run, so even the
+        legitimately-shared sample has no coverage to reuse; the set is empty.
+        """
+        reusable = commands._resolve_batch_sample_ids(
+            ["d/s1.bam"], ["d/s1.bam"], building_reference=False
+        )
+        self.assertEqual(reusable, set())
+
+    def test_resolve_batch_sample_ids_duplicate_within_set(self):
+        """A repeated sample ID within one set (distinct paths, same basename)
+        is always fatal (#48).
+
+        Two inputs sharing an ID would overwrite each other's
+        ``{output_dir}/{id}.*`` outputs, so this must abort regardless of the
+        self-reference allowance.
+        """
+        with self.assertRaises(SystemExit):
+            commands._resolve_batch_sample_ids(
+                ["a/s1.bam", "b/s1.bam"], [], building_reference=True
+            )
+
+    def test_resolve_batch_sample_ids_same_id_different_paths(self):
+        """Same basename from different real paths across the two sets is fatal
+        (#48).
+
+        The self-reference allowance covers only the *same file* in both sets;
+        distinct files colliding on ID would overwrite outputs, so this aborts.
+        """
+        with self.assertRaises(SystemExit):
+            commands._resolve_batch_sample_ids(
+                ["tumor/s1.bam"], ["normal/s1.bam"], building_reference=True
+            )
+
+    def test_resolve_batch_sample_ids_no_overlap(self):
+        """Disjoint tumor/normal ID sets are valid and reuse nothing (#48)."""
+        reusable = commands._resolve_batch_sample_ids(
+            ["t1.bam", "t2.bam"], ["n1.bam", "n2.bam"], building_reference=True
+        )
+        self.assertEqual(reusable, set())
+
+    def test_batch_run_sample_reuse_coverage_guarded_read(self):
+        """``batch_run_sample`` must read existing coverage via ``read_cna``
+        under a branch gated by ``reuse_coverage`` (#48).
+
+        AST-level guard so source rearrangements still catch a regression that
+        drops the reuse branch (or the parameter) without needing a BAM fixture
+        per case, mirroring the bias_smoother/do_call plumbing guards above.
+        """
+        self.assertIn(
+            "reuse_coverage",
+            inspect.signature(batch.batch_run_sample).parameters,
+            "batch_run_sample must expose a reuse_coverage parameter (#48).",
+        )
+        src = inspect.getsource(batch.batch_run_sample)
+        tree = ast.parse(src)
+        guarded_reads = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.If):
+                continue
+            names_in_test = {
+                n.id for n in ast.walk(node.test) if isinstance(n, ast.Name)
+            }
+            if "reuse_coverage" not in names_in_test:
+                continue
+            guarded_reads.extend(
+                body_node
+                for body_node in ast.walk(node)
+                if isinstance(body_node, ast.Call)
+                and isinstance(body_node.func, ast.Name)
+                and body_node.func.id == "read_cna"
+            )
+        self.assertGreater(
+            len(guarded_reads),
+            0,
+            "batch_run_sample must read existing coverage via read_cna under a "
+            "branch guarded by reuse_coverage so the self-reference pass skips "
+            "recomputation (#48).",
+        )
+
+    def test_batch_run_sample_reuse_coverage_end_to_end(self):
+        """End-to-end self-reference: the shared sample's coverage is computed
+        once (during the reference build) and reused on the tumor pass (#48).
+
+        Drives the direct API with haar (pure-Python) segmentation. The
+        deterministic dedup signal is the number of ``coverage.do_coverage``
+        calls -- 0 on the reuse pass vs 2 (target + antitarget) without reuse --
+        rather than bit-exact .cnr equality, which is unsafe because the reuse
+        path reads coverage round-tripped through tabio's ``%.6g`` writer while
+        a fresh run uses full-precision in-memory values.
+        """
+        target_bed = "formats/my-targets.bed"
+        fasta = "formats/chrM-Y-trunc.hg19.fa"
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        sample_id = core.fbase(bam)
+        outdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outdir, ignore_errors=True)
+
+        # Build a hybrid-capture reference from the sample itself; this writes
+        # {outdir}/{sample_id}.{target,antitarget}coverage.cnn.
+        ref_fname, tgt_bed_fname, anti_bed_fname = batch.batch_make_reference(
+            [bam],
+            target_bed,
+            None,
+            True,
+            None,
+            fasta,
+            None,
+            True,
+            10,
+            None,
+            1000,
+            100,
+            None,
+            outdir,
+            1,
+            False,
+            0,
+            "hybrid",
+            False,
+        )
+        self.assertTrue(os.path.isfile(ref_fname))
+        self.assertTrue(
+            os.path.isfile(os.path.join(outdir, sample_id + ".targetcoverage.cnn"))
+        )
+
+        def run(reuse):
+            with mock.patch.object(
+                batch.coverage,
+                "do_coverage",
+                wraps=batch.coverage.do_coverage,
+            ) as spy:
+                batch.batch_run_sample(
+                    bam,
+                    tgt_bed_fname,
+                    anti_bed_fname,
+                    ref_fname,
+                    outdir,
+                    True,
+                    None,
+                    False,
+                    False,
+                    "Rscript",
+                    False,
+                    0,
+                    False,
+                    "hybrid",
+                    "haar",
+                    1,
+                    False,
+                    fasta=fasta,
+                    reuse_coverage=reuse,
+                )
+            return spy.call_count
+
+        # Control first: the default path recomputes both (anti)target coverage,
+        # proving the spy has teeth and reuse is what suppresses the calls.
+        self.assertEqual(
+            run(reuse=False),
+            2,
+            "reuse_coverage=False must recompute target + antitarget coverage.",
+        )
+        # Self-reference tumor pass with reuse: coverage is read back, never
+        # recomputed. Runs last so the output assertions below defend the reuse
+        # path's products.
+        self.assertEqual(
+            run(reuse=True),
+            0,
+            "reuse_coverage=True must skip do_coverage for the shared sample "
+            "whose coverage the reference build already wrote (#48).",
+        )
+
+        # Outputs from the reuse pass exist and are non-empty.
+        cnr = cnvlib.read(os.path.join(outdir, sample_id + ".cnr"))
+        self.assertGreater(len(cnr), 0)
+        call_cns = cnvlib.read(os.path.join(outdir, sample_id + ".call.cns"))
+        self.assertGreater(len(call_cns), 0)
 
     @pytest.mark.slow
     def test_diploid_parx_genome(self):

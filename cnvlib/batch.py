@@ -460,6 +460,7 @@ def batch_run_sample(
     fasta: str | None = None,
     sample_sex: str | None = None,
     bias_smoother: str = "median",
+    reuse_coverage: bool = False,
 ) -> None:
     """Run the pipeline on one sample (BAM or bedGraph file).
 
@@ -467,21 +468,33 @@ def batch_run_sample(
     coverage and is passed through to copy-number calling and (if enabled)
     diagram plotting; it accepts the same strings as ``--sample-sex`` on
     the ``call`` / ``diagram`` / ``genemetrics`` subcommands.
+
+    ``reuse_coverage`` indicates this sample's (anti)target coverage was already
+    computed and written to ``{output_dir}/{sample_id}.*coverage.cnn`` earlier in
+    the same run (the self-reference workflow where the sample is also a normal,
+    #48); when True the existing files are read back instead of recomputed.
     """
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", sample_fname)
     sample_id = core.fbase(sample_fname)
     sample_pfx = os.path.join(output_dir, sample_id)
 
-    raw_tgt = coverage.do_coverage(
-        target_bed, sample_fname, by_count, min_mapq, processes, fasta
-    )
-    tabio.write(raw_tgt, sample_pfx + ".targetcoverage.cnn")
+    tgt_cnn = sample_pfx + ".targetcoverage.cnn"
+    anti_cnn = sample_pfx + ".antitargetcoverage.cnn"
+    if reuse_coverage and os.path.isfile(tgt_cnn) and os.path.isfile(anti_cnn):
+        logging.info("Reusing existing coverage for %s", sample_fname)
+        raw_tgt = read_cna(tgt_cnn)
+        raw_anti = read_cna(anti_cnn)
+    else:
+        raw_tgt = coverage.do_coverage(
+            target_bed, sample_fname, by_count, min_mapq, processes, fasta
+        )
+        tabio.write(raw_tgt, tgt_cnn)
 
-    raw_anti = coverage.do_coverage(
-        antitarget_bed, sample_fname, by_count, min_mapq, processes, fasta
-    )
-    tabio.write(raw_anti, sample_pfx + ".antitargetcoverage.cnn")
+        raw_anti = coverage.do_coverage(
+            antitarget_bed, sample_fname, by_count, min_mapq, processes, fasta
+        )
+        tabio.write(raw_anti, anti_cnn)
 
     cnarr = fix.do_fix(
         raw_tgt,
