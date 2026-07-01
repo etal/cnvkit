@@ -11,17 +11,18 @@ Two approaches available:
   apparently captured region.
 
 Use multiple BAMs for greater robustness in detecting targeted regions, as a
-single sample may have poor coverage are some targets by chance.
+single sample may have poor coverage at some targets by chance.
 Still, this script does not guarantee correctly detecting all targets.
 
 See also: https://github.com/brentp/goleft
 """
 
 import argparse
-import collections
 import logging
 import subprocess
 import sys
+from collections.abc import Iterable, Iterator
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -34,7 +35,16 @@ from ..coverage import do_coverage
 from ..descriptives import modal_location
 
 
-def argument_parsing():
+class Region(NamedTuple):
+    """A captured genomic interval, 0-indexed half-open, with mean depth."""
+
+    chromosome: str
+    start: int
+    end: int
+    depth: float
+
+
+def argument_parsing() -> argparse.Namespace:
     AP = argparse.ArgumentParser(description=__doc__)
     AP.add_argument(
         "sample_bams",
@@ -72,6 +82,16 @@ def argument_parsing():
         metavar="FILENAME",
         help="Reference genome, FASTA format (e.g. UCSC hg19.fa)",
     )
+    AP.add_argument(
+        "-d",
+        "--min-depth",
+        metavar="DEPTH",
+        type=int,
+        default=5,
+        help="""Minimum sequencing read depth to accept as captured. With
+                    --access, half this depth is used for the initial scan.
+                    [Default: %(default)s]""",
+    )
 
     AP_x = AP.add_mutually_exclusive_group(required=True)
     AP_x.add_argument(
@@ -87,22 +107,10 @@ def argument_parsing():
         "-a",
         "--access",
         metavar="ACCESS_BED",
-        # default="../data/access-5k-mappable.grch37.bed",
         help="""Sequencing-accessible genomic regions (e.g. from
                     'cnvkit.py access'), or known genic regions in the reference
                     genome, in BED format. All bases will be tested for
                     enrichment. (Slower method)""",
-    )
-
-    AP_target = AP.add_argument_group("With --targets only")
-    AP_target.add_argument(
-        "-d",
-        "--min-depth",
-        metavar="DEPTH",
-        type=int,
-        default=5,
-        help="""Minimum sequencing read depth to accept as captured.
-                    [Default: %(default)s]""",
     )
 
     AP_access = AP.add_argument_group("With --access only")
@@ -132,7 +140,9 @@ def argument_parsing():
 # Guided method: guess from potential targets
 
 
-def filter_targets(target_bed, sample_bams, procs, fasta):
+def filter_targets(
+    target_bed: str, sample_bams: list[str], procs: int, fasta: str | None
+) -> GA:
     """Check if each potential target has significant coverage."""
     try:
         baits = tabio.read(target_bed, "bed4")
@@ -144,7 +154,11 @@ def filter_targets(target_bed, sample_bams, procs, fasta):
     for bam_fname in sample_bams:
         logging.info("Evaluating targets in %s", bam_fname)
         sample = do_coverage(target_bed, bam_fname, processes=procs, fasta=fasta)
-        assert len(sample) == len(baits), "%d != %d" % (len(sample), len(baits))
+        if len(sample) != len(baits):
+            raise ValueError(
+                f"Coverage returned {len(sample)} rows for {len(baits)} candidate "
+                f"regions in {bam_fname}"
+            )
         total_depths += sample["depth"].to_numpy()
     baits["depth"] = total_depths / len(sample_bams)
     logging.info("Average candidate-target depth:\n%s", baits["depth"].describe())
@@ -155,7 +169,14 @@ def filter_targets(target_bed, sample_bams, procs, fasta):
 # Unguided method: guess from raw depths
 
 
-def scan_targets(access_bed, sample_bams, min_depth, min_gap, min_length, procs):
+def scan_targets(
+    access_bed: str,
+    sample_bams: list[str],
+    min_depth: float,
+    min_gap: int,
+    min_length: int,
+    procs: int,
+) -> GA:
     """Estimate baited regions from a genome-wide, per-base depth profile."""
     bait_chunks = []
     # ENH: context manager to call rm on bed chunks? with to_chunks as pool, ck?
@@ -173,8 +194,8 @@ def scan_targets(access_bed, sample_bams, min_depth, min_gap, min_length, procs)
     return baits
 
 
-def _scan_depth(args):
-    """Wrapper for parallel map"""
+def _scan_depth(args) -> tuple[str, pd.DataFrame]:
+    """Wrapper for parallel map."""
     bed_fname, bam_fnames, min_depth, min_gap, min_length = args
     regions = list(
         drop_small(
@@ -182,98 +203,130 @@ def _scan_depth(args):
             min_length,
         )
     )
-    result = pd.DataFrame.from_records(list(regions), columns=regions[0]._fields)
+    result = pd.DataFrame.from_records(regions, columns=Region._fields)
+    if result.empty:
+        # from_records infers object dtype for an empty frame, which would
+        # down-cast every column to object in the scan_targets concat (most
+        # genome-wide chunks are empty). Pin Region's dtypes so the numeric
+        # columns survive and the --coverage log2 path stays valid.
+        result = result.astype(
+            {"chromosome": str, "start": int, "end": int, "depth": float}
+        )
     return bed_fname, result
 
 
-def scan_depth(bed_fname, bam_fnames, min_depth):
+def scan_depth(
+    bed_fname: str, bam_fnames: list[str], min_depth: float
+) -> Iterator[Region]:
     """Locate sub-regions with enriched read depth in the given regions.
+
+    Runs ``samtools depth`` over the BED regions and emits maximal runs of
+    consecutive bases whose depth is at least ``min_depth``. A run is broken by
+    a sub-threshold base, a chromosome change, or a gap in the reported
+    positions: ``samtools depth`` omits bases with no confidently-mapped
+    coverage -- uncaptured sequence, or the multi-mappers ``-Q 1`` drops (e.g.
+    pseudogenes) -- which do not belong in the inferred panel. Each run is
+    trimmed to the span where depth is at least half its peak.
+
+    With multiple BAMs the per-base depths are summed across samples and
+    ``min_depth`` is scaled by the number of samples.
 
     Yields
     ------
-    tuple
-        Region coordinates (0-indexed, half-open): chromosome name, start, end
+    Region
+        A ``Region(chromosome, start, end, depth)`` namedtuple; coordinates are
+        0-indexed half-open and ``depth`` is the mean over the trimmed span.
     """
-    Region = collections.namedtuple("Region", "chromosome start end depth")
+    # NB: samtools emits additional BAMs' depths as trailing columns
+    min_depth *= len(bam_fnames)
 
-    nsamples = len(bam_fnames)
-    if nsamples == 1:
-
-        def get_depth(depths):
-            return int(depths[0])
-    else:
-        min_depth *= nsamples
-
-        # NB: samtools emits additional BAMs' depths as trailing columns
-        def get_depth(depths):
-            return sum(map(int, depths))
-
-    proc = subprocess.Popen(
+    with subprocess.Popen(
         [
             "samtools",
             "depth",
             "-Q",
-            "1",  # Skip pseudogenes
+            "1",  # Drop MAPQ-0 multi-mappers, keeping pseudogenes out of the panel
             "-b",
             bed_fname,
             *bam_fnames,
         ],
         stdout=subprocess.PIPE,
-        shell=False,
+        text=True,
+    ) as proc:
+        # Detect runs of >= min_depth over consecutive positions; emit them
+        chrom = ""
+        start = 0
+        prev_pos = 0
+        depths: list[int] = []
+        for line in proc.stdout:  # type: ignore[union-attr]
+            fields = line.split("\t")
+            pos = int(fields[1])
+            depth = sum(map(int, fields[2:]))
+            enriched = depth >= min_depth
+            contiguous = fields[0] == chrom and pos == prev_pos + 1
+            if depths and not (enriched and contiguous):
+                # The current run ends at the previous base
+                yield _make_region(chrom, start, depths)
+                depths = []
+            if enriched:
+                if not depths:
+                    # Open a new run
+                    chrom = fields[0]
+                    start = pos - 1
+                depths.append(depth)
+                prev_pos = pos
+        # Flush the final run at end of stream
+        if depths:
+            yield _make_region(chrom, start, depths)
+
+    if proc.returncode:
+        raise RuntimeError(
+            f"samtools depth failed (exit {proc.returncode}) scanning {bed_fname}"
+        )
+
+
+def _make_region(chrom: str, start: int, depths: list[int]) -> Region:
+    """Trim a contiguous depth run to its >= half-peak span and average it."""
+    darr = np.array(depths)
+    half_depth = 0.5 * darr.max()
+    ok_dp_idx = np.nonzero(darr >= half_depth)[0]
+    start_idx = int(ok_dp_idx[0])
+    end_idx = int(ok_dp_idx[-1]) + 1
+    return Region(
+        chrom,
+        start + start_idx,
+        start + end_idx,
+        float(darr[start_idx:end_idx].mean()),
     )
 
-    # Detect runs of >= min_depth; emit their coordinates
-    chrom = start = depths = None
-    for line in proc.stdout:  # type: ignore[union-attr]
-        fields = line.split(b"\t")
-        depth = get_depth(fields[2:])
-        is_enriched = depth >= min_depth
-        if start is None:
-            if is_enriched:
-                # Entering a new captured region
-                chrom = fields[0]
-                start = int(fields[1]) - 1
-                depths = [depth]
-            else:
-                # Still not in a captured region
-                continue
-        elif is_enriched and fields[0] == chrom:
-            # Still in a captured region -- extend it
-            depths.append(depth)  # type: ignore[union-attr]
-        else:
-            # Exiting a captured region
-            # Update target region boundaries
-            darr = np.array(depths)
-            half_depth = 0.5 * darr.max()
-            ok_dp_idx = np.nonzero(darr >= half_depth)[0]
-            start_idx = ok_dp_idx[0]
-            end_idx = ok_dp_idx[-1] + 1
-            yield Region(
-                chrom,
-                start + start_idx,
-                start + end_idx,
-                darr[start_idx:end_idx].mean(),
-            )
-            chrom = start = depths = None
 
-
-def merge_gaps(regions, min_gap):
-    """Merge regions across small gaps."""
-    prev = next(regions)
+def merge_gaps(regions: Iterable[Region], min_gap: int) -> Iterator[Region]:
+    """Merge same-chromosome regions separated by gaps smaller than min_gap."""
+    group: list[Region] = []
     for reg in regions:
-        if reg.start - prev.end < min_gap:
-            # Merge
-            prev = prev._replace(end=reg.end)
-        else:
-            # Done merging; move on
-            yield prev
-            prev = reg
-    # Residual
-    yield prev
+        if group and (
+            reg.chromosome != group[-1].chromosome
+            or not 0 <= reg.start - group[-1].end < min_gap
+        ):
+            yield _merge_group(group)
+            group = []
+        group.append(reg)
+    if group:
+        yield _merge_group(group)
 
 
-def drop_small(regions, min_length):
-    """Merge small gaps and filter by minimum length."""
+def _merge_group(group: list[Region]) -> Region:
+    """Combine merged sub-regions; depth is their length-weighted mean."""
+    if len(group) == 1:
+        return group[0]
+    first, last = group[0], group[-1]
+    total_len = sum(reg.end - reg.start for reg in group)
+    weighted_depth = sum(reg.depth * (reg.end - reg.start) for reg in group) / total_len
+    return Region(first.chromosome, first.start, last.end, weighted_depth)
+
+
+def drop_small(regions: Iterable[Region], min_length: int) -> Iterator[Region]:
+    """Filter regions by minimum length."""
     return (reg for reg in regions if reg.end - reg.start >= min_length)
 
 
@@ -281,7 +334,9 @@ def drop_small(regions, min_length):
 # Shared
 
 
-def normalize_depth_log2_filter(baits, min_depth, enrich_ratio=0.1):
+def normalize_depth_log2_filter(
+    baits: GA, min_depth: float, enrich_ratio: float = 0.1
+) -> GA:
     """Calculate normalized depth, add log2 column, filter by enrich_ratio."""
     # Normalize depths to a neutral value of 1.0
     dp_mode = modal_location(baits.data.loc[baits["depth"] > min_depth, "depth"].values)
@@ -299,10 +354,8 @@ def normalize_depth_log2_filter(baits, min_depth, enrich_ratio=0.1):
 
 
 def guess_baits(args) -> None:
-    # ENH: can we reserve multiple cores for htslib?
-    if args.processes < 1:
-        args.processes = None
-
+    # Argparse yields 0 for "-p" with no argument; pick_pool reads <1 as
+    # "use all available CPUs", so pass the process count through unchanged.
     if args.targets:
         baits = filter_targets(
             args.targets, args.sample_bams, args.processes, args.fasta
