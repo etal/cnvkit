@@ -54,7 +54,7 @@ class VariantArray(GenomicArray):
             logging.warning("VCF has no allele frequencies for BAF calculation")
             # Length must match `ranges` (one value per bin), like the normal
             # into_ranges path -- not the variant rows (self.data.index), which
-            # made a shorter/longer Series and crashed callers. (cnvkit-ugh)
+            # made a shorter/longer Series and crashed callers.
             return pd.Series(np.repeat(np.nan, len(ranges)))
 
         def summarize(vals):

@@ -94,9 +94,9 @@ class SegmentationTests(unittest.TestCase):
         )
         self.assertGreater(len(segments), n_chroms)
         self.assertTrue((segments.start < segments.end).all())
-        # haar segmentation with variants unions depth+BAF breakpoints
-        # (cnvkit-ugh); see test_haar_vcf_detects_copy_neutral_loh for the LOH
-        # behavior. Here just confirm it runs and yields valid segments.
+        # haar segmentation with variants unions depth+BAF breakpoints;
+        # see test_haar_vcf_detects_copy_neutral_loh for the LOH behavior.
+        # Here just confirm it runs and yields valid segments.
         varr = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
         segments = segmentation.do_segmentation(cnarr, "haar", variants=varr)
         self.assertGreater(len(segments), n_chroms)
@@ -183,7 +183,7 @@ class SegmentationTests(unittest.TestCase):
         self.assertEqual(rstr, "")
 
     def test_threshold_zero_not_overridden(self):
-        """threshold=0.0 is honored, not treated as 'unset' (scq.4).
+        """threshold=0.0 is honored, not treated as 'unset'.
 
         'if not threshold' replaced the valid value 0.0 with the method default;
         'if threshold is None' keeps it.
@@ -197,7 +197,7 @@ class SegmentationTests(unittest.TestCase):
 
     def test_haar_vcf_detects_copy_neutral_loh(self):
         """`-m haar --vcf` unions depth+BAF breakpoints -> catches copy-neutral
-        LOH (flat depth, BAF shift), and adds a 'baf' column (cnvkit-ugh)."""
+        LOH (flat depth, BAF shift), and adds a 'baf' column."""
         n = 120
         rng = np.random.default_rng(0)
         cnarr = cnary.CopyNumArray(
@@ -244,7 +244,7 @@ class SegmentationTests(unittest.TestCase):
 
     def test_haar_vcf_without_allele_info_falls_back(self):
         """`-m haar --vcf` on a VCF lacking AF and AD/DP must not crash; it
-        falls back to depth-only segmentation (cnvkit-ugh)."""
+        falls back to depth-only segmentation."""
         n = 30
         cnarr = cnary.CopyNumArray(
             pd.DataFrame(
