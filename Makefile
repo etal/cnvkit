@@ -39,7 +39,8 @@ help:
 	@echo "  Note: GHA automatically builds 'devel' on master, 'latest' on tags"
 	@echo ""
 	@echo "Release:"
-	@echo "  upload-pypi    Upload to PyPI (set release_version=X.Y.Z)"
+	@echo "  check-version   Verify _version.py is consistent with the release workflow"
+	@echo "  upload-pypi     Upload to PyPI (set release_version=X.Y.Z)"
 	@echo ""
 
 # =============================================================================
@@ -144,6 +145,10 @@ docker-test:
 # =============================================================================
 # Release
 # =============================================================================
+
+.PHONY: check-version
+check-version:
+	$(PYTHON) devtools/check_version.py --mode dev
 
 .PHONY: upload-pypi
 upload-pypi: build

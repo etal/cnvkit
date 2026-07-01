@@ -1,0 +1,36 @@
+name: Version Guard
+
+# Ensures the version string in cnvlib/_version.py stays consistent with the
+# release workflow:
+#   * on master / PRs -- master must not be left sitting on an already-released
+#     version (the ".dev0 bump was skipped" failure mode);
+#   * on vX.Y.Z tags -- the released version must match the tag and carry no
+#     development suffix.
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*.*.*'
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  version-guard:
+    name: Check version string
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # full history + tags for release-tag comparison
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Check version invariants
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            python devtools/check_version.py --mode release --tag "${GITHUB_REF#refs/tags/}"
+          else
+            python devtools/check_version.py --mode dev
+          fi

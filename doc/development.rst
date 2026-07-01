@@ -191,6 +191,40 @@ Build a wheel and source distribution into ``dist/``::
     make build
 
 
+Releasing to PyPI
+-----------------
+
+The full, narrative release procedure lives in the `Release procedure
+<https://github.com/etal/cnvkit/wiki/Release-procedure>`_ wiki page. The
+repository enforces one invariant mechanically: **the ``master`` branch always
+carries a development version** (``X.Y.Z.devN``), and a plain ``X.Y.Z`` version
+exists only transiently on the tagged release commit. The ``Version Guard``
+GitHub Actions workflow fails any master build or pull request whose
+``cnvlib/_version.py`` is left on a plain release version, which prevents the
+post-release ``.dev0`` bump from being silently skipped. Check it locally with::
+
+    make check-version
+
+To cut a release, once the notes are written:
+
+1. Set ``cnvlib/_version.py`` to the plain release version ``X.Y.Z`` (drop the
+   ``.devN`` suffix) and commit.
+2. Tag the commit with the summarized changelog as its message and push::
+
+       git tag vX.Y.Z -aF release-notes.md
+       git push --tags
+
+   GitHub Actions builds and publishes the Docker image for the tag.
+3. Build and upload the Python distributions to PyPI::
+
+       make build
+       make release_version=X.Y.Z upload-pypi
+
+4. Bump ``cnvlib/_version.py`` to the next development version
+   ``X.Y.(Z+1).dev0``, commit, and push. (``Version Guard`` enforces that this
+   step is not forgotten.)
+
+
 Building and releasing Docker images
 ------------------------------------
 
@@ -211,8 +245,8 @@ Build and push a release
 
 ::
 
-    make release_version=0.9.13 docker-release   # Build a tagged image from PyPI
-    make release_version=0.9.13 docker-push      # Push to Docker Hub (needs auth)
+    make release_version=0.9.14 docker-release   # Build a tagged image from PyPI
+    make release_version=0.9.14 docker-push      # Push to Docker Hub (needs auth)
 
 Automated builds (GitHub Actions)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
