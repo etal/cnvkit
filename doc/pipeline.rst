@@ -636,8 +636,9 @@ The following segmentation algorithms can be specified with the ``-m`` option:
   Requires the R package DNAcopy.
 - ``haar`` -- a pure-Python implementation of `HaarSeg
   <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_,
-  a wavelet-based method. Very fast and performs reasonably well on small
-  panels, but tends to over-segment large datasets.
+  a wavelet-based method. Very fast and dependency-free, making it a good
+  fallback when R is unavailable. Sensitivity is controlled by the FDR
+  q-value (``--threshold``); smaller values yield fewer, larger segments.
 - ``hmm`` -- Hidden Markov Model with distance-dependent transitions and joint
   log2/BAF emissions. Estimates tumor purity and ploidy via grid search over
   marginal likelihood. Suitable for most samples.
@@ -673,11 +674,13 @@ the basic CNVkit installation.
    on noisy data; it is opt-in and applies only to the ``cbs`` method.
 
    A separate Savitzky-Golay smoother draws the grey trend line in :ref:`scatter`
-   plots and is used internally by the ``haar`` and ``hmm`` methods. When that
-   smoother produces a value slightly outside the input range it logs a
-   ``Smoothing overshot ...`` message. This is informational only and does not
-   affect ``cbs`` segmentation, so seeing it after a ``scatter`` plot or an
-   ``haar``/``hmm`` run is expected.
+   plots and is used internally by the ``hmm`` methods. (The ``haar`` method
+   segments the raw log2 ratios directly; HaarSeg does its own noise modeling,
+   and pre-smoothing its input deflated the noise estimate and caused
+   over-segmentation.) When that smoother produces a value slightly outside the
+   input range it logs a ``Smoothing overshot ...`` message. This is
+   informational only and does not affect ``cbs`` or ``haar`` segmentation, so
+   seeing it after a ``scatter`` plot or an ``hmm`` run is expected.
 
 
 Bin filtering

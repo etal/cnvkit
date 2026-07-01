@@ -44,7 +44,7 @@ SIGMA_FLOOR = 1e-10
 
 # Floor for per-bin BAF weights (read depths) so a window of all SNP-less bins
 # can't divide by zero in the weighted Haar convolution. Negligible vs real
-# read depths (~30-100x), so observed bins still dominate. (cnvkit-ugh)
+# read depths (~30-100x), so observed bins still dominate.
 WEIGHT_FLOOR = 1e-6
 
 
@@ -94,9 +94,25 @@ def _bin_weights(cnarr: CopyNumArray) -> ndarray | None:
     return cnarr["weight"].to_numpy() if "weight" in cnarr else None
 
 
+def _haar_signal(cnarr: CopyNumArray) -> ndarray:
+    """The raw per-bin log2 fed to haarSeg.
+
+    HaarSeg is itself a denoising segmenter: its FDR threshold assumes the
+    finest-scale (level-1) MAD reflects the true per-bin measurement noise.
+    Pre-smoothing (e.g. Savitzky-Golay) deflates that noise floor while leaving
+    coarse-scale autocorrelated structure intact, collapsing the FDR threshold
+    so nearly every wiggle passes and ``fdr_q`` loses control -- ~8x
+    over-segmentation into uniform ~7-bin pieces. Segmenting the
+    raw log2 matches stock upstream HaarSeg and CNVkit's pre-2019 behavior; a
+    prior scipy p-value bug (since fixed) was the real cause the smoothing was
+    added to mask.
+    """
+    return cnarr["log2"].to_numpy()  # type: ignore[no-any-return]
+
+
 def one_chrom(cnarr: CopyNumArray, fdr_q: float, chrom: str) -> pd.DataFrame:
     logging.debug("Segmenting %s", chrom)
-    signal = cnarr.smooth_log2()
+    signal = _haar_signal(cnarr)
     weights = _bin_weights(cnarr)
     breakpoints = _haar_breakpoints(signal, fdr_q, weights)
     return _segments_from_breakpoints(cnarr, signal, weights, breakpoints, chrom)
@@ -174,7 +190,7 @@ def one_chrom_baf(
     then rebuild segments. Detects copy-neutral LOH (BAF shift, flat depth).
     """
     logging.debug("Segmenting (depth+BAF) %s", chrom)
-    signal = cnarr.smooth_log2()
+    signal = _haar_signal(cnarr)
     weights = _bin_weights(cnarr)
     log2_bps = _haar_breakpoints(signal, fdr_q, weights)
 
@@ -214,8 +230,9 @@ def _segments_from_breakpoints(
 ) -> pd.DataFrame:
     """Build a segment table from breakpoint bin indices (shared by haar paths).
 
-    `signal` is the smoothed log2 used to find the breakpoints; reuse it (rather
-    than re-smoothing) so the segment means come from the same signal.
+    `signal` is the raw per-bin log2 (from `_haar_signal`) used to find the
+    breakpoints; reuse the same array here so the segment means are consistent
+    with the breakpoints.
     """
     n = len(cnarr)
     seg_starts = np.insert(breakpoints, 0, 0)
@@ -314,7 +331,7 @@ def haarSeg(
         # Caller supplies a noise estimate computed over informative bins only
         # (the BAF pass: peakSigmaEst above is contaminated by neutral-filled,
         # SNP-less bins because it is computed unweighted). Default None keeps
-        # the depth pass byte-identical. (cnvkit-ugh)
+        # the depth pass byte-identical.
         peakSigmaEst = max(sigma_override, SIGMA_FLOOR)
 
     breakpoints = np.array([], dtype=np.int_)
