@@ -686,7 +686,7 @@ def _cmd_antitarget(args: argparse.Namespace) -> None:
     access = tabio.read_auto(args.access) if args.access else None
     out_arr = antitarget.do_antitarget(targets, access, args.avg_size, args.min_size)
     if not args.output:
-        base, ext = args.interval.rsplit(".", 1)
+        base, ext = args.targets.rsplit(".", 1)
         args.output = base + ".antitarget." + ext
     tabio.write(out_arr, args.output, "bed4")
 
