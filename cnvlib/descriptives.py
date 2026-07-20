@@ -74,10 +74,15 @@ def on_weighted_array(default: object = None) -> Callable:
                 if default is None:
                     return a[0]
                 return default
-            # Fill w's NaN indices
+            # Fill w's NaN indices with 0. Build a new array rather than
+            # assigning in place: `np.asarray` above returns the caller's
+            # buffer unchanged when it is already float, so an in-place write
+            # would both mutate the caller's weights and raise on a read-only
+            # view (e.g. a pandas copy-on-write slice, as produced by the
+            # non-finite-bin drop in segmentation -> HMM's weighted_std).
             w_nan = np.isnan(w)
             if w_nan.any():
-                w[w_nan] = 0.0
+                w = np.where(w_nan, 0.0, w)
             return f(a, w, **kwargs)
 
         return wrapper
