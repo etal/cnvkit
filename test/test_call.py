@@ -111,6 +111,62 @@ class CallTests(unittest.TestCase):
         )
         self.assertEqual(len(cl_cns), len(cl_none))
 
+    def test_call_nan_log2_neutral_fallback(self):
+        """A NaN log2 segment must not produce a garbage integer copy number.
+
+        Regression for #647: a non-finite log2 reaching the integer cast in
+        do_call silently yielded the int64 sentinel (-9223372036854775808) on
+        older NumPy, or a false homozygous-deletion cn=0 on newer NumPy, for
+        the clonal and pure paths -- whereas the threshold path already mapped
+        NaN to the neutral reference copy number. All methods must agree:
+        substitute the neutral copy number, never emit garbage.
+        """
+        # NaN log2 on an autosome and on both sex chromosomes, where the
+        # neutral reference copy number differs (chr1=2; chrX=1 and chrY=1
+        # under a haploid-X reference). Interleave finite segments as controls.
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1", "chr1", "chrX", "chrY"],
+                    "start": [0, 1000, 0, 0],
+                    "end": [1000, 2000, 1000, 1000],
+                    "gene": ["A", "B", "C", "D"],
+                    "log2": [np.nan, 0.5, np.nan, np.nan],
+                    "weight": [1.0, 1.0, 1.0, 1.0],
+                    "probes": [10, 10, 10, 10],
+                }
+            )
+        )
+        sentinel = np.iinfo(np.int64).min
+        # Neutral reference copies per NaN segment: chr1=2, chrX=1, chrY=1.
+        expected_neutral = {0: 2, 2: 1, 3: 1}
+        results = {}
+        for method, kwargs in (
+            ("clonal", {}),  # -> absolute_pure
+            ("clonal_purity", {"purity": 0.6}),  # -> absolute_clonal
+            ("threshold", {}),  # already guarded; pin the shared contract
+        ):
+            out = commands.do_call(
+                segarr,
+                None,
+                method.split("_")[0],
+                is_haploid_x_reference=True,
+                is_sample_female=True,
+                **kwargs,
+            )
+            cn = out["cn"]
+            results[method] = list(cn)
+            for idx, neutral in expected_neutral.items():
+                self.assertEqual(cn[idx], neutral, f"{method} seg{idx}")
+                self.assertNotEqual(cn[idx], sentinel, f"{method} seg{idx}")
+            self.assertTrue((cn >= 0).all(), method)
+        # All three call methods must agree on the NaN-segment copy numbers.
+        for idx in expected_neutral:
+            called = {m: r[idx] for m, r in results.items()}
+            self.assertEqual(
+                len(set(called.values())), 1, f"methods disagree at seg{idx}: {called}"
+            )
+
     def test_call_filter(self):
         segments = cnvlib.read("formats/tr95t.segmetrics.cns")
         variants = tabio.read("formats/na12878_na12882_mix.vcf", "vcf")
