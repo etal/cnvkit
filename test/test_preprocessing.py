@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Tests for preprocessing commands: access, antitarget, autobin, target, coverage."""
 
+import argparse
 import logging
 import os
 import shutil
@@ -94,6 +95,33 @@ class PreprocessingTests(unittest.TestCase):
         self.assertLess(0, len(commands.do_antitarget(baits, acs)))
         self.assertLess(0, len(commands.do_antitarget(baits, acs, 200000)))
         self.assertLess(0, len(commands.do_antitarget(baits, acs, 10000, 5000)))
+
+    def test_cmd_antitarget_default_output(self):
+        """#806: the 'antitarget' CLI command with -o/--output omitted must
+        derive the default output filename from args.targets. The pre-fix code
+        referenced the nonexistent args.interval and raised AttributeError in
+        this default-output branch; after the args.targets fix it succeeds.
+        Exercises commands._cmd_antitarget, which the (slow) test_antitarget
+        above never touches."""
+        with tempfile.TemporaryDirectory() as tmp:
+            # Copy a tiny targets BED into a temp dir so the derived default
+            # output lands there, not in test/formats/.
+            targets_bed = os.path.join(tmp, "mytargets.bed")
+            shutil.copy("formats/agilent.bed", targets_bed)
+            args = argparse.Namespace(
+                targets=targets_bed,
+                access=None,
+                avg_size=150000,
+                min_size=None,
+                output=None,
+            )
+            # Pre-fix: raises AttributeError here (args.interval). Post-fix: OK.
+            commands._cmd_antitarget(args)
+            expect_out = os.path.join(tmp, "mytargets.antitarget.bed")
+            self.assertTrue(os.path.exists(expect_out))
+            self.assertGreater(os.path.getsize(expect_out), 0)
+            # Sanity: the derived file parses back as a genomic table.
+            self.assertGreater(len(tabio.read_auto(expect_out)), 0)
 
     def test_autobin(self):
         """The 'autobin' command."""
