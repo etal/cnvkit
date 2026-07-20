@@ -10,7 +10,9 @@ See: https://github.com/etal/cnvkit/issues/1038
 
 from __future__ import annotations
 
+import logging
 import os
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -507,6 +509,48 @@ class TestSavgol:
         assert np.isfinite(result).all()
         assert calls["interp"] >= 1, "Interp path should have been attempted"
         assert calls["fallback"] >= 1, "Fallback (non-polyfit) path should have run"
+
+    def test_nan_input_runs_clean_on_nan_bins(self):
+        """Savgol runs the weighted NaN path without warning or crashing (#543).
+
+        Zero-depth antitarget bins on WGS reach savgol via smooth_log2 with NaN
+        log2 values and zero weight. This is a smoke test for that end-to-end
+        scenario: it does not discriminate the fix on the supported numpy floor
+        (numpy >= 2.3.5 no longer signals FP-invalid on NaN comparisons, so the
+        pre-fix NaN bounds were warning-free there too), but it guards the path
+        against regressions and against older numpy that did warn. The
+        functional value of the fix -- restoring the overshoot check that NaN
+        bounds silently disabled -- is covered by the companion test below.
+        """
+        x = np.array([1.0, 2.0, np.nan, 4.0, 5.0, np.nan, 7.0, 8.0, 9.0, 10.0])
+        weights = np.where(np.isnan(x), 0.0, 1.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = savgol(x, total_width=5, weights=weights)
+        assert len(result) == len(x)
+
+    def test_overshoot_check_ignores_nan_bounds(self, caplog):
+        """The overshoot check uses finite bounds even when x contains NaN.
+
+        A plain x.max()/x.min() is NaN on non-finite input, so every
+        comparison is False and a genuine overshoot goes silently undetected.
+        Computing the bounds over the finite values restores the check: a
+        spike that makes the smoother overshoot the input's [0, 100] range is
+        still logged despite an intervening NaN bin (#543).
+        """
+        n = 60
+        x = np.zeros(n)
+        x[30] = 100.0  # spike -> smoother overshoots the finite [0, 100] range
+        x[10] = np.nan  # non-finite bin that would poison x.max()/x.min()
+        weights = np.where(np.isnan(x), 0.0, 1.0)
+        with caplog.at_level(logging.WARNING):
+            savgol(x, total_width=11, weights=weights)
+        overshoot = [
+            r.getMessage() for r in caplog.records if "overshot" in r.getMessage()
+        ]
+        assert overshoot, "Overshoot must be detected despite the NaN bin"
+        # The logged 'original' bounds are the finite range, not NaN.
+        assert "vs. original (0.0, 100.0)" in overshoot[0]
 
 
 class TestLoess:

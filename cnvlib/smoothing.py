@@ -307,18 +307,27 @@ def savgol(
         # TODO fit edges here, too
         window = savgol_coeffs(window_width, order)
         y, _w = convolve_weighted(window, signal, weights, n_iter)
-    # Safety
-    bad_idx = (y > x.max()) | (y < x.min())
-    if bad_idx.any():
-        logging.warning(
-            "Smoothing overshot at %s / %s indices: (%s, %s) vs. original (%s, %s)",
-            bad_idx.sum(),
-            len(bad_idx),
-            y.min(),
-            y.max(),
-            x.min(),
-            x.max(),
-        )
+    # Safety: flag smoothed values that overshoot the input's finite range.
+    # Bounds are taken over finite bins only: non-finite bins (NaN/inf, e.g.
+    # zero-depth antitargets on WGS that reach savgol via smooth_log2 without a
+    # prior drop) make a plain x.max()/x.min() NaN, which silently disables this
+    # check (every comparison against NaN is False) and, on older numpy, emitted
+    # "invalid value encountered in less/greater" RuntimeWarnings (#543).
+    finite = np.isfinite(x)
+    if finite.any():
+        xf = x[finite]
+        lo, hi = xf.min(), xf.max()
+        bad_idx = (y > hi) | (y < lo)
+        if bad_idx.any():
+            logging.warning(
+                "Smoothing overshot at %s / %s indices: (%s, %s) vs. original (%s, %s)",
+                bad_idx.sum(),
+                len(bad_idx),
+                np.nanmin(y),
+                np.nanmax(y),
+                lo,
+                hi,
+            )
     return y[total_wing:-total_wing]
 
 
