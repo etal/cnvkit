@@ -326,7 +326,9 @@ def absolute_threshold(
             row.chromosome, ploidy, is_haploid_x_reference
         )
         if np.isnan(row.log2):
-            # XXX fallback
+            # A NaN log2 (malformed input) is replaced with the neutral
+            # reference copy number, consistent with absolute_pure and
+            # absolute_clonal, rather than emitting a garbage integer.
             logging.warning(
                 "log2=nan found; replacing with neutral copy number %s", ref_copies
             )
@@ -374,6 +376,12 @@ def absolute_pure(
         ref_copies = _reference_copies_pure(
             row.chromosome, ploidy, is_haploid_x_reference
         )
+        if np.isnan(row.log2):
+            logging.warning(
+                "log2=nan found; replacing with neutral copy number %s", ref_copies
+            )
+            absolutes[i] = ref_copies
+            continue
         absolutes[i] = _log2_ratio_to_absolute_pure(row.log2, ref_copies)
     return absolutes
 
@@ -396,6 +404,13 @@ def absolute_dataframe(
         ),
         axis=1,
     )
+    nan_mask = df["log2"].isna()
+    if nan_mask.any():
+        logging.warning(
+            "log2=nan found in %d segment(s); replacing with neutral copy number",
+            int(nan_mask.sum()),
+        )
+        df.loc[nan_mask, "absolute"] = df.loc[nan_mask, "reference"]
     return df[["absolute", "expect", "reference"]]
 
 
@@ -546,9 +561,10 @@ def _log2_ratio_to_absolute(
         # deletion, or the NULL_LOG2_COVERAGE sentinel from zero-coverage bins),
         # this formula extrapolates to a negative count; clamp it to 0 so the
         # 'call' command never emits a nonsensical negative copy number (#503).
-        # A NaN log2 (malformed input) is left to propagate rather than silently
-        # floored to 0 -- a false homozygous-deletion call would be worse than a
-        # surfaced error (cf. the np.isnan guard in absolute_threshold).
+        # A NaN log2 (malformed input) yields NaN here; skip the clamp so it
+        # stays NaN and the caller (absolute_clonal/absolute_dataframe) can
+        # substitute the neutral reference copy number -- matching the np.isnan
+        # guard in absolute_threshold rather than emitting a false deletion.
         if not np.isnan(ncopies):
             ncopies = max(0.0, ncopies)
     else:
