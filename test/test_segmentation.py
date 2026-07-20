@@ -485,3 +485,44 @@ class TransferFieldsTests(unittest.TestCase):
         cns = segmentation.do_segmentation(cnarr, "haar", processes=1)
         self.assertGreater(len(cns), 0)
         self.assertTrue(np.isfinite(cns["log2"].to_numpy()).all())
+
+    def test_hmm_tolerates_nonfinite_log2_and_nan_weight(self):
+        """HMM segmentation must not hard-abort on non-finite bins (#672).
+
+        Dropping non-finite-log2 bins (the boundary guard) hands the HMM path a
+        pandas copy-on-write slice whose buffers are read-only. HMM then calls
+        smooth_log2 -> guess_window_size -> weighted_std, whose NaN-weight fill
+        formerly wrote in place and raised "assignment destination is
+        read-only", intermittently aborting batch/coverage runs. A surviving
+        NaN bin weight must be filled on a copy, not the shared buffer.
+
+        Uses a single chromosome so the whole-genome transfer_fields path is not
+        exercised (the separate all-of-first-chromosome-dropped edge is tracked
+        independently); the weighted_std path that crashed is shared by every
+        method.
+        """
+        n = 120  # > guess_window_size / drop_outliers width so smoothing runs
+        rng = np.random.default_rng(0)
+        log2 = rng.normal(0, 0.2, n)
+        log2[5] = np.nan  # dropped at the boundary -> read-only CoW slice
+        log2[60] = np.inf  # ±inf dropped too
+        weight = np.ones(n)
+        weight[70] = np.nan  # survives the log2 drop -> hits the fill path
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["G"] * n,
+                    "log2": log2,
+                    "depth": np.ones(n) * 100.0,
+                    "weight": weight,
+                }
+            )
+        )
+        # Must not raise; no non-finite must leak into the segment output.
+        cns = segmentation.do_segmentation(cnarr, "hmm", processes=1)
+        self.assertGreater(len(cns), 0)
+        self.assertTrue(np.isfinite(cns["log2"].to_numpy()).all())
+        self.assertFalse(np.isnan(cns["weight"].to_numpy()).any())

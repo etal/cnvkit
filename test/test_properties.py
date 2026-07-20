@@ -32,6 +32,7 @@ from cnvlib.descriptives import (
     median_absolute_deviation,
     q_n,
     weighted_median,
+    weighted_std,
 )
 from cnvlib.smoothing import (
     _width2wing,
@@ -282,6 +283,37 @@ class TestWeightedMedian:
     def test_mismatched_lengths_raises(self):
         with pytest.raises(ValueError, match="Unequal array lengths"):
             weighted_median(np.array([1.0, 2.0]), np.array([1.0]))
+
+
+class TestOnWeightedArrayNaNSafety:
+    """The on_weighted_array wrapper must fill NaN weights safely (#672).
+
+    The wrapper promises to "replace any remaining NaN cells in w with 0."
+    It formerly did so with an in-place ``w[w_nan] = 0.0``, which (a) mutated
+    the caller's weight array and (b) raised ``ValueError: assignment
+    destination is read-only`` on a read-only buffer -- e.g. the pandas
+    copy-on-write slice produced when segmentation drops non-finite-log2 bins
+    and HMM's smooth_log2 then calls weighted_std, aborting the run. The fill
+    must build a new array instead.
+    """
+
+    def test_does_not_mutate_caller_weights(self):
+        a = np.array([0.1, 0.2, 0.3, 0.4])
+        w = np.array([1.0, np.nan, 2.0, 3.0])
+        w_before = w.copy()
+        weighted_std(a, w)
+        weighted_median(a, w)
+        # The NaN weight is untouched: the wrapper worked on a copy.
+        np.testing.assert_array_equal(w, w_before)
+        assert np.isnan(w[1])
+
+    def test_read_only_weights_do_not_raise(self):
+        a = np.array([0.1, 0.2, 0.3, 0.4])
+        w = np.array([1.0, np.nan, 2.0, 3.0])
+        w.setflags(write=False)
+        # Must not raise "assignment destination is read-only".
+        assert np.isfinite(weighted_std(a, w))
+        assert np.isfinite(weighted_median(a, w))
 
 
 class TestGapperScale:
