@@ -735,6 +735,87 @@ class CallTests(unittest.TestCase):
             np.isnan(call._log2_ratio_to_absolute(np.nan, 2, 2, purity=0.5))
         )
 
+    @staticmethod
+    def _clonal_purity_cns():
+        """Deterministic 4-segment fixture spanning del/loss/gain/amp log2."""
+        return cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1", "chr1", "chr1", "chr1"],
+                    "start": [0, 1000, 2000, 3000],
+                    "end": [1000, 2000, 3000, 4000],
+                    "gene": ["A", "B", "C", "D"],
+                    "log2": [-1.2, -0.3, 0.4, 0.9],
+                    "weight": [1.0, 1.0, 1.0, 1.0],
+                    "probes": [10, 10, 10, 10],
+                }
+            )
+        )
+
+    def test_call_clonal_purity_honors_purity(self):
+        """clonal + purity uses the purity-aware absolute_clonal path (#424).
+
+        Regression guard: the purity branch computes purity-adjusted clonal
+        absolutes, so -m clonal --purity 0.7 must differ from pure clonal
+        (purity=1.0). This pins the current-master cn values and would fail if
+        a "fix" reordered the branches to overwrite them with absolute_pure.
+        """
+        cns = self._clonal_purity_cns()
+        clonal_purity = commands.do_call(
+            cns,
+            None,
+            "clonal",
+            purity=0.7,
+            is_haploid_x_reference=True,
+            is_sample_female=True,
+        )
+        self.assertEqual(list(clonal_purity["cn"]), [0, 1, 3, 4])
+        pure_clonal = commands.do_call(
+            cns,
+            None,
+            "clonal",
+            is_haploid_x_reference=True,
+            is_sample_female=True,
+        )
+        # Purity must be honored: distinct from the pure-clonal call.
+        self.assertEqual(list(pure_clonal["cn"]), [1, 2, 3, 4])
+
+    def test_call_clonal_purity_log_confirms_clonal(self):
+        """clonal + purity logs a line naming both clonal and purity (#424).
+
+        The reported defect was a misleading log: with --purity <1 and
+        -m clonal, the elif clonal branch is skipped, so the old code only
+        printed "Rescaling sample with purity ...", making users think
+        -m clonal was ignored. The purity branch now confirms clonal.
+        """
+        cns = self._clonal_purity_cns()
+        with self.assertLogs(level="INFO") as ctx:
+            commands.do_call(
+                cns,
+                None,
+                "clonal",
+                purity=0.7,
+                is_haploid_x_reference=True,
+                is_sample_female=True,
+            )
+        clonal_log = "\n".join(ctx.output)
+        self.assertIn("clonal ploidy", clonal_log)
+        self.assertIn("rescaled for purity", clonal_log)
+        # The default (threshold) purity path keeps the plain rescale message
+        # and must NOT claim clonal calling.
+        with self.assertLogs(level="INFO") as ctx:
+            commands.do_call(
+                cns,
+                None,
+                "threshold",
+                purity=0.7,
+                is_haploid_x_reference=True,
+                is_sample_female=True,
+            )
+        threshold_log = "\n".join(ctx.output)
+        self.assertIn("Rescaling sample with purity", threshold_log)
+        self.assertNotIn("rescaled for purity", threshold_log)
+
 
 class LoadHetSnpsTests(unittest.TestCase):
     """Tests for cmdutil.load_het_snps and the _warn_if_baf_input_suspicious helper."""
