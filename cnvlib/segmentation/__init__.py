@@ -352,7 +352,12 @@ def _do_segmentation(
                 hmm.variants_in_segment(subvarr, segment)
                 for segment, subvarr in variants.by_ranges(segarr)
             ]
-            segarr = segarr.as_dataframe(pd.concat(newsegs))
+            # ignore_index: each variants_in_segment result is indexed from 0,
+            # so concatenating them yields duplicate labels. The baf assignment
+            # below aligns by label and would broadcast the first segment's BAF
+            # to every row sharing a label -- a segmentation result must carry a
+            # unique index (#1125).
+            segarr = segarr.as_dataframe(pd.concat(newsegs, ignore_index=True))
         # else: 'haar' already incorporated BAF via its depth+BAF breakpoint
         # union, so no re-segmentation -- just attach the per-segment BAF below.
         segarr["baf"] = variants.baf_by_ranges(segarr)
