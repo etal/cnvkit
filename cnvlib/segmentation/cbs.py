@@ -49,7 +49,10 @@ write("Segmenting the probe data", stderr())
 set.seed(0xA5EED)
 
 # additional smoothing (if --smooth-cbs provided)
-if (smooth_cbs) {
+# smooth.CNA aborts with "NA/NaN/Inf in foreign function call (arg 7)" when an
+# arm has a single bin (e.g. a lone surviving chrY bin), so skip smoothing for
+# arms too short to smooth -- the lone bin becomes one segment either way (#594)
+if (smooth_cbs && nrow(tbl) >= 2) {
     write("Performing smoothing of the data", stderr())
     cna = smooth.CNA(cna)
 }
