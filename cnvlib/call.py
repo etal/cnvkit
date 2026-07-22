@@ -184,7 +184,14 @@ def do_call(
             outarr["nbaf"] = 0
 
     if purity and purity < 1.0:
-        logging.info("Rescaling sample with purity %g, ploidy %g", purity, ploidy)
+        if method == "clonal":
+            logging.info(
+                "Calling copy number with clonal ploidy %g, rescaled for purity %g",
+                ploidy,
+                purity,
+            )
+        else:
+            logging.info("Rescaling sample with purity %g, ploidy %g", purity, ploidy)
         absolutes = absolute_clonal(
             outarr,
             ploidy,
