@@ -85,7 +85,11 @@ def segment_haar(
             one_chrom_baf(subprobes, fdr_q, chrom, variants)
             for chrom, subprobes in cnarr.by_arm()
         ]
-    segarr = cnarr.as_dataframe(pd.concat(chrom_tables))
+    # ignore_index: by_arm splits a chromosome into arms, and each arm's segment
+    # table starts its index at 0, so a plain concat would yield duplicate index
+    # labels. A segmentation result must carry a unique index for downstream
+    # label-based operations to behave (#1125).
+    segarr = cnarr.as_dataframe(pd.concat(chrom_tables, ignore_index=True))
     segarr.sort_columns()
     return segarr
 

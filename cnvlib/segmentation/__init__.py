@@ -438,9 +438,15 @@ def transfer_fields(
     if not len(segments):
         # All bins in this chromosome arm were dropped: make a dummy segment
         return make_null_segment(bins_chrom, bins_start, bins_end)  # type: ignore[return-value,no-any-return]
-    # Avoid chained assignment by directly modifying the underlying DataFrame
-    segments.data.loc[segments.data.index[0], "start"] = bins_start
-    segments.data.loc[segments.data.index[-1], "end"] = bins_end
+    # Stretch the first and last segment endpoints to cover the arm's original
+    # bins. Address by POSITION, not index label: haar concatenates per-arm
+    # segment tables whose labels can repeat, and `.loc[label]` would broadcast
+    # the write to every row sharing that label, collapsing distinct segments to
+    # the full-arm span (#1125).
+    start_col = segments.data.columns.get_loc("start")
+    end_col = segments.data.columns.get_loc("end")
+    segments.data.iloc[0, start_col] = bins_start
+    segments.data.iloc[-1, end_col] = bins_end
 
     # Aggregate segment depths, weights, gene names
     # ENH refactor so that np/CNA.data access is encapsulated in skgenome

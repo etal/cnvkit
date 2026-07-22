@@ -102,6 +102,35 @@ class SegmentationTests(unittest.TestCase):
         self.assertGreater(len(segments), n_chroms)
         self.assertTrue((segments.start < segments.end).all())
 
+    def test_segment_haar_no_duplicate_segments(self):
+        """haar must not emit duplicate or overlapping segments (#1125).
+
+        Re-segmenting the regression fixture 9_2 with haar previously produced
+        pairs of segments sharing identical (chromosome, start, end) bounds:
+        do_segmentation splits by chromosome arm, segment_haar re-splits an arm
+        on internal gaps, and pd.concat left duplicate index labels so
+        transfer_fields' by-label endpoint stretch collapsed distinct segments
+        onto the full-arm span. Assert unique, non-overlapping intervals.
+        """
+        cnarr = cnvlib.read("formats/regression/p2-9_2.cnr")
+        segments = segmentation.do_segmentation(cnarr, "haar")
+        df = segments.data
+        # No two segments share the same interval.
+        dupes = df.duplicated(subset=["chromosome", "start", "end"], keep=False)
+        self.assertFalse(
+            dupes.any(),
+            f"duplicate segment intervals:\n"
+            f"{df.loc[dupes, ['chromosome', 'start', 'end']]}",
+        )
+        # Every segment is well-formed and segments do not overlap within a
+        # chromosome (sorted by start, each begins at or after the prior end).
+        self.assertTrue((df["start"] < df["end"]).all())
+        for chrom, grp in df.groupby("chromosome"):
+            ordered = grp.sort_values("start")
+            prev_ends = ordered["end"].shift(1)
+            overlap = ordered["start"] < prev_ends
+            self.assertFalse(overlap.any(), f"overlapping segments on {chrom}")
+
     @pytest.mark.slow
     def test_segment_hmm(self):
         """The 'segment' command with HMM methods."""
