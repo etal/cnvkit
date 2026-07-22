@@ -9,12 +9,13 @@ import unittest
 from unittest import mock
 
 import numpy as np
+import pandas as pd
 import pytest
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
 import cnvlib
-from cnvlib import core, segmentation
+from cnvlib import cnary, core, segmentation, vary
 from cnvlib.segmentation.cbs import CBS_RSCRIPT
 
 
@@ -228,6 +229,66 @@ class RTests(unittest.TestCase):
         )
         self.assertEqual(len(segarr), 1)
         self.assertAlmostEqual(segarr["log2"].iloc[0], arm["log2"].iloc[0], places=6)
+
+    @pytest.mark.slow
+    def test_cbs_variants_baf_per_segment(self):
+        """CBS + --vcf keeps each segment's own BAF (#1125).
+
+        do_segmentation re-segments each CBS segment on variant allele frequency
+        and concatenated the per-segment tables (each indexed from 0) without
+        resetting the index, leaving duplicate labels. The subsequent
+        ``segarr["baf"] = variants.baf_by_ranges(segarr)`` aligns by label, so
+        the first segment's BAF was silently broadcast to every segment sharing
+        that label. Build one arm with a copy-number step at bin 60 (CBS splits
+        there) and a BAF that is balanced in the first half and imbalanced in
+        the second; the two segments must retain distinct BAF values.
+        """
+        n = 120
+        rng = np.random.default_rng(0)
+        log2 = np.concatenate([np.zeros(60), np.ones(60)]) + rng.normal(0, 0.02, n)
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(n) * 1000,
+                    "end": np.arange(n) * 1000 + 1000,
+                    "gene": "-",
+                    "log2": log2,
+                    "weight": np.ones(n),
+                }
+            )
+        )
+        cnarr.meta["sample_id"] = "TestSample"
+        # Balanced BAF (0.5) first half, LOH (0.3) second half, aligned to the
+        # copy-number step so each CBS segment is BAF-homogeneous.
+        alt = np.concatenate([np.full(60, 15.0), np.full(60, 9.0)])
+        varr = vary.VariantArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * n,
+                    "start": np.arange(n) * 1000 + 500,
+                    "end": np.arange(n) * 1000 + 501,
+                    "ref": ["A"] * n,
+                    "alt": ["G"] * n,
+                    "zygosity": np.full(n, 0.5),
+                    "alt_count": alt,
+                    "depth": np.full(n, 30.0),
+                    "alt_freq": alt / 30.0,
+                }
+            )
+        )
+        segarr = segmentation._do_segmentation(
+            cnarr, "cbs", None, 0.0001, variants=varr, skip_outliers=0
+        )
+        self.assertEqual(len(segarr), 2)
+        # Unique index -- a duplicate label is what caused the BAF broadcast.
+        self.assertTrue(segarr.data.index.is_unique)
+        bafs = segarr["baf"].to_numpy()
+        # Each segment keeps its own BAF; the LOH segment is not overwritten
+        # with the balanced segment's 0.5.
+        self.assertEqual(len(set(np.round(bafs, 2))), 2)
+        self.assertAlmostEqual(bafs[0], 0.5, places=1)
+        self.assertAlmostEqual(bafs[1], 0.3, places=1)
 
 
 def _test_method(self, method):
