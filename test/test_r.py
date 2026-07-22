@@ -210,6 +210,25 @@ class RTests(unittest.TestCase):
         self.assertEqual(cns.chromosome.unique().tolist(), ["chr2"])
         self.assertIn("chrom", rstr)  # valid stitched SEG string, no crash
 
+    @pytest.mark.slow
+    def test_cbs_smooth_single_bin_arm(self):
+        """Issue #594: --smooth-cbs must not crash on a single-bin arm.
+
+        DNAcopy's ``smooth.CNA`` aborts with "NA/NaN/Inf in foreign function
+        call (arg 7)" when an arm has only one bin (e.g. a lone surviving chrY
+        bin). Segmentation runs the R script once per arm, so the guard skips
+        smoothing for arms too short to smooth; the lone bin must still come
+        back as exactly one segment carrying its own log2. Tested directly (not
+        via ``do_segmentation``), whose process pool would swallow the crash.
+        """
+        cnr = self.tas_cnr[self.tas_cnr["chromosome"] == "chr1"]
+        arm = cnr.as_dataframe(cnr.data.head(1).reset_index(drop=True).copy())
+        segarr = segmentation._do_segmentation(
+            arm, "cbs", None, 0.0001, skip_outliers=0, smooth_cbs=True
+        )
+        self.assertEqual(len(segarr), 1)
+        self.assertAlmostEqual(segarr["log2"].iloc[0], arm["log2"].iloc[0], places=6)
+
 
 def _test_method(self, method):
     for cnr in (
