@@ -406,28 +406,14 @@ def transfer_fields(
     weight is the sum of bin weights, and depth is the (weighted) mean of bin
     depths. Bins with NaN weights are excluded from the sums and averages.
 
-    Also: Post-process segmentation output.
-
-    1. Ensure every chromosome has at least one segment.
-    2. Ensure first and last segment ends match 1st/last bin ends
-       (but keep log2 as-is).
+    Also post-processes the segmentation: within `cnarr`, each chromosome's
+    first and last segment is stretched to span that chromosome's bins, keeping
+    log2 as-is. (`cnarr` is one chromosome arm on the per-arm CBS/haar/none
+    path, and the whole genome on the HMM path.) A chromosome whose bins were
+    all dropped upstream yields no segment at all -- fabricating a null segment
+    would report it as neutral, log2=0.
 
     """
-
-    def make_null_segment(chrom, orig_start, orig_end):
-        """Closes over 'segments'."""
-        vals = {
-            "chromosome": chrom,
-            "start": orig_start,
-            "end": orig_end,
-            "gene": "-",
-            "depth": 0.0,
-            "log2": 0.0,
-            "probes": 0.0,
-            "weight": 0.0,
-        }
-        row_vals = tuple(vals[c] for c in segments.data.columns)
-        return row_vals
 
     if not len(cnarr):
         # This Should Never Happen (TM)
@@ -435,28 +421,42 @@ def transfer_fields(
         logging.warning("No bins for:\n%s", segments.data)
         return segments
 
-    # Adjust segment endpoints to cover the chromosome arm's original bins
-    # (Stretch first and last segment endpoints to match first/last bins)
-    bins_chrom = cnarr.chromosome.iat[0]
-    bins_start = cnarr.start.iat[0]
-    bins_end = cnarr.end.iat[-1]
-    if not len(segments):
-        # All bins in this chromosome arm were dropped: make a dummy segment
-        return make_null_segment(bins_chrom, bins_start, bins_end)  # type: ignore[return-value,no-any-return]
-    # Stretch the first and last segment endpoints to cover the arm's original
-    # bins. Address by POSITION, not index label: haar concatenates per-arm
-    # segment tables whose labels can repeat, and `.loc[label]` would broadcast
-    # the write to every row sharing that label, collapsing distinct segments to
+    # Locate the boundary segments per chromosome, not once for the whole
+    # table: the HMM methods segment the whole genome in a single call (only
+    # CBS/haar/none run per chromosome arm), so a single global stretch would
+    # extend just the genome's very first and last segments.
+    # Address by POSITION, not index label: haar concatenates per-arm segment
+    # tables whose labels can repeat, and `.loc[label]` would broadcast the
+    # write to every row sharing that label, collapsing distinct segments to
     # the full-arm span (#1125).
     start_col = segments.data.columns.get_loc("start")
     end_col = segments.data.columns.get_loc("end")
-    segments.data.iloc[0, start_col] = bins_start
-    segments.data.iloc[-1, end_col] = bins_end
+    seg_chroms = segments.chromosome.to_numpy()
+    matched = np.zeros(len(seg_chroms), dtype=bool)
+    for chrom, bin_rows in cnarr.by_chromosome():
+        seg_pos = np.flatnonzero(seg_chroms == chrom)
+        if not len(seg_pos):
+            # The bin filters in _do_segmentation (non-finite log2, low
+            # coverage, outliers, zero weight) dropped every bin of this
+            # chromosome, so it has no segments to stretch.
+            continue
+        matched[seg_pos] = True
+        segments.data.iloc[seg_pos[0], start_col] = bin_rows.start.iat[0]
+        segments.data.iloc[seg_pos[-1], end_col] = bin_rows.end.iat[-1]
+    if not matched.all():
+        # The bins are the source of these segments, so a segment on an unknown
+        # chromosome means the name was mangled in transit -- e.g. DNAcopy
+        # renders a zero-padded contig '01' as '1'. Fail loudly: the segment
+        # would otherwise silently take the default gene '-' and weight/depth 0
+        # below, since the aggregation matches on chromosome name too.
+        raise ValueError(
+            "Segments on chromosomes absent from the input bins: "
+            + ", ".join(sorted(set(seg_chroms[~matched])))
+        )
 
     # Aggregate segment depths, weights, gene names
     # ENH refactor so that np/CNA.data access is encapsulated in skgenome
     ignore += params.ANTITARGET_ALIASES
-    assert bins_chrom == segments.chromosome.iat[0]
     cdata = cnarr.data.reset_index()
     if "depth" not in cdata.columns:
         cdata["depth"] = np.exp2(cnarr["log2"].to_numpy())

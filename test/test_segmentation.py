@@ -447,6 +447,100 @@ class TransferFieldsTests(unittest.TestCase):
         self.assertEqual(result2["weight"].iat[0], 0.0)
         self.assertEqual(result2["depth"].iat[0], 0.0)
 
+    def test_transfer_fields_stretches_every_chromosome(self):
+        """Each chromosome's boundary segments cover that chromosome's bins.
+
+        The HMM methods segment the whole genome in one call, so transfer_fields
+        receives a multi-chromosome table. Stretching only the global first and
+        last segment would leave every other chromosome's boundary segments
+        short of their bins. Each chromosome gets a distinct coordinate origin
+        so that looking the bin bounds up globally instead of per chromosome
+        fails the assertions too.
+        """
+        n = 10
+        origins = {"chr1": 0, "chr2": 1_000_000, "chr3": 2_000_000}
+        bins = pd.concat(
+            [
+                pd.DataFrame(
+                    {
+                        "chromosome": [chrom] * n,
+                        "start": origin + np.arange(0, n * 1000, 1000),
+                        "end": origin + np.arange(1000, n * 1000 + 1000, 1000),
+                        "gene": ["G"] * n,
+                        "log2": np.zeros(n),
+                        "depth": np.ones(n) * 100.0,
+                        "weight": np.ones(n),
+                    }
+                )
+                for chrom, origin in origins.items()
+            ],
+            ignore_index=True,
+        )
+        cnarr = cnary.CopyNumArray(bins)
+        # Two segments per chromosome, all inset from that chromosome's bounds
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1", "chr1", "chr2", "chr2", "chr3", "chr3"],
+                    "start": [o + s for o in origins.values() for s in (2000, 5000)],
+                    "end": [o + e for o in origins.values() for e in (5000, 8000)],
+                    "gene": ["-"] * 6,
+                    "log2": [0.0] * 6,
+                    "probes": [3, 3] * 3,
+                    "weight": [0.0] * 6,
+                }
+            )
+        )
+        result = segmentation.transfer_fields(segarr, cnarr)
+        self.assertEqual(
+            result["start"].tolist(),
+            [o + s for o in origins.values() for s in (0, 5000)],
+        )
+        self.assertEqual(
+            result["end"].tolist(),
+            [o + e for o in origins.values() for e in (5000, 10000)],
+        )
+
+    def test_transfer_fields_rejects_unknown_chromosome(self):
+        """A segment on a chromosome absent from the bins must fail loudly.
+
+        Segments derive from the bins, so a mismatch means a name was mangled
+        in transit -- DNAcopy renders a zero-padded contig '01' as '1'. Both the
+        endpoint stretch and the gene/weight/depth aggregation match on
+        chromosome name, so such a segment would otherwise be emitted with the
+        placeholder gene '-' and weight/depth 0 and no warning.
+        """
+        n = 10
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["01"] * n,
+                    "start": np.arange(0, n * 1000, 1000),
+                    "end": np.arange(1000, n * 1000 + 1000, 1000),
+                    "gene": ["G"] * n,
+                    "log2": np.zeros(n),
+                    "depth": np.ones(n) * 100.0,
+                    "weight": np.ones(n),
+                }
+            )
+        )
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["1"],  # as DNAcopy renders '01'
+                    "start": [2000],
+                    "end": [8000],
+                    "gene": ["-"],
+                    "log2": [0.0],
+                    "probes": [6],
+                    "weight": [0.0],
+                }
+            )
+        )
+        with self.assertRaises(ValueError) as caught:
+            segmentation.transfer_fields(segarr, cnarr)
+        self.assertIn("1", str(caught.exception))
+
     def test_do_segmentation_drops_nan_log2(self):
         """do_segmentation tolerates NaN-log2 bins on the default path (#881).
 
@@ -526,9 +620,9 @@ class TransferFieldsTests(unittest.TestCase):
         NaN bin weight must be filled on a copy, not the shared buffer.
 
         Uses a single chromosome so the whole-genome transfer_fields path is not
-        exercised (the separate all-of-first-chromosome-dropped edge is tracked
-        independently); the weighted_std path that crashed is shared by every
-        method.
+        exercised (that edge is covered by
+        test_hmm_first_chromosome_entirely_dropped); the weighted_std path that
+        crashed is shared by every method.
         """
         n = 120  # > guess_window_size / drop_outliers width so smoothing runs
         rng = np.random.default_rng(0)
@@ -555,3 +649,55 @@ class TransferFieldsTests(unittest.TestCase):
         self.assertGreater(len(cns), 0)
         self.assertTrue(np.isfinite(cns["log2"].to_numpy()).all())
         self.assertFalse(np.isnan(cns["weight"].to_numpy()).any())
+
+    def test_hmm_first_chromosome_entirely_dropped(self):
+        """HMM survives the non-finite guard dropping a whole first chromosome.
+
+        The HMM path segments the genome in one call, then transfers fields from
+        the unfiltered bins. When every bin of the leading chromosome is
+        non-finite, the first segment belongs to a later chromosome than the
+        first bin, which used to trip a bare AssertionError in transfer_fields.
+        The dropped chromosome must simply be absent from the output -- not
+        emitted as a fabricated neutral segment.
+
+        chr2's leading and chr3's trailing bins are dropped as well, with a
+        distinct coordinate origin per chromosome, so the surviving
+        chromosomes' spans pin the per-chromosome endpoint stretch rather than
+        holding vacuously.
+        """
+        n = 60
+        rng = np.random.default_rng(0)
+        origins = {"chr1": 0, "chr2": 1_000_000, "chr3": 2_000_000}
+        frames = []
+        for chrom, origin in origins.items():
+            if chrom == "chr1":
+                log2 = np.full(n, np.nan)  # entire leading chromosome dropped
+            else:
+                log2 = rng.normal(0, 0.2, n)
+                # Chromosome-edge bins the stretch must reclaim
+                if chrom == "chr2":
+                    log2[:3] = np.nan
+                else:
+                    log2[-3:] = np.nan
+            frames.append(
+                pd.DataFrame(
+                    {
+                        "chromosome": [chrom] * n,
+                        "start": origin + np.arange(0, n * 1000, 1000),
+                        "end": origin + np.arange(1000, n * 1000 + 1000, 1000),
+                        "gene": ["G"] * n,
+                        "log2": log2,
+                        "depth": np.ones(n) * 100.0,
+                        "weight": np.ones(n),
+                    }
+                )
+            )
+        cnarr = cnary.CopyNumArray(pd.concat(frames, ignore_index=True))
+        cns = segmentation.do_segmentation(cnarr, "hmm", processes=1)
+        # chr1 absent, and no fabricated segment in its place
+        self.assertEqual(set(cns.chromosome), {"chr2", "chr3"})
+        # Surviving chromosomes span their original bins, dropped edges included
+        for chrom, subseg in cns.by_chromosome():
+            subbins = cnarr[cnarr.chromosome == chrom]
+            self.assertEqual(subseg["start"].iat[0], subbins["start"].iat[0])
+            self.assertEqual(subseg["end"].iat[-1], subbins["end"].iat[-1])
