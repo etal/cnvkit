@@ -367,6 +367,33 @@ class ExportTests(unittest.TestCase):
         table_ogt = export.export_nexus_ogt(cnr, varr, 0.05)
         self.assertEqual(len(table_ogt), len(cnr))
 
+    def test_export_nexus_ogt_min_weight(self):
+        """BAFs stay on their own rows after --min-weight drops early bins.
+
+        Dropping bins leaves a gapped index, and the BAF column is assigned
+        back onto the filtered table, which pandas aligns by label. Without a
+        matching index the values land on the wrong bins and some are lost.
+        """
+        cnr = cnvlib.read("formats/amplicon.cnr")
+        varr = commands.load_het_snps(
+            "formats/na12878_na12882_mix.vcf", None, None, 15, None
+        )
+        full = export.export_nexus_ogt(cnr.copy(), varr)
+        # amplicon.cnr's lowest weight is ~0.28, so this drops a real prefix
+        kept = cnr["weight"] >= 0.4
+        self.assertTrue(0 < kept.sum() < len(cnr))
+        self.assertFalse(kept.iat[0])
+        table = export.export_nexus_ogt(cnr.copy(), varr, 0.4)
+        self.assertEqual(len(table), int(kept.sum()))
+        expected = full["B-Allele Frequency"][kept.to_numpy()]
+        self.assertEqual(
+            table["B-Allele Frequency"].fillna(-1).tolist(),
+            expected.fillna(-1).tolist(),
+        )
+        self.assertEqual(
+            table["B-Allele Frequency"].notna().sum(), expected.notna().sum()
+        )
+
     def test_export_seg(self):
         """The 'export seg' command."""
         seg_rows = export.export_seg(["formats/tr95t.cns"])

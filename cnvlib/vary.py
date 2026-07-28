@@ -52,10 +52,11 @@ class VariantArray(GenomicArray):
         """
         if "alt_freq" not in self:
             logging.warning("VCF has no allele frequencies for BAF calculation")
-            # Length must match `ranges` (one value per bin), like the normal
-            # into_ranges path -- not the variant rows (self.data.index), which
-            # made a shorter/longer Series and crashed callers.
-            return pd.Series(np.repeat(np.nan, len(ranges)))
+            # Length and index must match `ranges` (one value per bin), like
+            # the normal into_ranges path -- not the variant rows
+            # (self.data.index), which made a shorter/longer Series and crashed
+            # callers.
+            return pd.Series(np.repeat(np.nan, len(ranges)), index=ranges.data.index)
 
         def summarize(vals):
             mirrored = _mirrored_baf(vals, above_half)

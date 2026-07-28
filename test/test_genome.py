@@ -173,17 +173,91 @@ class GaryTests(unittest.TestCase):
         self.assertEqual(len(seg_baf), len(segarr))
         cna_baf = varr.into_ranges(cnarr, "alt_freq", 0.0, np.max)
         self.assertEqual(len(cna_baf), len(cnarr))
-        # Edge cases
+        # Edge cases: an empty source or destination still yields one value per
+        # destination row, as a Series indexed by the destination
         mtarr = tabio.read("formats/empty")
-        segarr.into_ranges(mtarr, "start", 0, int)
-        mtarr.into_ranges(segarr, "end", 0, 0)
+        self.assertEqual(len(segarr.into_ranges(mtarr, "start", 0, int)), 0)
+        empty_src = mtarr.into_ranges(segarr, "end", 0, 0)
+        self.assertIsInstance(empty_src, pd.Series)
+        self.assertEqual(empty_src.index.tolist(), segarr.data.index.tolist())
+        self.assertTrue((empty_src == 0).all())
+
+    @staticmethod
+    def _non_contiguous_pair():
+        """A source of two named ranges, and a destination with interleaved rows.
+
+        Source: chr2:0-1000 "AAA", chr10:0-1000 "CCC". Destination rows, in
+        order: chr2:0-1000 (hits AAA), chr10:0-1000 (hits CCC), chr2:2000-3000
+        and chr10:2000-3000 (no overlap).
+
+        Interleaved chromosome rows arise only for an in-memory array assembled
+        by concatenation and never re-sorted, since every file-based route is
+        sorted by ``tabio.read``. chr2 before chr10 makes first-appearance order
+        differ from the lexicographic order pandas would use with
+        ``groupby(sort=True)``, so recovering the groups by sorting fails here
+        too.
+        """
+        src = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr2", "chr10"],
+                    "start": [0, 0],
+                    "end": [1000, 1000],
+                    "gene": ["AAA", "CCC"],
+                }
+            )
+        )
+        dest = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr2", "chr10", "chr2", "chr10"],
+                    "start": [0, 0, 2000, 2000],
+                    "end": [1000, 1000, 3000, 3000],
+                }
+            )
+        )
+        return src, dest
+
+    def test_ranges_into_non_contiguous_chromosomes(self):
+        """into_ranges places each value on its own row of the destination.
+
+        ``by_shared_chroms`` groups the destination by chromosome, so consuming
+        it directly would summarize into chromosome-grouped order rather than
+        the destination's row order.
+        """
+        src, dest = self._non_contiguous_pair()
+        self.assertEqual(
+            src.into_ranges(dest, "gene", "-").tolist(), ["AAA", "CCC", "-", "-"]
+        )
+
+    def test_ranges_into_preserves_dest_index(self):
+        """into_ranges is indexed by the destination's labels, not 0..n-1.
+
+        Callers assign the result straight onto a column of the destination,
+        and pandas aligns that by label. A filtered destination has a gapped
+        index -- ``target --annotate`` drops zero-width baits that way -- so a
+        fresh RangeIndex would drop values onto the wrong rows.
+        """
+        src, dest = self._non_contiguous_pair()
+        # Dropping row 1 leaves chr2, chr2, chr10 -- contiguous, so this test
+        # pins index alignment alone, independent of the ordering fix.
+        gapped = dest[np.array([True, False, True, True])]
+        self.assertEqual(gapped.data.index.tolist(), [0, 2, 3])
+        genes = src.into_ranges(gapped, "gene", "-")
+        self.assertEqual(genes.index.tolist(), [0, 2, 3])
+        gapped["gene"] = genes
+        self.assertEqual(gapped["gene"].tolist(), ["AAA", "-", "-"])
+        # The no-such-column fallback must be indexed the same way
+        with self.assertLogs(level="WARNING"):
+            missing = src.into_ranges(gapped, "nosuchcolumn", "-")
+        self.assertEqual(missing.index.tolist(), [0, 2, 3])
 
     def test_ranges_of(self):
         cnarr = read_ga("formats/amplicon.cnr")
         segarr = read_ga("formats/amplicon.cns")
         by_bins = cnarr.by_ranges(segarr)
         by_slices = cnarr.iter_ranges_of(segarr, "gene")
-        for (_seg, by_bin), by_slice in zip(by_bins, by_slices, strict=False):
+        for (_seg, by_bin), by_slice in zip(by_bins, by_slices, strict=True):
             self.assertEqual(len(by_bin), len(by_slice))
             self.assertTrue((by_bin["gene"].to_numpy() == by_slice.to_numpy()).all())
         # With a VCF
@@ -196,6 +270,33 @@ class GaryTests(unittest.TestCase):
         mtarr = tabio.read("formats/empty")
         self.assertEqual(0, len(list(segarr.iter_ranges_of(mtarr, "start"))))
         self.assertEqual(88, len(list(mtarr.iter_ranges_of(segarr, "end"))))
+
+    def test_ranges_of_non_contiguous_chromosomes(self):
+        """iter_ranges_of and by_ranges yield in the other array's row order.
+
+        Both are consumed positionally against the other array's rows -- see
+        ``segmetrics.do_segmetrics`` and ``CopyNumArray.residuals`` for
+        ``iter_ranges_of``, and the ``variants.by_ranges(segarr)``
+        re-segmentation in ``cnvlib.segmentation`` for ``by_ranges`` -- so a
+        chromosome-grouped order would misassign across chromosomes.
+        """
+        src, dest = self._non_contiguous_pair()
+        self.assertEqual(
+            [s.tolist() for s in src.iter_ranges_of(dest, "gene")],
+            [["AAA"], ["CCC"], [], []],
+        )
+        self.assertEqual(
+            [
+                (row.chromosome, row.start, sub["gene"].tolist())
+                for row, sub in src.by_ranges(dest)
+            ],
+            [
+                ("chr2", 0, ["AAA"]),
+                ("chr10", 0, ["CCC"]),
+                ("chr2", 2000, []),
+                ("chr10", 2000, []),
+            ],
+        )
 
     def test_ranges_resize(self):
         baits_fname = "formats/nv2_baits.interval_list"

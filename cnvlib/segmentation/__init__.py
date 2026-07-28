@@ -404,7 +404,11 @@ def transfer_fields(
 
     Segment gene name is the comma-separated list of bin gene names. Segment
     weight is the sum of bin weights, and depth is the (weighted) mean of bin
-    depths. Bins with NaN weights are excluded from the sums and averages.
+    depths. Bins with NaN weights are excluded from the sums and averages. A
+    segment overlapping no bins takes the placeholder gene "-" and a weight and
+    depth of 0; that happens on the CBS/"none" variant re-segmentation path,
+    where `variants_in_segment` places a breakpoint midway between two SNVs and
+    that midpoint can fall inside a bin-free gap.
 
     Also post-processes the segmentation: within `cnarr`, each chromosome's
     first and last segment is stretched to span that chromosome's bins, keeping
@@ -447,8 +451,8 @@ def transfer_fields(
         # The bins are the source of these segments, so a segment on an unknown
         # chromosome means the name was mangled in transit -- e.g. DNAcopy
         # renders a zero-padded contig '01' as '1'. Fail loudly: the segment
-        # would otherwise silently take the default gene '-' and weight/depth 0
-        # below, since the aggregation matches on chromosome name too.
+        # would otherwise silently take the empty aggregate -- gene '-' and
+        # weight/depth 0 -- since the aggregation matches on chromosome name too.
         raise ValueError(
             "Segments on chromosomes absent from the input bins: "
             + ", ".join(sorted(set(seg_chroms[~matched])))
@@ -457,34 +461,43 @@ def transfer_fields(
     # Aggregate segment depths, weights, gene names
     # ENH refactor so that np/CNA.data access is encapsulated in skgenome
     ignore += params.ANTITARGET_ALIASES
-    cdata = cnarr.data.reset_index()
+    # reset_index so the index labels `iter_slices` yields are also positions
+    # into the numpy arrays extracted below, which the loop indexes directly.
+    cdata = cnarr.data.reset_index(drop=True)
     if "depth" not in cdata.columns:
         cdata["depth"] = np.exp2(cnarr["log2"].to_numpy())
     bin_genes = cdata["gene"].to_numpy()
-    bin_weights = cdata["weight"].to_numpy() if "weight" in cdata.columns else None
     bin_depths = cdata["depth"].to_numpy()
-    seg_genes = ["-"] * len(segments)
-    seg_weights = np.zeros(len(segments))
-    seg_depths = np.zeros(len(segments))
+    bin_weights = (
+        cdata["weight"].to_numpy()
+        if "weight" in cdata.columns
+        # No weight column means equal weighting, so the sum below is the bin
+        # count and the weighted mean is the plain mean.
+        else np.ones(len(cdata))
+    )
+    seg_genes: list[str] = []
+    seg_weights: list[float] = []
+    seg_depths: list[float] = []
 
-    for i, bin_idx in enumerate(iter_slices(cdata, segments.data, "outer", False)):
-        if bin_weights is not None:
-            wt = bin_weights[bin_idx]
-            # Use nansum so NaN weights don't propagate into .cns output
-            seg_wt = float(np.nansum(wt))
-            if seg_wt > 0:
-                valid = ~np.isnan(wt)
-                seg_dp = np.average(bin_depths[bin_idx][valid], weights=wt[valid])
-            else:
-                seg_dp = 0.0
+    # keep_empty=True is what makes `iter_slices` yield one index array per
+    # segment row (the order is always the segments' row order): a segment
+    # spanning no bins must still take a slot, or every later row would take
+    # its successor's bins. A dropped slot then fails loudly on the `assign`
+    # below, which rejects a length mismatch; the ordering half of the
+    # correspondence is `iter_slices`' responsibility.
+    for bin_idx in iter_slices(cdata, segments.data, "outer", keep_empty=True):
+        wt = bin_weights[bin_idx]
+        # Use nansum so NaN weights don't propagate into .cns output
+        seg_wt = float(np.nansum(wt))
+        if seg_wt > 0:
+            valid = ~np.isnan(wt)
+            seg_dp = np.average(bin_depths[bin_idx][valid], weights=wt[valid])
         else:
-            bin_count = len(cdata.iloc[bin_idx])
-            seg_wt = float(bin_count)
-            seg_dp = bin_depths[bin_idx].mean()
-        seg_gn = join_strings(bin_genes[bin_idx], ignore=ignore)
-        seg_genes[i] = seg_gn
-        seg_weights[i] = seg_wt
-        seg_depths[i] = seg_dp
+            # No overlapping bins, or every one weightless: no depth evidence
+            seg_dp = 0.0
+        seg_genes.append(join_strings(bin_genes[bin_idx], ignore=ignore))
+        seg_weights.append(seg_wt)
+        seg_depths.append(float(seg_dp))
 
     segments.data = segments.data.assign(
         gene=seg_genes, weight=seg_weights, depth=seg_depths

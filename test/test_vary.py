@@ -59,6 +59,12 @@ class VariantArrayTests(unittest.TestCase):
         baf = varr.baf_by_ranges(ranges)
         self.assertEqual(len(baf), len(ranges))  # 3, not 5 (the variant count)
         self.assertTrue(baf.isna().all())
+        # Indexed by the ranges, like the normal into_ranges path: callers
+        # assign it onto a column and pandas aligns that by label
+        gapped = ranges[np.array([True, False, True])]
+        self.assertEqual(
+            varr.baf_by_ranges(gapped).index.tolist(), gapped.data.index.tolist()
+        )
 
     def test_mirrored_baf_all_nan(self):
         """All-NaN frequencies mirror to all-NaN without warning (#407).
