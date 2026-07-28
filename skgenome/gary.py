@@ -388,7 +388,9 @@ class GenomicArray:
         Yields
         ------
         tuple
-            (other bin, GenomicArray of overlapping rows in self)
+            (other bin, GenomicArray of overlapping rows in self), in `other`'s
+            row order. With `keep_empty`, exactly one per row of `other`, so
+            callers may pair them positionally.
         """
         for bin_row, subrange in by_ranges(self.data, other.data, mode, keep_empty):  # type: ignore[func-returns-value]
             if len(subrange):
@@ -503,7 +505,7 @@ class GenomicArray:
         column: str,
         default: int | float | str,
         summary_func: Callable | None = None,
-    ) -> pd.Series | pd.DataFrame:
+    ) -> pd.Series:
         """Re-bin values from `column` into the corresponding ranges in `other`.
 
         Match overlapping/intersecting rows from `other` to each row in `self`.
@@ -543,11 +545,12 @@ class GenomicArray:
         -------
         pd.Series
             The extracted and summarized values from `self` corresponding to
-            other's genomic ranges, the same length as `other`.
+            other's genomic ranges: the same length as `other`, in `other`'s
+            row order, and indexed by `other`'s index labels.
         """
         if column not in self:
             logging.warning("No '%s' column available for summary calculation", column)
-            return pd.Series(np.repeat(default, len(other)))
+            return pd.Series(np.repeat(default, len(other)), index=other.data.index)
         return into_ranges(self.data, other.data, column, default, summary_func)
 
     def iter_ranges_of(
@@ -557,7 +560,7 @@ class GenomicArray:
         mode: str = "outer",
         keep_empty: bool = True,
     ) -> Iterator[pd.Series]:
-        """Group rows by another GenomicArray's bin coordinate ranges.
+        """Extract values of `column` grouped by another array's ranges.
 
         For example, this can be used to group SNVs by CNV segments.
 
@@ -579,13 +582,15 @@ class GenomicArray:
               selection; the bin start or end position is replaced with the
               selection boundary position.
         keep_empty : bool
-            Whether to also yield `other` bins with no overlapping bins in
-            `self`, or to skip them when iterating.
+            Whether to also emit an empty Series for `other` rows with no
+            overlapping rows in `self`, or to skip those rows.
 
         Yields
         ------
-        tuple
-            (other bin, GenomicArray of overlapping rows in self)
+        pd.Series
+            The `column` values of the rows in `self` overlapping each row of
+            `other`, in `other`'s row order. With `keep_empty`, exactly one per
+            row of `other`, so callers may pair them positionally.
         """
         if column not in self.data.columns:
             raise ValueError(f"No column named {column!r} in this object")
@@ -754,7 +759,8 @@ class GenomicArray:
             pairs = pairs[
                 (pairs["start"] >= pairs["start_"]) & (pairs["end"] <= pairs["end_"])
             ]
-        # Sort by other-index then self-index to match by_ranges ordering
+        # Sort by `other`'s index labels then `self`'s; with `other`'s usual
+        # monotonic index this reproduces `by_ranges`' row order
         pairs = pairs.sort_values(["index_", "index"])
         # Return self rows (with duplicates, one per overlap pair)
         self_indices = pairs["index"].to_numpy()

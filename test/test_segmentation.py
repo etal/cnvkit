@@ -541,6 +541,203 @@ class TransferFieldsTests(unittest.TestCase):
             segmentation.transfer_fields(segarr, cnarr)
         self.assertIn("1", str(caught.exception))
 
+    @staticmethod
+    def _bin_gap_pair(with_weight):
+        """Two chr1 bins separated by a 99 kb gap, and three segments over them.
+
+        Bins: 0-1000 (AAA, depth 100, weight 1) and 100000-101000 (BBB, depth
+        200, weight 2). Segments: 0-20000, 20000-60000 and 60000-101000, of
+        which the middle one lies wholly inside the gap. ``with_weight`` adds
+        the bin weight column; without it the aggregation weights bins equally.
+        """
+        bins = {
+            "chromosome": ["chr1"] * 2,
+            "start": [0, 100_000],
+            "end": [1000, 101_000],
+            "gene": ["AAA", "BBB"],
+            "log2": [0.0, 0.0],
+            "depth": [100.0, 200.0],
+        }
+        if with_weight:
+            bins["weight"] = [1.0, 2.0]
+        segments = {
+            "chromosome": ["chr1"] * 3,
+            "start": [0, 20_000, 60_000],
+            "end": [20_000, 60_000, 101_000],
+            "gene": ["-"] * 3,
+            "log2": [0.0] * 3,
+        }
+        return (
+            cnary.CopyNumArray(pd.DataFrame(bins)),
+            cnary.CopyNumArray(pd.DataFrame(segments)),
+        )
+
+    def test_transfer_fields_segment_spanning_no_bins(self):
+        """A segment overlapping no bins takes the empty aggregate, not a neighbor's.
+
+        ``iter_slices(..., keep_empty=False)`` omits the yield for such a
+        segment, so a consumer pairing the yields with segment rows
+        positionally would shift every later row onto the following segment's
+        bins. The middle segment here lies wholly inside a bin-free gap; each
+        flanking segment must still get its own bin.
+        """
+        cnarr, segarr = self._bin_gap_pair(with_weight=True)
+        result = segmentation.transfer_fields(segarr, cnarr)
+        self.assertEqual(result["gene"].tolist(), ["AAA", "-", "BBB"])
+        self.assertEqual(result["weight"].tolist(), [1.0, 0.0, 2.0])
+        self.assertEqual(result["depth"].tolist(), [100.0, 0.0, 200.0])
+
+    def test_transfer_fields_non_contiguous_chromosomes(self):
+        """Aggregates follow segment rows, not chromosome-grouped yield order.
+
+        ``by_shared_chroms`` groups the segments by chromosome with
+        ``groupby(sort=False)``, so consuming it directly would yield in
+        chromosome-of-first-appearance order and write values across
+        chromosomes; ``iter_slices`` re-orders to the segment rows. Interleaved
+        chromosome rows arise only for an in-memory array assembled by
+        concatenation and never re-sorted, since every file-based route is
+        sorted by ``tabio.read``. chr2 before chr10 makes first-appearance
+        order differ from the lexicographic order pandas would use with
+        ``groupby(sort=True)``, so recovering the groups by sorting fails here
+        too. Every gene, depth and weight is distinct, so any permutation of
+        the assignment fails.
+        """
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr2", "chr2", "chr10", "chr10"],
+                    "start": [0, 1000, 0, 1000],
+                    "end": [1000, 2000, 1000, 2000],
+                    "gene": ["AAA", "BBB", "CCC", "DDD"],
+                    "log2": [0.0] * 4,
+                    "depth": [100.0, 200.0, 300.0, 400.0],
+                    "weight": [1.0, 2.0, 3.0, 4.0],
+                }
+            )
+        )
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr2", "chr10", "chr2", "chr10"],
+                    "start": [0, 0, 1000, 1000],
+                    "end": [1000, 1000, 2000, 2000],
+                    "gene": ["-"] * 4,
+                    "log2": [0.0] * 4,
+                }
+            )
+        )
+        result = segmentation.transfer_fields(segarr, cnarr)
+        self.assertEqual(result["gene"].tolist(), ["AAA", "CCC", "BBB", "DDD"])
+        self.assertEqual(result["weight"].tolist(), [1.0, 3.0, 2.0, 4.0])
+        self.assertEqual(result["depth"].tolist(), [100.0, 300.0, 200.0, 400.0])
+
+    def test_transfer_fields_no_weight_column_spanning_no_bins(self):
+        """Without a bin weight column, a bin-free segment gets depth 0, not NaN.
+
+        ``weight`` is optional throughout CNVkit; absent, bins are weighted
+        equally, so the segment weight is the bin count and the depth is the
+        plain mean. The mean of an empty selection is NaN and warns, which
+        would put NaN in the .cns.
+        """
+        cnarr, segarr = self._bin_gap_pair(with_weight=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            result = segmentation.transfer_fields(segarr, cnarr)
+        self.assertEqual(result["depth"].tolist(), [100.0, 0.0, 200.0])
+        self.assertEqual(result["weight"].tolist(), [1.0, 0.0, 1.0])
+        # The .cns columns are float, not the int the bin count would infer
+        self.assertEqual(result.data["weight"].dtype, np.float64)
+        self.assertEqual(result.data["depth"].dtype, np.float64)
+
+    def test_transfer_fields_filtered_bins_gapped_index(self):
+        """Bin aggregation survives a bin table whose index has gaps.
+
+        ``iter_slices`` yields index *labels*, and the aggregation indexes the
+        extracted numpy arrays positionally, so ``transfer_fields`` resets the
+        index first. Without that, a filtered ``cnarr`` -- as the upstream log2
+        and coverage filters produce -- reads the wrong bins or runs off the
+        end of the arrays.
+        """
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 4,
+                    "start": [0, 100_000, 200_000, 300_000],
+                    "end": [1000, 101_000, 201_000, 301_000],
+                    "gene": ["AAA", "BBB", "CCC", "DDD"],
+                    "log2": [0.0] * 4,
+                    "depth": [100.0, 200.0, 300.0, 400.0],
+                    "weight": [1.0, 2.0, 3.0, 4.0],
+                }
+            )
+        )
+        # As drop_outliers / drop_low_coverage do: filter without re-indexing
+        kept = cnarr[cnarr["depth"] >= 300.0]
+        self.assertEqual(kept.data.index.tolist(), [2, 3])
+        segarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 2,
+                    "start": [200_000, 300_000],
+                    "end": [201_000, 301_000],
+                    "gene": ["-"] * 2,
+                    "log2": [0.0] * 2,
+                }
+            )
+        )
+        result = segmentation.transfer_fields(segarr, kept)
+        self.assertEqual(result["gene"].tolist(), ["CCC", "DDD"])
+        self.assertEqual(result["depth"].tolist(), [300.0, 400.0])
+        self.assertEqual(result["weight"].tolist(), [3.0, 4.0])
+
+    def test_do_segmentation_vcf_subsegment_without_bins(self):
+        """End-to-end: --vcf sub-segments can land in a bin-free gap.
+
+        ``variants_in_segment`` places a breakpoint midway between two SNVs,
+        which on a targeted panel can fall entirely inside the gap between two
+        bins. Whatever the resulting breakpoints, each bin's gene, depth and
+        weight must land on the segment that actually contains it.
+        """
+        bins, _segarr = self._bin_gap_pair(with_weight=True)
+        # 180 SNVs, all inside the 99 kb bin-free gap: 120 spread across it,
+        # plus 60 at BAF 0.75 in its middle, so the allele-frequency split
+        # necessarily lands between the bins.
+        pos = np.concatenate(
+            [np.linspace(1500, 99_000, 120), np.linspace(20_000, 60_000, 60)]
+        ).astype(int)
+        baf = np.concatenate([np.full(120, 0.5), np.full(60, 0.75)])
+        order = np.argsort(pos)
+        varr = vary.VariantArray(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 180,
+                    "start": pos[order],
+                    "end": pos[order] + 1,
+                    "ref": ["A"] * 180,
+                    "alt": ["G"] * 180,
+                    "zygosity": np.full(180, 0.5),
+                    "alt_freq": baf[order],
+                    "depth": np.full(180, 100.0),
+                }
+            )
+        )
+        segarr = segmentation.do_segmentation(bins, "none", variants=varr)
+        # The bin-free sub-segment is the condition under test; assert it exists
+        # so that a later change to `variants_in_segment` cannot make the test
+        # vacuous.
+        covered = [
+            ((bins.start < seg.end) & (bins.end > seg.start)).any()
+            for seg in segarr.data.itertuples()
+        ]
+        self.assertIn(False, covered)
+        for _, abin in bins.data.iterrows():
+            midpoint = (abin.start + abin.end) // 2
+            hits = segarr.data[(segarr.start <= midpoint) & (midpoint < segarr.end)]
+            self.assertEqual(len(hits), 1)
+            self.assertIn(abin.gene, hits["gene"].iat[0])
+            self.assertEqual(hits["depth"].iat[0], abin.depth)
+            self.assertEqual(hits["weight"].iat[0], abin.weight)
+
     def test_do_segmentation_drops_nan_log2(self):
         """do_segmentation tolerates NaN-log2 bins on the default path (#881).
 

@@ -9,6 +9,7 @@ GenomicArray types.
 
 from __future__ import annotations
 
+from itertools import repeat
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 import numpy as np
@@ -20,42 +21,60 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator, Sequence
 
     from numpy import ndarray
-    from pandas.core.indexes.base import Index
 
 Numeric: TypeAlias = int | float | np.number
+
+# One shared placeholder instead of a fresh array per yield: allocating one
+# costs ~200 ns against ~7 us of per-row work, and the missing-chromosome path
+# yields one for every row of `other`. Safe to hand out repeatedly because a
+# zero-length array has no elements to write.
+_EMPTY_SELECTION = np.empty(0, dtype=np.intp)
 
 
 def by_ranges(
     table: pd.DataFrame, other: pd.DataFrame, mode: str, keep_empty: bool
 ) -> Generator[tuple, None, None]:
-    """Group rows by another GenomicArray's bin coordinate ranges."""
-    for _chrom, bin_rows, src_rows in by_shared_chroms(other, table, keep_empty):
-        if src_rows is not None:
-            subranges = iter_ranges(
+    """Group rows by another GenomicArray's bin coordinate ranges.
+
+    Yields one (row of `other`, overlapping rows of `table`) pair per row of
+    `other`, in `other`'s row order, unless `keep_empty` is false and the
+    selection is empty.
+    """
+    # Build one sub-iterator per chromosome and draw from them in `other`'s row
+    # order; see `iter_slices` for why the grouped order of `by_shared_chroms`
+    # will not do.
+    per_chrom: dict[Any, Iterator] = {}
+    for chrom, bin_rows, src_rows in by_shared_chroms(other, table):
+        if src_rows is None or not len(src_rows):
+            # `table` has no rows on this chromosome, so every selection is
+            # empty. `by_shared_chroms` yields no empty group today; the length
+            # check is defensive, since `idx_ranges` would collapse an empty
+            # table to a single slice(None) and silently under-yield.
+            # ENH: empty dframe matching table, rather than a bare sequence
+            per_chrom[chrom] = repeat((), len(bin_rows))
+        else:
+            per_chrom[chrom] = iter_ranges(
                 src_rows, None, bin_rows["start"], bin_rows["end"], mode
             )
-            for bin_row, subrange in zip(
-                bin_rows.itertuples(index=False), subranges, strict=True
-            ):
-                yield bin_row, subrange
-        elif keep_empty:
-            for bin_row in bin_rows.itertuples(index=False):
-                yield (
-                    bin_row,
-                    [],
-                )  # ENH: empty dframe matching table  # ENH: empty dframe matching table
+    for bin_row in other.itertuples(index=False):
+        subrange = next(per_chrom[bin_row.chromosome])
+        if keep_empty or len(subrange):
+            yield bin_row, subrange
 
 
 def by_shared_chroms(
-    table: pd.DataFrame, other: pd.DataFrame, keep_empty: bool = True
-) -> Iterator[tuple[str, pd.DataFrame, None] | tuple[str, pd.DataFrame, pd.DataFrame]]:
-    """Group rows for both `table` and `other` by matching chromosome names."""
+    table: pd.DataFrame, other: pd.DataFrame
+) -> Iterator[tuple[str, pd.DataFrame, pd.DataFrame | None]]:
+    """Group rows for both `table` and `other` by matching chromosome names.
+
+    Yields one group per chromosome of `table`, in order of first appearance;
+    the third element is None where `other` has no rows on that chromosome.
+    """
     # When both `table` and `other` contain only one chromosome each, and it's
     # the same chromosome, we can just return the original tables.
     table_chr, other_chr = set(table["chromosome"]), set(other["chromosome"])
     if len(table_chr) == 1 and table_chr == other_chr:
         yield table["chromosome"].iat[0], table, other
-        # yield None, table, other
     else:
         # C416 would suggest `dict(...)`, but `dict()` on a pandas
         # DataFrameGroupBy follows the mapping protocol (via __getitem__),
@@ -63,11 +82,7 @@ def by_shared_chroms(
         # `'str' object is not callable`. Keep the comprehension.
         other_chroms = {c: o for c, o in other.groupby("chromosome", sort=False)}  # noqa: C416
         for chrom, ctable in table.groupby("chromosome", sort=False):
-            if chrom in other_chroms:
-                otable = other_chroms[chrom]
-                yield chrom, ctable, otable
-            elif keep_empty:
-                yield chrom, ctable, None
+            yield chrom, ctable, other_chroms.get(chrom)
 
 
 def into_ranges(
@@ -76,10 +91,10 @@ def into_ranges(
     src_col: str,
     default: Any,
     summary_func: Callable | None,
-) -> pd.DataFrame | pd.Series:
+) -> pd.Series:
     """Group a column in `source` by regions in `dest` and summarize."""
     if not len(source) or not len(dest):
-        return dest
+        return pd.Series(np.repeat(default, len(dest)), index=dest.index)
 
     if summary_func is None:
         # Choose a type-appropriate summary function
@@ -105,7 +120,9 @@ def into_ranges(
     result = [
         series2value(column[slc]) for slc in iter_slices(source, dest, "outer", True)
     ]
-    return pd.Series(result)
+    # Index by `dest`'s labels: callers assign the result back onto `dest`
+    # columns, and pandas aligns that assignment by label, not by position.
+    return pd.Series(result, index=dest.index)
 
 
 def iter_ranges(
@@ -141,24 +158,52 @@ def iter_ranges(
 
 def iter_slices(
     table: pd.DataFrame, other: pd.DataFrame, mode: str, keep_empty: bool
-) -> Iterator[ndarray | Index]:
-    """Yields indices to extract ranges from `table`.
+) -> Iterator[ndarray]:
+    """Yields indices to extract ranges from `table`, in `other`'s row order.
 
     Returns an iterable of integer arrays that can apply to Series objects,
     i.e. columns of `table`. These indices are of the DataFrame/Series' Index,
     not array coordinates -- so be sure to use DataFrame.loc, Series.loc, or
     Series getitem, as opposed to .iloc or indexing directly into Numpy arrays.
+
+    The yields are always in `other`'s row order. With `keep_empty` there is
+    additionally exactly one per row, so callers may pair them positionally;
+    without it, a row whose selection is empty is skipped.
     """
-    for _c, bin_rows, src_rows in by_shared_chroms(other, table, keep_empty):
-        if src_rows is None:
-            # Emit empty indices since 'table' is missing this chromosome
-            for _ in range(len(bin_rows)):
-                yield pd.Index([], dtype="int64")
+    # `by_shared_chroms` groups `other` by chromosome, so consuming it directly
+    # would yield in chromosome-of-first-appearance order, which differs from
+    # row order once a chromosome's rows are non-contiguous; a caller pairing
+    # the yields with rows positionally would then write each row's values onto
+    # another chromosome's row. Instead, build one lazy sub-iterator per
+    # chromosome and draw from them in `other`'s row order.
+    per_chrom: dict[Any, Iterator[ndarray]] = {}
+    for chrom, bin_rows, src_rows in by_shared_chroms(other, table):
+        if src_rows is None or not len(src_rows):
+            # `table` has no rows on this chromosome, so every selection is
+            # empty. `by_shared_chroms` yields no empty group today; the length
+            # check is defensive, since `idx_ranges` would collapse an empty
+            # table to a single slice(None) and silently under-yield.
+            per_chrom[chrom] = repeat(_EMPTY_SELECTION, len(bin_rows))
         else:
-            for slc, _s, _e in idx_ranges(src_rows, bin_rows.start, bin_rows.end, mode):
-                indices = src_rows.index[slc].to_numpy()
-                if keep_empty or len(indices):
-                    yield indices
+            per_chrom[chrom] = _chrom_slices(src_rows, bin_rows, mode)
+    for chrom in other["chromosome"].to_numpy():
+        indices = next(per_chrom[chrom])
+        if keep_empty or len(indices):
+            yield indices
+
+
+def _chrom_slices(
+    src_rows: pd.DataFrame, bin_rows: pd.DataFrame, mode: str
+) -> Iterator[ndarray]:
+    """Yield `src_rows` index labels selected by each row of `bin_rows`.
+
+    A named function rather than an inline generator expression: a genexp
+    evaluates only its outermost iterable eagerly, so its body would re-read
+    the caller's loop variables and every chromosome would slice the last one's
+    rows.
+    """
+    for slc, _start, _end in idx_ranges(src_rows, bin_rows.start, bin_rows.end, mode):
+        yield src_rows.index[slc].to_numpy()
 
 
 def idx_ranges(
