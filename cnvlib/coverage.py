@@ -20,7 +20,7 @@ from skgenome.chromnames import detect_chr_prefix
 
 from . import core, samutil
 from .cnary import CopyNumArray as CNA
-from .parallel import pick_pool, rm, to_chunks
+from .parallel import effective_procs, pick_pool, rm, to_chunks
 from .params import NULL_LOG2_COVERAGE
 
 if TYPE_CHECKING:
@@ -533,14 +533,18 @@ def interval_coverages_pileup(
     # regions doesn't abort the run -- and so the result is independent of how
     # the BED is split across processes (#620).
     bam_chroms = samutil.get_bam_chroms(bam_fname, fasta)
-    if procs == 1:
+    # Resolve the requested process count once, so the pool and the BED
+    # chunking agree on how many workers there are -- and so a host that can
+    # only give us one worker takes the cheap unchunked path.
+    nprocs = effective_procs(procs)
+    if nprocs == 1:
         table = bedcov(bed_fname, bam_fname, min_mapq, fasta, bam_chroms=bam_chroms)
     else:
         chunks = []
-        with pick_pool(procs) as pool:
+        with pick_pool(nprocs) as pool:
             args_iter = (
                 (bed_chunk, bam_fname, min_mapq, fasta, bam_chroms)
-                for bed_chunk in to_chunks(bed_fname)
+                for bed_chunk in to_chunks(bed_fname, nprocs=nprocs)
             )
             for bed_chunk_fname, table in pool.map(_bedcov, args_iter):
                 if len(table):
@@ -683,18 +687,24 @@ def bedcov(
             f"BED file {bed_fname!r} chromosome names don't match any in "
             f"BAM file {bam_fname!r}"
         )
-    columns = detect_bedcov_columns(raw)  # type: ignore[arg-type]
+    columns = detect_bedcov_columns(raw, has_extra=max_depth is not None)  # type: ignore[arg-type]
     usecols = [c for c in columns if c != "extra"]
     table = pd.read_csv(StringIO(raw), sep="\t", names=columns, usecols=usecols)  # type: ignore[arg-type]
     return table
 
 
-def detect_bedcov_columns(text: str) -> list[str]:
+def detect_bedcov_columns(text: str, has_extra: bool = False) -> list[str]:
     """Determine which 'bedcov' output columns to keep.
 
     bedcov outputs the input BED columns plus an appended numeric column
-    (basecount). With some options (e.g. -d), an additional trailing numeric
-    column may be appended; then basecount is the second-to-last column.
+    (basecount). Passing samtools ``-d`` appends a second numeric column, so
+    basecount is then the second-to-last; the caller knows whether it did that
+    and says so via `has_extra`.
+
+    `has_extra` must not be inferred from the data: a BED whose fifth field is
+    a numeric score is indistinguishable that way from ``-d`` output, and the
+    guess is made per output batch, so under ``--processes`` it could differ
+    between chunks of one BED and silently take depth from the score column.
     """
     firstline = text[: text.index("\n")]
     fields = firstline.split("\t")
@@ -702,15 +712,6 @@ def detect_bedcov_columns(text: str) -> list[str]:
 
     if tabcount < 3:
         raise RuntimeError(f"Bad line from bedcov:\n{firstline!r}")
-
-    def _is_int(s: str) -> bool:
-        try:
-            int(s)
-            return True
-        except ValueError:
-            return False
-
-    has_extra = len(fields) >= 2 and _is_int(fields[-1]) and _is_int(fields[-2])
 
     # BED3
     if tabcount == 3:

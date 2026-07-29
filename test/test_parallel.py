@@ -1,5 +1,9 @@
 """Unit tests for the parallel module."""
 
+import glob
+import gzip
+import os
+import tempfile
 import unittest
 from concurrent import futures
 from unittest import mock
@@ -146,3 +150,115 @@ class ParallelTests(unittest.TestCase):
             with parallel.pick_pool(64) as pool:
                 self.assertIsInstance(pool, futures.ProcessPoolExecutor)
                 self.assertEqual(pool._max_workers, 4)
+
+
+class ToChunksTests(unittest.TestCase):
+    """Tests for splitting a BED file into per-worker chunks."""
+
+    def _write_bed(self, nlines, *, comments=0, gzipped=False):
+        """Write a BED of `nlines` regions, optionally gzipped, and return it."""
+        lines = [f"#comment {i}\n" for i in range(comments)]
+        lines += [f"chr1\t{i * 100}\t{i * 100 + 50}\tbin{i}\n" for i in range(nlines)]
+        suffix = ".bed.gz" if gzipped else ".bed"
+        fd, fname = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+        self.addCleanup(parallel.rm, fname)
+        opener = gzip.open if gzipped else open
+        with opener(fname, "wt") as fh:
+            fh.writelines(lines)
+        return fname, lines[comments:]
+
+    @staticmethod
+    def _read_chunks(chunk_fnames):
+        """Read back the lines of each chunk file, in chunk order."""
+        chunks = []
+        for fname in chunk_fnames:
+            with open(fname) as fh:
+                chunks.append(fh.readlines())
+            parallel.rm(fname)
+        return chunks
+
+    def test_to_chunks_fills_every_worker(self):
+        """A BED smaller than the maximum chunk size must still be split across
+        the available workers; a fixed chunk size made `coverage -p N` run
+        single-threaded on small (e.g. WGS access) BEDs regardless of N (#526).
+        """
+        bed, lines = self._write_bed(440)
+        with mock.patch.object(parallel, "available_cpus", return_value=16):
+            chunks = self._read_chunks(parallel.to_chunks(bed, nprocs=16))
+        self.assertEqual(
+            len(chunks),
+            16 * parallel.CHUNKS_PER_PROCESS,
+            "a 440-region BED under 16 workers must be split CHUNKS_PER_PROCESS "
+            "ways per worker, not into a single serialized chunk",
+        )
+        self.assertEqual(
+            [line for chunk in chunks for line in chunk],
+            lines,
+            "chunking must preserve every region, in the BED's original order",
+        )
+        self.assertTrue(all(chunks), "no chunk may be empty")
+
+    def test_to_chunks_serial_yields_one_chunk(self):
+        """With one worker, a BED below the size cap stays a single chunk."""
+        bed, lines = self._write_bed(12)
+        chunks = self._read_chunks(parallel.to_chunks(bed))
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0], lines)
+
+    def test_to_chunks_respects_max_chunk_size(self):
+        """The per-worker size is capped, so a large BED under few workers is
+        still split into bounded chunks rather than one huge task."""
+        bed, lines = self._write_bed(10)
+        with mock.patch.object(parallel, "MAX_CHUNK_SIZE", 3):
+            chunks = self._read_chunks(parallel.to_chunks(bed))
+        self.assertEqual([len(chunk) for chunk in chunks], [3, 3, 3, 1])
+        self.assertEqual([line for chunk in chunks for line in chunk], lines)
+
+    def test_to_chunks_exact_multiple_yields_no_empty_chunk(self):
+        """When the line count divides evenly by the chunk size, the last chunk
+        is not an empty file -- and no unyielded temp file is left behind."""
+        bed, lines = self._write_bed(9)
+        before = set(glob.glob(os.path.join(tempfile.gettempdir(), "tmp.*.bed")))
+        with mock.patch.object(parallel, "MAX_CHUNK_SIZE", 3):
+            chunks = self._read_chunks(parallel.to_chunks(bed))
+        after = set(glob.glob(os.path.join(tempfile.gettempdir(), "tmp.*.bed")))
+        self.assertEqual([len(chunk) for chunk in chunks], [3, 3, 3])
+        self.assertEqual([line for chunk in chunks for line in chunk], lines)
+        self.assertEqual(after - before, set(), "left an unyielded chunk file")
+
+    def test_to_chunks_empty_bed_yields_nothing(self):
+        """A BED with no regions yields no chunks and creates no temp file, so
+        callers see an empty iteration rather than an empty chunk."""
+        bed, _lines = self._write_bed(0, comments=2)
+        before = set(glob.glob(os.path.join(tempfile.gettempdir(), "tmp.*.bed")))
+        with mock.patch.object(parallel, "available_cpus", return_value=4):
+            chunks = self._read_chunks(parallel.to_chunks(bed, nprocs=4))
+        after = set(glob.glob(os.path.join(tempfile.gettempdir(), "tmp.*.bed")))
+        self.assertEqual(chunks, [])
+        self.assertEqual(after - before, set())
+
+    def test_to_chunks_gzipped_input_and_comments(self):
+        """Comment lines are dropped and don't count toward chunk sizing, for
+        gzipped input as well as plain text."""
+        for gzipped in (False, True):
+            with self.subTest(gzipped=gzipped):
+                bed, lines = self._write_bed(8, comments=3, gzipped=gzipped)
+                with mock.patch.object(parallel, "available_cpus", return_value=4):
+                    chunks = self._read_chunks(parallel.to_chunks(bed, nprocs=4))
+                flat = [line for chunk in chunks for line in chunk]
+                self.assertEqual(flat, lines)
+                self.assertFalse(any(line.startswith("#") for line in flat))
+                self.assertEqual([len(chunk) for chunk in chunks], [1] * 8)
+
+    def test_to_chunks_rejects_positional_worker_count(self):
+        """`nprocs` is keyword-only: the parameter used to be a line count, so a
+        stale positional call must fail loudly rather than request 5000 workers.
+        """
+        bed, _lines = self._write_bed(4)
+        with self.assertRaises(TypeError):
+            list(parallel.to_chunks(bed, 5000))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
