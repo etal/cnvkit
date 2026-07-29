@@ -52,6 +52,7 @@ def batch_make_reference(
     do_cluster: bool,
     cluster_method: str = "hierarchical",
     bias_smoother: str = "median",
+    no_overlap: bool = False,
 ) -> tuple[str, str, str]:
     """Build a complete copy number reference from normal samples.
 
@@ -106,6 +107,10 @@ def batch_make_reference(
         0 = use all available CPUs.
     by_count : bool
         Calculate coverage by read count instead of read depth.
+    no_overlap : bool
+        Count each mate-pair fragment's overlapping bases once (avoids
+        FFPE short-insert double-counting). Passed to ``coverage.do_coverage``
+        for every normal sample.
     method : str
         Sequencing protocol: 'hybrid' (default), 'wgs', or 'amplicon'.
         Determines target/antitarget handling and default parameters.
@@ -383,6 +388,7 @@ def batch_make_reference(
                         min_mapq,
                         procs_per_cnn,
                         fasta,
+                        no_overlap,
                     )
                 )
                 anti_futures.append(
@@ -395,6 +401,7 @@ def batch_make_reference(
                         min_mapq,
                         procs_per_cnn,
                         fasta,
+                        no_overlap,
                     )
                 )
 
@@ -430,10 +437,11 @@ def batch_write_coverage(
     min_mapq: int,
     processes: int,
     fasta: str | None,
+    no_overlap: bool = False,
 ) -> str:
     """Run coverage on one sample (BAM or bedGraph), write to file."""
     cnarr = coverage.do_coverage(
-        bed_fname, sample_fname, by_count, min_mapq, processes, fasta
+        bed_fname, sample_fname, by_count, min_mapq, processes, fasta, no_overlap
     )
     tabio.write(cnarr, out_fname)
     return out_fname
@@ -461,6 +469,7 @@ def batch_run_sample(
     sample_sex: str | None = None,
     bias_smoother: str = "median",
     reuse_coverage: bool = False,
+    no_overlap: bool = False,
 ) -> None:
     """Run the pipeline on one sample (BAM or bedGraph file).
 
@@ -487,12 +496,24 @@ def batch_run_sample(
         raw_anti = read_cna(anti_cnn)
     else:
         raw_tgt = coverage.do_coverage(
-            target_bed, sample_fname, by_count, min_mapq, processes, fasta
+            target_bed,
+            sample_fname,
+            by_count,
+            min_mapq,
+            processes,
+            fasta,
+            no_overlap,
         )
         tabio.write(raw_tgt, tgt_cnn)
 
         raw_anti = coverage.do_coverage(
-            antitarget_bed, sample_fname, by_count, min_mapq, processes, fasta
+            antitarget_bed,
+            sample_fname,
+            by_count,
+            min_mapq,
+            processes,
+            fasta,
+            no_overlap,
         )
         tabio.write(raw_anti, anti_cnn)
 

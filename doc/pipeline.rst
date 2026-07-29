@@ -353,6 +353,15 @@ Alternatively, using the ``--count`` option counts
 the number of read start positions in the interval and normalizes to the
 interval size.
 
+For short-insert libraries where the two mates of a read pair overlap --
+common in FFPE and other degraded-DNA samples -- the default pileup and
+``--count`` calculations both count the overlapping bases twice, inflating
+apparent depth and occasionally producing artifactual focal copy-number
+calls. The ``--no-overlap`` option counts each fragment's
+mate-overlap bases once instead (the same semantics as ``samtools depth
+-s``), at the cost of forcing the ``--count`` algorithm internally, since
+``samtools bedcov`` has no equivalent overlap-aware mode.
+
 ::
 
     cnvkit.py coverage Sample.bam targets.bed -o Sample.targetcoverage.cnn

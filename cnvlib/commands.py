@@ -171,6 +171,18 @@ def add_min_mapq(P: argparse._ActionsContainer) -> None:
     )
 
 
+def add_no_overlap(P: argparse._ActionsContainer) -> None:
+    P.add_argument(
+        "--no-overlap",
+        action="store_true",
+        help="""Count each mate-pair fragment's overlapping bases once instead of
+                once per mate (samtools depth -s semantics), avoiding inflated
+                depth from short-insert fragments (e.g. FFPE). Forces the
+                by-count coverage algorithm, since samtools bedcov has no
+                overlap-aware mode.""",
+    )
+
+
 def add_snp_vcf_args(
     P: argparse._ActionsContainer, *, short_min_depth: bool = False
 ) -> None:
@@ -330,6 +342,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             args.cluster,
             args.cluster_method,
             bias_smoother=args.bias_smoother,
+            no_overlap=args.no_overlap,
         )
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
@@ -380,6 +393,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     args.sample_sex,
                     args.bias_smoother,
                     core.fbase(bam) in reusable_sids,
+                    args.no_overlap,
                 )
                 futures.append((bam, future))
             # Wait for all tasks to complete and raise any exceptions
@@ -454,6 +468,7 @@ P_batch.add_argument(
 )
 add_processes(P_batch)
 add_min_mapq(P_batch)
+add_no_overlap(P_batch)
 P_batch.add_argument(
     "--rscript-path",
     metavar="PATH",
@@ -911,6 +926,7 @@ def _cmd_coverage(args: argparse.Namespace) -> None:
         args.min_mapq,
         args.processes,
         args.fasta,
+        args.no_overlap,
     )
     if not args.output:
         # Create an informative but unique name for the coverage output file
@@ -943,6 +959,7 @@ P_coverage.add_argument(
             (An alternative algorithm).""",
 )
 add_min_mapq(P_coverage)
+add_no_overlap(P_coverage)
 P_coverage.add_argument(
     "-o", "--output", metavar="FILENAME", help="""Output file name."""
 )

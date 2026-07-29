@@ -403,6 +403,137 @@ class BatchTests(unittest.TestCase):
                 "reference construction (#1028).",
             )
 
+    def test_batch_run_sample_passes_no_overlap_to_do_coverage(self):
+        """``batch_run_sample`` must forward its ``no_overlap`` argument to
+        every ``coverage.do_coverage`` invocation it makes (#999).
+
+        Without this, ``cnvkit batch --no-overlap`` would silently drop
+        the flag and (anti)target coverage would keep double-counting
+        mate-pair overlap even though the CLI accepted the option.
+
+        AST-level guard, paired with the bias_smoother guards above.
+        ``no_overlap`` is threaded positionally (alongside ``fasta``), not
+        by keyword, so this checks the trailing positional argument rather
+        than ``inv.keywords``.
+        """
+        src = inspect.getsource(batch.batch_run_sample)
+        tree = ast.parse(src)
+        do_coverage_invocations = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "do_coverage"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "coverage"
+            ):
+                do_coverage_invocations.append(node)
+        self.assertGreater(
+            len(do_coverage_invocations),
+            0,
+            "Expected at least one coverage.do_coverage() invocation in "
+            "batch_run_sample",
+        )
+        for inv in do_coverage_invocations:
+            arg_names = {a.id for a in inv.args if isinstance(a, ast.Name)}
+            kw_names = {kw.arg for kw in inv.keywords}
+            self.assertIn(
+                "no_overlap",
+                arg_names | kw_names,
+                "coverage.do_coverage inside batch_run_sample must pass "
+                "no_overlap so `cnvkit batch --no-overlap` reaches "
+                "overlap-aware depth counting (#999).",
+            )
+
+    def test_batch_make_reference_passes_no_overlap_to_batch_write_coverage(self):
+        """``batch_make_reference`` must forward ``no_overlap`` to every
+        ``batch_write_coverage`` call it submits for normal samples (#999).
+
+        AST-level guard, paired with
+        ``test_batch_run_sample_passes_no_overlap_to_do_coverage``.
+        """
+        src = inspect.getsource(batch.batch_make_reference)
+        tree = ast.parse(src)
+        submit_invocations = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "submit"
+                and node.args
+                and isinstance(node.args[0], ast.Name)
+                and node.args[0].id == "batch_write_coverage"
+            ):
+                submit_invocations.append(node)
+        self.assertGreater(
+            len(submit_invocations),
+            0,
+            "Expected at least one pool.submit(batch_write_coverage, ...) "
+            "invocation in batch_make_reference",
+        )
+        for inv in submit_invocations:
+            arg_names = {a.id for a in inv.args if isinstance(a, ast.Name)}
+            kw_names = {kw.arg for kw in inv.keywords}
+            self.assertIn(
+                "no_overlap",
+                arg_names | kw_names,
+                "pool.submit(batch_write_coverage, ...) inside "
+                "batch_make_reference must pass no_overlap so `cnvkit batch "
+                "--no-overlap` reaches normal-sample coverage (#999).",
+            )
+
+    def test_cmd_batch_passes_no_overlap(self):
+        """``_cmd_batch`` must forward ``args.no_overlap`` to both
+        ``batch.batch_make_reference`` and ``batch.batch_run_sample`` (#999).
+        """
+        src = inspect.getsource(commands._cmd_batch)
+        tree = ast.parse(src)
+        checked = 0
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            target_name = None
+            if isinstance(func, ast.Attribute) and func.attr in (
+                "batch_make_reference",
+                "submit",
+            ):
+                target_name = func.attr
+            if target_name == "submit":
+                if not (
+                    node.args
+                    and isinstance(node.args[0], ast.Attribute)
+                    and node.args[0].attr == "batch_run_sample"
+                ):
+                    continue
+            elif target_name != "batch_make_reference":
+                continue
+            # batch_make_reference receives no_overlap by keyword;
+            # pool.submit(batch_run_sample, ...) receives it as a trailing
+            # positional argument (matching every other pool.submit call in
+            # this codebase, cf. batch_write_coverage in batch.py) --
+            # SerialPool.submit only forwards *args, not **kwargs.
+            arg_names = {a.id for a in node.args if isinstance(a, ast.Name)}
+            attr_names = {a.attr for a in node.args if isinstance(a, ast.Attribute)}
+            kw_names = {kw.arg for kw in node.keywords}
+            self.assertIn(
+                "no_overlap",
+                arg_names | attr_names | kw_names,
+                f"_cmd_batch's call to {target_name} must pass "
+                "args.no_overlap through to no_overlap (#999).",
+            )
+            checked += 1
+        self.assertEqual(
+            checked,
+            2,
+            "Expected exactly one batch_make_reference call and one "
+            "pool.submit(batch_run_sample, ...) call in _cmd_batch",
+        )
+
     # -- batch coverage-dedup / self-reference (#48) --
 
     def test_resolve_batch_sample_ids_self_reference_building(self):
