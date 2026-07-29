@@ -250,7 +250,7 @@ def do_coverage(
             )
         if no_overlap:
             logging.warning(
-                "Option --no-overlap/-s is not applicable to bedGraph input "
+                "Option --no-overlap is not applicable to bedGraph input "
                 "(no per-read pair information) and will be ignored"
             )
         cnarr = interval_coverages_bedgraph(bed_fname, bam_or_bg_fname)
@@ -294,10 +294,9 @@ def interval_coverages(
             )
             return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
 
-    # Calculate average read depth in each bin. `samtools bedcov` (the pileup
-    # path below) has no per-fragment overlap awareness, so overlap-aware
-    # mode always routes through the by-read-fetch counting engine, same as
-    # --count -- the only path that can see both mates of a fragment (#999).
+    # Calculate average read depth in each bin. The by-read-fetch engine is the
+    # only path that sees both mates of a fragment, so overlap-aware mode has to
+    # route through it (#999).
     if by_count or no_overlap:
         if no_overlap and not by_count:
             logging.info(
@@ -310,7 +309,7 @@ def interval_coverages(
             bam_fname,
             min_mapq,
             processes,
-            fasta,  # type: ignore[arg-type]
+            fasta,
             no_overlap,
         )
         read_counts, cna_rows = zip(*results, strict=True)
@@ -436,7 +435,7 @@ def interval_coverages_count(
     bam_fname: str,
     min_mapq: int,
     procs: int = 1,
-    fasta: None = None,
+    fasta: str | None = None,
     no_overlap: bool = False,
 ) -> Iterator[list[int | tuple[str, int, int, str, float, float]]]:
     """Calculate log2 coverages in the BAM file at each interval."""
@@ -487,7 +486,7 @@ def _rdc_chunk(
     bamfile: pysam.AlignmentFile,
     regions: GenomicArray,
     min_mapq: int,
-    fasta: None = None,
+    fasta: str | None = None,
     no_overlap: bool = False,
 ) -> Iterator[tuple[int, tuple[str, int, int, str, float, float]]]:
     if isinstance(bamfile, str):  # type: ignore[unreachable]
@@ -513,17 +512,21 @@ def region_depth_count(
     min_mapq: int,
     no_overlap: bool = False,
 ) -> tuple[int, tuple[str, int, int, str, float, float]]:
-    """Calculate depth of a region via pysam count.
+    """Calculate depth of a region by scanning its reads with pysam.
 
-    i.e. counting the number of read starts in a region, then scaling for read
-    length and region width to estimate depth.
+    i.e. counting the bases each read aligns within the region, then dividing by
+    the region's width. Coordinates are 0-based, per pysam.
 
-    Coordinates are 0-based, per pysam.
-
-    ``no_overlap``, if True, counts each fragment's (read pair's) covered
-    bases once instead of once per mate, so a short-insert fragment whose
-    mates overlap doesn't inflate depth in the overlap -- the same semantics
-    as ``samtools depth -s`` (#999, FFPE double-counting).
+    ``no_overlap``, if True, counts each fragment's (read pair's) covered bases
+    once instead of once per mate, so a short-insert fragment whose mates overlap
+    doesn't inflate depth in the overlap -- the semantics of ``samtools depth -s``
+    (#999, FFPE double-counting). Only records that can actually have a mate in
+    this region are pooled -- paired, mate mapped, mate on the same contig --
+    matching the preconditions htslib applies before entering its overlap hash;
+    single-end and cross-contig records are counted per read, as htslib does.
+    Where more than two records share a query name (e.g. a supplementary
+    alignment of a chimeric read), all of them are pooled as one template,
+    whereas htslib pairs only the first two.
     """
 
     def filter_read(read) -> bool:
@@ -542,24 +545,41 @@ def region_depth_count(
 
     count = 0
     bases = 0
-    # Overlap-aware mode unions each template's (query name's) aligned
-    # positions instead of summing per-read, so mate-pair overlap within a
-    # fragment is counted once; `frag_positions is None` keeps the default
-    # (bit-exact, allocation-free) path unchanged.
-    frag_positions: dict[str | None, set[int]] | None = {} if no_overlap else None
+    # Overlap-aware mode collects each template's (query name's) in-region
+    # aligned blocks and merges them, so a fragment's mate overlap is counted
+    # once. Blocks rather than positions: a bin can hold millions of aligned
+    # bases, and per-base Python objects cost both memory and time (#999).
+    frag_blocks: dict[str | None, list[tuple[int, int]]] = {}
     for read in bamfile.fetch(reference=chrom, start=start, end=end):
         if not filter_read(read):
             continue
         count += 1
-        read_positions = read.positions  # type: ignore[attr-defined]
-        in_region = (p for p in read_positions if start <= p < end)
-        if frag_positions is not None:
-            frag_positions.setdefault(read.query_name, set()).update(in_region)
+        if (
+            no_overlap
+            and read.is_paired
+            and not read.mate_is_unmapped
+            and read.next_reference_id == read.reference_id
+        ):
+            blocks = frag_blocks.setdefault(read.query_name, [])
+            for block_start, block_end in read.get_blocks():
+                lo, hi = max(block_start, start), min(block_end, end)
+                if lo < hi:
+                    blocks.append((lo, hi))
         else:
             # Only count the bases aligned to the region
-            bases += sum(1 for _ in in_region)
-    if frag_positions is not None:
-        bases = sum(len(positions) for positions in frag_positions.values())
+            bases += sum(1 for p in read.positions if start <= p < end)  # type: ignore[attr-defined,misc]
+    for blocks in frag_blocks.values():
+        if not blocks:
+            continue
+        blocks.sort()
+        cur_lo, cur_hi = blocks[0]
+        for lo, hi in blocks[1:]:
+            if lo > cur_hi:
+                bases += cur_hi - cur_lo
+                cur_lo, cur_hi = lo, hi
+            else:
+                cur_hi = max(cur_hi, hi)
+        bases += cur_hi - cur_lo
     depth = bases / (end - start) if end > start else 0
     row = (
         chrom,

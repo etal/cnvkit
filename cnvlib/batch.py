@@ -107,16 +107,16 @@ def batch_make_reference(
         0 = use all available CPUs.
     by_count : bool
         Calculate coverage by read count instead of read depth.
-    no_overlap : bool
-        Count each mate-pair fragment's overlapping bases once (avoids
-        FFPE short-insert double-counting). Passed to ``coverage.do_coverage``
-        for every normal sample.
     method : str
         Sequencing protocol: 'hybrid' (default), 'wgs', or 'amplicon'.
         Determines target/antitarget handling and default parameters.
     do_cluster : bool
         Apply hierarchical clustering to identify and separate reference
         sample subgroups (useful for heterogeneous normal cohorts).
+    no_overlap : bool, optional
+        Count each mate-pair fragment's overlapping bases once (avoids FFPE
+        short-insert double-counting), for every normal sample's coverage.
+        Default is False.
 
     Returns
     -------
@@ -388,7 +388,7 @@ def batch_make_reference(
                         min_mapq,
                         procs_per_cnn,
                         fasta,
-                        no_overlap,
+                        no_overlap=no_overlap,
                     )
                 )
                 anti_futures.append(
@@ -401,7 +401,7 @@ def batch_make_reference(
                         min_mapq,
                         procs_per_cnn,
                         fasta,
-                        no_overlap,
+                        no_overlap=no_overlap,
                     )
                 )
 
@@ -437,7 +437,7 @@ def batch_write_coverage(
     min_mapq: int,
     processes: int,
     fasta: str | None,
-    no_overlap: bool = False,
+    no_overlap: bool,
 ) -> str:
     """Run coverage on one sample (BAM or bedGraph), write to file."""
     cnarr = coverage.do_coverage(
@@ -482,6 +482,10 @@ def batch_run_sample(
     computed and written to ``{output_dir}/{sample_id}.*coverage.cnn`` earlier in
     the same run (the self-reference workflow where the sample is also a normal,
     #48); when True the existing files are read back instead of recomputed.
+
+    ``no_overlap`` counts each fragment's mate-overlap bases once instead of once
+    per mate when computing this sample's (anti)target coverage; see
+    ``--no-overlap`` on the ``coverage`` subcommand (#999).
     """
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", sample_fname)
@@ -502,7 +506,7 @@ def batch_run_sample(
             min_mapq,
             processes,
             fasta,
-            no_overlap,
+            no_overlap=no_overlap,
         )
         tabio.write(raw_tgt, tgt_cnn)
 
@@ -513,7 +517,7 @@ def batch_run_sample(
             min_mapq,
             processes,
             fasta,
-            no_overlap,
+            no_overlap=no_overlap,
         )
         tabio.write(raw_anti, anti_cnn)
 

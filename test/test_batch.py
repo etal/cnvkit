@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from conftest import linecount
+from conftest import ast_calls_to, ast_submit_calls, call_arg_names, linecount
 
 import cnvlib
 from cnvlib import (
@@ -287,26 +287,13 @@ class BatchTests(unittest.TestCase):
         AST-level guard so source rearrangements still catch the regression
         cleanly without needing a full BAM fixture per case.
         """
-        src = inspect.getsource(batch.batch_run_sample)
-        tree = ast.parse(src)
-        do_call_invocations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "do_call"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "call"
-            ):
-                do_call_invocations.append(node)
+        invocations = ast_calls_to(batch.batch_run_sample, "do_call", "call")
         self.assertGreater(
-            len(do_call_invocations),
+            len(invocations),
             0,
             "Expected at least one call.do_call() invocation in batch_run_sample",
         )
-        for inv in do_call_invocations:
+        for inv in invocations:
             kw_names = {kw.arg for kw in inv.keywords}
             self.assertIn(
                 "is_haploid_x_reference",
@@ -333,30 +320,16 @@ class BatchTests(unittest.TestCase):
         AST-level guard so source rearrangements still catch the regression
         cleanly without needing a full BAM fixture.
         """
-        src = inspect.getsource(batch.batch_run_sample)
-        tree = ast.parse(src)
-        do_fix_invocations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "do_fix"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "fix"
-            ):
-                do_fix_invocations.append(node)
+        invocations = ast_calls_to(batch.batch_run_sample, "do_fix", "fix")
         self.assertGreater(
-            len(do_fix_invocations),
+            len(invocations),
             0,
             "Expected at least one fix.do_fix() invocation in batch_run_sample",
         )
-        for inv in do_fix_invocations:
-            kw_names = {kw.arg for kw in inv.keywords}
+        for inv in invocations:
             self.assertIn(
                 "bias_smoother",
-                kw_names,
+                {kw.arg for kw in inv.keywords},
                 "fix.do_fix inside batch_run_sample must pass bias_smoother "
                 "explicitly so `cnvkit batch --bias-smoother loess` reaches "
                 "center_by_window (#1028).",
@@ -372,31 +345,19 @@ class BatchTests(unittest.TestCase):
         AST-level guard, paired with
         ``test_batch_run_sample_passes_bias_smoother_to_do_fix``.
         """
-        src = inspect.getsource(batch.batch_make_reference)
-        tree = ast.parse(src)
-        do_reference_invocations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "do_reference"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "reference"
-            ):
-                do_reference_invocations.append(node)
+        invocations = ast_calls_to(
+            batch.batch_make_reference, "do_reference", "reference"
+        )
         self.assertGreater(
-            len(do_reference_invocations),
+            len(invocations),
             0,
             "Expected at least one reference.do_reference() invocation "
             "in batch_make_reference",
         )
-        for inv in do_reference_invocations:
-            kw_names = {kw.arg for kw in inv.keywords}
+        for inv in invocations:
             self.assertIn(
                 "bias_smoother",
-                kw_names,
+                {kw.arg for kw in inv.keywords},
                 "reference.do_reference inside batch_make_reference must "
                 "pass bias_smoother explicitly so `cnvkit batch "
                 "--bias-smoother loess` reaches center_by_window during "
@@ -412,36 +373,18 @@ class BatchTests(unittest.TestCase):
         mate-pair overlap even though the CLI accepted the option.
 
         AST-level guard, paired with the bias_smoother guards above.
-        ``no_overlap`` is threaded positionally (alongside ``fasta``), not
-        by keyword, so this checks the trailing positional argument rather
-        than ``inv.keywords``.
         """
-        src = inspect.getsource(batch.batch_run_sample)
-        tree = ast.parse(src)
-        do_coverage_invocations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "do_coverage"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "coverage"
-            ):
-                do_coverage_invocations.append(node)
+        invocations = ast_calls_to(batch.batch_run_sample, "do_coverage", "coverage")
         self.assertGreater(
-            len(do_coverage_invocations),
+            len(invocations),
             0,
             "Expected at least one coverage.do_coverage() invocation in "
             "batch_run_sample",
         )
-        for inv in do_coverage_invocations:
-            arg_names = {a.id for a in inv.args if isinstance(a, ast.Name)}
-            kw_names = {kw.arg for kw in inv.keywords}
+        for inv in invocations:
             self.assertIn(
                 "no_overlap",
-                arg_names | kw_names,
+                call_arg_names(inv),
                 "coverage.do_coverage inside batch_run_sample must pass "
                 "no_overlap so `cnvkit batch --no-overlap` reaches "
                 "overlap-aware depth counting (#999).",
@@ -454,33 +397,19 @@ class BatchTests(unittest.TestCase):
         AST-level guard, paired with
         ``test_batch_run_sample_passes_no_overlap_to_do_coverage``.
         """
-        src = inspect.getsource(batch.batch_make_reference)
-        tree = ast.parse(src)
-        submit_invocations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "submit"
-                and node.args
-                and isinstance(node.args[0], ast.Name)
-                and node.args[0].id == "batch_write_coverage"
-            ):
-                submit_invocations.append(node)
+        invocations = ast_submit_calls(
+            batch.batch_make_reference, "batch_write_coverage"
+        )
         self.assertGreater(
-            len(submit_invocations),
+            len(invocations),
             0,
             "Expected at least one pool.submit(batch_write_coverage, ...) "
             "invocation in batch_make_reference",
         )
-        for inv in submit_invocations:
-            arg_names = {a.id for a in inv.args if isinstance(a, ast.Name)}
-            kw_names = {kw.arg for kw in inv.keywords}
+        for inv in invocations:
             self.assertIn(
                 "no_overlap",
-                arg_names | kw_names,
+                call_arg_names(inv),
                 "pool.submit(batch_write_coverage, ...) inside "
                 "batch_make_reference must pass no_overlap so `cnvkit batch "
                 "--no-overlap` reaches normal-sample coverage (#999).",
@@ -490,49 +419,21 @@ class BatchTests(unittest.TestCase):
         """``_cmd_batch`` must forward ``args.no_overlap`` to both
         ``batch.batch_make_reference`` and ``batch.batch_run_sample`` (#999).
         """
-        src = inspect.getsource(commands._cmd_batch)
-        tree = ast.parse(src)
-        checked = 0
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            target_name = None
-            if isinstance(func, ast.Attribute) and func.attr in (
-                "batch_make_reference",
-                "submit",
-            ):
-                target_name = func.attr
-            if target_name == "submit":
-                if not (
-                    node.args
-                    and isinstance(node.args[0], ast.Attribute)
-                    and node.args[0].attr == "batch_run_sample"
-                ):
-                    continue
-            elif target_name != "batch_make_reference":
-                continue
-            # batch_make_reference receives no_overlap by keyword;
-            # pool.submit(batch_run_sample, ...) receives it as a trailing
-            # positional argument (matching every other pool.submit call in
-            # this codebase, cf. batch_write_coverage in batch.py) --
-            # SerialPool.submit only forwards *args, not **kwargs.
-            arg_names = {a.id for a in node.args if isinstance(a, ast.Name)}
-            attr_names = {a.attr for a in node.args if isinstance(a, ast.Attribute)}
-            kw_names = {kw.arg for kw in node.keywords}
-            self.assertIn(
-                "no_overlap",
-                arg_names | attr_names | kw_names,
-                f"_cmd_batch's call to {target_name} must pass "
-                "args.no_overlap through to no_overlap (#999).",
-            )
-            checked += 1
+        invocations = ast_calls_to(commands._cmd_batch, "batch_make_reference")
+        invocations += ast_submit_calls(commands._cmd_batch, "batch_run_sample")
         self.assertEqual(
-            checked,
+            len(invocations),
             2,
             "Expected exactly one batch_make_reference call and one "
             "pool.submit(batch_run_sample, ...) call in _cmd_batch",
         )
+        for inv in invocations:
+            self.assertIn(
+                "no_overlap",
+                call_arg_names(inv),
+                "_cmd_batch must pass args.no_overlap through to no_overlap "
+                "in both the reference-building and per-sample paths (#999).",
+            )
 
     # -- batch coverage-dedup / self-reference (#48) --
 

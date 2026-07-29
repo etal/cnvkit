@@ -21,10 +21,10 @@ class SerialPool:
     def __init__(self) -> None:
         pass
 
-    def submit(self, func: Callable, *args) -> SerialFuture:
+    def submit(self, func: Callable, *args, **kwargs) -> SerialFuture:
         """Just call the function on the arguments."""
         try:
-            result = func(*args)
+            result = func(*args, **kwargs)
             return SerialFuture(result=result)
         except Exception as exc:
             return SerialFuture(exception=exc)

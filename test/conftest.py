@@ -1,3 +1,6 @@
+import ast
+import inspect
+
 import matplotlib
 import pytest
 
@@ -19,3 +22,53 @@ def linecount(filename):
         for i, _line in enumerate(handle):
             pass
         return i + 1
+
+
+def ast_calls_to(func, attr, obj=None):
+    """Return the ``ast.Call`` nodes in `func`'s source that call `attr`.
+
+    `obj`, when given, additionally requires the call to be made on that name,
+    so ``ast_calls_to(batch.batch_run_sample, "do_fix", "fix")`` matches only
+    ``fix.do_fix(...)``. Used by the argument-propagation guards, which assert
+    that a high-level entry point forwards an option to the function that
+    implements it -- a regression class that otherwise needs a BAM fixture and
+    a full pipeline run to detect.
+    """
+    calls = []
+    for node in ast.walk(ast.parse(inspect.getsource(func))):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != attr:
+            continue
+        if obj is not None and not (
+            isinstance(node.func.value, ast.Name) and node.func.value.id == obj
+        ):
+            continue
+        calls.append(node)
+    return calls
+
+
+def ast_submit_calls(func, target):
+    """Return the ``pool.submit(target, ...)`` call nodes in `func`'s source."""
+    calls = []
+    for call in ast_calls_to(func, "submit"):
+        if not call.args:
+            continue
+        first = call.args[0]
+        name = first.id if isinstance(first, ast.Name) else getattr(first, "attr", None)
+        if name == target:
+            calls.append(call)
+    return calls
+
+
+def call_arg_names(call):
+    """Names, attribute names and keywords supplied at a call site.
+
+    A propagation guard can then accept ``f(no_overlap)``, ``f(args.no_overlap)``
+    or ``f(no_overlap=...)`` interchangeably.
+    """
+    return (
+        {a.id for a in call.args if isinstance(a, ast.Name)}
+        | {a.attr for a in call.args if isinstance(a, ast.Attribute)}
+        | {kw.arg for kw in call.keywords}
+    )

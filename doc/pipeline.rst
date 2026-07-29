@@ -349,18 +349,24 @@ command.
 Calculate coverage in the given regions from BAM read depths.
 
 By default, coverage is calculated via mean read depth from a pileup.
-Alternatively, using the ``--count`` option counts
-the number of read start positions in the interval and normalizes to the
-interval size.
+Alternatively, the ``--count`` option scans each read individually with pysam
+and counts the bases it aligns within each interval, instead of using a
+samtools pileup.
 
 For short-insert libraries where the two mates of a read pair overlap --
 common in FFPE and other degraded-DNA samples -- the default pileup and
 ``--count`` calculations both count the overlapping bases twice, inflating
 apparent depth and occasionally producing artifactual focal copy-number
-calls. The ``--no-overlap`` option counts each fragment's
-mate-overlap bases once instead (the same semantics as ``samtools depth
--s``), at the cost of forcing the ``--count`` algorithm internally, since
-``samtools bedcov`` has no equivalent overlap-aware mode.
+calls. The ``--no-overlap`` option, available on both the :ref:`coverage` and
+:ref:`batch` commands, counts each fragment's mate-overlap bases once instead
+(the same semantics as ``samtools depth -s``). It implies the ``--count``
+algorithm, since ``samtools bedcov`` has no equivalent overlap-aware mode, and
+that switch carries two further consequences: bases spanned by a read's
+deletion are no longer counted, and the per-read scan is slower than the
+samtools pileup, so ``-p``/``--processes`` is advisable on large inputs. Under
+:ref:`batch`, note that automatic bin sizing (:ref:`autobin`) still estimates
+depth from the pileup, so bins will be somewhat smaller than the requested
+average when mate overlap is substantial.
 
 ::
 
