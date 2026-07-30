@@ -52,6 +52,7 @@ def batch_make_reference(
     do_cluster: bool,
     cluster_method: str = "hierarchical",
     bias_smoother: str = "median",
+    no_overlap: bool = False,
 ) -> tuple[str, str, str]:
     """Build a complete copy number reference from normal samples.
 
@@ -112,6 +113,10 @@ def batch_make_reference(
     do_cluster : bool
         Apply hierarchical clustering to identify and separate reference
         sample subgroups (useful for heterogeneous normal cohorts).
+    no_overlap : bool, optional
+        Count each mate-pair fragment's overlapping bases once (avoids FFPE
+        short-insert double-counting), for every normal sample's coverage.
+        Default is False.
 
     Returns
     -------
@@ -383,6 +388,7 @@ def batch_make_reference(
                         min_mapq,
                         procs_per_cnn,
                         fasta,
+                        no_overlap=no_overlap,
                     )
                 )
                 anti_futures.append(
@@ -395,6 +401,7 @@ def batch_make_reference(
                         min_mapq,
                         procs_per_cnn,
                         fasta,
+                        no_overlap=no_overlap,
                     )
                 )
 
@@ -430,10 +437,11 @@ def batch_write_coverage(
     min_mapq: int,
     processes: int,
     fasta: str | None,
+    no_overlap: bool,
 ) -> str:
     """Run coverage on one sample (BAM or bedGraph), write to file."""
     cnarr = coverage.do_coverage(
-        bed_fname, sample_fname, by_count, min_mapq, processes, fasta
+        bed_fname, sample_fname, by_count, min_mapq, processes, fasta, no_overlap
     )
     tabio.write(cnarr, out_fname)
     return out_fname
@@ -461,6 +469,7 @@ def batch_run_sample(
     sample_sex: str | None = None,
     bias_smoother: str = "median",
     reuse_coverage: bool = False,
+    no_overlap: bool = False,
 ) -> None:
     """Run the pipeline on one sample (BAM or bedGraph file).
 
@@ -473,6 +482,10 @@ def batch_run_sample(
     computed and written to ``{output_dir}/{sample_id}.*coverage.cnn`` earlier in
     the same run (the self-reference workflow where the sample is also a normal,
     #48); when True the existing files are read back instead of recomputed.
+
+    ``no_overlap`` counts each fragment's mate-overlap bases once instead of once
+    per mate when computing this sample's (anti)target coverage; see
+    ``--no-overlap`` on the ``coverage`` subcommand (#999).
     """
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", sample_fname)
@@ -487,12 +500,24 @@ def batch_run_sample(
         raw_anti = read_cna(anti_cnn)
     else:
         raw_tgt = coverage.do_coverage(
-            target_bed, sample_fname, by_count, min_mapq, processes, fasta
+            target_bed,
+            sample_fname,
+            by_count,
+            min_mapq,
+            processes,
+            fasta,
+            no_overlap=no_overlap,
         )
         tabio.write(raw_tgt, tgt_cnn)
 
         raw_anti = coverage.do_coverage(
-            antitarget_bed, sample_fname, by_count, min_mapq, processes, fasta
+            antitarget_bed,
+            sample_fname,
+            by_count,
+            min_mapq,
+            processes,
+            fasta,
+            no_overlap=no_overlap,
         )
         tabio.write(raw_anti, anti_cnn)
 

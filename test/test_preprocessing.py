@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from conftest import linecount
+from conftest import ast_calls_to, call_arg_names, linecount
 
 import cnvlib
 from cnvlib import (
@@ -232,6 +232,225 @@ class PreprocessingTests(unittest.TestCase):
             self.assertEqual(count, n_kept)
         finally:
             shutil.rmtree(tmpdir)
+
+    def _write_overlap_fixture(self, tmpdir):
+        """Build a BAM/BED pair for exercising --no-overlap.
+
+        ``regionA`` (chr1:90-180, width 90) holds one fragment whose mates
+        overlap by 30bp (mate1 [100,150), mate2 [120,170) -- 70bp of unique
+        fragment span but 100bp of naively-summed mate bases), mimicking the
+        short-insert FFPE double-counting from #999.
+
+        ``regionB`` (chr1:300-400, width 100) holds one fragment whose mates
+        do *not* overlap (mate1 [300,350), mate2 [360,410)), so it's a control
+        proving --no-overlap is a no-op when no mate bases overlap.
+
+        Empirically cross-checked against samtools 1.24 on this exact
+        geometry: ``samtools bedcov`` and ``samtools depth`` (no ``-s``) both
+        report basecount 100 in regionA (they count the overlap twice);
+        ``samtools depth -s`` and ``samtools mpileup`` (overlap-removal default
+        ON) report 70. ``samtools bedcov`` has no ``-s``-equivalent flag at all,
+        hence the per-template position union this option implements.
+        """
+        seqlen = 50
+        header = {
+            "HD": {"VN": "1.6", "SO": "coordinate"},
+            "SQ": [{"SN": "chr1", "LN": 1000}],
+        }
+        bam = os.path.join(tmpdir, "overlap.bam")
+
+        def make_read(name, start, flag, mate_start):
+            a = pysam.AlignedSegment()
+            a.query_name = name
+            a.query_sequence = "A" * seqlen
+            a.flag = flag
+            a.reference_id = 0
+            a.reference_start = start
+            a.mapping_quality = 60
+            a.cigarstring = f"{seqlen}M"
+            a.query_qualities = pysam.qualitystring_to_array("I" * seqlen)
+            a.next_reference_id = 0
+            a.next_reference_start = mate_start
+            return a
+
+        with pysam.AlignmentFile(bam, "wb", header=header) as out:
+            # regionA: overlapping mates (paired, proper_pair, read1/read2)
+            out.write(make_read("fragA", 100, 0x63, 120))
+            out.write(make_read("fragA", 120, 0x93, 100))
+            # regionB: non-overlapping mates -- the union changes nothing
+            out.write(make_read("fragB", 300, 0x63, 360))
+            out.write(make_read("fragB", 360, 0x93, 300))
+        pysam.index(bam)
+
+        bed = os.path.join(tmpdir, "region.bed")
+        with open(bed, "w") as fh:
+            fh.write("chr1\t90\t180\tregionA\n")
+            fh.write("chr1\t300\t400\tregionB\n")
+        return bam, bed
+
+    def test_coverage_no_overlap_counts_mate_overlap_once(self):
+        """--no-overlap counts a fragment's mate-overlap bases once
+        (``samtools depth -s`` semantics), leaving non-overlapping fragments
+        untouched (#999)."""
+        tmpdir = tempfile.mkdtemp()
+        try:
+            bam, _bed = self._write_overlap_fixture(tmpdir)
+            bamfile = pysam.AlignmentFile(bam, "rb")
+            count_off, row_off = coverage.region_depth_count(
+                bamfile, "chr1", 90, 180, "regionA", 0
+            )
+            count_on, row_on = coverage.region_depth_count(
+                bamfile, "chr1", 90, 180, "regionA", 0, no_overlap=True
+            )
+            self.assertEqual(count_off, 2)
+            self.assertEqual(
+                count_on, 2, "read count is unaffected by overlap unioning"
+            )
+            self.assertAlmostEqual(
+                row_off[5], 100 / 90, msg="flag off: overlap counted twice"
+            )
+            self.assertAlmostEqual(
+                row_on[5], 70 / 90, msg="flag on: overlap counted once"
+            )
+
+            # Control region: mates don't overlap, so the union changes nothing.
+            _count_off, ctrl_off = coverage.region_depth_count(
+                bamfile, "chr1", 300, 400, "regionB", 0
+            )
+            _count_on, ctrl_on = coverage.region_depth_count(
+                bamfile, "chr1", 300, 400, "regionB", 0, no_overlap=True
+            )
+            self.assertEqual(ctrl_off[5], ctrl_on[5])
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_coverage_defaults_to_overlap_unaware_pileup(self):
+        """Omitting --no-overlap must leave the historical (overlap-inflated)
+        behavior in place: the default routes to the pileup engine, whose
+        basecount it reproduces exactly, and the by-count engine still sums both
+        mates over the overlap."""
+        tmpdir = tempfile.mkdtemp()
+        try:
+            bam, bed = self._write_overlap_fixture(tmpdir)
+            cna = commands.do_coverage(bed, bam)  # no_overlap defaults to False
+            bedcov_table = coverage.bedcov(bed, bam, 0)
+            bedcov_table["depth"] = bedcov_table["basecount"] / (
+                bedcov_table["end"] - bedcov_table["start"]
+            )
+            for _i, row in bedcov_table.iterrows():
+                match = cna.data[
+                    (cna.data.start == row.start) & (cna.data.end == row.end)
+                ]
+                self.assertEqual(len(match), 1)
+                self.assertAlmostEqual(float(match["depth"].iloc[0]), row["depth"])
+            # The by-count engine, which --no-overlap reroutes through, also
+            # double-counts the overlap by default (100 of 90bp, not 70).
+            cna_count = commands.do_coverage(bed, bam, by_count=True)
+            self.assertAlmostEqual(
+                float(cna_count.data[cna_count.data.start == 90]["depth"].iloc[0]),
+                100 / 90,
+            )
+            self.assertAlmostEqual(
+                float(cna_count.data[cna_count.data.start == 300]["depth"].iloc[0]),
+                90 / 100,
+            )
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_coverage_no_overlap_only_pools_matable_records(self):
+        """Overlap unioning applies only to records that could have a mate in
+        the region. Two *unpaired* records sharing a query name -- e.g. from
+        name-collided merged BAMs -- must still be counted separately, as
+        ``samtools depth -s`` does, rather than silently losing their overlap."""
+        tmpdir = tempfile.mkdtemp()
+        try:
+            seqlen = 50
+            header = {
+                "HD": {"VN": "1.6", "SO": "coordinate"},
+                "SQ": [{"SN": "chr1", "LN": 1000}],
+            }
+            bam = os.path.join(tmpdir, "unpaired.bam")
+            with pysam.AlignmentFile(bam, "wb", header=header) as out:
+                for start in (100, 120):
+                    a = pysam.AlignedSegment()
+                    a.query_name = "collided"
+                    a.query_sequence = "A" * seqlen
+                    a.flag = 0  # single-end, mapped, forward
+                    a.reference_id = 0
+                    a.reference_start = start
+                    a.mapping_quality = 60
+                    a.cigarstring = f"{seqlen}M"
+                    a.query_qualities = pysam.qualitystring_to_array("I" * seqlen)
+                    out.write(a)
+            pysam.index(bam)
+            bamfile = pysam.AlignmentFile(bam, "rb")
+            _count, row = coverage.region_depth_count(
+                bamfile, "chr1", 90, 180, "regionA", 0, no_overlap=True
+            )
+            self.assertAlmostEqual(row[5], 100 / 90)
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_coverage_no_overlap_end_to_end(self):
+        """--no-overlap, threaded through do_coverage (both the default
+        pileup-equivalent path and --count), fixes the overlap-inflated bin to
+        its true depth while leaving the non-overlapping control bin unchanged,
+        for a fixture BAM with a known overlapping mate pair (#999 acceptance
+        criteria). The flag-off values it is measured against are pinned exactly
+        by ``test_coverage_no_overlap_counts_mate_overlap_once`` (count engine)
+        and ``test_coverage_no_overlap_flag_off_is_bit_exact`` (pileup engine).
+        """
+        tmpdir = tempfile.mkdtemp()
+        try:
+            bam, bed = self._write_overlap_fixture(tmpdir)
+            for by_count in (False, True):
+                with self.subTest(by_count=by_count):
+                    cna = commands.do_coverage(
+                        bed, bam, by_count=by_count, no_overlap=True
+                    )
+                    regionA = cna.data[cna.data.start == 90].iloc[0]
+                    regionB = cna.data[cna.data.start == 300].iloc[0]
+                    self.assertAlmostEqual(float(regionA["depth"]), 70 / 90)
+                    self.assertAlmostEqual(float(regionB["depth"]), 90 / 100)
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_coverage_no_overlap_ignored_for_bedgraph(self):
+        """--no-overlap has no per-read information to act on for bedGraph
+        input, so it's ignored with a warning, matching --count/--min-mapq/
+        --processes on the same input type."""
+        bed = "formats/my-targets.bed"
+        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
+        with self.assertLogs(level="WARNING") as cm:
+            cna = commands.do_coverage(bed, bedgraph, no_overlap=True)
+        self.assertTrue(any("no-overlap" in m.lower() for m in cm.output))
+        self.assertGreater(len(cna), 0)
+
+    def test_coverage_no_overlap_cli_flag(self):
+        """--no-overlap parses on both `coverage` and `batch`, default off."""
+        args = commands.AP.parse_args(["coverage", "a.bam", "b.bed"])
+        self.assertFalse(args.no_overlap)
+        args = commands.AP.parse_args(["coverage", "a.bam", "b.bed", "--no-overlap"])
+        self.assertTrue(args.no_overlap)
+        args = commands.AP.parse_args(
+            ["batch", "a.bam", "-r", "ref.cnn", "-d", "out", "--no-overlap"]
+        )
+        self.assertTrue(args.no_overlap)
+
+    def test_coverage_no_overlap_propagated_to_do_coverage(self):
+        """AST guard: `_cmd_coverage` must forward `args.no_overlap` into
+        `coverage.do_coverage`, not silently drop it (cf. the bias_smoother
+        propagation guards in test_batch.py)."""
+        invocations = ast_calls_to(commands._cmd_coverage, "do_coverage", "coverage")
+        self.assertGreater(
+            len(invocations), 0, "Expected a do_coverage() call in _cmd_coverage"
+        )
+        for inv in invocations:
+            self.assertIn(
+                "no_overlap",
+                call_arg_names(inv),
+                "_cmd_coverage must pass args.no_overlap to do_coverage",
+            )
 
     def test_coverage_partial_chrom_mismatch(self):
         """coverage tolerates a BED mixing present and absent contigs,

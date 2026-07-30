@@ -171,6 +171,23 @@ def add_min_mapq(P: argparse._ActionsContainer) -> None:
     )
 
 
+def add_no_overlap(P: argparse._ActionsContainer) -> None:
+    # Unlike the --no-gc/--no-edge/--no-rmask family, this flag switches a
+    # correction ON rather than disabling a default-on step, so the polarity is
+    # store_true with a negative dest -- deliberate, matching `samtools depth -s`
+    # and the option name users asked for in #999.
+    P.add_argument(
+        "--no-overlap",
+        action="store_true",
+        help="""Count each mate-pair fragment's overlapping bases once instead of
+                once per mate (samtools depth -s semantics), avoiding inflated
+                depth from short-insert fragments (e.g. FFPE). Implies the
+                by-count coverage algorithm, since samtools bedcov has no
+                overlap-aware mode: bases spanned by a read deletion are not
+                counted, and the output column order follows the --count path.""",
+    )
+
+
 def add_snp_vcf_args(
     P: argparse._ActionsContainer, *, short_min_depth: bool = False
 ) -> None:
@@ -330,6 +347,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             args.cluster,
             args.cluster_method,
             bias_smoother=args.bias_smoother,
+            no_overlap=args.no_overlap,
         )
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
@@ -376,10 +394,11 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     args.segment_method,
                     procs_per_sample,
                     args.cluster,
-                    args.fasta,
-                    args.sample_sex,
-                    args.bias_smoother,
-                    core.fbase(bam) in reusable_sids,
+                    fasta=args.fasta,
+                    sample_sex=args.sample_sex,
+                    bias_smoother=args.bias_smoother,
+                    reuse_coverage=core.fbase(bam) in reusable_sids,
+                    no_overlap=args.no_overlap,
                 )
                 futures.append((bam, future))
             # Wait for all tasks to complete and raise any exceptions
@@ -454,6 +473,7 @@ P_batch.add_argument(
 )
 add_processes(P_batch)
 add_min_mapq(P_batch)
+add_no_overlap(P_batch)
 P_batch.add_argument(
     "--rscript-path",
     metavar="PATH",
@@ -911,6 +931,7 @@ def _cmd_coverage(args: argparse.Namespace) -> None:
         args.min_mapq,
         args.processes,
         args.fasta,
+        no_overlap=args.no_overlap,
     )
     if not args.output:
         # Create an informative but unique name for the coverage output file
@@ -943,6 +964,7 @@ P_coverage.add_argument(
             (An alternative algorithm).""",
 )
 add_min_mapq(P_coverage)
+add_no_overlap(P_coverage)
 P_coverage.add_argument(
     "-o", "--output", metavar="FILENAME", help="""Output file name."""
 )
