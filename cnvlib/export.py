@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import OrderedDict as OD
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -312,6 +312,13 @@ def export_vcf(
         segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female
     )
     table = pd.DataFrame.from_records(vcf_rows, columns=vcf_columns)
+    if table.empty and len(segments):
+        logging.info(
+            "No VCF records emitted from %d input segments; the VCF will have a "
+            "header only. Only segments differing from the copy number expected "
+            "for this sample's sex and ploidy are exported.",
+            len(segments),
+        )
     vcf_body = table.to_csv(sep="\t", header=True, index=False, float_format="%.3g")
     return VCF_HEADER, vcf_body
 
@@ -413,13 +420,18 @@ def segments2vcf(
     else:
         has_ci = False
 
+    n_bad_probes = 0
     # Reformat this data to create INFO and genotype
     # TODO be more clever about this
     for out_row, abs_exp in zip(
         out_dframe.itertuples(index=False), abs_expect, strict=True
     ):
-        # Survive files from buggy v0.7.1 (#53)
-        if not str(out_row.probes).isdigit():
+        probes_str = _vcf_probes_str(out_row.probes)
+        if probes_str is None:
+            # Present but not a usable count: a segment file from the buggy
+            # v0.7.1 release (#53). Skip the segment, but say so afterward
+            # rather than silently emitting a header-only VCF.
+            n_bad_probes += 1
             continue
 
         cn_changed = out_row.ncopies != abs_exp
@@ -452,7 +464,7 @@ def segments2vcf(
         elif cn_changed and out_row.ncopies < abs_exp:
             # TODO XXX handle non-diploid ploidies, haploid chroms
             gt = "1/1" if out_row.ncopies == 0 else "0/1"
-            gq = str(out_row.probes)
+            gq = probes_str
         else:
             # Copy-neutral LOH: same diploid genotype call, allele identity
             # encoded by CN1/CN2.
@@ -462,9 +474,7 @@ def segments2vcf(
         if has_allele_specific:
             cn1_str = "." if pd.isna(out_row.cn1) else str(int(out_row.cn1))
             cn2_str = "." if pd.isna(out_row.cn2) else str(int(out_row.cn2))
-            genotype = (
-                f"{gt}:{gq}:{out_row.ncopies}:{cn1_str}:{cn2_str}:{out_row.probes}"
-            )
+            genotype = f"{gt}:{gq}:{out_row.ncopies}:{cn1_str}:{cn2_str}:{probes_str}"
             fmt_str = "GT:GQ:CN:CN1:CN2:CNQ"
         elif svtype == "DEL":
             # Preserve legacy GT:GQ-only shape for losses when no
@@ -472,7 +482,7 @@ def segments2vcf(
             genotype = f"{gt}:{gq}"
             fmt_str = "GT:GQ"
         else:
-            genotype = f"{gt}:{gq}:{out_row.ncopies}:{out_row.probes}"
+            genotype = f"{gt}:{gq}:{out_row.ncopies}:{probes_str}"
             fmt_str = "GT:GQ:CN:CNQ"
 
         fields = [
@@ -482,7 +492,7 @@ def segments2vcf(
             f"SVLEN={svlen_out}",
             f"FOLD_CHANGE={2.0**out_row.log2}",
             f"FOLD_CHANGE_LOG={out_row.log2}",
-            f"PROBES={out_row.probes}",
+            f"PROBES={probes_str}",
         ]
         if has_baf and not pd.isna(out_row.baf):
             fields.append(f"BAF={out_row.baf:.4g}")
@@ -511,6 +521,37 @@ def segments2vcf(
             fmt_str,
             genotype,
         )
+
+    if n_bad_probes:
+        logging.warning(
+            "Skipped %d of %d segments carrying an unparseable probe count; "
+            "was this segment file written by CNVkit v0.7.1?",
+            n_bad_probes,
+            len(segments),
+        )
+
+
+def _vcf_probes_str(probes: Any) -> str | None:
+    """Format a segment's probe count for VCF, or None to skip the segment.
+
+    An absent count -- a .cns written without a ``probes`` column, or with the
+    field left blank -- yields ".", the VCF missing value: missing support
+    information is not a reason to drop the segment from the export. A count
+    that is present but is not a whole number in the range of a VCF ``Integer``
+    yields None, skipping the segment, as such values indicate a segment file
+    written by the buggy v0.7.1 release (#53).
+    """
+    if pd.isna(probes):
+        return "."
+    try:
+        count = float(probes)
+    except (TypeError, ValueError):
+        return None
+    # A blank field in any row makes the whole column float-typed, so an intact
+    # count can arrive here as 6.0 rather than 6.
+    if not count.is_integer() or not 0 <= count < 2**31:
+        return None
+    return str(int(count))
 
 
 # _____________________________________________________________________________

@@ -163,6 +163,15 @@ to construct the :ref:`reference`, use it here, too.
 
     cnvkit.py export vcf Sample.cns -y -x female -i "SampleID" -o Sample.cnv.vcf
 
+The ``probes`` column of the input segments, if present, is reported as the
+``PROBES`` INFO field, the ``CNQ`` FORMAT field, and -- for deletions -- the
+genotype quality ``GQ``. The column is optional: segment files produced by
+other tools, or post-processed after ``cnvkit.py segment``, may omit it, in
+which case those three fields report the VCF missing value ``.`` and the
+segments themselves are still exported. A probe count that is present but is
+not a whole number indicates a segment file written by the buggy v0.7.1
+release; those segments are skipped, and the number skipped is logged.
+
 Allele-specific copy number and LOH evidence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

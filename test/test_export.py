@@ -345,6 +345,165 @@ class ExportTests(unittest.TestCase):
             info = dict(kv.split("=", 1) for kv in fields[7].split(";") if "=" in kv)
             self.assertIn(info["SVTYPE"], {"DUP", "DEL"})
 
+    def test_export_vcf_missing_probes_column(self):
+        """A .cns without a ``probes`` column still yields records, with ``PROBES=.``
+
+        ``segments2vcf`` reindexes the segment table onto a fixed column list, so
+        a segment file lacking ``probes`` gets NaN there rather than raising. The
+        #53 guard against unparseable probe counts then skipped every segment,
+        turning a missing optional column into a silent, header-only VCF. A
+        missing support count must not suppress the record: PROBES, CNQ and the
+        deletion genotype's GQ report the VCF missing value instead.
+        """
+        cns = cnvlib.read("formats/amplicon.cns")
+        # Sex context used for this fixture elsewhere in this class: a male
+        # sample against a haploid-X reference.
+        args = (2, True, None, False)
+        with_probes = self._vcf_records(cns, args)
+        without = self._vcf_records(
+            cns.as_dataframe(cns.data.drop(columns=["probes"])), args
+        )
+        self.assertTrue(with_probes)
+        # The same segments are emitted, and everything up to INFO is identical.
+        self.assertEqual(len(without), len(with_probes))
+        self.assertEqual([f[:7] for f in without], [f[:7] for f in with_probes])
+        self.assertTrue([f for f in without if f[4] == "<DEL>"])  # GQ check below
+        for fields in without:
+            where = f"{fields[0]}:{fields[1]}"
+            info = dict(kv.split("=", 1) for kv in fields[7].split(";") if "=" in kv)
+            self.assertEqual(info["PROBES"], ".", where)
+            fmt = fields[8].split(":")
+            vals = fields[9].split(":")
+            if "CNQ" in fmt:
+                self.assertEqual(vals[fmt.index("CNQ")], ".", where)
+            if info["SVTYPE"] == "DEL":
+                # GQ carries the probe count for losses (legacy GT:GQ shape).
+                self.assertEqual(vals[fmt.index("GQ")], ".", where)
+
+    def test_export_vcf_blank_probes_field(self):
+        """A blank ``probes`` field drops only that segment's count, not the file.
+
+        One missing value makes the whole column float-typed, so an intact count
+        arrives at the exporter as 6.0 rather than 6; the #53 guard rejected
+        every such value and emptied the VCF. Intact counts must still render as
+        integers, and only the blank one as the VCF missing value.
+        """
+        rows = [
+            ("chr1", 0, 1000, "-", -1.0, 6.0),  # loss, probe count intact
+            ("chr1", 1000, 2000, "-", 0.58, np.nan),  # gain, probe count blank
+        ]
+        cns = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=["chromosome", "start", "end", "gene", "log2", "probes"],
+            ),
+            {"sample_id": "T1"},
+        )
+        records = self._vcf_records(cns, (2, False, None, True))
+        self.assertEqual([f[4] for f in records], ["<DEL>", "<DUP>"])
+        self.assertEqual(self._probes_info(records), ["6", "."])
+        # The loss reports its count as GQ; the gain reports missing CNQ.
+        self.assertEqual(records[0][9].split(":"), ["0/1", "6"])
+        self.assertEqual(records[1][9].split(":")[-1], ".")
+
+    def test_export_vcf_missing_probes_allele_specific(self):
+        """CNQ is the VCF missing value in allele-specific records, too.
+
+        The allele-specific ``GT:GQ:CN:CN1:CN2:CNQ`` genotype reports the probe
+        count in its own field, which must not fall back to the NaN text when
+        the segments carry no ``probes`` column.
+        """
+        rows = [
+            # copy-loss LOH and a copy-neutral LOH segment, no probes column
+            ("chr1", 0, 1000, "-", -1.0, 1, 1, 0, 1.00, 20),
+            ("chr1", 1000, 2000, "-", 0.0, 2, 2, 0, 1.00, 30),
+        ]
+        cns = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=[
+                    "chromosome",
+                    "start",
+                    "end",
+                    "gene",
+                    "log2",
+                    "cn",
+                    "cn1",
+                    "cn2",
+                    "baf",
+                    "nbaf",
+                ],
+            ),
+            {"sample_id": "T1"},
+        )
+        records = self._vcf_records(cns, (2, False, None, True))
+        self.assertEqual(len(records), 2)
+        self.assertEqual(self._probes_info(records), [".", "."])
+        for fields in records:
+            fmt = fields[8].split(":")
+            self.assertEqual(fmt[-1], "CNQ")
+            self.assertEqual(fields[9].split(":")[-1], ".")
+
+    def test_export_vcf_nonnumeric_probes_skipped_loudly(self):
+        """Present-but-unparseable probe counts are still skipped, with a warning.
+
+        Segment files written by the buggy v0.7.1 release carry unparseable
+        probe counts (#53); those segments remain excluded. Unlike before, the
+        exporter reports the dropped segments instead of quietly writing a
+        header-only VCF.
+        """
+        cns = cnvlib.read("formats/amplicon.cns")
+        garbled = cns.as_dataframe(cns.data.assign(probes="foo"))
+        with self.assertLogs(level="WARNING") as cm:
+            self.assertEqual(
+                list(export.segments2vcf(garbled, 2, True, None, False)), []
+            )
+        self.assertTrue(any("unparseable probe count" in m for m in cm.output))
+        with self.assertLogs(level="WARNING"):
+            _vheader, vcf_body = export.export_vcf(garbled, 2, True, None, False)
+        # Header row of the table only -- no variant records.
+        self.assertEqual(len(vcf_body.splitlines()), 1)
+
+    def test_export_vcf_copy_neutral_sample_is_not_a_warning(self):
+        """A flat sample emitting no records is reported, but not as a warning.
+
+        Every segment matching the expected copy number is the correct outcome
+        for a copy-neutral sample, so it must not be conflated with the
+        unparseable-probe-count pathology above.
+        """
+        rows = [
+            ("chr1", 0, 1000, "-", 0.0, 50),
+            ("chr1", 1000, 2000, "-", 0.01, 60),
+        ]
+        cns = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows,
+                columns=["chromosome", "start", "end", "gene", "log2", "probes"],
+            ),
+            {"sample_id": "T1"},
+        )
+        with self.assertLogs(level="INFO") as cm:
+            _vheader, vcf_body = export.export_vcf(cns, 2, False, None, True)
+        self.assertEqual(len(vcf_body.splitlines()), 1)
+        self.assertTrue(any("No VCF records" in m for m in cm.output))
+        self.assertEqual({r.levelname for r in cm.records}, {"INFO"})
+
+    @staticmethod
+    def _vcf_records(segments, args):
+        """Emitted VCF records of `segments`, each split into its 10 fields."""
+        _vheader, vcf_body = export.export_vcf(segments, *args)
+        return [
+            ln.split("\t") for ln in vcf_body.splitlines() if not ln.startswith("#")
+        ]
+
+    @staticmethod
+    def _probes_info(records):
+        """The PROBES INFO value of each split VCF record."""
+        return [
+            dict(kv.split("=", 1) for kv in fields[7].split(";") if "=" in kv)["PROBES"]
+            for fields in records
+        ]
+
     def test_export_cdt_jtv(self):
         """The 'export' command for CDT and Java TreeView formats."""
         fnames = ["formats/p2-20_1.cnr", "formats/p2-20_2.cnr"]
