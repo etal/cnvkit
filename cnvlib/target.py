@@ -37,7 +37,9 @@ def do_target(
         Reduce multi-accession bait labels to be short and consistent.
         Default is False.
     do_split : bool, optional
-        Split large target intervals into smaller pieces. Default is False.
+        Normalize target sizes: join contiguous intervals and divide them into
+        pieces of about `avg_size`. Bin boundaries already present in the bait
+        file are not preserved. Default is False.
     avg_size : float, optional
         Average target size when splitting large intervals.
         Default is 200/0.75 (~267 bp).
@@ -45,14 +47,40 @@ def do_target(
     Returns
     -------
     GenomicArray
-        Processed target intervals ready for CNVkit analysis.
+        Processed target intervals ready for CNVkit analysis: zero-width bait
+        intervals have been dropped and overlapping ones merged, so the targets
+        are disjoint and each genomic position falls in at most one bin.
+        Without `do_split`, bait intervals that merely abut are kept apart.
     """
     tgt_arr = bait_arr.copy()
     # Drop zero-width regions
     tgt_arr = tgt_arr[tgt_arr.start != tgt_arr.end]
+    unmerged_baits = tgt_arr  # kept for re-labeling the split bins below
+    # Merge duplicate and overlapping baits, joining their gene labels, so that
+    # each position is covered by one target. Left in place, duplicated
+    # coordinates reach `fix` as "Duplicated genomic coordinates" (#567), and
+    # overlapping baits count the shared reads twice. Bookended baits (the
+    # consecutive tiles of a capture kit) are kept separate, so a target BED
+    # without overlaps is passed through unchanged. `subdivide` would merge
+    # these anyway, but doing it here holds the postcondition on both paths.
+    n_baits = len(tgt_arr)
+    tgt_arr = tgt_arr.merge(bp=1)
+    if len(tgt_arr) < n_baits:
+        logging.info(
+            "Merged overlapping or duplicated baits: %d intervals -> %d targets",
+            n_baits,
+            len(tgt_arr),
+        )
     if do_split:
         logging.info("Splitting large targets")
         tgt_arr = tgt_arr.subdivide(avg_size, 0)
+        if not annotate:
+            # Unless an annotation is about to replace every label: `subdivide`
+            # re-merges bookended regions before splitting them evenly, so the
+            # joined label of a whole contiguous run would otherwise be stamped
+            # on every bin the run is cut into. Take each bin's label from the
+            # baits it actually covers instead.
+            tgt_arr["gene"] = unmerged_baits.into_ranges(tgt_arr, "gene", "-")
     if annotate:
         logging.info("Applying annotations as target names")
         annotation = tabio.read_auto(annotate)

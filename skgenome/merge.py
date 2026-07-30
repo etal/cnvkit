@@ -50,16 +50,45 @@ def _fill_unnamed(table: pd.DataFrame, cmb: dict[str, Callable]) -> pd.DataFrame
     return table
 
 
+def _nothing_to_cluster(table: pd.DataFrame, bp: int) -> bool:
+    """Whether no two rows would cluster together, so the table passes through.
+
+    Rows cluster when the gap between them is at most ``-bp`` bases: ``bp = 0``
+    clusters bookended rows, and ``bp = 1`` clusters only rows that genuinely
+    overlap.
+
+    Each row is compared against the running maximum end of the preceding rows
+    on the same chromosome, which assumes the table is sorted -- as everything
+    read through :mod:`skgenome.tabio` is. Tables whose rows are out of order,
+    or whose chromosomes are not in contiguous blocks, fall through to the
+    clustering path, which sorts.
+    """
+    chromosomes = table.chromosome.to_numpy()
+    changes = chromosomes[1:] != chromosomes[:-1]
+    if 1 + int(changes.sum()) != table.chromosome.nunique():
+        # A chromosome occurs in more than one block, so the running maximum
+        # below would skip comparisons between rows that are not adjacent
+        return False
+    covered = table.groupby("chromosome", sort=False).end.cummax().to_numpy()
+    gap_sizes = table.start.to_numpy()[1:] - covered[:-1]
+    return bool((changes | (gap_sizes > -bp)).all())
+
+
 def flatten(
     table: pd.DataFrame,
     combine: dict[str, Callable] | None = None,
     split_columns: Iterable[str] | None = None,
 ) -> pd.DataFrame:
-    """Combine overlapping regions into single rows, similar to bedtools merge."""
+    """Split overlapping regions at every breakpoint, combining extra fields.
+
+    Unlike :func:`merge`, which emits an overlapping group's union as one row,
+    this emits one row per distinct sub-interval, so partially overlapping
+    regions yield fragments narrower than either input.
+    """
     if table.empty:
         return table
     cmb = get_combiners(table, False, combine)
-    if (table.start.to_numpy()[1:] >= table.end.cummax().to_numpy()[:-1]).all():
+    if _nothing_to_cluster(table, 1):
         return _fill_unnamed(table, cmb)
     # NB: Input rows and columns should already be sorted like this
     table = table.sort_values(["chromosome", "start", "end"])
@@ -111,16 +140,43 @@ def merge(
     stranded: bool = False,
     combine: dict[str, Callable] | None = None,
 ) -> pd.DataFrame:
-    """Merge overlapping rows in a DataFrame."""
+    """Merge rows that overlap, or that lie within a given gap of each other.
+
+    Parameters
+    ----------
+    table : DataFrame
+        Genomic intervals, with at least chromosome, start and end columns.
+        Must be sorted by chromosome, start, end.
+    bp : int
+        Rows are merged when the gap between them is at most ``-bp`` bases.
+        The default 0 merges bookended rows too, as ``bedtools merge`` does,
+        and negative values bridge gaps of that many bases. Any value above 0
+        merges only rows that genuinely overlap, leaving bookended rows -- the
+        consecutive tiles of a bait file, say -- separate; bioframe cannot
+        express a finer distinction, so 1 is the effective maximum.
+    stranded : bool
+        Merge only rows on the same strand, keeping the strand in the output.
+    combine : dict, optional
+        Column-to-function mapping for aggregating the merged rows' other
+        fields. See :func:`skgenome.combiners.get_combiners`.
+
+    Returns
+    -------
+    DataFrame
+        A new table with the overlapping (or near-enough) rows merged.
+    """
     if table.empty:
         return table
     cmb = get_combiners(table, stranded, combine)
-    gap_sizes = table.start.to_numpy()[1:] - table.end.cummax().to_numpy()[:-1]
-    if (gap_sizes > -bp).all():
+    # bioframe clusters rows at most `min_dist` bases apart, and with None only
+    # rows that truly overlap -- the finest distinction it can express, so any
+    # `bp` above 1 is the same as 1.
+    bp = min(bp, 1)
+    if _nothing_to_cluster(table, bp):
         return _fill_unnamed(table, cmb)
     groupkey = ["chromosome", "strand"] if stranded else ["chromosome"]
     table = table.sort_values([*groupkey, "start", "end"])
-    min_dist = max(0, -bp)
+    min_dist = None if bp == 1 else -bp
     on = ["strand"] if stranded else None
     clustered = bioframe.cluster(
         table,
@@ -135,11 +191,19 @@ def merge(
         for c in clustered.columns
         if c not in ("cluster", "cluster_start", "cluster_end")
     ]
-    result_rows = []
-    for _cluster_id, group in clustered.groupby("cluster", sort=False):
-        if len(group) == 1:
-            result_rows.append(group[data_cols].iloc[0])
-        else:
+    # Rows that cluster alone are emitted verbatim; only the rows that really
+    # combine are worth a Python-level pass. When a bait file holds a handful
+    # of duplicates nearly every cluster is a singleton, and visiting them all
+    # otherwise dominates the runtime.
+    cluster_ids = clustered["cluster"]
+    is_first = ~cluster_ids.duplicated().to_numpy()
+    in_multi_row_cluster = cluster_ids.duplicated(keep=False).to_numpy()
+    out = clustered.loc[is_first, data_cols].reset_index(drop=True)
+    if in_multi_row_cluster.any():
+        combined_rows = []
+        for _cluster_id, group in clustered[in_multi_row_cluster].groupby(
+            "cluster", sort=False
+        ):
             vals = {}
             for col in data_cols:
                 if col == "start":
@@ -150,8 +214,16 @@ def merge(
                     vals[col] = cmb[col](group[col].values)
                 else:
                     vals[col] = group[col].iloc[0]
-            result_rows.append(pd.Series(vals))
-    out = pd.DataFrame(result_rows, columns=data_cols).reset_index(drop=True)
+            combined_rows.append(vals)
+        # `groupby(sort=False)` yields clusters in order of first appearance,
+        # which is the order `is_first` picked them out of `out`. Splice via
+        # `concat` so pandas widens each column's dtype to fit the combined
+        # values, e.g. a joined name landing in an all-NaN float column.
+        combining = in_multi_row_cluster[is_first]
+        replacement = pd.DataFrame(
+            combined_rows, columns=data_cols, index=np.flatnonzero(combining)
+        )
+        out = pd.concat([out[~combining], replacement]).sort_index(kind="mergesort")
     # Re-sort chromosomes cleverly instead of lexicographically
     out = out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index

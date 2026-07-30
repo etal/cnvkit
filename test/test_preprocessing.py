@@ -714,6 +714,19 @@ class PreprocessingTests(unittest.TestCase):
     def test_target(self):
         """The 'target' command."""
         annot_fname = "formats/refflat-mini.txt"
+
+        def assert_disjoint(arr, msg):
+            """Bins are sorted and non-overlapping: next start >= previous end."""
+            for _c, subarr in arr.by_chromosome():
+                self.assertTrue(subarr.start.is_monotonic_increasing, msg)
+                self.assertTrue(subarr.end.is_monotonic_increasing, msg)
+                gaps = subarr.start.to_numpy()[1:] - subarr.end.to_numpy()[:-1]
+                self.assertTrue((gaps >= 0).all(), msg)
+
+        def covered_bases(arr):
+            merged = arr.merge()
+            return int((merged.end - merged.start).sum())
+
         for bait_fname in (
             "formats/nv2_baits.interval_list",
             "formats/amplicon.bed",
@@ -723,7 +736,14 @@ class PreprocessingTests(unittest.TestCase):
             bait_len = len(baits)
             # No splitting: w/o and w/ re-annotation
             r1 = commands.do_target(baits)
-            self.assertEqual(len(r1), bait_len)
+            # Overlapping baits are merged, so the row count may shrink, but
+            # the covered territory is unchanged and no bin is smaller than the
+            # smallest bait it came from (#567)
+            assert_disjoint(r1, bait_fname)
+            self.assertEqual(covered_bases(r1), covered_bases(baits), bait_fname)
+            self.assertGreaterEqual(
+                (r1.end - r1.start).min(), (baits.end - baits.start).min(), bait_fname
+            )
             r1a = commands.do_target(baits, do_short_names=True, annotate=annot_fname)
             self.assertEqual(len(r1a), len(r1))
             # Splitting, w/o and w/ re-annotation
@@ -731,15 +751,7 @@ class PreprocessingTests(unittest.TestCase):
                 baits, do_short_names=True, do_split=True, avg_size=100
             )
             self.assertGreater(len(r2), len(r1))
-            for _c, subarr in r2.by_chromosome():
-                self.assertTrue(subarr.start.is_monotonic_increasing, bait_fname)
-                self.assertTrue(subarr.end.is_monotonic_increasing, bait_fname)
-                # Bins are non-overlapping; next start >= prev. end
-                self.assertTrue(
-                    (
-                        (subarr.start.to_numpy()[1:] - subarr.end.to_numpy()[:-1]) >= 0
-                    ).all()
-                )
+            assert_disjoint(r2, bait_fname)
             r2a = commands.do_target(
                 baits,
                 do_short_names=True,
@@ -750,3 +762,113 @@ class PreprocessingTests(unittest.TestCase):
             self.assertEqual(len(r2a), len(r2))
             # Original regions object should be unmodified
             self.assertEqual(len(baits), bait_len)
+
+    def test_target_collapses_duplicate_baits(self):
+        """'target' merges duplicate and overlapping baits (#567).
+
+        Duplicate BED rows, and rows with identical coordinates but different
+        gene labels, otherwise reach `fix` as duplicated coordinates and abort
+        the run. Before this change nothing collapsed them unless --split was
+        given.
+        """
+        baits = tabio.read_auto("formats/baits-funky.bed")
+
+        def coords(arr):
+            return list(zip(arr.chromosome, arr.start, arr.end, strict=True))
+
+        self.assertGreater(len(coords(baits)), len(set(coords(baits))))
+
+        with self.assertLogs(level="INFO") as cm:
+            out = commands.do_target(baits)
+        self.assertTrue(any("overlapping or duplicated" in m for m in cm.output))
+        self.assertEqual(len(coords(out)), len(set(coords(out))))
+
+        # Genes of coincident baits are joined, each name appearing once --
+        # including names that arrive already joined, as at chr1:14360-14409,
+        # where two of the three duplicate rows are labelled "DDX11L1,WASH7P"
+        for chromosome, start, end, gene in [
+            ("chr1", 14360, 14409, "DDX11L1,WASH7P,WASH7P_DUPE"),
+            ("chrX", 69673485, 69673643, "DLG3,DLG3_DUPE"),
+            # A nested bait is absorbed by the one containing it
+            ("chr1", 16605, 16765, "WASH7P,WASH7P_NESTED"),
+            # Partly overlapping baits merge into their union
+            ("chr1", 14968, 15150, "WASH7P,WASH7P_OVERLAP"),
+        ]:
+            row = out[(out.chromosome == chromosome) & (out.start == start)]
+            self.assertEqual(len(row), 1, (chromosome, start))
+            self.assertEqual(row["end"].iloc[0], end)
+            self.assertEqual(row["gene"].iloc[0], gene)
+
+        # Bookended baits are left alone: merging them would coarsen the tiling
+        # of a capture kit, whose targets are consecutive by design
+        bookended = out[(out.chromosome == "chr1") & (out.start == 17367)]
+        self.assertEqual(list(bookended["end"]), [17368])
+
+    def test_target_is_idempotent(self):
+        """Re-running 'target' on its own output changes nothing.
+
+        The output of `target` is a valid bait file, so feeding it back in with
+        the same options must be a no-op: merging is confined to genuine
+        overlaps, of which the output has none, and re-splitting an evenly
+        divided run reproduces the same bins. Users do chain the command this
+        way, and `batch` effectively does so when handed an already-processed
+        target BED.
+        """
+        options = [
+            {},
+            {"do_split": True, "avg_size": 200},
+            {"do_split": True, "avg_size": 100, "do_short_names": True},
+            {"do_split": True, "avg_size": 200, "annotate": "formats/refflat-mini.txt"},
+        ]
+        for bait_fname in (
+            "formats/amplicon.bed",
+            "formats/baits-funky.bed",
+        ):
+            baits = tabio.read_auto(bait_fname)
+            for kwargs in options:
+                once = commands.do_target(baits, **kwargs)
+                twice = commands.do_target(once, **kwargs)
+                self.assertTrue(
+                    once.data.reset_index(drop=True).equals(
+                        twice.data.reset_index(drop=True)
+                    ),
+                    f"{bait_fname} {kwargs}",
+                )
+
+    def test_target_split_labels_come_from_covering_baits(self):
+        """Each split bin is named for the baits it covers, not its whole run.
+
+        `subdivide` re-merges bookended regions before dividing them evenly, so
+        the joined label of a contiguous run used to be stamped on every bin the
+        run was cut into -- naming bins after genes they do not overlap.
+        """
+        out = commands.do_target(
+            tabio.read_auto("formats/baits-funky.bed"), do_split=True, avg_size=200
+        )
+        labels = {
+            (int(s), int(e)): g
+            for c, s, e, g in zip(
+                out.chromosome, out.start, out.end, out["gene"], strict=True
+            )
+            if c == "chr1"
+        }
+        # chr1:13219-14829 is one contiguous run of DDX11L1 and WASH7P baits.
+        # Every bin cut from it used to carry the whole run's joined label.
+        self.assertEqual(labels[(13219, 13420)], "DDX11L1")
+        self.assertEqual(labels[(14225, 14426)], "DDX11L1,WASH7P,WASH7P_DUPE")
+        self.assertEqual(labels[(14627, 14829)], "WASH7P")
+
+        # No bin anywhere may claim a bait it does not overlap
+        for bait_fname in (
+            "formats/nv2_baits.interval_list",
+            "formats/baits-funky.bed",
+        ):
+            baits = tabio.read_auto(bait_fname)
+            split = commands.do_target(baits, do_split=True, avg_size=200)
+            covering = baits.into_ranges(split, "gene", "-")
+            for bin_label, bait_labels in zip(split["gene"], covering, strict=True):
+                self.assertEqual(
+                    set(bin_label.split(",")),
+                    set(str(bait_labels).split(",")),
+                    bait_fname,
+                )

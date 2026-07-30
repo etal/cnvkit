@@ -333,8 +333,12 @@ def match_ref_to_sample(
         if dupes.any():
             raise ValueError(
                 (
-                    "Duplicated genomic coordinates in {} set. Total duplicated regions: {}, starting with:\n"
-                    "{}."
+                    "Duplicated genomic coordinates in {} set. Total duplicated "
+                    "regions: {}, starting with:\n{}.\nThese usually come from "
+                    "duplicate or overlapping rows in the bait BED. Rebuild the "
+                    "targets with 'cnvkit.py target', which merges overlapping "
+                    "baits into disjoint bins, then redo 'coverage' and "
+                    "'reference' with the rebuilt BED."
                 ).format(
                     name,
                     len(dset.index[dupes]),

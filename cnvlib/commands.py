@@ -638,7 +638,9 @@ P_target.add_argument(
 P_target.add_argument(
     "--split",
     action="store_true",
-    help="Split large tiled intervals into smaller, consecutive targets.",
+    help="""Split large tiled intervals into smaller, consecutive targets.
+            Contiguous intervals are joined first, then divided evenly, so
+            existing bin boundaries are not preserved.""",
 )
 # Exons: [114--188==203==292--21750], mean=353 -> outlier=359, extreme=515
 #   NV2:  [65--181==190==239--12630], mean=264 -> outlier=277, extreme=364

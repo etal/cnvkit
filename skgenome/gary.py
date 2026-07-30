@@ -774,7 +774,8 @@ class GenomicArray:
     ) -> GenomicArray:
         """Merge adjacent or overlapping regions into single rows.
 
-        Similar to 'bedtools merge'.
+        Similar to 'bedtools merge'. Pass ``bp=1`` to merge only regions that
+        genuinely overlap, leaving bookended regions as separate rows.
         """
         return self.as_dataframe(merge(self.data, bp, stranded, combine))
 
@@ -832,9 +833,13 @@ class GenomicArray:
         return self.as_dataframe(squash(self.data, by=by, combine=combine))
 
     def subdivide(
-        self, avg_size: int, min_size: int = 0, verbose: bool = False
+        self, avg_size: float, min_size: int = 0, verbose: bool = False
     ) -> GenomicArray:
-        """Split this array's regions into roughly equal-sized sub-regions."""
+        """Resize this array's regions to roughly equal-sized sub-regions.
+
+        Contiguous regions are merged before being divided, so their original
+        boundaries are not preserved.
+        """
         return self.as_dataframe(subdivide(self.data, avg_size, min_size, verbose))
 
     def subtract(self, other: GenomicArray) -> GenomicArray:
