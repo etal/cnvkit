@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import unittest
 import warnings
+from unittest import mock
 
 import pytest
 
@@ -187,6 +188,43 @@ class PreprocessingTests(unittest.TestCase):
                 bed, bam, 0, bam_chroms=bam_chroms, allow_empty=True
             )
             self.assertEqual(len(empty), 0)
+        finally:
+            os.unlink(bed)
+
+    def test_bedcov_depth_independent_of_process_count(self):
+        """Emitted depth must not depend on how the BED is split across workers.
+
+        A BED5 whose score field is numeric on some rows and '.' on others used
+        to make the column layout ambiguous: it was guessed per output batch
+        from whether the last two fields both looked like integers, so a numeric
+        score was mistaken for samtools' -d column and depth was computed from
+        the score instead of the basecount. Which rows started a batch depended
+        on the chunk count, hence on --processes and the host's CPU count.
+        """
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        samutil.ensure_bam_index(bam)
+        with tempfile.NamedTemporaryFile("w+t", suffix=".bed", delete=False) as f:
+            for i in range(40):
+                # Legal BED5 either way: '.' and an integer are both valid scores
+                score = "." if i < 24 else str(100 + i)
+                f.write(f"chrM\t{i * 400}\t{(i + 1) * 400}\tbin{i}\t{score}\n")
+            bed = f.name
+        try:
+            serial = coverage.interval_coverages_pileup(bed, bam, 0, procs=1)
+            with mock.patch.object(parallel, "available_cpus", return_value=8):
+                parallelized = coverage.interval_coverages_pileup(bed, bam, 0, procs=8)
+            self.assertEqual(len(serial), 40)
+            self.assertEqual(list(serial.start), list(parallelized.start))
+            self.assertEqual(
+                list(serial.depth),
+                list(parallelized.depth),
+                "depth must be identical however the BED is chunked",
+            )
+            # Depth comes from the appended basecount, never from the score.
+            self.assertTrue(
+                (serial.depth > 1).all(),
+                "a numeric BED score must not be mistaken for the basecount",
+            )
         finally:
             os.unlink(bed)
 

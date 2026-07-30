@@ -179,7 +179,12 @@ def scan_targets(
 ) -> GA:
     """Estimate baited regions from a genome-wide, per-base depth profile."""
     bait_chunks = []
-    # ENH: context manager to call rm on bed chunks? with to_chunks as pool, ck?
+    # Chunk size is deliberately left at the default here rather than derived
+    # from `procs`: _scan_depth applies merge_gaps/drop_small within each chunk,
+    # so chunk boundaries are visible in the output. Deriving them from the
+    # worker count would make the emitted baits depend on -p and on the host's
+    # CPU count. Chunk files are removed below, with to_chunks' atexit
+    # registration as a backstop if this loop raises.
     logging.info("Scanning for enriched regions in:\n  %s", "\n  ".join(sample_bams))
     with parallel.pick_pool(procs) as pool:
         args_iter = (
