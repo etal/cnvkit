@@ -15,22 +15,29 @@ from .merge import merge
 
 
 def subdivide(
-    table, avg_size: int, min_size: int = 0, verbose: bool = False
+    table, avg_size: float, min_size: int = 0, verbose: bool = False
 ) -> pd.DataFrame:
-    """Split `table` rows into sub-regions of about `avg_size`."""
+    """Resize `table` rows to sub-regions of about `avg_size`.
+
+    Overlapping and bookended rows are merged before being divided, so a run of
+    contiguous small regions is normalized up to ``avg_size`` rather than left
+    as it is -- dividing alone could only ever make regions smaller. The
+    original boundaries within such a run are therefore not preserved.
+    """
     return pd.DataFrame.from_records(
         _split_targets(table, avg_size, min_size, verbose), columns=table.columns
     )
 
 
-def _split_targets(regions, avg_size: int, min_size: int, verbose: bool):
+def _split_targets(regions, avg_size: float, min_size: int, verbose: bool):
     """Split large regions into smaller, consecutive regions.
 
-    Output bin metadata and additional columns match the input dataframe.
+    Rows are merged before being split, per :func:`subdivide`. Output bin
+    metadata and additional columns match the input dataframe.
 
     Parameters
     ----------
-    avg_size : int
+    avg_size : float
         Split regions into equal-sized subregions of about this size.
         Specifically, subregions are no larger than 150% of this size, no
         smaller than 75% this size, and the average will approach this size

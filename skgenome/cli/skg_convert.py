@@ -50,9 +50,11 @@ def argument_parsing():
         type=int,
         const=1,
         help="""Merge overlapping regions with different names.
-                    Recommended with --exons. Optional argument value is the
-                    number of overlapping bases between two regions to trigger a
-                    merge. [Default: %(const)s]""",
+                    Recommended with --exons. The optional argument value is
+                    the gap to bridge: 0 also merges bookended regions, and
+                    negative values merge regions up to that many bases apart.
+                    Any positive value merges only regions that genuinely
+                    overlap. [Default: %(const)s]""",
     )
     # ENH combine --gff-type, --refflat-type
     # AP.add_argument('-e', '--exons', action='store_true',
@@ -106,7 +108,7 @@ def skg_convert(args) -> None:
     # Post-processing
     if args.flatten:
         regions = regions.flatten()
-    elif args.merge:
+    elif args.merge is not None:
         regions = regions.merge(bp=args.merge)
 
     tabio.write(regions, args.output, args.out_fmt)

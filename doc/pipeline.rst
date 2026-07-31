@@ -112,12 +112,37 @@ Prepare a BED file of baited regions for use with CNVkit.
     cnvkit.py target my_baits.bed --annotate data/refFlat_hg38.txt --split -o my_targets.bed
 
 The BED file should be the baited genomic regions for your target capture kit,
-as provided by your vendor. Since these regions (usually exons) may be of
-unequal size, the ``--split`` option divides the larger regions so that the
-average bin size after dividing is close to the size specified by
-``--avg-size``.  If any of these three (``--split``, ``--annotate``, or
-``--short-names``) flags are used, a new target BED file will be created;
-otherwise, the provided target BED file will be used as-is.
+as provided by your vendor. The ``--annotate`` and ``--short-names`` options
+rewrite the region labels. The :ref:`batch` command runs this step for you,
+writing a processed ``*.target.bed`` next to its other output files.
+
+Vendor bait files sometimes repeat a region, or list baits that overlap --
+for instance, two rows with the same coordinates but different symbols for a
+pair of synonymous or nested genes. Every CNVkit bin must cover a distinct
+stretch of the genome, so ``target`` merges overlapping baits into a single
+bin labeled with the joined names of the baits it covers. Left in place,
+repeated coordinates propagate through :ref:`coverage` into the
+:ref:`reference` and abort :ref:`fix` with a "Duplicated genomic coordinates"
+error, and overlapping baits count the reads in the shared stretch twice.
+
+Whether the bins you get back follow your bait file's own boundaries depends
+on ``--split``:
+
+- **Without** ``--split``, only overlaps are resolved. Baits that merely abut
+  each other stay separate, so a bait file you have already curated into
+  meaningful capture regions comes through with its boundaries -- and its gene
+  labels -- intact.
+- **With** ``--split``, target sizes are normalized instead: runs of
+  contiguous baits are joined and then divided into pieces of about
+  ``--avg-size``, discarding the original boundaries within each run. Joining
+  first is what allows a kit that tiles its exons with small baits to reach the
+  requested bin size at all, since dividing alone can only make bins smaller.
+  Each resulting bin is labeled for the baits it actually covers, not for the
+  whole run it was cut from -- unless ``--annotate`` supplies the labels
+  instead.
+
+Since exons are of unequal size, ``--split`` is the right choice for raw
+vendor baits, and the one :ref:`batch` applies.
 
 If you don't have the capture regions BED file, but you do know which commercial
 exome capture kit was used to prepare your samples, you might find the file you

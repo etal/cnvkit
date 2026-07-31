@@ -13,6 +13,7 @@ import pandas as pd
 from cnvlib import read_ga
 from skgenome import GenomicArray as GA
 from skgenome import chromsort, rangelabel, tabio
+from skgenome.combiners import join_strings
 
 
 class GaryTests(unittest.TestCase):
@@ -463,6 +464,63 @@ class IntervalTests(unittest.TestCase):
             expect = self._from_intervals(merged_coords)
             self._compare_regions(result, expect)
 
+    def test_merge_overlapping_only(self):
+        """``merge(bp=1)`` merges overlapping rows but not bookended ones.
+
+        The bookended distinction matters to the 'target' command: consecutive
+        bait tiles must survive as separate bins, or a capture kit's targets
+        get coarsened (#567). It is also what ``skg_convert --merge`` has
+        always documented -- "the number of overlapping bases ... to trigger a
+        merge" -- while the default ``bp=0`` follows ``bedtools merge`` in
+        merging bookended rows too.
+        """
+        regions = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [100, 150, 400, 500, 700, 720],
+                    "end": [200, 300, 500, 600, 750, 800],
+                    "gene": ["A", "B", "C", "D", "E", "F"],
+                }
+            )
+        )
+        merged = regions.merge(bp=1)
+        self.assertEqual(
+            list(zip(merged.start, merged.end, merged["gene"], strict=True)),
+            [(100, 300, "A,B"), (400, 500, "C"), (500, 600, "D"), (700, 800, "E,F")],
+        )
+        # The default also merges the bookended pair chr0:400-500 / 500-600
+        default_merged = regions.merge()
+        self.assertEqual(
+            list(zip(default_merged.start, default_merged.end, strict=True)),
+            [(100, 300), (400, 600), (700, 800)],
+        )
+        # A table with no overlaps at all passes through unchanged
+        disjoint = GA(regions.data.iloc[[2, 3]].reset_index(drop=True))
+        self.assertTrue(disjoint.merge(bp=1).data.equals(disjoint.data))
+        # Overlaps are found even when a chromosome's rows are not contiguous,
+        # where the sorted-input shortcut for spotting them does not apply
+        interleaved = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1", "chr2", "chr1"],
+                    "start": [100, 500, 150],
+                    "end": [200, 600, 250],
+                    "gene": ["A", "Z", "B"],
+                }
+            )
+        )
+        self.assertEqual(
+            list(
+                zip(
+                    interleaved.merge(bp=1).start,
+                    interleaved.merge(bp=1).end,
+                    strict=True,
+                )
+            ),
+            [(100, 250), (500, 600)],
+        )
+
     def test_nan_gene_names(self):
         """merge/flatten/subdivide tolerate NaN-float gene names (issue #850).
 
@@ -510,6 +568,45 @@ class IntervalTests(unittest.TestCase):
             for gene in result["gene"]:
                 self.assertIsInstance(gene, str)
                 self.assertNotIn("nan", gene.lower())
+
+        # A name column with no strings at all is typed float64 (all-NaN) or
+        # int64 (numeric bait names, which Picard interval_list files carry),
+        # and merging must widen it to hold the "-" that join_strings returns
+        # rather than coerce the value into the incumbent dtype
+        for names in ([np.nan] * 3, [1, 2, 3]):
+            numeric = GA(
+                pd.DataFrame(
+                    {
+                        "chromosome": "chr0",
+                        "start": [100, 150, 700],
+                        "end": [400, 600, 900],
+                        "gene": names,
+                    }
+                )
+            )
+            self.assertEqual(list(numeric.merge()["gene"]), ["-", "-"])
+
+    def test_join_strings_deduplicates_across_separator(self):
+        """Joining already-joined gene labels repeats no name (#567).
+
+        Combining operations chain -- ``target`` merges overlapping baits and
+        then re-labels the bins split out of them from those already-joined
+        labels, and ``segmentation`` joins the gene labels of the bins a
+        segment spans -- so the inputs to ``join_strings`` are often themselves
+        joined labels. Treating each input as opaque yielded labels such as
+        "GENEA,GENEA,GENEB,GENEB".
+        """
+        self.assertEqual(join_strings(["GENEA", "GENEA,GENEB"]), "GENEA,GENEB")
+        self.assertEqual(
+            join_strings(["GENEA,GENEB", "GENEB,GENEC"]), "GENEA,GENEB,GENEC"
+        )
+        # Order of first appearance is preserved, and joining is idempotent
+        joined = join_strings(["B,A", "C"])
+        self.assertEqual(joined, "B,A,C")
+        self.assertEqual(join_strings([joined]), joined)
+        # Ignored names are dropped from within joined labels too
+        self.assertEqual(join_strings(["-,GENEA"], ignore=("-",)), "GENEA")
+        self.assertEqual(join_strings(["-", np.nan]), "-")
 
     def test_intersect(self):
         selections1 = self._from_intervals(

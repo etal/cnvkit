@@ -60,24 +60,36 @@ def join_strings(
     sep: str = ",",
     ignore: tuple[str, ...] = (),
 ) -> str:
-    """Join a Series of unique strings, skipping NaN values and ignored names.
+    """Join a Series of unique names, skipping NaN values and ignored names.
+
+    Inputs may themselves already be joined labels -- a bin spanning two genes
+    carries the label ``"GENEA,GENEB"`` -- and combining operations chain:
+    :func:`skgenome.merge.merge` joins the labels of overlapping baits, and
+    :meth:`GenomicArray.into_ranges` then joins those already-joined labels
+    again when re-labelling the bins cut from them. Names are therefore
+    deduplicated across the separator, so joining is idempotent and no name is
+    repeated in the result.
 
     Parameters
     ----------
     elems : iterable
         Values to join. Non-string elements (e.g. NaN) are silently skipped.
     sep : str
-        Separator between joined names.
+        Separator between joined names, and within any already-joined input.
     ignore : tuple of str
-        String values to exclude from the result (e.g. placeholder gene names).
+        Names to exclude from the result (e.g. placeholder gene names).
 
     Returns
     -------
     str
-        The joined string, or ``"-"`` if no valid strings remain.
+        The joined string, or ``"-"`` if no valid names remain.
     """
     unique_strs = dict.fromkeys(
-        e for e in elems if isinstance(e, str) and e not in ignore
+        name
+        for e in elems
+        if isinstance(e, str)
+        for name in e.split(sep)
+        if name not in ignore
     )
     return sep.join(unique_strs) or "-"
 
