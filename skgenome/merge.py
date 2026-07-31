@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
 _BF_COLS = ("chromosome", "start", "end")
+# Columns that `flatten` apportions across the pieces of a split region, being
+# quantities spread over its length rather than properties of it
+_SPLIT_COLUMNS = ("weight", "probes")
 
 
 def _fill_unnamed(table: pd.DataFrame, cmb: dict[str, Callable]) -> pd.DataFrame:
@@ -84,12 +87,39 @@ def flatten(
     Unlike :func:`merge`, which emits an overlapping group's union as one row,
     this emits one row per distinct sub-interval, so partially overlapping
     regions yield fragments narrower than either input.
+
+    Parameters
+    ----------
+    table : DataFrame
+        Genomic intervals, with at least chromosome, start and end columns.
+        Must be sorted by chromosome, start, end.
+    combine : dict, optional
+        Column-to-function mapping for aggregating the fields of the rows that
+        cover each sub-interval. See :func:`skgenome.combiners.get_combiners`.
+    split_columns : iterable of str, optional
+        Columns holding a quantity spread over the length of a region rather
+        than a property of it -- ``weight`` and ``probes`` by default. Each
+        row's value is apportioned among its sub-intervals in proportion to
+        their lengths before the covering rows are combined, so the column's
+        total is preserved instead of being duplicated into every piece. Pass
+        an empty sequence to combine these columns like any other; columns
+        without a combiner are ignored.
+
+    Returns
+    -------
+    DataFrame
+        A new table with the overlapping rows split at each breakpoint.
     """
     if table.empty:
         return table
     cmb = get_combiners(table, False, combine)
     if _nothing_to_cluster(table, 1):
         return _fill_unnamed(table, cmb)
+    split_cols = {
+        col
+        for col in (_SPLIT_COLUMNS if split_columns is None else split_columns)
+        if col in cmb
+    }
     # NB: Input rows and columns should already be sorted like this
     table = table.sort_values(["chromosome", "start", "end"])
     clustered = bioframe.cluster(
@@ -100,37 +130,49 @@ def flatten(
         group_rows = group.drop(
             columns=["cluster", "cluster_start", "cluster_end"], errors="ignore"
         )
-        all_rows.extend(_flatten_tuples(group_rows, cmb))
-    out = pd.DataFrame.from_records(all_rows, columns=table.columns)
+        all_rows.extend(_flatten_cluster(group_rows, cmb, split_cols))
+    out = pd.DataFrame(all_rows, columns=table.columns)
     out = out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
     )
     return _fill_unnamed(out, cmb)
 
 
-def _flatten_tuples(
-    group_df: pd.DataFrame, combine: dict[str, Callable]
-) -> list[tuple]:
-    """Divide multiple rows where they overlap.
+def _flatten_cluster(
+    group_df: pd.DataFrame, combine: dict[str, Callable], split_cols: set[str]
+) -> list[dict]:
+    """Divide one cluster of overlapping rows at each of their breakpoints.
 
-    Split at all coordinate breakpoints and combine extra fields.
+    Every sub-interval draws its values from the rows covering that
+    sub-interval alone: the columns in `combine` through their combiner, the
+    rest from the first covering row. Columns in `split_cols` are apportioned
+    by length before being combined.
     """
+    columns = list(group_df.columns)
     rows = list(group_df.itertuples(index=False))
-    if len(rows) == 1:
-        return rows
-    first_row = rows[0]
-    extra_cols = [x for x in first_row._fields[3:] if x in combine]
-    breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
+    breaks = sorted({bound for row in rows for bound in (row.start, row.end)})
     result = []
     for bp_start, bp_end in itertools.pairwise(breaks):
-        rows_in_play = [
-            row for row in rows if row.start <= bp_start and row.end >= bp_end
-        ]
-        extra_fields = {
-            key: combine[key]([getattr(r, key) for r in rows_in_play])
-            for key in extra_cols
-        }
-        result.append(first_row._replace(start=bp_start, end=bp_end, **extra_fields))
+        # The cluster spans a contiguous range and no breakpoint falls strictly
+        # within this sub-interval, so at least one row covers all of it
+        covering = [row for row in rows if row.start <= bp_start and row.end >= bp_end]
+        piece = {}
+        for col in columns:
+            if col == "start":
+                piece[col] = bp_start
+            elif col == "end":
+                piece[col] = bp_end
+            elif col in combine:
+                values = [getattr(row, col) for row in covering]
+                if col in split_cols:
+                    values = [
+                        val * (bp_end - bp_start) / (row.end - row.start)
+                        for val, row in zip(values, covering, strict=True)
+                    ]
+                piece[col] = combine[col](values)
+            else:
+                piece[col] = getattr(covering[0], col)
+        result.append(piece)
     return result
 
 

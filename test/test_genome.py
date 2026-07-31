@@ -453,6 +453,99 @@ class IntervalTests(unittest.TestCase):
             expect = self._from_intervals(flat_coords)
             self._compare_regions(result, expect)
 
+    def test_flatten_fields_follow_the_covering_rows(self):
+        """Each sub-interval takes its fields from the rows that cover it.
+
+        Columns with no combiner -- log2, depth, gc and the rest of a .cnr's
+        payload -- were copied from the first row of the whole overlap cluster,
+        so a piece belonging solely to a later region reported an earlier
+        region's coverage. Bookended rows were caught by this too: they
+        clustered together, and one overlap anywhere in a table sends every
+        cluster through the splitting path.
+
+        chr1 and chr2 each hold an overlapping pair plus an isolated region,
+        after and before the pair respectively, so the pieces have to be
+        interleaved back among the rows that pass through unsplit. chr3 is a
+        bookended run, which has no breakpoint to split at.
+        """
+        regions = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 3 + ["chr2"] * 3 + ["chr3"] * 3,
+                    "start": [0, 50, 400, 0, 300, 500, 0, 100, 200],
+                    "end": [100, 200, 500, 100, 600, 700, 100, 200, 300],
+                    "gene": [*"ABC", *"PQR", *"XYZ"],
+                    "log2": [1.0, -2.0, 9.0, 3.0, 4.0, 5.0, 7.0, 7.5, 8.0],
+                }
+            )
+        )
+        flat = regions.flatten()
+        self.assertEqual(
+            list(
+                zip(
+                    flat.chromosome,
+                    flat.start,
+                    flat.end,
+                    flat["gene"],
+                    flat["log2"],
+                    strict=True,
+                )
+            ),
+            [
+                ("chr1", 0, 50, "A", 1.0),
+                ("chr1", 50, 100, "A,B", 1.0),
+                ("chr1", 100, 200, "B", -2.0),
+                ("chr1", 400, 500, "C", 9.0),
+                ("chr2", 0, 100, "P", 3.0),
+                ("chr2", 300, 500, "Q", 4.0),
+                ("chr2", 500, 600, "Q,R", 4.0),
+                ("chr2", 600, 700, "R", 5.0),
+                ("chr3", 0, 100, "X", 7.0),
+                ("chr3", 100, 200, "Y", 7.5),
+                ("chr3", 200, 300, "Z", 8.0),
+            ],
+        )
+        # A table with no overlaps at all passes through unchanged
+        disjoint = GA(regions.data.iloc[6:].reset_index(drop=True))
+        self.assertTrue(disjoint.flatten().data.equals(disjoint.data))
+
+    def test_flatten_apportions_split_columns(self):
+        """'weight' and 'probes' are divided among the pieces of a region.
+
+        They quantify a region rather than describe it, so splitting a region
+        has to divide them: replicating each row's whole value into every piece
+        inflated the totals, most starkly on the one-base slivers that .cns
+        files with off-by-one segment boundaries flatten into.
+        """
+        regions = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [0, 300],
+                    "end": [400, 500],
+                    "gene": ["A", "B"],
+                    "weight": [4.0, 2.0],
+                    "probes": [8, 4],
+                }
+            )
+        )
+        flat = regions.flatten()
+        # A gives 3/4 of itself to chr0:0-300 and 1/4 to chr0:300-400, which B
+        # halves with chr0:400-500 -- shares of length, not equal shares
+        self.assertEqual(
+            list(
+                zip(flat.start, flat.end, flat["weight"], flat["probes"], strict=True)
+            ),
+            [(0, 300, 3.0, 6.0), (300, 400, 2.0, 4.0), (400, 500, 1.0, 2.0)],
+        )
+        self.assertAlmostEqual(flat["weight"].sum(), regions["weight"].sum())
+        self.assertAlmostEqual(flat["probes"].sum(), regions["probes"].sum())
+        # Opting out combines them like any other column, so each row's value
+        # reappears whole in every piece it was split into
+        plain = regions.flatten(split_columns=())
+        self.assertEqual(list(plain["weight"]), [4.0, 6.0, 2.0])
+        self.assertEqual(list(plain["probes"]), [8, 12, 4])
+
     def test_merge(self):
         merged_coords_1 = [(1, 23, "ABCDE")]
         merged_coords_2 = [(3, 42, "ABCDEFGHI")]
