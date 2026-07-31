@@ -40,8 +40,13 @@ def argument_parsing():
     AP.add_argument(
         "--flatten",
         action="store_true",
-        help="""Flatten overlapping regions, keeping original
-                    boundaries. Not recommended with --exons.""",
+        help="""Split overlapping regions at every boundary, keeping the
+                    original boundaries and giving each output region the
+                    fields of the input regions covering it. Partly overlapping
+                    regions yield fragments narrower than either input, and any
+                    'weight' or 'probes' field is divided among them, so
+                    --merge is usually the better choice for bait files. Not
+                    recommended with --exons.""",
     )
     AP.add_argument(
         "--merge",

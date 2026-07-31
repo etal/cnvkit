@@ -9,6 +9,7 @@ import unittest
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_integer_dtype
 
 from cnvlib import read_ga
 from skgenome import GenomicArray as GA
@@ -466,16 +467,21 @@ class IntervalTests(unittest.TestCase):
         chr1 and chr2 each hold an overlapping pair plus an isolated region,
         after and before the pair respectively, so the pieces have to be
         interleaved back among the rows that pass through unsplit. chr3 is a
-        bookended run, which has no breakpoint to split at.
+        bookended run, which has no breakpoint to split at, ending in a
+        zero-width region that only a clustering rule coarser than "genuinely
+        overlapping" would swallow.
         """
         regions = GA(
             pd.DataFrame(
                 {
-                    "chromosome": ["chr1"] * 3 + ["chr2"] * 3 + ["chr3"] * 3,
-                    "start": [0, 50, 400, 0, 300, 500, 0, 100, 200],
-                    "end": [100, 200, 500, 100, 600, 700, 100, 200, 300],
-                    "gene": [*"ABC", *"PQR", *"XYZ"],
-                    "log2": [1.0, -2.0, 9.0, 3.0, 4.0, 5.0, 7.0, 7.5, 8.0],
+                    "chromosome": ["chr1"] * 3 + ["chr2"] * 3 + ["chr3"] * 4,
+                    "start": [0, 50, 400, 0, 300, 500, 0, 100, 200, 300],
+                    "end": [100, 200, 500, 100, 600, 700, 100, 200, 300, 300],
+                    "gene": [*"ABC", *"PQR", *"XYZW"],
+                    "log2": [1.0, -2.0, 9.0, 3.0, 4.0, 5.0, 7.0, 7.5, 8.0, 8.5],
+                    # Not a Python identifier: a tabular input's header is the
+                    # user's own, and `itertuples` renames what it cannot use
+                    "GC content": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
                 }
             )
         )
@@ -488,21 +494,23 @@ class IntervalTests(unittest.TestCase):
                     flat.end,
                     flat["gene"],
                     flat["log2"],
+                    flat["GC content"],
                     strict=True,
                 )
             ),
             [
-                ("chr1", 0, 50, "A", 1.0),
-                ("chr1", 50, 100, "A,B", 1.0),
-                ("chr1", 100, 200, "B", -2.0),
-                ("chr1", 400, 500, "C", 9.0),
-                ("chr2", 0, 100, "P", 3.0),
-                ("chr2", 300, 500, "Q", 4.0),
-                ("chr2", 500, 600, "Q,R", 4.0),
-                ("chr2", 600, 700, "R", 5.0),
-                ("chr3", 0, 100, "X", 7.0),
-                ("chr3", 100, 200, "Y", 7.5),
-                ("chr3", 200, 300, "Z", 8.0),
+                ("chr1", 0, 50, "A", 1.0, 0.1),
+                ("chr1", 50, 100, "A,B", 1.0, 0.1),
+                ("chr1", 100, 200, "B", -2.0, 0.2),
+                ("chr1", 400, 500, "C", 9.0, 0.3),
+                ("chr2", 0, 100, "P", 3.0, 0.4),
+                ("chr2", 300, 500, "Q", 4.0, 0.5),
+                ("chr2", 500, 600, "Q,R", 4.0, 0.5),
+                ("chr2", 600, 700, "R", 5.0, 0.6),
+                ("chr3", 0, 100, "X", 7.0, 0.7),
+                ("chr3", 100, 200, "Y", 7.5, 0.8),
+                ("chr3", 200, 300, "Z", 8.0, 0.9),
+                ("chr3", 300, 300, "W", 8.5, 1.0),
             ],
         )
         # A table with no overlaps at all passes through unchanged
@@ -522,29 +530,31 @@ class IntervalTests(unittest.TestCase):
                 {
                     "chromosome": "chr0",
                     "start": [0, 300],
-                    "end": [400, 500],
+                    "end": [400, 600],
                     "gene": ["A", "B"],
-                    "weight": [4.0, 2.0],
-                    "probes": [8, 4],
+                    "weight": [4.0, 3.0],
+                    "probes": [7, 5],
                 }
             )
         )
         flat = regions.flatten()
-        # A gives 3/4 of itself to chr0:0-300 and 1/4 to chr0:300-400, which B
-        # halves with chr0:400-500 -- shares of length, not equal shares
+        # A gives 3/4 of itself to chr0:0-300 and 1/4 to chr0:300-400, where B
+        # adds a third of itself -- shares of length, not equal shares
         self.assertEqual(
-            list(
-                zip(flat.start, flat.end, flat["weight"], flat["probes"], strict=True)
-            ),
-            [(0, 300, 3.0, 6.0), (300, 400, 2.0, 4.0), (400, 500, 1.0, 2.0)],
+            list(zip(flat.start, flat.end, flat["weight"], strict=True)),
+            [(0, 300, 3.0), (300, 400, 2.0), (400, 600, 2.0)],
         )
         self.assertAlmostEqual(flat["weight"].sum(), regions["weight"].sum())
-        self.assertAlmostEqual(flat["probes"].sum(), regions["probes"].sum())
+        # A count has no fractional part to give: the shares 5.25 / 3.42 / 3.33
+        # are rounded, and the column keeps its integer type, or `export vcf`
+        # would read every piece as a segment with a corrupt probe count
+        self.assertEqual(list(flat["probes"]), [5, 3, 3])
+        self.assertTrue(is_integer_dtype(flat["probes"]))
         # Opting out combines them like any other column, so each row's value
         # reappears whole in every piece it was split into
         plain = regions.flatten(split_columns=())
-        self.assertEqual(list(plain["weight"]), [4.0, 6.0, 2.0])
-        self.assertEqual(list(plain["probes"]), [8, 12, 4])
+        self.assertEqual(list(plain["weight"]), [4.0, 7.0, 3.0])
+        self.assertEqual(list(plain["probes"]), [7, 12, 5])
 
     def test_merge(self):
         merged_coords_1 = [(1, 23, "ABCDE")]
