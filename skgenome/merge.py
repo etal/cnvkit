@@ -122,16 +122,53 @@ def flatten(
     }
     # NB: Input rows and columns should already be sorted like this
     table = table.sort_values(["chromosome", "start", "end"])
+    # Bookended rows share no breakpoint to split at, so cluster only the rows
+    # that genuinely overlap -- the same distinction `_nothing_to_cluster`
+    # makes above when it lets a whole table through.
     clustered = bioframe.cluster(
-        table, min_dist=0, cols=_BF_COLS, return_cluster_ids=True
+        table, min_dist=None, cols=_BF_COLS, return_cluster_ids=True
     )
-    all_rows: list = []
-    for _cluster_id, group in clustered.groupby("cluster", sort=False):
-        group_rows = group.drop(
-            columns=["cluster", "cluster_start", "cluster_end"], errors="ignore"
+    data_cols = [
+        c
+        for c in clustered.columns
+        if c not in ("cluster", "cluster_start", "cluster_end")
+    ]
+    # Rows that cluster alone are emitted verbatim; only the rows that really
+    # overlap are worth a Python-level pass. When a bait file holds a handful
+    # of overlaps nearly every cluster is a singleton, and visiting them all
+    # otherwise dominates the runtime.
+    cluster_ids = clustered["cluster"]
+    is_first = ~cluster_ids.duplicated().to_numpy()
+    in_multi_row_cluster = cluster_ids.duplicated(keep=False).to_numpy()
+    out = clustered.loc[is_first, data_cols].reset_index(drop=True)
+    if in_multi_row_cluster.any():
+        splitting = in_multi_row_cluster[is_first]
+        pieces = []
+        # `groupby(sort=False)` yields clusters in order of first appearance,
+        # which is the order `is_first` picked them out of `out`. Each cluster's
+        # sub-intervals replace the one row standing in for it there, so index
+        # them within its position to interleave them back in coordinate order.
+        for position, (_cluster_id, group) in zip(
+            np.flatnonzero(splitting),
+            clustered[in_multi_row_cluster].groupby("cluster", sort=False),
+            strict=True,
+        ):
+            rows = _flatten_cluster(group[data_cols], cmb, split_cols)
+            pieces.append(
+                pd.DataFrame(
+                    rows,
+                    columns=data_cols,
+                    index=position + np.arange(len(rows)) / len(rows),
+                )
+            )
+        # Splice via `concat` so pandas widens each column's dtype to fit the
+        # combined values, e.g. a joined name landing in an all-NaN float column.
+        out = (
+            pd.concat([out[~splitting], *pieces])
+            .sort_index(kind="mergesort")
+            .reset_index(drop=True)
         )
-        all_rows.extend(_flatten_cluster(group_rows, cmb, split_cols))
-    out = pd.DataFrame(all_rows, columns=table.columns)
+    # Re-sort chromosomes cleverly instead of lexicographically
     out = out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
     )
