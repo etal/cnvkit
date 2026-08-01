@@ -514,7 +514,8 @@ class IntervalTests(unittest.TestCase):
             ],
         )
         # A table with no overlaps at all passes through unchanged
-        disjoint = GA(regions.data.iloc[6:].reset_index(drop=True))
+        chr3_only = regions.data[regions.data.chromosome == "chr3"]
+        disjoint = GA(chr3_only.reset_index(drop=True))
         self.assertTrue(disjoint.flatten().data.equals(disjoint.data))
 
     def test_flatten_apportions_split_columns(self):
@@ -555,6 +556,17 @@ class IntervalTests(unittest.TestCase):
         plain = regions.flatten(split_columns=())
         self.assertEqual(list(plain["weight"]), [4.0, 7.0, 3.0])
         self.assertEqual(list(plain["probes"]), [7, 12, 5])
+
+        # Which column rounds is decided by what it means, not by the dtype it
+        # happens to arrive with. A file whose weights are all whole is written
+        # as bare integers and reads back as int64, but a weight is a
+        # proportion, so rounding it would zero every share below a half.
+        whole_weights = GA(regions.data.assign(weight=np.array([4, 3], dtype=np.int64)))
+        self.assertEqual(list(whole_weights.flatten()["weight"]), [3.0, 2.0, 2.0])
+        # A blank field in one row makes 'probes' float-typed, and it is still
+        # a count: the shares round, and stay whole for `export vcf`
+        float_probes = GA(regions.data.assign(probes=[7.0, 5.0]))
+        self.assertEqual(list(float_probes.flatten()["probes"]), [5.0, 3.0, 3.0])
 
     def test_merge(self):
         merged_coords_1 = [(1, 23, "ABCDE")]
