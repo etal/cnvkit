@@ -523,8 +523,7 @@ class IntervalTests(unittest.TestCase):
 
         They quantify a region rather than describe it, so splitting a region
         has to divide them: replicating each row's whole value into every piece
-        inflated the totals, most starkly on the one-base slivers that .cns
-        files with off-by-one segment boundaries flatten into.
+        inflated the totals, the more so the more finely a region was split.
         """
         regions = GA(
             pd.DataFrame(
