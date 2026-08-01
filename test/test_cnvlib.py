@@ -296,6 +296,53 @@ class CNATests(unittest.TestCase):
                 f"{fname}: guessed XX {guess} but is {sample_is_f}",
             )
 
+    def test_segment_fixtures_sit_on_their_bin_edges(self):
+        """Segment fixtures record boundaries a segmenter could have emitted.
+
+        A segment takes its start from its first bin and its end from its
+        last, so segments on a chromosome are bookended or gapped and never
+        overlap. tr95t.cns held 54 one-base overlaps from its September 2016
+        regeneration until 2026: that fell ten weeks before "segment: Fix
+        possible 1-base overlap of output segments (closes #158)", the window
+        in which the SEG round-trip took a base off every segment start.
+
+        The first segment on each chromosome is checked separately, against
+        the single-segment-per-chromosome fixtures for the same panel, because
+        it was never affected -- the segmenter overwrites it with the bin
+        start it came from. Correcting it along with the rest would satisfy
+        the adjacency check above while moving 24 boundaries per file off
+        their bins, which is why adjacency alone does not settle this.
+        """
+        panel_first: dict[str, set[int]] = {}
+        for fname in (
+            "formats/f-on-f.cns",
+            "formats/f-on-m.cns",
+            "formats/m-on-f.cns",
+            "formats/m-on-m.cns",
+        ):
+            for chrom, rows in cnvlib.read(fname).data.groupby(
+                "chromosome", sort=False
+            ):
+                panel_first.setdefault(chrom, set()).add(int(rows.start.min()))
+        disagree = {c: v for c, v in panel_first.items() if len(v) > 1}
+        self.assertFalse(disagree, f"panel fixtures disagree on a start: {disagree}")
+
+        for fname in ("formats/tr95t.cns", "formats/tr95t.segmetrics.cns"):
+            segments = cnvlib.read(fname)
+            for chrom, rows in segments.data.groupby("chromosome", sort=False):
+                rows = rows.sort_values("start")
+                gaps = rows.start.to_numpy()[1:] - rows.end.to_numpy()[:-1]
+                self.assertTrue(
+                    (gaps >= 0).all(),
+                    f"{fname} {chrom}: segments overlap by {-int(gaps.min())} bases",
+                )
+                self.assertEqual(
+                    int(rows.start.iat[0]),
+                    next(iter(panel_first[chrom])),
+                    f"{fname} {chrom}: first segment does not start at the "
+                    "panel's first bin on this chromosome",
+                )
+
     def test_guess_xx_indeterminate_defaults_female(self):
         """Indeterminate sex (no chrX) defaults to female, never silently male.
 
