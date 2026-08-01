@@ -9,6 +9,7 @@ import unittest
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_integer_dtype
 
 from cnvlib import read_ga
 from skgenome import GenomicArray as GA
@@ -452,6 +453,120 @@ class IntervalTests(unittest.TestCase):
             result = regions.flatten(combine=self.combiner)
             expect = self._from_intervals(flat_coords)
             self._compare_regions(result, expect)
+
+    def test_flatten_fields_follow_the_covering_rows(self):
+        """Each sub-interval takes its fields from the rows that cover it.
+
+        Columns with no combiner -- log2, depth, gc and the rest of a .cnr's
+        payload -- were copied from the first row of the whole overlap cluster,
+        so a piece belonging solely to a later region reported an earlier
+        region's coverage. Bookended rows were caught by this too: they
+        clustered together, and one overlap anywhere in a table sends every
+        cluster through the splitting path.
+
+        chr1 and chr2 each hold an overlapping pair plus an isolated region,
+        after and before the pair respectively, so the pieces have to be
+        interleaved back among the rows that pass through unsplit. chr3 is a
+        bookended run, which has no breakpoint to split at, ending in a
+        zero-width region that only a clustering rule coarser than "genuinely
+        overlapping" would swallow.
+        """
+        regions = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 3 + ["chr2"] * 3 + ["chr3"] * 4,
+                    "start": [0, 50, 400, 0, 300, 500, 0, 100, 200, 300],
+                    "end": [100, 200, 500, 100, 600, 700, 100, 200, 300, 300],
+                    "gene": [*"ABC", *"PQR", *"XYZW"],
+                    "log2": [1.0, -2.0, 9.0, 3.0, 4.0, 5.0, 7.0, 7.5, 8.0, 8.5],
+                    # Not a Python identifier: a tabular input's header is the
+                    # user's own, and `itertuples` renames what it cannot use
+                    "GC content": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+                }
+            )
+        )
+        flat = regions.flatten()
+        self.assertEqual(
+            list(
+                zip(
+                    flat.chromosome,
+                    flat.start,
+                    flat.end,
+                    flat["gene"],
+                    flat["log2"],
+                    flat["GC content"],
+                    strict=True,
+                )
+            ),
+            [
+                ("chr1", 0, 50, "A", 1.0, 0.1),
+                ("chr1", 50, 100, "A,B", 1.0, 0.1),
+                ("chr1", 100, 200, "B", -2.0, 0.2),
+                ("chr1", 400, 500, "C", 9.0, 0.3),
+                ("chr2", 0, 100, "P", 3.0, 0.4),
+                ("chr2", 300, 500, "Q", 4.0, 0.5),
+                ("chr2", 500, 600, "Q,R", 4.0, 0.5),
+                ("chr2", 600, 700, "R", 5.0, 0.6),
+                ("chr3", 0, 100, "X", 7.0, 0.7),
+                ("chr3", 100, 200, "Y", 7.5, 0.8),
+                ("chr3", 200, 300, "Z", 8.0, 0.9),
+                ("chr3", 300, 300, "W", 8.5, 1.0),
+            ],
+        )
+        # A table with no overlaps at all passes through unchanged
+        chr3_only = regions.data[regions.data.chromosome == "chr3"]
+        disjoint = GA(chr3_only.reset_index(drop=True))
+        self.assertTrue(disjoint.flatten().data.equals(disjoint.data))
+
+    def test_flatten_apportions_split_columns(self):
+        """'weight' and 'probes' are divided among the pieces of a region.
+
+        They quantify a region rather than describe it, so splitting a region
+        has to divide them: replicating each row's whole value into every piece
+        inflated the totals, most starkly on the one-base slivers that .cns
+        files with off-by-one segment boundaries flatten into.
+        """
+        regions = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [0, 300],
+                    "end": [400, 600],
+                    "gene": ["A", "B"],
+                    "weight": [4.0, 3.0],
+                    "probes": [7, 5],
+                }
+            )
+        )
+        flat = regions.flatten()
+        # A gives 3/4 of itself to chr0:0-300 and 1/4 to chr0:300-400, where B
+        # adds a third of itself -- shares of length, not equal shares
+        self.assertEqual(
+            list(zip(flat.start, flat.end, flat["weight"], strict=True)),
+            [(0, 300, 3.0), (300, 400, 2.0), (400, 600, 2.0)],
+        )
+        self.assertAlmostEqual(flat["weight"].sum(), regions["weight"].sum())
+        # A count has no fractional part to give: the shares 5.25 / 3.42 / 3.33
+        # are rounded, and the column keeps its integer type, or `export vcf`
+        # would read every piece as a segment with a corrupt probe count
+        self.assertEqual(list(flat["probes"]), [5, 3, 3])
+        self.assertTrue(is_integer_dtype(flat["probes"]))
+        # Opting out combines them like any other column, so each row's value
+        # reappears whole in every piece it was split into
+        plain = regions.flatten(split_columns=())
+        self.assertEqual(list(plain["weight"]), [4.0, 7.0, 3.0])
+        self.assertEqual(list(plain["probes"]), [7, 12, 5])
+
+        # Which column rounds is decided by what it means, not by the dtype it
+        # happens to arrive with. A file whose weights are all whole is written
+        # as bare integers and reads back as int64, but a weight is a
+        # proportion, so rounding it would zero every share below a half.
+        whole_weights = GA(regions.data.assign(weight=np.array([4, 3], dtype=np.int64)))
+        self.assertEqual(list(whole_weights.flatten()["weight"]), [3.0, 2.0, 2.0])
+        # A blank field in one row makes 'probes' float-typed, and it is still
+        # a count: the shares round, and stay whole for `export vcf`
+        float_probes = GA(regions.data.assign(probes=[7.0, 5.0]))
+        self.assertEqual(list(float_probes.flatten()["probes"]), [5.0, 3.0, 3.0])
 
     def test_merge(self):
         merged_coords_1 = [(1, 23, "ABCDE")]

@@ -62,8 +62,11 @@ Additional scripts
 
     In either mode, the input region coordinates can be provided in any of the
     formats handled by skgenome.tabio, but it's best to first run them through
-    either the command :ref:`target` or script ``skg_convert.py --flatten``
-    (see below) to ensure the input regions do not overlap.
+    either the command :ref:`target` or the script ``skg_convert.py --merge``
+    (see below) to ensure the input regions do not overlap. Prefer those to
+    ``skg_convert.py --flatten``, which also removes overlaps but does so by
+    splitting each region at every boundary, shattering partly overlapping
+    bait tiles into slivers a few bases wide.
 
 ``reference2targets.py``
     Extract target and antitarget BED files from a CNVkit reference file.

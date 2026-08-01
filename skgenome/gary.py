@@ -727,7 +727,11 @@ class GenomicArray:
         combine: dict[str, Callable] | None = None,
         split_columns: Iterable[str] | None = None,
     ) -> GenomicArray:
-        """Split this array's regions where they overlap."""
+        """Split this array's regions where they overlap.
+
+        Each sub-interval takes its fields from the rows covering it alone.
+        See :func:`skgenome.merge.flatten` for `combine` and `split_columns`.
+        """
         return self.as_dataframe(
             flatten(self.data, combine=combine, split_columns=split_columns)
         )

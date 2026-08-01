@@ -23,6 +23,14 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
 _BF_COLS = ("chromosome", "start", "end")
+# Columns that `flatten` apportions across the pieces of a split region, being
+# quantities spread over its length rather than properties of it
+_SPLIT_COLUMNS = ("weight", "probes")
+# Those of them that count something, and so have no fractional part to give.
+# Not inferred from the column's dtype: 'weight' is a proportion that happens
+# to read as int64 whenever a file's weights are all whole, and 'probes' is a
+# count that reads as float64 whenever one row's field is blank.
+_COUNT_COLUMNS = frozenset({"probes"})
 
 
 def _fill_unnamed(table: pd.DataFrame, cmb: dict[str, Callable]) -> pd.DataFrame:
@@ -74,6 +82,66 @@ def _nothing_to_cluster(table: pd.DataFrame, bp: int) -> bool:
     return bool((changes | (gap_sizes > -bp)).all())
 
 
+def _data_columns(clustered: pd.DataFrame) -> list[str]:
+    """The columns of a `bioframe.cluster` result that came from the input.
+
+    ``cluster``, ``cluster_start`` and ``cluster_end`` are bioframe's to use,
+    so an input column of the same name is shadowed and dropped.
+    """
+    return [
+        col
+        for col in clustered.columns
+        if col not in ("cluster", "cluster_start", "cluster_end")
+    ]
+
+
+def _splice_clusters(
+    clustered: pd.DataFrame,
+    data_cols: list[str],
+    expand: Callable[[pd.DataFrame], list[dict]],
+) -> pd.DataFrame:
+    """Rebuild a clustered table, replacing each multi-row cluster with `expand`.
+
+    Rows that cluster alone are emitted verbatim; only the rows that really
+    cluster together are worth a Python-level pass. When a bait file holds a
+    handful of overlaps nearly every cluster is a singleton, and visiting them
+    all otherwise dominates the runtime.
+
+    `expand` must return at least one row for a cluster: an empty list drops
+    the cluster, and one for every cluster would leave the spliced frame with
+    no values to take its dtypes from.
+    """
+    cluster_ids = clustered["cluster"]
+    is_first = ~cluster_ids.duplicated().to_numpy()
+    in_multi_row_cluster = cluster_ids.duplicated(keep=False).to_numpy()
+    out = clustered.loc[is_first, data_cols].reset_index(drop=True)
+    if not in_multi_row_cluster.any():
+        return out
+    # `groupby(sort=False)` yields clusters in order of first appearance, which
+    # is the order `is_first` picked them out of `out`. The rows replacing a
+    # cluster take the index of the one row standing in for it there, and
+    # `mergesort` is stable, so they keep the order `expand` gave them.
+    changing = in_multi_row_cluster[is_first]
+    rows: list[dict] = []
+    index: list[int] = []
+    for position, (_cluster_id, group) in zip(
+        np.flatnonzero(changing).tolist(),
+        clustered[in_multi_row_cluster].groupby("cluster", sort=False),
+        strict=True,
+    ):
+        new_rows = expand(group)
+        rows.extend(new_rows)
+        index.extend(itertools.repeat(position, len(new_rows)))
+    # Splice via `concat` so pandas widens each column's dtype to fit the
+    # combined values, e.g. a joined name landing in an all-NaN float column.
+    replacement = pd.DataFrame(rows, columns=data_cols, index=index)
+    return (
+        pd.concat([out[~changing], replacement])
+        .sort_index(kind="mergesort")
+        .reset_index(drop=True)
+    )
+
+
 def flatten(
     table: pd.DataFrame,
     combine: dict[str, Callable] | None = None,
@@ -84,53 +152,120 @@ def flatten(
     Unlike :func:`merge`, which emits an overlapping group's union as one row,
     this emits one row per distinct sub-interval, so partially overlapping
     regions yield fragments narrower than either input.
+
+    Parameters
+    ----------
+    table : DataFrame
+        Genomic intervals, with at least chromosome, start and end columns.
+        Must be sorted by chromosome, start, end.
+    combine : dict, optional
+        Column-to-function mapping for aggregating the fields of the rows that
+        cover each sub-interval. See :func:`skgenome.combiners.get_combiners`.
+    split_columns : iterable of str, optional
+        Columns holding a quantity spread over the length of a region rather
+        than a property of it -- ``weight`` and ``probes`` by default. Each
+        row's value is apportioned among its sub-intervals in proportion to
+        their lengths before the covering rows are combined, rather than being
+        duplicated whole into every piece. Pass an empty sequence to combine
+        these columns like any other; a column with no combiner is ignored.
+
+        The total is preserved exactly, given an additive combiner -- the
+        default for both of these -- and regions of positive length; a
+        zero-width row contributes a breakpoint but has no sub-interval to
+        carry its value, so it is dropped as it always has been. ``probes`` is
+        the exception: it counts bins, which have no fractional part to give,
+        so its shares are rounded piece by piece and its total can drift by up
+        to half a count per piece.
+
+    Returns
+    -------
+    DataFrame
+        A new table with the overlapping rows split at each breakpoint.
     """
     if table.empty:
         return table
     cmb = get_combiners(table, False, combine)
     if _nothing_to_cluster(table, 1):
         return _fill_unnamed(table, cmb)
+    # Filtered to the columns that have a combiner, since a column with none is
+    # taken from its covering row verbatim and so cannot be apportioned
+    split_cols = {
+        col
+        for col in (_SPLIT_COLUMNS if split_columns is None else split_columns)
+        if col in cmb
+    }
     # NB: Input rows and columns should already be sorted like this
     table = table.sort_values(["chromosome", "start", "end"])
+    # Bookended rows share no breakpoint to split at, so cluster only the rows
+    # that genuinely overlap -- the same distinction `_nothing_to_cluster`
+    # makes above when it lets a whole table through.
     clustered = bioframe.cluster(
-        table, min_dist=0, cols=_BF_COLS, return_cluster_ids=True
+        table, min_dist=None, cols=_BF_COLS, return_cluster_ids=True
     )
-    all_rows: list = []
-    for _cluster_id, group in clustered.groupby("cluster", sort=False):
-        group_rows = group.drop(
-            columns=["cluster", "cluster_start", "cluster_end"], errors="ignore"
-        )
-        all_rows.extend(_flatten_tuples(group_rows, cmb))
-    out = pd.DataFrame.from_records(all_rows, columns=table.columns)
+    data_cols = _data_columns(clustered)
+    out = _splice_clusters(
+        clustered,
+        data_cols,
+        lambda group: _flatten_cluster(group[data_cols], cmb, split_cols),
+    )
+    # A count stays whole: 'probes' is documented as a number of bins, and
+    # `export vcf` reads a fractional probe count as a corrupt segment and drops
+    # it. Rounding the shares back costs under one count per piece.
+    for col in split_cols & _COUNT_COLUMNS:
+        out[col] = out[col].round().astype(table[col].dtype)
+    # Re-sort chromosomes cleverly instead of lexicographically
     out = out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
     )
     return _fill_unnamed(out, cmb)
 
 
-def _flatten_tuples(
-    group_df: pd.DataFrame, combine: dict[str, Callable]
-) -> list[tuple]:
-    """Divide multiple rows where they overlap.
+def _flatten_cluster(
+    group_df: pd.DataFrame, cmb: dict[str, Callable], split_cols: set[str]
+) -> list[dict]:
+    """Divide one cluster of overlapping rows at each of their breakpoints.
 
-    Split at all coordinate breakpoints and combine extra fields.
+    Every sub-interval draws its values from the rows covering that
+    sub-interval alone: the columns in `cmb` through their combiner, the rest
+    from the first covering row. Columns in `split_cols` are apportioned by
+    length before being combined.
     """
-    rows = list(group_df.itertuples(index=False))
-    if len(rows) == 1:
-        return rows
-    first_row = rows[0]
-    extra_cols = [x for x in first_row._fields[3:] if x in combine]
-    breaks = sorted(set(itertools.chain(*[(r.start, r.end) for r in rows])))
+    # Address the rows positionally: `itertuples` renames any column whose name
+    # is not an identifier, and a tabular input's header is the user's own
+    positions = {col: i for i, col in enumerate(group_df.columns)}
+    i_start = positions["start"]
+    i_end = positions["end"]
+    rows = list(group_df.itertuples(index=False, name=None))
+    breaks = sorted({bound for row in rows for bound in (row[i_start], row[i_end])})
     result = []
     for bp_start, bp_end in itertools.pairwise(breaks):
-        rows_in_play = [
-            row for row in rows if row.start <= bp_start and row.end >= bp_end
+        # The cluster spans a contiguous range and no breakpoint falls strictly
+        # within this sub-interval, so at least one row covers all of it
+        covering = [
+            row for row in rows if row[i_start] <= bp_start and row[i_end] >= bp_end
         ]
-        extra_fields = {
-            key: combine[key]([getattr(r, key) for r in rows_in_play])
-            for key in extra_cols
-        }
-        result.append(first_row._replace(start=bp_start, end=bp_end, **extra_fields))
+        piece = {}
+        for col, i_col in positions.items():
+            if col == "start":
+                piece[col] = bp_start
+            elif col == "end":
+                piece[col] = bp_end
+            elif col in cmb:
+                if col in split_cols:
+                    # A row's share of the quantity is its share of the length
+                    piece[col] = cmb[col](
+                        [
+                            row[i_col]
+                            * (bp_end - bp_start)
+                            / (row[i_end] - row[i_start])
+                            for row in covering
+                        ]
+                    )
+                else:
+                    piece[col] = cmb[col]([row[i_col] for row in covering])
+            else:
+                piece[col] = covering[0][i_col]
+        result.append(piece)
     return result
 
 
@@ -186,44 +321,28 @@ def merge(
         return_cluster_ids=True,
         return_cluster_intervals=True,
     )
-    data_cols = [
-        c
-        for c in clustered.columns
-        if c not in ("cluster", "cluster_start", "cluster_end")
-    ]
-    # Rows that cluster alone are emitted verbatim; only the rows that really
-    # combine are worth a Python-level pass. When a bait file holds a handful
-    # of duplicates nearly every cluster is a singleton, and visiting them all
-    # otherwise dominates the runtime.
-    cluster_ids = clustered["cluster"]
-    is_first = ~cluster_ids.duplicated().to_numpy()
-    in_multi_row_cluster = cluster_ids.duplicated(keep=False).to_numpy()
-    out = clustered.loc[is_first, data_cols].reset_index(drop=True)
-    if in_multi_row_cluster.any():
-        combined_rows = []
-        for _cluster_id, group in clustered[in_multi_row_cluster].groupby(
-            "cluster", sort=False
-        ):
-            vals = {}
-            for col in data_cols:
-                if col == "start":
-                    vals[col] = group["cluster_start"].iloc[0]
-                elif col == "end":
-                    vals[col] = group["cluster_end"].iloc[0]
-                elif col in cmb:
-                    vals[col] = cmb[col](group[col].values)
-                else:
-                    vals[col] = group[col].iloc[0]
-            combined_rows.append(vals)
-        # `groupby(sort=False)` yields clusters in order of first appearance,
-        # which is the order `is_first` picked them out of `out`. Splice via
-        # `concat` so pandas widens each column's dtype to fit the combined
-        # values, e.g. a joined name landing in an all-NaN float column.
-        combining = in_multi_row_cluster[is_first]
-        replacement = pd.DataFrame(
-            combined_rows, columns=data_cols, index=np.flatnonzero(combining)
-        )
-        out = pd.concat([out[~combining], replacement]).sort_index(kind="mergesort")
+    data_cols = _data_columns(clustered)
+
+    def combine_cluster(group: pd.DataFrame) -> list[dict]:
+        """Combine one cluster's rows into the single row of their union.
+
+        A closure rather than a module-level helper because it reads the
+        cluster bounds, which `_data_columns` leaves out of the group frame
+        that the combined columns come from.
+        """
+        vals = {}
+        for col in data_cols:
+            if col == "start":
+                vals[col] = group["cluster_start"].iloc[0]
+            elif col == "end":
+                vals[col] = group["cluster_end"].iloc[0]
+            elif col in cmb:
+                vals[col] = cmb[col](group[col].values)
+            else:
+                vals[col] = group[col].iloc[0]
+        return [vals]
+
+    out = _splice_clusters(clustered, data_cols, combine_cluster)
     # Re-sort chromosomes cleverly instead of lexicographically
     out = out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
