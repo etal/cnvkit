@@ -635,6 +635,98 @@ class IntervalTests(unittest.TestCase):
             [(100, 250), (500, 600)],
         )
 
+    def test_columns_named_like_bioframe_bookkeeping(self):
+        """A column named cluster/cluster_start/cluster_end is the user's own.
+
+        ``bioframe.cluster``, which merge and flatten group rows with, used to
+        be asked for its bookkeeping alongside the input, and it names that
+        bookkeeping cluster/cluster_start/cluster_end. An input column of the
+        same name was duplicated rather than replaced. Under the name
+        ``cluster`` the duplicate label made the cluster ids a whole DataFrame,
+        so rows were grouped by bioframe's id and the user's value together and
+        genuinely overlapping rows came through unmerged and unsplit -- wrong
+        coordinates, not merely a lost column. Under ``cluster_start`` or
+        ``cluster_end``, merge read the same DataFrame where it expected one
+        coordinate and raised ``TypeError``, while flatten dropped the column
+        silently. ``tabio.read_tab`` accepts arbitrary extra columns, so a
+        header is user data, and 'cluster' is an unremarkable name for a bait
+        or sample label.
+
+        The damage was data-dependent: a table with nothing to cluster passes
+        through verbatim, so the same pipeline mangled or preserved the same
+        column according to whether that particular file held an overlap.
+        """
+        expect = {
+            # Two rows overlapping: merged into one, split into three
+            ("overlapping", "merge"): [10],
+            ("overlapping", "flatten"): [10, 10, 20],
+            # Nothing to cluster: both pass the rows through untouched
+            ("disjoint", "merge"): [10, 20],
+            ("disjoint", "flatten"): [10, 20],
+        }
+        bounds = {
+            "overlapping": ([0, 50], [100, 200]),
+            "disjoint": ([0, 500], [100, 600]),
+        }
+        for name in ("cluster", "cluster_start", "cluster_end"):
+            for layout, (starts, ends) in bounds.items():
+                regions = GA(
+                    pd.DataFrame(
+                        {
+                            "chromosome": "chr0",
+                            "start": starts,
+                            "end": ends,
+                            "gene": ["A", "B"],
+                            name: [10, 20],
+                        }
+                    )
+                )
+                for op in ("merge", "flatten"):
+                    with self.subTest(column=name, table=layout, op=op):
+                        result = getattr(regions, op)()
+                        self.assertEqual(list(result[name]), expect[layout, op])
+
+        # Every route a column can take treats these names like any other: all
+        # three at once, combined by a caller's own function...
+        overlapping = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [0, 50],
+                    "end": [100, 200],
+                    "cluster": [10, 20],
+                    "cluster_start": [1, 2],
+                    "cluster_end": [3, 4],
+                }
+            )
+        )
+        merged = overlapping.merge()
+        self.assertEqual(
+            [merged[col].iloc[0] for col in overlapping.data.columns],
+            ["chr0", 0, 200, 10, 1, 3],
+        )
+        self.assertEqual(
+            list(overlapping.merge(combine={"cluster": sum})["cluster"]), [30]
+        )
+        # ...and apportioned by length as a quantity spread over the region,
+        # where the column's name must not decide whether the division happens
+        shares = []
+        for name in ("extra", "cluster_start"):
+            regions = GA(
+                pd.DataFrame(
+                    {
+                        "chromosome": "chr0",
+                        "start": [0, 50],
+                        "end": [100, 200],
+                        name: [1.0, 2.0],
+                    }
+                )
+            )
+            pieces = regions.flatten(combine={name: sum}, split_columns=(name,))
+            shares.append(list(pieces[name]))
+        self.assertEqual(shares[0], shares[1])
+        self.assertAlmostEqual(sum(shares[1]), 3.0)
+
     def test_nan_gene_names(self):
         """merge/flatten/subdivide tolerate NaN-float gene names (issue #850).
 
