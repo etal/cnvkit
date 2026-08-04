@@ -990,6 +990,76 @@ class IntervalTests(unittest.TestCase):
                 )
                 self._compare_regions(result, expect)
 
+    def test_intersect_columns_named_like_bioframe_bookkeeping(self):
+        """A column named index/index_/start_/end_ is the user's own.
+
+        ``intersection`` pairs rows with ``bioframe.overlap``, which returns
+        its own ``index`` and ``index_`` columns and, when asked for the inputs
+        as well, the second one's coordinates suffixed apart as ``start_`` and
+        ``end_``. An input column of one of those four names duplicated a label
+        the code then read: ``index`` and ``index_`` raised ``ValueError``
+        naming the column as not unique, and ``start_``/``end_`` raised
+        ``ValueError: Operands are not aligned`` in the 'inner' mode that is
+        the only one to compare them.
+
+        Index labels no longer influence the result at all, since the rows are
+        addressed by position: a duplicated label resolved through ``.loc`` to
+        every row that shared it, and ``other``'s labels, rather than its row
+        order, decided which of its regions was reported first.
+
+        chr0:650-750 overlaps the first selection without being contained in
+        it, so 'inner' keeps one pairing fewer than 'outer', and 'trim' clips
+        it to the selection's end. chr0:5000-5100 overlaps nothing.
+        """
+        regions = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [0, 500, 650, 900, 5000],
+                    "end": [100, 600, 750, 1000, 5100],
+                    "gene": [*"ABECZ"],
+                }
+            )
+        )
+        selections = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [0, 450],
+                    "end": [700, 1000],
+                    "gene": ["X", "Y"],
+                }
+            )
+        )
+        expect = {
+            "outer": [10, 20, 30, 20, 30, 40],
+            "inner": [10, 20, 20, 30, 40],
+            "trim": [10, 20, 30, 20, 30, 40],
+        }
+        for name in ("index", "index_", "start_", "end_"):
+            labelled = GA(regions.data.assign(**{name: [10, 20, 30, 40, 50]}))
+            for mode in ("outer", "inner", "trim"):
+                with self.subTest(column=name, mode=mode):
+                    result = labelled.intersection(selections, mode=mode)
+                    self.assertEqual(list(result[name]), expect[mode])
+
+        # A duplicated label -- as a table assembled from several sources
+        # carries -- once selected every row that shared it, so the pairings of
+        # A, B, E and C dragged in the region that overlaps nothing
+        duped = GA(regions.data.set_axis([0, 1, 0, 1, 0], axis=0))
+        want = regions.intersection(selections)
+        got = duped.intersection(selections)
+        self.assertEqual(
+            list(zip(got.start, got["gene"], strict=True)),
+            list(zip(want.start, want["gene"], strict=True)),
+        )
+        self.assertEqual(len(got), 6)
+        # `other`'s rows are reported in its own order, not its labels'
+        relabelled = GA(selections.data.set_axis([5, 1], axis=0))
+        self.assertEqual(
+            list(regions.intersection(relabelled)["gene"]), list(want["gene"])
+        )
+
     def test_subtract(self):
         # Test cases:
         #  | access: ====   ====   ====    ==========
