@@ -407,16 +407,8 @@ def squash(
         if len(group) == 1:
             result_rows.append(group.iloc[0])
         else:
-            vals: dict = {}
-            for col in table.columns:
-                if col == "start":
-                    vals[col] = group["start"].iloc[0]
-                elif col == "end":
-                    vals[col] = group["end"].iloc[-1]
-                elif col in cmb:
-                    vals[col] = cmb[col](group[col].values)
-                else:
-                    vals[col] = group[col].iloc[0]
-            result_rows.append(pd.Series(vals))
+            # A run of bookended rows spans from the first row's start to the
+            # last row's end, which is what `_merge_cluster` emits for a group
+            result_rows.append(pd.Series(_merge_cluster(group, cmb)))
     out = pd.DataFrame(result_rows, columns=table.columns).reset_index(drop=True)
     return _fill_unnamed(out, cmb)
