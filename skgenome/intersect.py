@@ -17,12 +17,23 @@ import pandas as pd
 
 from .combiners import first_of, join_strings, make_const
 
+Numeric: TypeAlias = int | float | np.number
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterator, Sequence
 
     from numpy import ndarray
 
-Numeric: TypeAlias = int | float | np.number
+    # One coordinate per query region
+    Coords: TypeAlias = Sequence[Numeric] | pd.Series | ndarray
+    # ... or none at all, for a bound the caller left open
+    Bounds: TypeAlias = Coords | None
+
+# Stand-ins for the open side of a one-sided query, chosen to fall outside the
+# coordinates rather than at their edge: genomic positions are non-negative,
+# and none exceeds what an int64 column can hold.
+_BEFORE_FIRST_BASE = -1
+_PAST_LAST_BASE = np.iinfo(np.int64).max
 
 # One shared placeholder instead of a fresh array per yield: allocating one
 # costs ~200 ns against ~7 us of per-row work, and the missing-chromosome path
@@ -128,8 +139,8 @@ def into_ranges(
 def iter_ranges(
     table: pd.DataFrame,
     chrom: str | None,
-    starts: Sequence[Numeric] | None,
-    ends: Sequence[Numeric] | None,
+    starts: Bounds,
+    ends: Bounds,
     mode: str,
 ) -> Iterator[pd.DataFrame]:
     """Iterate through sub-ranges."""
@@ -208,16 +219,18 @@ def _chrom_slices(
 
 def idx_ranges(
     table: pd.DataFrame,
-    starts: list[int] | pd.Series,
-    ends: list[int] | pd.Series,
+    starts: Bounds,
+    ends: Bounds,
     mode: str,
 ) -> Generator[tuple, None, None]:
     """Iterate through sub-ranges.
 
-    `table` must hold one chromosome's rows in ascending `start` order, as
-    every caller here arranges: `by_ranges` and `iter_slices` group by
-    chromosome, `iter_ranges` selects one, and `tabio.read` sorts what it
-    loads. Rows out of that order raise `ValueError`.
+    `table`'s `start` column must ascend, since that is what lets a binary
+    search place the query. Callers that group by chromosome first --
+    `by_ranges`, `iter_slices` -- hold that per group, and `iter_ranges` does
+    when given a chromosome to select; searching a whole array at once, as
+    `in_range(None, ...)` does, needs it end to end. Rows out of order raise
+    `ValueError` rather than being answered wrongly.
     """
     assert mode in ("inner", "outer")
     # Edge cases: when the `table` is either empty, or both `starts` and `ends`
@@ -234,8 +247,8 @@ def idx_ranges(
     # `searchsorted`, which reads its column as ascending: handed rows in some
     # other order it returns a position unrelated to the query, silently, and
     # the caller gets bins that do not overlap the region it asked about. One
-    # pass to rule that out, against the pass over `end` just below and the
-    # binary searches themselves.
+    # pass to rule that out, beside the pass over `end` that chooses between
+    # those implementations, and the binary searches themselves.
     if not table.start.is_monotonic_increasing:
         _raise_unsorted(table)
 
@@ -248,79 +261,81 @@ def idx_ranges(
         # None` case above, which asks for the whole table.)
         return
 
+    # Both implementations below want a start and an end for every region, so
+    # stand in for whichever side a one-sided query left open. A real bound of
+    # 0 is not the same query as no bound at all -- it excludes a zero-width
+    # bin at the origin, whose end is not past it -- so the stand-in has to sit
+    # outside the coordinates rather than at their edge.
+    if starts is None or not len(starts):
+        starts = np.full(n_regions, _BEFORE_FIRST_BASE)
+    if ends is None or not len(ends):
+        ends = np.full(n_regions, _PAST_LAST_BASE)
+
     if table.end.is_monotonic_increasing:
         yield from _irange_simple(table, starts, ends, mode)
-        return
-
-    # At least one bin is fully nested in another, leaving `end` out of
-    # ascending order, and `_irange_simple` reads `end` with `searchsorted`
-    # too -- to place a start in 'outer' mode, an end in 'inner' mode. The
-    # masks `_irange_nested` builds compare `end` elementwise instead, so they
-    # do not care, but it wants a start and an end for every region: fill in
-    # whichever side a one-sided query left open.
-    if starts is None or not len(starts):
-        starts = np.zeros(n_regions, dtype=np.int_)
-    if ends is None or not len(ends):
-        ends = [None] * n_regions
-    yield from _irange_nested(table, starts, ends, mode)
+    else:
+        # A bin nested inside another leaves `end` out of ascending order, and
+        # `_irange_simple` reads `end` with `searchsorted` too -- to place a
+        # start in 'outer' mode, an end in 'inner' mode. The masks
+        # `_irange_nested` builds compare `end` elementwise instead.
+        yield from _irange_nested(table, starts, ends, mode)
 
 
 def _raise_unsorted(table: pd.DataFrame) -> NoReturn:
-    """Report what is out of order about `table`, and the likely reason."""
-    starts = table["start"].to_numpy()
-    descents = np.flatnonzero(np.diff(starts) < 0)
-    if len(descents):
-        row = int(descents[0]) + 1
+    """Report what is out of order about `table`, and how to fix it."""
+    starts = table["start"]
+    chroms = table["chromosome"].unique()
+    # Diagnose the cause once: each carries its own remedy, and the widest
+    # explanation is the right one to give.
+    if len(chroms) > 1:
+        # Coordinates restart at every chromosome, so an array holding more
+        # than one is out of order by construction. This is a search that
+        # named none of them.
+        shown = ", ".join(map(str, chroms[:3]))
+        opening = "Genomic intervals must be sorted by start position"
         detail = (
-            f"start={starts[row]} follows start={starts[row - 1]}, at row "
+            f"these {len(table)} rows span {len(chroms)} chromosomes "
+            f"({shown}{', ...' if len(chroms) > 3 else ''})"
+        )
+        remedy = "name the chromosome to search rather than passing None"
+    elif starts.isna().any():
+        # A missing position compares false against every other, so the column
+        # counts as unordered with no row behind the one before it.
+        opening = "Genomic intervals must have a start position"
+        detail = f"start is missing in {int(starts.isna().sum())} of {len(table)} rows"
+        remedy = "drop the rows whose start is missing"
+    else:
+        # Nothing is missing, so some row's start is simply behind the one
+        # before it. Compare the column against itself shifted rather than
+        # differencing it, so that reporting the problem cannot fail on
+        # whatever the caller put in the column.
+        values = starts.to_numpy()
+        row = int(np.flatnonzero(values[1:] < values[:-1])[0]) + 1
+        opening = "Genomic intervals must be sorted by start position"
+        detail = (
+            f"start={values[row]} follows start={values[row - 1]}, at row "
             f"{row} of {len(table)}"
         )
-        remedy = "sort the array with .sort() before selecting from it"
-    else:
-        # No row is behind the one before it, so the column is unordered for
-        # the other reason: it holds a missing or non-finite position, which
-        # every comparison against is false.
-        detail = f"no position descends among these {len(table)} rows"
-        remedy = "drop the rows whose start is missing or non-finite"
-    chroms = table["chromosome"].unique()
-    if len(chroms) > 1:
-        names = ", ".join(map(str, chroms[:3]))
-        remedy = (
-            f"this selection spans {len(chroms)} chromosomes "
-            f"({names}{', ...' if len(chroms) > 3 else ''}), so name the one "
-            "to search rather than passing None"
-        )
-    raise ValueError(
-        "Genomic intervals must be sorted by start position to be searched: "
-        f"{detail}. To fix, {remedy}."
-    )
+        remedy = "sort the rows by start -- GenomicArray.sort, or sort_values"
+    raise ValueError(f"{opening} to be searched: {detail}. To fix, {remedy}.")
 
 
 def _irange_simple(
-    table: pd.DataFrame, starts: pd.Series, ends: pd.Series, mode: str
+    table: pd.DataFrame, starts: Coords, ends: Coords, mode: str
 ) -> Iterator[tuple[slice, int, int]]:
-    """Slice subsets of table when regions are not nested."""
-    if starts is not None and len(starts):
-        if mode == "inner":
-            # Only rows entirely after the start point
-            start_idxs = table.start.searchsorted(starts)
-        else:
-            # Include all rows overlapping the start point
-            start_idxs = table.end.searchsorted(starts, "right")
-    else:
-        # `idx_ranges` has ruled out both sides being absent, so `ends` is
-        # there to take the region count from.
-        starts = np.zeros(len(ends), dtype=np.int_)
-        start_idxs = starts.copy()
+    """Select each region by slice, for a table whose bins do not nest.
 
-    if ends is not None and len(ends):
-        if mode == "inner":
-            end_idxs = table.end.searchsorted(ends, "right")
-        else:
-            end_idxs = table.start.searchsorted(ends)
+    Both coordinate columns ascend, so each region's rows are one run of the
+    table and binary search finds its two ends.
+    """
+    if mode == "inner":
+        # Only the rows the region encloses
+        start_idxs = table.start.searchsorted(starts)
+        end_idxs = table.end.searchsorted(ends, "right")
     else:
-        end_idxs = np.repeat(len(table), len(starts))
-        ends = [None] * len(starts)
+        # Also the rows straddling either boundary
+        start_idxs = table.end.searchsorted(starts, "right")
+        end_idxs = table.start.searchsorted(ends)
 
     for start_idx, start_val, end_idx, end_val in zip(
         start_idxs, starts, end_idxs, ends, strict=True
@@ -329,32 +344,24 @@ def _irange_simple(
 
 
 def _irange_nested(
-    table: pd.DataFrame,
-    starts: Sequence | ndarray,
-    ends: Sequence | ndarray,
-    mode: str,
+    table: pd.DataFrame, starts: Coords, ends: Coords, mode: str
 ) -> Iterator[tuple[ndarray, int, int]]:
-    """Slice subsets of table when regions are nested."""
+    """Select each region by mask, for a table whose bins nest.
+
+    A nested bin leaves `end` out of ascending order, so only `start` can be
+    searched; `end` is compared row by row instead.
+    """
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
     assert len(starts) == len(ends) > 0
     for start_val, end_val in zip(starts, ends, strict=True):
         # Mask of table rows to keep for this query region
-        region_mask = np.ones(len(table), dtype=np.bool_)
-        if start_val:
-            if mode == "inner":
-                # Only rows entirely after the start point
-                start_idx = table.start.searchsorted(start_val)
-                region_mask[: int(start_idx)] = 0
-            else:
-                # Include all rows overlapping the start point
-                region_mask = table.end.to_numpy() > start_val
-        if end_val is not None:
-            if mode == "inner":
-                # Only rows up to the end point
-                region_mask &= table.end.to_numpy() <= end_val
-            else:
-                # Include all rows overlapping the end point
-                end_idx = table.start.searchsorted(end_val)
-                region_mask[int(end_idx) :] = 0
+        if mode == "inner":
+            # Only the rows the region encloses
+            region_mask = table.end.to_numpy() <= end_val
+            region_mask[: int(table.start.searchsorted(start_val))] = 0
+        else:
+            # Also the rows straddling either boundary
+            region_mask = table.end.to_numpy() > start_val
+            region_mask[int(table.start.searchsorted(end_val)) :] = 0
 
         yield region_mask, start_val, end_val

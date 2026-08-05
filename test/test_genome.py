@@ -1136,13 +1136,16 @@ class IntervalTests(unittest.TestCase):
             frayed.in_range("chr0", 0, 700)
         self.assertIn("missing", str(caught.exception))
 
-    def test_search_requires_one_chromosome(self):
-        """A whole-array search names its chromosome, or is refused.
+    def test_search_across_chromosomes_is_refused(self):
+        """Searching a whole array holding several chromosomes is refused.
 
         ``in_range(None, ...)`` is documented for an array holding one
-        chromosome. Given several it searched across them all, since a second
-        chromosome's coordinates restart below the first one's: asking chr1 for
-        0-700 also returned chr2's rows.
+        chromosome. Given several it searched across them all: asking for
+        0-700 without naming a chromosome returned chr2's rows alongside
+        chr1's. What the guard sees is the coordinate restart at the boundary,
+        so it catches the multi-chromosome case as ordinary disorder -- and
+        only when the later chromosome's positions do begin below the earlier
+        one's, which for real genomic coordinates they do.
         """
         two_chroms = GA(
             pd.DataFrame(
@@ -1194,11 +1197,42 @@ class IntervalTests(unittest.TestCase):
         )
 
     def test_search_no_ranges_selects_nothing(self):
-        """An empty list of ranges selects nothing, rather than everything."""
+        """An empty list of ranges selects nothing, rather than everything.
+
+        The two spellings failed differently: an empty `starts` with no `ends`
+        was read as one region covering the whole table, while an empty
+        `starts` and `ends` yielded no regions at all and left ``pd.concat``
+        with nothing to concatenate.
+        """
         empty = self.regions_2.in_ranges("chr0", [], [])
         self.assertEqual(len(empty), 0)
         self.assertEqual(list(empty.data.columns), list(self.regions_2.data.columns))
         self.assertEqual(len(self.regions_2.in_ranges("chr0", [], None)), 0)
+
+    def test_search_start_of_zero_is_not_an_absent_bound(self):
+        """A region starting at 0 is a bound; leaving the bound out is not.
+
+        A zero-width bin at the origin ends where it starts, so no region
+        overlaps it and a query from 0 excludes it -- while a query with no
+        lower bound at all selects every row, that one included. Both
+        implementations have to agree on that: the slicing one searches `end`
+        for the query start, while the masking one read a start of 0 as no
+        bound at all, so the same question put to a nested table and to a flat
+        one came back answered differently.
+        """
+        origin = (0, 0, "Z")
+        flat = self._from_intervals([origin, (0, 50, "A"), (100, 200, "B")])
+        nested = self._from_intervals([origin, (0, 1000, "A"), (100, 200, "B")])
+        self.assertTrue(flat.end.is_monotonic_increasing)
+        self.assertFalse(nested.end.is_monotonic_increasing)
+        for label, regions in (("flat", flat), ("nested", nested)):
+            with self.subTest(bins=label):
+                self.assertEqual(
+                    list(regions.in_range("chr0", 0, 500)["gene"]), ["A", "B"]
+                )
+                self.assertEqual(
+                    list(regions.in_range("chr0", None, 500)["gene"]), ["Z", "A", "B"]
+                )
 
     def test_subtract(self):
         # Test cases:

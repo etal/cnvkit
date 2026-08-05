@@ -368,8 +368,10 @@ class GenomicArray:
 
         Bins in this array that fall outside the other array's bins are skipped.
 
-        `self` must be sorted by chromosome and start position, as `tabio.read`
-        and `sort` leave it; any other row order raises `ValueError`.
+        `self` must be sorted by start position within each chromosome, as
+        `tabio.read` and `sort` leave it; rows out of that order raise
+        `ValueError`. Chromosome order does not matter: this groups by
+        chromosome before searching.
 
         Parameters
         ----------
@@ -436,8 +438,11 @@ class GenomicArray:
     ) -> Self:
         """Get the GenomicArray portion within the given genomic range.
 
-        `self` must be sorted by chromosome and start position, as `tabio.read`
-        and `sort` leave it; any other row order raises `ValueError`.
+        `self` must be sorted by start position within each chromosome, as
+        `tabio.read` and `sort` leave it; rows out of that order raise
+        `ValueError`. Without a `chrom` the whole array is searched at once, so
+        it must then ascend from end to end -- which a multi-chromosome array
+        does not, since coordinates restart at every chromosome.
 
         Parameters
         ----------
@@ -478,8 +483,11 @@ class GenomicArray:
         Similar to `in_range`, but concatenating the selections of all the
         regions specified by the `starts` and `ends` arrays.
 
-        `self` must be sorted by chromosome and start position, as `tabio.read`
-        and `sort` leave it; any other row order raises `ValueError`.
+        `self` must be sorted by start position within each chromosome, as
+        `tabio.read` and `sort` leave it; rows out of that order raise
+        `ValueError`. Without a `chrom` the whole array is searched at once, so
+        it must then ascend from end to end -- which a multi-chromosome array
+        does not, since coordinates restart at every chromosome.
 
         Parameters
         ----------
@@ -529,8 +537,10 @@ class GenomicArray:
         For example, group SNVs (self) by CNV segments (other) and calculate the
         median (summary_func) of each SNV group's allele frequencies.
 
-        `self` must be sorted by chromosome and start position, as `tabio.read`
-        and `sort` leave it; any other row order raises `ValueError`.
+        `self` must be sorted by start position within each chromosome, as
+        `tabio.read` and `sort` leave it; rows out of that order raise
+        `ValueError`. Chromosome order does not matter: this groups by
+        chromosome before searching.
 
         Parameters
         ----------
@@ -582,8 +592,10 @@ class GenomicArray:
 
         Bins in this array that fall outside the other array's bins are skipped.
 
-        `self` must be sorted by chromosome and start position, as `tabio.read`
-        and `sort` leave it; any other row order raises `ValueError`.
+        `self` must be sorted by start position within each chromosome, as
+        `tabio.read` and `sort` leave it; rows out of that order raise
+        `ValueError`. Chromosome order does not matter: this groups by
+        chromosome before searching.
 
         Parameters
         ----------
@@ -759,6 +771,11 @@ class GenomicArray:
         """Select the bins in `self` that overlap the regions in `other`.
 
         The extra fields of `self`, but not `other`, are retained in the output.
+
+        The `trim` mode clips the bins it selects, which `by_ranges` does, so
+        that mode alone requires `self` to be sorted by start position within
+        each chromosome and raises `ValueError` otherwise. The other two modes
+        pair the rows through bioframe, which sorts for itself.
         """
         if not len(self) or not len(other):
             return self.as_dataframe(self.data.iloc[:0])
