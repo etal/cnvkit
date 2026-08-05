@@ -10,7 +10,7 @@ GenomicArray types.
 from __future__ import annotations
 
 from itertools import repeat
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any, NoReturn, TypeAlias
 
 import numpy as np
 import pandas as pd
@@ -212,7 +212,13 @@ def idx_ranges(
     ends: list[int] | pd.Series,
     mode: str,
 ) -> Generator[tuple, None, None]:
-    """Iterate through sub-ranges."""
+    """Iterate through sub-ranges.
+
+    `table` must hold one chromosome's rows in ascending `start` order, as
+    every caller here arranges: `by_ranges` and `iter_slices` group by
+    chromosome, `iter_ranges` selects one, and `tabio.read` sorts what it
+    loads. Rows out of that order raise `ValueError`.
+    """
     assert mode in ("inner", "outer")
     # Edge cases: when the `table` is either empty, or both `starts` and `ends`
     # are None, we want to signal the calling function to use the entire table.
@@ -222,16 +228,47 @@ def idx_ranges(
     # chromosome.
     if not len(table) or (starts is None and ends is None):
         yield slice(None), None, None
+        return
+
+    # Both implementations below place their slice boundaries with
+    # `searchsorted`, which reads its column as ascending: handed rows in some
+    # other order it returns a position unrelated to the query, silently, and
+    # the caller gets bins that do not overlap the region it asked about. One
+    # pass to rule that out, against the pass over `end` just below and the
+    # binary searches themselves.
+    if not table.start.is_monotonic_increasing:
+        _raise_unsorted(table)
+
+    # Don't be fooled by nested bins
+    if (
+        (ends is not None and len(ends)) and (starts is not None and len(starts))
+    ) and not table.end.is_monotonic_increasing:
+        # At least one bin is fully nested -- account for it
+        irange_func = _irange_nested
     else:
-        # Don't be fooled by nested bins
-        if (
-            (ends is not None and len(ends)) and (starts is not None and len(starts))
-        ) and not table.end.is_monotonic_increasing:
-            # At least one bin is fully nested -- account for it
-            irange_func = _irange_nested
-        else:
-            irange_func = _irange_simple  # type: ignore[assignment]
-        yield from irange_func(table, starts, ends, mode)
+        irange_func = _irange_simple  # type: ignore[assignment]
+    yield from irange_func(table, starts, ends, mode)
+
+
+def _raise_unsorted(table: pd.DataFrame) -> NoReturn:
+    """Report the first row out of order, and the likely reason for it."""
+    row = int(np.flatnonzero(np.diff(table["start"].to_numpy()) < 0)[0]) + 1
+    chroms = table["chromosome"].unique()
+    if len(chroms) > 1:
+        names = ", ".join(map(str, chroms[:3]))
+        remedy = (
+            f"this selection spans {len(chroms)} chromosomes "
+            f"({names}{', ...' if len(chroms) > 3 else ''}), so name the one "
+            "to search rather than passing None"
+        )
+    else:
+        remedy = "sort the array with .sort() before selecting from it"
+    raise ValueError(
+        "Genomic intervals must be sorted by start position to be searched: "
+        f"start={table['start'].iat[row]} follows "
+        f"start={table['start'].iat[row - 1]}, at row {row} of {len(table)}. "
+        f"To fix, {remedy}."
+    )
 
 
 def _irange_simple(

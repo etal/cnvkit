@@ -1092,6 +1092,65 @@ class IntervalTests(unittest.TestCase):
                 with self.subTest(empty_self=True, mode=mode):
                     self.assertEqual(len(empty.intersection(region, mode=mode)), 0)
 
+    def test_search_requires_ascending_rows(self):
+        """Searching rows out of coordinate order raises instead of misleading.
+
+        ``searchsorted`` places the boundaries of every selection here, and it
+        reads its column as ascending: given rows in any other order it returns
+        a position unrelated to the query. The three rows below, shuffled,
+        answered "which bins overlap 0-700?" with the bin at 900-1000 as well
+        -- and in 'trim' mode clipped it to 900-700, an interval whose end
+        precedes its start. 'inner' searches a different column and happened to
+        survive, which is why every mode is checked.
+        """
+        coords = [(0, 100, "A"), (500, 600, "B"), (900, 1000, "C")]
+        ascending = self._from_intervals(coords)
+        shuffled = self._from_intervals([coords[i] for i in (2, 0, 1)])
+        selection = self._from_intervals([(0, 700, "X")])
+        for mode in ("outer", "inner", "trim"):
+            with self.subTest(mode=mode):
+                self.assertEqual(
+                    [
+                        list(rows["gene"])
+                        for _bin, rows in ascending.by_ranges(selection, mode=mode)
+                    ],
+                    [["A", "B"]],
+                )
+                with self.assertRaises(ValueError):
+                    list(shuffled.by_ranges(selection, mode=mode))
+                self.assertEqual(
+                    list(ascending.in_range("chr0", 0, 700, mode=mode)["gene"]),
+                    ["A", "B"],
+                )
+                with self.assertRaises(ValueError):
+                    shuffled.in_range("chr0", 0, 700, mode=mode)
+        self.assertEqual(list(ascending.into_ranges(selection, "gene", "-")), ["A,B"])
+        with self.assertRaises(ValueError):
+            shuffled.into_ranges(selection, "gene", "-")
+
+    def test_search_requires_one_chromosome(self):
+        """A whole-array search names its chromosome, or is refused.
+
+        ``in_range(None, ...)`` is documented for an array holding one
+        chromosome. Given several it searched across them all, since a second
+        chromosome's coordinates restart below the first one's: asking chr1 for
+        0-700 also returned chr2's rows.
+        """
+        two_chroms = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 2 + ["chr2"] * 2,
+                    "start": [0, 900] * 2,
+                    "end": [100, 1000] * 2,
+                    "gene": list("ABCD"),
+                }
+            )
+        )
+        self.assertEqual(list(two_chroms.in_range("chr1", 0, 700)["gene"]), ["A"])
+        with self.assertRaises(ValueError) as caught:
+            two_chroms.in_range(None, 0, 700)
+        self.assertIn("chr1, chr2", str(caught.exception))
+
     def test_subtract(self):
         # Test cases:
         #  | access: ====   ====   ====    ==========

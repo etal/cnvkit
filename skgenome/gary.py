@@ -368,6 +368,9 @@ class GenomicArray:
 
         Bins in this array that fall outside the other array's bins are skipped.
 
+        `self` must be sorted by chromosome and start position, as `tabio.read`
+        and `sort` leave it; any other row order raises `ValueError`.
+
         Parameters
         ----------
         other : GenomicArray
@@ -433,6 +436,9 @@ class GenomicArray:
     ) -> Self:
         """Get the GenomicArray portion within the given genomic range.
 
+        `self` must be sorted by chromosome and start position, as `tabio.read`
+        and `sort` leave it; any other row order raises `ValueError`.
+
         Parameters
         ----------
         chrom : str or None
@@ -469,8 +475,11 @@ class GenomicArray:
     ) -> GenomicArray:
         """Get the GenomicArray portion within the specified ranges.
 
-        Similar to `in_ranges`, but concatenating the selections of all the
+        Similar to `in_range`, but concatenating the selections of all the
         regions specified by the `starts` and `ends` arrays.
+
+        `self` must be sorted by chromosome and start position, as `tabio.read`
+        and `sort` leave it; any other row order raises `ValueError`.
 
         Parameters
         ----------
@@ -515,6 +524,9 @@ class GenomicArray:
 
         For example, group SNVs (self) by CNV segments (other) and calculate the
         median (summary_func) of each SNV group's allele frequencies.
+
+        `self` must be sorted by chromosome and start position, as `tabio.read`
+        and `sort` leave it; any other row order raises `ValueError`.
 
         Parameters
         ----------
@@ -565,6 +577,9 @@ class GenomicArray:
         For example, this can be used to group SNVs by CNV segments.
 
         Bins in this array that fall outside the other array's bins are skipped.
+
+        `self` must be sorted by chromosome and start position, as `tabio.read`
+        and `sort` leave it; any other row order raises `ValueError`.
 
         Parameters
         ----------
