@@ -82,25 +82,18 @@ def _nothing_to_cluster(table: pd.DataFrame, bp: int) -> bool:
     return bool((changes | (gap_sizes > -bp)).all())
 
 
-def _data_columns(clustered: pd.DataFrame) -> list[str]:
-    """The columns of a `bioframe.cluster` result that came from the input.
-
-    ``cluster``, ``cluster_start`` and ``cluster_end`` are bioframe's to use,
-    so an input column of the same name is shadowed and dropped.
-    """
-    return [
-        col
-        for col in clustered.columns
-        if col not in ("cluster", "cluster_start", "cluster_end")
-    ]
-
-
 def _splice_clusters(
-    clustered: pd.DataFrame,
-    data_cols: list[str],
+    table: pd.DataFrame,
+    cluster_ids: np.ndarray,
     expand: Callable[[pd.DataFrame], list[dict]],
 ) -> pd.DataFrame:
-    """Rebuild a clustered table, replacing each multi-row cluster with `expand`.
+    """Rebuild `table`, replacing each multi-row cluster with `expand`.
+
+    `cluster_ids` labels the rows of `table` with the cluster each belongs to,
+    row for row -- an array, so that it cannot align on the table's index
+    instead. Keeping it out of `table` is what lets an input column be named
+    ``cluster``: `bioframe.cluster` is asked for its own bookkeeping alone, so
+    its names and the user's never share a frame.
 
     Rows that cluster alone are emitted verbatim; only the rows that really
     cluster together are worth a Python-level pass. When a bait file holds a
@@ -111,10 +104,10 @@ def _splice_clusters(
     the cluster, and one for every cluster would leave the spliced frame with
     no values to take its dtypes from.
     """
-    cluster_ids = clustered["cluster"]
-    is_first = ~cluster_ids.duplicated().to_numpy()
-    in_multi_row_cluster = cluster_ids.duplicated(keep=False).to_numpy()
-    out = clustered.loc[is_first, data_cols].reset_index(drop=True)
+    ids = pd.Index(cluster_ids)
+    is_first = ~ids.duplicated()
+    in_multi_row_cluster = ids.duplicated(keep=False)
+    out = table[is_first].reset_index(drop=True)
     if not in_multi_row_cluster.any():
         return out
     # `groupby(sort=False)` yields clusters in order of first appearance, which
@@ -126,7 +119,9 @@ def _splice_clusters(
     index: list[int] = []
     for position, (_cluster_id, group) in zip(
         np.flatnonzero(changing).tolist(),
-        clustered[in_multi_row_cluster].groupby("cluster", sort=False),
+        table[in_multi_row_cluster].groupby(
+            cluster_ids[in_multi_row_cluster], sort=False
+        ),
         strict=True,
     ):
         new_rows = expand(group)
@@ -134,7 +129,7 @@ def _splice_clusters(
         index.extend(itertools.repeat(position, len(new_rows)))
     # Splice via `concat` so pandas widens each column's dtype to fit the
     # combined values, e.g. a joined name landing in an all-NaN float column.
-    replacement = pd.DataFrame(rows, columns=data_cols, index=index)
+    replacement = pd.DataFrame(rows, columns=table.columns, index=index)
     return (
         pd.concat([out[~changing], replacement])
         .sort_index(kind="mergesort")
@@ -195,18 +190,21 @@ def flatten(
         if col in cmb
     }
     # NB: Input rows and columns should already be sorted like this
-    table = table.sort_values(["chromosome", "start", "end"])
+    table = table.sort_values(["chromosome", "start", "end"], ignore_index=True)
     # Bookended rows share no breakpoint to split at, so cluster only the rows
     # that genuinely overlap -- the same distinction `_nothing_to_cluster`
-    # makes above when it lets a whole table through.
-    clustered = bioframe.cluster(
-        table, min_dist=None, cols=_BF_COLS, return_cluster_ids=True
-    )
-    data_cols = _data_columns(clustered)
+    # makes above when it lets a whole table through. Ask for the cluster ids
+    # alone: bioframe's other output would collide with a column of the input.
+    cluster_ids = bioframe.cluster(
+        table,
+        min_dist=None,
+        cols=_BF_COLS,
+        return_input=False,
+        return_cluster_ids=True,
+        return_cluster_intervals=False,
+    )["cluster"].to_numpy()
     out = _splice_clusters(
-        clustered,
-        data_cols,
-        lambda group: _flatten_cluster(group[data_cols], cmb, split_cols),
+        table, cluster_ids, lambda group: _flatten_cluster(group, cmb, split_cols)
     )
     # A count stays whole: 'probes' is documented as a number of bins, and
     # `export vcf` reads a fractional probe count as a corrupt segment and drops
@@ -310,44 +308,49 @@ def merge(
     if _nothing_to_cluster(table, bp):
         return _fill_unnamed(table, cmb)
     groupkey = ["chromosome", "strand"] if stranded else ["chromosome"]
-    table = table.sort_values([*groupkey, "start", "end"])
+    table = table.sort_values([*groupkey, "start", "end"], ignore_index=True)
     min_dist = None if bp == 1 else -bp
     on = ["strand"] if stranded else None
-    clustered = bioframe.cluster(
+    # The cluster ids alone: bioframe's other output, the cluster's own
+    # interval, would collide with a column of the input, and is just the
+    # extent of the rows that `_merge_cluster` combines anyway.
+    cluster_ids = bioframe.cluster(
         table,
         min_dist=min_dist,
         cols=_BF_COLS,
         on=on,
+        return_input=False,
         return_cluster_ids=True,
-        return_cluster_intervals=True,
+        return_cluster_intervals=False,
+    )["cluster"].to_numpy()
+    out = _splice_clusters(
+        table, cluster_ids, lambda group: [_merge_cluster(group, cmb)]
     )
-    data_cols = _data_columns(clustered)
-
-    def combine_cluster(group: pd.DataFrame) -> list[dict]:
-        """Combine one cluster's rows into the single row of their union.
-
-        A closure rather than a module-level helper because it reads the
-        cluster bounds, which `_data_columns` leaves out of the group frame
-        that the combined columns come from.
-        """
-        vals = {}
-        for col in data_cols:
-            if col == "start":
-                vals[col] = group["cluster_start"].iloc[0]
-            elif col == "end":
-                vals[col] = group["cluster_end"].iloc[0]
-            elif col in cmb:
-                vals[col] = cmb[col](group[col].values)
-            else:
-                vals[col] = group[col].iloc[0]
-        return [vals]
-
-    out = _splice_clusters(clustered, data_cols, combine_cluster)
     # Re-sort chromosomes cleverly instead of lexicographically
     out = out.reindex(
         out.chromosome.apply(sorter_chrom).sort_values(kind="mergesort").index
     )
     return _fill_unnamed(out, cmb)
+
+
+def _merge_cluster(group_df: pd.DataFrame, cmb: dict[str, Callable]) -> dict:
+    """Combine one group of rows into the single row spanning them.
+
+    The rows need not overlap: `merge` groups rows that reach each other
+    within a given gap, and `squash` consecutive rows that are bookended, so
+    the row emitted spans their whole extent.
+    """
+    vals = {}
+    for col in group_df.columns:
+        if col == "start":
+            vals[col] = group_df["start"].min()
+        elif col == "end":
+            vals[col] = group_df["end"].max()
+        elif col in cmb:
+            vals[col] = cmb[col](group_df[col].values)
+        else:
+            vals[col] = group_df[col].iloc[0]
+    return vals
 
 
 def squash(
@@ -404,16 +407,8 @@ def squash(
         if len(group) == 1:
             result_rows.append(group.iloc[0])
         else:
-            vals: dict = {}
-            for col in table.columns:
-                if col == "start":
-                    vals[col] = group["start"].iloc[0]
-                elif col == "end":
-                    vals[col] = group["end"].iloc[-1]
-                elif col in cmb:
-                    vals[col] = cmb[col](group[col].values)
-                else:
-                    vals[col] = group[col].iloc[0]
-            result_rows.append(pd.Series(vals))
+            # A run of bookended rows spans from the first row's start to the
+            # last row's end, which is what `_merge_cluster` emits for a group
+            result_rows.append(pd.Series(_merge_cluster(group, cmb)))
     out = pd.DataFrame(result_rows, columns=table.columns).reset_index(drop=True)
     return _fill_unnamed(out, cmb)

@@ -635,6 +635,98 @@ class IntervalTests(unittest.TestCase):
             [(100, 250), (500, 600)],
         )
 
+    def test_columns_named_like_bioframe_bookkeeping(self):
+        """A column named cluster/cluster_start/cluster_end is the user's own.
+
+        ``bioframe.cluster``, which merge and flatten group rows with, used to
+        be asked for its bookkeeping alongside the input, and it names that
+        bookkeeping cluster/cluster_start/cluster_end. An input column of the
+        same name was duplicated rather than replaced. Under the name
+        ``cluster`` the duplicate label made the cluster ids a whole DataFrame,
+        so rows were grouped by bioframe's id and the user's value together and
+        genuinely overlapping rows came through unmerged and unsplit -- wrong
+        coordinates, not merely a lost column. Under ``cluster_start`` or
+        ``cluster_end``, merge read the same DataFrame where it expected one
+        coordinate and raised ``TypeError``, while flatten dropped the column
+        silently. ``tabio.read_tab`` accepts arbitrary extra columns, so a
+        header is user data, and 'cluster' is an unremarkable name for a bait
+        or sample label.
+
+        The damage was data-dependent: a table with nothing to cluster passes
+        through verbatim, so the same pipeline mangled or preserved the same
+        column according to whether that particular file held an overlap.
+        """
+        expect = {
+            # Two rows overlapping: merged into one, split into three
+            ("overlapping", "merge"): [10],
+            ("overlapping", "flatten"): [10, 10, 20],
+            # Nothing to cluster: both pass the rows through untouched
+            ("disjoint", "merge"): [10, 20],
+            ("disjoint", "flatten"): [10, 20],
+        }
+        bounds = {
+            "overlapping": ([0, 50], [100, 200]),
+            "disjoint": ([0, 500], [100, 600]),
+        }
+        for name in ("cluster", "cluster_start", "cluster_end"):
+            for layout, (starts, ends) in bounds.items():
+                regions = GA(
+                    pd.DataFrame(
+                        {
+                            "chromosome": "chr0",
+                            "start": starts,
+                            "end": ends,
+                            "gene": ["A", "B"],
+                            name: [10, 20],
+                        }
+                    )
+                )
+                for op in ("merge", "flatten"):
+                    with self.subTest(column=name, table=layout, op=op):
+                        result = getattr(regions, op)()
+                        self.assertEqual(list(result[name]), expect[layout, op])
+
+        # Every route a column can take treats these names like any other: all
+        # three at once, combined by a caller's own function...
+        overlapping = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [0, 50],
+                    "end": [100, 200],
+                    "cluster": [10, 20],
+                    "cluster_start": [1, 2],
+                    "cluster_end": [3, 4],
+                }
+            )
+        )
+        merged = overlapping.merge()
+        self.assertEqual(
+            [merged[col].iloc[0] for col in overlapping.data.columns],
+            ["chr0", 0, 200, 10, 1, 3],
+        )
+        self.assertEqual(
+            list(overlapping.merge(combine={"cluster": sum})["cluster"]), [30]
+        )
+        # ...and apportioned by length as a quantity spread over the region,
+        # where the column's name must not decide whether the division happens
+        shares = []
+        for name in ("extra", "cluster_start"):
+            regions = GA(
+                pd.DataFrame(
+                    {
+                        "chromosome": "chr0",
+                        "start": [0, 50],
+                        "end": [100, 200],
+                        name: [1.0, 2.0],
+                    }
+                )
+            )
+            pieces = regions.flatten(combine={name: sum}, split_columns=(name,))
+            shares.append(list(pieces[name]))
+        self.assertEqual(shares[0], shares[1])
+        self.assertAlmostEqual(sum(shares[1]), 3.0)
+
     def test_nan_gene_names(self):
         """merge/flatten/subdivide tolerate NaN-float gene names (issue #850).
 
@@ -897,6 +989,108 @@ class IntervalTests(unittest.TestCase):
                     functools.reduce(operator.iadd, expectations[mode], [])
                 )
                 self._compare_regions(result, expect)
+
+    def test_intersect_columns_named_like_bioframe_bookkeeping(self):
+        """A column named index/index_/start_/end_ is the user's own.
+
+        ``intersection`` pairs rows with ``bioframe.overlap``, which returns
+        its own ``index`` and ``index_`` columns and, when asked for the inputs
+        as well, the second one's coordinates suffixed apart as ``start_`` and
+        ``end_``. An input column of one of those four names duplicated a label
+        the code then read: ``index`` and ``index_`` raised ``ValueError``
+        naming the column as not unique, and ``start_``/``end_`` raised
+        ``ValueError: Operands are not aligned`` in the 'inner' mode that is
+        the only one to compare them.
+
+        Index labels no longer influence the result at all, since the rows are
+        addressed by position: a duplicated label resolved through ``.loc`` to
+        every row that shared it, and ``other``'s labels, rather than its row
+        order, decided which of its regions was reported first.
+
+        chr0:650-750 overlaps the first selection without being contained in
+        it, so 'inner' keeps one pairing fewer than 'outer', and 'trim' clips
+        it to the selection's end. chr0:5000-5100 overlaps nothing.
+        """
+        regions = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [0, 500, 650, 900, 5000],
+                    "end": [100, 600, 750, 1000, 5100],
+                    "gene": [*"ABECZ"],
+                }
+            )
+        )
+        selections = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr0",
+                    "start": [0, 450],
+                    "end": [700, 1000],
+                    "gene": ["X", "Y"],
+                }
+            )
+        )
+        expect = {
+            "outer": [10, 20, 30, 20, 30, 40],
+            "inner": [10, 20, 20, 30, 40],
+            "trim": [10, 20, 30, 20, 30, 40],
+        }
+        for name in ("index", "index_", "start_", "end_"):
+            labelled = GA(regions.data.assign(**{name: [10, 20, 30, 40, 50]}))
+            for mode in ("outer", "inner", "trim"):
+                with self.subTest(column=name, mode=mode):
+                    result = labelled.intersection(selections, mode=mode)
+                    self.assertEqual(list(result[name]), expect[mode])
+
+        # A duplicated label -- as a table assembled from several sources
+        # carries -- once selected every row that shared it, so the pairings of
+        # A, B, E and C dragged in the region that overlaps nothing
+        duped = GA(regions.data.set_axis([0, 1, 0, 1, 0], axis=0))
+        want = regions.intersection(selections)
+        got = duped.intersection(selections)
+        self.assertEqual(
+            list(zip(got.start, got["gene"], strict=True)),
+            list(zip(want.start, want["gene"], strict=True)),
+        )
+        self.assertEqual(len(got), 6)
+        # `other`'s rows are reported in its own order, not its labels'
+        relabelled = GA(selections.data.set_axis([5, 1], axis=0))
+        self.assertEqual(
+            list(regions.intersection(relabelled)["gene"]), list(want["gene"])
+        )
+
+    def test_intersect_nothing_to_select(self):
+        """Selecting nothing gives an empty array in every mode, not an error.
+
+        'trim' concatenates the pieces ``by_ranges`` yields, and ``pd.concat``
+        raises on an empty list, so a selection that nothing overlaps -- or an
+        empty array on either side -- ended in ``ValueError: No objects to
+        concatenate``, while the other two modes returned an empty array. The
+        guard for the empty inputs sat below the 'trim' branch, so it never
+        applied to it.
+        """
+        region = GA(
+            pd.DataFrame(
+                {"chromosome": ["chr1"], "start": [10], "end": [20], "gene": ["A"]}
+            )
+        )
+        empty = GA(region.data.iloc[:0])
+        selections = {
+            "empty": empty,
+            "disjoint": GA(region.data.assign(start=100, end=200)),
+            "other chromosome": GA(region.data.assign(chromosome="chrZ")),
+        }
+        for label, selection in selections.items():
+            for mode in ("outer", "inner", "trim"):
+                with self.subTest(selection=label, mode=mode):
+                    result = region.intersection(selection, mode=mode)
+                    self.assertEqual(len(result), 0)
+                    self.assertEqual(
+                        list(result.data.columns), list(region.data.columns)
+                    )
+                with self.subTest(empty_self=True, mode=mode):
+                    self.assertEqual(len(empty.intersection(region, mode=mode)), 0)
 
     def test_subtract(self):
         # Test cases:

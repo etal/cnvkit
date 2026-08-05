@@ -19,8 +19,6 @@ from .chromnames import (
 from .chromsort import sorter_chrom
 from .cut import cut
 from .intersect import Numeric, by_ranges, into_ranges, iter_ranges, iter_slices
-
-_BF_COLS = ("chromosome", "start", "end")
 from .merge import flatten, merge, squash
 from .rangelabel import to_label
 from .subdivide import subdivide
@@ -32,6 +30,8 @@ if TYPE_CHECKING:
     from numpy import ndarray
 
     from cnvlib.cnary import CopyNumArray
+
+_BF_COLS = ("chromosome", "start", "end")
 
 
 class GenomicArray:
@@ -741,34 +741,50 @@ class GenomicArray:
 
         The extra fields of `self`, but not `other`, are retained in the output.
         """
+        if not len(self) or not len(other):
+            return self.as_dataframe(self.data.iloc[:0])
         if mode == "trim":
             chunks = [
                 chunk.data
                 for _, chunk in self.by_ranges(other, mode=mode, keep_empty=False)
             ]
+            # Nothing overlaps, so there is nothing to concatenate
+            if not chunks:
+                return self.as_dataframe(self.data.iloc[:0])
             return self.as_dataframe(pd.concat(chunks))
-        if not len(self) or not len(other):
-            return self.as_dataframe(self.data.iloc[:0])
+        # Take from bioframe only its pairing of the rows: with `return_input`
+        # it also returns index, index_ and the two inputs' coordinates
+        # suffixed apart, in the same frame as the user's columns, where a
+        # column of the input can share one of those names -- `read_tab`
+        # accepts arbitrary extra columns, so any name can arrive from a file,
+        # and none of them is ours to reserve. Indexing both inputs from zero
+        # makes the labels bioframe reports positions instead, so the pairing
+        # is independent of whatever labels the caller's rows carry.
+        mine = self.data.reset_index(drop=True)
+        theirs = other.data.reset_index(drop=True)
         pairs = bioframe.overlap(
-            self.data,
-            other.data,
+            mine,
+            theirs,
             how="inner",
             cols1=_BF_COLS,
             cols2=_BF_COLS,
             return_index=True,
-            return_input=True,
+            return_input=False,
         )
         if mode == "inner":
             # Keep only self bins fully contained within an other bin
+            rows = pairs["index"].to_numpy(dtype=int)
+            covering = pairs["index_"].to_numpy(dtype=int)
             pairs = pairs[
-                (pairs["start"] >= pairs["start_"]) & (pairs["end"] <= pairs["end_"])
+                (mine.start.to_numpy()[rows] >= theirs.start.to_numpy()[covering])
+                & (mine.end.to_numpy()[rows] <= theirs.end.to_numpy()[covering])
             ]
-        # Sort by `other`'s index labels then `self`'s; with `other`'s usual
-        # monotonic index this reproduces `by_ranges`' row order
+        # Sort by `other`'s rows then `self`'s, which reproduces `by_ranges`'
+        # row order
         pairs = pairs.sort_values(["index_", "index"])
-        # Return self rows (with duplicates, one per overlap pair)
-        self_indices = pairs["index"].to_numpy()
-        return self.as_dataframe(self.data.loc[self_indices])
+        # Return self rows (with duplicates, one per overlap pair), taken by
+        # position, since `mine` is `self.data` row for row
+        return self.as_dataframe(self.data.iloc[pairs["index"].to_numpy(dtype=int)])
 
     def merge(
         self,
