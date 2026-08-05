@@ -1151,6 +1151,47 @@ class IntervalTests(unittest.TestCase):
             two_chroms.in_range(None, 0, 700)
         self.assertIn("chr1, chr2", str(caught.exception))
 
+    def test_search_one_sided_over_nested_bins(self):
+        """A half-open range selects what the closed range covering it selects.
+
+        A bin nested inside another leaves `end` out of ascending order, so the
+        slicing implementation cannot search it; the mask implementation is
+        there for exactly that. But the choice between them also asked whether
+        the query had both bounds, and a half-open range has one -- so
+        ``in_range(chrom, 20, None)`` searched a column it could not search,
+        and lost the bins covering position 20 that the equivalent closed
+        range, on the same rows, returned.
+        """
+        nested = self.regions_2
+        self.assertFalse(nested.end.is_monotonic_increasing)
+        beyond = int(nested.end.max()) + 1
+        for mode in ("outer", "inner", "trim"):
+            with self.subTest(mode=mode):
+                self.assertEqual(
+                    list(nested.in_range("chr0", 20, None, mode=mode)["gene"]),
+                    list(nested.in_range("chr0", 20, beyond, mode=mode)["gene"]),
+                )
+                self.assertEqual(
+                    list(nested.in_range("chr0", None, 20, mode=mode)["gene"]),
+                    list(nested.in_range("chr0", 0, 20, mode=mode)["gene"]),
+                )
+        # Spelled out, so the agreement above cannot be two identical mistakes:
+        # every bin reaching past 20, and every bin ending by 20.
+        self.assertEqual(
+            list(nested.in_range("chr0", 20, None)["gene"]),
+            ["A", "D", "E", "F", "G", "H", "I"],
+        )
+        self.assertEqual(
+            list(nested.in_range("chr0", None, 20, mode="inner")["gene"]), ["B", "C"]
+        )
+
+    def test_search_no_ranges_selects_nothing(self):
+        """An empty list of ranges selects nothing, rather than everything."""
+        empty = self.regions_2.in_ranges("chr0", [], [])
+        self.assertEqual(len(empty), 0)
+        self.assertEqual(list(empty.data.columns), list(self.regions_2.data.columns))
+        self.assertEqual(len(self.regions_2.in_ranges("chr0", [], None)), 0)
+
     def test_subtract(self):
         # Test cases:
         #  | access: ====   ====   ====    ==========

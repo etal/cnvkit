@@ -505,8 +505,12 @@ class GenomicArray:
             Concatenation of all the subsets of `self` enclosed by the specified
             ranges.
         """
-        table = pd.concat(iter_ranges(self.data, chrom, starts, ends, mode), sort=False)
-        return self.as_dataframe(table)
+        chunks = list(iter_ranges(self.data, chrom, starts, ends, mode))
+        # An empty `starts`/`ends` selects nothing, and `pd.concat` raises on an
+        # empty list, so hoist that case out.
+        if not chunks:
+            return self.as_dataframe(self.data.iloc[:0])
+        return self.as_dataframe(pd.concat(chunks, sort=False))
 
     def into_ranges(
         self,

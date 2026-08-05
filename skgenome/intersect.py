@@ -239,15 +239,30 @@ def idx_ranges(
     if not table.start.is_monotonic_increasing:
         _raise_unsorted(table)
 
-    # Don't be fooled by nested bins
-    if (
-        (ends is not None and len(ends)) and (starts is not None and len(starts))
-    ) and not table.end.is_monotonic_increasing:
-        # At least one bin is fully nested -- account for it
-        irange_func = _irange_nested
-    else:
-        irange_func = _irange_simple  # type: ignore[assignment]
-    yield from irange_func(table, starts, ends, mode)
+    n_regions = max(
+        0 if starts is None else len(starts), 0 if ends is None else len(ends)
+    )
+    if not n_regions:
+        # No regions to select, so nothing to yield: one region per query, and
+        # there are none. (Not the same as the `starts is None and ends is
+        # None` case above, which asks for the whole table.)
+        return
+
+    if table.end.is_monotonic_increasing:
+        yield from _irange_simple(table, starts, ends, mode)
+        return
+
+    # At least one bin is fully nested in another, leaving `end` out of
+    # ascending order, and `_irange_simple` reads `end` with `searchsorted`
+    # too -- to place a start in 'outer' mode, an end in 'inner' mode. The
+    # masks `_irange_nested` builds compare `end` elementwise instead, so they
+    # do not care, but it wants a start and an end for every region: fill in
+    # whichever side a one-sided query left open.
+    if starts is None or not len(starts):
+        starts = np.zeros(n_regions, dtype=np.int_)
+    if ends is None or not len(ends):
+        ends = [None] * n_regions
+    yield from _irange_nested(table, starts, ends, mode)
 
 
 def _raise_unsorted(table: pd.DataFrame) -> NoReturn:
@@ -283,7 +298,9 @@ def _irange_simple(
             # Include all rows overlapping the start point
             start_idxs = table.end.searchsorted(starts, "right")
     else:
-        starts = np.zeros(len(ends) if ends is not None else 1, dtype=np.int_)
+        # `idx_ranges` has ruled out both sides being absent, so `ends` is
+        # there to take the region count from.
+        starts = np.zeros(len(ends), dtype=np.int_)
         start_idxs = starts.copy()
 
     if ends is not None and len(ends):
@@ -302,7 +319,10 @@ def _irange_simple(
 
 
 def _irange_nested(
-    table: pd.DataFrame, starts: Sequence, ends: Sequence, mode: str
+    table: pd.DataFrame,
+    starts: Sequence | ndarray,
+    ends: Sequence | ndarray,
+    mode: str,
 ) -> Iterator[tuple[ndarray, int, int]]:
     """Slice subsets of table when regions are nested."""
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
