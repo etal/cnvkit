@@ -109,10 +109,11 @@ def do_segmentation(
     if variants is not None and len(variants):
         # Process variants in genomic order. by_ranges/baf_by_ranges slice via
         # binary search and the HMM expects an ordered observation sequence, so
-        # an unsorted input VCF -- which nothing upstream sorts -- mis-assigns
-        # variants to segments (silently wrong BAF) and crashes downstream in
-        # variants_in_segment with "Improper post-processing of segment"
-        # (#893). Copy first so we don't mutate the caller's array.
+        # an unsorted input VCF -- which nothing upstream sorts -- is refused
+        # outright by skgenome.intersect, and before that check existed it
+        # mis-assigned variants to segments (silently wrong BAF) and crashed
+        # downstream in variants_in_segment with "Improper post-processing of
+        # segment" (#893). Copy first so we don't mutate the caller's array.
         variants = variants.copy()
         variants.sort()
 

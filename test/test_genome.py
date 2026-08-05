@@ -1092,6 +1092,148 @@ class IntervalTests(unittest.TestCase):
                 with self.subTest(empty_self=True, mode=mode):
                     self.assertEqual(len(empty.intersection(region, mode=mode)), 0)
 
+    def test_search_requires_ascending_rows(self):
+        """Searching rows out of coordinate order raises instead of misleading.
+
+        ``searchsorted`` places the boundaries of every selection here, and it
+        reads its column as ascending: given rows in any other order it returns
+        a position unrelated to the query. The three rows below, shuffled,
+        answered "which bins overlap 0-700?" with the bin at 900-1000 as well
+        -- and in 'trim' mode clipped it to 900-700, an interval whose end
+        precedes its start. 'inner' searches a different column and happened to
+        survive, which is why every mode is checked.
+        """
+        coords = [(0, 100, "A"), (500, 600, "B"), (900, 1000, "C")]
+        ascending = self._from_intervals(coords)
+        shuffled = self._from_intervals([coords[i] for i in (2, 0, 1)])
+        selection = self._from_intervals([(0, 700, "X")])
+        for mode in ("outer", "inner", "trim"):
+            with self.subTest(mode=mode):
+                self.assertEqual(
+                    [
+                        list(rows["gene"])
+                        for _bin, rows in ascending.by_ranges(selection, mode=mode)
+                    ],
+                    [["A", "B"]],
+                )
+                with self.assertRaises(ValueError):
+                    list(shuffled.by_ranges(selection, mode=mode))
+                self.assertEqual(
+                    list(ascending.in_range("chr0", 0, 700, mode=mode)["gene"]),
+                    ["A", "B"],
+                )
+                with self.assertRaises(ValueError):
+                    shuffled.in_range("chr0", 0, 700, mode=mode)
+        self.assertEqual(list(ascending.into_ranges(selection, "gene", "-")), ["A,B"])
+        with self.assertRaises(ValueError):
+            shuffled.into_ranges(selection, "gene", "-")
+        # A missing position leaves the column unordered without any row being
+        # behind the one before it, so the report has nothing to point at.
+        frayed = self._from_intervals(coords)
+        frayed.data = frayed.data.astype({"start": float})
+        frayed.data.loc[1, "start"] = np.nan
+        with self.assertRaises(ValueError) as caught:
+            frayed.in_range("chr0", 0, 700)
+        self.assertIn("missing", str(caught.exception))
+
+    def test_search_across_chromosomes_is_refused(self):
+        """Searching a whole array holding several chromosomes is refused.
+
+        ``in_range(None, ...)`` is documented for an array holding one
+        chromosome. Given several it searched across them all: asking for
+        0-700 without naming a chromosome returned chr2's rows alongside
+        chr1's. What the guard sees is the coordinate restart at the boundary,
+        so it catches the multi-chromosome case as ordinary disorder -- and
+        only when the later chromosome's positions do begin below the earlier
+        one's, which for real genomic coordinates they do.
+        """
+        two_chroms = GA(
+            pd.DataFrame(
+                {
+                    "chromosome": ["chr1"] * 2 + ["chr2"] * 2,
+                    "start": [0, 900] * 2,
+                    "end": [100, 1000] * 2,
+                    "gene": list("ABCD"),
+                }
+            )
+        )
+        self.assertEqual(list(two_chroms.in_range("chr1", 0, 700)["gene"]), ["A"])
+        with self.assertRaises(ValueError) as caught:
+            two_chroms.in_range(None, 0, 700)
+        self.assertIn("chr1, chr2", str(caught.exception))
+
+    def test_search_one_sided_over_nested_bins(self):
+        """A half-open range selects what the closed range covering it selects.
+
+        A bin nested inside another leaves `end` out of ascending order, so the
+        slicing implementation cannot search it; the mask implementation is
+        there for exactly that. But the choice between them also asked whether
+        the query had both bounds, and a half-open range has one -- so
+        ``in_range(chrom, 20, None)`` searched a column it could not search,
+        and lost the bins covering position 20 that the equivalent closed
+        range, on the same rows, returned.
+        """
+        nested = self.regions_2
+        self.assertFalse(nested.end.is_monotonic_increasing)
+        beyond = int(nested.end.max()) + 1
+        for mode in ("outer", "inner", "trim"):
+            with self.subTest(mode=mode):
+                self.assertEqual(
+                    list(nested.in_range("chr0", 20, None, mode=mode)["gene"]),
+                    list(nested.in_range("chr0", 20, beyond, mode=mode)["gene"]),
+                )
+                self.assertEqual(
+                    list(nested.in_range("chr0", None, 20, mode=mode)["gene"]),
+                    list(nested.in_range("chr0", 0, 20, mode=mode)["gene"]),
+                )
+        # Spelled out, so the agreement above cannot be two identical mistakes:
+        # every bin reaching past 20, and every bin ending by 20.
+        self.assertEqual(
+            list(nested.in_range("chr0", 20, None)["gene"]),
+            ["A", "D", "E", "F", "G", "H", "I"],
+        )
+        self.assertEqual(
+            list(nested.in_range("chr0", None, 20, mode="inner")["gene"]), ["B", "C"]
+        )
+
+    def test_search_no_ranges_selects_nothing(self):
+        """An empty list of ranges selects nothing, rather than everything.
+
+        The two spellings failed differently: an empty `starts` with no `ends`
+        was read as one region covering the whole table, while an empty
+        `starts` and `ends` yielded no regions at all and left ``pd.concat``
+        with nothing to concatenate.
+        """
+        empty = self.regions_2.in_ranges("chr0", [], [])
+        self.assertEqual(len(empty), 0)
+        self.assertEqual(list(empty.data.columns), list(self.regions_2.data.columns))
+        self.assertEqual(len(self.regions_2.in_ranges("chr0", [], None)), 0)
+
+    def test_search_start_of_zero_is_not_an_absent_bound(self):
+        """A region starting at 0 is a bound; leaving the bound out is not.
+
+        A zero-width bin at the origin ends where it starts, so no region
+        overlaps it and a query from 0 excludes it -- while a query with no
+        lower bound at all selects every row, that one included. Both
+        implementations have to agree on that: the slicing one searches `end`
+        for the query start, while the masking one read a start of 0 as no
+        bound at all, so the same question put to a nested table and to a flat
+        one came back answered differently.
+        """
+        origin = (0, 0, "Z")
+        flat = self._from_intervals([origin, (0, 50, "A"), (100, 200, "B")])
+        nested = self._from_intervals([origin, (0, 1000, "A"), (100, 200, "B")])
+        self.assertTrue(flat.end.is_monotonic_increasing)
+        self.assertFalse(nested.end.is_monotonic_increasing)
+        for label, regions in (("flat", flat), ("nested", nested)):
+            with self.subTest(bins=label):
+                self.assertEqual(
+                    list(regions.in_range("chr0", 0, 500)["gene"]), ["A", "B"]
+                )
+                self.assertEqual(
+                    list(regions.in_range("chr0", None, 500)["gene"]), ["Z", "A", "B"]
+                )
+
     def test_subtract(self):
         # Test cases:
         #  | access: ====   ====   ====    ==========
