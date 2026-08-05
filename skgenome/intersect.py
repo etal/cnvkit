@@ -266,8 +266,22 @@ def idx_ranges(
 
 
 def _raise_unsorted(table: pd.DataFrame) -> NoReturn:
-    """Report the first row out of order, and the likely reason for it."""
-    row = int(np.flatnonzero(np.diff(table["start"].to_numpy()) < 0)[0]) + 1
+    """Report what is out of order about `table`, and the likely reason."""
+    starts = table["start"].to_numpy()
+    descents = np.flatnonzero(np.diff(starts) < 0)
+    if len(descents):
+        row = int(descents[0]) + 1
+        detail = (
+            f"start={starts[row]} follows start={starts[row - 1]}, at row "
+            f"{row} of {len(table)}"
+        )
+        remedy = "sort the array with .sort() before selecting from it"
+    else:
+        # No row is behind the one before it, so the column is unordered for
+        # the other reason: it holds a missing or non-finite position, which
+        # every comparison against is false.
+        detail = f"no position descends among these {len(table)} rows"
+        remedy = "drop the rows whose start is missing or non-finite"
     chroms = table["chromosome"].unique()
     if len(chroms) > 1:
         names = ", ".join(map(str, chroms[:3]))
@@ -276,13 +290,9 @@ def _raise_unsorted(table: pd.DataFrame) -> NoReturn:
             f"({names}{', ...' if len(chroms) > 3 else ''}), so name the one "
             "to search rather than passing None"
         )
-    else:
-        remedy = "sort the array with .sort() before selecting from it"
     raise ValueError(
         "Genomic intervals must be sorted by start position to be searched: "
-        f"start={table['start'].iat[row]} follows "
-        f"start={table['start'].iat[row - 1]}, at row {row} of {len(table)}. "
-        f"To fix, {remedy}."
+        f"{detail}. To fix, {remedy}."
     )
 
 

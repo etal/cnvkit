@@ -1127,6 +1127,14 @@ class IntervalTests(unittest.TestCase):
         self.assertEqual(list(ascending.into_ranges(selection, "gene", "-")), ["A,B"])
         with self.assertRaises(ValueError):
             shuffled.into_ranges(selection, "gene", "-")
+        # A missing position leaves the column unordered without any row being
+        # behind the one before it, so the report has nothing to point at.
+        frayed = self._from_intervals(coords)
+        frayed.data = frayed.data.astype({"start": float})
+        frayed.data.loc[1, "start"] = np.nan
+        with self.assertRaises(ValueError) as caught:
+            frayed.in_range("chr0", 0, 700)
+        self.assertIn("missing", str(caught.exception))
 
     def test_search_requires_one_chromosome(self):
         """A whole-array search names its chromosome, or is refused.
