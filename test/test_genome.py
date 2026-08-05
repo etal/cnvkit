@@ -1060,6 +1060,38 @@ class IntervalTests(unittest.TestCase):
             list(regions.intersection(relabelled)["gene"]), list(want["gene"])
         )
 
+    def test_intersect_nothing_to_select(self):
+        """Selecting nothing gives an empty array in every mode, not an error.
+
+        'trim' concatenates the pieces ``by_ranges`` yields, and ``pd.concat``
+        raises on an empty list, so a selection that nothing overlaps -- or an
+        empty array on either side -- ended in ``ValueError: No objects to
+        concatenate``, while the other two modes returned an empty array. The
+        guard for the empty inputs sat below the 'trim' branch, so it never
+        applied to it.
+        """
+        region = GA(
+            pd.DataFrame(
+                {"chromosome": ["chr1"], "start": [10], "end": [20], "gene": ["A"]}
+            )
+        )
+        empty = GA(region.data.iloc[:0])
+        selections = {
+            "empty": empty,
+            "disjoint": GA(region.data.assign(start=100, end=200)),
+            "other chromosome": GA(region.data.assign(chromosome="chrZ")),
+        }
+        for label, selection in selections.items():
+            for mode in ("outer", "inner", "trim"):
+                with self.subTest(selection=label, mode=mode):
+                    result = region.intersection(selection, mode=mode)
+                    self.assertEqual(len(result), 0)
+                    self.assertEqual(
+                        list(result.data.columns), list(region.data.columns)
+                    )
+                with self.subTest(empty_self=True, mode=mode):
+                    self.assertEqual(len(empty.intersection(region, mode=mode)), 0)
+
     def test_subtract(self):
         # Test cases:
         #  | access: ====   ====   ====    ==========

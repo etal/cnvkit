@@ -741,14 +741,17 @@ class GenomicArray:
 
         The extra fields of `self`, but not `other`, are retained in the output.
         """
+        if not len(self) or not len(other):
+            return self.as_dataframe(self.data.iloc[:0])
         if mode == "trim":
             chunks = [
                 chunk.data
                 for _, chunk in self.by_ranges(other, mode=mode, keep_empty=False)
             ]
+            # Nothing overlaps, so there is nothing to concatenate
+            if not chunks:
+                return self.as_dataframe(self.data.iloc[:0])
             return self.as_dataframe(pd.concat(chunks))
-        if not len(self) or not len(other):
-            return self.as_dataframe(self.data.iloc[:0])
         # Take from bioframe only its pairing of the rows: with `return_input`
         # it also returns index, index_ and the two inputs' coordinates
         # suffixed apart, in the same frame as the user's columns, where a
