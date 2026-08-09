@@ -243,14 +243,10 @@ def idx_ranges(
         yield slice(None), None, None
         return
 
-    # Both implementations below place their slice boundaries with
-    # `searchsorted`, which reads its column as ascending: handed rows in some
-    # other order it returns a position unrelated to the query, silently, and
-    # the caller gets bins that do not overlap the region it asked about. One
-    # pass to rule that out, beside the pass over `end` that chooses between
-    # those implementations, and the binary searches themselves.
-    if not table.start.is_monotonic_increasing:
-        _raise_unsorted(table)
+    # Cost: one extra pass over `start`, beside the pass over `end` below that
+    # chooses between the two implementations, and the binary searches
+    # themselves.
+    require_ascending_starts(table)
 
     n_regions = max(
         0 if starts is None else len(starts), 0 if ends is None else len(ends)
@@ -279,6 +275,24 @@ def idx_ranges(
         # start in 'outer' mode, an end in 'inner' mode. The masks
         # `_irange_nested` builds compare `end` elementwise instead.
         yield from _irange_nested(table, starts, ends, mode)
+
+
+def require_ascending_starts(table: pd.DataFrame) -> None:
+    """Raise `ValueError` unless `table`'s `start` column ascends.
+
+    The precondition every `searchsorted` against a coordinate column carries:
+    handed rows in some other order it returns a position unrelated to the
+    query, silently, and the caller acts on a row it never asked for. Callers
+    that place a coordinate without wanting a row selection back need the
+    check on its own, which is why it is not folded into `idx_ranges`.
+
+    `table` needs a `chromosome` column as well as `start`, since that is what
+    tells a genuinely unsorted table apart from one merely spanning several
+    chromosomes -- which every whole-genome array does, coordinates restarting
+    at each one.
+    """
+    if not table.start.is_monotonic_increasing:
+        _raise_unsorted(table)
 
 
 def _raise_unsorted(table: pd.DataFrame) -> NoReturn:
