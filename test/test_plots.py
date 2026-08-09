@@ -10,8 +10,6 @@ import tempfile
 import unittest
 import warnings
 
-import pytest
-
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
