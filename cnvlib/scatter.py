@@ -403,7 +403,7 @@ def snv_on_genome(
         snvs = chrom_snvs[chrom]
         # Plot the points
         axis.scatter(
-            snvs["start"].values + x_offset,
+            plots.binwise_x(snvs) + x_offset,
             snvs["alt_freq"].values,
             color=POINT_COLOR,
             edgecolor="none",
@@ -420,7 +420,7 @@ def snv_on_genome(
         if chrom in chrom_loh:
             loh_snvs = chrom_loh[chrom]
             axis.scatter(
-                loh_snvs["start"].values + x_offset,
+                plots.binwise_x(loh_snvs) + x_offset,
                 loh_snvs["alt_freq"].values,
                 color=LOH_SNV_COLOR,
                 alpha=0.7,
@@ -430,7 +430,7 @@ def snv_on_genome(
         if chrom in chrom_som:
             som_snvs = chrom_som[chrom]
             axis.scatter(
-                som_snvs["start"].values + x_offset,
+                plots.binwise_x(som_snvs) + x_offset,
                 som_snvs["alt_freq"].values,
                 color=SOMATIC_SNV_COLOR,
                 alpha=0.7,
@@ -453,7 +453,8 @@ def snv_on_genome(
                         sex_chrom_labels=sex_labels,
                     )
                 else:
-                    posn = [snvs.start.iat[0] + x_offset, snvs.start.iat[-1] + x_offset]
+                    x_snvs = plots.binwise_x(snvs)
+                    posn = [x_snvs[0] + x_offset, x_snvs[-1] + x_offset]
                     color = TREND_COLOR
                 axis.plot(
                     posn,
@@ -899,13 +900,13 @@ def snv_on_chromosome(
     axis.get_xaxis().tick_top()
     axis.tick_params(which="both", direction="out", labelbottom=False, labeltop=False)
 
-    x_mb = variants["start"].values * MB
+    x_mb = plots.binwise_x(variants) * MB
     y = variants["alt_freq"].values
     axis.scatter(x_mb, y, color=POINT_COLOR, alpha=0.3)
     overlay_present = False
     if loh_variants is not None and len(loh_variants):
         axis.scatter(
-            loh_variants["start"].values * MB,
+            plots.binwise_x(loh_variants) * MB,
             loh_variants["alt_freq"].values,
             color=LOH_SNV_COLOR,
             alpha=0.8,
@@ -915,7 +916,7 @@ def snv_on_chromosome(
         overlay_present = True
     if somatic_variants is not None and len(somatic_variants):
         axis.scatter(
-            somatic_variants["start"].values * MB,
+            plots.binwise_x(somatic_variants) * MB,
             somatic_variants["alt_freq"].values,
             color=SOMATIC_SNV_COLOR,
             alpha=0.8,
@@ -946,7 +947,8 @@ def snv_on_chromosome(
                     sex_chrom_labels=sex_labels,
                 )
             else:
-                posn = [variants.start.iat[0] * MB, variants.start.iat[-1] * MB]
+                x_snvs = plots.binwise_x(variants)
+                posn = [x_snvs[0] * MB, x_snvs[-1] * MB]
                 color = TREND_COLOR
             axis.plot(
                 posn,

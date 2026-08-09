@@ -528,3 +528,138 @@ class ByBinCoordinateTests(unittest.TestCase):
         _c, segs, _v, _x = plots.update_binwise_positions(cnarr, segarr)
         chr19 = segs.data.loc[segs.chromosome == "chr19", ["start", "end"]]
         self.assertEqual(chr19.to_numpy().tolist(), [[0, 7], [7, 25], [25, 273]])
+
+
+class ByBinVariantTests(unittest.TestCase):
+    """Placing variants on the bin axis.
+
+    `scatter --by-bin -v` crashed for the whole life of the feature, so there
+    is no prior rendering to preserve; these pin the intended one.
+    """
+
+    @staticmethod
+    def _arrays():
+        # Bins 0 and 1 abut; bin 2 is separated from them by a 300-400 gap.
+        bins = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100, 200, "A", 0.0],
+                ["chr1", 200, 300, "B", 0.0],
+                ["chr1", 400, 500, "C", 0.0],
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        # Two co-binned, one in the gap, one on-target, one off each end.
+        snvs = vary.VariantArray.from_rows(
+            [
+                ["chr1", 50, 51, "A", "G", 0.5],  # before the first bin
+                ["chr1", 150, 151, "C", "T", 0.5],  # inside bin 0
+                ["chr1", 160, 161, "G", "A", 0.5],  # inside bin 0, sharing it
+                ["chr1", 350, 351, "T", "C", 0.5],  # in the gap after bin 1
+                ["chr1", 450, 451, "A", "T", 0.5],  # inside bin 2
+                ["chr1", 600, 601, "C", "G", 0.5],  # past the last bin
+            ],
+            columns=["chromosome", "start", "end", "ref", "alt", "alt_freq"],
+        )
+        return bins, snvs
+
+    def test_variants_take_their_own_bin_and_gaps_take_the_boundary(self):
+        """A position inside a bin gets that bin, not its rank among starts.
+
+        searchsorted's default 'left' rank is one too high for anything not
+        landing exactly on a bin start, which is nearly every variant. A
+        variant between two bins belongs to neither, and the gap has no width
+        on this axis, so it goes to the boundary with the following bin --
+        index 2 below -- rather than to the preceding one, which a plain
+        ``searchsorted(side="right") - 1`` would hand it.
+        """
+        bins, snvs = self._arrays()
+        _c, _s, out, _x = plots.update_binwise_positions(bins, None, snvs)
+        self.assertEqual(out.start.tolist(), [0, 0, 2, 2])
+
+    def test_off_panel_variants_are_dropped(self):
+        bins, snvs = self._arrays()
+        _c, _s, out, _x = plots.update_binwise_positions(bins, None, snvs)
+        self.assertEqual(len(out), 4)
+        # The two with nowhere to sit, not two arbitrary rows: ref alone does
+        # not distinguish them, since dropping the last two also leaves ACGT.
+        self.assertEqual(
+            list(zip(out.data.ref, out.data.alt, strict=True)),
+            [("C", "T"), ("G", "A"), ("T", "C"), ("A", "T")],
+        )
+
+    def test_start_stays_an_integer_ordinal(self):
+        """The offset is a rendering artifact and must not enter a coordinate.
+
+        GenomicArray recasts its coordinate columns to int on every rewrap, so
+        a fraction stored in `start` is destroyed by the next `by_chromosome`.
+        """
+        bins, snvs = self._arrays()
+        _c, _s, out, _x = plots.update_binwise_positions(bins, None, snvs)
+        self.assertTrue(np.issubdtype(out.data.start.dtype, np.integer))
+        self.assertIn("bin_offset", out)
+
+    def test_offsets_survive_a_rewrap_and_centre_on_the_bin(self):
+        """A lone variant lands on the bin midpoint, where its log2 dot is.
+
+        The VAF panel shares an x-axis with the log2 panel, which draws each
+        bin at 0.5 * (start + end). Offsets of j/n would put every lone
+        variant half a bin to the left of its own coverage point.
+        """
+        bins, snvs = self._arrays()
+        _c, _s, out, _x = plots.update_binwise_positions(bins, None, snvs)
+        per_chrom = dict(out.by_chromosome())["chr1"]
+        x = plots.binwise_x(per_chrom)
+        self.assertEqual(sorted(x.tolist()), [0.25, 0.75, 2.25, 2.75])
+
+    def test_offsets_never_cross_a_bin_boundary(self):
+        """Segment membership is decided on the integer part.
+
+        `get_segment_vafs` groups variants by segment in bin space, so an
+        offset reaching 1.0 would move a variant into the next segment and
+        change a plotted BAF. Uses a crowded bin the other tests do not cover.
+        """
+        bins = cnary.CopyNumArray.from_rows(
+            [["chr1", 0, 100, "A", 0.0]],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        snvs = vary.VariantArray.from_rows(
+            [["chr1", 10 * i, 10 * i + 1, "A", "G", 0.5] for i in range(1, 8)],
+            columns=["chromosome", "start", "end", "ref", "alt", "alt_freq"],
+        )
+        _c, _s, out, _x = plots.update_binwise_positions(bins, None, snvs)
+        offsets = out["bin_offset"].to_numpy()
+        self.assertEqual(len(offsets), 7)
+        self.assertTrue(((offsets >= 0) & (offsets < 1)).all())
+        self.assertAlmostEqual(offsets.mean(), 0.5)
+
+    def test_point_cloud_does_not_depend_on_row_order(self):
+        """Co-binned variants are grouped by value, not by consecutive run.
+
+        `itertools.groupby` only sees runs, so this interleaves the two pairs
+        that share a bin -- 150, 350, 160, 450. Reversing the rows would not
+        do: it keeps each pair adjacent, and run-grouping would still find
+        them and pass.
+        """
+        bins, snvs = self._arrays()
+        interleaved = snvs.as_dataframe(
+            snvs.data.iloc[[0, 1, 3, 2, 4, 5]].reset_index(drop=True)
+        )
+        _c, _s, a, _x = plots.update_binwise_positions(bins, None, snvs)
+        _c, _s, b, _x = plots.update_binwise_positions(bins, None, interleaved)
+        x_a, x_b = plots.binwise_x(a), plots.binwise_x(b)
+        self.assertEqual(sorted(x_a.tolist()), sorted(x_b.tolist()))
+        # Run-grouping would leave both pairs stacked, i.e. only 2 distinct x
+        self.assertEqual(len(set(x_b.tolist())), 4)
+
+    def test_scatter_by_bin_with_variants_renders(self):
+        """Regression for the crash: int64 += float64, then two more layers."""
+        # lazy: defer matplotlib import to keep headless test collection fast
+        from matplotlib import pyplot  # noqa: PLC0415
+
+        cnarr = cnvlib.read("formats/p2-20_1.cnr")
+        variants = cmdutil.load_het_snps(
+            "formats/na12878_na12882_mix.vcf", None, None, 0, None
+        )
+        fig = scatter.do_scatter(cnarr, variants=variants, by_bin=True)
+        self.assertIsNotNone(fig)
+        pyplot.close(fig)

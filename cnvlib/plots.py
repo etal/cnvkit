@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import collections
-import itertools
+import logging
 import math
 from typing import TYPE_CHECKING
 
@@ -21,6 +21,25 @@ if TYPE_CHECKING:
 
 
 MB = 1e-6  # To rescale from bases to megabases
+
+
+def binwise_x(varr):
+    """X positions of `varr` on the bin axis, sub-bin offsets included.
+
+    `update_binwise_positions` spreads variants that share a bin across its
+    width, and parks that offset in a ``bin_offset`` column rather than in
+    `start`: it is a rendering artifact with no genomic meaning, and
+    `GenomicArray` recasts its coordinate columns to int on every rewrap, so a
+    fraction stored in `start` would not survive to be drawn. A caller's own
+    ``bin_offset`` column, were one ever read from a file, is overwritten.
+
+    Arrays that never went through that transform carry no such column and
+    plot at `start`, so callers need not know which axis they are on.
+    """
+    x = varr["start"].values
+    if "bin_offset" in varr:
+        return x + varr["bin_offset"].values
+    return x
 
 
 def plot_chromosome_dividers(
@@ -170,8 +189,17 @@ def update_binwise_positions(
 
     Revise the start and end values for all GenomicArray instances at once,
     where the `cnarr` bins are mapped to corresponding `segments`, and
-    `variants` are grouped into `cnarr` bins as well -- if multiple `variants`
-    rows fall within a single bin, equally-spaced fractional positions are used.
+    `variants` are placed on the same axis.
+
+    A variant inside a bin takes that bin's ordinal. One between two bins has
+    no bin of its own, and the gap has no width on this axis, so it sits on
+    the boundary. One before the first bin or past the last has nowhere to
+    sit and is dropped: on the genomic axis its distance from any covered bin
+    is visible, here it would land on a real bin and lend that bin's segment
+    a BAF it has no evidence for.
+
+    `start` stays an integer ordinal; variants sharing a bin are separated by
+    an offset that `binwise_x` adds back at draw time.
 
     ``extra_variants`` is an optional list of additional VariantArray (or None)
     instances to translate against the same bin enumeration as ``variants``
@@ -180,7 +208,9 @@ def update_binwise_positions(
 
     Returns a 4-tuple ``(cnarr, segments, variants, extras)`` where ``extras``
     is the list of translated extra arrays in input order (empty list if no
-    extras were passed).
+    extras were passed). ``variants`` and each of ``extras`` may hold fewer
+    rows than the array they came from, the ones with no place on the bin
+    axis having been dropped as described above.
     """
     cnarr = cnarr.copy()
     if segments:
@@ -190,8 +220,14 @@ def update_binwise_positions(
     # iterates them uniformly. Copy each so the caller's arrays are unmodified.
     var_arrs = [variants, *(list(extra_variants) if extra_variants else [])]
     var_arrs = [v.copy() if v is not None else None for v in var_arrs]
-    var_chroms_per = [
-        set(v.chromosome.unique()) if v is not None else None for v in var_arrs
+    # Only the arrays that exist take part in the loop, each carrying the
+    # chromosomes it spans and a mask of the rows that found a place on the
+    # axis; the rest are dropped at the end. Their slots in `var_arrs` are
+    # kept so the return preserves the caller's argument order.
+    present = [
+        (i, v, set(v.chromosome.unique()), np.zeros(len(v), dtype=bool))
+        for i, v in enumerate(var_arrs)
+        if v is not None
     ]
 
     # ENH: look into pandas groupby innards to get group indices
@@ -202,53 +238,80 @@ def update_binwise_positions(
         c_bins = cnarr[c_idx]  # .copy()
         require_ascending_starts(c_bins.data)
         bin_starts = c_bins.start.values
+        bin_ends = c_bins.end.values
         if segments and chrom in seg_chroms:
             # Match segment boundaries to enumerated bins. Read each segment's
-            # own end rather than chaining to the next segment's start: the two
-            # agree wherever the segments ascend and cover the trailing bins,
-            # and only the former stays right when they do not.
+            # own end rather than chaining to the next segment's start, which
+            # is wrong when the segments do not ascend and tile the bins.
             c_seg_idx = (segments.chromosome == chrom).values
             seg_starts = np.searchsorted(bin_starts, segments.start.values[c_seg_idx])
             seg_ends = np.searchsorted(bin_starts, segments.end.values[c_seg_idx])
             segments.data.loc[c_seg_idx, "start"] = seg_starts
             segments.data.loc[c_seg_idx, "end"] = seg_ends
 
-        for varr, vchroms in zip(var_arrs, var_chroms_per, strict=True):
-            if varr is None or vchroms is None or chrom not in vchroms:
+        for _i, varr, vchroms, keep in present:
+            if chrom not in vchroms:
                 continue
-            # Match variant positions to enumerated bins, and
-            # add fractional increments to multiple variants within 1 bin
-            c_varr_idx = (varr.chromosome == chrom).values
-            c_varr_df = varr.data[c_varr_idx]
-            # Get binwise start indices of the variants
-            v_starts = np.searchsorted(bin_starts, c_varr_df.start.values)
-            # Overwrite runs of repeats with fractional increments,
-            #   adding the cumulative fraction to each repeat
-            for idx, size in list(get_repeat_slices(v_starts)):
-                v_starts[idx] += np.arange(size) / size
-            variant_sizes = c_varr_df.end - c_varr_df.start
-            varr.data.loc[c_varr_idx, "start"] = v_starts
-            varr.data.loc[c_varr_idx, "end"] = v_starts + variant_sizes
+            c_varr_idx = np.flatnonzero((varr.chromosome == chrom).values)
+            positions = varr.start.values[c_varr_idx]
+            # searchsorted gives the rank among bin starts, which is one past
+            # the bin holding the position unless it is a bin start exactly.
+            below = np.searchsorted(bin_starts, positions, side="right") - 1
+            after_first_bin = below >= 0
+            inside = after_first_bin & (positions < bin_ends[np.maximum(below, 0)])
+            # In a gap: no bin of its own, so it sits on the boundary with the
+            # next one. Past the last bin that boundary is off the axis.
+            v_starts = np.where(inside, below, below + 1)
+            on_axis = after_first_bin & (v_starts < len(bin_starts))
+
+            rows = c_varr_idx[on_axis]
+            keep[rows] = True
+            v_starts = v_starts[on_axis]
+            labels = varr.data.index[rows]
+            varr.data.loc[labels, "start"] = v_starts
+            # One bin wide, matching how the bins themselves are numbered.
+            varr.data.loc[labels, "end"] = v_starts + 1
+            varr.data.loc[labels, "bin_offset"] = _within_bin_offsets(v_starts)
 
         c_starts = np.arange(len(c_bins))  # c_idx.sum())
         c_ends = np.arange(1, len(c_bins) + 1)
         cnarr.data.loc[c_idx, "start"] = c_starts
         cnarr.data.loc[c_idx, "end"] = c_ends
 
+    dropped = sum(int((~keep).sum()) for _i, _v, _c, keep in present)
+    if dropped:
+        total = sum(len(keep) for _i, _v, _c, keep in present)
+        logging.info(
+            "Dropped %d of %d variant(s) lying outside the binned regions; "
+            "the bin axis has no position for them",
+            dropped,
+            total,
+        )
+    for i, varr, _c, keep in present:
+        var_arrs[i] = varr[keep]
     return cnarr, segments, var_arrs[0], var_arrs[1:]
 
 
-def get_repeat_slices(values):
-    """Find the location and size of each repeat in `values`."""
-    # ENH: look into pandas groupby innards
-    offset = 0
-    for idx, (_val, rpt) in enumerate(itertools.groupby(values)):
-        size = len(list(rpt))
-        if size > 1:
-            i = idx + offset
-            slc = slice(i, i + size)
-            yield slc, size
-            offset += size - 1
+def _within_bin_offsets(bin_indices):
+    """Spread variants that share a bin evenly across that bin's width.
+
+    Returns one value in [0, 1) per entry: (2j+1)/2n for the j-th of n sharing
+    a bin, so a variant alone in its bin lands at 0.5 -- the bin midpoint,
+    where that bin's own log2 dot is drawn on the panel above.
+
+    Grouped by value rather than by consecutive run, so the point cloud does
+    not depend on the order the rows arrive in; a stable sort settles which
+    row gets which slot.
+    """
+    order = np.argsort(bin_indices, kind="stable")
+    ranked = bin_indices[order]
+    starts_run = np.flatnonzero(np.concatenate(([True], ranked[1:] != ranked[:-1])))
+    sizes = np.diff(np.append(starts_run, len(ranked)))
+    offsets = np.empty(len(ranked))
+    offsets[order] = (
+        np.arange(len(ranked)) - np.repeat(starts_run, sizes) + 0.5
+    ) / np.repeat(sizes, sizes)
+    return offsets
 
 
 # ________________________________________
