@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from skgenome.intersect import require_ascending_starts
 from skgenome.rangelabel import Region, unpack_range
 
 from . import core, params
@@ -108,6 +109,10 @@ def translate_region_to_bins(region, bins):
     """Map genomic coordinates to bin indices.
 
     Return a tuple of (chrom, start, end), just like unpack_range.
+
+    `bins` must hold the named chromosome's rows in ascending start order: a
+    bin index is a position in that order, so a coordinate's rank among the
+    bin starts is only its index on the axis while the two agree.
     """
     if region is None:
         return Region(None, None, None)
@@ -118,9 +123,10 @@ def translate_region_to_bins(region, bins):
         start = 0
     if end is None:
         end = float("inf")
+    c_rows = bins.data.loc[bins.data.chromosome == chrom]
+    require_ascending_starts(c_rows)
     # NB: only bin start positions matter here
-    c_bin_starts = bins.data.loc[bins.data.chromosome == chrom, "start"].values
-    r_start, r_end = np.searchsorted(c_bin_starts, [start, end])
+    r_start, r_end = np.searchsorted(c_rows["start"].values, [start, end])
     return Region(chrom, r_start, r_end)
 
 
@@ -171,6 +177,13 @@ def update_binwise_positions(
 
     Instead of chromosomal basepairs, the positions indicate enumerated bins.
 
+    The bin axis is `cnarr`'s row order -- `np.arange` over each chromosome's
+    rows -- while `searchsorted` below returns a coordinate's rank among the
+    bin starts. Those coincide only while each chromosome's rows ascend, and
+    there is no answer to compute when they do not: a correct rank drawn
+    against a scrambled axis is still a wrong figure. So rows out of order
+    raise `ValueError` rather than rendering silently.
+
     Revise the start and end values for all GenomicArray instances at once,
     where the `cnarr` bins are mapped to corresponding `segments`, and
     `variants` are grouped into `cnarr` bins as well -- if multiple `variants`
@@ -203,6 +216,7 @@ def update_binwise_positions(
         # NB: plotted points will be at +0.5 offsets
         c_idx = cnarr.chromosome == chrom
         c_bins = cnarr[c_idx]  # .copy()
+        require_ascending_starts(c_bins.data)
         if segments and chrom in seg_chroms:
             # Match segment boundaries to enumerated bins
             c_seg_idx = (segments.chromosome == chrom).values

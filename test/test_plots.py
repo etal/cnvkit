@@ -441,3 +441,92 @@ class DiagramCoordinateTests(unittest.TestCase):
             out = os.path.join(tmpdir, "diagram.pdf")
             result = diagram.create_diagram(cnarr, segarr, 0.5, 3, out)
             self.assertTrue(os.path.exists(result))
+
+
+class ByBinCoordinateTests(unittest.TestCase):
+    """Both --by-bin lookups refuse rows their axis cannot represent.
+
+    The rationale lives with the code, in `plots.update_binwise_positions`.
+    """
+
+    @staticmethod
+    def _bins(rows):
+        return cnary.CopyNumArray.from_rows(
+            rows, columns=["chromosome", "start", "end", "gene", "log2"]
+        )
+
+    def _unsorted_bins(self):
+        """Descending starts on one chromosome: what both guards must catch."""
+        return self._bins(
+            [
+                ["chr1", 300, 400, "D", 0.0],
+                ["chr1", 0, 100, "A", 0.0],
+                ["chr1", 100, 200, "B", 0.0],
+            ]
+        )
+
+    def test_translate_region_to_bins_rejects_unsorted(self):
+        bins = self._unsorted_bins()
+        with self.assertRaises(ValueError) as cm:
+            plots.translate_region_to_bins("chr1:0-250", bins)
+        self.assertIn("sorted by start position", str(cm.exception))
+
+    def test_update_binwise_positions_rejects_unsorted(self):
+        bins = self._unsorted_bins()
+        segs = self._bins([["chr1", 0, 400, "-", 0.0]])
+        with self.assertRaises(ValueError):
+            plots.update_binwise_positions(bins, segs)
+
+    def test_chromosome_major_array_is_not_unsorted(self):
+        """Coordinates restart at each chromosome, so a whole-genome array is
+        non-monotonic by construction. The guard is per chromosome; a whole-
+        table check would reject every normal input."""
+        bins = self._bins(
+            [
+                ["chr1", 100, 200, "A", 0.0],
+                ["chr1", 200, 300, "B", 0.0],
+                ["chr2", 0, 100, "C", 0.0],
+                ["chr2", 100, 200, "D", 0.0],
+            ]
+        )
+        self.assertFalse(bins.data.start.is_monotonic_increasing)
+        # Both chr2 bins start below 150, and are numbered from 0 on their own
+        # chromosome -- chr1's two rows do not shift them.
+        self.assertEqual(
+            plots.translate_region_to_bins("chr2:0-150", bins),
+            ("chr2", 0, 2),
+        )
+        cnarr, _s, _v, _x = plots.update_binwise_positions(bins)
+        self.assertEqual(cnarr.start.tolist(), [0, 1, 0, 1])
+
+    def test_absent_chromosome_yields_empty_span(self):
+        bins = self._bins([["chr1", 100, 200, "A", 0.0]])
+        self.assertEqual(
+            plots.translate_region_to_bins("chrZZ:1-100", bins), ("chrZZ", 0, 0)
+        )
+
+    def test_sorted_ordinals_are_unchanged(self):
+        """Pin the ordinals themselves, not just the absence of a raise.
+
+        Both endpoints are a 'left' search of the *start* column. Queries that
+        land exactly on a bin start cannot tell that apart from an overlap
+        query -- all three agree there -- so this uses coordinates strictly
+        inside a bin, where `skgenome.intersect`'s modes part company:
+        'inner' would give (51, 150) and 'outer' (50, 151). Neither reproduces
+        the pair, so a reroute through the overlap machinery fails here.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        # Midway into chr19's 50th and 150th bins, of 273
+        self.assertEqual(
+            plots.translate_region_to_bins("chr19:9007547-9067688", cnarr),
+            ("chr19", 51, 151),
+        )
+        # On a bin start, the ordinal is that bin's own index
+        self.assertEqual(
+            plots.translate_region_to_bins("chr19:9007428-9067555", cnarr),
+            ("chr19", 50, 150),
+        )
+        _c, segs, _v, _x = plots.update_binwise_positions(cnarr, segarr)
+        chr19 = segs.data.loc[segs.chromosome == "chr19", ["start", "end"]]
+        self.assertEqual(chr19.to_numpy().tolist(), [[0, 7], [7, 25], [25, 273]])
