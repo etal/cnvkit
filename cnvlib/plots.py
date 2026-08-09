@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import collections
 import itertools
-import logging
 import math
 from typing import TYPE_CHECKING
 
@@ -128,21 +127,6 @@ def translate_region_to_bins(region, bins):
     # NB: only bin start positions matter here
     r_start, r_end = np.searchsorted(c_rows["start"].values, [start, end])
     return Region(chrom, r_start, r_end)
-
-
-def translate_segments_to_bins(segments, bins):
-    if "probes" in segments and segments["probes"].sum() == len(bins):
-        # Segments and .cnr bins already match
-        return update_binwise_positions_simple(segments)
-
-    logging.warning(
-        "Segments %s 'probes' sum does not match the number of bins in %s",
-        segments.sample_id,
-        bins.sample_id,
-    )
-    # Must re-align segments to .cnr bins
-    _x, segments, _v, _extras = update_binwise_positions(bins, segments)
-    return segments
 
 
 def update_binwise_positions_simple(cnarr):
