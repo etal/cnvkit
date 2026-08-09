@@ -1070,13 +1070,31 @@ def get_segment_vafs(variants, segments):
 
     Assume variants and segments were already subset to one chromosome.
 
+    On the bin axis the coordinates are ordinals, so grouping by segment span
+    here would answer a question about bin numbers rather than about genomic
+    position. `update_binwise_positions` resolved membership while the genomic
+    coordinates still existed and left it in ``genomic_segment``; segments keep
+    their index labels through every later subset, so the two still pair up.
+
     Yields
     ------
     tuple
         (segment, value)
     """
-    # No segments -> one fake segment covering the whole region.
-    chunks = variants.by_ranges(segments) if segments else [(None, variants)]
+    if not segments:
+        # One fake segment covering the whole region.
+        chunks = [(None, variants)]
+    elif "genomic_segment" in variants:
+        # `dict(groupby)` takes the mapping protocol, not iterable-of-pairs;
+        # the list() is required (skgenome/intersect.py:88 explains why).
+        groups = dict(list(variants.data.groupby("genomic_segment", sort=False)))
+        chunks = [
+            (seg, variants.as_dataframe(groups[label]))
+            for label, seg in zip(segments.data.index, segments, strict=True)
+            if label in groups
+        ]
+    else:
+        chunks = variants.by_ranges(segments)
     for seg, seg_snvs in chunks:
         # ENH: seg_snvs.tumor_boost()
         freqs = seg_snvs["alt_freq"].values

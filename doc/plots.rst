@@ -150,7 +150,7 @@ plotted::
 
     cnvkit.py scatter -v Sample.vcf
 
-When given segments, the plot will show the mean b-allele frequency values above
+When given segments, the plot will show the median b-allele frequency values above
 and below 0.5 of SNVs falling within each segment. Divergence from 0.5 indicates
 loss of heterozygosity (LOH) or allelic imbalance in the tumor sample.
 
@@ -223,11 +223,18 @@ Since the axis is an enumeration of the bins, positions that fall outside them
 have nowhere to go. A variant between two bins is drawn on the boundary
 between them, the gap having no width on this axis; one lying before the first
 bin or after the last of its chromosome is omitted, and the number omitted is
-reported. Leaving those in would place them on a bin they are nowhere near and
-lend that bin's segment a B-allele frequency it has no evidence for -- on the
-genomic axis their distance from any covered region is plain to see, but here
-there is no way to show it. Variants sharing a bin are spread evenly across
-its width so that they remain individually visible.
+reported. Leaving those in would place them on a bin they are nowhere near,
+claiming a position the data never supported -- on the genomic axis their
+distance from any covered region is plain to see, but here there is no way to
+show it. Variants sharing a bin are spread evenly across its width so that
+they remain individually visible.
+
+The B-allele frequency levels drawn over each segment are the same on either
+axis. A variant drawn on a gap boundary can land within a neighbouring
+segment's span once both are renumbered, so which segment a variant belongs to
+is settled on its genomic coordinates before the axis is rebuilt, not on the
+bin index afterwards. The level summarizes the variants actually drawn: those
+omitted above are left out of it, for the same reason they are not plotted.
 
 
 .. _diagram:

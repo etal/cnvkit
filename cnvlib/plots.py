@@ -195,11 +195,15 @@ def update_binwise_positions(
     no bin of its own, and the gap has no width on this axis, so it sits on
     the boundary. One before the first bin or past the last has nowhere to
     sit and is dropped: on the genomic axis its distance from any covered bin
-    is visible, here it would land on a real bin and lend that bin's segment
-    a BAF it has no evidence for.
+    is visible, here it would sit on a real bin and claim a place in the data
+    it never had.
 
     `start` stays an integer ordinal; variants sharing a bin are separated by
     an offset that `binwise_x` adds back at draw time.
+
+    Each variant also gains a ``genomic_segment`` column naming the segment
+    that contains it, resolved here because this is the last moment the
+    genomic coordinates exist; see `_freeze_segment_membership`.
 
     ``extra_variants`` is an optional list of additional VariantArray (or None)
     instances to translate against the same bin enumeration as ``variants``
@@ -229,6 +233,9 @@ def update_binwise_positions(
         for i, v in enumerate(var_arrs)
         if v is not None
     ]
+    if segments:
+        for _i, varr, _c, _k in present:
+            _freeze_segment_membership(varr, segments)
 
     # ENH: look into pandas groupby innards to get group indices
     for chrom in cnarr.chromosome.unique():
@@ -290,6 +297,37 @@ def update_binwise_positions(
     for i, varr, _c, keep in present:
         var_arrs[i] = varr[keep]
     return cnarr, segments, var_arrs[0], var_arrs[1:]
+
+
+def _freeze_segment_membership(varr, segments) -> None:
+    """Freeze which segment genomically contains each variant, in `varr`.
+
+    The bin ordinal cannot answer this later. A variant in a gap between bins
+    is parked on the boundary, which can lie inside a segment its genomic
+    position never reached -- lending that segment a B-allele frequency it has
+    no evidence for.
+
+    The answer is the segment's index label, not its row number: `in_range`
+    hands the drawing code a trimmed subset whose rows keep their labels but
+    no longer sit at their original positions. Variants in no segment keep the
+    -1 fill, which matches no label and so joins nothing. A caller's own
+    ``genomic_segment`` column, were one ever read from a file, is overwritten.
+
+    One label per variant, so a multi-base variant overlapping two segments
+    joins the later one rather than both, where the genomic axis counts it
+    twice. Segments CNVkit produces are point-disjoint, and no fixture has
+    such a variant; the two axes otherwise agree.
+    """
+    labels = segments.data.index
+    if not labels.is_unique or (labels == -1).any():
+        raise ValueError(
+            "Segments must carry unique index labels, none of them -1, to key "
+            f"B-allele frequency membership: {labels.tolist()}"
+        )
+    varr.data["genomic_segment"] = -1
+    for label, (_seg, group) in zip(labels, varr.by_ranges(segments), strict=True):
+        if len(group):
+            varr.data.loc[group.data.index, "genomic_segment"] = label
 
 
 def _within_bin_offsets(bin_indices):

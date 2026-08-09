@@ -612,11 +612,11 @@ class ByBinVariantTests(unittest.TestCase):
         self.assertEqual(sorted(x.tolist()), [0.25, 0.75, 2.25, 2.75])
 
     def test_offsets_never_cross_a_bin_boundary(self):
-        """Segment membership is decided on the integer part.
+        """The offset never carries a variant out of the bin it belongs to.
 
-        `get_segment_vafs` groups variants by segment in bin space, so an
-        offset reaching 1.0 would move a variant into the next segment and
-        change a plotted BAF. Uses a crowded bin the other tests do not cover.
+        `binwise_x` draws the dot at start plus the offset, so an offset
+        reaching 1.0 would put it under the next bin's log2 point and break
+        the alignment. Uses a crowded bin the other tests do not cover.
         """
         bins = cnary.CopyNumArray.from_rows(
             [["chr1", 0, 100, "A", 0.0]],
@@ -663,3 +663,97 @@ class ByBinVariantTests(unittest.TestCase):
         fig = scatter.do_scatter(cnarr, variants=variants, by_bin=True)
         self.assertIsNotNone(fig)
         pyplot.close(fig)
+
+
+class ByBinSegmentMembershipTests(unittest.TestCase):
+    """Which segment a variant's B-allele frequency belongs to, under --by-bin."""
+
+    @staticmethod
+    def _arrays():
+        # Bins 0 and 1 abut and carry segment A; bins 2 and 3 abut and carry
+        # segment B; 300-400 is a gap in coverage that neither segment spans.
+        bins = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100, 200, "A", 0.0],
+                ["chr1", 200, 300, "A", 0.0],
+                ["chr1", 400, 500, "B", 0.0],
+                ["chr1", 500, 600, "B", 0.0],
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        # Segment A overhangs the first bin, as a .cns from another tool may.
+        segs = cnary.CopyNumArray.from_rows(
+            [["chr1", 50, 300, "segA", 0.0], ["chr1", 400, 600, "segB", 0.0]],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+        # Distinct frequencies per group, so a mis-grouping moves a median
+        # rather than merely reordering equal values.
+        snvs = vary.VariantArray.from_rows(
+            [
+                ["chr1", 60, 61, "A", "G", 0.45],  # before bin 0, inside segment A
+                ["chr1", 150, 151, "A", "G", 0.20],  # bin 0, segment A
+                ["chr1", 250, 251, "A", "G", 0.40],  # bin 1, segment A
+                ["chr1", 320, 321, "A", "G", 0.40],  # in the gap, no segment
+                ["chr1", 340, 341, "A", "G", 0.40],  # in the gap, no segment
+                ["chr1", 450, 451, "A", "G", 0.10],  # bin 2, segment B
+                ["chr1", 550, 551, "A", "G", 0.10],  # bin 3, segment B
+            ],
+            columns=["chromosome", "start", "end", "ref", "alt", "alt_freq"],
+        )
+        return bins, segs, snvs
+
+    @staticmethod
+    def _levels(variants, segments):
+        return sorted(
+            (seg.gene, round(float(value), 12))
+            for seg, value in scatter.get_segment_vafs(variants, segments)
+        )
+
+    def test_gap_variants_join_no_segment(self):
+        """The gap pair sits on bin 2, inside segment B's span on that axis.
+
+        Genomically it is in neither segment, so segment B's level must stay
+        the median of its own two variants. Grouping on the ordinal would
+        pull the 0.40 pair in and pull the level to 0.25.
+        """
+        bins, segs, snvs = self._arrays()
+        _c, out_segs, out_snvs, _x = plots.update_binwise_positions(bins, segs, snvs)
+        self.assertEqual(out_snvs.start.tolist(), [0, 1, 2, 2, 2, 3])
+        self.assertEqual(
+            self._levels(out_snvs, out_segs), [("segA", 0.30), ("segB", 0.10)]
+        )
+
+    def test_by_bin_levels_match_the_genomic_view(self):
+        """Same drawn levels on either axis, over the variants both can show."""
+        bins, segs, snvs = self._arrays()
+        _c, out_segs, out_snvs, _x = plots.update_binwise_positions(bins, segs, snvs)
+        # Semantics: the retained variants only -- a level must never
+        # summarize evidence the bin axis dropped and the reader cannot see.
+        retained = snvs.as_dataframe(snvs.data.loc[out_snvs.data.index])
+        self.assertEqual(self._levels(out_snvs, out_segs), self._levels(retained, segs))
+
+    def test_membership_survives_subsetting_the_segments(self):
+        """Membership pairs by index label, not by row position.
+
+        The chromosome view hands `get_segment_vafs` a windowed subset whose
+        rows keep their labels but no longer sit at their original positions.
+        """
+        bins, segs, snvs = self._arrays()
+        _c, out_segs, out_snvs, _x = plots.update_binwise_positions(bins, segs, snvs)
+        later = out_segs[out_segs.start >= 2]
+        self.assertEqual(later.data.index.tolist(), [1])
+        self.assertEqual(self._levels(out_snvs, later), [("segB", 0.10)])
+
+    def test_unusable_segment_labels_are_refused(self):
+        """The join needs unique labels, and -1 is the no-segment fill.
+
+        Neither arises from a file, but an API caller can build one, and the
+        failure would otherwise be a silently merged or poisoned level.
+        """
+        bins, segs, snvs = self._arrays()
+        for labels in ([0, 0], [-1, 1]):
+            bad = segs.copy()
+            bad.data.index = pd.Index(labels)
+            with self.assertRaises(ValueError) as cm:
+                plots.update_binwise_positions(bins, bad, snvs)
+            self.assertIn("unique index labels", str(cm.exception))
