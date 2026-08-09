@@ -201,13 +201,15 @@ def update_binwise_positions(
         c_idx = cnarr.chromosome == chrom
         c_bins = cnarr[c_idx]  # .copy()
         require_ascending_starts(c_bins.data)
+        bin_starts = c_bins.start.values
         if segments and chrom in seg_chroms:
-            # Match segment boundaries to enumerated bins
+            # Match segment boundaries to enumerated bins. Read each segment's
+            # own end rather than chaining to the next segment's start: the two
+            # agree wherever the segments ascend and cover the trailing bins,
+            # and only the former stays right when they do not.
             c_seg_idx = (segments.chromosome == chrom).values
-            seg_starts = np.searchsorted(
-                c_bins.start.values, segments.start.values[c_seg_idx]
-            )
-            seg_ends = np.r_[seg_starts[1:], len(c_bins)]
+            seg_starts = np.searchsorted(bin_starts, segments.start.values[c_seg_idx])
+            seg_ends = np.searchsorted(bin_starts, segments.end.values[c_seg_idx])
             segments.data.loc[c_seg_idx, "start"] = seg_starts
             segments.data.loc[c_seg_idx, "end"] = seg_ends
 
@@ -219,7 +221,7 @@ def update_binwise_positions(
             c_varr_idx = (varr.chromosome == chrom).values
             c_varr_df = varr.data[c_varr_idx]
             # Get binwise start indices of the variants
-            v_starts = np.searchsorted(c_bins.start.values, c_varr_df.start.values)
+            v_starts = np.searchsorted(bin_starts, c_varr_df.start.values)
             # Overwrite runs of repeats with fractional increments,
             #   adding the cumulative fraction to each repeat
             for idx, size in list(get_repeat_slices(v_starts)):
