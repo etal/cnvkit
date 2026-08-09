@@ -209,6 +209,26 @@ stricter T/N-aware definition. In tumor-only flows the selector falls back to
 any tumor-homozygous locus, with the caveat that true germline-homozygous
 positions are then indistinguishable from LOH-induced homozygosity.
 
+Equal-width bins
+~~~~~~~~~~~~~~~~
+
+The x-axis normally shows genomic coordinates, so on a targeted panel most of
+its width is the unprobed sequence between baits and the bins themselves are
+crowded into slivers. The ``--by-bin`` flag replaces those coordinates with
+bin indices, giving every bin the same width::
+
+    cnvkit.py scatter Sample.cnr -s Sample.cns -v Sample.vcf --by-bin
+
+Since the axis is an enumeration of the bins, positions that fall outside them
+have nowhere to go. A variant between two bins is drawn on the boundary
+between them, the gap having no width on this axis; one lying before the first
+bin or after the last of its chromosome is omitted, and the number omitted is
+reported. Leaving those in would place them on a bin they are nowhere near and
+lend that bin's segment a B-allele frequency it has no evidence for -- on the
+genomic axis their distance from any covered region is plain to see, but here
+there is no way to show it. Variants sharing a bin are spread evenly across
+its width so that they remain individually visible.
+
 
 .. _diagram:
 
