@@ -306,7 +306,7 @@ def export_vcf(
         "FORMAT",
         sample_id or segments.sample_id,
     ]
-    if cnarr:  # type: ignore[unreachable]
+    if cnarr:
         segments = assign_ci_start_end(segments, cnarr)
     vcf_rows = segments2vcf(
         segments, ploidy, is_haploid_x_reference, diploid_parx_genome, is_sample_female
@@ -324,7 +324,7 @@ def export_vcf(
 
 
 def assign_ci_start_end(segarr, cnarr):
-    """Assign ci_start and ci_end fields to segments.
+    """Assign ci_left and ci_right coordinates to segments.
 
     Values for each segment indicate the CI boundary points within that segment,
     i.e. the right CI boundary for the left-side breakpoint (segment start), and
@@ -334,12 +334,12 @@ def assign_ci_start_end(segarr, cnarr):
     the segment, but we're storing the info in an array of segments.
 
     Calculation: Just use the boundaries of the bins left- and right-adjacent to
-    each segment breakpoint.
+    each segment breakpoint. A segment that no bin overlaps has no such
+    boundary, and takes NaN -- "no information", as distinct from a breakpoint
+    known exactly. Callers must not emit that as a coordinate.
     """
     lefts_rights = (
-        (bins.end.iat[0], bins.start.iat[-1])
-        if len(bins.end) > 0 and len(bins.start) > 0
-        else (np.nan, np.nan)
+        (bins.end.iat[0], bins.start.iat[-1]) if len(bins) else (np.nan, np.nan)
         for _seg, bins in cnarr.by_ranges(segarr, mode="outer")
     )
     ci_lefts, ci_rights = zip(*lefts_rights, strict=True)
@@ -408,17 +408,33 @@ def segments2vcf(
     if has_baf_count:
         out_dframe["nbaf"] = segments["nbaf"]
 
-    if "ci_left" in segments and "ci_right" in segments:
-        has_ci = True
-        # Calculate fuzzy left&right coords for CIPOS and CIEND
-        left_margin = segments["ci_left"].to_numpy() - segments.start.to_numpy()
-        right_margin = segments.end.to_numpy() - segments["ci_right"].to_numpy()
-        out_dframe["ci_pos_left"] = np.r_[0, -right_margin[:-1]]
-        out_dframe["ci_pos_right"] = left_margin
-        out_dframe["ci_end_left"] = right_margin
-        out_dframe["ci_end_right"] = np.r_[left_margin[1:], 0]
-    else:
-        has_ci = False
+    has_ci = "ci_left" in segments and "ci_right" in segments
+    if has_ci:
+        # The breakpoint between consecutive segments k-1 and k is bracketed by
+        # the absolute coordinates [ci_right[k-1], ci_left[k]] (see
+        # assign_ci_start_end). Each record reports that interval twice against
+        # a different anchor -- CIPOS about POS (breakpoint k = i) and CIEND
+        # about END (breakpoint k = i+1) -- so every bound is measured from
+        # *this* record's anchor, never the neighbouring segment's.
+        starts = segments.start.to_numpy()
+        ends = segments.end.to_numpy()
+        ci_left = segments["ci_left"].to_numpy()
+        ci_right = segments["ci_right"].to_numpy()
+        # A bound borrowed from the adjacent row is only meaningful when that
+        # row lies on the same chromosome. Where it does not, the breakpoint is
+        # unbounded on that side and the record's own anchor stands in, giving
+        # an offset of 0 -- generalizing the padding the first and last rows
+        # already needed. Masking rather than grouping keeps a .cns whose
+        # chromosome rows are not contiguous safe: an interleave yields 0
+        # instead of pairing two rows that are far apart.
+        chroms = segments.chromosome.to_numpy()
+        same_chrom = chroms[1:] == chroms[:-1]
+        outer_pos = np.where(np.r_[False, same_chrom], np.r_[0, ci_right[:-1]], starts)
+        outer_end = np.where(np.r_[same_chrom, False], np.r_[ci_left[1:], 0], ends)
+        out_dframe["ci_pos_left"] = outer_pos - starts
+        out_dframe["ci_pos_right"] = ci_left - starts
+        out_dframe["ci_end_left"] = ci_right - ends
+        out_dframe["ci_end_right"] = outer_end - ends
 
     n_bad_probes = 0
     # Reformat this data to create INFO and genotype
@@ -500,13 +516,17 @@ def segments2vcf(
             fields.append(f"BAFN={int(out_row.nbaf)}")
         if is_loh:
             fields.append("LOH")
+        # A segment with no overlapping bins has no breakpoint confidence
+        # interval; omit the field rather than assert a spurious one. Each
+        # field fails independently, and the columns are float64 whenever any
+        # segment lacked bins, so both bounds are cast explicitly.
         if has_ci:
-            fields.extend(
-                [
-                    f"CIPOS=({out_row.ci_pos_left},{out_row.ci_pos_right})",
-                    f"CIEND=({out_row.ci_end_left},{out_row.ci_end_right})",
-                ]
-            )
+            for key, lo, hi in (
+                ("CIPOS", out_row.ci_pos_left, out_row.ci_pos_right),
+                ("CIEND", out_row.ci_end_left, out_row.ci_end_right),
+            ):
+                if not (pd.isna(lo) or pd.isna(hi)):
+                    fields.append(f"{key}={int(lo)},{int(hi)}")
         info = ";".join(fields)
 
         yield (
