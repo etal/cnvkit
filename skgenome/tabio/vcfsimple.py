@@ -85,7 +85,6 @@ def read_vcf_sites(infile):
         converters={"end": parse_end_from_info, "qual": parse_qual},
         dtype=dtypes,
     )
-    # Where END is missing, infer from allele lengths
     table["start"] -= 1
     set_ends(table)
     logging.info("Loaded %d plain records", len(table))
@@ -113,13 +112,13 @@ def parse_qual(qual):
 
 
 def set_ends(table) -> None:
-    """Set 'end' field according to allele lengths."""
+    """Fill in each missing 'end' from the reference allele's length.
+
+    A record without INFO/END spans exactly the reference bases it quotes,
+    starting at 'start'.  The alternate alleles do not enter into it: they
+    describe what replaces that span, not how far it reaches, and a record
+    carries one reference allele however many alternates it lists.
+    """
     need_end_idx = table.end == -1
-    if need_end_idx.any():
-        ref_sz = table.loc[need_end_idx, "ref"].str.len()
-        # TODO handle multiple alts -- split commas & take max len
-        alt_sz = table.loc[need_end_idx, "alt"].str.len()
-        var_sz = alt_sz - ref_sz
-        # TODO XXX if end > start, swap 'em?
-        var_sz = var_sz.clip(lower=0)
-        table.loc[need_end_idx, "end"] = table.loc[need_end_idx, "start"] + var_sz
+    ref_sz = table.loc[need_end_idx, "ref"].str.len()
+    table.loc[need_end_idx, "end"] = table.loc[need_end_idx, "start"] + ref_sz

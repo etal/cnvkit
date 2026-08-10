@@ -2,6 +2,7 @@
 """Unit tests for the CNVkit library, cnvlib."""
 
 import math
+import tempfile
 import unittest
 from io import StringIO
 
@@ -143,6 +144,63 @@ class IOTests(unittest.TestCase):
         # VCF from GATK 4 with no ALT
         v6 = tabio.read("formats/gatk-emptyalt.vcf", "vcf", sample_id="sample1")
         self.assertEqual(len(v6), 0)
+
+    def test_read_vcf_end_is_reference_footprint(self):
+        """A record spans the reference bases it quotes, not its alt alleles.
+
+        The end coordinate used to come from the alternate allele -- the
+        replacement string's length in ``vcf``, the net indel size in
+        ``vcf-simple`` -- so an insertion reached into reference it does not
+        describe while a deletion stopped short of reference it does. At a
+        bin's left edge that decided which variant supplied the b-allele
+        frequency, so the three readers must agree here, not merely each be
+        self-consistent.
+
+        The blanket span assertion is sound for this fixture because every
+        record in it is a precise variant, for which the spec defines END as
+        ``POS + len(REF) - 1``; the 159 that declare one therefore agree with
+        the footprint. A symbolic ALT would part the two, which is what
+        ``test_read_vcf_end_tag_beats_the_footprint`` covers.
+        """
+        fname = "formats/na12878_na12882_mix.vcf"
+        coords = {}
+        for fmt in ("vcf", "vcf-simple", "vcf-sites"):
+            dframe = tabio.read(fname, fmt).data
+            spans = dframe.end - dframe.start
+            n_wrong = int((spans != dframe.ref.str.len()).sum())
+            self.assertEqual(
+                n_wrong, 0, f"{fmt}: {n_wrong} rows do not span the reference allele"
+            )
+            coords[fmt] = dframe[["chromosome", "start", "end"]].to_csv(index=False)
+        self.assertEqual(
+            len(set(coords.values())), 1, "the VCF readers disagree on coordinates"
+        )
+
+    def test_read_vcf_end_tag_beats_the_footprint(self):
+        """An explicit INFO/END wins over the reference allele's length.
+
+        htslib folds a declared END into ``record.stop`` and drops it from the
+        INFO mapping, so a reader that consults ``record.info`` loses it
+        silently: this deletion was read as spanning five bases, the length of
+        the string ``<DEL>``.
+        """
+        vcf_text = (
+            "##fileformat=VCFv4.2\n"
+            "##contig=<ID=chr1,length=100000>\n"
+            '##INFO=<ID=END,Number=1,Type=Integer,Description="End position">\n'
+            '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV type">\n'
+            '##ALT=<ID=DEL,Description="Deletion">\n'
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1\n"
+            "chr1\t500\t.\tA\t<DEL>\t50\tPASS\tSVTYPE=DEL;END=900\tGT\t0/1\n"
+        )
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(vcf_text)
+            tmp.flush()
+            for fmt in ("vcf", "vcf-simple", "vcf-sites"):
+                dframe = tabio.read(tmp.name, fmt).data
+                self.assertEqual(list(dframe.start), [499], fmt)
+                self.assertEqual(list(dframe.end), [900], fmt)
 
     def test_read_vcf_strelka(self):
         """Read a Strelka somatic-SNV VCF, which has no GT FORMAT field.
