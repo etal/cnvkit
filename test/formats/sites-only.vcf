@@ -1,0 +1,15 @@
+##fileformat=VCFv4.2
+##source=SelectVariants
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency, for each ALT allele, in the same order as listed">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth; some reads may have been filtered">
+##INFO=<ID=MQ,Number=1,Type=Float,Description="RMS Mapping Quality">
+##contig=<ID=chr1,length=249250621>
+##contig=<ID=chr2,length=243199373>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+chr1	160786650	rs1801274	A	G	4106.77	PASS	AC=1;AF=0.500;AN=2;DP=120;MQ=60.00
+chr2	29416000	rs2229080	G	C	2513.77	PASS	AC=1;AF=0.480;AN=2;DP=100;MQ=59.44
+chr2	212295600	rs1050171	G	A	3311.77	PASS	AC=2;AF=1.000;AN=2;DP=90;MQ=60.00
+chr2	212578300	.	C	T,G	881.77	PASS	AC=1,1;AF=0.250,0.250;AN=2;DP=80;MQ=57.13
+chr2	212587100	rs9678	T	C	1902.77	PASS	AC=1;AF=0.510;AN=2;DP=.;MQ=60.00
