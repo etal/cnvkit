@@ -92,15 +92,19 @@ def read_vcf_sites(infile):
 
 
 def parse_end_from_info(info):
-    """Parse END position, if present, from an INFO field."""
-    idx = info.find("END=")
-    if idx == -1:
-        return -1
-    info = info[idx + 4 :]
-    idx = info.find(";")
-    if idx != -1:
-        info = info[:idx]
-    return int(info)
+    """Parse the END position, if present, from an INFO field.
+
+    Only a field keyed exactly "END" counts.  Keys merely ending in those
+    characters are other fields entirely: CIEND, the confidence interval
+    around END, is standard on imprecise structural variants.  Return -1
+    where the record declares no usable END, leaving `set_ends` to fall
+    back to the reference footprint.
+    """
+    for field in info.split(";"):
+        key, _, value = field.partition("=")
+        if key == "END" and value not in ("", "."):
+            return int(value)
+    return -1
 
 
 def parse_qual(qual):
