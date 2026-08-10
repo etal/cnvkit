@@ -264,6 +264,74 @@ class IOTests(unittest.TestCase):
                 self.assertEqual(list(dframe.start), [1999, 2999], fmt)
                 self.assertEqual(list(dframe.end), [2003, 3003], fmt)
 
+    def test_read_vcf_sites_only(self):
+        """Read a sites-only VCF, where depth and frequency come from INFO.
+
+        Stripping the sample columns from a caller's output -- `bcftools
+        view -G`, GATK SelectVariants -- leaves the INFO fields untouched,
+        so the reader takes depth and allele frequency from there instead
+        of from a genotype. GATK declares AF as Number=A, one value per
+        ALT, which pysam returns as a tuple.
+        """
+        varr = tabio.read("formats/sites-only.vcf", "vcf")
+        # The 2-ALT record yields a row per ALT, both carrying the record's
+        # own depth and its first ALT's frequency (see the XXX in vcfio.py)
+        self.assertEqual(len(varr), 6)
+        self.assertEqual(list(varr["depth"])[:4], [120, 100, 90, 80])
+        # AF drives the alt count and the inferred zygosity
+        self.assertEqual(list(varr["alt_count"])[:3], [60, 48, 90])
+        self.assertEqual(list(varr["zygosity"])[:3], [0.5, 0.5, 1.0])
+        # A '.' depth is missing, not zero-coverage, and must not crash
+        self.assertEqual(list(varr["depth"])[-1], 0.0)
+        # Only the AF=1.000 record is homozygous
+        self.assertEqual(len(varr.heterozygous()), 5)
+
+    def test_read_vcf_info_values_are_reduced_to_one_number(self):
+        """Depth survives every shape pysam can return an INFO value in.
+
+        A VCF header decides how pysam types an INFO value, and a reader
+        that assumes a number gets four other things instead: a tuple for
+        any Number=A/R/G/. field, None for the '.' missing marker, a
+        string for a key the header never declares -- htslib admits those
+        mid-parse, so the same key can raise on one record and return a
+        string on the next -- and, for a key both undeclared and absent, a
+        ValueError. Each must reduce to a number or to the no-depth 0.0,
+        and a depth the file declared an integer must stay one: `export
+        theta` writes the column, so widening it is visible to a reader.
+        """
+        header = (
+            "##fileformat=VCFv4.2\n"
+            "##contig=<ID=chr1,length=100000>\n"
+            '##INFO=<ID=AF,Number=1,Type=Float,Description="Frequency">\n'
+        )
+        declare_dp = '##INFO=<ID=DP,Number=1,Type=Integer,Description="Depth">\n'
+        columns = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+        # The expected depth's own type is the column type it must produce
+        for label, decl, info, depth in (
+            ("declared and present", declare_dp, "DP=34;AF=0.5", 34),
+            ("declared, value '.'", declare_dp, "DP=.;AF=0.5", 0.0),
+            ("declared, absent", declare_dp, "AF=0.5", 0.0),
+            ("undeclared, present", "", "DP=34;AF=0.5", 34.0),
+            ("undeclared, absent", "", "AF=0.5", 0.0),
+            ("undeclared, multi-valued", "", "DP=34,35;AF=0.5", 34.0),
+            # A declared field's missing value is parsed into None, but an
+            # undeclared one reaches Python as the marker's own text
+            ("undeclared, value '.'", "", "DP=.;AF=0.5", 0.0),
+        ):
+            vcf_text = (
+                header + decl + columns + f"chr1\t500\t.\tA\tG\t50\tPASS\t{info}\n"
+            )
+            with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+                tmp.write(vcf_text)
+                tmp.flush()
+                varr = tabio.read(tmp.name, "vcf")
+                self.assertEqual(list(varr["depth"]), [depth], label)
+                self.assertEqual(
+                    varr["depth"].dtype.kind,
+                    "i" if isinstance(depth, int) else "f",
+                    label,
+                )
+
     def test_read_vcf_strelka(self):
         """Read a Strelka somatic-SNV VCF, which has no GT FORMAT field.
 

@@ -286,9 +286,9 @@ def _parse_records(
                 raise
         else:
             # Assume unpaired tumor; take DP, AF from INFO (e.g. LoFreq)
-            depth = record.info.get("DP", 0.0)  # type: ignore[assignment,arg-type]
-            if "AF" in record.info:
-                alt_freq = record.info["AF"]
+            depth = _info_scalar(record, "DP", 0.0)
+            alt_freq = _info_scalar(record, "AF", 0.0)
+            if alt_freq:
                 alt_count = round(alt_freq * depth)
                 # NB: No genotype, so crudely guess from allele frequency
                 zygosity = _zygosity_from_freq(alt_freq)
@@ -342,10 +342,8 @@ def _get_depth(sample: VariantRecordSample, record: VariantRecord) -> int | floa
         return sample["DP"]  # type: ignore[no-any-return]
     if "AD" in sample and isinstance(sample["AD"], tuple):
         return _safesum(sample["AD"])
-    if "DP" in record.info:
-        return record.info["DP"]  # type: ignore[no-any-return]
-    # SV or not called, probably
-    return np.nan
+    # SV or not called, probably -- _info_scalar yields NaN for those too
+    return _info_scalar(record, "DP", np.nan)
 
 
 def _get_zygosity(
@@ -442,6 +440,32 @@ def _strelka_alt_count(
         # tier-1 count is the first of the (tier1, tier2) pair
         return value[0] if isinstance(value, tuple) else value  # type: ignore[no-any-return]
     return np.nan
+
+
+def _info_scalar(record: VariantRecord, key: str, default: int | float) -> int | float:
+    """Get one number from a VCF record's INFO field, or `default`.
+
+    INFO values are only as well-typed as the file's header lets them be:
+    pysam yields a tuple for any Number=A/R/G/. field, None for a '.' missing
+    value, and -- for a key the header never declares, which htslib admits
+    with a warning as Type=String -- a string. Reduce each of those to the one
+    number this module reads.
+    """
+    # NB: `in` tolerates a key the header never declares; `.get` raises
+    # ValueError('Invalid header') for it rather than returning the default
+    if key not in record.info:
+        return default
+    value = record.info[key]
+    if isinstance(value, tuple):
+        # One value per ALT, but a row carries one per record: take the first
+        value = value[0] if value else None
+    # Coerce only strings; widening a declared integer would widen the column
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default if value is None else value
 
 
 def _safesum(tup: tuple[None] | tuple[int, int] | tuple[int]) -> int:
