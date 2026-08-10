@@ -488,6 +488,142 @@ class ExportTests(unittest.TestCase):
         self.assertTrue(any("No VCF records" in m for m in cm.output))
         self.assertEqual({r.levelname for r in cm.records}, {"INFO"})
 
+    def test_export_vcf_ci_fields_survive_a_vcf_parser(self):
+        """Both CIPOS/CIEND bounds reach a reader, on the ``--cnr`` path (#72).
+
+        The fields were emitted wrapped in parentheses for eight years. htslib
+        does not reject that: it reads ``(-56`` as a missing integer, keeps the
+        right bound, and hands back a well-formed record with the left
+        confidence bound silently gone. Parsing the output is therefore the
+        only assertion that can detect the defect -- the text looks plausible.
+        """
+        segments = cnvlib.read("formats/amplicon.cns")
+        bins = cnvlib.read("formats/amplicon.cnr")
+        header, body = export.export_vcf(segments, 2, True, None, True, cnarr=bins)
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(header + body)
+            tmp.flush()
+            records = list(pysam.VariantFile(tmp.name))
+        self.assertGreater(len(records), 0)
+        n_seen = 0
+        for rec in records:
+            for key in ("CIPOS", "CIEND"):
+                bounds = rec.info.get(key)
+                if bounds is None:
+                    continue  # omitted for a segment with no bins; see below
+                n_seen += 1
+                # A dropped bound reads as None, not as an error
+                self.assertNotIn(None, bounds, f"{key} at {rec.chrom}:{rec.pos}")
+                # The interval brackets the breakpoint: left <= 0 <= right
+                self.assertLessEqual(bounds[0], 0, f"{key} at {rec.chrom}:{rec.pos}")
+                self.assertGreaterEqual(bounds[1], 0, f"{key} at {rec.chrom}:{rec.pos}")
+        self.assertGreater(n_seen, 0)
+
+    def test_export_vcf_ci_bounds_stay_on_one_chromosome(self):
+        """A breakpoint's confidence interval never borrows another chromosome.
+
+        The bounds come from the bins flanking a breakpoint, so a segment's
+        outward bound is derived from its neighbouring segment. Shifting the
+        whole table at once takes that neighbour across a chromosome boundary,
+        producing an offset measured against a different chromosome entirely.
+        The first segment of a chromosome has nothing to its left and the last
+        has nothing to its right, so those bounds are zero.
+        """
+        rows = [
+            ("chr1", 0, 1000, "-", 1.0, 10),
+            ("chr1", 2000, 3000, "-", -1.0, 10),
+            ("chr2", 0, 1000, "-", 1.0, 10),
+        ]
+        segments = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows, columns=["chromosome", "start", "end", "gene", "log2", "probes"]
+            ),
+            {"sample_id": "T1"},
+        )
+        # Two bins per segment, so the inner bin edges that bracket each
+        # breakpoint are distinct: the CI runs from the START of the last bin
+        # before the breakpoint to the END of the first bin after it.
+        bin_rows = [
+            ("chr1", 100, 300, "-", 1.0),
+            ("chr1", 700, 900, "-", 1.0),
+            ("chr1", 2100, 2300, "-", -1.0),
+            ("chr1", 2700, 2800, "-", -1.0),
+            ("chr2", 300, 400, "-", 1.0),
+            ("chr2", 600, 700, "-", 1.0),
+        ]
+        bins = cnary.CopyNumArray(
+            pd.DataFrame(
+                bin_rows, columns=["chromosome", "start", "end", "gene", "log2"]
+            ),
+            {"sample_id": "T1"},
+        )
+        records = self._vcf_records(segments, (2, False, None, True, None, bins))
+        infos = [
+            dict(kv.split("=", 1) for kv in fields[7].split(";") if "=" in kv)
+            for fields in records
+        ]
+        by_chrom_pos = {
+            (fields[0], int(fields[1])): info
+            for fields, info in zip(records, infos, strict=True)
+        }
+        self.assertEqual(len(by_chrom_pos), 3)
+        # chr1's first segment: nothing to its left, so that bound is zero
+        first = by_chrom_pos[("chr1", 1)]
+        self.assertEqual(first["CIPOS"], "0,300")
+        # Its END bound reaches into chr1's next segment, which is legitimate
+        self.assertEqual(first["CIEND"], "-300,1300")
+        # chr1's last segment: nothing to its right, and chr2 must not supply it
+        last_chr1 = by_chrom_pos[("chr1", 2000)]
+        self.assertEqual(last_chr1["CIPOS"], "-1300,300")
+        self.assertEqual(last_chr1["CIEND"], "-300,0")
+        # chr2's only segment is both first and last of its chromosome
+        only_chr2 = by_chrom_pos[("chr2", 1)]
+        self.assertEqual(only_chr2["CIPOS"], "0,400")
+        self.assertEqual(only_chr2["CIEND"], "-400,0")
+
+    def test_export_vcf_ci_omitted_when_no_bin_covers_the_segment(self):
+        """A segment no bin overlaps has no confidence interval, so emits none.
+
+        ``--cnr`` accepts any file; nothing checks that its bins cover the
+        segments. An uncovered segment leaves the breakpoint unlocalized, which
+        is not the same as localizing it exactly -- emitting ``0,0`` would claim
+        the strongest possible precision for the case with the least evidence.
+        The copy-number call itself is unaffected, so the record still appears.
+        """
+        rows = [
+            ("chr1", 0, 1000, "-", 1.0, 10),
+            ("chr1", 5000, 6000, "-", -1.0, 10),
+        ]
+        segments = cnary.CopyNumArray(
+            pd.DataFrame(
+                rows, columns=["chromosome", "start", "end", "gene", "log2", "probes"]
+            ),
+            {"sample_id": "T1"},
+        )
+        # Bins cover the first segment only
+        bins = cnary.CopyNumArray(
+            pd.DataFrame(
+                [("chr1", 100, 900, "-", 1.0)],
+                columns=["chromosome", "start", "end", "gene", "log2"],
+            ),
+            {"sample_id": "T1"},
+        )
+        records = self._vcf_records(segments, (2, False, None, True, None, bins))
+        self.assertEqual(len(records), 2)  # both calls survive
+        infos = [
+            dict(kv.split("=", 1) for kv in fields[7].split(";") if "=" in kv)
+            for fields in records
+        ]
+        # The covered segment keeps the bound it can compute and drops the one
+        # that would have to come from its uncovered neighbour
+        self.assertEqual(infos[0]["CIPOS"], "0,900")
+        self.assertNotIn("CIEND", infos[0])
+        # The uncovered segment has neither
+        self.assertNotIn("CIPOS", infos[1])
+        self.assertNotIn("CIEND", infos[1])
+        # Never the string "nan", which htslib reads as a missing value
+        self.assertNotIn("nan", "".join(fields[7] for fields in records))
+
     @staticmethod
     def _vcf_records(segments, args):
         """Emitted VCF records of `segments`, each split into its 10 fields."""

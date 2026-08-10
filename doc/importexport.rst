@@ -172,6 +172,22 @@ segments themselves are still exported. A probe count that is present but is
 not a whole number indicates a segment file written by the buggy v0.7.1
 release; those segments are skipped, and the number skipped is logged.
 
+Segment breakpoints are reported as single coordinates, but the underlying
+bins localize them only to the gap between the last bin supporting one copy
+number level and the first bin supporting the next. Passing the bin-level
+copy ratios with ``--cnr`` records that gap as the ``CIPOS`` and ``CIEND``
+INFO fields, which bracket the start and end breakpoints respectively::
+
+    cnvkit.py export vcf Sample.cns --cnr Sample.cnr -o Sample.cnv.vcf
+
+These are the coordinates of the flanking bins, not a statistical confidence
+interval: a wide interval means the breakpoint falls in a poorly covered
+region, not that the copy number call is uncertain. A breakpoint at the first
+or last segment of a chromosome is unbounded on the outward side, which is
+reported as an offset of zero. Where no bin covers a segment at all the
+breakpoint is not localized, and the field is omitted rather than reported as
+``0,0``, which would claim an exactly known position.
+
 Allele-specific copy number and LOH evidence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
