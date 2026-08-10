@@ -202,6 +202,68 @@ class IOTests(unittest.TestCase):
                 self.assertEqual(list(dframe.start), [499], fmt)
                 self.assertEqual(list(dframe.end), [900], fmt)
 
+    def test_read_vcf_end_key_is_not_matched_by_substring(self):
+        """Only a field keyed exactly END sets the end coordinate.
+
+        The text readers found END by searching the raw INFO string for
+        "END=", which also matches CIEND, the confidence interval around
+        END that imprecise structural variants carry. htsjdk serialises
+        INFO through a sorted map, so GATK and Picard write the keys
+        alphabetically and CIEND lands ahead of the END it brackets; the
+        leftmost match then read the interval "-50,50" as a coordinate and
+        the file failed to load. A record carrying CIEND and no END fails
+        the same way whatever the field order, since the embedded "END="
+        is then the only one present.
+        """
+        vcf_text = (
+            "##fileformat=VCFv4.2\n"
+            "##contig=<ID=chr1,length=100000>\n"
+            '##INFO=<ID=END,Number=1,Type=Integer,Description="End position">\n'
+            '##INFO=<ID=CIEND,Number=2,Type=Integer,Description="CI around END">\n'
+            '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV type">\n'
+            '##ALT=<ID=DEL,Description="Deletion">\n'
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1\n"
+            "chr1\t500\t.\tA\t<DEL>\t50\tPASS\tCIEND=-50,50;END=900;SVTYPE=DEL\tGT\t0/1\n"
+            "chr1\t2000\t.\tACGT\tA\t50\tPASS\tCIEND=-50,50;SVTYPE=DEL\tGT\t0/1\n"
+        )
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(vcf_text)
+            tmp.flush()
+            for fmt in ("vcf", "vcf-simple", "vcf-sites"):
+                dframe = tabio.read(tmp.name, fmt).data
+                self.assertEqual(list(dframe.start), [499, 1999], fmt)
+                self.assertEqual(list(dframe.end), [900, 2003], fmt)
+
+    def test_read_vcf_end_without_a_value_uses_the_footprint(self):
+        """An END that declares no value leaves the footprint in place.
+
+        A record may spell "no end here" two ways: `.`, the marker VCF
+        gives every missing value, and a bare `END` carrying no value at
+        all, which is malformed for a reserved integer key but is what a
+        writer emitting flag fields produces by accident. Neither states
+        a coordinate, so both fall back to the reference allele rather
+        than failing the read. The same rule governs QUAL a few lines
+        below, where `.` becomes NaN instead of raising.
+        """
+        vcf_text = (
+            "##fileformat=VCFv4.2\n"
+            "##contig=<ID=chr1,length=100000>\n"
+            '##INFO=<ID=END,Number=1,Type=Integer,Description="End position">\n'
+            '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV type">\n'
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1\n"
+            "chr1\t2000\t.\tACGT\tA\t50\tPASS\tSVTYPE=DEL;END=.\tGT\t0/1\n"
+            "chr1\t3000\t.\tACGT\tA\t50\tPASS\tSVTYPE=DEL;END\tGT\t0/1\n"
+        )
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(vcf_text)
+            tmp.flush()
+            for fmt in ("vcf", "vcf-simple", "vcf-sites"):
+                dframe = tabio.read(tmp.name, fmt).data
+                self.assertEqual(list(dframe.start), [1999, 2999], fmt)
+                self.assertEqual(list(dframe.end), [2003, 3003], fmt)
+
     def test_read_vcf_strelka(self):
         """Read a Strelka somatic-SNV VCF, which has no GT FORMAT field.
 
