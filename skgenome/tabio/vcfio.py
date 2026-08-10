@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from pysam.libcbcf import (
         VariantFile,
         VariantRecord,
-        VariantRecordInfo,
         VariantRecordSample,
     )
 
@@ -301,12 +300,14 @@ def _parse_records(
         # Split multiallelics?
         # XXX Ensure sample genotypes are handled properly
         start = record.start
+        # `record.stop` is a declared INFO/END when present, otherwise the
+        # reference allele's footprint; either way it is one span per record.
+        end = record.stop
         if record.alts:
             for alt in record.alts:
                 if alt == "<NON_REF>":
                     # gVCF placeholder -- not a real allele
                     continue
-                end = _get_end(start, alt, record.info)
                 row = (
                     record.chrom,
                     start,
@@ -445,14 +446,6 @@ def _strelka_alt_count(
 
 def _safesum(tup: tuple[None] | tuple[int, int] | tuple[int]) -> int:
     return sum(filter(None, tup))
-
-
-def _get_end(posn: int, alt: str, info: VariantRecordInfo) -> int:
-    """Get record end position."""
-    if "END" in info:
-        # Structural variant
-        return info["END"]  # type: ignore[no-any-return]
-    return posn + len(alt)
 
 
 # _____________________________________________________________________
