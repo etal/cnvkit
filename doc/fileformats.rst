@@ -9,6 +9,20 @@ All of the non-standard file formats used by CNVkit are tab-separated plain text
 and can be loaded in a spreadsheet program, R or other statistical analysis
 software for manual analysis, if desired.
 
+Every interval CNVkit reads must end at or after it starts. In a region file
+written by another tool, a reversed pair is taken to span the wider range and
+the repair is logged. For BED that is what the writer meant, since some
+primer-design tools record reverse-direction amplicons that way; for an
+annotation file carrying its own strand column, such as GFF or refFlat, it is
+instead the only usable interval left in a damaged row. In
+CNVkit's own tables below, the ``.cnn``, ``.cnr``, ``.cns`` and SEG formats, a
+reversed row is refused: those coordinates came from a binner or a
+segmenter, so a reversed one means the file was damaged after it was written,
+and repairing it would invent a span no segmenter produced. Versions before
+0.9.14 could write such a row themselves when squashing segments whose bins
+were out of order (#677), so regenerating an old file with a current version
+is usually enough.
+
 .. _bedformat:
 
 BED and GATK/Picard Interval List

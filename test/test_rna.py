@@ -7,6 +7,7 @@ import inspect
 import io
 import logging
 import os
+import shutil
 import sys
 import tempfile
 import unittest
@@ -19,6 +20,7 @@ import pandas as pd
 from cnvlib import commands, import_rna, rna
 from cnvlib.cli import cnv_gene_info
 from cnvlib.cnary import CopyNumArray
+from skgenome import tabio
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 
@@ -428,6 +430,50 @@ class FilterProbesPlumbingTests(unittest.TestCase):
             .default,
             0.5,
         )
+
+
+class GeneResourceCoordinateTests(unittest.TestCase):
+    """A reversed row in the gene resource cannot reach the emitted .cnr.
+
+    The gene resource is a user-supplied export and does not pass through
+    `skgenome.tabio.read`, so before `load_gene_info` repaired it,
+    `import-rna` could write a .cnr that every later command refused --
+    blaming a squashing bug in CNVkit for coordinates CNVkit never wrote.
+    """
+
+    def _reversed_resource(self):
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmpdir)
+        dst = os.path.join(tmpdir, "reversed.tsv")
+        with open("formats/rna-gene-resource.tsv") as src, open(dst, "w") as out:
+            for i, line in enumerate(src):
+                fields = line.rstrip("\n").split("\t")
+                if i == 2:  # first data row; line 0 is a comment, line 1 the header
+                    fields[3], fields[4] = fields[4], fields[3]
+                out.write("\t".join(fields) + "\n")
+        return dst
+
+    def test_load_gene_info_repairs_reversed_rows(self):
+        resource = self._reversed_resource()
+        with self.assertLogs(level="WARNING") as cm:
+            info = rna.load_gene_info(resource, None)
+        self.assertIn("1:101500-100000", " ".join(cm.output))
+        self.assertTrue((info["end"] >= info["start"]).all())
+
+    def test_import_rna_emits_a_readable_cnr(self):
+        resource = self._reversed_resource()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            _, cnrs = import_rna.do_import_rna(
+                ["formats/rna-sample-A.counts.txt"], "counts", resource
+            )
+            cnr = next(iter(cnrs))
+        self.assertTrue((cnr.data["end"] >= cnr.data["start"]).all())
+        # What it writes, CNVkit must be able to read back
+        out = os.path.join(tempfile.mkdtemp(), "A.cnr")
+        self.addCleanup(shutil.rmtree, os.path.dirname(out))
+        tabio.write(cnr, out)
+        self.assertEqual(len(tabio.read(out, "tab")), len(cnr))
 
 
 class DiploidParxPlumbingTests(unittest.TestCase):

@@ -2,14 +2,18 @@
 """Unit tests for the CNVkit library, cnvlib."""
 
 import math
+import os
+import shutil
 import tempfile
 import unittest
 from io import StringIO
 
 from conftest import linecount
 
+from cnvlib import commands
 from cnvlib.cnary import CopyNumArray as CNA
 from skgenome import tabio
+from skgenome.tabio import bedio
 
 
 class IOTests(unittest.TestCase):
@@ -438,6 +442,145 @@ class IOTests(unittest.TestCase):
         self.assertIn("format-no-sample.vcf", msg)
         # Should not be mislabeled as a "passed an open file handle" mistake
         self.assertNotIn("file handle", msg)
+
+
+class IntervalOrderTests(unittest.TestCase):
+    """A row whose end precedes its start is read according to who wrote it.
+
+    CNVkit's own bin and segment tables are refused: such a row is corrupt
+    output and any repair would invent a span no segmenter produced. A
+    third-party region file is repaired to span [min, max] instead, because
+    reversing an interval is how some tools record orientation.
+    """
+
+    HEADER = "chromosome\tstart\tend\tgene\tlog2\tprobes\n"
+    ROWS = "chr1\t100\t200\tA\t0.0\t5\nchr1\t400\t300\tB\t-1.0\t0\n"
+
+    def _write(self, suffix, text):
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w+t", suffix=suffix, delete=False, encoding="utf-8"
+        )
+        self.addCleanup(os.unlink, tmp.name)
+        with tmp:
+            tmp.write(text)
+        return tmp.name
+
+    def test_own_format_is_refused(self):
+        fname = self._write(".cns", self.HEADER + self.ROWS)
+        with self.assertRaises(ValueError) as ctx:
+            tabio.read(fname, "tab")
+        msg = str(ctx.exception)
+        # Name the offending row as the file spells it, not as repaired
+        self.assertIn("chr1:400-300", msg)
+        self.assertIn("1 of 2 rows", msg)
+        self.assertIn(fname, msg)
+
+    def test_seg_is_refused(self):
+        fname = self._write(
+            ".seg",
+            "ID\tchrom\tloc.start\tloc.end\tnum.mark\tseg.mean\n"
+            "s\t1\t400\t300\t0\t-1.0\n",
+        )
+        with self.assertRaises(ValueError):
+            tabio.read(fname, "seg")
+
+    def test_bed_is_reversed_with_a_warning(self):
+        fname = self._write(".bed", "chr1\t100\t200\tFWD\nchr1\t400\t300\tREV\n")
+        with self.assertLogs(level="WARNING") as cm:
+            regions = tabio.read(fname, "bed")
+        self.assertIn("chr1:400-300", " ".join(cm.output))
+        self.assertEqual(
+            regions.data[["start", "end"]].to_numpy().tolist(),
+            [[100, 200], [300, 400]],
+        )
+        # The repair happens before sorting, so the result is still ordered
+        self.assertTrue(regions.data.start.is_monotonic_increasing)
+
+    def test_only_reversed_rows_are_not_collapsed(self):
+        """Repairing every row must not collapse both coordinates onto one.
+
+        Reading a column out of a `.loc` slice gives a view rather than a
+        copy when the mask selects every row, so a swap through one uncopied
+        array leaves start and end both equal to the end. A reader hands back
+        start and end in a single consolidated block, which is the
+        arrangement that has it; the frame `read` goes on to build does not,
+        so driving the helper directly is what makes this able to fail.
+        """
+        fname = self._write(".bed", "chr1\t400\t300\tA\nchr1\t900\t800\tB\n")
+        frame = bedio.read_bed(fname)
+        with self.assertLogs(level="WARNING"):
+            tabio._apply_interval_order_policy(frame, "bed", fname)
+        self.assertEqual(
+            frame[["start", "end"]].to_numpy().tolist(), [[300, 400], [800, 900]]
+        )
+        self.assertEqual(frame["start"].dtype, "int64")
+
+    def test_single_row_file_is_reversed_through_read(self):
+        """One row, reversed, is the smallest whole-file repair `read` does."""
+        fname = self._write(".bed", "chr1\t400\t300\tONE\n")
+        with self.assertLogs(level="WARNING"):
+            regions = tabio.read(fname, "bed")
+        self.assertEqual(
+            regions.data[["start", "end"]].to_numpy().tolist(), [[300, 400]]
+        )
+        self.assertEqual(regions.data["start"].dtype, "int64")
+
+    def test_import_seg_repairs_rather_than_refusing(self):
+        """A SEG from another tool is repaired, so the .cns it makes is readable.
+
+        `import-seg` exists to ingest foreign SEG and does not go through
+        `read`, so before it repaired at ingest it wrote a .cns holding the
+        reversed row -- which every later command then refused, blaming
+        CNVkit's own segmenter for a row CNVkit never wrote.
+        """
+        segfile = self._write(
+            ".seg",
+            "ID\tchrom\tloc.start\tloc.end\tnum.mark\tseg.mean\n"
+            "foo\t1\t100\t200\t10\t0.1\n"
+            "foo\t1\t400\t300\t0\t-1.0\n",
+        )
+        outdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, outdir)
+        args = commands.parse_args(["import-seg", segfile, "-d", outdir])
+        with self.assertLogs(level="WARNING") as cm:
+            args.func(args)
+        self.assertIn("1:399-300", " ".join(cm.output))
+        written = os.path.join(outdir, "foo.cns")
+        # The whole point: what it wrote, CNVkit can read
+        segs = tabio.read(written, "tab")
+        self.assertEqual(len(segs), 2)
+        self.assertTrue((segs.data["end"] >= segs.data["start"]).all())
+
+    def test_well_formed_files_are_untouched(self):
+        """Neither branch fires on a file that is already in order.
+
+        Comparing two reads of the same file would only assert that reading
+        is deterministic. What has to hold is that the policy stays silent:
+        no repair, and no refusal.
+        """
+        for fname, fmt in (
+            ("formats/amplicon.cns", "tab"),
+            ("formats/amplicon.bed", "bed"),
+            ("formats/example.gff", "gff"),
+            ("formats/empty", "tab"),
+        ):
+            with self.subTest(fname=fname), self.assertNoLogs(level="WARNING"):
+                arr = tabio.read(fname, fmt)
+            self.assertTrue((arr.data["end"] >= arr.data["start"]).all())
+
+    def test_every_reader_is_classified(self):
+        """A reader added to READERS without a classification fails here.
+
+        The VCF family is the deliberate exemption;
+        `skgenome.tabio._apply_interval_order_policy` says why.
+        """
+        classified = tabio._SELF_WRITTEN_FORMATS | tabio._FOREIGN_FORMATS
+        self.assertEqual(
+            set(tabio.READERS) - classified - {"auto"},
+            {"vcf", "vcf-simple", "vcf-sites"},
+        )
+        self.assertFalse(tabio._SELF_WRITTEN_FORMATS & tabio._FOREIGN_FORMATS)
+        self.assertTrue(classified <= set(tabio.READERS))
 
 
 if __name__ == "__main__":

@@ -223,11 +223,13 @@ def _min_magnitude(threshold_low: float | None, threshold_high: float | None) ->
 def _feature_span(start: int, end: int, chrom_size: int) -> tuple[int, int] | None:
     """0-based half-open span ``[lo, hi)`` for a feature, or None if out of range.
 
-    Normalizes reverse-oriented intervals: reverse-direction PCR primers are
-    sometimes stored with ``start > end`` in the input BED, so the interval is
-    taken to span ``[min, max]`` regardless of column order. Biopython's
-    chromosome renderer asserts ``0 <= start <= end <= length``, so an
-    un-normalized reversed interval would otherwise crash the diagram.
+    Normalizes reverse-oriented intervals to span ``[min, max]``.
+    ``skgenome.tabio.read`` keeps such a row out of every region and
+    copy-number array it returns -- reversing it out of a BED, refusing it in
+    CNVkit's own formats -- but the VCF readers are exempt and an array built
+    in memory is not covered at all. Biopython's chromosome renderer asserts
+    ``0 <= start <= end <= length``, so an un-normalized reversed interval
+    would crash the diagram.
     """
     lo = min(start, end) - 1
     hi = max(start, end)

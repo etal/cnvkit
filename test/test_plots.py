@@ -388,9 +388,10 @@ class DiagramGeneLabelTests(unittest.TestCase):
 class DiagramCoordinateTests(unittest.TestCase):
     """diagram renders reverse-oriented intervals (start > end) gracefully.
 
-    Reverse-direction PCR primers are sometimes saved in the input BED with
-    start > end; CNVkit should treat the interval as spanning [min, max] rather
-    than crashing Biopython's renderer, which asserts start <= end <= length.
+    Such a row cannot reach here from a file -- `skgenome.tabio.read`
+    reverses it out of a BED and refuses it in CNVkit's own formats -- so
+    these build their rows in memory, which is the path that remains.
+    Biopython's renderer asserts start <= end <= length, and used to crash.
     """
 
     def test_feature_span_normalizes_orientation(self):

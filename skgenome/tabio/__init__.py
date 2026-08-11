@@ -114,6 +114,7 @@ def read(
 
         suggest_into = VA  # type: ignore[assignment]
     result = (into or suggest_into)(dframe, meta)
+    _apply_interval_order_policy(result.data, fmt, get_filename(infile))
     result.sort_columns()
     result.sort()
     return result
@@ -124,6 +125,132 @@ def read(
     #                                      ordered=True)
     # Create a multi-index of genomic coordinates (like GRanges)
     # dframe.set_index(['chromosome', 'start'], inplace=True)
+
+
+#: Formats CNVkit writes itself: the bin and segment tables (.cnn, .cnr, .cns)
+#: and the SEG its own segmenter emits. A row whose end precedes its start in
+#: one of these is corrupt output, so it is refused rather than repaired --
+#: see `_apply_interval_order_policy`.
+_SELF_WRITTEN_FORMATS = frozenset(("tab", "seg"))
+
+#: Formats other tools write, whose rows carry both coordinates as the file
+#: spells them. CNVkit does not own these producers, so a reversed row is
+#: repaired rather than refused. The remainder of `READERS` is the VCF
+#: family, which derives its end from a declared field against a fallback of
+#: its own; `_apply_interval_order_policy` says why that is left alone.
+_FOREIGN_FORMATS = frozenset(
+    (
+        "bed",
+        "bed3",
+        "bed4",
+        "bed6",
+        "dict",
+        "genepred",
+        "genepredext",
+        "gff",
+        "interval",
+        "picardhs",
+        "refflat",
+        "refgene",
+        "text",
+    )
+)
+
+
+def repair_inverted_intervals(frame: pd.DataFrame, fname: str | None = None) -> None:
+    """Reverse every row whose end precedes its start, in place, and say so.
+
+    The answer for coordinates another tool wrote, where refusing the file
+    would block a workflow CNVkit does not control, so the interval is taken
+    to span the wider range. For BED that is the reading the writer intended:
+    reverse-direction PCR primers are recorded with the start after the end.
+    For an annotation format carrying its own strand column, GFF and the
+    genePred family, coordinate order encodes nothing, so a reversed row is
+    damage and the wider range is merely the only usable interval left in it.
+    Both warrant repair over refusal; the warning is what tells them apart.
+
+    Public because provenance is a property of the caller, not only of the
+    format. `import-seg` reads SEG another tool produced and so calls this
+    directly, while `read`'s own SEG branch refuses, its caller being
+    CNVkit's DNAcopy output.
+
+    Call it before sorting: reversing coordinates can move a row's place in
+    the order.
+    """
+    inverted = (frame["end"] < frame["start"]).to_numpy()
+    if not inverted.any():
+        return
+    first = _describe_row(frame, int(inverted.argmax()))
+    # Copy both columns before writing either. `.to_numpy()` on a `.loc`
+    # slice hands back a view whenever the mask selects every row, so a swap
+    # through one uncopied array reduces those rows to `end, end`. A reader's
+    # own frame has that layout; the frame `read` goes on to build does not.
+    starts = frame.loc[inverted, "start"].to_numpy(copy=True)
+    ends = frame.loc[inverted, "end"].to_numpy(copy=True)
+    frame.loc[inverted, "start"] = ends
+    frame.loc[inverted, "end"] = starts
+    logging.warning(
+        "Reversed %d of %d intervals whose end preceded their start%s, first %s",
+        int(inverted.sum()),
+        len(frame),
+        f" in {fname}" if fname else "",
+        first,
+    )
+
+
+def _apply_interval_order_policy(
+    frame: pd.DataFrame, fmt: str, fname: str | None
+) -> None:
+    """Refuse or repair rows whose end precedes their start, as `fmt` warrants.
+
+    What an inverted row means depends on who wrote it, so the two answers
+    are not interchangeable.
+
+    In a format CNVkit produces, the coordinates are a segmenter's or a
+    binner's own output and an inverted row cannot be anything but corrupt.
+    The damage such a row does is downstream of any search -- `export vcf`
+    writes it out as a deletion call whose END precedes its POS, and it
+    suppresses a neighbouring record's confidence interval -- which is why a
+    check inside the search half would not have caught it. Repairing one
+    would invent a span no segmenter produced, so the only safe answer is to
+    refuse the file and say which rows are wrong.
+
+    A format another tool wrote is repaired instead; see
+    `repair_inverted_intervals`. SEG is counted as CNVkit's own here because
+    the only caller that reaches it through `read` is the DNAcopy pipeline
+    reading its own segmenter back; `import-seg`, whose input is foreign by
+    definition, repairs instead.
+
+    VCF is deliberately in neither group. Its end is not read but derived,
+    from INFO/END against a fallback rule of its own, so an end below the
+    start means the declared END is untrustworthy rather than that the record
+    runs backwards; swapping the two would fabricate a span. Resolving that
+    belongs with the reader that computes it.
+    """
+    if fmt in _SELF_WRITTEN_FORMATS:
+        inverted = (frame["end"] < frame["start"]).to_numpy()
+        if inverted.any():
+            remedy = (
+                "To fix, regenerate the file with a current CNVkit, which "
+                "has not written such a row since v0.9.14, or drop the rows."
+                if fname
+                else "These coordinates were produced in this process, so "
+                "this is a defect in CNVkit rather than in the input."
+            )
+            raise ValueError(
+                "Genomic intervals must not end before they start: "
+                f"{int(inverted.sum())} of {len(frame)} rows"
+                f"{f' in {fname}' if fname else ''} are reversed, first "
+                f"{_describe_row(frame, int(inverted.argmax()))}. {remedy}"
+            )
+    elif fmt in _FOREIGN_FORMATS:
+        repair_inverted_intervals(frame, fname)
+
+
+def _describe_row(frame: pd.DataFrame, position: int) -> str:
+    """Name one row by its coordinates, for a diagnostic message."""
+    row = frame.iloc[position]
+    return f"{row['chromosome']}:{row['start']}-{row['end']}"
 
 
 def read_auto(infile: str) -> GA:
