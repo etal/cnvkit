@@ -27,6 +27,15 @@ the writer plainly meant, as they already do for an END the header never
 declares. Refusing it would put the pysam-backed reader at odds with the text
 ones, which parse the raw field and cannot see a declared type in the first
 place.
+
+Half of this expires. Raising the pinned pysam to 0.24.0 makes `vcfio`'s
+arithmetic dead code, because htslib >= 1.23 already returns the maximum, and
+the two mutation cases that defend those lines pass under that pysam today.
+Delete them then rather than leave them looking load-bearing. The text
+readers' half never expires: they call no htslib at all. This module is
+separate precisely because two reader families must not derive the
+symbolic-allele rule independently, so at one remaining caller it should fold
+into `vcfsimple`.
 """
 
 from __future__ import annotations

@@ -4,6 +4,11 @@ matplotlib == 3.10.7
 numpy == 2.3.5
 pandas == 2.3.3
 pyfaidx == 0.8.1.3
+# Raising this floor to 0.24.0 (htslib 1.23) does not merely widen what is
+# tested: it makes part of skgenome/tabio/vcfio.py obsolete, because htslib
+# then computes the record span CNVkit computes for it. Delete that code
+# rather than keep it covered -- see skgenome/tabio/vcfspan.py, which says
+# which half expires and which half never does.
 pysam == 0.23.3
 reportlab == 4.4.10
 scikit-learn == 1.7.2
