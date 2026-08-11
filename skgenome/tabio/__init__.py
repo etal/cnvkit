@@ -222,13 +222,12 @@ def _apply_interval_order_policy(
     definition, repairs instead.
 
     VCF is deliberately in neither group. Its end is not read but derived,
-    from INFO/END against a fallback rule of its own, so an end below the
-    start means the declared END is untrustworthy rather than that the record
-    runs backwards; swapping the two would fabricate a span. That is resolved
-    where it arises instead: `vcfsimple.set_ends` discards an END below its
-    record's POS in favour of the reference footprint, which is what htslib
-    already does for `vcfio`, so no VCF reader hands this function an
-    inverted row.
+    from INFO/END and INFO/SVLEN against the reference allele, so an end
+    below the start means a declared value is untrustworthy rather than that
+    the record runs backwards; swapping the two would fabricate a span. That
+    is resolved where it arises instead: every VCF reader takes the furthest
+    of those three, so a value below the record's own POS simply loses (see
+    `vcfspan`), and no VCF reader hands this function an inverted row.
     """
     if fmt in _SELF_WRITTEN_FORMATS:
         inverted = (frame["end"] < frame["start"]).to_numpy()

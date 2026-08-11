@@ -13,6 +13,8 @@ import pandas as pd
 
 from skgenome._pysam import PYSAM_INSTALL_MSG
 
+from . import vcfspan
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -257,6 +259,9 @@ def _parse_records(
     flag, or the SOMATIC info field.
     """
     cnt_reject = 0  # For logging
+    # Hoisted: htslib admits an undeclared INFO key mid-parse, so asking the
+    # header per record costs more than the lookup it would save.
+    has_svlen = "SVLEN" in records.header.info
     for record in records:
         if (
             skip_reject
@@ -300,9 +305,15 @@ def _parse_records(
         # Split multiallelics?
         # XXX Ensure sample genotypes are handled properly
         start = record.start
-        # `record.stop` is a declared INFO/END when present, otherwise the
-        # reference allele's footprint; either way it is one span per record.
-        end = record.stop
+        # The record reaches as far as the furthest of its reference allele,
+        # a declared END, and an SVLEN against an allele that replaces
+        # reference. `record.stop` is a floor rather than the answer: it
+        # already carries END, and what an older htslib leaves out of it is
+        # exactly what the other two terms supply. See `vcfspan`.
+        end = max(record.stop, start + len(record.ref or ""))
+        if has_svlen and record.alts:
+            span = vcfspan.svlen_span(record.alts, _info_values(record, "SVLEN"))
+            end = max(end, start + span)
         if record.alts:
             for alt in record.alts:
                 if alt == "<NON_REF>":
@@ -466,6 +477,22 @@ def _info_scalar(record: VariantRecord, key: str, default: int | float) -> int |
         except ValueError:
             return default
     return default if value is None else value
+
+
+def _info_values(record: VariantRecord, key: str) -> tuple[object, ...]:
+    """Get every value of a VCF record's INFO field, or nothing.
+
+    The sibling of `_info_scalar` for a field that is genuinely one value per
+    ALT allele, where taking the first would answer for the wrong allele, and
+    carrying the same guard for the same reason. A multi-valued field always
+    arrives as a tuple, whatever the header made of its type, so a lone value
+    is wrapped rather than split; a key the header omits entirely does not
+    reach here, the caller having settled that once per file.
+    """
+    if key not in record.info:
+        return ()
+    value = record.info[key]
+    return value if isinstance(value, tuple) else (value,)
 
 
 def _safesum(tup: tuple[None] | tuple[int, int] | tuple[int]) -> int:

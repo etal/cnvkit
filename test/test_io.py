@@ -308,25 +308,18 @@ class IOTests(unittest.TestCase):
             self.assertIn("in 2 of 4 records", message)
             self.assertIn("chr1:200 with END=199", message)
 
-    def test_read_vcf_end_equal_to_pos_is_a_one_base_span(self):
-        """An END equal to POS is a real span, so only a smaller one is dropped.
+    def test_read_vcf_span_is_the_furthest_of_end_and_the_ref_allele(self):
+        """A declared END shorter than the reference allele does not shorten it.
 
-        This is the boundary the discard rule turns on, and the only END
-        case whose answer the reference allele's length can change: keeping
-        the declared END gives one base, discarding it gives the footprint.
-        A test where the two coincide would not tell the rules apart, so
-        the record quotes four reference bases.
-
-        Only the text readers are asserted here, because htslib's own
-        answer for a declared span shorter than REF moved. The spec defines
-        the span as the maximum of the reference allele's length and the
-        one END implies; htslib ignored that maximum through 1.21 (pysam
-        0.23.3, which ``requirements/min.txt`` pins) and adopted it by
-        1.23.1 (pysam 0.24.0), so the same record reads as 799..800 under
-        one and 799..803 under the other. Whether CNVkit should follow the
-        maximum is a decision of its own, tracked separately; until it is
-        taken, asserting agreement across the reader families here would
-        pin CNVkit to whichever pysam the runner happened to install.
+        The specification defines a record's span as the maximum of the
+        reference allele's length and the length INFO/END implies, so a
+        record quoting four reference bases while declaring a one-base END
+        still covers four. htslib disagreed with itself about this: through
+        1.21, which pysam 0.23.3 bundles and ``requirements/min.txt`` pins,
+        it took the shorter declared span; from 1.23 it takes the maximum.
+        CNVkit computes the maximum itself so that a run's coordinates do
+        not depend on which pysam wheel is installed, which is why all three
+        readers are asserted here and why this passes under either.
         """
         vcf_text = (
             "##fileformat=VCFv4.2\n"
@@ -338,10 +331,132 @@ class IOTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
             tmp.write(vcf_text)
             tmp.flush()
-            for fmt in ("vcf-simple", "vcf-sites"):
+            for fmt in ("vcf", "vcf-simple", "vcf-sites"):
                 dframe = tabio.read(tmp.name, fmt).data
                 self.assertEqual(list(dframe.start), [799], fmt)
-                self.assertEqual(list(dframe.end), [800], fmt)
+                self.assertEqual(list(dframe.end), [803], fmt)
+
+    def test_read_vcf_svlen_reaches_the_reference_only_for_some_alleles(self):
+        """SVLEN sizes a symbolic deletion, but never an insertion.
+
+        A symbolic ALT quotes one reference base and states its extent in
+        INFO/SVLEN, so a reader taking the reference allele alone reads a
+        400-base deletion as one base. SVLEN counts reference bases only
+        where the allele replaces reference: for an insertion it counts
+        inserted bases, and reading it as a span was an htslib defect
+        (its issue #1940) that 1.23 fixed by restricting the set. The sign
+        is not read, since VCF 4.2 writers make a deletion negative and 4.4
+        writers make it positive.
+
+        The inversion is the case to keep: htslib's own 1.23 release note
+        names only DEL, DUP and CNV, while its code also accepts INV. This
+        follows the code, so a future reader who trusts the changelog and
+        drops the case will see this fail. The last two records pin the
+        match's shape, which is a type prefix followed by the closing
+        bracket or a sub-type separator: ``<DEL:ME>`` is a deletion and
+        ``<DELETION>`` is not one of these types at all.
+        """
+        vcf_text = (
+            "##fileformat=VCFv4.4\n"
+            "##contig=<ID=chr1,length=100000>\n"
+            '##INFO=<ID=SVLEN,Number=A,Type=Integer,Description="SV length">\n'
+            '##ALT=<ID=DEL,Description="Deletion">\n'
+            '##ALT=<ID=INV,Description="Inversion">\n'
+            '##ALT=<ID=INS,Description="Insertion">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+            "chr1\t1000\t.\tA\t<DEL>\t50\tPASS\tSVLEN=-400\n"
+            "chr1\t2000\t.\tA\t<INV>\t50\tPASS\tSVLEN=400\n"
+            "chr1\t3000\t.\tA\t<INS>\t50\tPASS\tSVLEN=400\n"
+            "chr1\t4000\t.\tA\t<DEL:ME>\t50\tPASS\tSVLEN=400\n"
+            "chr1\t5000\t.\tA\t<DELETION>\t50\tPASS\tSVLEN=400\n"
+            "chr1\t6000\t.\tA\tAACGT\t50\tPASS\tSVLEN=4\n"
+        )
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(vcf_text)
+            tmp.flush()
+            for fmt in ("vcf", "vcf-simple", "vcf-sites"):
+                dframe = tabio.read(tmp.name, fmt).data
+                self.assertEqual(
+                    list(dframe.start), [999, 1999, 2999, 3999, 4999, 5999], fmt
+                )
+                self.assertEqual(
+                    list(dframe.end), [1400, 2400, 3000, 4400, 5000, 6000], fmt
+                )
+
+    def test_read_vcf_svlen_pairs_with_its_own_alt_allele(self):
+        """SVLEN carries one value per ALT, and the two pair by position.
+
+        A record offering both a deletion and an insertion states a length
+        for each, and only the deletion's reaches the reference. A reader
+        taking the largest value it could find would read the second record
+        as covering 900 bases rather than 400. The third pins that fewer
+        SVLEN values than alleles is not an error: the pairing runs out, as
+        it does in htslib.
+
+        The spans are compared rather than the frames, because the
+        pysam-backed reader emits a row per alternate allele where the text
+        readers emit one per record. Every row of a record carries the same
+        span, which is the point: how far a record reaches is a property of
+        the record, not of whichever allele proved longest.
+        """
+        vcf_text = (
+            "##fileformat=VCFv4.4\n"
+            "##contig=<ID=chr1,length=100000>\n"
+            '##INFO=<ID=SVLEN,Number=A,Type=Integer,Description="SV length">\n'
+            '##ALT=<ID=DEL,Description="Deletion">\n'
+            '##ALT=<ID=DUP,Description="Duplication">\n'
+            '##ALT=<ID=INS,Description="Insertion">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+            "chr1\t1000\t.\tA\t<DEL>,<DUP>\t50\tPASS\tSVLEN=400,900\n"
+            "chr1\t2000\t.\tA\t<DEL>,<INS>\t50\tPASS\tSVLEN=400,900\n"
+            "chr1\t3000\t.\tA\t<DEL>,<DUP>\t50\tPASS\tSVLEN=400\n"
+        )
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(vcf_text)
+            tmp.flush()
+            self.assertEqual(
+                list(tabio.read(tmp.name, "vcf").data.end),
+                [1900, 1900, 2400, 2400, 3400, 3400],
+            )
+            for fmt in ("vcf-simple", "vcf-sites"):
+                dframe = tabio.read(tmp.name, fmt).data
+                self.assertEqual(list(dframe.end), [1900, 2400, 3400], fmt)
+
+    def test_read_vcf_svlen_outside_htslibs_range_is_ignored(self):
+        """An SVLEN too extreme for htslib to keep is not a span here either.
+
+        htslib holds an INFO integer in a 32-bit field and replaces anything
+        outside it with the missing value, so an absurd SVLEN leaves the
+        record spanning its reference allele. The readers here match that
+        range rather than their own, which also keeps a value near the 64-bit
+        limit from overflowing the coordinate column: computing the span
+        first and range-checking afterwards raised OverflowError out of the
+        text readers on the last record below.
+
+        The range is not symmetric, which the first two records pin. Its
+        lower bound stops eight short of the 32-bit minimum, a margin
+        reserved for the markers that mean "missing" and "end of vector", so
+        a magnitude test would honour a few large negative values that htslib
+        discards.
+        """
+        vcf_text = (
+            "##fileformat=VCFv4.4\n"
+            "##contig=<ID=chr1,length=100000000>\n"
+            '##INFO=<ID=SVLEN,Number=A,Type=Integer,Description="SV length">\n'
+            '##ALT=<ID=DEL,Description="Deletion">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+            "chr1\t100\t.\tN\t<DEL>\t50\tPASS\tSVLEN=-2147483640\n"
+            "chr1\t200\t.\tN\t<DEL>\t50\tPASS\tSVLEN=-2147483641\n"
+            "chr1\t300\t.\tN\t<DEL>\t50\tPASS\tSVLEN=2147483648\n"
+            "chr1\t400\t.\tN\t<DEL>\t50\tPASS\tSVLEN=9223372036854775807\n"
+        )
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(vcf_text)
+            tmp.flush()
+            for fmt in ("vcf", "vcf-simple", "vcf-sites"):
+                dframe = tabio.read(tmp.name, fmt).data
+                self.assertEqual(list(dframe.start), [99, 199, 299, 399], fmt)
+                self.assertEqual(list(dframe.end), [2147483740, 200, 300, 400], fmt)
 
     def test_read_vcf_end_without_a_declaration_parts_the_reader_families(self):
         """An END the header never declares is honoured only by the text readers.
