@@ -777,24 +777,32 @@ class GenomicArray:
     def intersection(self, other: GenomicArray, mode: str = "outer") -> GenomicArray:
         """Select the bins in `self` that overlap the regions in `other`.
 
-        The extra fields of `self`, but not `other`, are retained in the output.
+        The extra fields of `self`, but not `other`, are retained in the
+        output. A bin overlapping several regions appears once per region, and
+        in `trim` mode is clipped to each; the rows come in `other`'s row
+        order, and within one region in `self`'s.
 
-        The `trim` mode clips the bins it selects, which `by_ranges` does, so
-        that mode alone requires `self` to be sorted by start position within
-        each chromosome and raises `ValueError` otherwise. The other two modes
-        pair the rows through bioframe, which sorts for itself.
+        Unlike `by_ranges` and `in_range`, this imposes no ordering on `self`:
+        every mode pairs the rows through bioframe, which sorts for itself.
+
+        Parameters
+        ----------
+        other : GenomicArray
+            The regions to select by.
+        mode : str
+            As in `by_ranges`: ``outer`` includes bins straddling a region's
+            boundaries, ``trim`` additionally alters the straddling bins'
+            endpoints to match them, and ``inner`` excludes those bins.
+
+        Returns
+        -------
+        GenomicArray
+            The rows of `self` that overlap a region of `other`.
         """
+        if mode not in ("outer", "inner", "trim"):
+            raise ValueError(f"Unrecognized mode: {mode!r}")
         if not len(self) or not len(other):
             return self.as_dataframe(self.data.iloc[:0])
-        if mode == "trim":
-            chunks = [
-                chunk.data
-                for _, chunk in self.by_ranges(other, mode=mode, keep_empty=False)
-            ]
-            # Nothing overlaps, so there is nothing to concatenate
-            if not chunks:
-                return self.as_dataframe(self.data.iloc[:0])
-            return self.as_dataframe(pd.concat(chunks))
         # Take from bioframe only its pairing of the rows: with `return_input`
         # it also returns index, index_ and the two inputs' coordinates
         # suffixed apart, in the same frame as the user's columns, where a
@@ -814,27 +822,46 @@ class GenomicArray:
             return_index=True,
             return_input=False,
         )
+        # Sort by `other`'s rows then `self`'s, which reproduces `by_ranges`'
+        # row order, and read the pairing out as positions into each input --
+        # `mine` is `self.data` row for row. Sorting before the 'inner' filter
+        # rather than after costs nothing: bioframe emits each pair once, so
+        # the key is unique and dropping rows cannot disturb the order.
+        pairs = pairs.sort_values(["index_", "index"])
+        rows = pairs["index"].to_numpy(dtype=int)
+        regions = pairs["index_"].to_numpy(dtype=int)
+        my_starts = mine.start.to_numpy()
+        their_starts = theirs.start.to_numpy()
         if mode == "inner":
             # Keep only self bins fully contained within an other bin, by the
             # same point-aware rule bioframe paired them under: a zero-width
             # bin is the base at its start, so it is contained wherever that
             # base is, and a one-base bin fits inside the point naming it.
-            rows = pairs["index"].to_numpy(dtype=int)
-            covering = pairs["index_"].to_numpy(dtype=int)
-            my_starts = mine.start.to_numpy()
-            their_starts = theirs.start.to_numpy()
-            my_ends = point_aware_ends(my_starts, mine.end)
-            their_ends = point_aware_ends(their_starts, theirs.end)
-            pairs = pairs[
-                (my_starts[rows] >= their_starts[covering])
-                & (my_ends[rows] <= their_ends[covering])
-            ]
-        # Sort by `other`'s rows then `self`'s, which reproduces `by_ranges`'
-        # row order
-        pairs = pairs.sort_values(["index_", "index"])
-        # Return self rows (with duplicates, one per overlap pair), taken by
-        # position, since `mine` is `self.data` row for row
-        return self.as_dataframe(self.data.iloc[pairs["index"].to_numpy(dtype=int)])
+            my_widened = point_aware_ends(my_starts, mine.end)
+            their_widened = point_aware_ends(their_starts, theirs.end)
+            contained = (my_starts[rows] >= their_starts[regions]) & (
+                my_widened[rows] <= their_widened[regions]
+            )
+            rows, regions = rows[contained], regions[contained]
+        # Take self's rows, with duplicates, one per surviving pair
+        selected = self.data.iloc[rows]
+        if mode == "trim":
+            # Clip each bin to the region that selected it. The bounds are the
+            # raw ones, not the point-aware widening the pairing was decided
+            # under: clipping to `start + 1` would hand back a base the query
+            # never asked for, the same reason `idx_ranges` reports the bounds
+            # it was given rather than the ones it searched with. No clip can
+            # invert a row, since every pair here genuinely overlaps and so the
+            # greater start never exceeds the lesser end -- which is what the
+            # old path, clipping against bounds an unsorted table had
+            # misplaced, could not promise.
+            my_ends = mine.end.to_numpy()
+            their_ends = theirs.end.to_numpy()
+            selected = selected.assign(
+                start=np.maximum(my_starts[rows], their_starts[regions]),
+                end=np.minimum(my_ends[rows], their_ends[regions]),
+            )
+        return self.as_dataframe(selected)
 
     def merge(
         self,
