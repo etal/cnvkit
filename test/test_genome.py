@@ -1084,13 +1084,13 @@ class IntervalTests(unittest.TestCase):
         ):
             self._assert_intersect(label, regions, selections, expectations)
 
-        # A one-base bin is contained in the point that names it. Three modes,
-        # three deciders, all of which must reach that same answer: 'inner' is
-        # the case only `intersection`'s own containment filter can settle,
-        # since bioframe hands the coordinates back unwidened; 'trim' routes
-        # through `by_ranges`, the searchsorted half; and 'outer' passed before
-        # this change and stays as a canary on bioframe's point rule, which
-        # everything here is built on.
+        # A one-base bin is contained in the point that names it. One pairing,
+        # three answers, all of which must agree: 'outer' takes the pairing as
+        # bioframe hands it back and stays as a canary on its point rule, which
+        # everything here is built on; 'inner' is the case only
+        # `intersection`'s own containment filter can settle, since bioframe
+        # returns the coordinates unwidened; and 'trim' clips to the raw bounds
+        # rather than the widened ones it was paired under.
         one_base = self._from_intervals([(10, 11, "X")])
         point = self._from_intervals([(10, 10, "")])
         for mode in ("outer", "trim", "inner"):
@@ -1172,12 +1172,13 @@ class IntervalTests(unittest.TestCase):
     def test_intersect_nothing_to_select(self):
         """Selecting nothing gives an empty array in every mode, not an error.
 
-        'trim' concatenates the pieces ``by_ranges`` yields, and ``pd.concat``
-        raises on an empty list, so a selection that nothing overlaps -- or an
-        empty array on either side -- ended in ``ValueError: No objects to
-        concatenate``, while the other two modes returned an empty array. The
-        guard for the empty inputs sat below the 'trim' branch, so it never
-        applied to it.
+        'trim' used to concatenate the pieces ``by_ranges`` yields, and
+        ``pd.concat`` raises on an empty list, so a selection that nothing
+        overlaps -- or an empty array on either side -- ended in ``ValueError:
+        No objects to concatenate``, while the other two modes returned an
+        empty array; the guard for the empty inputs sat below the 'trim'
+        branch, so it never applied to it. All three modes now read one
+        bioframe pairing, and an empty result is a pairing with no rows.
         """
         region = GA(
             pd.DataFrame(
@@ -1200,6 +1201,59 @@ class IntervalTests(unittest.TestCase):
                     )
                 with self.subTest(empty_self=True, mode=mode):
                     self.assertEqual(len(empty.intersection(region, mode=mode)), 0)
+
+    def test_intersect_ignores_row_order(self):
+        """``intersection`` answers whatever order the rows arrive in.
+
+        All three modes pair the rows through ``bioframe.overlap``, which
+        sorts for itself, so none of them carries the ascending-start
+        precondition ``searchsorted`` imposes on ``by_ranges`` and
+        ``in_range`` -- the one ``test_search_requires_ascending_rows`` pins,
+        from this same fixture. 'trim' was the exception while it clipped the
+        groups ``by_ranges`` yields: on the rows below, shuffled, it raised
+        ``ValueError`` where the other two answered.
+
+        Row order still decides the output's own order -- within one region
+        the bins come in the table's order -- so each table expects the same
+        rows, clipped the same way, in its own order.
+        """
+        coords = [(0, 100, "A"), (500, 600, "B"), (900, 1000, "C")]
+        tables = {
+            "ABC": self._from_intervals(coords),
+            "CAB": self._from_intervals([coords[i] for i in (2, 0, 1)]),
+        }
+        whole = {"A": (0, 100), "B": (500, 600), "C": (900, 1000)}
+        expectations = {
+            # Gene to the coordinates it comes back with, or absent if dropped
+            (50, 550): {
+                "outer": {"A": (0, 100), "B": (500, 600)},
+                "trim": {"A": (50, 100), "B": (500, 550)},
+                "inner": {},
+            },
+            # Wide enough to contain every row, so no mode clips or drops one
+            (0, 1000): dict.fromkeys(("outer", "trim", "inner"), whole),
+        }
+        for query, by_mode in expectations.items():
+            selection = self._from_intervals([(*query, "X")])
+            for mode, clipped in by_mode.items():
+                for order, regions in tables.items():
+                    with self.subTest(query=query, mode=mode, order=order):
+                        result = regions.intersection(selection, mode=mode)
+                        self.assertEqual(
+                            list(
+                                zip(
+                                    result.start,
+                                    result.end,
+                                    result["gene"],
+                                    strict=True,
+                                )
+                            ),
+                            [
+                                (*clipped[gene], gene)
+                                for gene in regions["gene"]
+                                if gene in clipped
+                            ],
+                        )
 
     def test_search_requires_ascending_rows(self):
         """Searching rows out of coordinate order raises instead of misleading.
