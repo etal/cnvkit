@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from numpy import ndarray
 
-    # One coordinate per query region
+    # One coordinate per interval, whether a table's rows or a query's regions
     Coords: TypeAlias = Sequence[Numeric] | pd.Series | ndarray
     # ... or none at all, for a bound the caller left open
     Bounds: TypeAlias = Coords | None
@@ -40,6 +40,36 @@ _PAST_LAST_BASE = np.iinfo(np.int64).max
 # yields one for every row of `other`. Safe to hand out repeatedly because a
 # zero-length array has no elements to write.
 _EMPTY_SELECTION = np.empty(0, dtype=np.intp)
+
+
+def point_aware_ends(starts: Coords, ends: Coords) -> ndarray:
+    """Give each zero-width interval the one base its start names.
+
+    The overlap predicate, stated once for the whole package: two intervals
+    overlap when their half-open coordinate ranges share a base, and an
+    interval whose end equals its start is the point at that start -- the BED
+    spelling of an insertion site -- rather than the empty set. Rewriting such
+    an end as `start + 1` reduces the point to an ordinary one-base interval,
+    so every caller needs only the strict half-open comparison.
+
+    This is bioframe's rule: `bioframe.overlap` applies the same rewrite to
+    both of its inputs, in `core.arrops._convert_points_to_len1_segments`.
+    Reproducing it here is what keeps the `searchsorted` searches below
+    answering the same question as the bioframe-backed
+    :meth:`GenomicArray.intersection`.
+
+    It governs overlap *selection*; clustering is a different relation, and
+    `skgenome.merge` explains why it stays strict.
+    """
+    start_arr = np.asarray(starts)
+    end_arr = np.asarray(ends)
+    # Only `end == start` is rewritten. An inverted row, `end < start`, is
+    # malformed input that neither half of the package repairs, and
+    # `max(end, start + 1)` would quietly rewrite those too -- eight such
+    # segments ship in `test/formats/amplicon.cns`. `np.where` evaluates both
+    # branches, so reading `start + 1` rather than `end + 1` also keeps
+    # `_PAST_LAST_BASE` out of an addition that would wrap in silence.
+    return np.where(end_arr == start_arr, start_arr + 1, end_arr)
 
 
 def by_ranges(
@@ -158,11 +188,16 @@ def iter_ranges(
         subtable = table.iloc[region_idx]
         if mode == "trim":
             subtable = subtable.copy()
-            # Update 5' endpoints to the boundary
-            if start_val:
+            # Clip to the region's bounds -- `is not None`, not truthiness. A
+            # bound of 0 is a real one: a zero-width query at the origin now
+            # selects the rows covering base 0, and a falsy `end_val` left
+            # them reaching past it, unclipped. (`clip(lower=0)` is a no-op on
+            # non-negative starts, so only the end bound ever did work, but a
+            # guard that is right on one side and wrong on the other is worse
+            # than either.)
+            if start_val is not None:
                 subtable.start = subtable.start.clip(lower=start_val)
-            # Update 3' endpoints to the boundary
-            if end_val:
+            if end_val is not None:
                 subtable.end = subtable.end.clip(upper=end_val)
         yield subtable
 
@@ -222,7 +257,7 @@ def idx_ranges(
     starts: Bounds,
     ends: Bounds,
     mode: str,
-) -> Generator[tuple, None, None]:
+) -> Generator[tuple[slice | ndarray, Numeric | None, Numeric | None], None, None]:
     """Iterate through sub-ranges.
 
     `table`'s `start` column must ascend, since that is what lets a binary
@@ -259,22 +294,42 @@ def idx_ranges(
 
     # Both implementations below want a start and an end for every region, so
     # stand in for whichever side a one-sided query left open. A real bound of
-    # 0 is not the same query as no bound at all -- it excludes a zero-width
-    # bin at the origin, whose end is not past it -- so the stand-in has to sit
-    # outside the coordinates rather than at their edge.
+    # 0 is not the same query as no bound at all -- `(0, 0)` is the point at
+    # the origin, while `(None, 0)` reaches only below base 0, where nothing
+    # lies -- so the stand-in has to sit outside the coordinates rather than at
+    # their edge, where the point rule would widen it into one.
     if starts is None or not len(starts):
         starts = np.full(n_regions, _BEFORE_FIRST_BASE)
     if ends is None or not len(ends):
         ends = np.full(n_regions, _PAST_LAST_BASE)
 
-    if table.end.is_monotonic_increasing:
-        yield from _irange_simple(table, starts, ends, mode)
+    # Apply the overlap predicate once, here, so that the two implementations
+    # below and the test choosing between them all read the same ends, and so
+    # that neither implementation can reach `table.end` itself.
+    table_ends = point_aware_ends(table.start, table.end)
+    query_starts = np.asarray(starts)
+    query_ends = point_aware_ends(query_starts, ends)
+
+    selections: Iterator[slice | ndarray]
+    # `pd.Index(...).is_monotonic_increasing` short-circuits, but constructing
+    # the Index costs more than the scan it saves: measured 1.6-10x slower
+    # than the comparison below over 2.6k-200k rows, sorted or not. Both
+    # answer True for an empty or single-row array and False where a
+    # coordinate is NaN.
+    if bool((table_ends[1:] >= table_ends[:-1]).all()):
+        selections = _irange_simple(table, table_ends, query_starts, query_ends, mode)
     else:
         # A bin nested inside another leaves `end` out of ascending order, and
         # `_irange_simple` reads `end` with `searchsorted` too -- to place a
         # start in 'outer' mode, an end in 'inner' mode. The masks
         # `_irange_nested` builds compare `end` elementwise instead.
-        yield from _irange_nested(table, starts, ends, mode)
+        selections = _irange_nested(table, table_ends, query_starts, query_ends, mode)
+    # Report the bounds as normalised above, not the point-aware widening of
+    # them: 'trim' mode clips its output to these, and clipping to `start + 1`
+    # would hand back a base the query never asked for. The open-side stand-ins
+    # reach it too, where `clip(lower=-1)` and `clip(upper=int64max)` are the
+    # no-ops an absent bound should be.
+    yield from zip(selections, starts, ends, strict=True)
 
 
 def require_ascending_starts(table: pd.DataFrame) -> None:
@@ -335,47 +390,55 @@ def _raise_unsorted(table: pd.DataFrame) -> NoReturn:
 
 
 def _irange_simple(
-    table: pd.DataFrame, starts: Coords, ends: Coords, mode: str
-) -> Iterator[tuple[slice, int, int]]:
+    table: pd.DataFrame,
+    table_ends: ndarray,
+    starts: ndarray,
+    ends: ndarray,
+    mode: str,
+) -> Iterator[slice]:
     """Select each region by slice, for a table whose bins do not nest.
 
     Both coordinate columns ascend, so each region's rows are one run of the
-    table and binary search finds its two ends.
+    table and binary search finds its two ends. `table_ends` and `ends` carry
+    the overlap predicate, `point_aware_ends`; `table.end` is not read here.
     """
     if mode == "inner":
         # Only the rows the region encloses
         start_idxs = table.start.searchsorted(starts)
-        end_idxs = table.end.searchsorted(ends, "right")
+        end_idxs = table_ends.searchsorted(ends, "right")
     else:
         # Also the rows straddling either boundary
-        start_idxs = table.end.searchsorted(starts, "right")
+        start_idxs = table_ends.searchsorted(starts, "right")
         end_idxs = table.start.searchsorted(ends)
 
-    for start_idx, start_val, end_idx, end_val in zip(
-        start_idxs, starts, end_idxs, ends, strict=True
-    ):
-        yield (slice(start_idx, end_idx), start_val, end_val)
+    for start_idx, end_idx in zip(start_idxs, end_idxs, strict=True):
+        yield slice(start_idx, end_idx)
 
 
 def _irange_nested(
-    table: pd.DataFrame, starts: Coords, ends: Coords, mode: str
-) -> Iterator[tuple[ndarray, int, int]]:
+    table: pd.DataFrame,
+    table_ends: ndarray,
+    starts: ndarray,
+    ends: ndarray,
+    mode: str,
+) -> Iterator[ndarray]:
     """Select each region by mask, for a table whose bins nest.
 
     A nested bin leaves `end` out of ascending order, so only `start` can be
-    searched; `end` is compared row by row instead.
+    searched; `end` is compared row by row instead. `table_ends` and `ends`
+    carry the overlap predicate, `point_aware_ends`; `table.end` is not read
+    here.
     """
     # ENH: Binary Interval Search (BITS) or Layer&Quinlan(2015)
-    assert len(starts) == len(ends) > 0
     for start_val, end_val in zip(starts, ends, strict=True):
         # Mask of table rows to keep for this query region
         if mode == "inner":
             # Only the rows the region encloses
-            region_mask = table.end.to_numpy() <= end_val
+            region_mask = table_ends <= end_val
             region_mask[: int(table.start.searchsorted(start_val))] = 0
         else:
             # Also the rows straddling either boundary
-            region_mask = table.end.to_numpy() > start_val
+            region_mask = table_ends > start_val
             region_mask[int(table.start.searchsorted(end_val)) :] = 0
 
-        yield region_mask, start_val, end_val
+        yield region_mask

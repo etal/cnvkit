@@ -303,7 +303,10 @@ def merge(
     cmb = get_combiners(table, stranded, combine)
     # bioframe clusters rows at most `min_dist` bases apart, and with None only
     # rows that truly overlap -- the finest distinction it can express, so any
-    # `bp` above 1 is the same as 1.
+    # `bp` above 1 is the same as 1. Clustering is strict where
+    # `intersect.point_aware_ends` is not: bioframe does not widen a zero-width
+    # row to the base it names here, so a point sitting on a neighbour's
+    # boundary stays a row of its own.
     bp = min(bp, 1)
     if _nothing_to_cluster(table, bp):
         return _fill_unnamed(table, cmb)

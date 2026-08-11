@@ -18,7 +18,14 @@ from .chromnames import (
 )
 from .chromsort import sorter_chrom
 from .cut import cut
-from .intersect import Numeric, by_ranges, into_ranges, iter_ranges, iter_slices
+from .intersect import (
+    Numeric,
+    by_ranges,
+    into_ranges,
+    iter_ranges,
+    iter_slices,
+    point_aware_ends,
+)
 from .merge import flatten, merge, squash
 from .rangelabel import to_label
 from .subdivide import subdivide
@@ -808,12 +815,19 @@ class GenomicArray:
             return_input=False,
         )
         if mode == "inner":
-            # Keep only self bins fully contained within an other bin
+            # Keep only self bins fully contained within an other bin, by the
+            # same point-aware rule bioframe paired them under: a zero-width
+            # bin is the base at its start, so it is contained wherever that
+            # base is, and a one-base bin fits inside the point naming it.
             rows = pairs["index"].to_numpy(dtype=int)
             covering = pairs["index_"].to_numpy(dtype=int)
+            my_starts = mine.start.to_numpy()
+            their_starts = theirs.start.to_numpy()
+            my_ends = point_aware_ends(my_starts, mine.end)
+            their_ends = point_aware_ends(their_starts, theirs.end)
             pairs = pairs[
-                (mine.start.to_numpy()[rows] >= theirs.start.to_numpy()[covering])
-                & (mine.end.to_numpy()[rows] <= theirs.end.to_numpy()[covering])
+                (my_starts[rows] >= their_starts[covering])
+                & (my_ends[rows] <= their_ends[covering])
             ]
         # Sort by `other`'s rows then `self`'s, which reproduces `by_ranges`'
         # row order
