@@ -99,6 +99,14 @@ def parse_end_from_info(info):
     around END, is standard on imprecise structural variants.  Return -1
     where the record declares no usable END, leaving `set_ends` to fall
     back to the reference footprint.
+
+    The INFO header is not consulted.  END is a reserved key, fixed by the
+    spec at Number=1, Type=Integer, so its type is knowable from the key
+    alone; htslib nonetheless declines to type an undeclared one ("assuming
+    Type=String") and reports the footprint instead, so the two reader
+    families part company on a file that omits the declaration.  That
+    divergence is deliberate: reading what a careless writer meant, on
+    files htslib will not, is the reason these readers exist.
     """
     for field in info.split(";"):
         key, _, value = field.partition("=")
@@ -116,13 +124,42 @@ def parse_qual(qual):
 
 
 def set_ends(table) -> None:
-    """Fill in each missing 'end' from the reference allele's length.
+    """Fill in each unusable 'end' from the reference allele's length.
 
     A record without INFO/END spans exactly the reference bases it quotes,
     starting at 'start'.  The alternate alleles do not enter into it: they
     describe what replaces that span, not how far it reaches, and a record
     carries one reference allele however many alternates it lists.
+
+    An END below the record's own POS is unusable in the same way.  END is
+    defined as the last position of a span running from POS, so a smaller
+    value describes nothing, while the reference allele is mandatory and
+    still says how far the record reaches.  Discarding it is what htslib
+    does -- it warns "INFO/END=... is smaller than POS" and falls back to
+    the same footprint -- so the text readers and `vcfio` agree here rather
+    than each being self-consistent.  Honouring it would emit an interval
+    ending before it starts, which every half-open overlap predicate in
+    skgenome mis-answers silently, and which `read` deliberately does not
+    repair for VCF: the coordinates are not written backwards, the
+    declaration is wrong.  An END equal to POS is a one-base span and stands.
     """
-    need_end_idx = table.end == -1
+    declared = table.end != -1
+    backwards = declared & (table.end <= table.start)
+    if backwards.any():
+        first = int(backwards.to_numpy().argmax())
+        # POS and END as the file spells them, 1-based: `start` has already
+        # been shifted by the time this runs, and `_describe_row`'s 0-based
+        # rendering would name a coordinate absent from the user's own VCF.
+        logging.warning(
+            "Discarding INFO/END in %d of %d records for declaring an end "
+            "below the record's own POS, first %s:%d with END=%d; using the "
+            "reference allele's length instead",
+            int(backwards.sum()),
+            len(table),
+            table.chromosome.iat[first],
+            int(table.start.iat[first]) + 1,
+            int(table.end.iat[first]),
+        )
+    need_end_idx = ~declared | backwards
     ref_sz = table.loc[need_end_idx, "ref"].str.len()
     table.loc[need_end_idx, "end"] = table.loc[need_end_idx, "start"] + ref_sz

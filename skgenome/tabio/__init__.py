@@ -224,8 +224,11 @@ def _apply_interval_order_policy(
     VCF is deliberately in neither group. Its end is not read but derived,
     from INFO/END against a fallback rule of its own, so an end below the
     start means the declared END is untrustworthy rather than that the record
-    runs backwards; swapping the two would fabricate a span. Resolving that
-    belongs with the reader that computes it.
+    runs backwards; swapping the two would fabricate a span. That is resolved
+    where it arises instead: `vcfsimple.set_ends` discards an END below its
+    record's POS in favour of the reference footprint, which is what htslib
+    already does for `vcfio`, so no VCF reader hands this function an
+    inverted row.
     """
     if fmt in _SELF_WRITTEN_FORMATS:
         inverted = (frame["end"] < frame["start"]).to_numpy()
