@@ -15,6 +15,7 @@ from cnvlib import read_ga
 from skgenome import GenomicArray as GA
 from skgenome import chromsort, rangelabel, tabio
 from skgenome.combiners import join_strings
+from skgenome.intersect import point_aware_ends
 
 
 class GaryTests(unittest.TestCase):
@@ -414,6 +415,33 @@ class IntervalTests(unittest.TestCase):
                 (expect[col].to_numpy() == result[col].to_numpy()).all(),
                 f"Col '{col}' differs:\nExpect:\n{expect.data}\nGot:\n{result.data}",
             )
+
+    def _assert_intersect(self, label, regions, selections, expectations):
+        """Both halves of skgenome select the same rows, per query and in bulk.
+
+        `by_ranges` yields one group per row of `selections`, in that table's
+        row order; `intersection` returns those groups concatenated.
+        """
+        for mode in ("outer", "trim", "inner"):
+            with self.subTest(bins=label, mode=mode):
+                # Iterative intersection
+                grouped_results = regions.by_ranges(selections, mode=mode)
+                for (_coord, result), expect in zip(
+                    grouped_results, expectations[mode], strict=True
+                ):
+                    self._compare_regions(result, self._from_intervals(expect))
+                # Single-object intersect
+                result = regions.intersection(selections, mode=mode)
+                expect = self._from_intervals(
+                    functools.reduce(operator.iadd, expectations[mode], [])
+                )
+                self._compare_regions(result, expect)
+
+    @staticmethod
+    def _widened_ends_ascend(regions):
+        """Whether `idx_ranges` will search this table by slice or by mask."""
+        widened = point_aware_ends(regions.start, regions.end)
+        return bool((widened[1:] >= widened[:-1]).all())
 
     def setUp(self):
         self.regions_1 = self._from_intervals(self.region_coords_1)
@@ -972,23 +1000,104 @@ class IntervalTests(unittest.TestCase):
             ),
         }
 
-        for regions, selections, expectations in (
-            (self.regions_1, selections1, expectations1),
-            (self.regions_2, selections2, expectations2),
+        for label, regions, selections, expectations in (
+            ("simple", self.regions_1, selections1, expectations1),
+            ("gene models", self.regions_2, selections2, expectations2),
         ):
-            for mode in ("outer", "trim", "inner"):
-                # Iterative intersection
-                grouped_results = regions.by_ranges(selections, mode=mode)
-                for (_coord, result), expect in zip(
-                    grouped_results, expectations[mode], strict=False
-                ):
-                    self._compare_regions(result, self._from_intervals(expect))
-                # Single-object intersect
-                result = regions.intersection(selections, mode=mode)
-                expect = self._from_intervals(
-                    functools.reduce(operator.iadd, expectations[mode], [])
+            self._assert_intersect(label, regions, selections, expectations)
+
+    def test_intersect_zero_width_is_a_point(self):
+        """A zero-width interval is the base at its start, not the empty set.
+
+        Both halves of the package have to agree on that. `by_ranges` places
+        each query by binary search, while `intersection` pairs the rows
+        through bioframe, and until they shared `point_aware_ends` the two
+        answered differently for every zero-width interval touching another's
+        start boundary -- `by_ranges` excluded it, `intersection` kept it.
+
+        Two region sets, because `idx_ranges` dispatches on whether the
+        widened ends ascend: the first is searched by slice, the second nests
+        and is searched by mask. A rule that held in only one of them would be
+        no rule at all.
+        """
+        by_slice = self._from_intervals(
+            [(10, 10, "P"), (10, 20, "A"), (20, 20, "Q"), (30, 40, "B")]
+        )
+        by_mask = self._from_intervals(
+            [(0, 50, "A"), (10, 10, "P"), (10, 20, "B"), (50, 50, "Q"), (60, 60, "R")]
+        )
+        for regions, ascends in ((by_slice, True), (by_mask, False)):
+            self.assertEqual(self._widened_ends_ascend(regions), ascends)
+        # Zero-width regions on the query side as well as the table side
+        selections = self._from_intervals(
+            [(0, 0, ""), (10, 10, ""), (10, 20, ""), (20, 20, ""), (35, 35, "")]
+        )
+        expectations_by_slice = {
+            "outer": (
+                [],
+                [(10, 10, "P"), (10, 20, "A")],
+                [(10, 10, "P"), (10, 20, "A")],
+                [(20, 20, "Q")],
+                [(30, 40, "B")],
+            ),
+            "trim": (
+                [],
+                [(10, 10, "P"), (10, 10, "A")],
+                [(10, 10, "P"), (10, 20, "A")],
+                [(20, 20, "Q")],
+                [(35, 35, "B")],
+            ),
+            "inner": (
+                [],
+                [(10, 10, "P")],
+                [(10, 10, "P"), (10, 20, "A")],
+                [(20, 20, "Q")],
+                [],
+            ),
+        }
+        expectations_by_mask = {
+            "outer": (
+                [(0, 50, "A")],
+                [(0, 50, "A"), (10, 10, "P"), (10, 20, "B")],
+                [(0, 50, "A"), (10, 10, "P"), (10, 20, "B")],
+                [(0, 50, "A")],
+                [(0, 50, "A")],
+            ),
+            "trim": (
+                [(0, 0, "A")],
+                [(10, 10, "A"), (10, 10, "P"), (10, 10, "B")],
+                [(10, 20, "A"), (10, 10, "P"), (10, 20, "B")],
+                [(20, 20, "A")],
+                [(35, 35, "A")],
+            ),
+            "inner": (
+                [],
+                [(10, 10, "P")],
+                [(10, 10, "P"), (10, 20, "B")],
+                [],
+                [],
+            ),
+        }
+        for label, regions, expectations in (
+            ("by slice", by_slice, expectations_by_slice),
+            ("by mask", by_mask, expectations_by_mask),
+        ):
+            self._assert_intersect(label, regions, selections, expectations)
+
+        # A one-base bin is contained in the point that names it. Three modes,
+        # three deciders, all of which must reach that same answer: 'inner' is
+        # the case only `intersection`'s own containment filter can settle,
+        # since bioframe hands the coordinates back unwidened; 'trim' routes
+        # through `by_ranges`, the searchsorted half; and 'outer' passed before
+        # this change and stays as a canary on bioframe's point rule, which
+        # everything here is built on.
+        one_base = self._from_intervals([(10, 11, "X")])
+        point = self._from_intervals([(10, 10, "")])
+        for mode in ("outer", "trim", "inner"):
+            with self.subTest(one_base=mode):
+                self.assertEqual(
+                    list(one_base.intersection(point, mode=mode)["gene"]), ["X"]
                 )
-                self._compare_regions(result, expect)
 
     def test_intersect_columns_named_like_bioframe_bookkeeping(self):
         """A column named index/index_/start_/end_ is the user's own.
@@ -1212,27 +1321,36 @@ class IntervalTests(unittest.TestCase):
     def test_search_start_of_zero_is_not_an_absent_bound(self):
         """A region starting at 0 is a bound; leaving the bound out is not.
 
-        A zero-width bin at the origin ends where it starts, so no region
-        overlaps it and a query from 0 excludes it -- while a query with no
-        lower bound at all selects every row, that one included. Both
-        implementations have to agree on that: the slicing one searches `end`
-        for the query start, while the masking one read a start of 0 as no
-        bound at all, so the same question put to a nested table and to a flat
-        one came back answered differently.
+        A zero-width bin at the origin is the base at 0, so every query
+        reaching that base keeps it, one with no lower bound at all included.
+        What still tells the two spellings apart is the query itself: `(0, 0)`
+        is the point at the origin, while `(None, 0)` reaches only below base
+        0, where nothing lies. Both implementations have to agree on that: the
+        slicing one searches `end` for the query start, while the masking one
+        once read a start of 0 as no bound at all, so the same question put to
+        a nested table and to a flat one came back answered differently.
         """
         origin = (0, 0, "Z")
         flat = self._from_intervals([origin, (0, 50, "A"), (100, 200, "B")])
         nested = self._from_intervals([origin, (0, 1000, "A"), (100, 200, "B")])
-        self.assertTrue(flat.end.is_monotonic_increasing)
-        self.assertFalse(nested.end.is_monotonic_increasing)
+        # Which implementation runs is decided on the widened ends, since
+        # those are the ones both of them search
+        for regions, ascends in ((flat, True), (nested, False)):
+            self.assertEqual(self._widened_ends_ascend(regions), ascends)
         for label, regions in (("flat", flat), ("nested", nested)):
             with self.subTest(bins=label):
                 self.assertEqual(
-                    list(regions.in_range("chr0", 0, 500)["gene"]), ["A", "B"]
+                    list(regions.in_range("chr0", 0, 500)["gene"]), ["Z", "A", "B"]
                 )
                 self.assertEqual(
                     list(regions.in_range("chr0", None, 500)["gene"]), ["Z", "A", "B"]
                 )
+                # Those two coincide for every end past base 0, so they cannot
+                # tell a bound of 0 from its absence on their own
+                self.assertEqual(
+                    list(regions.in_range("chr0", 0, 0)["gene"]), ["Z", "A"]
+                )
+                self.assertEqual(list(regions.in_range("chr0", None, 0)["gene"]), [])
 
     def test_subtract(self):
         # Test cases:
