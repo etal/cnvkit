@@ -2825,6 +2825,10 @@ def _cmd_import_seg(args: argparse.Namespace) -> None:
     for sid, segtable in tabio.seg.parse_seg(
         args.segfile, chrom_names, args.prefix, args.from_log10
     ):
+        # import-seg exists to ingest SEG another tool produced, so a reversed
+        # row is repaired rather than refused. `tabio.read`'s own "seg" branch
+        # refuses instead, its caller being CNVkit's DNAcopy output.
+        tabio.repair_inverted_intervals(segtable, args.segfile)
         segarr = _CNA(segtable, {"sample_id": sid})
         tabio.write(segarr, os.path.join(args.output_dir, sid + ".cns"))
 

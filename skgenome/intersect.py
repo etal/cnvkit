@@ -64,10 +64,11 @@ def point_aware_ends(starts: Coords, ends: Coords) -> ndarray:
     start_arr = np.asarray(starts)
     end_arr = np.asarray(ends)
     # Only `end == start` is rewritten. An inverted row, `end < start`, is
-    # malformed input that neither half of the package repairs, and
-    # `max(end, start + 1)` would quietly rewrite those too -- eight such
-    # segments ship in `test/formats/amplicon.cns`. `np.where` evaluates both
-    # branches, so reading `start + 1` rather than `end + 1` also keeps
+    # malformed input that this package does not repair in place, and
+    # `max(end, start + 1)` would quietly rewrite those too. Where such a row
+    # comes from decides what happens to it, which is a question for
+    # `skgenome.tabio.read` and not for a comparison. `np.where` evaluates
+    # both branches, so reading `start + 1` rather than `end + 1` also keeps
     # `_PAST_LAST_BASE` out of an addition that would wrap in silence.
     return np.where(end_arr == start_arr, start_arr + 1, end_arr)
 

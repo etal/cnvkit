@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import collections
 import logging
 from typing import TYPE_CHECKING
 
@@ -235,10 +234,7 @@ def genome_scatter(
         )
     else:
         axis.set_title(f"Variant allele frequencies: {title}")
-        chrom_sizes = collections.OrderedDict(
-            (chrom, subarr["end"].max())
-            for chrom, subarr in variants.by_chromosome()  # type: ignore[union-attr]
-        )
+        chrom_sizes = plots.chromosome_sizes(variants)  # type: ignore[arg-type]
         axis = snv_on_genome(
             axis,
             variants,

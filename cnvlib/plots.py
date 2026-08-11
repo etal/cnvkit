@@ -113,10 +113,12 @@ def chromosome_sizes(
     """Create an ordered mapping of chromosome names to sizes."""
     chrom_sizes = collections.OrderedDict()
     for chrom, rows in probes.by_chromosome():
-        # Use the rightmost coordinate from either column so reverse-oriented
-        # intervals (start > end, e.g. reverse-direction PCR primers) still set
-        # the chromosome's extent. For well-formed intervals end.max() already
-        # dominates, so this is a no-op there.
+        # Use the rightmost coordinate from either column, so an array holding
+        # a reverse-oriented interval (start > end) still sets the
+        # chromosome's extent. `skgenome.tabio.read` keeps such a row out of
+        # every region and copy-number array it returns, but arrays built by
+        # library callers are not covered. For well-formed intervals end.max()
+        # already dominates, so this is a no-op there.
         chrom_sizes[chrom] = max(rows["end"].max(), rows["start"].max())
         if to_mb:
             chrom_sizes[chrom] *= MB

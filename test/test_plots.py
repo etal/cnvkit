@@ -388,9 +388,10 @@ class DiagramGeneLabelTests(unittest.TestCase):
 class DiagramCoordinateTests(unittest.TestCase):
     """diagram renders reverse-oriented intervals (start > end) gracefully.
 
-    Reverse-direction PCR primers are sometimes saved in the input BED with
-    start > end; CNVkit should treat the interval as spanning [min, max] rather
-    than crashing Biopython's renderer, which asserts start <= end <= length.
+    Such a row cannot reach here from a file -- `skgenome.tabio.read`
+    reverses it out of a BED and refuses it in CNVkit's own formats -- so
+    these build their rows in memory, which is the path that remains.
+    Biopython's renderer asserts start <= end <= length, and used to crash.
     """
 
     def test_feature_span_normalizes_orientation(self):
@@ -427,17 +428,6 @@ class DiagramCoordinateTests(unittest.TestCase):
             out = os.path.join(tmpdir, "diagram.pdf")
             # Must not raise the Biopython start<=end<=length assertion
             result = diagram.create_diagram(None, seg, 0.5, 3, out, title="t")
-            self.assertTrue(os.path.exists(result))
-
-    def test_create_diagram_amplicon_fixture(self):
-        """Regression: the amplicon fixture has several reverse-oriented
-        segments (e.g. chr2 212578209-212576985) that previously crashed the
-        renderer. It must now produce a diagram."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out = os.path.join(tmpdir, "diagram.pdf")
-            result = diagram.create_diagram(cnarr, segarr, 0.5, 3, out)
             self.assertTrue(os.path.exists(result))
 
 

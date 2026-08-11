@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import gmean
 
+from skgenome import tabio
+
 from .cnary import CopyNumArray as CNA
 from .fix import center_by_window
 
@@ -146,6 +148,12 @@ def load_gene_info(gene_resource, corr_fname, default_r=0.1):
         },
     ).sort_values("gene_id")
     logging.info("Loaded %s with shape: %s", gene_resource, gene_info.shape)
+    # The gene resource is a user-supplied export, typically from BioMart, and
+    # its coordinates go straight into the .cnr this command writes. Repair a
+    # reversed row here, as `skgenome.tabio.read` does for every other file
+    # another tool wrote, so that `import-rna` cannot emit a .cnr that CNVkit
+    # then refuses to read back.
+    tabio.repair_inverted_intervals(gene_info, gene_resource)
 
     if corr_fname:
         corr_table = load_cnv_expression_corr(corr_fname)
