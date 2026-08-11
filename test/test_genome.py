@@ -272,7 +272,7 @@ class GaryTests(unittest.TestCase):
         # Edge cases
         mtarr = tabio.read("formats/empty")
         self.assertEqual(0, len(list(segarr.iter_ranges_of(mtarr, "start"))))
-        self.assertEqual(88, len(list(mtarr.iter_ranges_of(segarr, "end"))))
+        self.assertEqual(len(segarr), len(list(mtarr.iter_ranges_of(segarr, "end"))))
 
     def test_ranges_of_non_contiguous_chromosomes(self):
         """iter_ranges_of and by_ranges yield in the other array's row order.

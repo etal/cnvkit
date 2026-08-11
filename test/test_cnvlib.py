@@ -5,6 +5,7 @@ import logging
 import math
 import unittest
 import warnings
+from pathlib import Path
 
 import pytest
 
@@ -342,6 +343,31 @@ class CNATests(unittest.TestCase):
                     f"{fname} {chrom}: first segment does not start at the "
                     "panel's first bin on this chromosome",
                 )
+
+    def test_segment_fixtures_have_no_inverted_rows(self):
+        """No committed segment fixture holds a row whose end precedes its start.
+
+        Eight such rows shipped in amplicon.cns from October 2015 until 2026.
+        They were zero-size haar segments: the mapping from breakpoint indices
+        to coordinates read ``end = bins.end[start_idx + size - 1]``, so a
+        size of 0 took the end of the bin *before* the segment's own first
+        bin. Duplicate breakpoints made such segments reachable until
+        "segment haar: avoid duplicate breakpoints" fixed UnifyLevels fifteen
+        days later; the fixture was never regenerated.
+
+        The adjacency check above does not cover this. Each inverted row took
+        its start from the following segment and its end from the preceding
+        one, so both columns stayed ascending and no gap went negative.
+        """
+        for path in sorted(Path("formats").glob("*.cns")):
+            rows = cnvlib.read(str(path)).data
+            inverted = rows[rows.end < rows.start]
+            self.assertTrue(
+                inverted.empty,
+                f"{path}: {len(inverted)} rows have end < start, first at "
+                f"{inverted.chromosome.iat[0] if len(inverted) else ''} "
+                f"{inverted.start.iat[0] if len(inverted) else ''}",
+            )
 
     def test_guess_xx_indeterminate_defaults_female(self):
         """Indeterminate sex (no chrX) defaults to female, never silently male.

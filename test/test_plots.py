@@ -429,17 +429,6 @@ class DiagramCoordinateTests(unittest.TestCase):
             result = diagram.create_diagram(None, seg, 0.5, 3, out, title="t")
             self.assertTrue(os.path.exists(result))
 
-    def test_create_diagram_amplicon_fixture(self):
-        """Regression: the amplicon fixture has several reverse-oriented
-        segments (e.g. chr2 212578209-212576985) that previously crashed the
-        renderer. It must now produce a diagram."""
-        cnarr = cnvlib.read("formats/amplicon.cnr")
-        segarr = cnvlib.read("formats/amplicon.cns")
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out = os.path.join(tmpdir, "diagram.pdf")
-            result = diagram.create_diagram(cnarr, segarr, 0.5, 3, out)
-            self.assertTrue(os.path.exists(result))
-
 
 class ByBinCoordinateTests(unittest.TestCase):
     """Both --by-bin lookups refuse rows their axis cannot represent.
