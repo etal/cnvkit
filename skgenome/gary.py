@@ -799,6 +799,8 @@ class GenomicArray:
         GenomicArray
             The rows of `self` that overlap a region of `other`.
         """
+        if mode not in ("outer", "inner", "trim"):
+            raise ValueError(f"Unrecognized mode: {mode!r}")
         if not len(self) or not len(other):
             return self.as_dataframe(self.data.iloc[:0])
         # Take from bioframe only its pairing of the rows: with `return_input`

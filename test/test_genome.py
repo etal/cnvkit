@@ -1202,6 +1202,26 @@ class IntervalTests(unittest.TestCase):
                 with self.subTest(empty_self=True, mode=mode):
                     self.assertEqual(len(empty.intersection(region, mode=mode)), 0)
 
+    def test_intersect_unrecognized_mode(self):
+        """A mode this method does not implement is refused, not aliased.
+
+        Only the exact string 'trim' ever reached the clipping branch, and
+        every other unrecognized spelling fell through to the pairing and
+        came back as though the caller had asked for 'outer'. The empty
+        inputs are checked too, since their early return sits below this.
+        """
+        region = GA(
+            pd.DataFrame(
+                {"chromosome": ["chr1"], "start": [10], "end": [20], "gene": ["A"]}
+            )
+        )
+        for other in (region, GA(region.data.iloc[:0])):
+            for mode in ("Trim", "", "bogus"):
+                with self.subTest(mode=mode, empty=not len(other)):
+                    with self.assertRaises(ValueError) as caught:
+                        region.intersection(other, mode=mode)
+                    self.assertIn(repr(mode), str(caught.exception))
+
     def test_intersect_ignores_row_order(self):
         """``intersection`` answers whatever order the rows arrive in.
 
