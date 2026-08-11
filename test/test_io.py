@@ -277,10 +277,10 @@ class IOTests(unittest.TestCase):
         ordinary variant. ``read`` deliberately does not repair an inverted
         VCF row, which is why the discard belongs in the reader itself.
 
-        The third record pins the boundary: an END equal to POS is a
-        legitimate one-base span and stands, even where the reference
-        allele it quotes is longer. That is htslib's rule rather than the
-        spec's maximum of the two lengths, and the readers follow htslib.
+        The last two records are not discarded, and are what keep the
+        warning's counts honest: one declares a usable END and one declares
+        none at all, so the number discarded, the number declaring an END,
+        and the number of records are three different values.
         """
         vcf_text = (
             "##fileformat=VCFv4.2\n"
@@ -289,23 +289,59 @@ class IOTests(unittest.TestCase):
             "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
             "chr1\t200\t.\tA\tG\t50\tPASS\tEND=199\n"
             "chr1\t500\t.\tACGT\tA\t50\tPASS\tEND=400\n"
-            "chr1\t800\t.\tACGT\tA\t50\tPASS\tEND=800\n"
+            "chr1\t800\t.\tACGT\tA\t50\tPASS\tEND=805\n"
+            "chr1\t900\t.\tACGT\tA\t50\tPASS\t.\n"
         )
         with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
             tmp.write(vcf_text)
             tmp.flush()
             for fmt in ("vcf", "vcf-simple", "vcf-sites"):
                 dframe = tabio.read(tmp.name, fmt).data
-                self.assertEqual(list(dframe.start), [199, 499, 799], fmt)
-                self.assertEqual(list(dframe.end), [200, 503, 800], fmt)
+                self.assertEqual(list(dframe.start), [199, 499, 799, 899], fmt)
+                self.assertEqual(list(dframe.end), [200, 503, 805, 903], fmt)
             # Only the text reader's warning reaches Python logging; htslib
             # writes its own "INFO/END ... smaller than POS" to C stderr,
             # and the pysam reader separately warns about absent genotypes.
             with self.assertLogs(level="WARNING") as cm:
                 tabio.read(tmp.name, "vcf-simple")
             message = " ".join(cm.output)
-            self.assertIn("in 2 of 3 records", message)
+            self.assertIn("in 2 of 4 records", message)
             self.assertIn("chr1:200 with END=199", message)
+
+    def test_read_vcf_end_equal_to_pos_is_a_one_base_span(self):
+        """An END equal to POS is a real span, so only a smaller one is dropped.
+
+        This is the boundary the discard rule turns on, and the only END
+        case whose answer the reference allele's length can change: keeping
+        the declared END gives one base, discarding it gives the footprint.
+        A test where the two coincide would not tell the rules apart, so
+        the record quotes four reference bases.
+
+        Only the text readers are asserted here, because htslib's own
+        answer for a declared span shorter than REF moved. The spec defines
+        the span as the maximum of the reference allele's length and the
+        one END implies; htslib ignored that maximum through 1.21 (pysam
+        0.23.3, which ``requirements/min.txt`` pins) and adopted it by
+        1.23.1 (pysam 0.24.0), so the same record reads as 799..800 under
+        one and 799..803 under the other. Whether CNVkit should follow the
+        maximum is a decision of its own, tracked separately; until it is
+        taken, asserting agreement across the reader families here would
+        pin CNVkit to whichever pysam the runner happened to install.
+        """
+        vcf_text = (
+            "##fileformat=VCFv4.2\n"
+            "##contig=<ID=chr1,length=100000>\n"
+            '##INFO=<ID=END,Number=1,Type=Integer,Description="End position">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+            "chr1\t800\t.\tACGT\tA\t50\tPASS\tEND=800\n"
+        )
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(vcf_text)
+            tmp.flush()
+            for fmt in ("vcf-simple", "vcf-sites"):
+                dframe = tabio.read(tmp.name, fmt).data
+                self.assertEqual(list(dframe.start), [799], fmt)
+                self.assertEqual(list(dframe.end), [800], fmt)
 
     def test_read_vcf_end_without_a_declaration_parts_the_reader_families(self):
         """An END the header never declares is honoured only by the text readers.
