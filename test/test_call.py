@@ -865,16 +865,31 @@ class LoadHetSnpsTests(unittest.TestCase):
             ctx.output,
         )
 
-    def test_load_het_snps_silent_on_real_vcf(self):
-        """A legitimate test VCF with paired sample IDs doesn't trigger warnings."""
-        with self.assertNoLogs(level="WARNING"):
-            varr = commands.load_het_snps(
-                "formats/na12878_na12882_mix.vcf", "NA12878", "NA12882", 15, None
-            )
+    def test_load_het_snps_uses_the_matched_normal(self):
+        """The declared pair loads as a pair, so the T/N logic is reached.
+
+        Every matched-normal call in this file used to name the fixture's
+        samples in the order opposite its ``PEDIGREE`` header, which the
+        reader answered with an unpaired array. Nothing downstream of
+        ``heterozygous()``'s ``n_zygosity`` precedence was asserted, and the
+        omission was invisible because an unpaired read is well-formed.
+        """
+        varr = commands.load_het_snps(
+            "formats/na12878_na12882_mix.vcf", "NA12882", "NA12878", 15, None
+        )
         self.assertGreater(len(varr), 50)
+        self.assertIn("n_zygosity", varr.data.columns)
+        # The normal's genotype, not the tumor's, selects the germline hets
+        self.assertTrue((varr["n_zygosity"] == 0.5).all())
 
     def test_load_het_snps_warns_on_missing_sample_ids(self):
-        """Without -i/-n, the wrong sample is used; the distribution warning fires."""
+        """With no IDs the header still supplies the pair; the fixture's own
+        allele frequencies are what trip the distribution warning.
+
+        This VCF is a titration mixture of two individuals, so its median
+        allele frequency sits near 0.2 rather than 0.5. The warning names
+        unspecified sample IDs as only one of several candidate causes.
+        """
         with self.assertLogs(level="WARNING") as ctx:
             commands.load_het_snps(
                 "formats/na12878_na12882_mix.vcf", None, None, 15, None
@@ -889,14 +904,15 @@ class LoadHetSnpsTests(unittest.TestCase):
         in ``varr.meta`` so the chrX-het-density confirmer (#341) can compare
         chrX het rate against the haploid-X null.
 
-        NA12878 is XX, so the test VCF should have a non-trivial chrX het
-        count if the panel covers chrX at all. We don't pin exact numbers
-        (those depend on the fixture VCF's chrX content) -- we just verify
-        the meta keys are populated as ints, in the right ordering
-        (het count <= total).
+        The pair is named in the fixture's own ``PEDIGREE`` order, so the
+        counts come from NA12878 as the matched normal -- she is XX, so the
+        VCF should have a non-trivial chrX het count if the panel covers
+        chrX at all. We don't pin exact numbers (those depend on the fixture
+        VCF's chrX content) -- we just verify the meta keys are populated as
+        ints, in the right ordering (het count <= total).
         """
         varr = cmdutil.load_het_snps(
-            "formats/na12878_na12882_mix.vcf", "NA12878", "NA12882", 15, None
+            "formats/na12878_na12882_mix.vcf", "NA12882", "NA12878", 15, None
         )
         self.assertIn("chrx_snp_total", varr.meta)
         self.assertIn("chrx_het_count", varr.meta)
@@ -1014,8 +1030,8 @@ class BafLocusFilterTests(unittest.TestCase):
         varr = tabio.read(
             "formats/na12878_na12882_mix.vcf",
             "vcf",
-            sample_id="NA12878",
-            normal_id="NA12882",
+            sample_id="NA12882",
+            normal_id="NA12878",
         )
         self.assertEqual(len(cmdutil._drop_unusable_baf_loci(varr)), len(varr))
 

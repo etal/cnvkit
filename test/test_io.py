@@ -8,12 +8,13 @@ import tempfile
 import unittest
 from io import StringIO
 
+import pysam
 from conftest import linecount
 
 from cnvlib import commands
 from cnvlib.cnary import CopyNumArray as CNA
 from skgenome import tabio
-from skgenome.tabio import bedio
+from skgenome.tabio import bedio, vcfio
 
 
 class IOTests(unittest.TestCase):
@@ -658,6 +659,163 @@ class IOTests(unittest.TestCase):
         self.assertIn("format-no-sample.vcf", msg)
         # Should not be mislabeled as a "passed an open file handle" mistake
         self.assertNotIn("file handle", msg)
+
+
+class VcfSamplePairingTests(unittest.TestCase):
+    """A caller's sample IDs outrank the VCF header's declared pairing.
+
+    A ``PEDIGREE`` tag records how the file was made, which is not always how
+    it is being analyzed, and re-heading a VCF to correct one is expensive.
+    The header therefore fills in what the caller left out rather than
+    replacing what the caller supplied -- but displacing a declared pairing
+    is worth saying out loud, so it is logged.
+    """
+
+    _FIXTURE = "formats/na12878_na12882_mix.vcf"
+    # ##PEDIGREE=<Derived=NA12882,Original=NA12878>
+    _DECLARED_TUMOR = "NA12882"
+    _DECLARED_NORMAL = "NA12878"
+    _OVERRIDE_MSG = "overriding the tumor-normal pairing"
+
+    _HEADER = (
+        "##fileformat=VCFv4.2\n"
+        "##contig=<ID=chr1,length=1000>\n"
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+    )
+
+    def _write(self, pedigrees, samples):
+        """Write a minimal VCF declaring `pedigrees` over `samples`."""
+        body = self._HEADER
+        for tumor, normal in pedigrees:
+            body += f"##PEDIGREE=<Derived={tumor},Original={normal}>\n"
+        body += (
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"
+            + "\t".join(samples)
+            + "\nchr1\t100\t.\tA\tT\t50\tPASS\t.\tGT\t"
+            + "\t".join(["0/1"] * len(samples))
+            + "\n"
+        )
+        tmp = tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf", delete=False)
+        self.addCleanup(os.remove, tmp.name)
+        with tmp:
+            tmp.write(body)
+        return tmp.name
+
+    def _pair(self, fname, sample_id=None, normal_id=None):
+        """Resolve (tumor, normal) as the reader would, without loading rows.
+
+        ``VariantArray.sample_id`` falls back to the filename when the caller
+        names no sample, so it cannot witness which sample the header chose.
+        """
+        with pysam.VariantFile(fname) as vcf:
+            return vcfio._choose_samples(vcf, sample_id, normal_id)
+
+    def test_reversed_pair_is_honored_and_logged(self):
+        """Naming the declared pair backwards pairs it backwards, loudly.
+
+        Reading the roles from the header instead left the array unpaired,
+        which is indistinguishable from passing no normal at all.
+        """
+        with self.assertLogs(level="WARNING") as ctx:
+            varr = tabio.read(
+                self._FIXTURE,
+                "vcf",
+                sample_id=self._DECLARED_NORMAL,
+                normal_id=self._DECLARED_TUMOR,
+            )
+        self.assertEqual(varr.sample_id, self._DECLARED_NORMAL)
+        self.assertIn("n_zygosity", varr.data.columns)
+        message = "\n".join(ctx.output)
+        self.assertIn(self._OVERRIDE_MSG, message)
+        # Both the pair used and the pair displaced are named
+        self.assertIn(f"'{self._DECLARED_NORMAL}'", message)
+        self.assertIn(f"'{self._DECLARED_TUMOR}'", message)
+
+    def test_declared_pair_is_used_without_complaint(self):
+        """Agreeing with the header is the common case and must stay quiet.
+
+        Naming the pair the header already declares is the ordinary way to
+        be explicit about it, so a warning there would fire on runs where
+        nothing was displaced and teach readers to ignore the message.
+        """
+        for sid, nid in [
+            (self._DECLARED_TUMOR, self._DECLARED_NORMAL),
+            (self._DECLARED_TUMOR, None),
+            (None, self._DECLARED_NORMAL),
+            (None, None),
+        ]:
+            with self.subTest(sample_id=sid, normal_id=nid):
+                with self.assertNoLogs(level="WARNING"):
+                    pair = self._pair(self._FIXTURE, sid, nid)
+                self.assertEqual(pair, (self._DECLARED_TUMOR, self._DECLARED_NORMAL))
+
+    def test_normal_alone_draws_its_own_declared_tumor(self):
+        """A normal names a pairing, not merely a sample to exclude.
+
+        Pairing it with whichever other sample comes first in the file would
+        cross two declared pairs whenever the column order disagrees with the
+        header, which is why the declared pairings are consulted first.
+        """
+        fname = self._write([("A", "B"), ("C", "D")], ["C", "A", "B", "D"])
+        self.assertEqual(self._pair(fname, normal_id="B"), ("A", "B"))
+        self.assertEqual(self._pair(fname, normal_id="D"), ("C", "D"))
+
+    def test_normal_outside_the_declared_pair_is_honored(self):
+        """A third sample may be the normal even when the header names another.
+
+        This shape kept its ``n_*`` columns before, so the substitution of a
+        different individual's genotypes left no trace in the output's shape.
+        """
+        fname = self._write([("A", "B")], ["A", "B", "C"])
+        with self.assertLogs(level="WARNING") as ctx:
+            varr = tabio.read(fname, "vcf", sample_id="A", normal_id="C")
+        self.assertEqual(varr.sample_id, "A")
+        self.assertIn(self._OVERRIDE_MSG, "\n".join(ctx.output))
+        self.assertIn("'C'", "\n".join(ctx.output))
+
+    def test_sample_that_is_no_declared_tumor_is_unpaired_and_logged(self):
+        """Requesting the control sample alone still yields it, now with a note.
+
+        Selecting a normal by ``sample_id`` is supported, but dropping to an
+        unpaired analysis silently is how a missing ``baf`` column became
+        indistinguishable from a VCF that never had genotypes.
+        """
+        with self.assertLogs(level="WARNING") as ctx:
+            varr = tabio.read(self._FIXTURE, "vcf", sample_id=self._DECLARED_NORMAL)
+        self.assertEqual(varr.sample_id, self._DECLARED_NORMAL)
+        self.assertNotIn("n_zygosity", varr.data.columns)
+        self.assertIn("as unpaired", "\n".join(ctx.output))
+
+    def test_explicit_pair_is_not_filtered_through_the_header(self):
+        """A named pair is used as given, not looked up among the declared ones.
+
+        The header here declares a tumor the file no longer contains, which
+        subsetting a joint call routinely leaves behind. Consulting the
+        declared pairings for this normal and then keeping only the rows whose
+        tumor was named would filter the pair away to nothing, and the caller
+        would get their sample back unpaired -- which is what happened before.
+        A pairing the header declares nowhere still needs no header lookup.
+
+        Omitting the tumor is a different matter: the stale pairing is then
+        the only candidate, and naming a sample the file lacks is still an
+        error.
+        """
+        fname = self._write([("GHOST", "B")], ["A", "B"])
+        with self.assertLogs(level="WARNING"):
+            varr = tabio.read(fname, "vcf", sample_id="A", normal_id="B")
+        self.assertEqual(varr.sample_id, "A")
+        self.assertIn("n_zygosity", varr.data.columns)
+        with self.assertRaises(IndexError):
+            tabio.read(fname, "vcf", normal_id="B")
+
+    def test_sample_cannot_be_its_own_normal(self):
+        """One sample named as both halves has no reading worth guessing at."""
+        for fname in (self._FIXTURE, self._write([], ["A", "B"])):
+            sid = self._DECLARED_TUMOR if fname == self._FIXTURE else "A"
+            with self.subTest(vcf=fname):
+                with self.assertRaises(IndexError) as ctx:
+                    tabio.read(fname, "vcf", sample_id=sid, normal_id=sid)
+                self.assertIn("its own matched normal", str(ctx.exception))
 
 
 class IntervalOrderTests(unittest.TestCase):
