@@ -53,6 +53,14 @@ analysis depends on. The clearest setup is:
   this typically means keeping the ``REJECT`` records.
 - Somatic variants are flagged with the ``SOMATIC`` tag in the INFO column.
   CNVkit will skip these by default.
+- Structural variants are ignored. A symbolic allele such as ``<DEL>`` covers
+  the whole span its ``END`` or ``SVLEN`` declares, and its genotype records
+  whether the rearrangement is present rather than an allelic balance at each
+  position within it, so it is not a b-allele frequency. Alleles that share a
+  record with such a variant are ignored too, because a VCF record's ``END``
+  describes its longest alternate allele and no narrower position can be
+  recovered for the others. Both are reported in the log when they occur.
+  Ordinary insertions and deletions written as sequences are kept.
 
 If you do not have a matched normal sample, you can use 1000 Genomes common
 SNP sites to extract likely germline SNVs from a tumor-only VCF and use just
