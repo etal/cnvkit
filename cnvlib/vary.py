@@ -286,19 +286,3 @@ def chrx_het_density_rejects_haploid(
     # observation is unlikely under haploid X, so we reject the null.
     p_value = float(binom.sf(n_chrx_het - 1, n_chrx_total, haploid_x_het_rate_ceiling))
     return p_value < alpha, p_value
-
-
-def _allele_specific_copy_numbers(segarr, varr, ploidy=2):
-    """Split total copy number between alleles based on BAF.
-
-    See: PSCBS, Bentsson et al. 2011
-    """
-    # TODO fix ploidy on allosomes
-    seg_depths = ploidy * np.exp2(segarr["log2"])
-    seg_bafs = varr.baf_by_ranges(segarr, above_half=True)
-    cn1 = 0.5 * (1 - seg_bafs) * seg_depths
-    cn2 = seg_depths - cn1
-    # segout = segarr.copy()
-    # segout.update({"baf": seg_bafs, "CN1": cn1, "CN2": cn2})
-    # return segout
-    return pd.DataFrame({"baf": seg_bafs, "cn1": cn1, "cn2": cn2})

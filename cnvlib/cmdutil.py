@@ -71,6 +71,58 @@ def _resolve_zygosity_freq(
     return zygosity_freq
 
 
+#: Alleles a b-allele frequency can be read from: a run of nucleotide bases.
+#: The test is positive rather than a list of the symbolic spellings to
+#: reject, because that list is open -- ``<DEL>``, ``<INS>``, ``<*>``, the
+#: breakend forms ``A[chr2:500[`` and ``]chr2:500]A``, and whatever VCF adds
+#: next -- and missing one readmits the defect silently.
+_SEQUENCE_ALLELE = r"[ACGTNacgtn]+"
+
+
+def _drop_unusable_baf_loci(varr: VariantArray) -> VariantArray:
+    """Drop variant rows that cannot carry a b-allele frequency.
+
+    A BAF is a point measurement of allelic balance at one polymorphic locus.
+    Two kinds of row reach the reader without being that, and both are
+    aggregated over bins by `skgenome.intersect.into_ranges`, so one row can
+    outvote every genuine SNP in the region it covers.
+
+    The first is a symbolic structural allele. ``A -> <DEL>`` with
+    ``END=402000`` is a real call with a real 400-kilobase reference span, and
+    a ``0/1`` genotype on it states that the deletion is present -- not that
+    the sample is 20:20 at 400,000 positions.
+
+    The second is subtler and has no symbolic allele left in it to test. A
+    record's span is a property of the *record*, correctly so, while the
+    pysam-backed reader emits one row per alternate allele; so every allele of
+    a multi-allelic record inherits the whole record's reach. A plain SNP
+    beside a symbolic sibling, or beside a gVCF ``<NON_REF>`` block that the
+    reader already dropped as a non-allele, arrives with an interval tens of
+    kilobases wide. Comparing the row's span against its own reference
+    allele's length detects exactly that, and no per-allele coordinate is
+    recoverable from ``INFO/END``, which VCF defines as the end of the longest
+    variant in the record.
+
+    Neither test is a size threshold. An ordinary indel is a genuine
+    polymorphic locus and keeps its BAF: its span *is* its reference allele's
+    length.
+    """
+    data = varr.data
+    own_span = (data["end"] - data["start"]) == data["ref"].str.len()
+    # `alt` is never missing from this reader, but `fillna` before the cast
+    # keeps that from mattering: `bool(nan)` is True under an object dtype.
+    is_sequence = data["alt"].str.fullmatch(_SEQUENCE_ALLELE)
+    keep = own_span & is_sequence.fillna(False).astype(bool)
+    if keep.all():
+        return varr
+    logging.info(
+        "Skipping %d records that are not single polymorphic loci "
+        "(structural alleles, or alleles sharing a record's wider span)",
+        int((~keep).sum()),
+    )
+    return varr[keep]  # type: ignore[index,no-any-return]
+
+
 def load_het_snps(
     vcf_fname: str,
     sample_id: str | None = None,
@@ -89,6 +141,9 @@ def load_het_snps(
         min_depth=min_variant_depth,
         skip_somatic=True,
     )
+    # Before anything counts, infers or aggregates: a structural allele is not
+    # a BAF locus, and neither is an allele carrying a sibling's coordinates.
+    varr = _drop_unusable_baf_loci(varr)  # type: ignore[arg-type]
     zygosity_freq = _resolve_zygosity_freq(varr, zygosity_freq, warn=True)  # type: ignore[arg-type]
     if zygosity_freq is not None:
         varr = varr.zygosity_from_freq(zygosity_freq, 1 - zygosity_freq)  # type: ignore[attr-defined]
@@ -225,6 +280,10 @@ def load_snp_subsets(
         min_depth=min_variant_depth,
         skip_somatic=False,
     )
+    # The second door into the same data. These overlays are display-only, but
+    # a structural allele drawn as an LOH or somatic marker smears across
+    # every bin it spans just as visibly as it would in the BAF median.
+    varr_all = _drop_unusable_baf_loci(varr_all)  # type: ignore[arg-type]
     # Resolve the Mutect2 workaround against the germline subset only --
     # interleaved somatic rows can mask the all-zero-normal heuristic that
     # load_het_snps sees, which would leave germline rows with raw all-zero

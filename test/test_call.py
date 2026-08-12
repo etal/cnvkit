@@ -905,6 +905,121 @@ class LoadHetSnpsTests(unittest.TestCase):
         self.assertLessEqual(varr.meta["chrx_het_count"], varr.meta["chrx_snp_total"])
 
 
+class BafLocusFilterTests(unittest.TestCase):
+    """Tests for ``cmdutil._drop_unusable_baf_loci``.
+
+    The VCF reader is right about both row shapes it lets through -- a
+    record's span is a property of the record -- so ``cmdutil`` is where the
+    BAF path decides which of those rows it can read a frequency from.
+    """
+
+    # Declares every INFO, FORMAT and ALT key the record bodies below use.
+    _HEADER = (
+        "##fileformat=VCFv4.2\n"
+        "##contig=<ID=chr1,length=1000000>\n"
+        '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV type">\n'
+        '##INFO=<ID=END,Number=1,Type=Integer,Description="End">\n'
+        '##INFO=<ID=SVLEN,Number=A,Type=Integer,Description="SV length">\n'
+        '##ALT=<ID=DEL,Description="Deletion">\n'
+        '##ALT=<ID=INS,Description="Insertion">\n'
+        '##ALT=<ID=NON_REF,Description="gVCF placeholder">\n'
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+        '##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Depths">\n'
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tTUMOR\n"
+    )
+
+    def _load(self, body):
+        with tempfile.NamedTemporaryFile(mode="w+t", suffix=".vcf") as tmp:
+            tmp.write(self._HEADER + body)
+            tmp.flush()
+            return cmdutil.load_het_snps(tmp.name, None, None, 0, None)
+
+    def test_symbolic_deletion_does_not_smear_its_baf_across_bins(self):
+        """The acceptance case: a het ``<DEL>`` spanning 400 bins is inert.
+
+        Its genotype is ``0/1`` and its 400-kilobase span is genuine, so
+        nothing upstream stops it: measured on the unfixed code it placed the
+        same allele frequency in every bin below, where only two hold a real
+        heterozygous SNP, and shifted the median in those two as well. The
+        comparison is against the identical file with the record deleted, so
+        it pins the whole per-bin BAF vector rather than a count of bins.
+        """
+        snvs = (
+            "chr1\t1500\t.\tG\tA\t50\tPASS\t.\tGT:AD\t0/1:30,10\n"
+            "chr1\t399500\t.\tC\tT\t50\tPASS\t.\tGT:AD\t0/1:30,10\n"
+        )
+        sv = "chr1\t2000\t.\tA\t<DEL>\t50\tPASS\tSVTYPE=DEL;END=402000\tGT:AD\t0/1:20,20\n"
+        starts = np.arange(400) * 1000 + 1000
+        bins = GA(
+            pd.DataFrame({"chromosome": "chr1", "start": starts, "end": starts + 1000})
+        )
+        with_sv = self._load(snvs + sv).baf_by_ranges(bins)
+        without_sv = self._load(snvs).baf_by_ranges(bins)
+        self.assertEqual(int(without_sv.notna().sum()), 2)
+        pd.testing.assert_series_equal(with_sv, without_sv)
+
+    def test_indels_keep_their_baf(self):
+        """A span wider than one base is not the test, and must not become it.
+
+        An insertion and a deletion written as sequence alleles are genuine
+        polymorphic loci whose allele frequencies belong in the BAF. A
+        ``span > 1`` filter would drop the deletion here, and would also
+        revert the ``INFO/END`` corrections made when the reader started
+        honouring a declared end.
+        """
+        varr = self._load(
+            "chr1\t1000\t.\tA\tT\t50\tPASS\t.\tGT:AD\t0/1:20,20\n"
+            "chr1\t2000\t.\tACGT\tA\t50\tPASS\t.\tGT:AD\t0/1:20,20\n"
+            "chr1\t3000\t.\tA\tACGT\t50\tPASS\t.\tGT:AD\t0/1:20,20\n"
+        )
+        self.assertEqual(list(varr["start"]), [999, 1999, 2999])
+
+    def test_symbolic_allele_is_dropped_even_when_it_spans_one_base(self):
+        """Discriminates the allele test from the span test.
+
+        ``<INS>`` and a breakend both quote a single reference base, so they
+        smear nothing and the span comparison cannot see them -- but the
+        fraction of reads supporting a structural junction is not an allelic
+        balance, and averaging it with the SNPs in its bin is meaningless.
+        A fix built only on the span comparison keeps both of these rows.
+        """
+        varr = self._load(
+            "chr1\t1000\t.\tA\tT\t50\tPASS\t.\tGT:AD\t0/1:20,20\n"
+            "chr1\t5000\t.\tA\t<INS>\t50\tPASS\tSVTYPE=INS;SVLEN=900\tGT:AD\t0/1:20,20\n"
+            "chr1\t6000\t.\tA\tA[chr2:500[\t50\tPASS\t.\tGT:AD\t0/1:20,20\n"
+        )
+        self.assertEqual(list(varr["alt"]), ["T"])
+
+    def test_allele_inheriting_a_wider_records_span_is_dropped(self):
+        """Discriminates the span test from the allele test.
+
+        Every allele of a record carries that record's reach, so a plain SNP
+        beside a symbolic sibling arrives 400 kilobases wide. The second
+        record is the case that rules out judging the allele string alone at
+        any layer: the reader has already dropped ``<NON_REF>`` as a
+        non-allele, so the surviving ``C>G`` row is an ordinary SNP carrying a
+        gVCF reference block's span, with no symbolic allele left to test.
+        ``INFO/END`` is the end of the longest variant in the record, so
+        neither row's own coordinate is recoverable.
+        """
+        varr = self._load(
+            "chr1\t1000\t.\tA\tT\t50\tPASS\t.\tGT:AD\t0/1:20,20\n"
+            "chr1\t7000\t.\tA\tT,<DEL>\t50\tPASS\tSVTYPE=DEL;END=407000\tGT:AD\t1/2:5,20,20\n"
+            "chr1\t8000\t.\tC\tG,<NON_REF>\t50\tPASS\tEND=108000\tGT:AD\t0/1:20,20,0\n"
+        )
+        self.assertEqual(list(varr["start"]), [999])
+
+    def test_filter_is_inert_on_a_vcf_of_plain_snvs(self):
+        """No row of the reference fixture is touched, so no output moves."""
+        varr = tabio.read(
+            "formats/na12878_na12882_mix.vcf",
+            "vcf",
+            sample_id="NA12878",
+            normal_id="NA12882",
+        )
+        self.assertEqual(len(cmdutil._drop_unusable_baf_loci(varr)), len(varr))
+
+
 class LoadSnpSubsetsTests(unittest.TestCase):
     """Tests for cmdutil.load_snp_subsets and _partition_snp_extras.
 
