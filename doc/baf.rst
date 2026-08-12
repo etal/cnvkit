@@ -98,11 +98,19 @@ tumor and which is the normal. There are two ways:
   options are accepted by the :ref:`call`, :ref:`scatter`, :ref:`segment`,
   :ref:`export` ``theta``, and :ref:`export` ``nexus-ogt`` commands.
 
-If neither is provided, CNVkit silently uses the first sample in the VCF and
-treats the input as unpaired -- so genotype-based somatic filtering cannot
-run, and a tumor-with-somatic-only VCF will look superficially heterozygous
-to CNVkit. This is a common cause of incorrect BAF output (see
-:ref:`baf-troubleshooting` below).
+The command-line options take precedence. A PEDIGREE tag records how the file
+was made, which is not always how it is being analyzed, so naming a sample
+overrides the header rather than being overridden by it -- you do not have to
+rewrite a VCF to analyze a pairing its writer did not anticipate. Whichever
+half you leave out is filled in from the header: give only the normal and the
+tumor declared against it is used. Displacing a declared pairing is reported
+in the log.
+
+If neither is provided and the VCF declares no pairing, CNVkit silently uses
+the first sample in the file and treats the input as unpaired -- so
+genotype-based somatic filtering cannot run, and a tumor-with-somatic-only
+VCF will look superficially heterozygous to CNVkit. This is a common cause of
+incorrect BAF output (see :ref:`baf-troubleshooting` below).
 
 
 .. _baf-rescaling:
@@ -185,8 +193,9 @@ This means observed BAFs were too far from 0.5 for the rescaling model
 - **The VCF contains somatic-only variants** (most common). Re-run with a
   VCF that includes germline heterozygous SNPs. See :ref:`baf-vcf-prep`.
 - **Sample IDs not specified.** With ``-i``/``-n`` missing in a paired
-  tumor/normal VCF, CNVkit cannot apply genotype-based somatic filtering.
-  Set ``--sample-id`` and ``--normal-id`` (or add a PEDIGREE header).
+  tumor/normal VCF that declares no pairing of its own, CNVkit cannot apply
+  genotype-based somatic filtering. Set ``--sample-id`` and ``--normal-id``
+  (or add a PEDIGREE header).
 - **Purity estimate is too low.** If the purity passed to ``--purity`` is
   below the actual tumor cell fraction, observed deviations from 0.5 get
   amplified beyond the [0, 1] range during rescaling.

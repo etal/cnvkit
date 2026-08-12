@@ -170,8 +170,9 @@ Better results can be had by giving CNVkit more information:
 - Add a "PEDIGREE" tag to the VCF header, listing the tumor sample as "Derived"
   and the normal as "Original". (MuTect doesn't do this, but it does add a
   nonstandard GATK header that CNVkit can extract the same information from.)
-- In lieu of a PEDIGREE tag, tell CNVkit which sample IDs are the tumor and normal using the
-  ``-i`` and ``-n`` options, respectively.
+- Tell CNVkit which sample IDs are the tumor and normal using the ``-i`` and
+  ``-n`` options, respectively. These take precedence over a PEDIGREE tag, so
+  a header naming the wrong pair need not be corrected first.
 - If no paired normal sample is available, you can still filter for likely
   informative SNPs by intersecting your tumor VCF with a set of known SNPs such
   as 1000 Genomes, ESP6500, or ExAC.
