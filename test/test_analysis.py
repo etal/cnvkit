@@ -290,6 +290,26 @@ class AnalysisTests(unittest.TestCase):
         )
         self.assertTrue(finite.all())
 
+    def test_bca_jackknife_matches_leave_one_out(self):
+        """BCa's influence values are the leave-one-out weighted means.
+
+        The closed form over the totals agrees with the definition only if the
+        weights are carried through, so this pins the algebra rather than the
+        speed: a version that forgot the weights would still be fast.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        values = cnarr["log2"].to_numpy()[:200]
+        weights = cnarr["weight"].to_numpy()[:200]
+        self.assertGreater(weights.std(), 0, "constant weights would not discriminate")
+        expected = np.array(
+            [
+                np.average(np.delete(values, i), weights=np.delete(weights, i))
+                for i in range(len(values))
+            ]
+        )
+        observed = segmetrics._jackknife_weighted_means(values, weights)
+        np.testing.assert_allclose(observed, expected, rtol=1e-12, atol=0)
+
     def test_segmetrics(self):
         """The 'segmetrics' command."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
