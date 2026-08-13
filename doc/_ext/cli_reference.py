@@ -5,21 +5,19 @@ The ``cli-reference`` directive walks the argparse tree built in
 command's help text exactly as the terminal shows it.
 
 Help text is inserted as a literal block, i.e. as an opaque text node rather
-than as reStructuredText. That choice is what makes the directive usable here.
-CNVkit's help strings were written for an 80-column terminal, not for
-publication: they contain glob patterns (``*.cnr``), option names (``--diagram``)
-and quoted values with apostrophes, all of which docutils would otherwise
-interpret as markup. Parsing them produces broken emphasis, en dashes in place
-of option prefixes, and spurious definition lists -- silently, in the case of
-the third-party extensions surveyed before this module was written. A literal
-block cannot be misread, and the page is therefore correct by construction
-rather than by escaping 618 help strings.
+than as reStructuredText. CNVkit's help strings were written for an 80-column
+terminal, not for publication: they contain glob patterns (``*.cnr``), option
+names (``--diagram``) and quoted values with apostrophes, all of which docutils
+would otherwise interpret as markup. Parsing them produces broken emphasis, en
+dashes in place of option prefixes, and spurious definition lists -- silently,
+in the case of the third-party extensions surveyed before this module was
+written. A literal block cannot be misread, so the page is correct by
+construction rather than by escaping every help string.
 """
 
 from __future__ import annotations
 
 import argparse
-import contextlib
 import os
 from typing import TYPE_CHECKING
 
@@ -31,28 +29,24 @@ from cnvlib.commands import AP
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-#: Terminal width assumed when formatting help text. argparse wraps to the
-#: caller's terminal, so without this the rendered page would depend on the
-#: environment that happened to build it.
-HELP_WIDTH = "80"
 
+def format_help(parser: argparse.ArgumentParser, prog: str) -> str:
+    """Return `parser`'s help text as it would appear under the name `prog`.
 
-@contextlib.contextmanager
-def _formatting_context(parser: argparse.ArgumentParser, prog: str) -> Iterator[None]:
-    """Give `parser` the program name and width used in the rendered page.
-
-    argparse derives ``prog`` from ``sys.argv[0]``, which during a
-    documentation build is the build tool, and wraps help text to the current
-    terminal width. Both are set for the duration of formatting and restored
-    afterward, since the parser is a module-level singleton shared with
-    whatever else imports :mod:`cnvlib.commands`.
+    Two details of argparse have to be overridden for the result to be
+    reproducible. It derives ``prog`` from ``sys.argv[0]``, which during a
+    documentation build is the build tool, and it wraps help text to the
+    caller's terminal, which would otherwise make the rendered page depend on
+    the environment that happened to build it. Both are restored afterward,
+    since the parser is a module-level singleton shared with whatever else
+    imports :mod:`cnvlib.commands`.
     """
     old_prog = parser.prog
     old_columns = os.environ.get("COLUMNS")
     parser.prog = prog
-    os.environ["COLUMNS"] = HELP_WIDTH
+    os.environ["COLUMNS"] = "80"
     try:
-        yield
+        return parser.format_help()
     finally:
         parser.prog = old_prog
         if old_columns is None:
@@ -92,8 +86,7 @@ class CliReference(Directive):
     def run(self) -> list[nodes.Node]:
         sections = []
         for prog, parser in walk_parsers(AP, "cnvkit.py"):
-            with _formatting_context(parser, prog):
-                help_text = parser.format_help()
+            help_text = format_help(parser, prog)
             section = nodes.section(ids=[nodes.make_id(prog)], names=[prog])
             section += nodes.title(text=prog)
             block = nodes.literal_block(help_text, help_text)

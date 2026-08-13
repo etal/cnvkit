@@ -17,9 +17,9 @@ is the mechanical layer -- option spellings, arities, ``choices`` values and
 subcommand names -- which is exactly the layer prose cannot keep in step by
 hand.
 
-Exit status is 0 when every invocation parses and 1 otherwise, so it can gate
-CI. It runs in the documentation environment, ahead of ``sphinx-build``, because
-that is the one CI job triggered by changes to both ``doc/`` and ``cnvlib/``.
+A line whose CNVkit portion cannot be tokenized at all is reported rather than
+skipped: an example too malformed to parse is a documentation defect of the
+same kind as one argparse rejects.
 """
 
 from __future__ import annotations
@@ -35,11 +35,13 @@ from pathlib import Path
 
 from cnvlib.commands import AP
 
-#: A line that starts a command, optionally behind a shell prompt.
-INVOCATION_RE = re.compile(r"^\s*\$?\s*(cnvkit\.py\s.*)$")
+#: A line that starts a command, optionally behind a shell prompt or the
+#: ``docker run`` wrapper that ``doc/docker.rst`` uses to invoke the container.
+INVOCATION_RE = re.compile(r"^\s*\$?\s*(?:docker\s+run\s+.*?\s)?(cnvkit\.py\s.*)$")
 
-#: Shell operators that end the CNVkit command and begin something else.
-TAIL_RE = re.compile(r"\s(?:\||>|>>|&&|;)\s|\s(?:\||>|>>)")
+#: A word that ends the CNVkit command and begins something else: a pipe, a
+#: redirect (including ``2>``), or a command separator.
+OPERATOR_RE = re.compile(r"^(?:\|{1,2}|\d?>{1,2}|&&|;)$")
 
 #: A brace expansion such as ``Sample.cn{s,r}``, which the examples use to name
 #: a .cns and .cnr pair in one word.
@@ -61,7 +63,7 @@ def iter_doc_lines(doc_dir: Path):
 
 
 def expand_braces(word: str) -> list[str]:
-    """Expand one level of ``{a,b}`` alternation, as the shell would.
+    """Expand every ``{a,b}`` alternation in `word`, as the shell would.
 
     ``Sample.cn{s,r}`` becomes two words, which matters: the examples rely on
     the expansion to supply both the ``-s`` segment file and the positional
@@ -83,23 +85,26 @@ def to_argv(command: str) -> list[str] | None:
     """Turn a documented command line into an argv list, or None to skip it.
 
     Three conventions of the manual are normalized away. A command may be
-    piped into another program, in which case only the CNVkit part is ours to
-    check; a fragment may be bracketed to mark it optional, as in the
-    ``batch`` pipeline listing; and file pairs are written with brace
+    piped or redirected into something else, in which case only the CNVkit
+    part is ours to check; a fragment may be bracketed to mark it optional, as
+    in the ``batch`` pipeline listing; and file pairs are written with brace
     expansion. Templated invocations, which contain placeholders rather than
     arguments, are skipped: the WDL examples in ``doc/docker.rst`` are not
     shell commands.
+
+    Tokenizing precedes the search for a shell operator, so that an operator
+    inside a quoted argument is an ordinary word rather than the end of the
+    command. A line that cannot be tokenized raises :exc:`ValueError`, which
+    the caller reports.
     """
     if "${" in command:
         return None
-    tail = TAIL_RE.search(command)
-    if tail:
-        command = command[: tail.start()]
-    try:
-        words = shlex.split(command)
-    except ValueError:
-        return None
-    words = [word.strip("[]") for word in words if word.strip("[]")]
+    words = shlex.split(command)
+    for index, word in enumerate(words):
+        if OPERATOR_RE.match(word):
+            words = words[:index]
+            break
+    words = [word.strip("[]") for word in words]
     return list(itertools.chain.from_iterable(expand_braces(w) for w in words))
 
 
@@ -148,7 +153,13 @@ def main(argv: list[str] | None = None) -> int:
         if not match:
             continue
         command = match.group(1)
-        parsed = to_argv(command)
+        try:
+            parsed = to_argv(command)
+        except ValueError as exc:
+            failures.append(
+                (path, lineno, command, f"cannot be parsed as a command: {exc}")
+            )
+            continue
         if parsed is None:
             continue
         checked += 1
@@ -159,8 +170,14 @@ def main(argv: list[str] | None = None) -> int:
     for path, lineno, command, error in failures:
         print(f"{path}:{lineno}\n    {command}\n    {error}", file=sys.stderr)
     print(f"checked {checked} documented invocations; {len(failures)} rejected")
+    if not checked:
+        # A guard that inspects nothing reports success forever. The manual has
+        # had documented invocations since 2014, so finding none means the
+        # extraction, the glob or the path is broken rather than the docs empty.
+        print(f"no cnvkit.py invocations found in {args.doc_dir}", file=sys.stderr)
+        return 1
     return 1 if failures else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

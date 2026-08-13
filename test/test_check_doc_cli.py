@@ -3,8 +3,8 @@
 
 The script exists because a documented command line can stop working without
 anything in ``doc/`` changing: ``--smooth-bootstrap`` became an integer option
-in 9fc3456 and ``doc/pipeline.rst`` went on showing it as a bare flag for six
-months. The tests below defend two halves of that contract.
+in February 2026 and ``doc/pipeline.rst`` went on showing it as a bare flag for
+six months. The tests below defend two halves of that contract.
 
   * The normalizer accepts the conventions the manual actually uses -- shell
     pipelines, bracketed optional fragments, brace-expanded file pairs, prompts
@@ -53,8 +53,12 @@ def write_doc(tmp_path, command):
             "cnvkit.py autobin *.bam [--annotate refFlat.txt]",
             ["cnvkit.py", "autobin", "*.bam", "--annotate", "refFlat.txt"],
         ),
-        # A shell prompt is stripped by the line pattern, not by to_argv.
-        ("cnvkit.py version", ["cnvkit.py", "version"]),
+        # A quoted operator is an argument, not the end of the command, so
+        # tokenizing has to precede the search for one.
+        (
+            'cnvkit.py export bed S.cns -i "Sample > 2"',
+            ["cnvkit.py", "export", "bed", "S.cns", "-i", "Sample > 2"],
+        ),
     ],
 )
 def test_to_argv_normalizes_manual_conventions(command, expected):
@@ -70,17 +74,54 @@ def test_expand_braces_is_recursive():
     assert cdc.expand_braces("a{1,2}b{x,y}") == ["a1bx", "a1by", "a2bx", "a2by"]
 
 
-def test_expand_braces_leaves_plain_words_alone():
-    assert cdc.expand_braces("Sample.cnr") == ["Sample.cnr"]
+def test_docker_wrapped_invocations_are_extracted():
+    """doc/docker.rst invokes CNVkit inside a container; those examples rot too."""
+    match = cdc.INVOCATION_RE.match(
+        "    docker run --rm etal/cnvkit:latest cnvkit.py version"
+    )
+    assert match and match.group(1) == "cnvkit.py version"
+
+
+def test_unparseable_example_is_reported_not_skipped(tmp_path, capsys):
+    """An example too malformed to tokenize is a defect, not a line to ignore."""
+    doc_dir = write_doc(tmp_path, 'cnvkit.py export bed S.cns -i "unclosed')
+    assert cdc.main([str(doc_dir)]) == 1
+    assert "cannot be parsed as a command" in capsys.readouterr().err
+
+
+def test_finding_no_invocations_is_a_failure(tmp_path, capsys):
+    """A guard that inspects nothing would otherwise report success forever."""
+    (tmp_path / "empty.rst").write_text("Nothing\n=======\n")
+    assert cdc.main([str(tmp_path)]) == 1
+    assert "no cnvkit.py invocations found" in capsys.readouterr().err
 
 
 def test_continuation_lines_are_joined(tmp_path):
-    """A backslash-continued example is one command, not two fragments."""
+    """A backslash-continued example is one command, not two fragments.
+
+    The reported line number is the first physical line, which is where a
+    reader looking at the failure will start editing.
+    """
     (tmp_path / "c.rst").write_text(
         "T\n=\n\n::\n\n    cnvkit.py batch S.bam \\\n        -r ref.cnn -d out\n"
     )
-    texts = [text.strip() for _, _, text in cdc.iter_doc_lines(tmp_path)]
-    assert "cnvkit.py batch S.bam  -r ref.cnn -d out" in texts
+    matched = [
+        (lineno, cdc.INVOCATION_RE.match(text))
+        for _, lineno, text in cdc.iter_doc_lines(tmp_path)
+        if cdc.INVOCATION_RE.match(text)
+    ]
+    assert len(matched) == 1
+    lineno, match = matched[0]
+    assert lineno == 6
+    assert cdc.to_argv(match.group(1)) == [
+        "cnvkit.py",
+        "batch",
+        "S.bam",
+        "-r",
+        "ref.cnn",
+        "-d",
+        "out",
+    ]
 
 
 def test_accepts_the_current_manual():
@@ -127,3 +168,7 @@ def test_rejects_drift(tmp_path, command):
 )
 def test_accepts_valid_commands(tmp_path, command):
     assert cdc.main([str(write_doc(tmp_path, command))]) == 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-v"]))
