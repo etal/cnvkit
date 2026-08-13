@@ -81,7 +81,7 @@ The pipeline executed by the ``batch`` command is equivalent to::
     cnvkit.py segment Sample.cnr -o Sample.cns
 
     # Post-processing for each tumor sample...
-    cnvkit.py segmetrics Sample.cnr -s Sample.cns --ci --alpha 0.5 --smooth-bootstrap -o Sample.segmetrics.cns.tmp
+    cnvkit.py segmetrics Sample.cnr -s Sample.cns --ci --alpha 0.5 -o Sample.segmetrics.cns.tmp
     cnvkit.py call Sample.segmetrics.cns.tmp --method none --filter ci -o Sample.call.cns.tmp
     cnvkit.py segmetrics Sample.cnr -s Sample.call.cns.tmp --t-test -o Sample.segmetrics.cns.tmp2
     cnvkit.py call Sample.segmetrics.cns.tmp2 --center median -o Sample.call.cns
@@ -90,6 +90,13 @@ The pipeline executed by the ``batch`` command is equivalent to::
     # Optionally, with --scatter and --diagram
     cnvkit.py scatter Sample.cnr -s Sample.cns -o Sample-scatter.pdf
     cnvkit.py diagram Sample.cnr -s Sample.cns -o Sample-diagram.pdf
+
+The ``segmetrics`` step above uses the default ``--smooth-bootstrap``
+threshold, which adds Gaussian noise to the bootstrap resampling for segments
+of 10 bins or fewer. ``batch`` smooths every segment regardless of size, a
+setting no value of ``--smooth-bootstrap`` reproduces, so the confidence
+intervals from this sequence can differ slightly from the ones ``batch``
+writes.
 
 This is for hybrid capture protocols in which both on- and off-target reads can
 be used for copy number detection. To run alternative pipelines for targeted
