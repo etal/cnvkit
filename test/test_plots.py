@@ -747,3 +747,62 @@ class ByBinSegmentMembershipTests(unittest.TestCase):
             with self.assertRaises(ValueError) as cm:
                 plots.update_binwise_positions(bins, bad, snvs)
             self.assertIn("unique index labels", str(cm.exception))
+
+
+class SegmentVafNaNTests(unittest.TestCase):
+    """A NaN allele frequency belongs to neither side of the 0.5 split.
+
+    skgenome/tabio/vcfio.py leaves alt_freq as NaN when a heterozygous call
+    has no usable depth or allele counts: the fraction is unknown, not zero
+    (#407).
+    """
+
+    @staticmethod
+    def _rows(freqs):
+        return vary.VariantArray.from_rows(
+            [
+                ["chr1", 100 + 10 * i, 101 + 10 * i, "A", "G", freq]
+                for i, freq in enumerate(freqs)
+            ],
+            columns=["chromosome", "start", "end", "ref", "alt", "alt_freq"],
+        )
+
+    @staticmethod
+    def _segment():
+        return cnary.CopyNumArray.from_rows(
+            [["chr1", 0, 1000, "segA", 0.0]],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+        )
+
+    def _levels(self, freqs):
+        return sorted(
+            round(float(value), 12)
+            for _seg, value in scatter.get_segment_vafs(
+                self._rows(freqs), self._segment()
+            )
+        )
+
+    def test_nan_does_not_poison_the_lower_level(self):
+        """One unknown frequency erased the whole below-0.5 trend line.
+
+        np.median of a group holding any NaN is NaN, and matplotlib draws
+        nothing for it, so the segment silently lost a line.
+        """
+        without_nan = self._levels([0.2, 0.3, 0.4, 0.7, 0.8])
+        self.assertEqual(without_nan, [0.3, 0.75])
+        # The NaN row must change neither level, on either side.
+        self.assertEqual(
+            self._levels([0.2, 0.3, 0.4, float("nan"), 0.7, 0.8]), without_nan
+        )
+
+    def test_nan_does_not_count_toward_the_two_member_minimum(self):
+        """Discriminates the other plausible fix, np.nanmedian.
+
+        Taking the median with NaN skipped but the group unchanged would
+        draw a level here from a single variant, which the two-member
+        minimum exists to refuse.
+        """
+        self.assertEqual(self._levels([0.2, float("nan"), 0.7, 0.8]), [0.75])
+
+    def test_an_all_nan_group_draws_nothing(self):
+        self.assertEqual(self._levels([float("nan")] * 4), [])

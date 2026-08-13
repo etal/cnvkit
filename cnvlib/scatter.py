@@ -1094,10 +1094,14 @@ def get_segment_vafs(variants, segments):
     for seg, seg_snvs in chunks:
         # ENH: seg_snvs.tumor_boost()
         freqs = seg_snvs["alt_freq"].values
-        # Separately emit VAFs above and below .5 for plotting
-        idx_above_mid = freqs > 0.5
-        for idx_vaf in (idx_above_mid, ~idx_above_mid):
-            if sum(idx_vaf) > 1:
+        # Separately emit VAFs above and below .5 for plotting. A NaN
+        # frequency means the allele fraction is unknown, not zero: the
+        # reader leaves it NaN when the depth or the allele counts are
+        # missing (#407, skgenome/tabio/vcfio.py:99-105). NaN satisfies
+        # neither comparison, so it joins neither group; counting it below
+        # .5 made that group's median NaN and erased the drawn line.
+        for idx_vaf in (freqs > 0.5, freqs <= 0.5):
+            if idx_vaf.sum() > 1:
                 yield (seg, np.median(freqs[idx_vaf]))
 
 
