@@ -1,0 +1,89 @@
+name: Docs
+
+# Counterpart to the Tests workflow, which ignores 'doc/**' and so leaves
+# documentation changes untested:
+#   * on master, on pull requests, and on demand -- the Sphinx build must
+#     succeed with warnings treated as errors, on the paths that can break it
+#     (the documentation sources, the packages whose docstrings autodoc
+#     imports, and the build recipe with the dependencies it installs);
+#   * weekly and on demand -- report external link rot without failing any
+#     pull request, since a dead third-party URL is not a regression in this
+#     tree. That job is advisory: it is marked failed when links rot, but the
+#     run itself stays green.
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'doc/**'
+      - 'cnvlib/**'
+      - 'skgenome/**'
+      - 'requirements/core.txt'
+      - 'requirements/doc.txt'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - 'tox.ini'
+      - '.github/workflows/docs.yaml'
+  pull_request:
+    paths:
+      - 'doc/**'
+      - 'cnvlib/**'
+      - 'skgenome/**'
+      - 'requirements/core.txt'
+      - 'requirements/doc.txt'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - 'tox.ini'
+      - '.github/workflows/docs.yaml'
+  schedule:
+    # Mondays, 06:00 UTC -- link rot only.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  docs:
+    name: Build docs
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'requirements/*.txt'
+      - name: Cache tox environments
+        uses: actions/cache@v5
+        with:
+          path: .tox
+          key: tox-doc-3.12-${{ hashFiles('requirements/*.txt', 'pyproject.toml') }}
+          restore-keys: |
+            tox-doc-3.12-
+      - name: Install dependencies and tools
+        run: |
+          python -m pip install -U pip setuptools wheel tox
+      - name: Build the documentation with warnings as errors
+        run: tox -e doc
+
+  linkcheck:
+    name: Check external links
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    # Advisory only: third-party link rot must never fail this workflow.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'requirements/*.txt'
+      - name: Install dependencies and tools
+        run: |
+          python -m pip install -U pip setuptools wheel tox
+      - name: Check external links
+        run: tox -e linkcheck
+      - name: Show the link report
+        if: always()
+        run: |
+          cat .tox/tmp/linkcheck/report/output.txt || echo "No link report was written."
