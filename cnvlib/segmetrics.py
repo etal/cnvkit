@@ -177,7 +177,7 @@ def confidence_interval_bootstrap(
     weights: ndarray,
     alpha: float,
     bootstraps: int = 100,
-    smoothed: bool | int = False,
+    smoothed: bool | int = 10,
 ) -> ndarray:
     """Confidence interval for segment mean log2 value, estimated by bootstrap.
 
@@ -218,8 +218,8 @@ def confidence_interval_bootstrap(
     if k < 2:
         return np.repeat(values[0], 2)
 
-    # Determine whether to use smoothed bootstrap.
-    # If `smoothed` is a bool, use it directly; if an int threshold, use it when k <= threshold.
+    # `bool` is a subclass of `int`, so the isinstance test cannot be folded into
+    # the comparison: `smoothed=True` means "always smooth", not "threshold 1".
     use_smoothing = smoothed if isinstance(smoothed, bool) else k <= smoothed
 
     rng = np.random.default_rng(0xA5EED)

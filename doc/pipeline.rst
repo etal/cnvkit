@@ -91,13 +91,6 @@ The pipeline executed by the ``batch`` command is equivalent to::
     cnvkit.py scatter Sample.cnr -s Sample.cns -o Sample-scatter.pdf
     cnvkit.py diagram Sample.cnr -s Sample.cns -o Sample-diagram.pdf
 
-The ``segmetrics`` step above uses the default ``--smooth-bootstrap``
-threshold, which adds Gaussian noise to the bootstrap resampling for segments
-of 10 bins or fewer. ``batch`` smooths every segment regardless of size, a
-setting no value of ``--smooth-bootstrap`` reproduces, so the confidence
-intervals from this sequence can differ slightly from the ones ``batch``
-writes.
-
 This is for hybrid capture protocols in which both on- and off-target reads can
 be used for copy number detection. To run alternative pipelines for targeted
 amplicon sequencing or whole genome sequencing, use the ``--method`` option with

@@ -561,7 +561,6 @@ def batch_run_sample(
         segments,  # type: ignore[arg-type]
         interval_stats=["ci"],
         alpha=0.5,
-        smoothed=True,
         skip_low=skip_low,
     )
     tabio.write(seg_metrics, sample_pfx + ".cns")
