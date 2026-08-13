@@ -111,6 +111,10 @@ When using the :ref:`scatter` command to  plot these files, note that the bin
 circle size. A smoothed trendline (``-t``/``--trend``) can be helpful to
 supplement the coarse-grained segmentation.
 
+Tumor purity can also be estimated from these log2 ratios under favorable
+conditions; see :ref:`purity estimation from RNA-based copy ratios
+<rna-purity>` for the applicable approaches and their limits.
+
 
 Considerations
 --------------

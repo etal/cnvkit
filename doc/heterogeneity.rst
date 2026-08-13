@@ -44,6 +44,24 @@ Software implementations of the latter three approaches can be used directly on
 DNA sequencing data.
 
 
+.. _rna-purity:
+
+Purity estimation from RNA-based copy ratios
+````````````````````````````````````````````
+
+The log2 ratios that :ref:`import-rna` derives from transcriptome sequencing can
+in principle support the same purity estimates as DNA-derived copy ratios,
+through the clustering of log2 values around subclonal copy-number states. This
+requires the tumor to carry enough large-scale copy-number alterations for those
+clusters to be distinguishable, so feasibility varies with cancer type and
+stage. Allele frequencies measured from RNA reads are a weaker basis for the
+b-allele frequency approach, since allele-specific expression and
+nonsense-mediated decay move them independently of copy number. Expression
+reflects copy number only partly and unevenly across genes, so a purity value
+obtained this way is a rough estimate rather than a substitute for a DNA-based
+estimate where one can be made.
+
+
 Inferring tumor purity and subclonal population fractions from sequencing
 -------------------------------------------------------------------------
 
