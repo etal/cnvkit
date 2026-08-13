@@ -240,9 +240,9 @@ Gene info
 
 The gene-info table is per-gene metadata originally exported from Ensembl
 BioMart. To build one for your genome, open `Ensembl BioMart
-<https://www.ensembl.org/biomart/>`_, choose the Ensembl Genes database and the
-dataset for your species/assembly, and export these gene attributes (in any
-column order)::
+<https://www.ensembl.org/info/data/biomart/index.html>`_, choose the Ensembl
+Genes database and the dataset for your species/assembly, and export these gene
+attributes (in any column order)::
 
     Gene stable ID
     Gene % GC content

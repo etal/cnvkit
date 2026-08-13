@@ -28,10 +28,9 @@ is usually enough.
 BED and GATK/Picard Interval List
 ---------------------------------
 
-- UCSC Genome Browser's `BED definition and FAQ <http://genome.ucsc.edu/FAQ/FAQformat.html#format1>`_
-- GATK's `Interval List description
-  <https://www.broadinstitute.org/gatk/guide/article?id=1204>`_ and `FAQ
-  <https://www.broadinstitute.org/gatk/guide/article?id=1319>`_
+- UCSC Genome Browser's `BED definition and FAQ <https://genome.ucsc.edu/FAQ/FAQformat.html#format1>`_
+- GATK's description of `intervals and interval lists
+  <https://gatk.broadinstitute.org/hc/en-us/articles/360035531852-Intervals-and-interval-lists>`_
 
 Note that BED genomic coordinates are 0-indexed, like C or Python code -- for
 example, the first nucleotide of a 1000-basepair sequence has position 0, the
@@ -59,8 +58,8 @@ based on the file contents, not the filename extension.
 GFF
 ---
 
-CNVkit can read `GFF3 <http://gmod.org/wiki/GFF3>`_, `GFF2
-<http://gmod.org/wiki/GFF2>`_, and `GTF <http://mblab.wustl.edu/GTF2.html>`_
+CNVkit can read `GFF3 <https://gmod.org/wiki/GFF3>`_, `GFF2
+<https://gmod.org/wiki/GFF2>`_, and `GTF <http://mblab.wustl.edu/GTF2.html>`_
 files as input in most commands where UCSC BED works. These formats all have these 9 columns:
 
     - seqid/reference/seqname/chromosome
@@ -95,7 +94,7 @@ SEG
 ---
 
 The SEG format is the `tabular output
-<https://software.broadinstitute.org/software/igv/SEG>`_ of DNAcopy, the
+<https://igv.org/doc/desktop/FileFormats/DataTracks/#seg>`_ of DNAcopy, the
 reference implementation of Circular Binary Segmentation (CBS). It is a
 tab-separated table with the following 5 or 6 columns:
 

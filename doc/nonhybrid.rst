@@ -157,8 +157,8 @@ in a future version of CNVkit.
     hybrid capture). Variant callers like GATK and CNVkit will ignore those
     reads in their internal calculations, considering these reads to be
     non-independent measurements. (`This SeqAnswers thread
-    <http://seqanswers.com/forums/showthread.php?t=6854>`_ has details and
-    background).
+    <https://www.seqanswers.com/forum/bioinformatics/bioinformatics-aa/5774-removing-duplicates-is-it-really-necessary>`_
+    has details and background).
 
     In targeted amplicon sequencing, all of the amplified reads are in fact PCR
     duplicates by design. By marking and thus omitting these reads, the

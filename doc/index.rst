@@ -2,9 +2,9 @@ CNVkit: Genome-wide copy number from high-throughput sequencing
 ===============================================================
 
 :Source code: `GitHub <https://github.com/etal/cnvkit>`_
-:License: `Apache License 2.0 <http://www.apache.org/licenses/LICENSE-2.0>`_
-:Packages: `PyPI <https://pypi.python.org/pypi/CNVkit>`_ | `Debian <https://packages.debian.org/search?keywords=cnvkit>`_ | `Docker <https://hub.docker.com/r/etal/cnvkit/>`_ | `Galaxy <https://usegalaxy.eu/?tool_id=cnvkit_batch>`_
-:Article: `PLOS Computational Biology <http://dx.doi.org/10.1371/journal.pcbi.1004873>`_
+:License: `Apache License 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_
+:Packages: `PyPI <https://pypi.org/project/CNVkit/>`_ | `Debian <https://packages.debian.org/search?keywords=cnvkit>`_ | `Docker <https://hub.docker.com/r/etal/cnvkit/>`_ | `Galaxy <https://usegalaxy.eu/?tool_id=cnvkit_batch>`_
+:Article: `PLOS Computational Biology <https://doi.org/10.1371/journal.pcbi.1004873>`_
 :Q&A: `Biostars <https://www.biostars.org/t/CNVkit/>`_
 :Consulting: Contact `Eric Talevich <https://etal.bio/>`_
 
@@ -33,7 +33,7 @@ If you use this software in a publication, please cite our paper describing CNVk
 
     Talevich, E., Shain, A.H., Botton, T., & Bastian, B.C. (2016).
     `CNVkit: Genome-wide copy number detection and visualization from targeted DNA sequencing.
-    <http://dx.doi.org/10.1371/journal.pcbi.1004873>`_
+    <https://doi.org/10.1371/journal.pcbi.1004873>`_
     *PLOS Computational Biology* 12(4):e1004873
 
 Also please cite the supporting paper for the segmentation method you use:
@@ -41,16 +41,16 @@ Also please cite the supporting paper for the segmentation method you use:
 PSCBS and DNAcopy (``cbs``, the default):
     - Olshen, A.B., Bengtsson, H., Neuvial, P., Spellman, P.T., Olshen, R.A., & Seshan, V.E. (2011).
       `Parent-specific copy number in paired tumor-normal studies using circular binary segmentation.
-      <http://doi.org/10.1093/bioinformatics/btr329>`_
+      <https://doi.org/10.1093/bioinformatics/btr329>`_
       *Bioinformatics* 27(15):2038–46.
     - Venkatraman, E.S., & Olshen, A.B. (2007).
       `A faster circular binary segmentation algorithm for the analysis of array CGH data.
-      <http://doi.org/10.1093/bioinformatics/btl646>`_
+      <https://doi.org/10.1093/bioinformatics/btl646>`_
       *Bioinformatics* 23(6):657–63
 HaarSeg (``haar``):
     Ben-Yaacov, E., & Eldar, Y.C. (2008).
     `A fast and flexible method for the segmentation of aCGH data.
-    <http://doi.org/10.1093/bioinformatics/btn272>`_
+    <https://doi.org/10.1093/bioinformatics/btn272>`_
     *Bioinformatics* 24(16):i139-45.
 
 Command line usage

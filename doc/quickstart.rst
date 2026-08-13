@@ -66,7 +66,7 @@ Map sequencing reads to the reference genome
 --------------------------------------------
 
 If you haven't done so already, use a sequence mapping/alignment program such as
-`BWA <http://bio-bwa.sourceforge.net/>`_ to map your sequencing reads to the
+`BWA <https://bio-bwa.sourceforge.net/>`_ to map your sequencing reads to the
 reference genome sequence.
 
 You should now have one or more BAM files corresponding to individual samples.
@@ -168,7 +168,7 @@ Now, starting a project from scratch, you could follow any of these approaches:
   similar build tool.
 
     - See also: `Ten Simple Rules for Reproducible Computational Research
-      <http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003285>`_
+      <https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1003285>`_
 
 - *For the power user:* Run ``batch`` with all samples specified as tumor
   samples, using ``-n`` by itself to build a **flat reference**, yielding
