@@ -240,3 +240,18 @@ The **gene** column concatenates the gene names of all the bins that the segment
 covers. The **weight** column sums the bin-level weights, and the **depth** and
 **log2** is the weighted mean of the input bin-level values corresponding to
 the segment.
+
+Later stages of the pipeline append further columns. The :ref:`segmetrics`
+command adds one column per requested statistic, e.g. ``ci_lo`` and ``ci_hi``
+for the bounds of the segment mean's confidence interval, and the :ref:`call`
+command adds the integer copy number ``cn``.
+
+The **p_ttest** column, added by :ref:`segmetrics` ``--t-test``, is the p-value
+of a two-sided one-sample t-test of the segment's constituent bin-level log2
+ratios against a mean of 0.0. It thus estimates the probability of observing
+bin log2 ratios scattered at least this far from neutral coverage if the
+segment were in truth copy-number-neutral, so a small value indicates a segment
+whose bins are consistently shifted away from zero. The test is undefined for a
+segment covering only one bin, and the field is left empty there. The
+``.call.cns`` file written by :ref:`batch` carries this column; the ``.cns``
+files written by :ref:`segment` and by ``batch`` do not.
