@@ -209,19 +209,18 @@ heterozygous-SNP count (``nbaf``). The VCF export surfaces these as:
 - ``LOH`` (INFO, Flag): set when one parental allele is entirely lost for the
   segment (``CN1 == 0`` or ``CN2 == 0``), regardless of total copy number.
 
-Copy-neutral LOH (total copy number matches expected ploidy, but one allele
-is entirely lost — ``CN1==0`` or ``CN2==0``) is emitted as ``SVTYPE=CNV``
-(ALT ``<CNV>``) with ``SVLEN=0`` and the ``LOH`` flag. Before this change,
-such segments were silently dropped by the VCF exporter; they are now visible
-to downstream LOH-aware annotators such as
-`AnnotSV <https://lbgi.fr/AnnotSV/>`_. Existing DUP/DEL records additionally
-carry ``LOH`` when a copy gain or hemizygous loss is accompanied by complete
-allele loss.
+Copy-neutral LOH -- total copy number matches the expected ploidy, but one
+allele is entirely lost (``CN1==0`` or ``CN2==0``) -- is emitted as
+``SVTYPE=CNV`` (ALT ``<CNV>``) with ``SVLEN=0`` and the ``LOH`` flag, so that
+LOH-aware annotators such as
+`AnnotSV <https://bigest-icube.fr/AnnotSV/>`_ can consume it. DUP and DEL
+records additionally carry ``LOH`` when a copy gain or hemizygous loss is
+accompanied by complete allele loss.
 
 A ``.cns`` produced without ``-v`` has no allele-specific columns; in that
-case the VCF export omits ``CN1``/``CN2``/``BAF``/``BAFN`` entirely and
-preserves the legacy ``GT:GQ:CN:CNQ`` (DUP) / ``GT:GQ`` (DEL) FORMAT shapes
-for backwards compatibility with existing downstream parsers.
+case the VCF export omits ``CN1``/``CN2``/``BAF``/``BAFN`` entirely and emits
+the ``GT:GQ:CN:CNQ`` (DUP) and ``GT:GQ`` (DEL) FORMAT shapes that downstream
+parsers expect.
 
 cdt, jtv
 ````````
