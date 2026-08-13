@@ -206,7 +206,7 @@ The output table shows for each sample:
 - `Interquartile range <https://en.wikipedia.org/wiki/Interquartile_range>`_
   (IQR) -- another robust measure that is easy to understand.
 - Tukey's `biweight midvariance
-  <http://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/biwmidv.htm>`_
+  <https://www.itl.nist.gov/div898/software/dataplot/refman2/auxillar/biwmidv.htm>`_
   -- a robust and efficient measure of spread.
 
 Note that many small segments will fit noisy data better, shrinking the
@@ -215,9 +215,10 @@ segments are spurious. One possible heuristic for judging the overall noisiness
 of each sample in a table is to multiply the number of segments by the biweight
 midvariance -- the value will tend to be higher for unreliable samples.
 Check questionable samples for poor coverage (using e.g. `bedtools
-<http://bedtools.readthedocs.io/>`_, `chanjo <http://www.chanjo.co/>`_,
+<https://bedtools.readthedocs.io/en/stable/>`_, `chanjo
+<https://github.com/Clinical-Genomics/chanjo>`_,
 `IGV <https://igv.org/>`_ or `Picard CollectHsMetrics
-<http://broadinstitute.github.io/picard/command-line-overview.html#CollectHsMetrics>`_).
+<https://broadinstitute.github.io/picard/command-line-overview.html#CollectHsMetrics>`_).
 
 Finally, visualizing a sample with CNVkit's :ref:`scatter` command will often
 make it apparent whether a sample or the copy ratios within a genomic region can

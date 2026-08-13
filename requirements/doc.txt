@@ -1,1 +1,10 @@
-sphinx
+# Dependencies of the Sphinx documentation build. Sphinx is the only direct
+# requirement: alabaster, the default HTML theme this build renders, and
+# requests, which the linkcheck builder uses, are dependencies of Sphinx
+# itself. Both the tox documentation environment and Read the Docs install
+# CNVkit as well, which doc/conf.py and autodoc need importable.
+#
+# The floor is load-bearing for the warnings-as-errors gate: from Sphinx 8.1,
+# -W collects every warning before failing, where 8.0 and earlier stop at the
+# first and hide the rest.
+sphinx >= 8.1

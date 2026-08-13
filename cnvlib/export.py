@@ -70,8 +70,9 @@ def fmt_cdt(sample_ids, table):
 
     See:
 
-    - http://jtreeview.sourceforge.net/docs/JTVUserManual/ch02s11.html
-    - http://www.eisenlab.org/FuzzyK/cdt.html
+    - https://jtreeview.sourceforge.net/docs/JTVUserManual/ch02s11.html
+    - Eisen lab FuzzyK documentation, "CDT file format" (no longer available
+      online)
     """
     outheader = ["GID", "CLID", "NAME", "GWEIGHT", *sample_ids]
     header2 = ["AID", "", "", ""]
@@ -584,8 +585,8 @@ def export_gistic_markers(cnr_fnames):
     GISTIC documentation:
 
     ftp://ftp.broadinstitute.org/pub/GISTIC2.0/GISTICDocumentation_standalone.htm
-    http://genepattern.broadinstitute.org/ftp/distribution/genepattern/modules_public_server_doc/GISTIC2.pdf
-    http://gdac.broadinstitute.org/runs/analyses__2013_05_23/reports/cancer/KICH-TP/CopyNumber_Gistic2/nozzle.html
+    https://www.genepattern.org/modules/docs/GISTIC_2.0/7
+    https://gdac.broadinstitute.org/runs/analyses__2013_05_23/reports/cancer/KICH-TP/CopyNumber_Gistic2/nozzle.html
 
     The markers file identifies the marker names and positions of the markers in
     the original dataset (before segmentation). It is a three column,

@@ -17,7 +17,7 @@ and
 
 CNVkit can also :ref:`export` files to standard formats used by many other software
 packages, including `Integrative Genomics Viewer (IGV) <https://igv.org/>`_ and
-`BioDiscovery Nexus Copy Number <http://www.biodiscovery.com/nexus-copy-number/>`_.
+`BioDiscovery Nexus Copy Number <https://bionano.com/nexus-copy-number-software/>`_.
 
 Studies
 -------
@@ -58,18 +58,18 @@ We'd like to highlight:
 * Seed, G. *et al.* (2017).
   `Gene copy number estimation from targeted next generation sequencing of
   prostate cancer biopsies: Analytic validation and clinical qualification.
-  <http://dx.doi.org/10.1158/1078-0432.CCR-17-0972>`_
+  <https://doi.org/10.1158/1078-0432.CCR-17-0972>`_
   *Clinical Cancer Research*, 23(20), 6070–6077
 * McCreery, M.Q. *et al.* (2015).
   `Evolution of metastasis revealed by mutational landscapes of chemically
-  induced skin cancers. <http://dx.doi.org/10.1038/nm.3979>`_
+  induced skin cancers. <https://doi.org/10.1038/nm.3979>`_
   *Nature Medicine*, 21, 1514–1520
 * Shain, A.H. *et al.* (2015).
   `Exome sequencing of desmoplastic melanoma identifies recurrent NFKBIE
   promoter mutations and diverse activating mutations in the MAPK pathway.
-  <http://dx.doi.org/10.1038/ng.3382>`_
+  <https://doi.org/10.1038/ng.3382>`_
   *Nature Genetics*, 47(10), 1194-1199
 * Shain, A.H. *et al.* (2015).
   `The Genetic Evolution of Melanoma from Precursor Lesions.
-  <http://dx.doi.org/10.1056/NEJMoa1502583>`_
+  <https://doi.org/10.1056/NEJMoa1502583>`_
   *New England Journal of Medicine*, 373(20), 1926-1936

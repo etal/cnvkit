@@ -241,7 +241,7 @@ def tsl2int(tsl):
 
     The code has the format "tsl([1-5]|NA)".
 
-    See: https://www.ensembl.org/Help/Glossary?id=492
+    See: https://www.ensembl.org/info/genome/genebuild/transcript_quality_tags.html
     """
     if tsl in (np.nan, "", "tslNA"):
         return 0

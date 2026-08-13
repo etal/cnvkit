@@ -2,7 +2,7 @@
 
 See:
     https://en.wikipedia.org/wiki/Robust_measures_of_scale
-    https://astropy.readthedocs.io/en/latest/_modules/astropy/stats/funcs.html
+    https://docs.astropy.org/en/latest/_modules/astropy/stats/funcs.html
 
 """
 
@@ -200,7 +200,7 @@ def biweight_midvariance(
     See:
 
     - https://en.wikipedia.org/wiki/Robust_measures_of_scale#The_biweight_midvariance
-    - https://astropy.readthedocs.io/en/latest/_modules/astropy/stats/funcs.html
+    - https://docs.astropy.org/en/latest/_modules/astropy/stats/funcs.html
     """
     if initial is None:
         initial = biweight_location(a)

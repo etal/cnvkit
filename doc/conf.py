@@ -11,8 +11,8 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -301,3 +301,33 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 # texinfo_no_detailmenu = False
+
+
+# -- Options for the linkcheck builder ------------------------------------
+
+# Hosts that serve their pages to a reader's browser but reject automated
+# clients, so that checking them yields only false positives. Every URL matched
+# below returns 403 to the linkcheck builder while the page itself is intact.
+# Patterns are matched against the URI as written in the source, which is why
+# the publisher exemptions are expressed as DOI prefixes rather than as the
+# journal hostnames the DOIs resolve to.
+linkcheck_ignore = [
+    # Oxford University Press (academic.oup.com), where DOI prefix 10.1093
+    # resolves: Bioinformatics and Nucleic Acids Research citations.
+    r"https://doi\.org/10\.1093/",
+    # Massachusetts Medical Society (nejm.org).
+    r"https://doi\.org/10\.1056/",
+    # Taylor & Francis (tandfonline.com), for the one JASA citation.
+    r"https://doi\.org/10\.1080/01621459",
+    # American Association for Cancer Research (aacrjournals.org).
+    r"https://doi\.org/10\.1158/",
+    # SourceForge project pages, which reject non-browser clients outright.
+    r"https://bio-bwa\.sourceforge\.net/",
+    r"https://samtools\.sourceforge\.net/",
+    r"https://jtreeview\.sourceforge\.net/",
+    # Stack Exchange, Biostars and SeqAnswers sit behind a bot-protection
+    # challenge that an automated client cannot complete.
+    r"https://stackoverflow\.com/",
+    r"https://www\.biostars\.org/",
+    r"https://www\.seqanswers\.com/",
+]

@@ -111,6 +111,10 @@ When using the :ref:`scatter` command to  plot these files, note that the bin
 circle size. A smoothed trendline (``-t``/``--trend``) can be helpful to
 supplement the coarse-grained segmentation.
 
+Tumor purity can also be estimated from these log2 ratios under favorable
+conditions; see :ref:`purity estimation from RNA-based copy ratios
+<rna-purity>` for the applicable approaches and their limits.
+
 
 Considerations
 --------------
@@ -240,9 +244,9 @@ Gene info
 
 The gene-info table is per-gene metadata originally exported from Ensembl
 BioMart. To build one for your genome, open `Ensembl BioMart
-<https://www.ensembl.org/biomart/>`_, choose the Ensembl Genes database and the
-dataset for your species/assembly, and export these gene attributes (in any
-column order)::
+<https://www.ensembl.org/info/data/biomart/index.html>`_, choose the Ensembl
+Genes database and the dataset for your species/assembly, and export these gene
+attributes (in any column order)::
 
     Gene stable ID
     Gene % GC content

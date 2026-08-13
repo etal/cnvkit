@@ -171,7 +171,7 @@ Allele-specific copy number and LOH
 The :ref:`call` command pairs the rescaled BAF with the integer total copy
 number to split each segment into its two allelic copy numbers, output as
 columns ``cn1`` (major) and ``cn2`` (minor) in the ``.cns`` file. The
-calculation follows `PSCBS <http://bioinformatics.oxfordjournals.org/content/27/15/2038.short>`_:
+calculation follows `PSCBS <https://doi.org/10.1093/bioinformatics/btr329>`_:
 the total copy number is multiplied by the upper-half BAF and rounded to the
 nearest integer, with the constraint :math:`\text{cn1} \geq \text{cn2}` and
 :math:`\text{cn1} + \text{cn2} = \text{cn}`.

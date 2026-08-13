@@ -372,7 +372,7 @@ automatically via :ref:`autobin`; you can also run ``autobin`` separately, or
 specify your own bin sizes with ``--antitarget-avg-size``.
 
 Average off-target coverage depths can also be obtained with the script
-CollectHsMetrics in the Picard suite (http://picard.sourceforge.net/), or from
+CollectHsMetrics in the Picard suite (https://broadinstitute.github.io/picard/), or from
 the console output of the CNVkit :ref:`coverage` command when run on the target
 regions.
 
@@ -446,12 +446,12 @@ BAM file preparation
 ````````````````````
 
 For best results, use an aligner such as `BWA-MEM
-<http://bio-bwa.sourceforge.net/>`_, with the option to mark secondary mappings
+<https://bio-bwa.sourceforge.net/>`_, with the option to mark secondary mappings
 of reads, and flag PCR
 duplicates with a program such as `SAMBLASTER
 <https://github.com/GregoryFaust/samblaster>`_, `SAMBAMBA
 <http://lomereiter.github.io/sambamba/>`_, or the MarkDuplicates script in
-`Picard tools <http://picard.sourceforge.net/>`_, so that CNVkit will skip
+`Picard tools <https://broadinstitute.github.io/picard/>`_, so that CNVkit will skip
 these reads when calculating read depth.
 
 .. note::
@@ -464,7 +464,7 @@ these reads when calculating read depth.
     duplicates at all -- see :doc:`nonhybrid`.)
 
 You will probably want to index the finished BAM file using `samtools
-<http://samtools.sourceforge.net/>`_ or SAMBAMBA.  But if you haven't done this
+<https://samtools.sourceforge.net/>`_ or SAMBAMBA.  But if you haven't done this
 beforehand, CNVkit will automatically do it for you.
 
 .. note::
@@ -540,8 +540,8 @@ better than constructing a separate reference for each matched tumor-normal
 pair.
 Furthermore, even matched normals from a cohort sequenced together can exhibit
 distinctly different copy number biases (see `Plagnol et al. 2012
-<http://dx.doi.org/10.1093/bioinformatics/bts526>`_ and `Backenroth et al. 2014
-<http://dx.doi.org/10.1093/nar/gku345>`_); reusing a pooled reference across the
+<https://doi.org/10.1093/bioinformatics/bts526>`_ and `Backenroth et al. 2014
+<https://doi.org/10.1093/nar/gku345>`_); reusing a pooled reference across the
 cohort provides some consistency to help diagnose such issues.
 
 Notes on sample selection:
@@ -605,8 +605,8 @@ to take the weighted average (Tukey's biweight location) and spread (Tukey's
 biweight midvariance) of the values at each on-- and off-target genomic bin
 among all samples.
 (For background on these statistical methods see `Lax (1985)
-<http://dx.doi.org/10.1080/01621459.1985.10478177>`_ and `Randal (2008)
-<http://dx.doi.org/10.1016/j.csda.2008.04.016>`_.)
+<https://doi.org/10.1080/01621459.1985.10478177>`_ and `Randal (2008)
+<https://doi.org/10.1016/j.csda.2008.04.016>`_.)
 To adjust for the lower statistical reliability of a smaller number of samples
 for estimating parameters, a "pseudocount" equivalent to one sample of neutral
 copy number is included in the dataset when calculating these values.
@@ -715,7 +715,7 @@ The following segmentation algorithms can be specified with the ``-m`` option:
   performed best in our benchmarking on mid-size target panels and exomes.
   Requires the R package DNAcopy.
 - ``haar`` -- a pure-Python implementation of `HaarSeg
-  <http://webee.technion.ac.il/people/YoninaEldar/Info/software/HaarSeg.htm>`_,
+  <https://doi.org/10.1093/bioinformatics/btn272>`_,
   a wavelet-based method. Very fast and dependency-free, making it a good
   fallback when R is unavailable. Sensitivity is controlled by the FDR
   q-value (``--threshold``); smaller values yield fewer, larger segments.

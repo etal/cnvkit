@@ -70,8 +70,8 @@ Sequence repeats
 ----------------
 
 Repetitive elements in the genome can be masked out with `RepeatMasker
-<http://www.repeatmasker.org/>`_ -- and the genome sequences provided by the
-`UCSC Genome Bioinformatics Site <http://genome.ucsc.edu/>`_ have this masking
+<https://www.repeatmasker.org/>`_ -- and the genome sequences provided by the
+`UCSC Genome Bioinformatics Site <https://genome.ucsc.edu/>`_ have this masking
 applied already. The fraction of each genomic bin masked out for repetitiveness
 indicates both low mappability and the susceptibility to Cot-1 blocking, both of
 which can reduce the bin's observed coverage.
