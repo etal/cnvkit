@@ -101,16 +101,37 @@ tumor and which is the normal. There are two ways:
 The command-line options take precedence. A PEDIGREE tag records how the file
 was made, which is not always how it is being analyzed, so naming a sample
 overrides the header rather than being overridden by it -- you do not have to
-rewrite a VCF to analyze a pairing its writer did not anticipate. Whichever
-half you leave out is filled in from the header: give only the normal and the
-tumor declared against it is used. Displacing a declared pairing is reported
-in the log.
+rewrite a VCF to analyze a pairing its writer did not anticipate. Displacing a
+declared pairing is reported in the log.
 
-If neither is provided and the VCF declares no pairing, CNVkit silently uses
-the first sample in the file and treats the input as unpaired -- so
-genotype-based somatic filtering cannot run, and a tumor-with-somatic-only
-VCF will look superficially heterozygous to CNVkit. This is a common cause of
-incorrect BAF output (see :ref:`baf-troubleshooting` below).
+The four combinations resolve as follows, with whichever half of the pair you
+leave out filled in from the PEDIGREE tag when the VCF has one and from the
+order of the samples in the file otherwise:
+
+- ``--sample-id`` and ``--normal-id``: the named pair is used as given.
+- ``--sample-id`` alone: if the header declares that sample as a tumor, the
+  normal declared with it is used; otherwise the sample is analyzed unpaired.
+- ``--normal-id`` alone: the tumor declared against that normal is used; if the
+  header declares none, the first other sample in the file is taken as the
+  tumor.
+- Neither: the declared pair is used; with nothing declared, the first sample
+  in the file is analyzed unpaired.
+
+Naming the same sample as both the tumor and its own matched normal is an
+error rather than a request to analyze it unpaired; omit ``--normal-id`` for
+that.
+
+What the pairing changes is whose genotype the analysis reads. With a matched
+normal, a locus that is variant in the tumor but homozygous reference in the
+normal is dropped as somatic, the heterozygous sites are then selected by the
+*normal's* genotype rather than the tumor's, and ``--min-variant-depth``
+applies to the normal's read depth. Analyzed unpaired, the sample's own
+genotype is all there is: a variant that appears heterozygous only because it
+is somatic and subclonal is indistinguishable from a germline SNP. Only the
+``SOMATIC`` INFO flag remains to exclude it, so a tumor-with-somatic-only VCF
+will look superficially heterozygous to CNVkit. This is a common cause of
+incorrect BAF output (see :ref:`baf-troubleshooting`), and it is why a
+tumor-only VCF should be restricted to common SNP sites (:ref:`baf-vcf-prep`).
 
 
 .. _baf-rescaling:
