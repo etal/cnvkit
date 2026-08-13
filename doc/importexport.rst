@@ -78,15 +78,16 @@ integer IDs. Options in ``import-seg`` can help recover the original names.
 ----------------
 
 Convert the ".results" output of `THetA2
-<http://compbio.cs.brown.edu/projects/theta/>`_ to one or more CNVkit .cns files
+<https://github.com/raphael-group/THetA>`_ to one or more CNVkit .cns files
 representing subclones with integer absolute copy number in each segment.
 
 ::
 
     cnvkit.py import-theta Sample.cns Sample.BEST.results
 
-See the page on tumor :doc:`heterogeneity` for more guidance on performing this
-analysis.
+THetA2 has had no release since 2015; this wrapper is retained for established
+workflows. See the page on tumor :doc:`heterogeneity` for more guidance on
+performing this analysis, and for the currently recommended alternative.
 
 .. _export:
 
@@ -310,10 +311,12 @@ and assigned to the matching bins.
 theta
 `````
 
-`THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_ is a program for
+`THetA2 <https://github.com/raphael-group/THetA>`_ is a program for
 estimating normal-cell contamination and tumor subclone population fractions
 based on a tumor sample's copy number profile and, optionally, SNP allele
-frequencies. (See the page on tumor :doc:`heterogeneity` for more guidance.)
+frequencies. THetA2 has had no release since 2015; this export format is
+retained for established workflows. (See the page on tumor :doc:`heterogeneity`
+for more guidance, and for the currently recommended alternative.)
 
 THetA2's input file is a BED-like file, typically with the extension
 ``.interval_count``, listing the read counts  within each copy-number segment in

@@ -50,18 +50,45 @@ Inferring tumor purity and subclonal population fractions from sequencing
 While inferring the tumor population structure is currently out of the scope of
 CNVkit, this work can be done using other third-party programs such as
 `PureCN <https://github.com/lima1/PureCN>`_,
-`THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_,
-`PyClone <http://compbio.bccrc.ca/software/pyclone/>`_, or
-`BubbleTree <https://www.bioconductor.org/packages/release/bioc/html/BubbleTree.html>`_.
+`PyClone <https://github.com/Roth-Lab/pyclone>`_,
+`BubbleTree <https://www.bioconductor.org/packages/release/bioc/html/BubbleTree.html>`_,
+or `THetA2 <https://github.com/raphael-group/THetA>`_.
 Each of these programs can be used to estimate tumor cell content and infer
 integer copy number of tumor subclones in a sample.
 
-PureCN accepts CNVKit's .cnn and .cnr files directly as input, and is
-recommended.
+For CNVkit users, PureCN is the recommended choice. It is under active
+development, is distributed through `Bioconductor
+<https://bioconductor.org/packages/release/bioc/html/PureCN.html>`_, and reads
+CNVkit's output files directly, so the bin-level copy ratios need no
+intermediate conversion.
 
 
-Using CNVkit with THetA2
+Using CNVkit with PureCN
 ````````````````````````
+
+PureCN reads CNVkit's bin-level copy ratio (.cnr) and coverage (.cnn) files
+natively. The segmentation is supplied in the DNAcopy format written by the
+:ref:`export` ``seg`` command::
+
+    cnvkit.py export seg Sample_T.cns --enumerate-chroms -o Sample_T.seg
+
+The tumor .cnr and this .seg file are then given to PureCN together with a VCF
+of small variants called in the sample. PureCN's own documentation includes a
+`recommended CNVkit workflow
+<https://bioconductor.org/packages/release/bioc/vignettes/PureCN/inst/doc/Quick.html>`_,
+covering construction of a panel of normals from .cnn files and the recommended
+arguments; consult it for the current invocation.
+
+
+Using CNVkit with THetA2 (legacy)
+`````````````````````````````````
+
+THetA2 has had no release since version 0.7 in October 2015, and the most recent
+commit to its repository dates from August 2021; the project page formerly
+hosted at Brown University is no longer reachable. The authors have published no
+deprecation notice; CNVkit retains the wrappers described here so that
+established workflows continue to run, but PureCN is recommended for new
+analyses.
 
 CNVkit provides wrappers for exporting .cns segments to THetA2's input format
 and importing THetA2's result file as CNVkit's segmented .cns files.
