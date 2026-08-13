@@ -10,7 +10,8 @@ analysis workflows.
 
 Specific support for CNVkit is included in the tools
 `PureCN <https://github.com/lima1/PureCN>`_,
-`THetA2 <http://compbio.cs.brown.edu/projects/theta/>`_,
+`THetA2 <https://github.com/raphael-group/THetA>`_ (no release since 2015; see
+:doc:`heterogeneity`),
 and
 `MetaSV <http://bioinform.github.io/metasv/>`_.
 

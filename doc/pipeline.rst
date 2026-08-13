@@ -96,6 +96,46 @@ be used for copy number detection. To run alternative pipelines for targeted
 amplicon sequencing or whole genome sequencing, use the ``--method`` option with
 value ``amplicon`` or ``wgs``, respectively. The default is ``hybrid``.
 
+The post-processing steps shown above always run, so each analyzed sample yields
+three segment files rather than one:
+
+- ``Sample.cns`` -- the segments inferred by :ref:`segment`, with a bootstrap
+  confidence interval for each segment's log2 value.
+- ``Sample.call.cns`` -- segments with an integer copy number assigned in the
+  ``cn`` column (see :ref:`call`). Segments whose confidence interval overlaps
+  zero have been set to neutral and merged with their neighbors, so this file may
+  contain fewer segments than ``Sample.cns``.
+- ``Sample.bintest.cns`` -- the separate test for focal events affecting single
+  target bins (see :ref:`bintest`).
+
+Downstream analyses that need segment log2 ratios should therefore use
+``Sample.cns``, and those that need integer copy number ``Sample.call.cns``.
+
+The final calling step re-centers the log2 values before assigning copy number,
+which is why the ``log2`` column of ``Sample.call.cns`` does not match that of
+``Sample.cns``. A single constant -- the median of the per-chromosome median log2
+values on the autosomes -- is subtracted from every segment, so the whole profile
+shifts by the same amount. The shift is small in an already well-centered sample,
+but it is rarely exactly zero, and because the integer calls are derived from the
+shifted values, a segment lying near a cutoff can be called differently than its
+``Sample.cns`` log2 value would suggest.
+
+``batch`` calls copy number with the default method and cutoffs described
+under :ref:`call`, and exposes none of the options that would change them:
+there is no way to select another calling method, custom
+``-t``/``--thresholds``, ``--purity`` or ``--ploidy`` through ``batch``, whose
+own ``-m``/``--method`` selects the sequencing protocol rather than the calling
+method. Of ``call``'s options, only the sample's chromosomal sex
+(``-x``/``--sample-sex``) and the reference's chromosome X ploidy (``-y``) are
+passed through.
+To call copy number with an estimated tumor purity, a different ploidy, or
+custom cutoffs, run ``call`` on the ``.cns`` file afterward::
+
+    cnvkit.py call Sample.cns --center median --purity 0.65 -o Sample.purity.call.cns
+
+Including ``--center median`` reproduces the re-centering that ``batch``
+performs; omitting it leaves the log2 values as segmented.
+
 See the rest of the commands below to learn about each of these steps and other
 functionality in CNVkit.
 
@@ -883,12 +923,37 @@ applying the copy number thresholds.
 
 The default threshold values are reasonably "safe" for a tumor sample with
 purity of at least 30%.
-The inner cutoffs of +0.2 and -0.25 are sensitive enough to detect a single-copy
-gain or loss in a diploid tumor with purity (or subclone cellularity) as low as
-30%.
-But the outer cutoffs of -1.1 and +0.7 assume 100% purity, so a more extreme
-copy number, i.e. homozygous deletion (0 copies) or multi-copy amplification (4+
-copies), is only assigned to a CNV if there is strong evidence for it.
+They are calibrated for a diploid tumor at roughly 50% tumor-cell clonality --
+two normal copies alongside two tumor copies -- in which a tumor copy number of
+CN is expected at a log2 ratio of ``log2((2 + CN) / 4)``::
+
+    >>> import numpy as np
+    >>> print(np.log2((2 + np.arange(5)) / 4))
+    [-1.         -0.4150375   0.          0.32192809  0.5849625 ]
+
+Each default cutoff sits between 0.10 and 0.17 away from one of these
+expectations, an allowance for random noise, but the inner and outer cutoffs are
+displaced in opposite directions. The inner cutoffs of -0.25 and +0.2 are
+displaced inward, toward the neutral value of 0.0, so that a single-copy loss or
+gain is easier to reach; the outer cutoffs of -1.1 and +0.7 are displaced
+outward, so that a homozygous deletion (0 copies) or high-level amplification
+(4 or more copies) is harder to reach.
+
+Equivalently, in terms of purity rather than clonality: the log2 ratio expected
+for a diploid sample of purity ``p`` in copy number state CN is
+``log2((1 - p) + p * CN / 2)``. Solving for ``p`` at each default cutoff gives
+the purity at which that state just reaches the cutoff:
+
+- A single-copy gain reaches +0.2 at 30% purity, and a single-copy loss reaches
+  -0.25 at 32%, so the inner cutoffs are sensitive to a tumor fraction (or
+  subclone cellularity) of about 30%.
+- A homozygous deletion reaches -1.1 only at 53% purity, and a four-copy
+  amplification reaches +0.7 only at 62%.
+
+The outer cutoffs are thus not calibrated for a pure sample -- in a fully pure
+tumor those two states would fall at negative infinity and +1.0, far beyond the
+cutoffs -- but they do demand more evidence than the inner cutoffs, so an
+extreme copy number is assigned only where the log2 ratio clearly supports it.
 For germline samples, the ``-t`` values shown below (or ``-m clonal``) may yield
 more precise calls.
 
@@ -914,13 +979,13 @@ If log2 value is up to                  Copy number
 ...                                     ...
 =====================================   ===========
 
-For homogeneous samples of known ploidy, you can calculate cutoffs from scatch
+For homogeneous samples of known ploidy, you can calculate cutoffs from scratch
 by log-transforming the integer copy number values of interest, plus .5 (for
 rounding), divided by the ploidy. For a diploid genome::
 
     >>> import numpy as np
     >>> copy_nums = np.arange(5)
-    >>> print(np.log2((copy_nums+.5) / 2)
+    >>> print(np.log2((copy_nums+.5) / 2))
     [-2.         -0.4150375   0.32192809  0.80735492  1.169925  ]
 
 Or, in R::
@@ -984,14 +1049,13 @@ distribution with a mean of 0 and standard deviation back-calculated from bin
 weight. Bin p-values are eventually corrected for multiple hypothesis testing by
 the Benjamini-Hochberg method.
 
-Output is another .cnr with aditional column "p_bintest" corresponding to p-value
-of test probabilities. Rows considered as not significant, i.e. having probability
-above the threshold (controlled by ``--alpha``/``-a`` parameter), are dropped.
+Output is another .cnr with an additional column "p_bintest" holding each bin's
+p-value. Rows that are not significant, i.e. whose p-value is above the
+threshold set by ``--alpha``/``-a``, are dropped.
 
-This post-processing step were also included into :ref:`batch` subcommand, where
-``bintest`` is run with segment file and on target bins only (equivalent to
-``-t, --target`` parameter of ``bintest`` subcommand), producing a third ".cns"
-file with the suffix ".bintest.cns".
+The :ref:`batch` command runs this step automatically on target bins only,
+equivalent to the ``-t``/``--target`` option here, writing ``Sample.bintest.cns``
+alongside its other outputs.
 
 .. note::
     If ``bintest`` is run with ``-s file.cns``, it will try to find additional

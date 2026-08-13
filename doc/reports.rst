@@ -246,6 +246,13 @@ Supported stats:
 - Alternative estimators of segment mean, which ignore bin weights: ``--mean``,
   ``--median``, ``--mode``.
 
+- One-sample t-test of the segment's bin-level log2 ratios against 0.0
+  (``--t-test``), output as a p-value in the column ``p_ttest``. The test is
+  two-sided, and is undefined for a segment covering only one bin. The
+  :ref:`batch` command runs this test automatically, so the column appears in
+  the ``.call.cns`` file it writes; see :doc:`fileformats` for the
+  interpretation of the value.
+
 - As in :ref:`metrics`: standard deviation (``--stdev``), median absolute
   deviation (``--mad``), inter-quartile range (``--iqr``), Tukey's biweight
   midvariance (``--bivar``)
