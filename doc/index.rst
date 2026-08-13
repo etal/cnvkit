@@ -65,6 +65,7 @@ Command line usage
     importexport
     rna
     scripts
+    cli-reference
 
 
 FAQ

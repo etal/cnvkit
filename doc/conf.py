@@ -19,6 +19,7 @@ import sys
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 # sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath(".."))
+sys.path.insert(0, os.path.abspath("_ext"))
 
 from cnvlib import __version__
 
@@ -31,6 +32,7 @@ from cnvlib import __version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "cli_reference",
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.ifconfig",
