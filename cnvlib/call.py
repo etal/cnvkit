@@ -302,29 +302,29 @@ def absolute_threshold(
 ) -> ndarray:
     """Call integer copy number using hard thresholds for each level.
 
-    Integer values are assigned for log2 ratio values less than each given
+    Integer values are assigned for log2 ratio values up to each given
     threshold value in sequence, counting up from zero.
     Above the last threshold value, integer copy numbers are called assuming
-    full purity, diploidy, and rounding up.
+    full purity, rounding up from the reference copy number.
 
     Default thresholds follow this heuristic for calling CNAs in a tumor sample:
-    For single-copy gains and losses, assume 50% tumor cell clonality (including
-    normal cell contamination). Then::
+    assume a diploid tumor at 50% tumor cell clonality (including normal cell
+    contamination), so that tumor copy number 0 through 4 is expected at::
 
         R> log2(2:6 / 4)
         -1.0  -0.4150375  0.0  0.3219281  0.5849625
 
-    Allowing for random noise of +/- 0.1, the cutoffs are::
+    Allowing for random noise of about +/- 0.1, the cutoffs are::
 
-        DEL(0)  <  -1.1
-        LOSS(1) <  -0.25
-        GAIN(3) >=  +0.2
-        AMP(4)  >=  +0.7
+        DEL(0)  <= -1.1
+        LOSS(1) <= -0.25
+        GAIN(3) >   +0.2
+        AMP(4)  >   +0.7
 
     For germline samples, better precision could be achieved with::
 
-        LOSS(1) <  -0.4
-        GAIN(3) >=  +0.3
+        LOSS(1) <= -0.4
+        GAIN(3) >   +0.3
 
     """
     absolutes = np.zeros(len(cnarr), dtype=np.float64)
