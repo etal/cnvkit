@@ -1049,14 +1049,13 @@ distribution with a mean of 0 and standard deviation back-calculated from bin
 weight. Bin p-values are eventually corrected for multiple hypothesis testing by
 the Benjamini-Hochberg method.
 
-Output is another .cnr with aditional column "p_bintest" corresponding to p-value
-of test probabilities. Rows considered as not significant, i.e. having probability
-above the threshold (controlled by ``--alpha``/``-a`` parameter), are dropped.
+Output is another .cnr with an additional column "p_bintest" holding each bin's
+p-value. Rows that are not significant, i.e. whose p-value is above the
+threshold set by ``--alpha``/``-a``, are dropped.
 
-This post-processing step were also included into :ref:`batch` subcommand, where
-``bintest`` is run with segment file and on target bins only (equivalent to
-``-t, --target`` parameter of ``bintest`` subcommand), producing a third ".cns"
-file with the suffix ".bintest.cns".
+The :ref:`batch` command runs this step automatically on target bins only,
+equivalent to the ``-t``/``--target`` option here, writing ``Sample.bintest.cns``
+alongside its other outputs.
 
 .. note::
     If ``bintest`` is run with ``-s file.cns``, it will try to find additional
