@@ -96,6 +96,46 @@ be used for copy number detection. To run alternative pipelines for targeted
 amplicon sequencing or whole genome sequencing, use the ``--method`` option with
 value ``amplicon`` or ``wgs``, respectively. The default is ``hybrid``.
 
+The post-processing steps shown above always run, so each analyzed sample yields
+three segment files rather than one:
+
+- ``Sample.cns`` -- the segments inferred by :ref:`segment`, with a bootstrap
+  confidence interval for each segment's log2 value.
+- ``Sample.call.cns`` -- segments with an integer copy number assigned in the
+  ``cn`` column (see :ref:`call`). Segments whose confidence interval overlaps
+  zero have been set to neutral and merged with their neighbors, so this file may
+  contain fewer segments than ``Sample.cns``.
+- ``Sample.bintest.cns`` -- the separate test for focal events affecting single
+  target bins (see :ref:`bintest`).
+
+Downstream analyses that need segment log2 ratios should therefore use
+``Sample.cns``, and those that need integer copy number ``Sample.call.cns``.
+
+The final calling step re-centers the log2 values before assigning copy number,
+which is why the ``log2`` column of ``Sample.call.cns`` does not match that of
+``Sample.cns``. A single constant -- the median of the per-chromosome median log2
+values on the autosomes -- is subtracted from every segment, so the whole profile
+shifts by the same amount. The shift is small in an already well-centered sample,
+but it is rarely exactly zero, and because the integer calls are derived from the
+shifted values, a segment lying near a cutoff can be called differently than its
+``Sample.cns`` log2 value would suggest.
+
+``batch`` calls copy number with the default method and cutoffs described
+under :ref:`call`, and exposes none of the options that would change them:
+there is no way to select another calling method, custom
+``-t``/``--thresholds``, ``--purity`` or ``--ploidy`` through ``batch``, whose
+own ``-m``/``--method`` selects the sequencing protocol rather than the calling
+method. Of ``call``'s options, only the sample's chromosomal sex
+(``-x``/``--sample-sex``) and the reference's chromosome X ploidy (``-y``) are
+passed through.
+To call copy number with an estimated tumor purity, a different ploidy, or
+custom cutoffs, run ``call`` on the ``.cns`` file afterward::
+
+    cnvkit.py call Sample.cns --center median --purity 0.65 -o Sample.purity.call.cns
+
+Including ``--center median`` reproduces the re-centering that ``batch``
+performs; omitting it leaves the log2 values as segmented.
+
 See the rest of the commands below to learn about each of these steps and other
 functionality in CNVkit.
 
