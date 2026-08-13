@@ -23,6 +23,7 @@ on:
       - 'pyproject.toml'
       - 'setup.py'
       - 'tox.ini'
+      - 'devtools/check_doc_cli.py'
       - '.github/workflows/docs.yaml'
   pull_request:
     paths:
@@ -34,6 +35,7 @@ on:
       - 'pyproject.toml'
       - 'setup.py'
       - 'tox.ini'
+      - 'devtools/check_doc_cli.py'
       - '.github/workflows/docs.yaml'
   schedule:
     # Mondays, 06:00 UTC -- link rot only.
