@@ -847,7 +847,8 @@ additional "baf" column (using the same logic as ``export nexus-ogt``).
 If ``--purity`` was specified, then the BAF values are also rescaled to
 estimate pure-tumor BAFs (clamped to [0, 1]).
 The VCF must contain heterozygous germline SNVs; pass ``-i``/``--sample-id``
-and ``-n``/``--normal-id`` if the VCF lacks a PEDIGREE header. See
+and ``-n``/``--normal-id`` to name the pair, which overrides any PEDIGREE
+header. See
 :doc:`baf` for the math, VCF preparation requirements, and troubleshooting.
 
 The ``call`` command can also optionally re-center the log2 values, though

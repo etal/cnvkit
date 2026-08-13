@@ -91,7 +91,7 @@ def read_vcf(
     if nid:
         columns.extend(["n_zygosity", "n_depth", "n_alt_count"])
 
-    rows = _parse_records(vcf_reader, sid, nid, skip_reject)  # type: ignore[arg-type]
+    rows = _parse_records(vcf_reader, sid, nid, skip_reject)
     table = pd.DataFrame.from_records(rows, columns=columns)
     table["alt_freq"] = table["alt_count"] / table["depth"]
     if nid:
@@ -129,12 +129,16 @@ def read_vcf(
 
 def _choose_samples(
     vcf_reader: VariantFile, sample_id: str | None, normal_id: str | None
-) -> tuple[str, str]:
-    """Emit the sample IDs of all samples or tumor-normal pairs in the VCF.
+) -> tuple[str, str | None]:
+    """Pick the tumor sample, and its matched normal if there is one.
 
-    Determine tumor-normal pairs from the PEDIGREE tag(s). If no PEDIGREE tag
-    is present, use the specified sample_id and normal_id as the pair, or if
-    unspecified, emit all samples as unpaired tumors.
+    The caller's IDs outrank the header. A PEDIGREE (or MuTect/Mutect2) tag
+    supplies whichever half of the pair was not named: both halves given are
+    taken at face value, a normal alone draws the tumor declared against it,
+    a sample alone draws the normal declared for it, and neither given falls
+    back to the declared pair -- or, with nothing declared, to every sample as
+    an unpaired tumor. Overriding a declared pairing is legitimate but worth
+    saying out loud, so it is logged.
     """
     vcf_samples = list(vcf_reader.header.samples)
     if isinstance(sample_id, int):  # type: ignore[unreachable]
@@ -144,38 +148,71 @@ def _choose_samples(
     for sid in (sample_id, normal_id):
         if sid and sid not in vcf_samples:
             raise IndexError(f"Specified sample {sid} not in VCF file")
-    pairs = None
+    if sample_id and sample_id == normal_id:
+        raise IndexError(
+            f"Sample {sample_id} cannot be its own matched normal; name a "
+            "different normal, or omit it to analyze the sample unpaired"
+        )
     peds = list(_parse_pedigrees(vcf_reader))
-    if peds:
-        # Trust the PEDIGREE tag
-        pairs = peds
+    pairs: list[tuple[str, str | None]]
+    if sample_id and normal_id:
+        # Both halves given: take the pair at face value. Deleted in 2016 by a
+        # restructuring that nobody noticed for nine years -- keep it.
+        pairs = [(sample_id, normal_id)]
     elif normal_id:
-        # All/any other samples are tumors paired with this normal
-        other_ids = [s for s in vcf_samples if s != normal_id]
-        if not other_ids:
-            raise IndexError(
-                f"No other sample in VCF besides the specified normal {normal_id}; "
-                + "did you mean to use this as the sample_id instead?"
-            )
-        pairs = [(oid, normal_id) for oid in other_ids]
+        # Prefer the declared tumor for this normal, so that naming the normal
+        # of one declared pair does not draw a tumor out of another.
+        pairs = [(t, n) for t, n in peds if n == normal_id]
+        if not pairs:
+            # All/any other samples are tumors paired with this normal
+            other_ids = [s for s in vcf_samples if s != normal_id]
+            if not other_ids:
+                raise IndexError(
+                    f"No other sample in VCF besides the specified normal {normal_id}; "
+                    + "did you mean to use this as the sample_id instead?"
+                )
+            pairs = [(oid, normal_id) for oid in other_ids]
+    elif peds:
+        # Trust the PEDIGREE tag
+        pairs = list(peds)
     else:
         # All samples are unpaired tumors
-        pairs = [(sid, None) for sid in vcf_samples]  # type: ignore[misc]
+        pairs = [(sid, None) for sid in vcf_samples]
     if sample_id:
         # Keep only the specified tumor/test sample
         pairs = [(s, n) for s, n in pairs if s == sample_id]
     if not pairs:
-        # sample_id refers to a normal/control sample -- salvage it
+        # Only reachable when the header declares pairings and none names
+        # sample_id as its tumor: salvage it as an unpaired one.
         pairs = [(sample_id, None)]  # type: ignore[list-item]
-    for sid in set(chain(*pairs)) - {None}:
+    for sid in {s for s in chain(*pairs) if s is not None}:
         _confirm_unique(sid, vcf_samples)
 
     sid, nid = pairs[0]
+    if peds and (sid, nid) not in peds:
+        declared = "; ".join(f"tumor '{t}' / normal '{n}'" for t, n in peds)
+        if nid:
+            logging.warning(
+                "WARNING: Using tumor sample '%s' with the specified normal "
+                "sample '%s', overriding the tumor-normal pairing declared in "
+                "the VCF header (%s)",
+                sid,
+                nid,
+                declared,
+            )
+        else:
+            logging.warning(
+                "WARNING: Analyzing sample '%s' as unpaired: it is not the "
+                "tumor of any tumor-normal pairing declared in the VCF header "
+                "(%s)",
+                sid,
+                declared,
+            )
     if len(pairs) > 1:
         if nid:
             logging.warning(
-                "WARNING: VCF file contains multiple tumor-normal "
-                "pairs; returning the first pair '%s' / '%s'",
+                "WARNING: Returning the first of %d tumor-normal pairs: '%s' / '%s'",
+                len(pairs),
                 sid,
                 nid,
             )
@@ -251,7 +288,7 @@ def _confirm_unique(sample_id: str, samples: list[str]) -> None:
 
 
 def _parse_records(
-    records: VariantFile, sample_id: str, normal_id: str, skip_reject: bool
+    records: VariantFile, sample_id: str, normal_id: str | None, skip_reject: bool
 ) -> Iterator[Any]:
     """Parse VCF records into DataFrame rows.
 
