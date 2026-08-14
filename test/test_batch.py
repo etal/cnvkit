@@ -335,6 +335,61 @@ class BatchTests(unittest.TestCase):
                 "center_by_window (#1028).",
             )
 
+    def test_batch_run_sample_leaves_segmetrics_policy_to_the_library(self):
+        """``batch_run_sample`` may choose *which* segment metrics it wants and
+        at what level, but not *how* they are computed.
+
+        ``batch`` used to pin ``smoothed=True`` on its ``do_segmetrics`` call.
+        That matched the CLI while ``--smooth-bootstrap`` was a flag, but the
+        option became an integer threshold (bins at or below which to smooth,
+        BCa above) and the in-process caller was missed, so ``batch`` kept
+        smoothing every segment -- a setting no command line could express, and
+        one that leaves the confidence intervals of large segments dependent on
+        unseeded noise.
+
+        The whitelist, rather than an assertion that ``smoothed`` is absent,
+        states the invariant: a later ``bootstraps=200`` would break the
+        "equivalent to" pipeline listing in ``doc/pipeline.rst`` the same way.
+        If ``batch`` ever gains a legitimate smoothing option, delete this test
+        deliberately.
+        """
+        chosen_by_batch = {
+            "location_stats",
+            "spread_stats",
+            "interval_stats",
+            "alpha",
+            "skip_low",
+        }
+        invocations = ast_calls_to(
+            batch.batch_run_sample, "do_segmetrics", "segmetrics"
+        )
+        self.assertEqual(
+            sum(
+                "interval_stats" in {kw.arg for kw in inv.keywords}
+                for inv in invocations
+            ),
+            1,
+            "Expected exactly one segmetrics.do_segmetrics() invocation in "
+            "batch_run_sample to request interval statistics; the whitelist "
+            "below only covers calls spelled `segmetrics.do_segmetrics(...)`, "
+            "so an aliased import would otherwise go unchecked.",
+        )
+        for inv in invocations:
+            pinned = {kw.arg for kw in inv.keywords} - chosen_by_batch
+            self.assertEqual(
+                pinned,
+                set(),
+                "segmetrics.do_segmetrics inside batch_run_sample must leave "
+                f"{sorted(pinned)} at the library default so batch and "
+                "`cnvkit.py segmetrics` agree.",
+            )
+            self.assertLessEqual(
+                len(inv.args),
+                2,
+                "Only the bin- and segment-level arrays may be passed "
+                "positionally; anything further evades the keyword whitelist.",
+            )
+
     def test_batch_make_reference_passes_bias_smoother_to_do_reference(self):
         """``batch_make_reference`` must forward ``bias_smoother`` to
         ``reference.do_reference`` for the pooled-reference path (#1028).

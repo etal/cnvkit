@@ -359,8 +359,10 @@ def compute_gene_stats(
         Significance level for intervals.
     bootstraps : int, optional
         Number of bootstrap iterations.
-    smoothed : bool, optional
-        Use smoothed bootstrap.
+    smoothed : bool or int, optional
+        Smoothed bootstrap threshold for confidence intervals. If bool: True to
+        always use smoothed bootstrap, False to never use it. If int: use smoothed
+        bootstrap when gene has <= this many bins. Default is 10.
 
     Returns
     -------

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Tests for analysis commands: metrics, segmetrics, breaks, genemetrics, bintest, etc."""
 
+import inspect
 import logging
 import os
 import shutil
@@ -268,7 +269,13 @@ class AnalysisTests(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(scale_vals)))
 
     def test_segmetrics_single_bin(self):
-        """Single-probe segments get finite CIs bracketing the mean (no crash)."""
+        """Single-probe segments get finite CIs bracketing the mean (no crash).
+
+        Passes ``smoothed=True`` deliberately: no command line can produce a bool
+        any more, so this is the only remaining exercise of that arm of the
+        ``bool | int`` union, and single-bin segments are what the smoothed
+        bootstrap was introduced for.
+        """
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
         sm = segmetrics.do_segmetrics(
@@ -290,8 +297,74 @@ class AnalysisTests(unittest.TestCase):
         )
         self.assertTrue(finite.all())
 
+    def test_bca_jackknife_matches_leave_one_out(self):
+        """BCa's influence values are the leave-one-out weighted means.
+
+        The closed form over the totals agrees with the definition only if the
+        weights are carried through, so this pins the algebra rather than the
+        speed: a version that forgot the weights would still be fast.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        values = cnarr["log2"].to_numpy()[:200]
+        weights = cnarr["weight"].to_numpy()[:200]
+        self.assertGreater(weights.std(), 0, "constant weights would not discriminate")
+        expected = np.array(
+            [
+                np.average(np.delete(values, i), weights=np.delete(weights, i))
+                for i in range(len(values))
+            ]
+        )
+        observed = segmetrics._jackknife_weighted_means(values, weights)
+        np.testing.assert_allclose(observed, expected, rtol=1e-12, atol=0)
+
+    def test_smoothing_defaults_agree_across_the_relay(self):
+        """Every layer that carries ``smoothed`` must default to the same value.
+
+        The commit that turned ``--smooth-bootstrap`` from a flag into a bin-count
+        threshold moved six signature defaults and missed
+        ``confidence_interval_bootstrap``'s, which stayed at ``False``. That miss
+        is invisible at the call sites, since each layer passes the argument on
+        explicitly; it would surface only for a direct API user, as segments that
+        silently stopped being smoothed. ``bootstraps`` rides the same relay and
+        is checked here for the same reason.
+        """
+        relay = (
+            segmetrics.do_segmetrics,
+            segmetrics.confidence_interval_bootstrap,
+            reports.do_genemetrics,
+            reports.gene_metrics_by_gene,
+            reports.gene_metrics_by_segment,
+            reports.compute_gene_stats,
+            reports.group_by_genes,
+        )
+        for param, dest, expected in (
+            ("smoothed", "smooth_bootstrap", 10),
+            ("bootstraps", "bootstrap", 100),
+        ):
+            for func in relay:
+                default = inspect.signature(func).parameters[param].default
+                self.assertEqual(
+                    default,
+                    expected,
+                    f"{func.__module__}.{func.__name__} defaults {param} to "
+                    f"{default!r}, not {expected!r}",
+                )
+            cli_defaults = {
+                action.default
+                for parser in (commands.P_segmetrics, commands.P_genemetrics)
+                for action in parser._actions
+                if action.dest == dest
+            }
+            self.assertEqual(
+                cli_defaults,
+                {expected},
+                f"--{dest.replace('_', '-')} must default to {expected} at both "
+                "subcommands that offer it, matching the library signatures above "
+                "and the numbers quoted in doc/reports.rst",
+            )
+
     def test_segmetrics(self):
-        """The 'segmetrics' command."""
+        """The 'segmetrics' command, at the smoothing default users get."""
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
         sm = segmetrics.do_segmetrics(
@@ -301,7 +374,6 @@ class AnalysisTests(unittest.TestCase):
             spread_stats=["stdev", "sem", "iqr"],
             interval_stats=["pi", "ci"],
             bootstraps=50,
-            smoothed=True,
         )
         # Restrict to segments with enough supporting probes for sane stats
         sm = sm[sm["probes"] > 3]
