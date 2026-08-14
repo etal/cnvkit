@@ -272,9 +272,11 @@ class AnalysisTests(unittest.TestCase):
         """Single-probe segments get finite CIs bracketing the mean (no crash).
 
         Passes ``smoothed=True`` deliberately: no command line can produce a bool
-        any more, so this is the only remaining exercise of that arm of the
-        ``bool | int`` union, and single-bin segments are what the smoothed
-        bootstrap was introduced for.
+        any more, so the bool arm of the ``bool | int`` union is reachable only
+        from the test suite. The single-probe rows asserted on here never reach
+        the smoother -- ``confidence_interval_bootstrap`` returns a zero-width
+        interval before any resampling -- so what this pins is that the early
+        return survives the smoothed configuration.
         """
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
@@ -296,6 +298,42 @@ class AnalysisTests(unittest.TestCase):
             one[["mean", "ci_lo", "ci_hi", "pi_lo", "pi_hi"]].to_numpy(dtype=float)
         )
         self.assertTrue(finite.all())
+
+    def test_smoothed_bootstrap_ci_is_reproducible(self):
+        """Repeated ``--ci`` runs on the same input must give identical bounds.
+
+        Both draws inside ``confidence_interval_bootstrap`` -- the resample
+        indices and the Gaussian smoothing noise -- are taken from one seeded
+        generator, so repeated runs on identical input agree exactly. The noise
+        draw was unseeded between the NumPy modernization and this test, which
+        gave ``segmetrics --ci`` and ``genemetrics --ci`` run-to-run variation in
+        ``ci_lo``/``ci_hi`` for every segment at or below the
+        ``--smooth-bootstrap`` threshold -- 41 of amplicon's 80 segments, enough
+        to move a ``call --filter ci`` decision on a handful of them per run.
+
+        The weights are deliberately below 1. The noise scales as ``sqrt(1 - w)``,
+        so unit weights annihilate it and the unseeded code passed a
+        reproducibility assertion written that way.
+        """
+        values = np.array([-0.3, 0.1, 0.25])
+        weights = np.array([0.6, 0.8, 0.45])
+        ci_args = (values, weights, 0.05)
+        first = segmetrics.confidence_interval_bootstrap(*ci_args, smoothed=True)
+        self.assertGreater(first[1] - first[0], 0, "smoothing must widen the interval")
+        second = segmetrics.confidence_interval_bootstrap(*ci_args, smoothed=True)
+        np.testing.assert_array_equal(first, second)
+        # Same guarantee through the command, where the threshold rather than the
+        # bool selects the smoothed path.
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        n_smoothed = ((segarr["probes"] >= 2) & (segarr["probes"] <= 10)).sum()
+        self.assertGreater(n_smoothed, 40, "fixture must exercise the smoothed path")
+        runs = [
+            segmetrics.do_segmetrics(cnarr, segarr, interval_stats=["ci"])
+            for _ in range(2)
+        ]
+        for col in ("ci_lo", "ci_hi"):
+            np.testing.assert_array_equal(runs[0][col], runs[1][col])
 
     def test_bca_jackknife_matches_leave_one_out(self):
         """BCa's influence values are the leave-one-out weighted means.

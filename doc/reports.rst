@@ -267,7 +267,9 @@ Supported stats:
   Segments of ``--smooth-bootstrap`` bins or fewer (10 by default) are resampled
   with Gaussian noise added, since too few bins are available to represent the
   underlying distribution; larger segments instead receive the bias-corrected
-  and accelerated (BCa) adjustment.
+  and accelerated (BCa) adjustment. Both the resampling and the added noise are
+  drawn from a fixed seed, so repeated runs on the same input give identical
+  bounds.
 
 - Prediction interval (``--pi``), estimated by the range between the 2.5-97.5
   percentiles of the segment's bin-level log2 ratios. The upper and lower bounds

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 # import pandas as pd
 import numpy as np
@@ -13,7 +13,7 @@ from scipy import stats
 from . import descriptives
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Iterable
 
     from numpy import float64, ndarray
     from pandas.core.series import Series
@@ -224,9 +224,11 @@ def confidence_interval_bootstrap(
 
     rng = np.random.default_rng(0xA5EED)
     rand_indices = rng.integers(0, k, size=(bootstraps, k))
-    samples = ((np.take(values, idx), np.take(weights, idx)) for idx in rand_indices)
+    samples: Iterable[tuple[ndarray, ndarray]] = (
+        (np.take(values, idx), np.take(weights, idx)) for idx in rand_indices
+    )
     if use_smoothing:
-        samples = _smooth_samples_by_weight(values, samples)  # type: ignore[assignment]
+        samples = _smooth_samples_by_weight(k, samples, rng)
     # Recalculate segment means
     seg_means = (np.average(val, weights=wt) for val, wt in samples)
     bootstrap_dist = np.fromiter(seg_means, np.float64, bootstraps)
@@ -238,7 +240,7 @@ def confidence_interval_bootstrap(
 
 
 def _smooth_samples_by_weight(
-    values: ndarray, samples: Iterator[Any]
+    k: int, samples: Iterable[tuple[ndarray, ndarray]], rng: np.random.Generator
 ) -> list[tuple[ndarray, ndarray]]:
     """Add Gaussian noise to each bootstrap replicate.
 
@@ -249,35 +251,36 @@ def _smooth_samples_by_weight(
 
     This addresses the issue that small segments (#bins < #replicates) don't
     fully represent the underlying distribution, in particular the extreme
-    values, so the CI is too narrow. For single-bin segments in particular,
-    the confidence interval will always have zero width unless the samples are
-    smoothed.
+    values, so the CI is too narrow. Single-bin segments never arrive here:
+    ``confidence_interval_bootstrap`` returns a zero-width interval for them
+    before any resampling, so this widens the intervals of the multi-bin
+    segments that ``smoothed`` selects.
 
     Standard deviation of the noise added to each bin comes from each bin's
     weight, which is an estimate of (1-variance).
 
     Parameters
     ----------
-    values : np.ndarray
-        Original log2 values within the segment.
-    samples : list of np.ndarray
+    k : int
+        Number of bins in the segment.
+    samples : iterable of (np.ndarray, np.ndarray)
         Bootstrap replicates as (value_sample, weight_sample).
+    rng : np.random.Generator
+        Seeded generator, shared with the caller's resampling draw so that the
+        added noise is reproducible from run to run. Constructing a second
+        generator here from the same seed would not make the two draws
+        independent: identically seeded generators are the same stream.
 
     Returns
     -------
     `samples` with random N(0, pop_sd) added to each value, and
     weights unchanged.
     """
-    k = len(values)
-    # KDE bandwidth narrows for larger sample sizes
-    # Following Silverman's Rule and Polansky 1995,
-    # but requiring k=1 -> bw=1 for consistency
+    # KDE bandwidth narrows for larger sample sizes, following Silverman's Rule
+    # and Polansky 1995 but without their leading scale factor, which the
+    # per-bin weight supplies instead.
     bw = k ** (-1 / 4)
-    rng = np.random.default_rng()
-    samples_list = [
-        (v + (bw * np.sqrt(1 - w) * rng.standard_normal(k)), w) for v, w in samples
-    ]
-    return samples_list
+    return [(v + (bw * np.sqrt(1 - w) * rng.standard_normal(k)), w) for v, w in samples]
 
 
 def _jackknife_weighted_means(values: ndarray, weights: ndarray) -> ndarray:
