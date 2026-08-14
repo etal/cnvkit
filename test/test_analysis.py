@@ -272,9 +272,11 @@ class AnalysisTests(unittest.TestCase):
         """Single-probe segments get finite CIs bracketing the mean (no crash).
 
         Passes ``smoothed=True`` deliberately: no command line can produce a bool
-        any more, so this is the only remaining exercise of that arm of the
-        ``bool | int`` union, and single-bin segments are what the smoothed
-        bootstrap was introduced for.
+        any more, so the bool arm of the ``bool | int`` union is reachable only
+        from the test suite. The single-probe rows asserted on here never reach
+        the smoother -- ``confidence_interval_bootstrap`` returns a zero-width
+        interval before any resampling -- so what this pins is that the early
+        return survives the smoothed configuration.
         """
         cnarr = cnvlib.read("formats/amplicon.cnr")
         segarr = cnvlib.read("formats/amplicon.cns")
