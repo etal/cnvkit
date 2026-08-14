@@ -226,7 +226,7 @@ def confidence_interval_bootstrap(
     rand_indices = rng.integers(0, k, size=(bootstraps, k))
     samples = ((np.take(values, idx), np.take(weights, idx)) for idx in rand_indices)
     if use_smoothing:
-        samples = _smooth_samples_by_weight(values, samples)  # type: ignore[assignment]
+        samples = _smooth_samples_by_weight(values, samples, rng)  # type: ignore[assignment]
     # Recalculate segment means
     seg_means = (np.average(val, weights=wt) for val, wt in samples)
     bootstrap_dist = np.fromiter(seg_means, np.float64, bootstraps)
@@ -238,7 +238,7 @@ def confidence_interval_bootstrap(
 
 
 def _smooth_samples_by_weight(
-    values: ndarray, samples: Iterator[Any]
+    values: ndarray, samples: Iterator[Any], rng: np.random.Generator
 ) -> list[tuple[ndarray, ndarray]]:
     """Add Gaussian noise to each bootstrap replicate.
 
@@ -262,6 +262,11 @@ def _smooth_samples_by_weight(
         Original log2 values within the segment.
     samples : list of np.ndarray
         Bootstrap replicates as (value_sample, weight_sample).
+    rng : np.random.Generator
+        Seeded generator, shared with the caller's resampling draw so that the
+        added noise is reproducible from run to run. Constructing a second
+        generator here from the same seed would not make the two draws
+        independent: identically seeded generators are the same stream.
 
     Returns
     -------
@@ -273,7 +278,6 @@ def _smooth_samples_by_weight(
     # Following Silverman's Rule and Polansky 1995,
     # but requiring k=1 -> bw=1 for consistency
     bw = k ** (-1 / 4)
-    rng = np.random.default_rng()
     samples_list = [
         (v + (bw * np.sqrt(1 - w) * rng.standard_normal(k)), w) for v, w in samples
     ]
