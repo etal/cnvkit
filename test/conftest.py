@@ -33,6 +33,13 @@ def ast_calls_to(func, attr, obj=None):
     that a high-level entry point forwards an option to the function that
     implements it -- a regression class that otherwise needs a BAM fixture and
     a full pipeline run to detect.
+
+    Only ``ast.Attribute`` calls are matched, so a call reached through an
+    aliased import (``from cnvlib.call import do_call as _dc``) is invisible
+    here. A guard over a function that calls `attr` more than once must
+    therefore pin the number of invocations it expects: an existence check
+    would still pass on whichever sites remain visible, leaving the aliased
+    one unexamined.
     """
     calls = []
     for node in ast.walk(ast.parse(inspect.getsource(func))):
@@ -49,7 +56,13 @@ def ast_calls_to(func, attr, obj=None):
 
 
 def ast_submit_calls(func, target):
-    """Return the ``pool.submit(target, ...)`` call nodes in `func`'s source."""
+    """Return the ``pool.submit(target, ...)`` call nodes in `func`'s source.
+
+    `target` is matched by the name written at the call site, so the caveat on
+    `ast_calls_to` applies here too: submitting the function under an alias
+    hides the call, and a guard over more than one submit site must pin the
+    count it expects.
+    """
     calls = []
     for call in ast_calls_to(func, "submit"):
         if not call.args:
