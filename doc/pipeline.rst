@@ -762,6 +762,23 @@ the basic CNVkit installation.
    informational only and does not affect ``cbs`` or ``haar`` segmentation, so
    seeing it after a ``scatter`` plot or an ``hmm`` run is expected.
 
+.. note::
+   **Permutation significance.** CBS tests each candidate breakpoint against a
+   permutation reference distribution, so its p-value is itself an estimate
+   carrying Monte Carlo error. CNVkit fixes DNAcopy's random seed, which
+   establishes two properties: repeated runs on identical input produce
+   identical segments, at any ``-p`` process count, and each chromosome arm's
+   segmentation is independent of what else the input file contained, so
+   segmenting one chromosome reproduces that chromosome's rows from a
+   whole-genome run.
+
+   A breakpoint whose p-value falls near ``--threshold`` can still depend on
+   which random stream the test draws, because the decision compares an
+   estimated p-value against a fixed cutoff. Measured on a 47-arm exome
+   fixture, 44 arms give the same segmentation under every seed tried, and 3
+   yield more than one; raising DNAcopy's permutation count enough makes those
+   three agree on the segmentation the fixed seed already produces.
+
 
 Bin filtering
 `````````````

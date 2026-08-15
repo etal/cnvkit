@@ -1,11 +1,16 @@
 #!/usr/bin/env python
-"""Unit tests for CNVkit that require an R installation."""
+"""Unit tests for CNVkit's CBS segmentation and its R integration boundary.
+
+Most of these require an R installation with DNAcopy and are marked ``slow``; a
+few assert what CNVkit sends to R and mock the call instead.
+"""
 
 import logging
 import os
 import shutil
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import numpy as np
@@ -289,6 +294,55 @@ class RTests(unittest.TestCase):
         self.assertEqual(len(set(np.round(bafs, 2))), 2)
         self.assertAlmostEqual(bafs[0], 0.5, places=1)
         self.assertAlmostEqual(bafs[1], 0.3, places=1)
+
+    def test_cbs_arm_input_ignores_the_rest_of_the_file(self):
+        """An arm's input to R ignores the rest of the input file (#188).
+
+        Issue #188 reported that CBS output changed with how much of the genome
+        was in the input, which is why segmentation fans out per chromosome arm.
+        CBS estimates breakpoint significance against a permutation reference
+        distribution, so its result is a function of the RNG stream as well as
+        the data; the seed is a literal in the R script, which is what keeps an
+        arm's stream the same no matter which other arms accompany it.
+
+        Asserted at the R boundary rather than on segment coordinates: R is a
+        deterministic function of the script, the probe table and the arguments,
+        so identical inputs give identical output, and no R installation is
+        needed. A seed derived from an arm's index, or from the file's arm count,
+        would fail here.
+        """
+
+        def capture(cnarr):
+            """Map each arm to the exact script, table and arguments R receives."""
+            seen = {}
+
+            def fake_call_quiet(*args):
+                script = Path(args[3]).read_text()
+                probes = Path(args[4]).read_text()
+                rows = probes.splitlines()[1:]
+                fields = [r.split("\t") for r in rows]
+                chrom = fields[0][0]
+                seen[(chrom, len(rows))] = (script, probes, args[5:])
+                # Stand in for DNAcopy: one segment spanning the arm, so
+                # do_segmentation completes and every arm gets visited.
+                header = ("ID", "chrom", "loc.start", "loc.end", "num.mark", "seg.mean")
+                start = min(int(f[1]) for f in fields)
+                end = max(int(f[2]) for f in fields)
+                return (
+                    "\t".join(header)
+                    + f"\nx\t{chrom}\t{start}\t{end}\t{len(rows)}\t0.0\n"
+                ).encode()
+
+            with mock.patch.object(core, "call_quiet", fake_call_quiet):
+                segmentation.do_segmentation(cnarr, "cbs", processes=1)
+            return seen
+
+        whole = capture(self.tas_cnr)
+        part = capture(self.tas_cnr.in_range("chr7"))
+        self.assertTrue(part, "fixture must yield at least one chr7 arm")
+        self.assertLess(len(part), len(whole), "slice must drop other arms")
+        for arm, sent in part.items():
+            self.assertEqual(sent, whole[arm])
 
 
 def _test_method(self, method):
