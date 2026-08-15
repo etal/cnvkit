@@ -288,10 +288,14 @@ class BatchTests(unittest.TestCase):
         cleanly without needing a full BAM fixture per case.
         """
         invocations = ast_calls_to(batch.batch_run_sample, "do_call", "call")
-        self.assertGreater(
+        self.assertEqual(
             len(invocations),
-            0,
-            "Expected at least one call.do_call() invocation in batch_run_sample",
+            2,
+            "Expected exactly two call.do_call() invocations in "
+            "batch_run_sample: the method='none' pass that filters segments by "
+            "confidence interval, and the final method='threshold' pass that "
+            "assigns absolute copy number. The count is pinned because "
+            "ast_calls_to cannot see an aliased call.",
         )
         for inv in invocations:
             kw_names = {kw.arg for kw in inv.keywords}
@@ -430,11 +434,12 @@ class BatchTests(unittest.TestCase):
         AST-level guard, paired with the bias_smoother guards above.
         """
         invocations = ast_calls_to(batch.batch_run_sample, "do_coverage", "coverage")
-        self.assertGreater(
+        self.assertEqual(
             len(invocations),
-            0,
-            "Expected at least one coverage.do_coverage() invocation in "
-            "batch_run_sample",
+            2,
+            "Expected exactly two coverage.do_coverage() invocations in "
+            "batch_run_sample, one for targets and one for antitargets. The "
+            "count is pinned because ast_calls_to cannot see an aliased call.",
         )
         for inv in invocations:
             self.assertIn(
@@ -455,11 +460,13 @@ class BatchTests(unittest.TestCase):
         invocations = ast_submit_calls(
             batch.batch_make_reference, "batch_write_coverage"
         )
-        self.assertGreater(
+        self.assertEqual(
             len(invocations),
-            0,
-            "Expected at least one pool.submit(batch_write_coverage, ...) "
-            "invocation in batch_make_reference",
+            2,
+            "Expected exactly two pool.submit(batch_write_coverage, ...) "
+            "invocations in batch_make_reference, one for targets and one for "
+            "antitargets. The count is pinned because ast_submit_calls cannot "
+            "see an aliased target.",
         )
         for inv in invocations:
             self.assertIn(
