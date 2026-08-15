@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import warnings
 from typing import TYPE_CHECKING
 
-# import pandas as pd
 import numpy as np
 from scipy import stats
 
@@ -222,7 +222,7 @@ def confidence_interval_bootstrap(
     # the comparison: `smoothed=True` means "always smooth", not "threshold 1".
     use_smoothing = smoothed if isinstance(smoothed, bool) else k <= smoothed
 
-    rng = np.random.default_rng(0xA5EED)
+    rng = _rng_from_values(values, weights)
     rand_indices = rng.integers(0, k, size=(bootstraps, k))
     samples: Iterable[tuple[ndarray, ndarray]] = (
         (np.take(values, idx), np.take(weights, idx)) for idx in rand_indices
@@ -237,6 +237,41 @@ def confidence_interval_bootstrap(
         alphas = _bca_correct_alpha(values, weights, bootstrap_dist, alphas)
     ci = np.percentile(bootstrap_dist, list(100 * alphas))
     return ci  # type: ignore[no-any-return]
+
+
+def _rng_from_values(values: ndarray, weights: ndarray) -> np.random.Generator:
+    """Seed a generator from the segment's own values and weights.
+
+    One fixed seed for every call gives every segment of the same bin count the
+    same resample index matrix, so at the default 100 bootstraps the Monte Carlo
+    error in ``ci_lo``/``ci_hi`` is a common shock across same-size segments
+    rather than something that averages out along a profile: the bounds of two
+    5-bin segments are correlated by construction. Mixing a digest of the
+    segment's own numbers into the seed decorrelates them, and keeps both
+    properties a fixed seed had:
+
+    - repeated runs on the same input give identical bounds, since nothing
+      outside the segment enters the seed;
+    - an interval does not depend on the segment's position in the file or on
+      what else the input contained, so ``segmetrics --ci`` on one chromosome
+      reproduces that chromosome's rows of a whole-genome run. Keying on an
+      iteration counter would have bought decorrelation at the cost of this.
+
+    The digest covers the arrays as little-endian float64 bytes rather than as
+    they arrive, pinning the byte order so the bounds do not depend on the
+    machine. ``log2`` is float64 by construction (``CopyNumArray`` requires it),
+    but ``weight`` keeps whatever dtype pandas inferred while reading the file,
+    so an all-integral weight column arrives as int64 whose bytes are not those
+    of the same numbers as float64 -- enough to break the subset invariance
+    above, since which rows are integral depends on the slice. Both arrays have
+    one entry per bin, so concatenating them cannot be read two ways. Python's
+    ``hash`` is unusable here: it is salted by ``PYTHONHASHSEED``.
+    """
+    digest = hashlib.blake2b(digest_size=8)
+    digest.update(np.asarray(values, dtype="<f8").tobytes())
+    digest.update(np.asarray(weights, dtype="<f8").tobytes())
+    seed = np.random.SeedSequence([0xA5EED, int.from_bytes(digest.digest(), "little")])
+    return np.random.default_rng(seed)
 
 
 def _smooth_samples_by_weight(

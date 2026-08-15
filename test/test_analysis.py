@@ -335,6 +335,79 @@ class AnalysisTests(unittest.TestCase):
         for col in ("ci_lo", "ci_hi"):
             np.testing.assert_array_equal(runs[0][col], runs[1][col])
 
+    def test_same_size_segments_do_not_share_a_resample_pattern(self):
+        """Two segments of equal bin count must not draw the same indices.
+
+        One fixed seed per call made the resample index matrix a function of
+        ``(n_bins, bootstraps)`` alone, which left the unsmoothed interval
+        equivariant under an increasing affine map of the values: the weighted
+        resample means commute with ``a*x + b``, and so do BCa's jackknife
+        influence values, its bias correction (a count of means below the
+        observed one) and its scale-free acceleration. So
+        ``ci(2v + 0.5) == 2*ci(v) + 0.5`` held to machine precision -- possible
+        only while both calls share a stream. Measured on the pre-fix code, the
+        two sides agreed to better than 1e-12.
+
+        This is the property to defend rather than "the bounds differ", because
+        it fails for any rewrite that keys the stream on the bin count, the
+        bootstrap count, or anything else two same-size segments have in common.
+        """
+        rng = np.random.default_rng(7)
+        values = rng.standard_normal(20) * 0.3
+        weights = rng.uniform(0.4, 0.9, 20)
+        scale, shift = 2.0, 0.5
+        plain = segmetrics.confidence_interval_bootstrap(values, weights, 0.05)
+        mapped = segmetrics.confidence_interval_bootstrap(
+            scale * values + shift, weights, 0.05
+        )
+        self.assertFalse(
+            np.allclose(mapped, scale * plain + shift, rtol=1e-6, atol=1e-6),
+            f"{mapped} is the affine image of {plain}, so both segments drew the "
+            "same bootstrap indices",
+        )
+        # Both intervals are still intervals around their own weighted mean.
+        for ci, vals in ((plain, values), (mapped, scale * values + shift)):
+            mean = np.average(vals, weights=weights)
+            self.assertLess(ci[0], mean)
+            self.assertLess(mean, ci[1])
+
+    def test_ci_does_not_depend_on_the_rest_of_the_file(self):
+        """``--ci`` on one chromosome reproduces that chromosome's rows exactly.
+
+        The seed is derived from each segment's own values, so a segment's bounds
+        cannot depend on its position in the input or on what else the input
+        contained. Decorrelating same-size segments by counting iterations would
+        have passed the reproducibility test above and broken this one, which is
+        why it is asserted rather than left as a measured property.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        whole = segmetrics.do_segmetrics(cnarr, segarr, interval_stats=["ci"])
+        part = segmetrics.do_segmetrics(
+            cnarr.in_range("chr7"), segarr.in_range("chr7"), interval_stats=["ci"]
+        )
+        self.assertGreater(len(part), 1, "fixture must have several chr7 segments")
+        whole_chr7 = whole.in_range("chr7")
+        for col in ("ci_lo", "ci_hi"):
+            np.testing.assert_array_equal(whole_chr7[col], part[col])
+
+    def test_ci_ignores_the_weight_columns_dtype(self):
+        """Weights read as integers must give the bounds their float values give.
+
+        Reachable through CNVkit's own writer, not only a hand-written file: it
+        formats with ``%.6g``, so an all-1.0 weight column is written as ``1`` and
+        reads back as int64. ``_rng_from_values`` casts before digesting for this
+        reason; the consequences of not casting are recorded there.
+        """
+        values = np.array([-0.3, 0.1, 0.25, 0.4, -0.15])
+        as_int = np.ones(len(values), dtype=np.int64)
+        as_float = as_int.astype(np.float64)
+        self.assertNotEqual(as_int.dtype, as_float.dtype, "case must differ in dtype")
+        np.testing.assert_array_equal(
+            segmetrics.confidence_interval_bootstrap(values, as_int, 0.05),
+            segmetrics.confidence_interval_bootstrap(values, as_float, 0.05),
+        )
+
     def test_bca_jackknife_matches_leave_one_out(self):
         """BCa's influence values are the leave-one-out weighted means.
 

@@ -268,8 +268,9 @@ Supported stats:
   with Gaussian noise added, since too few bins are available to represent the
   underlying distribution; larger segments instead receive the bias-corrected
   and accelerated (BCa) adjustment. Both the resampling and the added noise are
-  drawn from a fixed seed, so repeated runs on the same input give identical
-  bounds.
+  drawn from a seed derived from the segment's own log2 ratios and weights, so
+  repeated runs on the same input give identical bounds, and no two segments
+  draw the same resample pattern merely by having the same number of bins.
 
 - Prediction interval (``--pi``), estimated by the range between the 2.5-97.5
   percentiles of the segment's bin-level log2 ratios. The upper and lower bounds
