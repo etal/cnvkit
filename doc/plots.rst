@@ -260,6 +260,36 @@ This plot style works best with target panels of a few hundred genes at most;
 with whole-exome sequencing there are often so many genes affected by CNAs that
 the individual gene labels become difficult to read.
 
+The bin side is aggregated rather than drawn bin by bin. Every feature is
+stroked a point wide whatever its span, and a chromosome gets only a couple of
+hundred points of the page -- about 220 for a whole genome in two rows, about
+490 when a single contig has the page to itself -- so a panel that puts several
+hundred bins on one chromosome paints them over each other and the reader sees
+whichever bin was drawn last, not the data. Each targeted gene is therefore
+drawn as a single feature, carrying the same log2 ratio the :ref:`genemetrics`
+table reports for it, and every stretch the .cnr does not name -- off-target
+bins, and everything in an unannotated file -- is averaged onto the page's own
+resolution, one feature per drawn point. The two rules apply side by side, so an
+annotated whole-genome .cnr shows gene-level features at its genes and
+page-level features between them.
+
+Whatever still shares a drawn point after that is combined, since the page
+cannot show it separately. On a panel this changes nothing, genes being far
+apart in page terms, but an annotated whole-genome .cnr can put thousands of
+genes on a couple of hundred points, and there the gene-by-gene reading is
+already lost. Where genes and off-target bins share a point the genes decide
+the color, because a target is a few hundred bases inside an off-target bin of
+hundreds of kilobases and averaging the two would report the background. A
+combined feature is summarized by the biweight location of its bins rather
+than their mean, since bins with no coverage are recorded at a floor of -20
+and a mean over those reads as a deletion; the gene labels still name every
+gene that passed the threshold, one label apiece.
+
+``--no-squash-genes`` draws one feature per bin instead. That is legible only
+where a chromosome carries few enough bins to tell apart, such as a small
+genome or a short contig, and it is the one setting under which an annotated
+.cnr and an unannotated one render identically (#650).
+
 .. image:: _static/TR_95_T-diagram.png
 
 By default, the sex chromosomes X and Y are colorized relative to the expected

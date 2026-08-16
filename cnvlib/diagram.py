@@ -10,7 +10,7 @@ from __future__ import annotations
 import collections
 import math
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 # Reportlab triggers a DeprecationWarning via load_module on import, which can
 # become an error under `-W error`. Silence it for just these imports rather
@@ -24,11 +24,16 @@ with warnings.catch_warnings():
     from reportlab.lib.units import inch
     from reportlab.pdfgen import canvas
 
+import numpy as np
+
 from skgenome.rangelabel import unpack_range
 
-from . import params, plots, reports
+from . import descriptives, params, plots, reports
+from .segmetrics import segment_mean
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from reportlab.graphics.shapes import Drawing
 
     from cnvlib.cnary import CopyNumArray
@@ -36,6 +41,40 @@ if TYPE_CHECKING:
 TELOMERE_LENGTH = 6e6  # For illustration only
 CHROM_FATNESS = 0.3
 PAGE_SIZE = (11.0 * inch, 8.5 * inch)
+# Page layout, shared by `bc_organism_draw` and by the resolution the bin half
+# is aggregated to. Every feature is stroked a point wide whatever its span,
+# so the points a chromosome gets are also the features it can distinguish.
+MARGIN_TOP = 1.25 * inch
+MARGIN_BOTTOM = 0.1 * inch
+MARGIN_SIDE = 0.5 * inch
+CHROM_WRAP = 12  # Chromosomes per row
+# Gene-column values that name no gene: placeholders and off-target bins
+_UNNAMED = frozenset(params.IGNORE_GENE_NAMES + params.ANTITARGET_ALIASES)
+
+
+def _bp_per_point(chrom_sizes: collections.OrderedDict) -> float:
+    """Base pairs the page gives one drawn point, on the tightest row.
+
+    Biopython divides a chromosome's vertical space by ``scale_num``, which
+    ``build_chrom_diagram`` sets to the longest chromosome plus its two
+    telomeres, and applies a 0.95 factor to the row's top coordinate. The rows
+    come from ``bc_organism_draw`` above, so the arithmetic belongs here rather
+    than in a measured constant: a whole genome gets ~220 points per scale and
+    a single contig ~490, and a constant fitted to one of those aggregates the
+    other twice as coarsely as the page can draw.
+    """
+    nrows = math.ceil(len(chrom_sizes) / CHROM_WRAP)
+    row_height = (PAGE_SIZE[1] - MARGIN_TOP - MARGIN_BOTTOM) / nrows
+    points = min(
+        (PAGE_SIZE[1] - MARGIN_TOP - row_height * row) * 0.95
+        - (MARGIN_BOTTOM + row_height * (nrows - row - 1))
+        for row in range(nrows)
+    )
+    scale = max(chrom_sizes.values()) + 2 * TELOMERE_LENGTH
+    # Biopython applies its 0.95 to an absolute page coordinate, so beyond ~20
+    # rows the space it computes goes negative; draw everything as one point
+    # rather than dividing by it.
+    return scale / points if points > 1 else float(scale)
 
 
 def create_diagram(
@@ -51,8 +90,21 @@ def create_diagram(
     threshold_low: float | None = None,
     threshold_high: float | None = None,
     gene_names: list[str] | None = None,
+    squash_genes: bool = True,
 ) -> str:
     """Create the diagram.
+
+    Segments (``segarr``) are drawn on the left half of each chromosome, one
+    feature apiece. The bin-level array (``cnarr``) is drawn on the right, but
+    not one feature per bin: Biopython strokes every feature a point wide
+    whatever its span, and a chromosome body is only a couple of hundred
+    points tall, so on a comprehensive panel or an exome the bins overdraw
+    each other and the page shows whichever bin was painted last. The bin half
+    is therefore aggregated by ``_aggregate_bins``, to genes where the .cnr
+    names them and to the page's own resolution everywhere else. Passing
+    ``squash_genes=False`` draws one feature per bin instead, which suits a
+    small genome or an assembly whose contigs are short enough for individual
+    bins to be legible.
 
     Gene labels are drawn for segments whose log2 ratio passes a threshold.
     By default the symmetric ``threshold`` is used (label when
@@ -97,30 +149,37 @@ def create_diagram(
         low, high = -threshold, threshold
     else:
         low, high = threshold_low, threshold_high
-    gene_labels = _get_gene_labels(cnarr, segarr, cnarr_is_seg, low, high, min_probes)
+    # Selecting labels means grouping every bin by gene, seconds of work on a
+    # WGS array -- skip it when nothing will be labeled. An empty set then
+    # leaves every row unlabeled below.
+    gene_labels = (
+        _get_gene_labels(cnarr, segarr, cnarr_is_seg, low, high, min_probes)
+        if show_labels
+        else set()
+    )
     requested = set(gene_names) if gene_names else None
 
-    # NB: If multiple segments cover the same gene (gene contains breakpoints),
-    # all those segments are marked as "hits".  We'll uniquify them.
-    # TODO - use different logic to only label the gene's signficant segment(s)
-    seen_genes = set()
+    # A gene that spans several segments, or is co-binned with its neighbors,
+    # reaches this loop once per row it appears in; label it only at the first.
+    # TODO - label the gene's most significant row instead of its first
+    seen_genes: set[str] = set()
 
-    # Consolidate genes & coverage values as chromosome features
+    # The segment half (below) is drawn separately, one feature per segment
     features = collections.defaultdict(list)
     strand = 1 if do_both else None  # Draw on the chr. right half or full width
     chrom_sizes = plots.chromosome_sizes(cnarr)
-    if not cnarr_is_seg:
-        cnarr = cnarr.squash_genes()
-    for row in cnarr:
+    drawn = (
+        cnarr
+        if cnarr_is_seg or not squash_genes
+        else _aggregate_bins(cnarr, _bp_per_point(chrom_sizes))
+    )
+    for row in drawn:
         span = _feature_span(row.start, row.end, chrom_sizes[row.chromosome])
         if span is not None:
             lo, hi = span
-            if show_labels and row.gene in gene_labels and row.gene not in seen_genes:
-                seen_genes.add(row.gene)
-                # TODO - line-wrap multi-gene labels (reportlab won't do \n)
-                feat_name = _gene_feature_label(row.gene, requested)
-            else:
-                feat_name = None
+            feat_name = _gene_feature_label(
+                row.gene, gene_labels, requested, seen_genes
+            )
             features[row.chromosome].append(
                 (
                     lo,
@@ -150,12 +209,123 @@ def create_diagram(
     # Generate the diagram PDF
     if not outfname:
         outfname = cnarr.sample_id + "-diagram.pdf"
-    drawing = build_chrom_diagram(features, chrom_sizes, cnarr.sample_id, title)  # type: ignore[arg-type]
+    drawing = build_chrom_diagram(features, chrom_sizes, cnarr.sample_id, title)
     cvs = canvas.Canvas(outfname, pagesize=PAGE_SIZE)
     renderPDF.draw(drawing, cvs, 0, 0)
     cvs.showPage()
     cvs.save()
     return outfname
+
+
+class _Feature(NamedTuple):
+    """One drawn row of the bin half, in the shape the feature loop reads."""
+
+    chromosome: str
+    start: int
+    end: int
+    log2: float
+    gene: str
+
+
+def _aggregate_bins(cnarr: CopyNumArray, resolution: float) -> Iterator[_Feature]:
+    """Reduce bins to the features a page can actually distinguish.
+
+    Each targeted gene becomes one feature spanning its bins, carrying the
+    log2 ratio ``genemetrics`` reports for it, so the ideogram and the table
+    agree. Every stretch the .cnr does not name -- off-target bins, or all of
+    them in an unannotated file -- is cut on a grid of ``resolution`` base
+    pairs, one drawn point, since nothing finer survives the page. The two
+    rules apply per stretch, not per file: an annotated whole-genome .cnr gets
+    gene features at its genes and gridded features between them.
+
+    Whatever then still shares a drawn point is combined, because the page
+    cannot show it separately and drawing it anyway means the last feature
+    painted decides the color. On a panel this changes nothing -- genes are
+    far apart in page terms -- but an annotated whole-genome .cnr puts
+    thousands of gene features on a couple of hundred points, and there the
+    gene-by-gene reading is already lost.
+    """
+    for chrom, subarr in cnarr.by_chromosome():
+        cells: dict[int, list[tuple[str, CopyNumArray]]] = {}
+        for name, rows in subarr.by_gene():
+            if not len(rows):
+                continue
+            if name in _UNNAMED:
+                for cell, cell_rows in _split_on_grid(rows, resolution):
+                    cells.setdefault(cell, []).append(("", cell_rows))
+            else:
+                cell = int(rows.start.min() // resolution)
+                cells.setdefault(cell, []).append((name, rows))
+        for _cell, members in sorted(cells.items()):
+            yield _combine(chrom, members)
+
+
+def _split_on_grid(
+    rows: CopyNumArray, resolution: float
+) -> Iterator[tuple[int, CopyNumArray]]:
+    """Cut a run of unnamed bins at the boundaries between drawn points."""
+    # Bins arrive in genomic order, so equal cells are consecutive and the
+    # boundaries between them are where the cell index steps up.
+    cell_of_bin = (rows.start.to_numpy() // resolution).astype(int)
+    edges = np.flatnonzero(np.diff(cell_of_bin)) + 1
+    for lo, hi in zip(
+        np.concatenate(([0], edges)),
+        np.concatenate((edges, [len(cell_of_bin)])),
+        strict=True,
+    ):
+        yield int(cell_of_bin[lo]), rows.as_dataframe(rows.data.iloc[lo:hi])
+
+
+def _combine(chrom: str, members: list[tuple[str, CopyNumArray]]) -> _Feature:
+    """One drawn feature from everything that landed on one point.
+
+    A gene with a point to itself keeps the weighted mean ``genemetrics``
+    publishes for it, so the plot and the table agree wherever the page has
+    room to say so.
+
+    Where several things share a point, targeted genes decide the color and
+    the off-target bins around them are left out of it: on a capture panel a
+    gene sits inside a much larger off-target bin, and averaging the two
+    reports the background instead of the gene -- measured on
+    test/formats/p2-20_1.cnr, METTL8 reads -1.17 in the table and -0.11 if its
+    neighbors are included.
+
+    The summary is then the biweight location of the bins in question, not
+    their mean. A mean cannot be used across many bins here because ``fix``
+    floors zero-coverage bins near -20, which is a censoring marker rather
+    than a measurement: on test/formats/wgs-chr17.cnr, where 21,361 of 165,626
+    bins sit at that floor, a weighted mean drives 288 of the 371 combined
+    cells past the color scale's -1.33 cutoff, against 12 for the biweight
+    location. Which estimator each summarizing site in CNVkit should use is a
+    wider question than this plot.
+    """
+    names = list(dict.fromkeys(name for name, _rows in members if name))
+    start = min(rows.start.min() for _name, rows in members)
+    end = max(rows.end.max() for _name, rows in members)
+    if len(members) == 1 and names:
+        return _Feature(chrom, start, end, segment_mean(members[0][1]), names[0])
+    speaking = [rows for name, rows in members if name] or [
+        rows for _name, rows in members
+    ]
+    log2s = np.concatenate([rows.log2.to_numpy() for rows in speaking])
+    return _Feature(
+        chrom, start, end, descriptives.biweight_location(log2s), ",".join(names)
+    )
+
+
+def _split_gene_names(gene: Any) -> list[str]:
+    """Individual gene names in a row's ``gene`` field, in order, deduplicated.
+
+    A bin or segment names every gene it covers, comma-joined; placeholders
+    ("-", "Antitarget", ...) name none. The field may also be missing: the BED
+    and interval-list readers default it to "-", but ``read_tab`` passes a
+    blank column through as NaN, and an array built in memory need not set it
+    at all.
+    """
+    if not isinstance(gene, str):
+        return []
+    names = (name.strip() for name in gene.split(","))
+    return list(dict.fromkeys(name for name in names if name and name not in _UNNAMED))
 
 
 def _get_gene_labels(
@@ -165,20 +335,24 @@ def _get_gene_labels(
     threshold_low: float | None,
     threshold_high: float | None,
     min_probes: int,
-) -> list[Any]:
-    """Label genes whose copy ratio passes a directional threshold.
+) -> set[str]:
+    """Gene names whose copy ratio passes a directional threshold.
 
     A gene qualifies when its log2 value is at or above ``threshold_high``
     (a gain) or at or below ``threshold_low`` (a loss). Either bound may be
     ``None`` to disable labeling in that direction.
+
+    Segments name every gene they cover, so the qualifying rows are split into
+    individual names: the drawn rows are bins and segments, not genes, and a
+    whole comma-joined string would match only the rows spelling it the same
+    way.
     """
     if cnarr_is_seg:
         # Only segments (.cns): build the directional mask directly.
         mask = cnarr.data["log2"].map(
             lambda v: _passes(v, threshold_low, threshold_high)
         )
-        sel = cnarr.data[mask & ~cnarr.data.gene.isin(params.IGNORE_GENE_NAMES)]
-        rows = sel.itertuples(index=False)
+        rows = cnarr.data[mask].itertuples(index=False)
         probes_attr = "probes"
     elif segarr:
         # Both segments and bin-level ratios. gene_metrics_by_segment filters on
@@ -202,7 +376,12 @@ def _get_gene_labels(
             if _passes(row.log2, threshold_low, threshold_high)
         )
         probes_attr = "probes"
-    return [row.gene for row in rows if getattr(row, probes_attr) >= min_probes]
+    return {
+        name
+        for row in rows
+        if getattr(row, probes_attr) >= min_probes
+        for name in _split_gene_names(row.gene)
+    }
 
 
 def _passes(
@@ -230,37 +409,56 @@ def _feature_span(start: int, end: int, chrom_size: int) -> tuple[int, int] | No
     in memory is not covered at all. Biopython's chromosome renderer asserts
     ``0 <= start <= end <= length``, so an un-normalized reversed interval
     would crash the diagram.
+
+    A feature reaching the start of the chromosome is clamped there rather
+    than dropped. The renderer's lower bound is what the subtraction can
+    violate, and it can only be violated by one base; dropping instead cost
+    the whole first feature, which since the bin half is aggregated is not one
+    bin but every bin up to the first drawn point -- 474 of them, three named
+    genes among them, on test/formats/wgs-chr17.cnr.
     """
-    lo = min(start, end) - 1
+    lo = max(0, min(start, end) - 1)
     hi = max(start, end)
-    if lo >= 0 and hi <= chrom_size:
+    # `lo` is clamped, `hi` is not, so an interval lying entirely below zero
+    # would come back inverted; Biopython asserts against exactly that.
+    if lo <= hi <= chrom_size:
         return lo, hi
     return None
 
 
-def _gene_feature_label(gene: str, requested: set[str] | None) -> str | None:
-    """Build the on-plot label for a qualifying segment or gene.
+def _gene_feature_label(
+    gene: Any,
+    gene_labels: set[str],
+    requested: set[str] | None,
+    seen: set[str],
+) -> str | None:
+    """Build the on-plot label for a drawn row, or None if it earns none.
 
-    Without ``requested`` (no --gene), expand the bin's comma-joined gene
-    string for display, preserving legacy output. With ``requested``, show only
-    the requested genes -- dropping co-binned neighbors the user did not ask for
-    and collapsing duplicate names.
+    Keep the row's gene names that passed the threshold, that ``--gene``
+    requested (when given), and that no earlier row has already been labeled
+    with; the kept names join into one label and are recorded in ``seen``.
     """
-    if requested is None:
-        return gene.replace(",", ", ")
-    names = list(
-        dict.fromkeys(n.strip() for n in gene.split(",") if n.strip() in requested)
-    )
-    return ", ".join(names) if names else None
+    names = [
+        name
+        for name in _split_gene_names(gene)
+        if name in gene_labels
+        and name not in seen
+        and (requested is None or name in requested)
+    ]
+    if not names:
+        return None
+    seen.update(names)
+    # TODO - line-wrap a multi-gene label (reportlab won't do \n)
+    return ", ".join(names)
 
 
 def build_chrom_diagram(
     features: collections.defaultdict[
-        str, list[tuple[int, int, int, None, colors.Color]]
+        str, list[tuple[int, int, int | None, str | None, colors.Color]]
     ],
     chr_sizes: collections.OrderedDict,
     sample_id: str,
-    title: None = None,
+    title: str | None = None,
 ) -> Drawing:
     """Create a PDF of color-coded features on chromosomes."""
     max_chr_len = max(chr_sizes.values())
@@ -299,11 +497,11 @@ def build_chrom_diagram(
         chr_diagram.add(cur_chromosome)
 
     if not title:
-        title = "Sample " + sample_id  # type: ignore[assignment]
-    return bc_organism_draw(chr_diagram, title)  # type: ignore[arg-type]
+        title = "Sample " + sample_id
+    return bc_organism_draw(chr_diagram, title)
 
 
-def bc_organism_draw(org: BC.Organism, title: str, wrap: int = 12) -> Drawing:
+def bc_organism_draw(org: BC.Organism, title: str, wrap: int = CHROM_WRAP) -> Drawing:
     """Modified copy of Bio.Graphics.BasicChromosome.Organism.draw.
 
     Instead of stacking chromosomes horizontally (along the x-axis), stack rows
@@ -319,9 +517,9 @@ def bc_organism_draw(org: BC.Organism, title: str, wrap: int = 12) -> Drawing:
         Maximum number of chromosomes per row; the remainder will be wrapped to
         the next row(s).
     """
-    margin_top = 1.25 * inch
-    margin_bottom = 0.1 * inch
-    margin_side = 0.5 * inch
+    margin_top = MARGIN_TOP
+    margin_bottom = MARGIN_BOTTOM
+    margin_side = MARGIN_SIDE
 
     width, height = org.page_size
     cur_drawing = BC.Drawing(width, height)

@@ -12,7 +12,7 @@ from skgenome import GenomicArray
 from skgenome.chromnames import infer_sex_chrom_labels
 from skgenome.genomebuild import get_genome_build
 
-from . import core, descriptives, params, smoothing
+from . import descriptives, params, smoothing
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -333,71 +333,6 @@ class CopyNumArray(GenomicArray):
         if verbose and drop_idx.any():
             logging.info("Dropped %d low-coverage bins", drop_idx.sum())
         return self[~drop_idx]
-
-    def squash_genes(
-        self,
-        summary_func: Callable = descriptives.biweight_location,
-        squash_antitarget: bool = False,
-        ignore: tuple[str, ...] = params.IGNORE_GENE_NAMES,
-    ) -> CopyNumArray:
-        """Combine consecutive bins with the same targeted gene name.
-
-        Parameters
-        ----------
-        summary_func : callable
-            Function to summarize an array of log2 values to produce a
-            new log2 value for a "squashed" (i.e. reduced) region. By default
-            this is the biweight location, but you might want median, mean, max,
-            min or something else in some cases.
-        squash_antitarget : bool
-            If True, also reduce consecutive "Antitarget" bins into a single
-            bin. Otherwise, keep "Antitarget" and ignored bins as they are in
-            the output.
-        ignore : list or tuple of str
-            Bin names to be treated as "Antitarget" instead of as unique genes.
-
-        Return
-        ------
-        CopyNumArray
-            Another, usually smaller, copy of `self` with each gene's bins
-            reduced to a single bin with appropriate values.
-        """
-
-        def squash_rows(name, rows):
-            """Combine multiple rows (for the same gene) into one row."""
-            if len(rows) == 1:
-                return tuple(rows.iloc[0])
-            # Build row matching self.data.columns order exactly
-            outrow = []
-            for col in self.data.columns:
-                match col:
-                    case "chromosome":
-                        outrow.append(core.check_unique(rows.chromosome, "chromosome"))
-                    case "start":
-                        outrow.append(rows.start.iat[0])
-                    case "end":
-                        outrow.append(rows.end.iat[-1])
-                    case "gene":
-                        outrow.append(name)
-                    case "log2":
-                        outrow.append(summary_func(rows.log2))
-                    case "probes":
-                        # Special case: sum probes rather than average
-                        outrow.append(sum(rows[col]))
-                    case _:
-                        # All other fields: use summary function
-                        outrow.append(summary_func(rows[col]))
-            return tuple(outrow)
-
-        outrows = []
-        for name, subarr in self.by_gene(ignore):
-            if not len(subarr):
-                continue
-            if name in params.ANTITARGET_ALIASES and not squash_antitarget:
-                outrows.extend(subarr.data.itertuples(index=False))
-            else:
-                outrows.append(squash_rows(name, subarr.data))
-        return self.as_rows(outrows)
 
     # Chromosomal sex
 

@@ -327,7 +327,6 @@ def gene_metrics_by_segment(
                 yield row
 
 
-# ENH consolidate with CNA.squash_genes
 def compute_gene_stats(
     bins: CopyNumArray,
     gene_log2: float,

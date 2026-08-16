@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import unittest
 import warnings
+from unittest import mock
 
 logging.basicConfig(level=logging.ERROR, format="%(message)s")
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -310,33 +311,65 @@ class DiagramGeneLabelTests(unittest.TestCase):
         seg = self._segments()
         seg.data["probes"] = [1, 1, 1, 1]
         labels = diagram._get_gene_labels(seg, None, True, -0.5, 0.5, 3)
-        self.assertEqual(labels, [])
+        self.assertEqual(labels, set())
+
+    def test_get_gene_labels_splits_co_binned_names(self):
+        """Each name on a qualifying segment qualifies on its own.
+
+        The drawn rows are segments and bins, never genes, so a label keyed on
+        the whole comma-joined string would only ever match a row spelling it
+        the same way -- silently dropping every gene that occurs only beside a
+        neighbor.
+        """
+        seg = self._segments()
+        labels = diagram._get_gene_labels(seg, None, True, -0.5, 0.5, 3)
+        self.assertEqual(labels, {"GAINER", "LOSER", "NF1", "ERBB2", "MIR4728"})
 
     def test_gene_feature_label_default(self):
-        """Without -g, the comma-joined gene string is expanded verbatim."""
+        """Without -g, a row is labeled with each qualifying name it carries."""
+        labels = {"NF1", "ERBB2", "MIR4728"}
+        seen: set[str] = set()
         self.assertEqual(
-            diagram._gene_feature_label("NF1,ERBB2,ERBB2,MIR4728", None),
-            "NF1, ERBB2, ERBB2, MIR4728",
+            diagram._gene_feature_label("NF1,ERBB2,ERBB2,MIR4728", labels, None, seen),
+            "NF1, ERBB2, MIR4728",
         )
-        self.assertEqual(diagram._gene_feature_label("GAINER", None), "GAINER")
+        # Those names are now spoken for: a later row naming them is not
+        # labeled again, however it spells the combination.
+        self.assertIsNone(
+            diagram._gene_feature_label("ERBB2,MIR4728", labels, None, seen)
+        )
+        # A name that did not pass the threshold earns no label
+        self.assertIsNone(diagram._gene_feature_label("STARD3", labels, None, set()))
+        # Neither does a placeholder, or a missing value from an in-memory row
+        self.assertIsNone(diagram._gene_feature_label("-", labels, None, set()))
+        self.assertIsNone(
+            diagram._gene_feature_label(float("nan"), labels, None, set())
+        )
 
     def test_gene_feature_label_restricts_to_requested(self):
         """-g shows only requested genes, dropping co-binned neighbors and dups."""
+        labels = {"NF1", "ERBB2", "MIR4728"}
         # ERBB2 requested: NF1/MIR4728 neighbors dropped; duplicate ERBB2 collapsed
         self.assertEqual(
-            diagram._gene_feature_label("NF1,ERBB2,ERBB2,MIR4728", {"ERBB2"}),
+            diagram._gene_feature_label(
+                "NF1,ERBB2,ERBB2,MIR4728", labels, {"ERBB2"}, set()
+            ),
             "ERBB2",
         )
         # Multiple requested genes sharing the bin all appear, in order
         self.assertEqual(
-            diagram._gene_feature_label("NF1,ERBB2,MIR4728", {"ERBB2", "MIR4728"}),
+            diagram._gene_feature_label(
+                "NF1,ERBB2,MIR4728", labels, {"ERBB2", "MIR4728"}, set()
+            ),
             "ERBB2, MIR4728",
         )
         # A segment with no requested gene yields no label
-        self.assertIsNone(diagram._gene_feature_label("STARD3", {"ERBB2"}))
+        self.assertIsNone(
+            diagram._gene_feature_label("STARD3", labels, {"ERBB2"}, set())
+        )
         # Whitespace around comma-separated names is tolerated when matching
         self.assertEqual(
-            diagram._gene_feature_label("NF1, ERBB2", {"ERBB2"}),
+            diagram._gene_feature_label("NF1, ERBB2", labels, {"ERBB2"}, set()),
             "ERBB2",
         )
 
@@ -385,6 +418,265 @@ class DiagramGeneLabelTests(unittest.TestCase):
         )
 
 
+class DiagramAggregationTests(unittest.TestCase):
+    """What the bin half draws, and how much of it (#650, #742).
+
+    Biopython strokes every feature a point wide whatever its span and a
+    chromosome gets only a couple of hundred points of the page, so a .cnr with
+    hundreds of bins on one chromosome cannot be drawn bin by bin: the features
+    overdraw and the page shows whichever came last. The bin half is aggregated
+    to genes where the .cnr names them and to the page's resolution everywhere
+    else, so both kinds of stretch stay under about one feature per drawn point.
+    """
+
+    # Distinct gains, all below cvg2rgb's 1.33 saturation cutoff so that each
+    # one has its own color
+    LOG2S = (1.2, 0.9, 0.3, 1.0, 0.6, 0.75)
+
+    @staticmethod
+    def _render(cnarr, segarr=None, squash_genes=True):
+        """Render to a throwaway PDF; return (bin features, labels drawn)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.object(
+                diagram, "build_chrom_diagram", wraps=diagram.build_chrom_diagram
+            ) as spy:
+                diagram.create_diagram(
+                    cnarr,
+                    segarr,
+                    0.5,
+                    3,
+                    os.path.join(tmpdir, "diagram.pdf"),
+                    squash_genes=squash_genes,
+                )
+        captured = spy.call_args.args[0]
+        bins = {
+            chrom: [
+                (lo, hi, color.rgb())
+                for lo, hi, strand, _name, color in rows
+                if strand != -1
+            ]
+            for chrom, rows in captured.items()
+        }
+        labels = [
+            label
+            for rows in captured.values()
+            for _lo, _hi, _strand, label, _color in rows
+            if label
+        ]
+        return bins, labels
+
+    @staticmethod
+    def _unannotated(cnarr):
+        """The same coverage as `batch` without --annotate would name it."""
+        out = cnarr.copy()
+        out.data["gene"] = "-"
+        return out
+
+    @staticmethod
+    def _strokes_per_point(features, cnarr):
+        """Drawn features per point of chromosome, the overdraw measure."""
+        sizes = plots.chromosome_sizes(cnarr)
+        resolution = diagram._bp_per_point(sizes)
+        return {
+            chrom: len(rows) / (sizes[chrom] / resolution)
+            for chrom, rows in features.items()
+        }
+
+    def test_gene_with_a_point_to_itself_carries_its_genemetrics_log2(self):
+        """A gene drawn alone is colored by the value the table reports.
+
+        The ideogram and `genemetrics` are meant to be read together, so a
+        gene's block takes `group_by_genes`' weighted mean rather than a
+        second, disagreeing summary of the same bins. Where the page has no
+        room to separate two genes their feature is a blend instead, which is
+        why this asserts only over the features naming one gene.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        resolution = diagram._bp_per_point(plots.chromosome_sizes(cnarr))
+        drawn = list(diagram._aggregate_bins(cnarr, resolution))
+        expected = {
+            row.gene: row.log2 for row in reports.gene_metrics_by_gene(cnarr, 0.0)
+        }
+        alone = [f for f in drawn if f.gene and "," not in f.gene]
+        self.assertGreater(len(alone), 30)
+        for feat in alone:
+            self.assertAlmostEqual(feat.log2, expected[feat.gene], places=12)
+        # chr17: TP53, NF1, and ERBB2 blended with the co-binned MIR4728
+        chr17 = [f for f in drawn if f.chromosome == "chr17"]
+        self.assertEqual([f.gene for f in chr17], ["TP53", "NF1", "ERBB2,MIR4728"])
+
+    def test_targets_decide_a_shared_point_not_the_background(self):
+        """Off-target bins do not dilute a gene they happen to sit beside.
+
+        On a capture panel a target is a few hundred bases inside an
+        off-target bin of hundreds of kilobases; averaging the two would
+        report the background. METTL8 reads -1.17 in the table, and -0.11 if
+        its neighbors are counted.
+        """
+        cnarr = cnvlib.read("formats/p2-20_1.cnr")
+        resolution = diagram._bp_per_point(plots.chromosome_sizes(cnarr))
+        drawn = {
+            name: feat
+            for feat in diagram._aggregate_bins(cnarr, resolution)
+            for name in feat.gene.split(",")
+            if name
+        }
+        self.assertAlmostEqual(drawn["METTL8"].log2, -1.1732, places=3)
+
+    def test_a_combined_cell_resists_zero_coverage_bins(self):
+        """A cell is summarized robustly, so floored bins cannot sink it.
+
+        `fix` records a bin with no coverage at a floor near -20 rather than as
+        missing. Those are censoring markers, not measurements, and a mean over
+        a cell holding one drives the whole cell past the color scale: on
+        test/formats/wgs-chr17.cnr, where 12.9% of bins sit at the floor, a
+        weighted mean puts 288 of the 371 combined cells past the -1.33 cutoff
+        against 12 for the biweight location.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100 * i, 100 * i + 100, "-", log2]
+                for i, log2 in enumerate(
+                    [0.05, -0.05, 0.0, -20.0, 0.02, -0.02], start=1
+                )
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+            meta_dict={"sample_id": "floored"},
+        )
+        # One cell, since the whole array is far narrower than one drawn point
+        drawn = list(diagram._aggregate_bins(cnarr, 1e6))
+        self.assertEqual(len(drawn), 1)
+        self.assertAlmostEqual(drawn[0].log2, 0.0, places=1)
+        self.assertGreater(drawn[0].log2, -1.33)  # the mean would be -3.33
+
+    def test_unnamed_stretches_collapse_to_page_resolution(self):
+        """Bins the .cnr does not name are averaged onto the drawn grid.
+
+        Applies per stretch, not per file: an annotated .cnr gets gene
+        features at its genes and gridded features between them, and an
+        unannotated one is gridded throughout.
+        """
+        cnarr = cnvlib.read("formats/p2-20_1.cnr")
+        squashed, _labels = self._render(cnarr)
+        per_bin, _l = self._render(cnarr, squash_genes=False)
+        busiest = max(self._strokes_per_point(per_bin, cnarr).values())
+        after = max(self._strokes_per_point(squashed, cnarr).values())
+        self.assertGreater(busiest, 5)  # what per-bin drawing would paint
+        self.assertLessEqual(after, 1.0)
+        # The off-target bins are the bulk of that panel and carry no name
+        self.assertLess(sum(len(v) for v in squashed.values()), len(cnarr) / 4)
+
+    def test_unannotated_input_is_bounded_too(self):
+        """An all-"-" .cnr has no genes to squash, and is still not per-bin."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        plain, labels = self._render(self._unannotated(cnarr))
+        self.assertEqual(labels, [])
+        self.assertLess(max(self._strokes_per_point(plain, cnarr).values()), 2)
+
+    def test_no_squash_genes_draws_every_bin_annotation_independently(self):
+        """--no-squash-genes is the mode that ignores the gene column (#650).
+
+        Aggregating by gene necessarily consults the names; the escape hatch
+        for a small genome does not, so there the same coverage renders
+        identically annotated or not.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        segarr = cnvlib.read("formats/amplicon.cns")
+        annotated, labels = self._render(cnarr, segarr, squash_genes=False)
+        unannotated, no_labels = self._render(
+            self._unannotated(cnarr), segarr, squash_genes=False
+        )
+        self.assertEqual(annotated, unannotated)
+        self.assertEqual(len(annotated["chr17"]), 102)  # one per bin
+        self.assertIn("ERBB2", {n for label in labels for n in label.split(", ")})
+        self.assertEqual(no_labels, [])
+
+    def test_co_binned_gene_is_labeled(self):
+        """A gene sharing every one of its bins with a neighbor is still named.
+
+        Two of amplicon.cnr's genes -- GS1-5L10.1 (only ever beside RUNX1T1)
+        and RP11-461L13.2 (only ever beside FBXW7) -- qualify for a label but
+        went unlabeled while a drawn row was matched by its whole gene string,
+        which spells both names at once.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        _features, labels = self._render(cnarr, cnvlib.read("formats/amplicon.cns"))
+        drawn = [name for label in labels for name in label.split(", ")]
+        self.assertLessEqual({"GS1-5L10.1", "RUNX1T1"}, set(drawn))
+        self.assertLessEqual({"RP11-461L13.2", "FBXW7"}, set(drawn))
+        # ... and each name is drawn once, not once per row that spells it
+        self.assertEqual(len(drawn), len(set(drawn)))
+
+    @classmethod
+    def _synthetic(cls):
+        """Six bins of AMP, the last three co-binned with NEIGHBOR.
+
+        Both genes clear the default 3-bin ``min_probes`` -- AMP over six bins,
+        NEIGHBOR over the three it shares with AMP -- and both clear the 0.5
+        threshold on their gene-level means, 0.79 and 0.78, although one bin's
+        own log2 is below it. Every bin carries a distinct log2 value.
+        """
+        genes = ["AMP"] * 3 + ["AMP,NEIGHBOR"] * 3
+        return cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 100 * i, 100 * i + 100, gene, log2]
+                for i, (gene, log2) in enumerate(
+                    zip(genes, cls.LOG2S, strict=True), start=1
+                )
+            ],
+            columns=["chromosome", "start", "end", "gene", "log2"],
+            meta_dict={"sample_id": "synthetic"},
+        )
+
+    def test_gene_spanning_several_rows_is_labeled_once(self):
+        """One label per gene, however many drawn rows carry its name.
+
+        Drawn per bin, so the six rows the labels have to choose between
+        survive to the page.
+        """
+        features, labels = self._render(self._synthetic(), squash_genes=False)
+        self.assertEqual(len(features["chr1"]), 6)
+        # AMP is labeled at its first bin; NEIGHBOR at the first bin it shares
+        self.assertEqual(labels, ["AMP", "NEIGHBOR"])
+
+    def test_feature_color_tracks_each_bin_log2(self):
+        """Every bin is colored by its own log2, not by a gene-level summary.
+
+        The annotation-independence check alone cannot see this: a constant
+        color, or one gene mean shared by all six bins, is just as independent
+        of the gene names. Asserted as properties of the drawn colors: comparing
+        them against ``plots.cvg2rgb`` would compare that function to itself.
+        """
+        features, _labels = self._render(self._synthetic(), squash_genes=False)
+        rgbs = [rgb for _lo, _hi, rgb in features["chr1"]]
+        self.assertEqual(len(set(rgbs)), len(set(self.LOG2S)))
+        # Every bin here is a gain, so red must outweigh blue: cvg2rgb's green
+        # channel is 1 - s in both directions, and so carries no sign at all
+        for rgb in rgbs:
+            self.assertGreater(rgb[0], rgb[2])
+
+
+class ColorScaleTests(unittest.TestCase):
+    """`plots.cvg2rgb`, the color scale the diagram and heatmap share."""
+
+    def test_intensity_grows_with_magnitude(self):
+        for desaturate in (False, True):
+            greens = [plots.cvg2rgb(v, desaturate)[1] for v in (0.1, 0.5, 0.9, 1.2)]
+            self.assertEqual(greens, sorted(greens, reverse=True))
+            self.assertLess(greens[-1], greens[0])
+
+    def test_sign_selects_the_hue(self):
+        red, _g, blue = plots.cvg2rgb(1.0, False)
+        self.assertGreater(red, blue)
+        red, _g, blue = plots.cvg2rgb(-1.0, False)
+        self.assertLess(red, blue)
+
+    def test_saturates_at_the_cutoff(self):
+        """Beyond |log2| 1.33 the color stops changing, by design."""
+        self.assertEqual(plots.cvg2rgb(1.33, False), plots.cvg2rgb(20.0, False))
+        self.assertEqual(plots.cvg2rgb(-1.33, True), plots.cvg2rgb(-20.0, True))
+
+
 class DiagramCoordinateTests(unittest.TestCase):
     """diagram renders reverse-oriented intervals (start > end) gracefully.
 
@@ -401,8 +693,17 @@ class DiagramCoordinateTests(unittest.TestCase):
         self.assertEqual(diagram._feature_span(400, 300, 400), (299, 400))
         # Out of range (beyond chromosome) is rejected
         self.assertIsNone(diagram._feature_span(100, 500, 300))
-        # start == 0 -> lo == -1 is rejected, preserving prior lower-bound guard
-        self.assertIsNone(diagram._feature_span(0, 50, 300))
+
+    def test_feature_reaching_position_zero_is_clamped_not_dropped(self):
+        """A feature at the chromosome start is drawn from 0.
+
+        The subtraction can undershoot Biopython's lower bound by one base, and
+        dropping the feature over that costs the whole first drawn point of the
+        aggregated bin half -- 474 bins and three named genes on
+        test/formats/wgs-chr17.cnr, whose first bin starts at 0.
+        """
+        self.assertEqual(diagram._feature_span(0, 50, 300), (0, 50))
+        self.assertEqual(diagram._feature_span(50, 0, 300), (0, 50))
 
     def test_chromosome_sizes_counts_reversed_intervals(self):
         seg = cnary.CopyNumArray.from_rows(
