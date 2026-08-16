@@ -912,11 +912,17 @@ class OtherTests(unittest.TestCase):
 
 
 class CNAryByGeneTests(unittest.TestCase):
-    """Tests for the by_gene method with various index types."""
+    """Tests for the by_gene method's grouping of bins into genes."""
 
-    def test_by_gene_with_numeric_index(self):
-        """Test by_gene with standard numeric index (default)."""
-        # Create test data with numeric index
+    def test_by_gene_ignores_the_index(self):
+        """Grouping is positional, so the DataFrame index cannot affect it.
+
+        Duplicate labels are the hardest case and used to matter: until the
+        runs were located positionally, `by_gene` looked bins up by label with
+        `index.get_loc`, which returns an int, a slice or a boolean mask
+        depending on how the labels repeat. This is the guard against anyone
+        reintroducing label lookups.
+        """
         data = pd.DataFrame(
             {
                 "chromosome": ["chr1"] * 6,
@@ -924,47 +930,13 @@ class CNAryByGeneTests(unittest.TestCase):
                 "end": [150, 250, 350, 450, 550, 650],
                 "gene": ["GeneA", "GeneA", "Antitarget", "GeneB", "GeneB", "GeneB"],
                 "log2": [0.1, 0.2, 0.0, -0.1, -0.2, -0.3],
-            }
-        )
-        cnarr = CopyNumArray(data, {"sample_id": "test"})
-
-        # Group by gene and check for duplicates
-        gene_groups = list(cnarr.by_gene())
-        all_coords = []
-
-        for gene_name, gene_cnarr in gene_groups:
-            for row in gene_cnarr.data.itertuples():
-                coord = (row.chromosome, row.start, row.end)
-                self.assertNotIn(
-                    coord,
-                    all_coords,
-                    f"Duplicate coordinate found in {gene_name}: {coord}",
-                )
-                all_coords.append(coord)
-
-        # Should have processed all 6 rows
-        self.assertEqual(len(all_coords), 6)
-
-    def test_by_gene_with_non_sequential_index(self):
-        """Test by_gene with non-sequential numeric index."""
-        # Create test data with gaps in the index
-        data = pd.DataFrame(
-            {
-                "chromosome": ["chr1"] * 5,
-                "start": [100, 200, 300, 400, 500],
-                "end": [150, 250, 350, 450, 550],
-                "gene": ["GeneA", "GeneA", "Antitarget", "GeneB", "GeneB"],
-                "log2": [0.1, 0.2, 0.0, -0.1, -0.2],
             },
-            index=[0, 5, 10, 15, 20],  # Non-sequential index
+            index=[0, 1, 1, 2, 3, 3],  # Duplicate labels at two places
         )
         cnarr = CopyNumArray(data, {"sample_id": "test"})
 
-        # Group by gene and check for duplicates
-        gene_groups = list(cnarr.by_gene())
         all_coords = []
-
-        for gene_name, gene_cnarr in gene_groups:
+        for gene_name, gene_cnarr in cnarr.by_gene():
             for row in gene_cnarr.data.itertuples():
                 coord = (row.chromosome, row.start, row.end)
                 self.assertNotIn(
@@ -973,9 +945,8 @@ class CNAryByGeneTests(unittest.TestCase):
                     f"Duplicate coordinate found in {gene_name}: {coord}",
                 )
                 all_coords.append(coord)
-
-        # Should have processed all 5 rows
-        self.assertEqual(len(all_coords), 5)
+        # Every row emitted exactly once
+        self.assertEqual(len(all_coords), 6)
 
     def test_by_gene_preserves_boundaries(self):
         """Test that by_gene correctly handles gene boundaries without overlap."""
@@ -1010,78 +981,138 @@ class CNAryByGeneTests(unittest.TestCase):
         self.assertEqual(gene_b.data.iloc[0]["start"], 400)
         self.assertEqual(gene_b.data.iloc[1]["end"], 550)
 
-    def test_by_gene_with_duplicate_index_labels(self):
-        """Test by_gene with duplicate index labels (edge case for get_loc)."""
-        # Create test data with duplicate index labels
-        # This simulates the case where get_loc() returns a slice or boolean array
+    def test_by_gene_recurrent_name_at_two_loci(self):
+        """A gene name at two loci yields one group per locus.
+
+        Fails on the pre-change first..last positional span, which turned
+        GeneA's two index labels into a single group covering all four bins --
+        swallowing the intervening GeneB, re-emitting every bin, and leaving
+        GeneB's trailing bin to be yielded a second time as "Antitarget".
+        """
         data = pd.DataFrame(
             {
-                "chromosome": ["chr1"] * 6,
-                "start": [100, 200, 300, 400, 500, 600],
-                "end": [150, 250, 350, 450, 550, 650],
-                "gene": ["GeneA", "GeneA", "Antitarget", "GeneB", "GeneB", "GeneB"],
-                "log2": [0.1, 0.2, 0.0, -0.1, -0.2, -0.3],
-            },
-            index=[0, 1, 1, 2, 3, 3],  # Duplicate labels at positions 1-2 and 5-6
-        )
-        cnarr = CopyNumArray(data, {"sample_id": "test"})
-
-        # Group by gene and verify no duplicates
-        gene_groups = list(cnarr.by_gene())
-        all_coords = []
-
-        for gene_name, gene_cnarr in gene_groups:
-            for row in gene_cnarr.data.itertuples():
-                coord = (row.chromosome, row.start, row.end)
-                self.assertNotIn(
-                    coord,
-                    all_coords,
-                    f"Duplicate coordinate found in {gene_name}: {coord}",
-                )
-                all_coords.append(coord)
-
-        # Should have processed all 6 rows
-        self.assertEqual(len(all_coords), 6)
-
-    def test_by_gene_multiple_genes_per_bin(self):
-        """Test by_gene with bins spanning multiple genes (comma-separated)."""
-        data = pd.DataFrame(
-            {
-                "chromosome": ["chr1"] * 5,
-                "start": [100, 200, 300, 400, 500],
-                "end": [150, 250, 350, 450, 550],
-                "gene": ["GeneA", "GeneA,GeneB", "GeneB", "Antitarget", "GeneC"],
-                "log2": [0.1, 0.2, 0.0, -0.1, -0.2],
+                "chromosome": ["chr1"] * 4,
+                "start": [100, 200, 300, 400],
+                "end": [150, 250, 350, 450],
+                "gene": ["GeneA", "GeneB", "GeneB", "GeneA"],
+                "log2": [0.1, 0.2, 0.3, 0.4],
             }
         )
         cnarr = CopyNumArray(data, {"sample_id": "test"})
 
-        # Group by gene
         gene_groups = list(cnarr.by_gene())
-        gene_dict = dict(gene_groups)
 
-        # The bin at position 1 with "GeneA,GeneB" should appear in both genes
-        self.assertIn("GeneA", gene_dict)
-        self.assertIn("GeneB", gene_dict)
-        self.assertIn("GeneC", gene_dict)
+        # GeneA occurs at two loci, so it gets two groups, in genomic order
+        gene_a_groups = [grp for name, grp in gene_groups if name == "GeneA"]
+        self.assertEqual(len(gene_a_groups), 2)
+        self.assertEqual([len(grp) for grp in gene_a_groups], [1, 1])
+        self.assertEqual(
+            [grp.data.iloc[0]["start"] for grp in gene_a_groups], [100, 400]
+        )
 
-        # GeneA should include the shared bin
-        gene_a_coords = [
+        # Neither GeneA group reaches across the GeneB locus
+        for grp in gene_a_groups:
+            self.assertEqual(list(grp.data["gene"]), ["GeneA"])
+
+        # Every bin is emitted exactly once: no swallowing, no re-emission
+        emitted = [
             (row.chromosome, row.start, row.end)
-            for row in gene_dict["GeneA"].data.itertuples()
+            for _name, grp in gene_groups
+            for row in grp.data.itertuples()
         ]
-        self.assertIn(("chr1", 200, 250), gene_a_coords)
+        self.assertEqual(len(emitted), 4)
+        self.assertEqual(len(set(emitted)), 4)
 
-        # GeneB should also include the shared bin
-        gene_b_coords = [
-            (row.chromosome, row.start, row.end)
-            for row in gene_dict["GeneB"].data.itertuples()
+    def test_by_gene_antitarget_between_same_gene_bins(self):
+        """An antitarget bin flanked by one gene's bins stays inside that gene.
+
+        This is the intent of the intronic/intergenic inclusion added in
+        0fa234d, and it is what a naive per-bin grouping would break: closing
+        GeneA's run at the "Antitarget" bin would split GeneA into two
+        one-bin groups and emit the intron as a separate intergenic stretch.
+        """
+        data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 4,
+                "start": [100, 200, 300, 400],
+                "end": [150, 250, 350, 450],
+                "gene": ["GeneA", "Antitarget", "GeneA", "GeneB"],
+                "log2": [0.1, 0.2, 0.3, 0.4],
+            }
+        )
+        cnarr = CopyNumArray(data, {"sample_id": "test"})
+
+        gene_groups = list(cnarr.by_gene())
+
+        gene_a_groups = [grp for name, grp in gene_groups if name == "GeneA"]
+        self.assertEqual(len(gene_a_groups), 1)
+        gene_a = gene_a_groups[0]
+        self.assertEqual(len(gene_a), 3)
+        self.assertEqual(list(gene_a.data["gene"]), ["GeneA", "Antitarget", "GeneA"])
+        self.assertEqual(gene_a.data.iloc[0]["start"], 100)
+        self.assertEqual(gene_a.data.iloc[-1]["end"], 350)
+
+        # The intron is not also emitted on its own
+        self.assertEqual([name for name, _ in gene_groups], ["GeneA", "GeneB"])
+
+    def test_by_gene_shared_bin_joins_both_runs(self):
+        """A co-binned bin belongs to the run of each gene it names.
+
+        Fails on the pre-change positional span, which yielded GeneA once over
+        all four bins rather than one group per GeneA locus, so the recurrence
+        after the shared bin was invisible. The shared bin must still appear
+        under both names, and GeneB must not inherit GeneA's later locus.
+        """
+        data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 4,
+                "start": [100, 200, 300, 400],
+                "end": [150, 250, 350, 450],
+                "gene": ["GeneA", "GeneA,GeneB", "GeneB", "GeneA"],
+                "log2": [0.1, 0.2, 0.3, 0.4],
+            }
+        )
+        cnarr = CopyNumArray(data, {"sample_id": "test"})
+
+        gene_groups = list(cnarr.by_gene())
+        spans = [
+            (name, grp.data.iloc[0]["start"], grp.data.iloc[-1]["end"])
+            for name, grp in gene_groups
         ]
-        self.assertIn(("chr1", 200, 250), gene_b_coords)
+        self.assertEqual(
+            spans,
+            [("GeneA", 100, 250), ("GeneB", 200, 350), ("GeneA", 400, 450)],
+        )
 
+    def test_by_gene_overlapping_runs_emit_no_phantom_intergenic_group(self):
+        """Overlapping runs must not leave a gap that looks intergenic.
 
-if __name__ == "__main__":
-    unittest.main()
+        GeneA's run covers both of the first two bins and GeneB's covers only
+        the first, so GeneB closes before GeneA. Tracking the furthest bin
+        already emitted, rather than the last run's end, is what stops GeneA's
+        second bin from being emitted a second time as an "Antitarget" group
+        between GeneB and GeneC.
+        """
+        data = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 3,
+                "start": [100, 200, 300],
+                "end": [150, 250, 350],
+                "gene": ["GeneA,GeneB", "GeneA", "GeneC"],
+                "log2": [0.1, 0.2, 0.3],
+            }
+        )
+        cnarr = CopyNumArray(data, {"sample_id": "test"})
+
+        groups = list(cnarr.by_gene())
+        self.assertEqual(
+            [
+                (name, grp.data.iloc[0]["start"], grp.data.iloc[-1]["end"])
+                for name, grp in groups
+            ],
+            [("GeneA", 100, 250), ("GeneB", 100, 150), ("GeneC", 300, 350)],
+        )
+        self.assertNotIn("Antitarget", [name for name, _grp in groups])
 
 
 if __name__ == "__main__":

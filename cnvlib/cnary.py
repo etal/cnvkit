@@ -12,7 +12,7 @@ from skgenome import GenomicArray
 from skgenome.chromnames import infer_sex_chrom_labels
 from skgenome.genomebuild import get_genome_build
 
-from . import core, descriptives, params, smoothing
+from . import descriptives, params, smoothing
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -34,6 +34,58 @@ def is_female_default(is_xx: bool | bool_ | None) -> bool:
     baseline). A real (non-None) guess is returned unchanged as a plain ``bool``.
     """
     return True if is_xx is None else bool(is_xx)
+
+
+def _gene_runs(gene_col: Series, ignore: tuple[str, ...]) -> list[tuple[int, int, str]]:
+    """Locate each gene's maximal runs of bins within one chromosome.
+
+    A run for gene *g* opens at the first bin naming *g*, survives bins that
+    name no gene outside `ignore`, and closes at the first bin that names some
+    other real gene but not *g*. The run spans from its opening bin through the
+    last bin naming *g*, so placeholder bins trailing the run are left out and
+    fall to the surrounding intergenic region.
+
+    Parameters
+    ----------
+    gene_col : pd.Series
+        The 'gene' column of a single chromosome's bins, in genomic order.
+    ignore : tuple of str
+        Gene names that do not count as a real gene.
+
+    Returns
+    -------
+    list of tuple
+        Triples of (start position, end position, gene name), positional and
+        half-open, ordered by where each run opens; runs opening on the same
+        bin keep that bin's own order of gene names. Runs of distinct genes may
+        overlap where a bin names more than one gene.
+    """
+    # (start position, place among that bin's names, end position, gene name).
+    # Runs close in a different order than they open, so the key that orders
+    # them is fixed when each opens: the bin it opened on, then where its name
+    # sat in that bin.
+    runs: list[tuple[int, int, int, str]] = []
+    # gene name -> [run start, place among the opening bin's names, last bin
+    # naming it]
+    open_runs: dict[str, list[int]] = {}
+    for pos, genestr in enumerate(gene_col.to_numpy()):
+        if pd.isna(genestr):
+            continue
+        here = [g for g in genestr.split(",") if g not in ignore]
+        if not here:
+            continue
+        for gene in open_runs.keys() - set(here):
+            start, place, last = open_runs.pop(gene)
+            runs.append((start, place, last + 1, gene))
+        for place, gene in enumerate(here):
+            if gene in open_runs:
+                open_runs[gene][2] = pos
+            else:
+                open_runs[gene] = [pos, place, pos]
+    for gene, (start, place, last) in open_runs.items():
+        runs.append((start, place, last + 1, gene))
+    runs.sort()
+    return [(start, end, gene) for start, _place, end, gene in runs]
 
 
 class CopyNumArray(GenomicArray):
@@ -177,11 +229,19 @@ class CopyNumArray(GenomicArray):
     ) -> Iterator[tuple[str, CopyNumArray]]:
         """Iterate over probes grouped by gene name.
 
-        Group each series of intergenic bins as an "Antitarget" gene; any
-        "Antitarget" bins within a gene are grouped with that gene.
+        A gene's bins are grouped as a *maximal run*: starting from a bin naming
+        that gene, the run extends over adjacent bins that also name it and over
+        intervening bins that name no real gene, and ends at the last bin naming
+        the gene before a different gene appears. A name that recurs at several
+        loci therefore yields one group per locus, in genomic order, instead of
+        a single span swallowing every bin in between.
+
+        Group each remaining series of intergenic bins as an "Antitarget" gene;
+        any "Antitarget" bins within a gene are grouped with that gene.
 
         Bins' gene names are split on commas to accommodate overlapping genes
-        and bins that cover multiple genes.
+        and bins that cover multiple genes; such a bin belongs to the run of
+        every gene it names, so it is emitted under each of those names.
 
         Parameters
         ----------
@@ -195,52 +255,21 @@ class CopyNumArray(GenomicArray):
         tuple
             Pairs of: (gene name, CNA of rows with same name)
         """
-        ignore += params.ANTITARGET_ALIASES
+        ignore = (*ignore, *params.ANTITARGET_ALIASES)
         for _chrom, subgary in self.by_chromosome():
             prev_pos = 0
-            for gene, gene_idx_labels in subgary._get_gene_map().items():
-                if gene not in ignore:
-                    if not len(gene_idx_labels):
-                        logging.warning("Specified gene name somehow missing: %s", gene)
-                        continue
-                    # Convert index labels to positional indices
-                    start_label = gene_idx_labels[0]
-                    end_label = gene_idx_labels[-1]
-                    start_loc = subgary.data.index.get_loc(start_label)
-                    end_loc = subgary.data.index.get_loc(end_label)
-
-                    # get_loc() can return int, slice, or boolean array depending on index type:
-                    # - int: unique label -> position
-                    # - slice: duplicate consecutive labels -> range of positions
-                    # - ndarray (bool): duplicate non-consecutive labels -> mask of positions
-                    # For duplicates, use the first occurrence for start, last for end
-                    if isinstance(start_loc, slice):
-                        start_pos = start_loc.start
-                    elif isinstance(start_loc, np.ndarray):
-                        # Boolean mask: convert to positions and take first
-                        start_pos = np.where(start_loc)[0][0]
-                    else:
-                        start_pos = start_loc
-
-                    if isinstance(end_loc, slice):
-                        end_pos = end_loc.stop
-                    elif isinstance(end_loc, np.ndarray):
-                        # Boolean mask: convert to positions, take last, +1 for exclusive end
-                        end_pos = np.where(end_loc)[0][-1] + 1
-                    else:
-                        end_pos = end_loc + 1
-
-                    if prev_pos < start_pos:
-                        # Include intergenic regions
-                        yield (
-                            params.ANTITARGET_NAME,
-                            subgary.as_dataframe(subgary.data.iloc[prev_pos:start_pos]),
-                        )
+            for start_pos, end_pos, gene in _gene_runs(subgary["gene"], ignore):
+                if prev_pos < start_pos:
+                    # Include intergenic regions
                     yield (
-                        gene,
-                        subgary.as_dataframe(subgary.data.iloc[start_pos:end_pos]),
+                        params.ANTITARGET_NAME,
+                        subgary.as_dataframe(subgary.data.iloc[prev_pos:start_pos]),
                     )
-                    prev_pos = end_pos
+                yield (
+                    gene,
+                    subgary.as_dataframe(subgary.data.iloc[start_pos:end_pos]),
+                )
+                prev_pos = max(prev_pos, end_pos)
             if prev_pos < len(subgary):
                 # Include the telomere
                 yield (
@@ -333,71 +362,6 @@ class CopyNumArray(GenomicArray):
         if verbose and drop_idx.any():
             logging.info("Dropped %d low-coverage bins", drop_idx.sum())
         return self[~drop_idx]
-
-    def squash_genes(
-        self,
-        summary_func: Callable = descriptives.biweight_location,
-        squash_antitarget: bool = False,
-        ignore: tuple[str, ...] = params.IGNORE_GENE_NAMES,
-    ) -> CopyNumArray:
-        """Combine consecutive bins with the same targeted gene name.
-
-        Parameters
-        ----------
-        summary_func : callable
-            Function to summarize an array of log2 values to produce a
-            new log2 value for a "squashed" (i.e. reduced) region. By default
-            this is the biweight location, but you might want median, mean, max,
-            min or something else in some cases.
-        squash_antitarget : bool
-            If True, also reduce consecutive "Antitarget" bins into a single
-            bin. Otherwise, keep "Antitarget" and ignored bins as they are in
-            the output.
-        ignore : list or tuple of str
-            Bin names to be treated as "Antitarget" instead of as unique genes.
-
-        Return
-        ------
-        CopyNumArray
-            Another, usually smaller, copy of `self` with each gene's bins
-            reduced to a single bin with appropriate values.
-        """
-
-        def squash_rows(name, rows):
-            """Combine multiple rows (for the same gene) into one row."""
-            if len(rows) == 1:
-                return tuple(rows.iloc[0])
-            # Build row matching self.data.columns order exactly
-            outrow = []
-            for col in self.data.columns:
-                match col:
-                    case "chromosome":
-                        outrow.append(core.check_unique(rows.chromosome, "chromosome"))
-                    case "start":
-                        outrow.append(rows.start.iat[0])
-                    case "end":
-                        outrow.append(rows.end.iat[-1])
-                    case "gene":
-                        outrow.append(name)
-                    case "log2":
-                        outrow.append(summary_func(rows.log2))
-                    case "probes":
-                        # Special case: sum probes rather than average
-                        outrow.append(sum(rows[col]))
-                    case _:
-                        # All other fields: use summary function
-                        outrow.append(summary_func(rows[col]))
-            return tuple(outrow)
-
-        outrows = []
-        for name, subarr in self.by_gene(ignore):
-            if not len(subarr):
-                continue
-            if name in params.ANTITARGET_ALIASES and not squash_antitarget:
-                outrows.extend(subarr.data.itertuples(index=False))
-            else:
-                outrows.append(squash_rows(name, subarr.data))
-        return self.as_rows(outrows)
 
     # Chromosomal sex
 

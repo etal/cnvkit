@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Self
 
 import bioframe
@@ -949,25 +948,3 @@ class GenomicArray:
             return 0
         regions = merge(self.data, bp=1)
         return int(regions.end.sum() - regions.start.sum())  # type: ignore[no-any-return]
-
-    def _get_gene_map(self) -> OrderedDict:
-        """Map unique gene names to their indices in this array.
-
-        Returns
-        -------
-        OrderedDict
-            An (ordered) dictionary of unique gene names and the data indices of
-            their segments in the order of occurrence (genomic order).
-        """
-        if "gene" not in self.data:
-            return OrderedDict()
-
-        genes: OrderedDict = OrderedDict()
-        for idx, genestr in self.data["gene"].items():
-            if pd.isna(genestr):
-                continue
-            for gene in genestr.split(","):
-                if gene not in genes:
-                    genes[gene] = []
-                genes[gene].append(idx)
-        return genes

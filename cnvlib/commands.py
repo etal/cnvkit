@@ -1667,6 +1667,7 @@ def _cmd_diagram(args: argparse.Namespace) -> None:
         threshold_low=threshold_low,
         threshold_high=threshold_high,
         gene_names=gene_names,
+        squash_genes=args.squash_genes,
     )
     logging.info("Wrote %s", outfname)
 
@@ -1754,6 +1755,23 @@ P_diagram_aes.add_argument(
     dest="show_labels",
     action="store_false",
     help="""Disable gene_name labels on plot (useful when a lot of CNV were called).""",
+)
+P_diagram_aes.add_argument(
+    "--squash-genes",
+    dest="squash_genes",
+    action="store_true",
+    default=True,
+    help="""Draw the bin-level half of each chromosome one feature per gene,
+            and one feature per drawn point everywhere the bins are not named.
+            [Default]""",
+)
+P_diagram_aes.add_argument(
+    "--no-squash-genes",
+    dest="squash_genes",
+    action="store_false",
+    help="""Draw one feature per bin instead. Legible only where a chromosome
+            carries few enough bins to tell apart, e.g. a small genome or a
+            short contig; on a panel or exome the bins overdraw each other.""",
 )
 add_diploid_parx_genome(P_diagram)
 P_diagram.set_defaults(func=_cmd_diagram)
