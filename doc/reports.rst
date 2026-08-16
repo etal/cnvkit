@@ -51,8 +51,11 @@ threshold. (Formerly called ``gainloss``.)
     cnvkit.py genemetrics Sample.cnr -s Sample.cns -t 0.4 -m 5 -y
 
 The first four columns of output table show each targeted gene's name and its
-genomic coordinates (based on the first and last bins with that label in the
-original target BED file, and thus the .cnr file).
+genomic coordinates, spanning the run of bins carrying that label in the
+original target BED file, and thus the .cnr file. Where the same gene name
+recurs at several separate loci, as small-RNA and repeat-family names do when
+whole-genome bins are annotated from refFlat, each locus gets its own row
+rather than one row stretching from the first occurrence to the last.
 
 The remaining output columns have slightly different meaning depending on
 whether or not segments were provided. Without segments (.cnr alone):
