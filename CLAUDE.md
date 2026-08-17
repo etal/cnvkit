@@ -1,6 +1,6 @@
-# CLAUDE.md
+# CNVkit: agent instructions
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents working in this repository. Two filenames reach this one file: Claude Code reads it as `CLAUDE.md`, while OMP and Codex read it as `AGENTS.md`, a symlink recorded in git. A checkout without symlink support — the Git for Windows default outside Developer Mode — leaves `AGENTS.md` as a stub naming this file rather than a copy of it, so read `CLAUDE.md` directly there.
 
 ## Project Overview
 
