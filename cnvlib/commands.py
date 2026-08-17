@@ -579,7 +579,7 @@ P_batch_report.add_argument(
 P_batch_report.add_argument(
     "--scatter",
     action="store_true",
-    help="Create a whole-genome copy ratio profile as a PDF scatter plot.",
+    help="Create a whole-genome copy ratio profile as a PNG scatter plot.",
 )
 P_batch_report.add_argument(
     "--diagram",

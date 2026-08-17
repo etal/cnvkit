@@ -78,18 +78,29 @@ The pipeline executed by the ``batch`` command is equivalent to::
 
     # For each tumor sample...
     cnvkit.py fix Sample.targetcoverage.cnn Sample.antitargetcoverage.cnn -r my_reference.cnn -o Sample.cnr
-    cnvkit.py segment Sample.cnr -o Sample.cns
+    cnvkit.py segment Sample.cnr -o Sample.segment.cns.tmp
 
     # Post-processing for each tumor sample...
-    cnvkit.py segmetrics Sample.cnr -s Sample.cns --ci --alpha 0.5 -o Sample.segmetrics.cns.tmp
-    cnvkit.py call Sample.segmetrics.cns.tmp --method none --filter ci -o Sample.call.cns.tmp
-    cnvkit.py segmetrics Sample.cnr -s Sample.call.cns.tmp --t-test -o Sample.segmetrics.cns.tmp2
-    cnvkit.py call Sample.segmetrics.cns.tmp2 --center median -o Sample.call.cns
+    cnvkit.py segmetrics Sample.cnr -s Sample.segment.cns.tmp --ci --alpha 0.5 -o Sample.cns
+    cnvkit.py call Sample.cns --method none --filter ci -o Sample.call.cns.tmp
+    cnvkit.py segmetrics Sample.cnr -s Sample.call.cns.tmp --t-test -o Sample.segmetrics.cns.tmp
+    cnvkit.py call Sample.segmetrics.cns.tmp --center median -o Sample.call.cns
     cnvkit.py bintest Sample.cnr -s Sample.call.cns.tmp --target -o Sample.bintest.cns
 
     # Optionally, with --scatter and --diagram
-    cnvkit.py scatter Sample.cnr -s Sample.cns -o Sample-scatter.pdf
-    cnvkit.py diagram Sample.cnr -s Sample.cns -o Sample-diagram.pdf
+    cnvkit.py scatter Sample.cnr -s Sample.call.cns -o Sample-scatter.png
+    cnvkit.py diagram Sample.cnr -s Sample.call.cns -o Sample-diagram.pdf
+
+Filenames with a ``.tmp`` suffix above stand for intermediate results that
+``batch`` keeps in memory and never writes to disk.
+
+The listing reproduces the steps ``batch`` takes, but not necessarily its numbers
+to the last digit: ``batch`` hands full-precision values from one step to the
+next, while the files written here round to six significant digits. Since each
+segment's bootstrap is seeded from its own values, a difference that small
+redraws the whole resample, so the confidence intervals differ slightly and a
+segment whose interval lies near zero can survive the ``ci`` filter in one and
+not the other.
 
 This is for hybrid capture protocols in which both on- and off-target reads can
 be used for copy number detection. To run alternative pipelines for targeted
