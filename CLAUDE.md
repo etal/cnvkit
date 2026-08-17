@@ -1,6 +1,6 @@
 # CNVkit: agent instructions
 
-Guidance for AI coding agents working in this repository. Two filenames reach this one file: Claude Code reads it as `CLAUDE.md`, while OMP and Codex read it as `AGENTS.md`, a symlink recorded in git. A checkout without symlink support — the Git for Windows default outside Developer Mode — leaves `AGENTS.md` as a stub naming this file rather than a copy of it, so read `CLAUDE.md` directly there.
+Two filenames reach this one file: Claude Code reads it as `CLAUDE.md`, while OMP and Codex read it as `AGENTS.md`, a symlink recorded in git. Where symlinks do not survive checkout (for example, Git for Windows outside Developer Mode, or a DrvFS mount such as `/mnt/c`), `AGENTS.md` is a stub naming this file, so read `CLAUDE.md` directly.
 
 ## Project Overview
 
