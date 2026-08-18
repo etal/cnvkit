@@ -36,7 +36,7 @@ def is_female_default(is_xx: bool | bool_ | None) -> bool:
     return True if is_xx is None else bool(is_xx)
 
 
-def _gene_runs(gene_col: Series, ignore: tuple[str, ...]) -> list[tuple[int, int, str]]:
+def gene_runs(gene_col: Series, ignore: tuple[str, ...]) -> list[tuple[int, int, str]]:
     """Locate each gene's maximal runs of bins within one chromosome.
 
     A run for gene *g* opens at the first bin naming *g*, survives bins that
@@ -258,7 +258,7 @@ class CopyNumArray(GenomicArray):
         ignore = (*ignore, *params.ANTITARGET_ALIASES)
         for _chrom, subgary in self.by_chromosome():
             prev_pos = 0
-            for start_pos, end_pos, gene in _gene_runs(subgary["gene"], ignore):
+            for start_pos, end_pos, gene in gene_runs(subgary["gene"], ignore):
                 if prev_pos < start_pos:
                     # Include intergenic regions
                     yield (

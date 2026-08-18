@@ -93,7 +93,15 @@ Chromosome-level views are controlled with the ``--chromosome``/``-c`` and
   (e.g. ``-g CDK4,MDM2``) will plot the genomic around that gene, or genes, and
   highlight the gene or genes with a vertical gold stripe.
 
-    - If multiple genes, they must all be on the same chromosome.
+    - Each locus where a name occurs is highlighted separately, grouped as the
+      ``genemetrics`` command groups bins into genes. A name shared by many
+      loci -- a repeat family such as ``Y_RNA``, say -- therefore yields one
+      stripe per locus rather than one stripe reaching from the first
+      occurrence to the last.
+    - If multiple genes, they must all be on the same chromosome. A name
+      occurring on more than one chromosome likewise needs one chosen with
+      ``-c``, e.g. ``-c chr7 -g <name>``; only its loci on that chromosome are
+      plotted.
     - The ``--width``/``-w`` argument determines the size of the plotted
       genomic region, in terms of basepairs flanking the selected region.
     - Any other genes in the plotted region will not be shown unless also
@@ -115,7 +123,9 @@ Chromosome-level views are controlled with the ``--chromosome``/``-c`` and
       will be shown, with no padding.
     - The ``-g`` option overrides the default behavior of showing all genes in
       the selection -- only the genes specified with ``-g`` will be highlighted
-      and labeled. To not show any genes, specify an empty string: ``-g ''``
+      and labeled. To not show any genes, specify an empty string: ``-g ''``.
+      Only the loci within the selected region are highlighted; if a named gene
+      has no locus there at all, that is reported as an error.
     - Special behavior occurs if there are no genes in the selected region:
       Instead, the selection itself is treated as a "gene", highlighted and
       labeled with the string "Selection", with padding controlled by ``-w``.

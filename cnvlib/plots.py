@@ -12,7 +12,7 @@ import numpy as np
 from skgenome.intersect import require_ascending_starts
 from skgenome.rangelabel import Region, unpack_range
 
-from . import core, params
+from . import cnary, params
 
 if TYPE_CHECKING:
     from matplotlib.axes._axes import Axes
@@ -377,45 +377,43 @@ def cvg2rgb(cvg: float, desaturate: bool) -> tuple[float, float, float]:
     return rgb
 
 
-# XXX should this be a CopyNumArray method?
-# or: use by_genes internally
-# or: have by_genes use this internally
 def gene_coords_by_name(probes, names):
     """Find the chromosomal position of each named gene in probes.
+
+    Each locus of a requested name gets its own region, grouped exactly as
+    `CopyNumArray.by_gene` groups bins, via `cnvlib.cnary.gene_runs`. A name
+    that recurs at several loci -- a repeat family, or a gene name reused on
+    another chromosome -- therefore yields one region per locus instead of one
+    span reaching from its first occurrence to its last.
 
     Returns
     -------
     dict
         Of: {chromosome: [(start, end, gene name), ...]}
     """
-    names = list(filter(None, set(names)))
+    names = set(filter(None, names))
     if not names:
         return {}
 
-    # Create an index of gene names
-    gene_index = collections.defaultdict(set)
-    for i, gene in enumerate(probes["gene"]):
-        for gene_name in gene.split(","):
-            if gene_name in names:
-                gene_index[gene_name].add(i)
-    # Retrieve coordinates by name
+    ignore = (*params.IGNORE_GENE_NAMES, *params.ANTITARGET_ALIASES)
+    # A locus spans its run's first and last bin -- the same start and end
+    # 'genemetrics' publishes for that locus (reports.group_by_genes).
+    # Regions are keyed so that requested names sharing a locus, e.g. the
+    # co-binned pair "ERBB2,MIR4728", are labeled once; co-binned names the
+    # caller did not ask for are never surfaced (#458).
     all_coords: dict = collections.defaultdict(lambda: collections.defaultdict(set))
-    for name in names:
-        gene_probes = probes.data.take(sorted(gene_index.get(name, [])))
-        if not len(gene_probes):
-            raise ValueError(f"No targeted gene named {name!r} found")
-        # Find the genomic range of this gene's probes
-        start = gene_probes["start"].min()
-        end = gene_probes["end"].max()
-        chrom = core.check_unique(gene_probes["chromosome"], name)
-        # Deduce the unique set of *requested* gene names for this region.
-        # A bin label may pack several genes (e.g. "ERBB2,MIR4728"); only the
-        # names the caller asked for should be surfaced, never co-binned
-        # neighbors (#458).
-        uniq_names: set[str] = set()
-        for oname in gene_probes["gene"].dropna().unique():
-            uniq_names.update(g for g in oname.split(",") if g in names)
-        all_coords[chrom][start, end].update(uniq_names)
+    found: set[str] = set()
+    for chrom, subarr in probes.by_chromosome():
+        starts = subarr["start"].to_numpy()
+        ends = subarr["end"].to_numpy()
+        for start_pos, end_pos, gene in cnary.gene_runs(subarr["gene"], ignore):
+            if gene in names:
+                found.add(gene)
+                all_coords[chrom][starts[start_pos], ends[end_pos - 1]].add(gene)
+    if unfound := names - found:
+        raise ValueError(
+            "No targeted gene named " + ", ".join(map(repr, sorted(unfound))) + " found"
+        )
     # Consolidate each region's gene names into a string
     uniq_coords = {}
     for chrom, hits in all_coords.items():

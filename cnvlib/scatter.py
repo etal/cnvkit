@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import collections
 import logging
 from typing import TYPE_CHECKING
 
@@ -9,9 +10,10 @@ import numpy as np
 from matplotlib import pyplot
 
 from skgenome.chromnames import detect_chr_prefix, diagnose_missing_chromosome
+from skgenome.chromsort import sorter_chrom
 from skgenome.rangelabel import unpack_range
 
-from . import core, params, plots
+from . import params, plots
 from .cnary import CopyNumArray as CNA
 from .plots import MB
 
@@ -607,6 +609,15 @@ def chromosome_scatter(
     return axis.get_figure()
 
 
+def _region_gene_names(regions) -> set[str]:
+    """The individual gene names labeling `regions`.
+
+    A region's label packs the requested names sharing that locus, e.g. the
+    co-binned pair "ERBB2,MIR4728".
+    """
+    return {name for _start, _end, label in regions for name in label.split(",")}
+
+
 def select_range_genes(
     cnarr,
     segments,
@@ -623,10 +634,17 @@ def select_range_genes(
     Behaviors::
 
         start/end   show_gene
-           +           +       given region + genes; err if any gene outside it
-           -           +       window +/- around genes
+           +           +       given region + the genes' loci within it; err if
+                               a named gene has no locus there
+           -           +       window +/- around the named genes' loci
            +           -       given region, highlighting any genes within it
            -           -       whole chromosome, no genes
+
+    A gene name is highlighted at each locus where it occurs, one region per
+    locus, so a repeat-family name yields many highlights rather than one span
+    reaching across all of them. A name occurring on several chromosomes needs
+    a chromosome selected by `show_range`, since one panel plots one
+    chromosome.
 
     If `show_range` is a chromosome name only, no start/end positions, then the
     whole chromosome will be shown.
@@ -677,41 +695,78 @@ def select_range_genes(
                 window_coords = (max(0, start - window_width), end + window_width)
 
     else:
-        gene_names = filter(None, show_gene.split(","))
+        gene_names = list(filter(None, show_gene.split(",")))
         if gene_names:
             # Scan for probes matching the specified gene(s)
             gene_coords = plots.gene_coords_by_name(cnarr or segments, gene_names)
-            if len(gene_coords) > 1:
+            if chrom:
+                # A name can occur on more than one chromosome; -c picks among
+                # them, so only its loci there are plotted.
+                gene_ranges = gene_coords.get(chrom, [])
+                absent = sorted(set(gene_names) - _region_gene_names(gene_ranges))
+                if absent:
+                    elsewhere = sorted(
+                        (
+                            other
+                            for other, regions in gene_coords.items()
+                            if _region_gene_names(regions).intersection(absent)
+                        ),
+                        key=sorter_chrom,
+                    )
+                    raise ValueError(
+                        f"Gene(s) {', '.join(absent)} not found on chromosome "
+                        f"{chrom} selected by region; found on "
+                        f"{', '.join(elsewhere)}"
+                    )
+            elif len(gene_coords) > 1:
                 raise ValueError(
                     f"Genes {show_gene} are split across chromosomes "
-                    f"{list(gene_coords.keys())}"
-                )
-            g_chrom, gene_ranges = gene_coords.popitem()
-            if chrom:
-                # Confirm that the selected chromosomes match
-                core.assert_equal(
-                    "Chromosome also selected by region (-c) does not match",
-                    **{"chromosome": chrom, "gene(s)": g_chrom},
+                    f"{sorted(gene_coords, key=sorter_chrom)}; "
+                    "select one with -c/--chromosome"
                 )
             else:
-                chrom = g_chrom
+                chrom, gene_ranges = gene_coords.popitem()
 
             gene_ranges.sort()
             if window_coords:
-                # Verify all genes fit in the given window
-                for gene_start, gene_end, gene_name in gene_ranges:
-                    if not (start <= gene_start and gene_end <= end):
-                        raise ValueError(
-                            f"Selected gene {gene_name} "
-                            + f"({chrom}:{gene_start}-{gene_end}) "
-                            + f"is outside specified region {show_range}"
-                        )
+                # Highlight the loci inside the given region; a gene with none
+                # there is the mistake this check exists to catch.
+                inside = [
+                    region
+                    for region in gene_ranges
+                    if start <= region[0] and region[1] <= end
+                ]
+                inside_names = _region_gene_names(inside)
+                for gene_start, gene_end, label in gene_ranges:
+                    for gene_name in label.split(","):
+                        if gene_name not in inside_names:
+                            raise ValueError(
+                                f"Selected gene {gene_name} "
+                                + f"({chrom}:{gene_start}-{gene_end}) "
+                                + f"is outside specified region {show_range}"
+                            )
+                if dropped := len(gene_ranges) - len(inside):
+                    logging.info(
+                        "Not highlighting %d gene loci outside the selected region",
+                        dropped,
+                    )
+                gene_ranges = inside
             elif not show_range:
                 # Set the display window to the selected genes +/- a margin
                 window_coords = (
                     max(0, gene_ranges[0][0] - window_width),
                     gene_ranges[-1][1] + window_width,
                 )
+            for gene_name, n_loci in collections.Counter(
+                name for _s, _e, label in gene_ranges for name in label.split(",")
+            ).items():
+                if n_loci > 1:
+                    logging.warning(
+                        "Gene %s occurs at %d separate loci on %s; highlighting each",
+                        gene_name,
+                        n_loci,
+                        chrom,
+                    )
 
     # Prune plotted elements to the selected region
     sel_probes = cnarr.in_range(chrom, *window_coords) if cnarr else CNA([])
@@ -724,7 +779,7 @@ def select_range_genes(
         somatic_variants.in_range(chrom, *window_coords) if somatic_variants else None
     )
     logging.info(
-        "Showing %d probes and %d selected genes in region %s",
+        "Showing %d probes and %d highlighted gene regions in region %s",
         len(sel_probes),
         len(gene_ranges),
         (chrom + ":{}-{}".format(*window_coords) if window_coords else chrom),

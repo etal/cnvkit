@@ -257,6 +257,154 @@ class GeneCoordsTests(unittest.TestCase):
             names_seen.update(label.split(","))
         self.assertEqual(names_seen, {"ERBB2", "MIR4728"})
 
+    def test_recurrent_name_is_one_region_per_locus(self):
+        """A name recurring at several loci gets one region per locus.
+
+        The grouping is `CopyNumArray.by_gene`'s, so the regions must equal that
+        method's groups bin for bin: a placeholder bin is absorbed into the run
+        it interrupts, while a bin naming another gene ends it. The superseded
+        rule reported a single span from the first occurrence to the last,
+        swallowing MIDGENE.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 2000, "REPEAT", 0.0],
+                ["chr1", 2000, 2500, "-", 0.0],
+                ["chr1", 2500, 3000, "REPEAT", 0.0],
+                ["chr1", 3000, 4000, "MIDGENE", 0.0],
+                ["chr1", 9000, 9500, "REPEAT", 0.0],
+            ]
+        )
+        coords = plots.gene_coords_by_name(cnarr, ["REPEAT"])
+        self.assertEqual(
+            coords["chr1"], [(1000, 3000, "REPEAT"), (9000, 9500, "REPEAT")]
+        )
+        by_gene_spans = [
+            (rows.start.iat[0], rows.end.iat[-1])
+            for gene, rows in cnarr.by_gene()
+            if gene == "REPEAT"
+        ]
+        self.assertEqual([(s, e) for s, e, _name in coords["chr1"]], by_gene_spans)
+
+    def test_recurrent_name_on_wgs_fixture(self):
+        """Every locus of a real repeat family is reported, and only those.
+
+        `Y_RNA` occurs at 29 loci across chr17 of this fixture; the superseded
+        rule reported one 76 Mb region reaching across all of them, which is
+        what `scatter -g Y_RNA` highlighted.
+        """
+        cnarr = cnvlib.read("formats/wgs-chr17.cnr")
+        coords = plots.gene_coords_by_name(cnarr, ["Y_RNA"])
+        by_gene_spans = [
+            (rows.start.iat[0], rows.end.iat[-1])
+            for gene, rows in cnarr.by_gene()
+            if gene == "Y_RNA"
+        ]
+        self.assertEqual(len(by_gene_spans), 29)
+        self.assertEqual([(s, e) for s, e, _name in coords["chr17"]], by_gene_spans)
+
+    def test_name_on_two_chromosomes_reports_both(self):
+        """A name reused on another chromosome yields a region on each.
+
+        The superseded rule asserted the name was unique to one chromosome and
+        died before its caller could report the ambiguity.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 2000, "DUP", 0.0],
+                ["chr2", 5000, 6000, "DUP", 0.0],
+            ]
+        )
+        self.assertEqual(
+            plots.gene_coords_by_name(cnarr, ["DUP"]),
+            {"chr1": [(1000, 2000, "DUP")], "chr2": [(5000, 6000, "DUP")]},
+        )
+
+    def test_unknown_gene_name_raises(self):
+        """A requested name absent from the bins is an error, not an omission."""
+        cnarr = cnary.CopyNumArray.from_rows([["chr1", 1000, 2000, "REAL", 0.0]])
+        with self.assertRaises(ValueError):
+            plots.gene_coords_by_name(cnarr, ["REAL", "ABSENT"])
+
+
+class ScatterSelectionTests(unittest.TestCase):
+    """`scatter`'s region and gene selection (scatter.select_range_genes)."""
+
+    @staticmethod
+    def _cnarr():
+        """Bins with REPEAT at two chr1 loci and DUP on chr1 and chr2."""
+        return cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 2000, "REPEAT", 0.0],
+                ["chr1", 2000, 3000, "REPEAT", 0.0],
+                ["chr1", 3000, 4000, "DUP", 0.0],
+                ["chr1", 9000, 9500, "REPEAT", 0.0],
+                ["chr2", 5000, 6000, "DUP", 0.0],
+                ["chr2", 7000, 8000, "OTHER", 0.0],
+            ]
+        )
+
+    def _select(self, show_range, show_gene, window_width=500):
+        _probes, _segs, _snvs, _loh, _som, window, gene_ranges, chrom = (
+            scatter.select_range_genes(
+                self._cnarr(), None, None, show_range, show_gene, window_width
+            )
+        )
+        return window, gene_ranges, chrom
+
+    def test_each_locus_is_highlighted(self):
+        """Each locus of a repeated name is highlighted, and the window spans all."""
+        with self.assertLogs(level="WARNING") as cm:
+            window, gene_ranges, chrom = self._select(None, "REPEAT")
+        self.assertEqual(chrom, "chr1")
+        self.assertEqual(gene_ranges, [(1000, 3000, "REPEAT"), (9000, 9500, "REPEAT")])
+        self.assertEqual(window, (500, 10000))
+        self.assertIn("2 separate loci", "".join(cm.output))
+
+    def test_region_keeps_only_the_loci_inside_it(self):
+        """An explicit region selects among a repeated name's loci."""
+        window, gene_ranges, chrom = self._select("chr1:1-5000", "REPEAT")
+        self.assertEqual(chrom, "chr1")
+        self.assertEqual(gene_ranges, [(1000, 3000, "REPEAT")])
+        self.assertEqual(window, (0, 5000))
+
+    def test_region_without_any_locus_of_the_gene_raises(self):
+        """A named gene with no locus in the region is the user's mistake."""
+        with self.assertRaises(ValueError) as cm:
+            self._select("chr1:4500-8000", "REPEAT")
+        self.assertIn("outside specified region", str(cm.exception))
+
+    def test_name_on_two_chromosomes_needs_a_chromosome(self):
+        """One panel plots one chromosome, so the ambiguity must be resolved."""
+        with self.assertRaises(ValueError) as cm:
+            self._select(None, "DUP")
+        message = str(cm.exception)
+        self.assertIn("chr1", message)
+        self.assertIn("chr2", message)
+        self.assertIn("-c", message)
+
+    def test_selected_chromosome_disambiguates_a_reused_name(self):
+        """`-c` picks which of a reused name's chromosomes is plotted."""
+        for chrom_sel, expected in (("chr1", (3000, 4000)), ("chr2", (5000, 6000))):
+            with self.subTest(chromosome=chrom_sel):
+                _window, gene_ranges, chrom = self._select(chrom_sel, "DUP")
+                self.assertEqual(chrom, chrom_sel)
+                self.assertEqual(gene_ranges, [(*expected, "DUP")])
+
+    def test_gene_absent_from_selected_chromosome_raises(self):
+        """A gene named with `-c` elsewhere is reported, not silently dropped."""
+        with self.assertRaises(ValueError) as cm:
+            self._select("chr1", "OTHER")
+        message = str(cm.exception)
+        self.assertIn("OTHER", message)
+        self.assertIn("chr2", message)
+
+    def test_empty_gene_list_highlights_nothing(self):
+        """`-g ''` plots the region with nothing highlighted (doc/plots.rst)."""
+        window, gene_ranges, chrom = self._select("chr1:1-5000", "")
+        self.assertEqual((chrom, window), ("chr1", (0, 5000)))
+        self.assertEqual(gene_ranges, [])
+
 
 class DiagramGeneLabelTests(unittest.TestCase):
     """`diagram` --gene and directional --threshold-low/-high (#248)."""

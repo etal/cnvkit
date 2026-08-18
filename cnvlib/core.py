@@ -105,16 +105,6 @@ def assert_equal(msg: str, **values) -> None:
         raise ValueError(msg)
 
 
-def check_unique(items, title):
-    """Ensure all items in an iterable are identical; return that one item."""
-    its = set(items)
-    assert len(its) == 1, "Inconsistent %s keys: %s" % (
-        title,
-        " ".join(map(str, sorted(its))),
-    )
-    return its.pop()
-
-
 def fbase(fname: str) -> str:
     """Strip directory and all extensions from a filename."""
     base = os.path.basename(fname)
