@@ -414,36 +414,37 @@ def gene_coords_by_name(probes, names):
         raise ValueError(
             "No targeted gene named " + ", ".join(map(repr, sorted(unfound))) + " found"
         )
-    # Consolidate each region's gene names into a string
-    uniq_coords = {}
-    for chrom, hits in all_coords.items():
-        uniq_coords[chrom] = [
-            (start, end, ",".join(sorted(gene_names)))
-            for (start, end), gene_names in hits.items()
-        ]
-    return uniq_coords
+    return {chrom: _join_labels(hits) for chrom, hits in all_coords.items()}
+
+
+def _join_labels(regions):
+    """Label each region with every gene sharing it, so labels don't overprint."""
+    return [
+        (start, end, ",".join(sorted(gene_names)))
+        for (start, end), gene_names in regions.items()
+    ]
 
 
 def gene_coords_by_range(probes, chrom, start, end, ignore=params.IGNORE_GENE_NAMES):
     """Find the chromosomal position of all genes in a range.
 
+    Every gene labeled in the window is reported, each locus of a recurring name
+    separately -- the grouping `gene_coords_by_name` and `CopyNumArray.by_gene`
+    use, via `cnvlib.cnary.gene_runs`. Genes sharing a locus, e.g. the co-binned
+    pair "ERBB2,MIR4728", are labeled once, jointly, rather than stacked as
+    identical regions.
+
     Returns
     -------
     dict
-        Of: {chromosome: [(start, end, gene), ...]}
+        Of: {chromosome: [(start, end, gene name), ...]}
     """
-    ignore += params.ANTITARGET_ALIASES
-    # Tabulate the genes in the selected region
-    genes: dict = collections.OrderedDict()
-    for row in probes.in_range(chrom, start, end):
-        if not isinstance(row.gene, str):
-            continue
-        name = row.gene
-        if name in genes:
-            genes[name][1] = row.end
-        elif name not in ignore:
-            genes[name] = [row.start, row.end]
-    # Reorganize the data structure
-    return {
-        chrom: [(gstart, gend, name) for name, (gstart, gend) in list(genes.items())]
-    }
+    ignore = (*ignore, *params.ANTITARGET_ALIASES)
+    subarr = probes.in_range(chrom, start, end)
+    starts = subarr["start"].to_numpy()
+    ends = subarr["end"].to_numpy()
+    regions: dict = collections.defaultdict(set)
+    for start_pos, end_pos, gene in cnary.gene_runs(subarr["gene"], ignore):
+        if gene:  # A trailing comma in the gene field names nothing
+            regions[starts[start_pos], ends[end_pos - 1]].add(gene)
+    return {chrom: _join_labels(regions)}

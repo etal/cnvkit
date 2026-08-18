@@ -112,7 +112,9 @@ Chromosome-level views are controlled with the ``--chromosome``/``-c`` and
 - A region label with chromosome name and 1-based start and end coordinates
   (e.g. ``-c chr5:1000000-4000000``) plots the specified region, with the start
   and end coordinates as the x-axis limits. All genes in this region (that are
-  labeled in the input .cnr file) are highlighted and labeled.
+  labeled in the input .cnr file) are highlighted and labeled, each locus of a
+  recurring name separately, as with ``-g``. Genes that share a locus, as
+  overlapping genes labeled in one bin do, are labeled together on one stripe.
 
     - If the start or end coordinate is left off (e.g. ``-c chr5:-4000000`` or
       ``-c chr7:140000000-``), the region is extended to the end of the

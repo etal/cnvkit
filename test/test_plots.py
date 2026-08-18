@@ -327,6 +327,108 @@ class GeneCoordsTests(unittest.TestCase):
             plots.gene_coords_by_name(cnarr, ["REAL", "ABSENT"])
 
 
+class GeneCoordsByRangeTests(unittest.TestCase):
+    """Tests for plots.gene_coords_by_range region-label selection."""
+
+    def test_cobinned_genes_are_labeled_separately(self):
+        """Each gene in a shared bin is labeled at its own locus.
+
+        Keying on the whole 'gene' field drew ERBB2 twice on this fixture -- once
+        at its true locus and once as a nested box labeled 'ERBB2,MIR4728' --
+        while MIR4728 was never labeled at all.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [
+                ["chr17", 37800000, 37850000, "STARD3", 0.0],
+                ["chr17", 37850000, 37860000, "ERBB2,MIR4728", 0.0],
+                ["chr17", 37860000, 37870000, "ERBB2", 0.0],
+                ["chr17", 37880000, 37890000, "GRB7", 0.0],
+            ]
+        )
+        self.assertEqual(
+            plots.gene_coords_by_range(cnarr, "chr17", 37800000, 37890000)["chr17"],
+            [
+                (37800000, 37850000, "STARD3"),
+                (37850000, 37870000, "ERBB2"),
+                (37850000, 37860000, "MIR4728"),
+                (37880000, 37890000, "GRB7"),
+            ],
+        )
+
+    def test_genes_sharing_a_locus_are_labeled_together(self):
+        """Genes whose bins coincide exactly get one stripe, labeled jointly.
+
+        Two identical regions would stack their highlights and overprint their
+        labels, so co-located names are joined as `gene_coords_by_name` joins
+        the ones a caller requested together.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 2000, "SOX2,SOX2-OT", 0.0],
+                ["chr1", 3000, 4000, "OTHER", 0.0],
+            ]
+        )
+        self.assertEqual(
+            plots.gene_coords_by_range(cnarr, "chr1", 0, 5000)["chr1"],
+            [(1000, 2000, "SOX2,SOX2-OT"), (3000, 4000, "OTHER")],
+        )
+
+    def test_regions_agree_with_gene_coords_by_name(self):
+        """`-c region` and `-g name` locate a gene identically.
+
+        One command answered 'where is this gene' two ways: the superseded rule
+        reported REPEAT as one span from its first occurrence to its last, while
+        `-g REPEAT` reported each locus.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 2000, "REPEAT", 0.0],
+                ["chr1", 2000, 2500, "-", 0.0],
+                ["chr1", 2500, 3000, "REPEAT", 0.0],
+                ["chr1", 3000, 4000, "MIDGENE", 0.0],
+                ["chr1", 9000, 9500, "REPEAT", 0.0],
+            ]
+        )
+        by_range = plots.gene_coords_by_range(cnarr, "chr1", 0, 10000)["chr1"]
+        self.assertEqual(
+            [region for region in by_range if region[2] == "REPEAT"],
+            plots.gene_coords_by_name(cnarr, ["REPEAT"])["chr1"],
+        )
+
+    def test_placeholder_bin_neither_splits_nor_labels(self):
+        """A backbone bin inside a gene is absorbed, not labeled.
+
+        A 'CGH' bin is a bait from a SNP-array-like backbone, not a gene; one
+        landing inside a real gene belongs to that gene's locus.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 2000, "GENE", 0.0],
+                ["chr1", 2000, 3000, "CGH", 0.0],
+                ["chr1", 3000, 4000, "GENE", 0.0],
+            ]
+        )
+        self.assertEqual(
+            plots.gene_coords_by_range(cnarr, "chr1", 0, 5000)["chr1"],
+            [(1000, 4000, "GENE")],
+        )
+
+    def test_trailing_comma_names_nothing(self):
+        """A trailing comma in the gene field yields no unlabeled region.
+
+        Splitting 'MIR3186,MIR4740,' -- 171 bins of test/formats/wgs-chr17.cnr
+        are labeled exactly that -- leaves an empty name, which would highlight
+        a region with no label.
+        """
+        cnarr = cnary.CopyNumArray.from_rows(
+            [["chr1", 1000, 2000, "MIR3186,MIR4740,", 0.0]]
+        )
+        self.assertEqual(
+            plots.gene_coords_by_range(cnarr, "chr1", 0, 5000)["chr1"],
+            [(1000, 2000, "MIR3186,MIR4740")],
+        )
+
+
 class ScatterSelectionTests(unittest.TestCase):
     """`scatter`'s region and gene selection (scatter.select_range_genes)."""
 
