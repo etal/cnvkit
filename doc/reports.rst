@@ -20,6 +20,14 @@ The output is a text table of tab-separated values, which is amenable to further
 processing by scripts and standard Unix tools such as ``grep``, ``sort``,
 ``cut`` and ``awk``.
 
+Genes are located as the :ref:`genemetrics` command locates them: where the same
+gene name recurs at several separate loci, each locus is considered on its own,
+rather than one span stretching from the name's first occurrence to its last. A
+bin labeled with several comma-separated gene names, as happens where genes
+overlap, belongs to each of those genes, so a breakpoint there is reported once
+per gene -- one row apiece, with the same location and change -- and never as a
+single row naming a gene that does not exist.
+
 Columns:
 
 - *gene*, *chromosome* -- as in .cns (see :ref:`cnxformat`), the gene where
@@ -27,9 +35,12 @@ Columns:
 - *location* -- the ``end`` of the segment to the left of the breakpoint, and
   ``start`` of the segment to the right.
 - *change* -- the difference in ``log2`` values between the adjacent segments.
-- *probes_left*, *probes_right* -- the number of probes on each side of the
-  breakpoint within the gene. (Not the same as the number of probes supporting
-  each segment; just the portion within the gene.)
+- *probes_left*, *probes_right* -- the number of bins on each side of the
+  breakpoint within the gene. (Not the same as the number of bins supporting
+  each segment; just the portion within the gene.) These are the same bins
+  :ref:`genemetrics` counts in its *probes* column, without ``-s``, including
+  any off-target or placeholder bins the gene's run absorbs, so the two add up
+  to it.
 
 For example, to get a list of the names of genes that contain a possible copy
 number breakpoint (e.g. unbalanced translocation)::

@@ -81,6 +81,109 @@ class AnalysisTests(unittest.TestCase):
         rows = commands.do_breaks(probes, segs, 4)
         self.assertGreater(len(rows), 0)
 
+    def test_breaks_names_one_gene_per_row(self):
+        """A bin naming several genes yields one row per gene, not a pseudo-gene.
+
+        The gene column is what the documented ``breaks ... | cut -f1 | sort -u``
+        pipeline reads, so every value in it must be a name that exists as a
+        gene. Tallying the whole comma-joined field invented five names on this
+        fixture, among them 'GOPC,ROS1' -- under which a breakpoint in ROS1 was
+        invisible to anyone looking for ROS1.
+        """
+        probes = cnvlib.read("formats/amplicon.cnr")
+        segs = cnvlib.read("formats/amplicon.cns")
+        rows = commands.do_breaks(probes, segs, 1)
+        for gene in rows["gene"]:
+            self.assertNotIn(",", gene)
+        # The co-binned pair is reported once each, same breakpoint
+        gopc = rows[rows["gene"] == "GOPC"]
+        ros1 = rows[rows["gene"] == "ROS1"]
+        self.assertEqual(len(gopc), 1)
+        self.assertEqual(len(ros1), 1)
+        for column in ("chromosome", "location", "change"):
+            self.assertEqual(gopc[column].iat[0], ros1[column].iat[0])
+        # ... and their probe counts differ, being their own loci's bins
+        self.assertNotEqual(gopc["probes_left"].iat[0], ros1["probes_left"].iat[0])
+
+    def test_breaks_probe_counts_match_genemetrics(self):
+        """probes_left + probes_right is the locus's bin count in genemetrics.
+
+        A copy number alteration affects a genomic region regardless of the gene
+        model, so an off-target or placeholder bin inside a gene supports a
+        breakpoint there as well as a targeted bin does. Both commands therefore
+        count the whole run of bins assigned to the locus, and the sum is
+        genemetrics' 'probes' exactly.
+        """
+        probes = cnvlib.read("formats/amplicon.cnr")
+        segs = cnvlib.read("formats/amplicon.cns")
+        rows = commands.do_breaks(probes, segs, 1)
+        self.assertGreater(len(rows), 0)
+        gene_probes: dict = {}
+        genemetrics = commands.do_genemetrics(probes, threshold=-1e9, min_probes=0)
+        for row in genemetrics.itertuples():
+            gene_probes.setdefault((row.chromosome, row.gene), []).append(row.probes)
+        for row in rows.itertuples():
+            self.assertIn(
+                row.probes_left + row.probes_right,
+                gene_probes[row.chromosome, row.gene],
+                f"{row.gene} at {row.chromosome}:{row.location}",
+            )
+
+    def test_breaks_ignores_gap_between_two_loci(self):
+        """A segment boundary between two loci of one name is not a breakpoint.
+
+        Condensing every occurrence of a name on a chromosome into one interval
+        put the gap between two loci inside it, so a boundary there was reported
+        as a breakpoint 'within the gene', with the bins of one locus counted on
+        the left and the other's on the right.
+        """
+        probes = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 2000, "REPEAT", 0.0],
+                ["chr1", 2000, 3000, "REPEAT", 0.0],
+                ["chr1", 3000, 4000, "MIDGENE", 0.0],
+                ["chr1", 4000, 5000, "MIDGENE", 0.0],
+                ["chr1", 9000, 9500, "REPEAT", 0.0],
+                ["chr1", 9500, 10000, "REPEAT", 0.0],
+            ]
+        )
+        segs = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 3500, "-", 0.0],
+                ["chr1", 3500, 10000, "-", 1.0],
+            ]
+        )
+        rows = commands.do_breaks(probes, segs, 1)
+        # The boundary at 3500 lies inside MIDGENE, and inside nothing else
+        self.assertEqual(list(rows["gene"]), ["MIDGENE"])
+
+    def test_breaks_counts_placeholder_bins_within_a_gene(self):
+        """Placeholder bins inside a gene count toward its breakpoint support.
+
+        A bin labeled 'CGH' is a backbone bait, not a gene, and one landing
+        inside a real gene is still a measurement of that locus. So it neither
+        splits the gene nor goes uncounted: here two of the three bins left of
+        the breakpoint carry the gene's name and the third is the placeholder.
+        """
+        probes = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 2000, "GENE", 0.0],
+                ["chr1", 2000, 3000, "CGH", 0.0],
+                ["chr1", 3000, 4000, "GENE", 0.0],
+                ["chr1", 4000, 5000, "GENE", 0.0],
+            ]
+        )
+        segs = cnary.CopyNumArray.from_rows(
+            [
+                ["chr1", 1000, 4000, "-", 0.0],
+                ["chr1", 4000, 5000, "-", 1.0],
+            ]
+        )
+        rows = commands.do_breaks(probes, segs, 1)
+        self.assertEqual(list(rows["gene"]), ["GENE"])
+        self.assertEqual(rows["probes_left"].iat[0], 3)
+        self.assertEqual(rows["probes_right"].iat[0], 1)
+
     def test_genemetrics(self):
         """The 'genemetrics' command."""
         probes = cnvlib.read("formats/amplicon.cnr")
