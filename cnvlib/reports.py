@@ -15,13 +15,13 @@ import pandas as pd
 from scipy import stats
 
 from . import descriptives, params, segmetrics
-from .cnary import is_female_default
+from .cnary import gene_runs, is_female_default
 from .segmetrics import segment_mean
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from numpy import float64
+    from numpy import float64, ndarray
 
     from cnvlib.cnary import CopyNumArray
 
@@ -68,36 +68,34 @@ def do_breaks(
 
 def get_gene_intervals(
     all_probes: CopyNumArray, ignore: tuple[str, ...] = params.IGNORE_GENE_NAMES
-) -> collections.defaultdict[str, list[tuple[str, list[int], int]]]:
-    """Tally genomic locations of each targeted gene.
+) -> collections.defaultdict[str, list[tuple[str, ndarray, int]]]:
+    """Tally each gene locus's bin positions, grouped by chromosome.
 
     Return a dict of chromosomes to a list of tuples: (gene name, starts, end),
-    where gene name is a string, starts is a sorted list of probe start
-    positions, and end is the last probe's end position as an integer. (The
-    endpoints are redundant since probes are adjacent.)
+    where starts holds the start position of each bin at that locus, in genomic
+    order, and end is the last bin's end position.
+
+    Loci are grouped as `CopyNumArray.by_gene` groups them, via
+    `cnvlib.cnary.gene_runs`: a bin naming several comma-separated genes belongs
+    to the locus of each of them, and a name recurring at several loci -- a
+    repeat family, say -- yields one entry per locus rather than one entry
+    reaching from its first occurrence to its last.
     """
-    ignore += params.ANTITARGET_ALIASES
-    # Tally the start & end points for each targeted gene; group by chromosome
-    gene_probes: dict = collections.defaultdict(lambda: collections.defaultdict(list))
-    for row in all_probes:
-        if not isinstance(row.gene, str):
-            continue
-        gname = row.gene
-        if gname not in ignore:
-            gene_probes[row.chromosome][gname].append(row)
-    # Condense into a single interval for each gene
+    ignore = (*ignore, *params.ANTITARGET_ALIASES)
     intervals = collections.defaultdict(list)
-    for chrom, gp in gene_probes.items():
-        for gene, probes in gp.items():
-            starts = sorted(row.start for row in probes)
-            end = max(row.end for row in probes)
-            intervals[chrom].append((gene, starts, end))
-        intervals[chrom].sort(key=lambda gse: gse[1])
+    for chrom, subarr in all_probes.by_chromosome():
+        starts = subarr["start"].to_numpy()
+        ends = subarr["end"].to_numpy()
+        for start_pos, end_pos, gene in gene_runs(subarr["gene"], ignore):
+            if gene:  # A trailing comma in the gene field names nothing
+                intervals[chrom].append(
+                    (gene, starts[start_pos:end_pos], ends[end_pos - 1])
+                )
     return intervals
 
 
 def get_breakpoints(
-    intervals: collections.defaultdict[str, list[tuple[str, list[int], int]]],
+    intervals: collections.defaultdict[str, list[tuple[str, ndarray, int]]],
     segments: CopyNumArray,
     min_probes: int,
 ) -> list[tuple[str, str, int, float64, int, int]]:
@@ -113,8 +111,9 @@ def get_breakpoints(
             continue
         for gname, gstarts, gend in intervals[curr_chrom]:
             if gstarts[0] < curr_end < gend:
-                probes_left = sum(s < curr_end for s in gstarts)
-                probes_right = sum(s >= curr_end for s in gstarts)
+                # The two sides partition the locus's bins, so one count suffices
+                probes_left = int((gstarts < curr_end).sum())
+                probes_right = len(gstarts) - probes_left
                 if probes_left >= min_probes and probes_right >= min_probes:
                     breakpoints.append(
                         (
