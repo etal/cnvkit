@@ -422,7 +422,7 @@ command.
 ``coverage``
 ------------
 
-Calculate coverage in the given regions from BAM read depths.
+Calculate coverage in the given regions from BAM or CRAM read depths.
 
 By default, coverage is calculated via mean read depth from a pileup.
 Alternatively, the ``--count`` option scans each read individually with pysam
@@ -474,6 +474,12 @@ these reads when calculating read depth.
     physically removed. (Exception: for amplicon sequencing, do *not* mark
     duplicates at all -- see :doc:`nonhybrid`.)
 
+CNVkit does not read base quality scores when calculating coverage, so base
+quality score recalibration does not affect it. GATK ApplyBQSR rewrites the
+quality scores and, apart from GATK's default filter for malformed reads, passes
+every read through with its alignment and flags unchanged, so the MarkDuplicates
+output and the recalibrated output yield the same coverage.
+
 You will probably want to index the finished BAM file using `samtools
 <https://samtools.sourceforge.net/>`_ or SAMBAMBA.  But if you haven't done this
 beforehand, CNVkit will automatically do it for you.
@@ -510,6 +516,77 @@ beforehand, CNVkit will automatically do it for you.
     ``.csi`` file is detected and reused just like ``.bai``. No extra options
     or manual indexing are required (equivalent to running ``samtools index
     -c`` yourself).
+
+CRAM input
+``````````
+
+CNVkit accepts CRAM files wherever it accepts BAM files, including the
+:ref:`batch`, :ref:`coverage`, and :ref:`autobin` commands. Most CRAM files store
+each read as its differences from an external reference genome, which is then
+needed to read the file. Supply the FASTA file that the CRAM files were written
+against with the ``-f``/``--fasta`` option::
+
+    cnvkit.py coverage Sample.cram targets.bed -f hg38.fa -o Sample.targetcoverage.cnn
+
+    cnvkit.py batch *Tumor.cram --normal *Normal.cram --targets my_targets.bed \
+        --fasta hg38.fa --output-reference my_reference.cnn --output-dir results/
+
+The :ref:`batch` command also accepts ``-f`` together with ``-r``/``--reference``,
+for applying an existing copy number reference to new CRAM files. As with BAM
+files, CNVkit builds a missing or outdated CRAM index (``.crai``) automatically.
+
+.. note::
+    **Without** ``-f``, **reading a CRAM file can take many hours or fail.**
+    CNVkit reads alignments through pysam and HTSlib. HTSlib looks for each
+    reference sequence, in order: by name in the FASTA file given with ``-f``;
+    by the MD5 checksum in the ``M5`` tag of the CRAM header's ``@SQ`` line,
+    first in the ``REF_CACHE`` directory and then in each location listed in
+    ``REF_PATH``; and by name in the local FASTA file named in the ``@SQ``
+    line's ``UR`` tag. If ``REF_PATH`` is set and none of these supplies the
+    sequence, HTSlib reports ``Unable to fetch reference`` and ``Failure to
+    decode slice``, and CNVkit stops with an error. If ``REF_PATH`` is not set,
+    the outcome depends on the HTSlib version:
+
+    - HTSlib 1.21 and earlier (bundled with pysam 0.23 and earlier) use the
+      European Bioinformatics Institute's reference server as the default
+      ``REF_PATH``, downloading each sequence and storing it in a local cache,
+      ``~/.cache/hts-ref`` unless ``REF_CACHE`` is set. Fetching every chromosome
+      of a large genome this way can take many hours, and is a common reason for
+      CRAM processing to run far slower than BAM processing of the same data.
+      HTSlib logs a warning beginning ``[W::cram_populate_ref] Creating
+      reference cache directory`` only when it creates the default cache
+      directory; later downloads into that directory are silent.
+    - Later HTSlib versions (bundled with pysam 0.24 and later) have no default
+      server, and fail with the errors above.
+
+    Passing the matching FASTA file with ``-f`` avoids both outcomes. Where that
+    is not possible, the ``seq_cache_populate.pl`` script distributed with
+    samtools builds a local directory of sequences named by their MD5
+    checksums, and prints the path template to assign to ``REF_CACHE``, such
+    as ``/data/ref_cache/%2s/%2s/%s``. Assign the same template to ``REF_PATH``,
+    so that HTSlib 1.21 and earlier do not fall back to the EBI server for a
+    sequence missing from the cache. HTSlib's `reference sequence
+    documentation <https://www.htslib.org/doc/reference_seqs.html>`_ describes
+    these variables in full.
+
+.. note::
+    **The FASTA file must contain the same sequences the CRAM files were written
+    against.** Where it differs, HTSlib reports an ``MD5 checksum reference
+    mismatch``, and CNVkit stops with an error rather than computing coverage
+    from misread alignments. A warning such as ``[W::sanitise_SQ_lines] Header
+    @SQ length mismatch for ref chr1, 249250621 vs 248956422`` means that the
+    FASTA file's sequence lengths disagree with the CRAM header, which typically
+    indicates a different genome assembly (here, a CRAM header from hg19 and a
+    FASTA file from hg38). Decoding can still succeed where the two sequences
+    happen to agree over the region being read, so treat the warning as a sign
+    that the wrong FASTA file was given, even when no error follows.
+
+A CRAM file and a BAM file holding the same alignments yield identical coverage,
+in both the default and ``--count`` calculations, and CNVkit's test suite checks
+this on a fixture that includes duplicate-marked reads. Duplicate flags are
+honored in CRAM input exactly as in BAM input (see the note on marking
+duplicates above), and since coverage does not depend on base quality scores,
+CRAM's lossy quality-score compression options do not affect it either.
 
 
 .. _reference:
