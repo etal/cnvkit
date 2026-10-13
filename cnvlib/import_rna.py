@@ -47,7 +47,7 @@ def do_import_rna(
         Maximum log2 ratio to cap values at. Default is 3.
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
-        (e.g., 'hg19', 'hg38').
+        (e.g., 'grch37', 'grch38').
     min_sample_fraction : float, optional
         Minimum fraction of samples in which a gene must be expressed
         (count >= 1) for it to be retained. Default 0.5 preserves the legacy

@@ -2349,7 +2349,7 @@ def do_sex(
         Whether the reference sample is male (haploid X chromosome).
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
-        (e.g., 'hg19', 'hg38', 'mm10').
+        (e.g., 'grch37', 'grch38').
 
     Returns
     -------

@@ -170,7 +170,7 @@ def do_genemetrics(
         Whether sample is female. If None, inferred from data.
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
-        (e.g., 'hg19', 'hg38', 'mm10').
+        (e.g., 'grch37', 'grch38').
     location_stats : list of str, optional
         Location statistics to compute: 'mean', 'median', 'mode', 'p_ttest'.
         Default is empty tuple.
