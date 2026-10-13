@@ -340,10 +340,16 @@ def sample_region_cov(
 
 
 def sample_midsize_regions(regions: GA, max_num: int) -> pd.DataFrame:
-    """Randomly select a subset of up to `max_num` regions."""
+    """Randomly select a subset of up to `max_num` regions.
+
+    Regions between the 25th and 75th percentile of size are preferred. When no
+    region falls in that range, as with two regions of very different size, all
+    regions of nonzero size are eligible instead.
+    """
     sizes = regions.end - regions.start
     lo_size, hi_size = np.percentile(sizes[sizes > 0], [25, 75])
-    midsize_regions = regions.data[(sizes >= lo_size) & (sizes <= hi_size)]
+    in_range = (sizes >= lo_size) & (sizes <= hi_size)
+    midsize_regions = regions.data[in_range if in_range.any() else sizes > 0]
     if len(midsize_regions) > max_num:
         midsize_regions = midsize_regions.sample(max_num, random_state=0xA5EED)
     return midsize_regions

@@ -252,6 +252,13 @@ class PreprocessingTests(unittest.TestCase):
                 bg, "wgs", access=access_arr.subtract(targets)
             )
             self.assertEqual(wgs_depth, 30)
+            # Two regions of very different size, neither between the 25th and
+            # 75th percentile of sizes: depth is still measured
+            two_regions = GA.from_columns(
+                {"chromosome": ["chr1"] * 2, "start": [0, 15200], "end": [1000, 35000]}
+            )
+            (wgs_depth, _), _ = autobin.do_autobin(bg, "wgs", access=two_regions)
+            self.assertEqual(wgs_depth, 30)
 
             with self.assertRaises(ValueError) as cm:
                 autobin.do_autobin(bg, "wgs")
