@@ -91,7 +91,10 @@ API points worth knowing:
   case rather than crashing).
 - `GenomicArray.autosomes()` falls back to returning the whole array
   (with a warning) when no autosomes are recognized. Be permissive on
-  unfamiliar assemblies; don't silently drop data.
+  unfamiliar assemblies; don't silently drop data. Its mask,
+  `GenomicArray.autosome_filter()`, deliberately has no fallback: use it
+  where "no autosomes" must mean "nothing to assess" (e.g. the
+  low-coverage warning in `segmentation`).
 - PAR coordinates live in `skgenome.genomebuild`;
   `cnvlib.params.PSEUDO_AUTSOMAL_REGIONS` is a back-compat re-export.
 

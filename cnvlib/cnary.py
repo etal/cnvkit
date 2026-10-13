@@ -341,24 +341,29 @@ class CopyNumArray(GenomicArray):
                 logging.info("Shifting log2 values by %f", shift)
             self.data["log2"] += shift
 
-    def drop_low_coverage(self, verbose: bool = False) -> CopyNumArray:
-        """Drop bins with extremely low log2 coverage or copy ratio values.
+    def low_coverage_mask(self) -> Series:
+        """Flag bins with extremely low log2 coverage or copy ratio values.
 
         These are generally bins that had no reads mapped due to sample-specific
         issues. A very small log2 ratio or coverage value may have been
         substituted to avoid domain or divide-by-zero errors.
 
         NaN log2/depth values (from degenerate or malformed inputs) are also
-        dropped here: a bare ``log2 < min_cvg`` comparison is False for NaN, so
+        flagged: a bare ``log2 < min_cvg`` comparison is False for NaN, so
         without this NaN bins would slip past into segmentation and trigger an
         'invalid value encountered in greater' warning or a CBS crash (#521).
         """
         min_cvg = params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
         log2 = self.data["log2"]
-        drop_idx = (log2 < min_cvg) | log2.isna()
+        mask = (log2 < min_cvg) | log2.isna()
         if "depth" in self:
             depth = self.data["depth"]
-            drop_idx |= (depth == 0) | depth.isna()
+            mask |= (depth == 0) | depth.isna()
+        return mask
+
+    def drop_low_coverage(self, verbose: bool = False) -> CopyNumArray:
+        """Drop the bins flagged by `low_coverage_mask`."""
+        drop_idx = self.low_coverage_mask()
         if verbose and drop_idx.any():
             logging.info("Dropped %d low-coverage bins", drop_idx.sum())
         return self[~drop_idx]

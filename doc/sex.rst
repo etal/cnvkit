@@ -307,8 +307,11 @@ CNVkit is not detecting my sample's sex correctly. What can I do?
 
 In lower-quality samples, particularly tumor samples analyzed without a robust
 reference (see :doc:`tumor`), there may be many bins with no coverage which bias
-the segment means. Try repeating the :ref:`segment` command with the
-``--drop-low-coverage`` option if you did not do so originally.
+the segment means; the :ref:`segment` command warns when this is the case. For
+a bulk tumor sample, try repeating the :ref:`segment` command with the
+``--drop-low-coverage`` option if you did not do so originally. Otherwise,
+recompute coverage with larger bins (see :ref:`autobin`), since that option
+also removes genuine homozygous deletions.
 
 If a small number of samples in your reference pool look like they were
 inferred incorrectly (e.g. three males among forty samples are reported as
