@@ -749,7 +749,7 @@ do_autobin = public(autobin.do_autobin)
 
 
 def _cmd_autobin(args: argparse.Namespace) -> None:
-    """Quickly calculate reasonable bin sizes from BAM or CRAM read counts."""
+    """Quickly calculate reasonable bin sizes from BAM, CRAM, or bedGraph depths."""
     if args.method in ("hybrid", "amplicon") and not args.targets:
         raise RuntimeError(f"Sequencing method {args.method!r} requires targets (-t)")
     if args.method == "wgs":
@@ -830,8 +830,8 @@ P_autobin = AP_subparsers.add_parser("autobin", help=_cmd_autobin.__doc__)
 P_autobin.add_argument(
     "bams",
     nargs="+",
-    help="""Sample BAM or CRAM file(s), or bedGraph file(s) (.bed.gz), to test for
-            target coverage""",
+    help="""Sample BAM or CRAM file(s), or bedGraph file(s) (.bed.gz with tabix index
+            .tbi or .csi), to test for target coverage""",
 )
 add_fasta(P_autobin)
 P_autobin.add_argument(
@@ -848,7 +848,9 @@ P_autobin.add_argument(
     "--access",
     metavar="FILENAME",
     help="""Sequencing-accessible genomic regions, or exons to use as possible targets
-            (e.g. output of refFlat2bed.py)""",
+            (e.g. output of refFlat2bed.py). For bedGraph input, read depth is
+            measured in these regions for 'wgs' (required) and outside the targets
+            for the 'hybrid' antitarget bin size.""",
 )
 P_autobin.add_argument(
     "-t",

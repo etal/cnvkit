@@ -1,4 +1,8 @@
-"""Estimate reasonable bin sizes from BAM read counts or depths."""
+"""Estimate reasonable bin sizes from read counts or depths.
+
+The sample may be a BAM or CRAM file, or a tabix-indexed bedGraph (.bed.gz) of
+per-base read depth.
+"""
 
 from __future__ import annotations
 
@@ -19,6 +23,12 @@ from skgenome import tabio
 from . import coverage, samutil
 from .antitarget import compare_chrom_names
 from .descriptives import weighted_median
+
+# A bedGraph is read line by line, so each region sampled from it is trimmed to a
+# centered window of at most this many bases. Accessible and antitarget regions
+# span up to megabases each, and 100 of them untrimmed would mean reading tens of
+# megabases of per-base depth; targets are almost always shorter than this.
+BEDGRAPH_SAMPLE_WIDTH = 10000
 
 
 def midsize_file(fnames: Sequence[str]) -> str:
@@ -42,19 +52,22 @@ def do_autobin(
     antitarget_max_size: int = 1000000,
     fasta: str | None = None,
 ) -> tuple[tuple[float, int | None], tuple[float | None, int | None]]:
-    """Quickly calculate reasonable bin sizes from BAM read counts.
+    """Quickly calculate reasonable bin sizes from read counts or depths.
 
     Parameters
     ----------
     bam_fname : str
-        Path to BAM file.
+        Path to a BAM or CRAM file, or to a tabix-indexed bedGraph file
+        (.bed.gz) of per-base read depth.
     method : str
         Sequencing method: 'wgs' (whole-genome sequencing), 'amplicon' (targeted
         amplicon capture), or 'hybrid' (hybridization capture).
     targets : GenomicArray, optional
         Targeted genomic regions (required for 'hybrid' and 'amplicon').
     access : GenomicArray, optional
-        Sequencing-accessible regions of the reference genome (for 'hybrid' and 'wgs').
+        Sequencing-accessible regions of the reference genome (for 'hybrid' and
+        'wgs'). Required for 'wgs' on a bedGraph, and for a bedGraph's 'hybrid'
+        antitarget depth.
     bp_per_bin : float, optional
         Desired number of sequencing read nucleotide bases mapped to each bin.
         Default is 100000.0.
@@ -78,7 +91,21 @@ def do_autobin(
     Raises
     ------
     ValueError
-        If targets are required for the method but not provided or empty.
+        If targets are required for the method but not provided or empty; if
+        method 'wgs' is given a bedGraph without accessible regions; or if no
+        read depth is found in the target regions.
+
+    Notes
+    -----
+    A BAM or CRAM file is summarized by its index: per-chromosome read counts
+    and the estimated read length give the 'wgs' depth and the 'hybrid'
+    antitarget depth. A bedGraph records neither read counts nor contig
+    lengths, so every depth is instead measured in a seeded random sample of
+    regions -- the targets, the accessible regions ('wgs'), or the accessible
+    regions on targeted chromosomes minus the targets ('hybrid' antitargets) --
+    as the target depth is for any input. The 'hybrid' target depth of a
+    bedGraph covers all targets, whereas for a BAM it covers only those on
+    accessible chromosomes.
     """
     if method in ("amplicon", "hybrid"):
         if targets is None:
@@ -113,6 +140,43 @@ def do_autobin(
             bin_size = max_size
         return bin_size
 
+    if access is not None and not len(access):
+        # Empty accessible regions mean none given, as on the command line
+        access = None
+    if coverage.is_bedgraph_format(bam_fname):
+        tgt_depth, anti_depth = bedgraph_depths(bam_fname, method, targets, access)
+    else:
+        tgt_depth, anti_depth = bam_depths(bam_fname, method, targets, access, fasta)
+
+    # A non-finite or non-positive target depth means no reads were found in
+    # the sampled/accessible regions -- give an actionable error rather than a
+    # cryptic "cannot convert float NaN to integer" downstream (#421).
+    if tgt_depth is None or not np.isfinite(tgt_depth) or tgt_depth <= 0:
+        raise ValueError(
+            f"Could not estimate read depth in the target regions of "
+            f"{bam_fname!r} (method {method!r}): got {tgt_depth!r}. This "
+            "usually means no reads mapped to those regions -- most often "
+            "because the chromosome names in the sample file don't match those "
+            "in the reference, --access, or --targets regions (e.g. 'chr1' "
+            "vs. '1'), or the regions are empty. Check that the sample file, "
+            "reference FASTA, and any --access/--targets files use consistent "
+            "chromosome names."
+        )
+
+    # Clip bin sizes to specified ranges
+    tgt_bin_size = depth2binsize(tgt_depth, target_min_size, target_max_size)
+    anti_bin_size = depth2binsize(anti_depth, antitarget_min_size, antitarget_max_size)
+    return ((tgt_depth, tgt_bin_size), (anti_depth, anti_bin_size))
+
+
+def bam_depths(
+    bam_fname: str,
+    method: str,
+    targets: GA | None,
+    access: GA | None,
+    fasta: str | None,
+) -> tuple[float, float | None]:
+    """Target and antitarget read depths of a BAM or CRAM file."""
     samutil.ensure_bam_index(bam_fname)
     rc_table = samutil.idxstats(bam_fname, drop_unmapped=True, fasta=fasta)
     read_len = samutil.get_read_length(bam_fname, fasta=fasta)
@@ -121,10 +185,6 @@ def do_autobin(
     # Dispatch
     match method:
         case "amplicon":
-            # From BAM index
-            # rc_table = update_chrom_length(rc_table, targets)
-            # tgt_depth = average_depth(rc_table, read_len)
-            # By sampling
             assert targets is not None
             tgt_depth = sample_region_cov(bam_fname, targets, fasta=fasta)
             anti_depth: float | None = None
@@ -139,30 +199,55 @@ def do_autobin(
                 fasta,
             )
         case "wgs":
-            if access is not None and len(access):
-                rc_table = update_chrom_length(rc_table, access)
+            rc_table = update_chrom_length(rc_table, access)
             tgt_depth = average_depth(rc_table, read_len)  # type: ignore[arg-type]
-            anti_depth = None  # type: ignore[assignment]
+            anti_depth = None
+        case _:
+            raise ValueError(f"Unknown sequencing method {method!r}")
+    return tgt_depth, anti_depth
 
-    # A non-finite or non-positive target depth means no reads were found in
-    # the sampled/accessible regions -- give an actionable error rather than a
-    # cryptic "cannot convert float NaN to integer" downstream (#421).
-    if tgt_depth is None or not np.isfinite(tgt_depth) or tgt_depth <= 0:
-        raise ValueError(
-            f"Could not estimate read depth in the target regions of "
-            f"{bam_fname!r} (method {method!r}): got {tgt_depth!r}. This "
-            "usually means no reads mapped to those regions -- most often "
-            "because the chromosome names in the BAM file don't match those "
-            "in the reference, --access, or --targets regions (e.g. 'chr1' "
-            "vs. '1'), or the regions are empty. Check that the BAM, reference "
-            "FASTA, and any --access/--targets files use consistent chromosome "
-            "names."
-        )
 
-    # Clip bin sizes to specified ranges
-    tgt_bin_size = depth2binsize(tgt_depth, target_min_size, target_max_size)
-    anti_bin_size = depth2binsize(anti_depth, antitarget_min_size, antitarget_max_size)
-    return ((tgt_depth, tgt_bin_size), (anti_depth, anti_bin_size))
+def bedgraph_depths(
+    bg_fname: str, method: str, targets: GA | None, access: GA | None
+) -> tuple[float, float | None]:
+    """Target and antitarget read depths of a bedGraph, by region sampling."""
+    match method:
+        case "amplicon":
+            assert targets is not None
+            return sample_region_cov(bg_fname, targets), None
+        case "hybrid":
+            assert targets is not None
+            tgt_depth = sample_region_cov(bg_fname, targets)
+            if access is None:
+                logging.warning(
+                    "Antitarget depth can't be estimated from bedGraph %s without "
+                    "sequencing-accessible regions (--access); a bedGraph does "
+                    "not record chromosome lengths",
+                    bg_fname,
+                )
+                return tgt_depth, None
+            # Off-target regions on the targeted chromosomes, as hybrid() takes
+            # for BAM. Unlike hybrid(), which subtracts target reads from each
+            # chromosome's total, the target depth needs no such restriction.
+            antitargets = shared_chroms(access.subtract(targets), targets)[0]
+            if not len(antitargets):
+                logging.warning(
+                    "No accessible regions lie off-target on the targeted "
+                    "chromosomes; check that the --access and --targets "
+                    "chromosome names match. Antitarget depth can't be estimated."
+                )
+                return tgt_depth, None
+            return tgt_depth, sample_region_cov(bg_fname, antitargets)
+        case "wgs":
+            if access is None:
+                raise ValueError(
+                    f"Method 'wgs' needs sequencing-accessible regions (--access) "
+                    f"to estimate the read depth of bedGraph {bg_fname!r}, since a "
+                    "bedGraph does not record chromosome lengths."
+                )
+            return sample_region_cov(bg_fname, access), None
+        case _:
+            raise ValueError(f"Unknown sequencing method {method!r}")
 
 
 def hybrid(
@@ -222,15 +307,30 @@ def idxstats2ga(table: pd.DataFrame, bam_fname: str) -> GA:
 def sample_region_cov(
     bam_fname: str, regions: GA, max_num: int = 100, fasta: str | None = None
 ) -> float:
-    """Calculate read depth in a randomly sampled subset of regions."""
+    """Calculate read depth in a randomly sampled subset of regions.
+
+    `bam_fname` may be a BAM or CRAM file, or a bedGraph (.bed.gz), whose
+    sampled regions are first trimmed to `BEDGRAPH_SAMPLE_WIDTH` bases.
+    """
+    if not (regions.end > regions.start).any():
+        # No targets on the accessible chromosomes, or only zero-width regions:
+        # depth is undefined, and do_autobin raises an actionable error.
+        return float("nan")
     midsize_regions = sample_midsize_regions(regions, max_num)
-    bam_chroms = samutil.get_bam_chroms(bam_fname, fasta)
+    is_bedgraph = coverage.is_bedgraph_format(bam_fname)
+    if is_bedgraph:
+        midsize_regions = center_windows(midsize_regions, BEDGRAPH_SAMPLE_WIDTH)
+    else:
+        bam_chroms = samutil.get_bam_chroms(bam_fname, fasta)
     with tempfile.NamedTemporaryFile(suffix=".bed", mode="w+t") as f:
         tabio.write(regions.as_dataframe(midsize_regions), f, "bed4")
         f.flush()
-        table = coverage.bedcov(
-            f.name, bam_fname, 0, fasta, allow_empty=True, bam_chroms=bam_chroms
-        )
+        if is_bedgraph:
+            table = coverage.bedgraph_to_basecount(f.name, bam_fname)
+        else:
+            table = coverage.bedcov(
+                f.name, bam_fname, 0, fasta, allow_empty=True, bam_chroms=bam_chroms
+            )
     if not len(table):
         # No sampled region overlaps a BAM contig -- depth is undefined; let
         # the caller (do_autobin) raise an actionable chrom-name-mismatch error.
@@ -247,6 +347,13 @@ def sample_midsize_regions(regions: GA, max_num: int) -> pd.DataFrame:
     if len(midsize_regions) > max_num:
         midsize_regions = midsize_regions.sample(max_num, random_state=0xA5EED)
     return midsize_regions
+
+
+def center_windows(regions: pd.DataFrame, width: int) -> pd.DataFrame:
+    """Trim each region longer than `width` to its centered `width`-base window."""
+    lengths = regions.end - regions.start
+    starts = regions.start + (lengths - width).clip(lower=0) // 2
+    return regions.assign(start=starts, end=starts + lengths.clip(upper=width))
 
 
 def shared_chroms(*tables) -> list:

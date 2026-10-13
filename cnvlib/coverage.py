@@ -1,4 +1,4 @@
-"""Supporting functions for the 'antitarget' command."""
+"""Supporting functions for the 'coverage' command."""
 
 from __future__ import annotations
 
@@ -196,14 +196,15 @@ def do_coverage(
     fasta: str | None = None,
     no_overlap: bool = False,
 ) -> CNA:
-    """Calculate coverage in the given regions from BAM read depths.
+    """Calculate coverage in the given regions from BAM read depths or a bedGraph.
 
     Parameters
     ----------
     bed_fname : str
         Path to BED file defining regions to measure coverage.
     bam_or_bg_fname : str
-        Path to BAM file containing aligned reads or bedGraph file (.bed.gz).
+        Path to a BAM or CRAM file of aligned reads, or a tabix-indexed bedGraph
+        file (.bed.gz) of per-base read depth.
     by_count : bool, optional
         Calculate coverage by read count instead of read depth. Default is False.
         Ignored for bedGraph input.

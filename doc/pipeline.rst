@@ -368,9 +368,13 @@ passing the locations of the accessible sequence regions with the ``-g`` or
 accessible genomic regions specified in the "access" file.
 
 The :ref:`batch` command automatically runs :ref:`autobin` to estimate
-appropriate on- and off-target bin sizes from the normal sample BAM files.
-You can override the computed sizes with the ``--target-avg-size`` and
-``--antitarget-avg-size`` options if needed.
+appropriate on- and off-target bin sizes from the normal sample BAM, CRAM, or
+:ref:`bedGraph <bedgraph_input>` files. A bedGraph does not record chromosome
+lengths, so for a hybrid capture the off-target bin size is estimated over the
+accessible regions given with ``--access``, or else over those that
+:ref:`access` finds in the ``--fasta`` reference genome; with neither, the
+default off-target bin size applies. You can override the computed sizes with
+the ``--target-avg-size`` and ``--antitarget-avg-size`` options if needed.
 
 
 Off-target bin size
@@ -398,9 +402,9 @@ regions.
 ``autobin``
 -----------
 
-Quickly estimate read counts or depths in a BAM file to estimate reasonable on-
-and (if relevant) off-target bin sizes. If multiple BAMs are given, use the BAM
-with median file size.
+Quickly estimate read counts or depths in a BAM, CRAM, or :ref:`bedGraph
+<bedgraph_input>` file to estimate reasonable on- and (if relevant) off-target
+bin sizes. If multiple files are given, use the file with median file size.
 
 Generates target and (if relevant) antitarget BED files, and prints a table of
 estimated average read depths and recommended bin sizes on standard output.
@@ -416,13 +420,23 @@ present in a file, and random sampling of targeted regions (``-t``) is used to
 estimate average on-target read depth much faster than the :ref:`coverage`
 command.
 
+A bedGraph has neither an index of read counts nor chromosome lengths, so for a
+bedGraph every depth is measured in a random sample of regions, each trimmed to
+at most 10 kb: the targets, the accessible regions (``-g``) for ``-m wgs``, and
+the accessible regions on targeted chromosomes minus the targets for the
+off-target depth of ``-m hybrid``. Without ``-g``, or when ``-g`` leaves no
+off-target region on a targeted chromosome, ``-m hybrid`` on a bedGraph
+estimates only the on-target bin size, with a warning, and the antitarget BED
+file it writes is empty.
+
 
 .. _coverage:
 
 ``coverage``
 ------------
 
-Calculate coverage in the given regions from BAM or CRAM read depths.
+Calculate coverage in the given regions from BAM or CRAM read depths, or from a
+:ref:`bedGraph <bedgraph_input>` of per-base depth.
 
 By default, coverage is calculated via mean read depth from a pileup.
 Alternatively, the ``--count`` option scans each read individually with pysam
@@ -587,6 +601,38 @@ this on a fixture that includes duplicate-marked reads. Duplicate flags are
 honored in CRAM input exactly as in BAM input (see the note on marking
 duplicates above), and since coverage does not depend on base quality scores,
 CRAM's lossy quality-score compression options do not affect it either.
+
+.. _bedgraph_input:
+
+bedGraph input
+``````````````
+
+The :ref:`coverage`, :ref:`autobin`, and :ref:`batch` commands also accept a
+precomputed per-base read depth profile in bedGraph format, compressed with
+bgzip and indexed with tabix (a ``.bed.gz`` file with a ``.tbi`` or ``.csi``
+index), in place of a BAM or CRAM file. A depth profile carries no read
+sequences, so it can be shared for copy number analysis where the alignments
+themselves cannot. The per-base output of `mosdepth
+<https://github.com/brentp/mosdepth>`_ (``{prefix}.per-base.bed.gz``) is in this
+format, as is the output of ``bedtools genomecov -bg`` after ``bgzip`` and
+``tabix -p bed``::
+
+    cnvkit.py coverage Sample.per-base.bed.gz targets.bed -o Sample.targetcoverage.cnn
+
+    cnvkit.py batch *Tumor.per-base.bed.gz --normal *Normal.per-base.bed.gz \
+        --targets my_targets.bed --fasta hg38.fa --output-reference my_reference.cnn
+
+A chromosome missing from the bedGraph is treated as having zero depth, and
+chromosome names that differ only by a ``chr`` prefix are matched.
+
+The depths are those that the program writing the bedGraph counted, so the
+options that select reads -- ``-q``/``--min-mapq``, ``-c``/``--count``, and
+``--no-overlap`` -- have no effect on a bedGraph and are ignored with a warning.
+For coverage comparable to that from a BAM file, exclude the same reads that
+CNVkit excludes: unmapped, secondary, QC-failed, and duplicate reads (SAM flag
+0x704). mosdepth excludes these by default (``-F 1796``), and also counts the
+overlapping bases of a read pair once, as ``--no-overlap`` does, unless run with
+``--fast-mode``.
 
 
 .. _reference:

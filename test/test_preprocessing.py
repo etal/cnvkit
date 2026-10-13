@@ -139,20 +139,143 @@ class PreprocessingTests(unittest.TestCase):
             self.assertGreater(bs, 0)
 
     def test_autobin_chrom_name_mismatch(self):
-        """WGS autobin gives a clear, actionable error -- not the cryptic
-        'cannot convert float NaN to integer' -- when the BAM and access
-        regions share no chromosome names (#421)."""
-        bam_fname = "formats/na12878-chrM-Y-trunc.bam"
-        # Access regions on a contig absent from the BAM => no shared chroms,
-        # so the estimated read depth is NaN.
+        """autobin gives a clear, actionable error -- not the cryptic
+        'cannot convert float NaN to integer' or an IndexError -- when the
+        sample and the access regions share no chromosome names (#421). A
+        bedGraph's hybrid target depth does not depend on the access regions,
+        so there only the antitarget depth is left undetermined, with a warning."""
+        targets = tabio.read("formats/my-targets.bed", "bed")
+        # Access regions on a contig absent from the sample => no shared chroms,
+        # so the estimated read depth is NaN (BAM) or zero (bedGraph).
         access_arr = GA.from_columns(
             {"chromosome": ["nonexistent_contig"], "start": [0], "end": [100000]}
         )
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
+        for fname, method in ((bam, "wgs"), (bam, "hybrid"), (bedgraph, "wgs")):
+            with self.subTest(fname=fname, method=method):
+                with self.assertRaises(ValueError) as cm:
+                    autobin.do_autobin(
+                        fname, method, targets=targets, access=access_arr
+                    )
+                msg = str(cm.exception)
+                self.assertNotIn("NaN", msg)
+                self.assertIn("chromosome", msg.lower())
+        with self.assertLogs(level="WARNING") as logs:
+            (tgt_depth, _), (anti_depth, _) = autobin.do_autobin(
+                bedgraph, "hybrid", targets=targets, access=access_arr
+            )
+        self.assertGreater(tgt_depth, 0)
+        self.assertIsNone(anti_depth)
+        self.assertTrue(any("chromosome names" in msg for msg in logs.output))
+
+    def test_autobin_zero_width_targets(self):
+        """Targets that are all zero-width leave no region to measure depth in,
+        which autobin reports as an error rather than an IndexError."""
+        point_targets = GA.from_columns(
+            {"chromosome": ["chrM", "chrM"], "start": [500, 700], "end": [500, 700]}
+        )
         with self.assertRaises(ValueError) as cm:
-            autobin.do_autobin(bam_fname, "wgs", access=access_arr)
-        msg = str(cm.exception)
-        self.assertNotIn("NaN", msg)
-        self.assertIn("chromosome", msg.lower())
+            autobin.do_autobin(
+                "formats/na12878-chrM-Y-trunc.bam", "amplicon", targets=point_targets
+            )
+        self.assertIn("Could not estimate read depth", str(cm.exception))
+
+    def test_autobin_empty_access(self):
+        """An empty set of accessible regions is treated as none given, as on
+        the command line, rather than leaving no antitargets to sample."""
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        targets = tabio.read("formats/my-targets.bed", "bed")
+        empty = GA.from_columns({"chromosome": [], "start": [], "end": []})
+        self.assertEqual(
+            autobin.do_autobin(bam, "hybrid", targets=targets, access=empty),
+            autobin.do_autobin(bam, "hybrid", targets=targets),
+        )
+
+    def test_autobin_bedgraph_vs_bam(self):
+        """autobin reads a bedGraph (.bed.gz) of the same sample as a BAM,
+        rather than failing on it as a non-alignment file."""
+        targets = tabio.read("formats/my-targets.bed", "bed")
+        (bam_depth, _), _ = autobin.do_autobin(
+            "formats/na12878-chrM-Y-trunc.bam", "amplicon", targets=targets
+        )
+        (bg_depth, _), _ = autobin.do_autobin(
+            "formats/na12878-chrM-Y-trunc.bed.gz", "amplicon", targets=targets
+        )
+        # Same seeded target sample. The fixture bedGraph also counts the
+        # duplicate-marked reads that the BAM depth excludes, so allow 5%.
+        self.assertAlmostEqual(bg_depth / bam_depth, 1.0, delta=0.05)
+
+    def test_autobin_bedgraph_methods(self):
+        """Each method measures the bedGraph depth of its own regions: targets,
+        accessible regions (wgs), or accessible regions minus targets (hybrid
+        antitargets). Without accessible regions, wgs is refused and hybrid
+        antitarget depth is left undetermined."""
+        # chr1: 300x on 48 targets, 30x elsewhere. chr2: one 3000x target.
+        tgt_starts = [15000 + 20000 * i for i in range(48)]
+        lines, prev = [], 0
+        for start in tgt_starts:
+            lines.append(f"chr1\t{prev}\t{start}\t30\n")
+            lines.append(f"chr1\t{start}\t{start + 200}\t300\n")
+            prev = start + 200
+        lines.append(f"chr1\t{prev}\t1000000\t30\n")
+        lines.append("chr2\t0\t5000\t0\nchr2\t5000\t5200\t3000\nchr2\t5200\t9000\t0\n")
+        targets = GA.from_columns(
+            {
+                "chromosome": ["chr1"] * 48 + ["chr2"],
+                "start": [*tgt_starts, 5000],
+                "end": [s + 200 for s in tgt_starts] + [5200],
+            }
+        )
+        access_arr = GA.from_columns(
+            {"chromosome": ["chr1"], "start": [0], "end": [1000000]}
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            bg_txt = os.path.join(tmp, "sample.bed")
+            with open(bg_txt, "w") as handle:
+                handle.writelines(lines)
+            bg = pysam.tabix_index(bg_txt, preset="bed")
+
+            (amp_depth, _), (amp_anti, _) = autobin.do_autobin(
+                bg, "amplicon", targets=targets
+            )
+            self.assertAlmostEqual(amp_depth, (48 * 300 + 3000) / 49)
+            self.assertIsNone(amp_anti)
+            # Target depth covers every target, including chr2's, which lies
+            # outside the accessible regions
+            (tgt_depth, tgt_bs), (anti_depth, anti_bs) = autobin.do_autobin(
+                bg, "hybrid", targets=targets, access=access_arr
+            )
+            self.assertEqual((tgt_depth, anti_depth), (amp_depth, 30))
+            self.assertEqual((tgt_bs, anti_bs), (282, 3333))
+            (wgs_depth, _), _ = autobin.do_autobin(
+                bg, "wgs", access=access_arr.subtract(targets)
+            )
+            self.assertEqual(wgs_depth, 30)
+
+            with self.assertRaises(ValueError) as cm:
+                autobin.do_autobin(bg, "wgs")
+            self.assertIn("--access", str(cm.exception))
+            (tgt_depth, _), (anti_depth, anti_bs) = autobin.do_autobin(
+                bg, "hybrid", targets=targets
+            )
+            self.assertEqual(tgt_depth, amp_depth)
+            self.assertIsNone(anti_depth)
+            self.assertIsNone(anti_bs)
+
+    def test_autobin_center_windows(self):
+        """Sampled bedGraph regions are trimmed to a centered window, never
+        extending past the original region; shorter regions are unchanged."""
+        regions = pd.DataFrame(
+            {
+                "chromosome": ["chr1"] * 4,
+                "start": [0, 100, 1000, 5000],
+                "end": [50, 110, 2001, 5100],
+            }
+        )
+        trimmed = autobin.center_windows(regions, 100)
+        self.assertEqual(trimmed.start.tolist(), [0, 100, 1450, 5000])
+        self.assertEqual(trimmed.end.tolist(), [50, 110, 1550, 5100])
 
     def test_bedcov_filters_absent_contigs(self):
         """bedcov keeps regions on BAM contigs and drops those on absent

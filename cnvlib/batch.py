@@ -258,7 +258,7 @@ def batch_make_reference(
         # Tweak default parameters
         if not target_avg_size:
             if normal_fnames:
-                # Calculate bin size from .bai & access
+                # Calculate bin size from the BAM index or bedGraph, & access
                 if fasta and not access_arr:
                     # Calculate wgs depth from all
                     # sequencing-accessible area (it doesn't take that long
@@ -293,11 +293,15 @@ def batch_make_reference(
 
     elif method == "hybrid":
         if (not target_avg_size or not antitarget_avg_size) and normal_fnames:
-            # Calculate bin sizes from BAM read counts
+            # Calculate bin sizes from read depths in the median-size normal
             assert target_bed is not None
             bait_arr = tabio.read_auto(target_bed)
             access_arr = tabio.read_auto(access_bed) if access_bed else None
             bam_fname = autobin.midsize_file(normal_fnames)
+            if not access_arr and fasta and coverage.is_bedgraph_format(bam_fname):
+                # A bedGraph has no chromosome lengths, which bound the
+                # off-target regions of a BAM; take accessible regions from FASTA
+                access_arr = access.do_access(fasta)
             (tgt_depth, tgt_bin_size), (anti_depth, anti_bin_size) = autobin.do_autobin(
                 bam_fname,
                 "hybrid",

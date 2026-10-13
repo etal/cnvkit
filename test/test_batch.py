@@ -179,6 +179,55 @@ class BatchTests(unittest.TestCase):
         self.assertGreater(len(tgt_regions), 0)
         self.assertEqual(len(refarr), len(tgt_regions) + len(anti_regions))
 
+    def test_batch_autobin_bedgraph(self):
+        """Batch auto-sizes bins from a bedGraph (.bed.gz) normal for the
+        protocols that call autobin, as it does from a BAM. Without --access,
+        hybrid sizes the antitargets over the accessible regions of --fasta."""
+        target_bed = "formats/my-targets.bed"
+        fasta = "formats/chrM-Y-trunc.hg19.fa"
+        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
+        # A side_effect spy, because wraps= does not record the return values
+        real_autobin = autobin.do_autobin
+        for method, targets in (("hybrid", target_bed), ("wgs", None)):
+            estimates = []
+
+            def record_autobin(*args, **kwargs):
+                estimates.append(real_autobin(*args, **kwargs))
+                return estimates[-1]
+
+            with (
+                self.subTest(method=method),
+                tempfile.TemporaryDirectory() as tmp,
+                mock.patch.object(autobin, "do_autobin", side_effect=record_autobin),
+            ):
+                ref_fname, tgt_bed_fname, _ = batch.batch_make_reference(
+                    [bedgraph],
+                    targets,
+                    None,
+                    True,
+                    None,
+                    fasta,
+                    None,
+                    True,
+                    0,
+                    None,
+                    None,
+                    None,
+                    None,
+                    tmp,
+                    1,
+                    False,
+                    0,
+                    method,
+                    False,
+                )
+                self.assertGreater(len(cnvlib.read(ref_fname)), 0)
+                self.assertGreater(len(tabio.read(tgt_bed_fname, "bed")), 0)
+                (_, tgt_bin_size), (_, anti_bin_size) = estimates[0]
+                self.assertIsNotNone(tgt_bin_size)
+                if method == "hybrid":
+                    self.assertIsNotNone(anti_bin_size)
+
     def test_batch_run_sample_with_duplicate_coordinates(self):
         """Integration test: batch_run_sample with duplicate coordinates in coverage.
 
