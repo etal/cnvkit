@@ -46,19 +46,21 @@ def is_bedgraph_format(fname: str) -> bool:
     return fname.endswith(".bed.gz")
 
 
-def validate_bedgraph_index(fname: str) -> None:
-    """Ensure bedGraph file has a tabix index.
+def find_bedgraph_index(fname: str) -> str:
+    """Locate a bedGraph file's tabix index, preferring .tbi over .csi.
 
     Raises
     ------
     FileNotFoundError
         If the index file (.tbi or .csi) is not found.
     """
-    if not (os.path.exists(f"{fname}.tbi") or os.path.exists(f"{fname}.csi")):
-        raise FileNotFoundError(
-            f"bedGraph file {fname} requires a tabix index (.tbi or .csi). "
-            f"Create one with: tabix -p bed {fname}"
-        )
+    for index_fname in (f"{fname}.tbi", f"{fname}.csi"):
+        if os.path.exists(index_fname):
+            return index_fname
+    raise FileNotFoundError(
+        f"bedGraph file {fname} requires a tabix index (.tbi or .csi). "
+        f"Create one with: tabix -p bed {fname}"
+    )
 
 
 def bedgraph_to_basecount(
@@ -90,14 +92,15 @@ def bedgraph_to_basecount(
             f"pysam is required for reading bedGraph files. {PYSAM_INSTALL_MSG}"
         ) from None
 
-    validate_bedgraph_index(bedgraph_fname)
+    index_fname = find_bedgraph_index(bedgraph_fname)
 
     # Read the BED file to get regions
     bed_data = tabio.read(bed_fname, "bed")
 
     # Open tabix file for random access with guaranteed cleanup
     try:
-        tbx = pysam.TabixFile(bedgraph_fname)
+        # pysam looks only for a .tbi index unless the index is named
+        tbx = pysam.TabixFile(bedgraph_fname, index=index_fname)
     except OSError as exc:
         raise ValueError(
             f"Failed to open bedGraph file {bedgraph_fname!r}. Error: {exc}"

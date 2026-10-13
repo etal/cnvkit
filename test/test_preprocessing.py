@@ -815,6 +815,20 @@ class PreprocessingTests(unittest.TestCase):
         finally:
             os.unlink(tmp_path)
 
+    def test_coverage_bedgraph_csi_index(self):
+        """A bedGraph indexed only with CSI, as mosdepth writes it, gives the
+        same coverage as with a TBI index."""
+        bed = "formats/my-targets.bed"
+        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
+        with tempfile.TemporaryDirectory() as tmp:
+            csi_bedgraph = os.path.join(tmp, "sample.bed.gz")
+            shutil.copyfile(bedgraph, csi_bedgraph)
+            pysam.tabix_index(csi_bedgraph, preset="bed", csi=True)
+            self.assertFalse(os.path.exists(csi_bedgraph + ".tbi"))
+            cna_csi = commands.do_coverage(bed, csi_bedgraph)
+        cna_tbi = commands.do_coverage(bed, bedgraph)
+        pd.testing.assert_frame_equal(cna_csi.data, cna_tbi.data)
+
     def test_coverage_bedgraph_chr_naming(self):
         """Test chromosome name mismatch handling (chr1 vs 1)."""
         bed = "formats/my-targets.bed"
