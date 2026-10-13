@@ -273,7 +273,7 @@ def _resolve_batch_sample_ids(
 
 
 def _cmd_batch(args: argparse.Namespace) -> None:
-    """Run the complete CNVkit pipeline on one or more BAM or bedGraph files."""
+    """Run the complete CNVkit pipeline on one or more BAM, CRAM, or bedGraph files."""
     logging.info("CNVkit %s", __version__)
     # Validate/restrict options, beyond what argparse mutual exclusion can do
     bad_args_msg = ""
@@ -426,7 +426,7 @@ P_batch = AP_subparsers.add_parser("batch", help=_cmd_batch.__doc__)
 P_batch.add_argument(
     "sample_fnames",
     nargs="*",
-    help="""Mapped sequence reads (.bam) or pre-computed per-base depth
+    help="""Mapped sequence reads (.bam or .cram) or pre-computed per-base depth
             (bedGraph .bed.gz with tabix index .tbi or .csi)""",
 )
 P_batch.add_argument(
@@ -491,10 +491,10 @@ P_batch_newref.add_argument(
     "--normal",
     nargs="*",
     metavar="FILES",
-    help="""Normal samples (.bam or bedGraph .bed.gz) used to construct the pooled, paired,
-            or flat reference. If this option is used but no filenames are given, a "flat"
-            reference will be built. Otherwise, all filenames following this option will
-            be used.""",
+    help="""Normal samples (.bam, .cram, or bedGraph .bed.gz) used to construct the
+            pooled, paired, or flat reference. If this option is used but no filenames
+            are given, a "flat" reference will be built. Otherwise, all filenames
+            following this option will be used.""",
 )
 add_fasta(P_batch_newref)
 P_batch_newref.add_argument(
@@ -749,7 +749,7 @@ do_autobin = public(autobin.do_autobin)
 
 
 def _cmd_autobin(args: argparse.Namespace) -> None:
-    """Quickly calculate reasonable bin sizes from BAM read counts."""
+    """Quickly calculate reasonable bin sizes from BAM or CRAM read counts."""
     if args.method in ("hybrid", "amplicon") and not args.targets:
         raise RuntimeError(f"Sequencing method {args.method!r} requires targets (-t)")
     if args.method == "wgs":
@@ -830,7 +830,8 @@ P_autobin = AP_subparsers.add_parser("autobin", help=_cmd_autobin.__doc__)
 P_autobin.add_argument(
     "bams",
     nargs="+",
-    help="""Sample BAM file(s) or bedGraph file(s) (.bed.gz) to test for target coverage""",
+    help="""Sample BAM or CRAM file(s), or bedGraph file(s) (.bed.gz), to test for
+            target coverage""",
 )
 add_fasta(P_autobin)
 P_autobin.add_argument(
@@ -925,7 +926,7 @@ do_coverage = public(coverage.do_coverage)
 
 
 def _cmd_coverage(args: argparse.Namespace) -> None:
-    """Calculate coverage in the given regions from BAM read depths or bedGraph."""
+    """Calculate coverage in the given regions from BAM/CRAM read depths or bedGraph."""
     pset = coverage.do_coverage(
         args.interval,
         args.bam_or_bg_file,
@@ -953,7 +954,7 @@ P_coverage = AP_subparsers.add_parser("coverage", help=_cmd_coverage.__doc__)
 P_coverage.add_argument(
     "bam_or_bg_file",
     metavar="input_file",
-    help="""Mapped sequence reads (.bam) or pre-computed per-base depth
+    help="""Mapped sequence reads (.bam or .cram) or pre-computed per-base depth
             (bedGraph .bed.gz with tabix index .tbi or .csi)""",
 )
 P_coverage.add_argument("interval", help="Intervals (.bed or .list)")
