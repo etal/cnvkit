@@ -231,43 +231,71 @@ class PreprocessingTests(unittest.TestCase):
     def test_coverage_skips_marked_duplicates(self):
         """Coverage ignores reads flagged as duplicates in both the depth
         (bedcov) and by-count paths, so marking duplicates (e.g. Picard
-        MarkDuplicates) is equivalent to physically removing them (#689)."""
+        MarkDuplicates) is equivalent to physically removing them (#689).
+
+        The same holds for CRAM input (#1105). Base qualities play no part
+        either: half of the surviving reads carry Phred 2 at every base, so
+        a recalibration that rewrites only base qualities, such as GATK
+        ApplyBQSR, cannot change the result.
+        """
         seqlen = 50
-        n_total, n_dup = 10, 6  # 4 reads survive the duplicate filter
+        n_total, n_dup = 10, 6
+        n_kept = n_total - n_dup
         header = {
             "HD": {"VN": "1.6", "SO": "coordinate"},
             "SQ": [{"SN": "chr1", "LN": 1000}],
         }
         tmpdir = tempfile.mkdtemp()
-        bam = os.path.join(tmpdir, "dup.bam")
-        with pysam.AlignmentFile(bam, "wb", header=header) as out:
-            for i in range(n_total):
-                a = pysam.AlignedSegment()
-                a.query_name = f"r{i}"
-                a.query_sequence = "A" * seqlen
-                a.flag = 0
-                a.reference_id = 0
-                a.reference_start = 100
-                a.mapping_quality = 60
-                a.cigarstring = f"{seqlen}M"
-                a.query_qualities = pysam.qualitystring_to_array("I" * seqlen)
-                a.is_duplicate = i >= (n_total - n_dup)
-                out.write(a)
-        pysam.index(bam)
-        bed = os.path.join(tmpdir, "region.bed")
-        with open(bed, "w") as fh:
-            fh.write("chr1\t90\t160\tregionA\n")
-        n_kept = n_total - n_dup
         try:
-            # Depth path (default): basecount counts only non-duplicate reads
-            table = coverage.bedcov(bed, bam, 0)
-            self.assertEqual(float(table["basecount"].iloc[0]), n_kept * seqlen)
-            # By-count path: same surviving read count
-            bamfile = pysam.AlignmentFile(bam, "rb")
-            count, _row = coverage.region_depth_count(
-                bamfile, "chr1", 90, 160, "regionA", 0
-            )
-            self.assertEqual(count, n_kept)
+            # The CRAM is written against a FASTA that is then moved, so its
+            # @SQ UR tag names a missing file. With REF_PATH and REF_CACHE
+            # pointing at a nonexistent directory, HTSlib has no other source (and
+            # does not fall back to the EBI server), so decoding depends on the
+            # FASTA passed to CNVkit.
+            written_fasta = os.path.join(tmpdir, "written.fa")
+            with open(written_fasta, "w") as fh:
+                fh.write(">chr1\n" + "A" * 1000 + "\n")
+            alns = {}
+            for ext, mode in (("bam", "wb"), ("cram", "wc")):
+                aln = alns[ext] = os.path.join(tmpdir, f"dup.{ext}")
+                with pysam.AlignmentFile(
+                    aln, mode, header=header, reference_filename=written_fasta
+                ) as out:
+                    for i in range(n_total):
+                        a = pysam.AlignedSegment()
+                        a.query_name = f"r{i}"
+                        a.query_sequence = "A" * seqlen
+                        a.flag = 0
+                        a.reference_id = 0
+                        a.reference_start = 100
+                        a.mapping_quality = 60
+                        a.cigarstring = f"{seqlen}M"
+                        a.query_qualities = pysam.qualitystring_to_array(
+                            ("I" if i % 2 else "#") * seqlen
+                        )
+                        a.is_duplicate = i >= n_kept
+                        out.write(a)
+                pysam.index(aln)
+            fasta = os.path.join(tmpdir, "ref.fa")
+            os.rename(written_fasta, fasta)
+            bed = os.path.join(tmpdir, "region.bed")
+            with open(bed, "w") as fh:
+                fh.write("chr1\t90\t160\tregionA\n")
+            no_cache = os.path.join(tmpdir, "no-cache", "%s")
+            ref_env = {"REF_PATH": no_cache, "REF_CACHE": no_cache}
+            for ext, aln in alns.items():
+                with self.subTest(fmt=ext), mock.patch.dict(os.environ, ref_env):
+                    # Depth path (default): only non-duplicate reads contribute
+                    table = coverage.bedcov(bed, aln, 0, fasta)
+                    self.assertEqual(float(table["basecount"].iloc[0]), n_kept * seqlen)
+                    # By-count path: same surviving read count
+                    with pysam.AlignmentFile(
+                        aln, "rb", reference_filename=fasta
+                    ) as alnfile:
+                        count, _row = coverage.region_depth_count(
+                            alnfile, "chr1", 90, 160, "regionA", 0
+                        )
+                    self.assertEqual(count, n_kept)
         finally:
             shutil.rmtree(tmpdir)
 
@@ -554,18 +582,31 @@ class PreprocessingTests(unittest.TestCase):
             self.assertGreater(cna.log2.nunique(), 1)
 
     def test_coverage_cram(self):
-        """The 'coverage' command with CRAM input."""
+        """CRAM input yields the same coverage as a BAM of the same alignments.
+
+        CRAM decoding reproduces the alignments exactly, so the two formats
+        must agree exactly in both the depth and by-count paths. The fixture
+        holds duplicate-marked reads within the chrM target, so the comparison
+        also requires both formats to apply the duplicate flag alike (#1105).
+
+        The fixture's @SQ UR tags name an absolute path on the machine that
+        wrote it, so where that path exists, this test cannot show that the
+        FASTA argument is used; test_coverage_skips_marked_duplicates does.
+        """
         bed = "formats/my-targets.bed"
         cram = "formats/na12878-chrM-Y-trunc.cram"
         fasta = "formats/chrM-Y-trunc.hg19.fa"
         bam = "formats/na12878-chrM-Y-trunc.bam"
-        # Verify CRAM coverage matches BAM coverage
-        cna_cram = commands.do_coverage(bed, cram, fasta=fasta)
-        cna_bam = commands.do_coverage(bed, bam)
-        self.assertEqual(len(cna_cram), len(cna_bam))
-        np.testing.assert_array_almost_equal(
-            cna_cram["depth"].values, cna_bam["depth"].values, decimal=1
-        )
+        for by_count in (False, True):
+            with self.subTest(by_count=by_count):
+                cna_cram = commands.do_coverage(
+                    bed, cram, by_count=by_count, fasta=fasta
+                )
+                cna_bam = commands.do_coverage(bed, bam, by_count=by_count)
+                self.assertEqual(len(cna_cram), 4)  # One row per BED region
+                np.testing.assert_array_equal(
+                    cna_cram["depth"].values, cna_bam["depth"].values
+                )
 
     def test_coverage_bedgraph(self):
         """The 'coverage' command with bedGraph input."""
