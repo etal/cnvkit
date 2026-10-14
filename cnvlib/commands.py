@@ -105,7 +105,7 @@ def add_diploid_parx_genome(P: argparse._ActionsContainer) -> None:
     P.add_argument(
         "--diploid-parx-genome",
         type=str,
-        help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
+        help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38' (or the UCSC name 'hg38')",
     )
 
 

@@ -225,11 +225,20 @@ seem to exhibit a copy number loss there (they should have doubled coverage but
 haven't).
 
 In order to avoid this, the option ``--diploid-parx-genome <genome-build>`` can
-be used for all affected commands. The genome build should be "grch38" or
-similar. This will cause cnvkit to treat the PAR1/2 on chromosome X as
-effectively autosomal (i.e. the expected copy number is the same for females
-and males, the sex prediction expects the same coverage on X in PAR1/2 for both
-sexes, etc.)
+be used for all affected commands. This will cause cnvkit to treat the PAR1/2
+on chromosome X as effectively autosomal (i.e. the expected copy number is the
+same for females and males, the sex prediction expects the same coverage on X
+in PAR1/2 for both sexes, etc.)
+
+The supported builds are ``grch37`` and ``grch38``; the UCSC names ``hg19`` and
+``hg38`` are accepted as aliases, since their chromosome X and Y coordinates
+are identical to GRCh37 and GRCh38, and names are not case-sensitive. The
+chromosome naming style (``chrX`` or ``X``) does not matter. The build should
+be the one the bin coordinates come from: CNVkit cannot detect a mismatch, and
+the PAR coordinates differ between the two builds. PAR1 differs only near its
+boundaries, but the two builds' PAR2 regions do not overlap at all, so with the
+wrong build the real PAR2 is not treated as autosomal and a stretch of
+X-specific sequence is.
 
 When ``--male-reference`` (see above) is also used, the reference copy number
 for PAR1/2 on X is still 2 (same as for the autosomes).
