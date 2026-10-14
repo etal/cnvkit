@@ -32,16 +32,40 @@ class GenomeBuildTests(unittest.TestCase):
         self.assertIs(get_genome_build("grch38"), GRCH38)
         self.assertIs(get_genome_build("GRCH38"), GRCH38)
 
+    def test_ucsc_aliases_resolve_to_canonical_build(self):
+        """UCSC hg19/hg38 share GRCh37/GRCh38 chrX and chrY coordinates."""
+        self.assertIs(get_genome_build("hg19"), GRCH37)
+        self.assertIs(get_genome_build("hg38"), GRCH38)
+        self.assertIs(get_genome_build("HG38"), GRCH38)
+        self.assertEqual(get_genome_build("hg38").name, "grch38")
+
     def test_get_genome_build_unknown_raises(self):
+        # hg18 is NCBI36, whose PAR coordinates differ; it must not resolve.
         with self.assertRaises(KeyError) as cm:
             get_genome_build("hg18")
-        # Error message lists supported names so the user can self-correct.
+        # Error message lists accepted names, aliases included, so the user can
+        # self-correct.
         self.assertIn("supported", str(cm.exception))
+        self.assertIn("hg38", str(cm.exception))
 
     def test_is_supported_build(self):
         self.assertTrue(is_supported_build("grch37"))
         self.assertTrue(is_supported_build("GRCh38"))
+        self.assertTrue(is_supported_build("HG19"))
         self.assertFalse(is_supported_build("hg18"))
+
+    def test_alias_table_is_unambiguous(self):
+        """Every name is lowercase and resolves to the build that declares it.
+
+        A collision between any two names, canonical or alias, would silently
+        resolve to whichever build came last and apply the wrong PAR
+        coordinates; lookup lowercases its argument, so an uppercase alias
+        could never match.
+        """
+        for build in REGISTERED_BUILDS.values():
+            for name in (build.name, *build.aliases):
+                self.assertEqual(name, name.lower())
+                self.assertIs(get_genome_build(name), build)
 
     def test_frozen(self):
         with self.assertRaises(FrozenInstanceError):
@@ -54,8 +78,10 @@ class GenomeBuildTests(unittest.TestCase):
 
     def test_back_compat_via_params(self):
         """cnvlib.params.PSEUDO_AUTSOMAL_REGIONS preserves the historical API."""
-        # Every registered build appears as a top-level key
+        # Every registered build appears as a top-level key, and aliases do not:
+        # the historical keys were exactly the canonical names.
         self.assertEqual(set(params.PSEUDO_AUTSOMAL_REGIONS), set(REGISTERED_BUILDS))
+        self.assertNotIn("hg38", params.PSEUDO_AUTSOMAL_REGIONS)
         # All four PAR keys round-trip equally for every build
         for build in (GRCH37, GRCH38):
             for key in ("PAR1X", "PAR2X", "PAR1Y", "PAR2Y"):

@@ -26,7 +26,8 @@ samples:
 
 - The ``--drop-low-coverage`` option (see :doc:`tumor`) should not be used; it
   will typically remove germline deep deletions altogether, which is not
-  desirable.
+  desirable. If :ref:`segment` warns that many bins have no or near-zero
+  coverage, recompute coverage with larger bins (see :ref:`autobin`) instead.
 
 
 A worked example

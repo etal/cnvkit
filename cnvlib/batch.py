@@ -77,7 +77,7 @@ def batch_make_reference(
     is_haploid_x_reference : bool
         True if reference samples are male (haploid X chromosome).
     diploid_parx_genome : str, optional
-        Reference genome name (e.g., 'hg19', 'hg38') for pseudo-autosomal region
+        Reference genome name (e.g., 'grch37', 'grch38') for pseudo-autosomal region
         handling on X/Y chromosomes.
     fasta : str
         Path to reference genome FASTA file. Required for GC/RepeatMasker
@@ -178,7 +178,7 @@ def batch_make_reference(
     ...     target_bed='baits.bed',
     ...     antitarget_bed=None,  # Auto-generate
     ...     is_haploid_x_reference=False,
-    ...     diploid_parx_genome='hg38',
+    ...     diploid_parx_genome='grch38',
     ...     fasta='hg38.fa',
     ...     annotate='refFlat.txt',
     ...     short_names=True,
@@ -200,7 +200,7 @@ def batch_make_reference(
     ...     target_bed=None,  # Auto-generate from FASTA
     ...     antitarget_bed=None,
     ...     is_haploid_x_reference=True,
-    ...     diploid_parx_genome='hg19',
+    ...     diploid_parx_genome='grch37',
     ...     fasta='hg19.fa',
     ...     annotate='refFlat.txt',
     ...     short_names=False,

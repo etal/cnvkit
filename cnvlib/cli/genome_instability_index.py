@@ -32,7 +32,7 @@ def argument_parsing():
     AP.add_argument(
         "--diploid-parx-genome",
         type=str,
-        help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38'",
+        help="Considers the given human genome's PAR of chromosome X as autosomal. Example: 'grch38' (or the UCSC name 'hg38')",
     )
     AP.add_argument("-o", "--output", help="Output filename (default: stdout).")
     return AP.parse_args()

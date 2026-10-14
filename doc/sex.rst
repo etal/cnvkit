@@ -225,11 +225,20 @@ seem to exhibit a copy number loss there (they should have doubled coverage but
 haven't).
 
 In order to avoid this, the option ``--diploid-parx-genome <genome-build>`` can
-be used for all affected commands. The genome build should be "grch38" or
-similar. This will cause cnvkit to treat the PAR1/2 on chromosome X as
-effectively autosomal (i.e. the expected copy number is the same for females
-and males, the sex prediction expects the same coverage on X in PAR1/2 for both
-sexes, etc.)
+be used for all affected commands. This will cause cnvkit to treat the PAR1/2
+on chromosome X as effectively autosomal (i.e. the expected copy number is the
+same for females and males, the sex prediction expects the same coverage on X
+in PAR1/2 for both sexes, etc.)
+
+The supported builds are ``grch37`` and ``grch38``; the UCSC names ``hg19`` and
+``hg38`` are accepted as aliases, since their chromosome X and Y coordinates
+are identical to GRCh37 and GRCh38, and names are not case-sensitive. The
+chromosome naming style (``chrX`` or ``X``) does not matter. The build should
+be the one the bin coordinates come from: CNVkit cannot detect a mismatch, and
+the PAR coordinates differ between the two builds. PAR1 differs only near its
+boundaries, but the two builds' PAR2 regions do not overlap at all, so with the
+wrong build the real PAR2 is not treated as autosomal and a stretch of
+X-specific sequence is.
 
 When ``--male-reference`` (see above) is also used, the reference copy number
 for PAR1/2 on X is still 2 (same as for the autosomes).
@@ -307,8 +316,11 @@ CNVkit is not detecting my sample's sex correctly. What can I do?
 
 In lower-quality samples, particularly tumor samples analyzed without a robust
 reference (see :doc:`tumor`), there may be many bins with no coverage which bias
-the segment means. Try repeating the :ref:`segment` command with the
-``--drop-low-coverage`` option if you did not do so originally.
+the segment means; the :ref:`segment` command warns when this is the case. For
+a bulk tumor sample, try repeating the :ref:`segment` command with the
+``--drop-low-coverage`` option if you did not do so originally. Otherwise,
+recompute coverage with larger bins (see :ref:`autobin`), since that option
+also removes genuine homozygous deletions.
 
 If a small number of samples in your reference pool look like they were
 inferred incorrectly (e.g. three males among forty samples are reported as

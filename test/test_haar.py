@@ -302,9 +302,11 @@ class HaarNoiseFloorTests(unittest.TestCase):
 
     FIXTURE = "formats/regression/p2-9_2.cnr"
 
+    def _load(self):
+        return cnvlib.read(self.FIXTURE)
+
     def _n_segments(self, fdr_q):
-        cnarr = cnvlib.read(self.FIXTURE)
-        return len(segment_haar(cnarr, fdr_q))
+        return len(segment_haar(self._load(), fdr_q))
 
     def test_not_grossly_over_segmented(self):
         """Default-q haar averages many bins per segment, not ~7.
@@ -313,7 +315,7 @@ class HaarNoiseFloorTests(unittest.TestCase):
         haar produces a few hundred (>=15 bins/seg). Assert the average segment
         spans at least 15 bins so the ~7-bin fragmentation cannot return.
         """
-        cnarr = cnvlib.read(self.FIXTURE)
+        cnarr = self._load()
         n_bins = len(cnarr)
         n_segs = len(segment_haar(cnarr, 1e-4))
         self.assertLessEqual(
@@ -340,6 +342,24 @@ class HaarNoiseFloorTests(unittest.TestCase):
             f"fdr_q barely controls segmentation: q=1e-2 -> {n_loose}, "
             f"q=1e-8 -> {n_tight} (expected tight-q count < half of loose-q).",
         )
+
+
+class HaarWgsNoiseFloorTests(HaarNoiseFloorTests):
+    """The same noise-floor assertions at WGS bin density.
+
+    Fixture: test/formats/wgs-chr17.cnr, 165,626 bins of median width 267 bp.
+    Both assertions hold once the zero-coverage placeholder bins (12.9% of
+    this fixture) are dropped, so the over-segmentation haar shows on the raw
+    array comes from those bins rather than from bin density. On the raw array
+    the level-1 MAD is blind to the placeholder values while the coarser
+    windowed means are not, the FDR threshold falls to about the dispersion of
+    the statistics it thresholds, and both assertions fail.
+    """
+
+    FIXTURE = "formats/wgs-chr17.cnr"
+
+    def _load(self):
+        return cnvlib.read(self.FIXTURE).drop_low_coverage()
 
 
 class SegmentByPeaksTests(unittest.TestCase):

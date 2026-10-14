@@ -921,7 +921,17 @@ Bins with a weight of 0 are dropped before segmentation.
 Additional filters:
 
 - ``--drop-low-coverage`` -- drop bins with a read depth of 0 or very close to
-  0, i.e. a log2 value suggesting the same. Use with tumor samples.
+  0, i.e. a log2 value suggesting the same. Typically used with tumor samples;
+  see :doc:`tumor` for exceptions.
+  Without this option, such bins are segmented as though their placeholder
+  log2 values (below -15) were measurements, which lowers the means of the
+  segments containing them and fragments haar segmentation. When at least 1%
+  of autosomal bins are affected, the ``segment`` command logs a warning that
+  also estimates the resulting downward shift in segment means where it is
+  appreciable. The usual cause is bins too small for the sequencing depth, as
+  in shallow whole-genome sequencing; recomputing coverage with larger bins
+  (see :ref:`autobin`) avoids it without discarding data, whereas this option
+  also removes genuine homozygous deletions (see :doc:`germline`).
 - ``--drop-outliers`` -- drop bins with log2 value too far from a rolling
   average, taking local variability into account. Applied by default.
 

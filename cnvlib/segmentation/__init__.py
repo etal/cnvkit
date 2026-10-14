@@ -27,6 +27,12 @@ SEGMENT_METHODS = ("cbs", "haar", "none", "hmm", "hmm-tumor", "hmm-germline")
 # HMM method variants, for dispatch (replaces scattered method.startswith("hmm"))
 _HMM_METHODS = frozenset({"hmm", "hmm-tumor", "hmm-germline"})
 
+#: Warn when at least this fraction of autosomal bins have no or near-zero
+#: coverage. At 1%, placeholder values injected into a clean WGS profile already
+#: shift CBS segment means by about 0.2 log2 and multiply the haar segment count
+#: about 80-fold, while the targeted test fixtures stay below 0.3%.
+LOW_COVERAGE_WARN_FRACTION = 0.01
+
 
 def do_segmentation(
     cnarr: CNA,
@@ -52,8 +58,8 @@ def do_segmentation(
         Segmentation algorithm: 'cbs', 'haar', 'hmm', 'hmm-tumor',
         or 'hmm-germline'.
     diploid_parx_genome : str, optional
-        Reference genome name for pseudo-autosomal region handling
-        (e.g., 'hg19', 'hg38', 'mm10').
+        Reference genome name for pseudo-autosomal region handling, as
+        registered in `skgenome.genomebuild` (e.g., 'grch38').
     threshold : float, optional
         Significance threshold (for CBS/haar) or smoothing window size
         (for HMM methods). If None, uses method-specific defaults.
@@ -105,6 +111,8 @@ def do_segmentation(
             "Input has no sample_id set; the segmented output will be "
             "unlabeled (CLI usage derives sample_id from the input filename)."
         )
+    if not skip_low:
+        _warn_low_coverage(cnarr)
 
     if variants is not None and len(variants):
         # Process variants in genomic order. by_ranges/baf_by_ranges slice via
@@ -198,6 +206,48 @@ def _to_str(s, enc=locale.getpreferredencoding()):  # noqa: B008
     if isinstance(s, bytes):
         return s.decode(enc)
     return s
+
+
+def _warn_low_coverage(cnarr: CNA) -> None:
+    """Warn when zero-coverage placeholder bins will distort segmentation.
+
+    Without ``skip_low``, bins with no reads are segmented as though their
+    placeholder log2 values (near ``params.NULL_LOG2_COVERAGE``) were
+    measurements. Only autosomal bins are counted, because a female sample's
+    chrY is legitimately at the floor; an input with no recognizable autosomes
+    is not assessed. Called once per sample, before the per-arm split, so the
+    warning is not repeated for each arm.
+    """
+    log2 = cnarr["log2"].to_numpy()
+    # Non-finite bins are dropped before segmentation whether or not skip_low
+    # is set, so they do not distort it.
+    is_counted = cnarr.autosome_filter().to_numpy() & np.isfinite(log2)
+    is_low = cnarr.low_coverage_mask().to_numpy() & is_counted
+    n_low = int(is_low.sum())
+    n_counted = int(is_counted.sum())
+    # ``not n_low`` also covers n_counted == 0
+    if not n_low or n_low < LOW_COVERAGE_WARN_FRACTION * n_counted:
+        return
+    msg = (
+        f"WARNING: {n_low} of {n_counted} autosomal bins "
+        f"({n_low / n_counted:.1%}) have no or near-zero coverage, so their "
+        "placeholder log2 values will be segmented as measurements."
+    )
+    if n_low < n_counted:
+        is_ok = is_counted & ~is_low
+        shift = n_low / n_counted * (log2[is_ok].mean() - log2[is_low].mean())
+        if round(shift, 2) > 0:
+            msg += (
+                f" This lowers segment means by about {shift:.2f} log2 units "
+                "on average, which can report copy-neutral regions as losses."
+            )
+    msg += (
+        " Recomputing coverage with larger bins (see the 'autobin' command) "
+        "leaves fewer bins without reads. The --drop-low-coverage option "
+        "excludes these bins, but also removes genuine homozygous deletions "
+        "in germline and high-purity tumor samples."
+    )
+    logging.warning(msg)
 
 
 def _ds(

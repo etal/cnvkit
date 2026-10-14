@@ -52,7 +52,7 @@ def do_fix(
         Contains expected neutral coverage and bias correction features.
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
-        (e.g., 'hg19', 'hg38', 'mm10'). Ensures PAR regions on X/Y chromosomes
+        (e.g., 'grch37', 'grch38'). Ensures PAR regions on X/Y chromosomes
         are treated as diploid during normalization.
         Default: None
     do_gc : bool, optional
@@ -140,7 +140,7 @@ def do_fix(
     For male sample with PAR handling:
     >>> fixed = do_fix(
     ...     target_raw, antitarget_raw, reference,
-    ...     diploid_parx_genome='hg38'
+    ...     diploid_parx_genome='grch38'
     ... )
     """
     # Load, recenter and GC-correct target & antitarget probes separately

@@ -305,6 +305,111 @@ class SegmentationTests(unittest.TestCase):
         self.assertTrue((seg.start < seg.end).all())
 
 
+class FloorBinWarningTests(unittest.TestCase):
+    """Zero-coverage placeholder bins are segmented as measurements by default.
+
+    Bins with no reads carry log2 near params.NULL_LOG2_COVERAGE. Unless
+    skip_low is set they reach the segmenter, where at WGS bin density they
+    pull CBS segment means down by several log2 units and fragment haar.
+    Dropping them by default would also remove genuine homozygous deletions
+    in high-purity samples, so do_segmentation warns instead.
+    """
+
+    WGS = "formats/wgs-chr17.cnr"
+
+    @staticmethod
+    def _synthetic(chrom_sizes, log2, depth=None):
+        """A CopyNumArray of 1-kb bins with the given per-chromosome bin counts."""
+        chroms = [c for c, n in chrom_sizes.items() for _ in range(n)]
+        starts = np.concatenate([np.arange(n) for n in chrom_sizes.values()]) * 1000
+        data = pd.DataFrame(
+            {
+                "chromosome": chroms,
+                "start": starts,
+                "end": starts + 1000,
+                "gene": ["-"] * len(chroms),
+                "log2": log2,
+                "weight": np.ones(len(chroms)),
+            }
+        )
+        if depth is not None:
+            data["depth"] = depth
+        return cnary.CopyNumArray(data, {"sample_id": "synthetic"})
+
+    def _warnings(self, cnarr, skip_low=False):
+        with self.assertLogs(level="INFO") as cm:
+            segmentation.do_segmentation(cnarr, "none", skip_low=skip_low)
+        return [line for line in cm.output if "--drop-low-coverage" in line]
+
+    def _assert_silent(self, cnarr, skip_low=False):
+        self.assertEqual(self._warnings(cnarr, skip_low), [])
+
+    def test_warns_once_on_wgs_dropout(self):
+        """12.9% of wgs-chr17 bins are at the floor; warn exactly once.
+
+        chr17 has two arms, so a warning emitted per arm would appear twice.
+        """
+        warned = self._warnings(cnvlib.read(self.WGS))
+        self.assertEqual(len(warned), 1, warned)
+        self.assertIn("21361 of 165626", warned[0])
+        self.assertIn("lowers segment means", warned[0])
+
+    def test_shift_stated_only_when_means_drop(self):
+        """The expected shift is stated only when it is a visible downward shift.
+
+        Bins flagged by zero depth alone keep ordinary log2 values; here they
+        sit 0.01 below the rest, a shift of 0.002 that would print as 0.00.
+        When every bin is at the floor there are no measured bins to compare.
+        """
+        depth_only = self._synthetic(
+            {"chr1": 100},
+            np.concatenate([np.full(20, -0.01), np.zeros(80)]),
+            depth=[0.0] * 20 + [30.0] * 80,
+        )
+        all_floor = self._synthetic({"chr1": 100}, np.full(100, -19.5))
+        for cnarr, counts in ((depth_only, "20 of 100"), (all_floor, "100 of 100")):
+            with self.subTest(counts=counts):
+                warned = self._warnings(cnarr)
+                self.assertEqual(len(warned), 1, warned)
+                self.assertIn(counts, warned[0])
+                self.assertNotIn("lowers segment means", warned[0])
+
+    def test_silent_when_dropping_low_coverage(self):
+        """With skip_low the floor bins are excluded, so there is nothing to report."""
+        self._assert_silent(cnvlib.read(self.WGS), skip_low=True)
+
+    def test_silent_on_targeted_fixtures(self):
+        """Ordinary panels have at most a few autosomal floor bins."""
+        for fname in (
+            "formats/amplicon.cnr",
+            "formats/p2-20_1.cnr",
+            "formats/regression/p2-9_2.cnr",
+        ):
+            with self.subTest(fname=fname):
+                self._assert_silent(cnvlib.read(fname))
+
+    def test_sex_chromosome_floor_is_not_counted(self):
+        """A female sample's chrY sits at the floor legitimately.
+
+        Counting it would warn on every female sample. The second case has no
+        autosomes, where GenomicArray.autosomes() would return the whole array.
+        """
+        rng = np.random.default_rng(0)
+        normal = rng.normal(0, 0.1, 80)
+        for sizes in ({"chr1": 60, "chrX": 20, "chrY": 20}, {"chrX": 80, "chrY": 20}):
+            with self.subTest(chromosomes=list(sizes)):
+                log2 = np.concatenate([normal, np.full(20, -19.5)])
+                self._assert_silent(self._synthetic(sizes, log2))
+
+    def test_non_finite_bins_are_not_counted(self):
+        """Non-finite bins are dropped before segmentation regardless of skip_low.
+
+        -inf is below the floor threshold, so counting it would report 10% here.
+        """
+        log2 = np.concatenate([np.full(10, -np.inf), np.zeros(90)])
+        self._assert_silent(self._synthetic({"chr1": 100}, log2))
+
+
 class TransferFieldsTests(unittest.TestCase):
     """Tests for transfer_fields and do_segmentation NaN handling."""
 

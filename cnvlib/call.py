@@ -88,7 +88,7 @@ def do_call(
         Default: False
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
-        (e.g., 'hg19', 'hg38', 'mm10'). Treats PAR regions as diploid
+        (e.g., 'grch37', 'grch38'). Treats PAR regions as diploid
         even in male samples.
         Default: None
     filters : list of str, optional

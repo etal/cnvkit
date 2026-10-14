@@ -18,11 +18,12 @@ IGNORE_GENE_NAMES = ("-", ".", "CGH")
 ANTITARGET_NAME = "Antitarget"
 ANTITARGET_ALIASES = (ANTITARGET_NAME, "Background")
 
-# PAR coordinates and the list of supported genome builds are owned by
-# skgenome.genomebuild; re-exported here for back-compat with code that
-# imports them from cnvlib.params. Inner coordinate values are returned
-# as mutable lists (matching the historical type) so any caller that
-# treated them as such continues to work.
+# PAR coordinates and the canonical names of supported genome builds are
+# owned by skgenome.genomebuild; re-exported here for back-compat with code
+# that imports them from cnvlib.params. Aliases such as "hg38" are accepted by
+# skgenome.genomebuild.get_genome_build but are not keys here. Inner coordinate
+# values are returned as mutable lists (matching the historical type) so any
+# caller that treated them as such continues to work.
 from skgenome.genomebuild import REGISTERED_BUILDS as _REGISTERED_BUILDS
 
 PSEUDO_AUTSOMAL_REGIONS = {

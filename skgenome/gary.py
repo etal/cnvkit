@@ -271,8 +271,8 @@ class GenomicArray:
 
     # Traversal
 
-    def autosomes(self, also: str | list[str] | pd.Series | None = None) -> Self:
-        """Select autosomal rows, excluding sex chromosomes and alternative contigs.
+    def autosome_filter(self) -> pd.Series:
+        """Flag autosomal rows, excluding sex chromosomes and alternative contigs.
 
         Accepts both arabic-numeral chromosome names (e.g. ``chr1``) and
         Roman-numeral names (e.g. ``chrI``, ``chrXVI``). Sex chromosomes are
@@ -280,20 +280,28 @@ class GenomicArray:
         as a sex chromosome in human data and as autosome 10 in yeast data.
 
         Mitochondrial and alternative/unplaced contigs are always excluded.
-
-        If no autosomes can be recognized (e.g. an unfamiliar custom assembly),
-        emits a warning and returns the whole array unchanged.
+        Unlike `autosomes`, an unfamiliar assembly yields an all-False mask, and
+        pseudo-autosomal regions are never included (``CopyNumArray.autosomes``
+        adds them back when given ``diploid_parx_genome``).
         """
-        unique = self.chromosome.unique()
-        sex_x, sex_y = infer_sex_chrom_labels(unique)
-        is_auto = self.chromosome.map(
+        sex_x, sex_y = infer_sex_chrom_labels(self.chromosome.unique())
+        return self.chromosome.map(
             lambda n: (
                 is_autosome(n, sex_x, sex_y)
                 and not is_mitochondrial(n)
                 and not is_alternative_contig(n)
             )
         )
+
+    def autosomes(self, also: str | list[str] | pd.Series | None = None) -> Self:
+        """Select the rows flagged by `autosome_filter`, plus any in `also`.
+
+        If no autosomes can be recognized (e.g. an unfamiliar custom assembly),
+        emits a warning and returns the whole array unchanged.
+        """
+        is_auto = self.autosome_filter()
         if not is_auto.any():
+            unique = self.chromosome.unique()
             logging.warning(
                 "GenomicArray.autosomes(): no autosomes recognized in %d "
                 "chromosomes (sample: %s); returning the array unchanged.",

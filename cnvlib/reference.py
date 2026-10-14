@@ -48,7 +48,7 @@ def do_reference_flat(
         Default is False.
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
-        (e.g., 'hg19', 'hg38', 'mm10').
+        (e.g., 'grch37', 'grch38').
 
     Returns
     -------
@@ -131,7 +131,7 @@ def do_reference(
         Default: False (assumes female reference or mixed)
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling
-        (e.g., 'hg19', 'hg38', 'mm10'). PAR regions on X/Y are treated as
+        (e.g., 'grch37', 'grch38'). PAR regions on X/Y are treated as
         diploid even in male samples.
         Default: None
     female_samples : bool, optional
@@ -211,7 +211,7 @@ def do_reference(
     ...     target_fnames=['M1.cnn', 'M2.cnn'],
     ...     fa_fname='hg38.fa',
     ...     female_samples=False,
-    ...     diploid_parx_genome='hg38'
+    ...     diploid_parx_genome='grch38'
     ... )
     """
     if antitarget_fnames:
