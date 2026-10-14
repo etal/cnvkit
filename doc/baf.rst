@@ -76,12 +76,57 @@ genotypes -- a somatic-only VCF gives CNVkit no heterozygous SNPs to use:
   somatic VCF contains only somatic variants and omits the ``GT`` field, so it
   has no usable germline SNPs.
 
+If the caller cannot be re-run, genotype the known SNP sites directly from the
+BAM files instead; see :ref:`baf-snpfilter` below.
+
 An `example VCF
 <https://github.com/etal/cnvkit/blob/master/test/formats/na12878_na12882_mix.vcf?raw=true>`_
 constructed from the 1000 Genomes samples NA12878 and NA12882 is included in
 CNVkit's test suite.
 
 See also: :ref:`vcfformat`.
+
+.. _baf-snpfilter:
+
+Genotyping known SNP sites with ``snpfilter.py``
+````````````````````````````````````````````````
+
+The script ``snpfilter.py``, installed with CNVkit, builds a VCF that CNVkit
+can use for BAF analysis from the sample's BAM file and a list of known SNP
+sites. It piles up the reads at each site and calls genotypes there with
+bcftools -- the copy bundled with pysam, so no separate installation is
+needed -- and records each sample's genotype (``GT``) and allele depths
+(``AD``, ``DP``)::
+
+    snpfilter.py Sample.bam common_snps.vcf.gz -f hg38.fa -n Normal.bam -o Sample.snps.vcf
+    cnvkit.py call Sample.cns -v Sample.snps.vcf -o Sample.call.cns
+
+- **Sites.** Any VCF of known SNP positions will do: common SNPs from dbSNP or
+  the 1000 Genomes Project, or a normal sample's germline calls. Only the
+  positions are read, so a sites-only VCF without sample columns is fine.
+- **Reference.** ``-f`` is required, and must be the FASTA the reads were
+  aligned to. If it has no index (``.fai``), one is created beside it.
+- **Chromosome names** must match between the BAM, the FASTA, and the sites
+  VCF (e.g. ``chr1`` versus ``1``). Sites on chromosomes absent from the BAM
+  or the FASTA are skipped and counted in the log; if no site remains, the
+  script stops with an error and writes no VCF.
+- **Sample names** in the output are the BAM filenames without directory or
+  extension, as in CNVkit's own output files. Given a matched normal BAM
+  (``-n``), the script genotypes both BAMs together and declares the pair in
+  the output's PEDIGREE header, so :ref:`call`, :ref:`scatter` and
+  :ref:`segment` read it as a tumor-normal VCF without ``--sample-id`` and
+  ``--normal-id``.
+- **Without a matched normal**, the tumor's own genotype decides which sites
+  are heterozygous. A site where the tumor has lost one allele entirely is
+  called homozygous and excluded. At high read depth, a site with strong but
+  incomplete allelic imbalance -- the signal BAF analysis looks for -- can be
+  called homozygous too (for example, an alternate-allele fraction of 0.8 at
+  300 reads), because bcftools' diploid genotype model finds a 50% allele
+  fraction implausible there. To classify sites by allele frequency instead,
+  pass ``--zygosity-freq`` (``-z``) with the lowest minor-allele fraction to
+  keep: ``-z 0.1`` treats sites with an alternate-allele fraction from 0.1 up
+  to 0.9 as heterozygous. With a matched normal, the normal's genotype selects
+  the heterozygous sites, so neither problem arises.
 
 
 Sample identification in VCFs

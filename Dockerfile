@@ -43,9 +43,6 @@ RUN if [ -n "$CNVKIT_VERSION" ]; then \
 # Verify installation and build matplotlib font cache
 RUN cnvkit.py version
 
-# Copy helper scripts to PATH
-COPY scripts/snpfilter.sh /usr/local/bin/
-
 # Create non-root user for security
 RUN useradd -m -s /bin/bash cnvkit
 USER cnvkit

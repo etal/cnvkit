@@ -49,9 +49,7 @@ changelog = "https://github.com/etal/cnvkit/releases"
 "guess_baits.py" = "cnvlib.cli.guess_baits:main"
 "reference2targets.py" = "cnvlib.cli.reference2targets:main"
 "skg_convert.py" = "skgenome.cli.skg_convert:main"
-# XXX TODO -- figure out whether this script should and could be included
-# in the installation
-#"snpfilter.sh" = "scripts/snpfilter.sh"
+"snpfilter.py" = "cnvlib.cli.snpfilter:main"
 
 [build-system]
 # Minimum requirements for the build system to execute (PEP 508)

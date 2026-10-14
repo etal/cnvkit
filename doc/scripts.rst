@@ -85,3 +85,11 @@ Additional scripts
     supported by skgenome.tabio, including BED and UCSC RefFlat (e.g.
     refFlat.txt from `UCSC Genome Bioinformatics
     <http://hgdownload.soe.ucsc.edu/downloads.html>`_).
+
+``snpfilter.py``
+    Genotype a sample, and optionally its matched normal, at a list of known
+    SNP sites, producing a VCF of germline SNPs for :doc:`BAF analysis <baf>`.
+    Useful when the available VCF has only somatic variants, as from GATK
+    Mutect2 run without germline output. See :ref:`baf-snpfilter`. ::
+
+        snpfilter.py Sample.bam common_snps.vcf.gz -f hg38.fa -n Normal.bam -o Sample.snps.vcf

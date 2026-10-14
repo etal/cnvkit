@@ -124,7 +124,7 @@ The production image includes:
 - Python 3.11+ with CNVkit and all dependencies
 - R with the DNAcopy package for segmentation
 - A Conda environment with all required packages
-- Helper scripts (e.g. ``snpfilter.sh``)
+- The :doc:`additional scripts <scripts>` (e.g. ``snpfilter.py``)
 - A non-root user (``cnvkit``) for security
 - A working directory at ``/data`` for mounted volumes
 
