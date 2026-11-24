@@ -1,7 +1,7 @@
 pytest
 pytest-cov
 pytest-xdist
-coverage[all]
+coverage
 hypothesis[numpy]
 mypy
 ruff
