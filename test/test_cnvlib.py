@@ -236,6 +236,52 @@ class CNATests(unittest.TestCase):
         cna[6:10] = cna[6:10]
         self.assertEqual(tuple(cna[0]), tuple(same[0]))
         self.assertEqual(cna[3:6], same[3:6])
+        self.assertEqual(cna[6:10], same[6:10])
+        # Assigning another array's rows is positional and keeps dtypes
+        cna[3:6] = same[10:13]
+        pd.testing.assert_frame_equal(
+            cna.data.iloc[3:6].reset_index(drop=True),
+            same.data.iloc[10:13].reset_index(drop=True),
+        )
+        # Rows from an array of another shape or schema must not be written
+        # by position: more columns, the same columns in another order (gc
+        # and rmask are both float64, so only their names tell them apart),
+        # another dtype, or a single row that pandas would broadcast
+        extra = same[1:3].copy()
+        extra["depth"] = 1.0
+        reordered = same[1:3].copy()
+        reordered.data = reordered.data[
+            ["chromosome", "start", "end", "gene", "log2", "rmask", "gc", "spread"]
+        ]
+        retyped = same[1:3].copy()
+        retyped["rmask"] = retyped["rmask"].astype("float32")
+        for label, value in (
+            ("extra column", extra),
+            ("reordered columns", reordered),
+            ("other dtype", retyped),
+            ("one row", same[10:11]),
+        ):
+            with self.subTest(label), self.assertRaises(ValueError):
+                cna[1:3] = value
+        pd.testing.assert_frame_equal(cna.data.iloc[1:3], same.data.iloc[1:3])
+        # A masked assignment must not align on row labels and fill with NaN;
+        # pandas >= 3.1 rejects it instead
+        mask = pd.Series(False, index=cna.data.index)
+        mask.iloc[20:23] = True
+        try:
+            cna[mask] = same[30:33]
+        except TypeError:
+            pd.testing.assert_frame_equal(cna.data.iloc[20:23], same.data.iloc[20:23])
+        else:
+            pd.testing.assert_frame_equal(
+                cna.data.iloc[20:23].reset_index(drop=True),
+                same.data.iloc[30:33].reset_index(drop=True),
+            )
+        # Assigning a one-row array to an integer index must still raise;
+        # passing its DataFrame there would put a one-element Series (pandas
+        # 2.3) or array (pandas 3.0) into the row's string cells
+        with self.assertRaises((TypeError, ValueError)):
+            cna[0] = same[0:1]
 
     def test_center_all(self):
         """Test recentering."""

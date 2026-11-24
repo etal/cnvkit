@@ -25,7 +25,8 @@ import math
 from itertools import zip_longest
 
 import pandas as pd
-from Bio.File import as_handle
+
+from .util import as_text_handle
 
 LOG2_10 = math.log(10, 2)  # To convert log10 values to log2
 
@@ -113,7 +114,7 @@ def parse_seg(infile, chrom_names=None, chrom_prefix=None, from_log10=False):
     Tuple of (string sample ID, DataFrame of segments)
     """
     # Scan through any leading garbage to find the header
-    with as_handle(infile) as handle:
+    with as_text_handle(infile) as handle:
         n_tabs = None
         for line in handle:
             n_tabs = line.count("\t")

@@ -40,7 +40,7 @@ named ``Case1.bam``, ``Case2.bam`` and so on, and the controls
 
     cnvkit.py batch Case*.bam --normal Control*.bam \
         --targets my_baits.bed --annotate data/refFlat_hg38.txt \
-        --fasta hg38.fasta --access data/access-10kb.hg38.bed \
+        --fasta hg38.fasta --access data/access-5k-mappable.hg38.bed \
         --output-reference my_reference.cnn --output-dir results/
 
 The control samples contribute to the reference only. Each case sample yields

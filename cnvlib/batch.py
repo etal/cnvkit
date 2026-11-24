@@ -205,7 +205,7 @@ def batch_make_reference(
     ...     annotate='refFlat.txt',
     ...     short_names=False,
     ...     target_avg_size=5000,
-    ...     access_bed='access-5k.hg19.bed',
+    ...     access_bed='access-5k-mappable.hg19.bed',
     ...     antitarget_avg_size=None,
     ...     antitarget_min_size=None,
     ...     output_reference='flat_reference.cnn',
@@ -244,7 +244,7 @@ def batch_make_reference(
                 # Run 'access' on the fly
                 access_arr = access.do_access(fasta)
                 # Take filename base from FASTA, lacking any other clue
-                target_bed = os.path.splitext(os.path.basename(fasta))[0] + ".bed"
+                target_bed = core.fbase(fasta) + ".bed"
                 if output_dir:
                     target_bed = os.path.join(output_dir, target_bed)
 
@@ -326,7 +326,7 @@ def batch_make_reference(
 
     # To make temporary filenames for processed targets or antitargets
     assert target_bed is not None
-    tgt_name_base, _tgt_ext = os.path.splitext(os.path.basename(target_bed))
+    tgt_name_base = core.fbase(target_bed)
     if output_dir:
         tgt_name_base = os.path.join(output_dir, tgt_name_base)
 

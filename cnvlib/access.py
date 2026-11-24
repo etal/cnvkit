@@ -14,6 +14,7 @@ import numpy as np
 from skgenome import GenomicArray as GA
 from skgenome import tabio
 from skgenome.chromnames import is_alternative_contig, is_mitochondrial
+from skgenome.tabio.util import as_text_handle
 
 
 def do_access(
@@ -27,9 +28,10 @@ def do_access(
     Parameters
     ----------
     fa_fname : str
-        Path to FASTA file to analyze.
+        Path to FASTA file to analyze, optionally gzip-compressed.
     exclude_fnames : Iterable[str], optional
-        Paths to BED files of regions to exclude from accessibility.
+        Paths to BED files of regions to exclude from accessibility, optionally
+        gzip-compressed.
     min_gap_size : int, optional
         Minimum gap size between accessible regions to keep them separate.
         Default is 5000.
@@ -69,8 +71,11 @@ def drop_noncanonical_contigs(region_tups: Iterable[tuple]) -> Iterable[tuple]:
 
 
 def get_regions(fasta_fname: str) -> Generator[tuple, None, None]:
-    """Find accessible sequence regions (those not masked out with 'N')."""
-    with open(fasta_fname) as infile:
+    """Find accessible sequence regions (those not masked out with 'N').
+
+    The FASTA file may be gzip-compressed.
+    """
+    with as_text_handle(fasta_fname) as infile:
         chrom = ""
         cursor = 0
         run_start: int | None = None

@@ -1,11 +1,10 @@
 """I/O for plain text formatting of genomic coordinates: `chrom:start-end`"""
 
 import pandas as pd
-from Bio.File import as_handle
 
 from skgenome.rangelabel import from_label, to_label
 
-from .util import report_bad_line
+from .util import as_text_handle, report_bad_line
 
 
 def read_text(infile):
@@ -16,7 +15,7 @@ def read_text(infile):
     Coordinate indexing is assumed to be from 1.
     """
     parse_line = report_bad_line(from_label)
-    with as_handle(infile, "r") as handle:
+    with as_text_handle(infile) as handle:
         rows = [parse_line(line) for line in handle]
     table = pd.DataFrame.from_records(
         rows, columns=["chromosome", "start", "end", "gene"]

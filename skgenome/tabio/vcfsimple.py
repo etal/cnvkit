@@ -9,9 +9,9 @@ import logging
 
 import numpy as np
 import pandas as pd
-from Bio.File import as_handle
 
 from . import vcfspan
+from .util import as_text_handle
 
 
 # TODO save VCF header (as string, the whole text block) in meta{header=}
@@ -20,7 +20,7 @@ def read_vcf_simple(infile):
     # ENH: Make all readers return a tuple (header_string, body_table)
     # ENH: usecols -- need to trim dtypes dict to match?
     header_lines = []
-    with as_handle(infile, "r") as handle:
+    with as_text_handle(infile) as handle:
         for line in handle:
             if line.startswith("##"):
                 header_lines.append(line)

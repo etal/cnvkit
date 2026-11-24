@@ -28,7 +28,7 @@ Run the CNVkit pipeline on one or more BAM files::
     # From baits and tumor/normal BAMs
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
         --targets my_baits.bed --annotate data/refFlat_hg38.txt \
-        --fasta hg38.fasta --access data/access-10kb.hg38.bed \
+        --fasta hg38.fasta --access data/access-5k-mappable.hg38.bed \
         --output-reference my_reference.cnn --output-dir results/ \
         --diagram --scatter
 
@@ -38,12 +38,12 @@ Run the CNVkit pipeline on one or more BAM files::
     # Reusing targets and antitargets to build a new reference, but no analysis
     cnvkit.py batch -n *Normal.bam --output-reference new_reference.cnn \
         -t my_targets.bed -a my_antitargets.bed \
-        -f hg38.fasta -g data/access-10kb.hg38.bed
+        -f hg38.fasta -g data/access-5k-mappable.hg38.bed
 
     # Self-reference QC: build a pooled reference from the normals and analyze
     # each of them against it, computing each sample's coverage only once
     cnvkit.py batch *Normal.bam --normal *Normal.bam \
-        --targets my_targets.bed -f hg38.fasta -g data/access-10kb.hg38.bed \
+        --targets my_targets.bed -f hg38.fasta -g data/access-5k-mappable.hg38.bed \
         --output-reference normals_reference.cnn --output-dir qc/
 
 With the ``-p`` option, process each of the BAM files in parallel, as separate
@@ -314,7 +314,7 @@ reference genome, output as a BED file.
     cnvkit.py access mm10.fasta -s 10000 -o access-10kb.mm10.bed
 
 Many fully sequenced genomes, including the human genome, contain large regions
-of DNA that are inaccessable to sequencing. (These are mainly the centromeres,
+of DNA that are inaccessible to sequencing. (These are mainly the centromeres,
 telomeres, and highly repetitive regions.) In the reference genome sequence
 these regions are filled in with large stretches of "N" characters.
 These regions cannot be mapped by resequencing, so CNVkit avoids them when
@@ -328,24 +328,73 @@ coordinates of the regions between them.
 Other known unmappable, variable, or poorly sequenced regions can be
 excluded with the ``-x``/``--exclude`` option.
 This option can be used more than once to exclude several BED files listing
-different sets of regions.
-For example, regions of poor mappability have been precalculated by others and
-are available from the `UCSC FTP Server
-<ftp://hgdownload.soe.ucsc.edu/goldenPath/>`_ (see `hg38 bigWig files
-<https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/>`_,
-or `hg19 ENCODE mappability
-<ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/>`_
-for legacy workflows).
+different sets of regions, and it accepts gzip-compressed BED files.
+
+For the human genome, a curated list of such regions is the `ENCODE Blacklist
+<https://github.com/Boyle-Lab/Blacklist>`_ (`Amemiya et al. 2019
+<https://doi.org/10.1038/s41598-019-45839-z>`_), which covers regions of low
+mappability and regions with anomalously high signal in sequencing experiments
+regardless of cell type or assay. Version 2 of the list supersedes the ENCODE
+DAC and Duke excludable-region lists from which the hg19 access file below was
+built, and it excludes considerably more sequence: about 106 Mb outside the
+assembly gaps of hg38, compared with about 10 Mb for the DAC and Duke lists on
+hg19. To build a mappability-filtered access file for hg38 from the UCSC genome
+sequence::
+
+    curl -LO https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
+    curl -LO https://github.com/Boyle-Lab/Blacklist/raw/v2.0/lists/hg38-blacklist.v2.bed.gz
+    cnvkit.py access hg38.fa.gz -x hg38-blacklist.v2.bed.gz -o access-5k-mappable.hg38.bed
+
+Both the genome sequence and the exclusion files may be gzip-compressed. The
+``access`` command omits mitochondrial and alternative contigs, so the result
+covers chr1--22, chrX and chrY.
+
+The same repository publishes the list for hg19 and other assemblies. The
+original DAC and Duke lists for hg19 remain available from `UCSC
+<https://hgdownload.soe.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeMapability/>`_.
 
 If there are many small excluded/inaccessible regions in the genome, then small,
 less-reliable antitarget bins would be squeezed into the remaining accessible
 regions.  The ``-s`` option ignores short regions that would otherwise be
 excluded, allowing larger antitarget bins to overlap them.
 
-Precomputed "access" files are included in the CNVkit source distribution under
-the ``data/`` directory. For the hg38/GRCh38 human genome build, use
-``data/access-10kb.hg38.bed``. An hg19 access file
-(``data/access-5k-mappable.hg19.bed``) is also available for legacy workflows.
+
+Precomputed access files
+````````````````````````
+
+The ``data/`` directory of the CNVkit source distribution includes precomputed
+access files for the human genome. They are not installed with the Python
+package.
+
+``data/access-5k-mappable.hg38.bed``
+    The recommended file for hg38/GRCh38, used in the examples throughout this
+    documentation. It is the output of the commands above, using version 2.0
+    of the ENCODE Blacklist and the default joining distance of 5 kb, so it can
+    be regenerated exactly.
+
+``data/access-10kb.hg38.bed``
+    The hg38 file distributed since CNVkit 0.9.11, and shown in the examples of
+    earlier versions of this documentation. Accessible regions separated by
+    less than 10 kb are joined, and about 72 Mb is excluded in addition to the
+    assembly gaps, mostly in regions of low mappability. The source of those
+    exclusions was not recorded, so this file cannot be regenerated; it is
+    retained so that existing analyses can be reproduced.
+
+``data/access-5k-mappable.hg19.bed`` and ``data/access-5k-mappable.grch37.bed``
+    The hg19 counterparts, for legacy workflows, differing from each other only
+    in chromosome naming. They exclude the ENCODE DAC and Duke lists described
+    above, with the default joining distance of 5 kb.
+
+``data/access-10kb.hg19.bed``
+    The hg19 assembly gaps only, joined at 10 kb, with no mappability
+    exclusion.
+
+Antitarget bins are placed within the access regions, so the access file
+determines the antitarget bins and therefore the contents of the resulting
+``.cnn``, ``.cnr`` and ``.cns`` files. A pooled reference and the samples
+analyzed against it must share the same bins, so a reference built with
+``data/access-10kb.hg38.bed`` remains valid for its samples, while changing to
+another access file requires building a new reference.
 
 
 .. _antitarget:
@@ -359,7 +408,7 @@ off-target/"antitarget" regions.
 
 ::
 
-    cnvkit.py antitarget my_targets.bed -g data/access-10kb.hg38.bed -o my_antitargets.bed
+    cnvkit.py antitarget my_targets.bed -g data/access-5k-mappable.hg38.bed -o my_antitargets.bed
 
 Certain genomic regions cannot be mapped by short-read resequencing (see
 :ref:`access`); we can avoid them when calculating the antitarget locations by
@@ -411,9 +460,9 @@ estimated average read depths and recommended bin sizes on standard output.
 
 ::
 
-    cnvkit.py autobin *.bam -t my_targets.bed -g data/access-10kb.hg38.bed
+    cnvkit.py autobin *.bam -t my_targets.bed -g data/access-5k-mappable.hg38.bed
     cnvkit.py autobin *.bam -m amplicon -t my_targets.bed
-    cnvkit.py autobin *.bam -m wgs -b 50000 -g data/access-10kb.hg38.bed --annotate data/refFlat_hg38.txt
+    cnvkit.py autobin *.bam -m wgs -b 50000 -g data/access-5k-mappable.hg38.bed --annotate data/refFlat_hg38.txt
 
 The BAM index (.bai) is used to quickly determine the total number of reads
 present in a file, and random sampling of targeted regions (``-t``) is used to

@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 """Unit tests for the CNVkit library, cnvlib."""
 
+import gzip
 import math
 import os
 import shutil
 import tempfile
+import threading
 import unittest
 from io import StringIO
 
 import pysam
-from conftest import linecount
+from conftest import gzipped, linecount
 
 from cnvlib import commands
 from cnvlib.cnary import CopyNumArray as CNA
@@ -114,6 +116,120 @@ class IOTests(unittest.TestCase):
         regions = tabio.read(fname, "text")
         self.assertEqual(len(regions), linecount(fname))
         self.assertEqual(regions.sample_id, "amplicon")
+
+    def test_read_gzip(self):
+        """A gzipped file reads the same as its uncompressed equivalent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dict_fname = os.path.join(tmp_dir, "genome.dict")
+            with open(dict_fname, "w") as handle:
+                handle.write(
+                    "@HD\tVN:1.6\n"
+                    "@SQ\tSN:chr1\tLN:1000\tUR:file:g.fa\tM5:0\n"
+                    "@SQ\tSN:chr2\tLN:500\tUR:file:g.fa\tM5:0\n"
+                )
+            for fname, fmt in (
+                ("formats/amplicon.bed", "bed"),
+                ("formats/amplicon.text", "text"),
+                ("formats/acgh-log10.seg", "seg"),
+                ("formats/sites-only.vcf", "vcf-simple"),
+                (dict_fname, "dict"),
+                ("formats/empty", "bed3"),
+            ):
+                with self.subTest(fname=fname, fmt=fmt):
+                    expect = tabio.read(fname, fmt)
+                    observed = tabio.read(gzipped(fname, tmp_dir), fmt)
+                    self.assertTrue(observed.data.equals(expect.data))
+                    self.assertEqual(observed.sample_id, expect.sample_id)
+
+    def test_read_gzip_detected_by_content(self):
+        """A gzipped file is decompressed even if its name lacks '.gz'."""
+        expect = tabio.read("formats/amplicon.bed", "bed")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fname = gzipped("formats/amplicon.bed", tmp_dir, "amplicon.bed")
+            observed = tabio.read(fname, "bed")
+        self.assertTrue(observed.data.equals(expect.data))
+
+    def test_read_bgzf(self):
+        """Every block of a BGZF (bgzip) file is read, not only the first."""
+        fname = "formats/na12878-chrM-Y-trunc.bed.gz"
+        with gzip.open(fname, "rt") as handle:
+            expect_nrows = sum(1 for _line in handle)
+        self.assertEqual(len(tabio.read(fname, "bed3")), expect_nrows)
+
+    def test_read_auto_gzip(self):
+        """Format detection and reading both see through gzip compression."""
+        for fname in (
+            "formats/amplicon.bed",
+            "formats/amplicon.text",
+            "formats/example.gff",
+            "formats/nv2_baits.interval_list",
+            "formats/refflat-mini.txt",
+        ):
+            with self.subTest(fname=fname):
+                expect = tabio.read_auto(fname)
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    gz_fname = gzipped(fname, tmp_dir)
+                    self.assertEqual(
+                        tabio.sniff_region_format(gz_fname),
+                        tabio.sniff_region_format(fname),
+                    )
+                    observed = tabio.read_auto(gz_fname)
+                self.assertTrue(observed.data.equals(expect.data))
+
+    def test_sniff_gzip_keeps_extension_hint(self):
+        """The '.bed' in 'x.bed.gz' still selects BED over interval-list.
+
+        A BED row with the strand in column 4 also matches the Picard
+        interval-list pattern, whose reader converts 1-based starts to 0-based;
+        without the extension to settle it, every start would shift by one.
+        """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            bed_fname = os.path.join(tmp_dir, "stranded.bed")
+            with open(bed_fname, "w") as handle:
+                handle.write("chr1\t100\t200\t+\tgeneA\n")
+            for suffix in (".gz", ".bgz", ".GZ"):
+                with self.subTest(suffix=suffix):
+                    gz_fname = gzipped(bed_fname, tmp_dir, "stranded.bed" + suffix)
+                    self.assertEqual(tabio.sniff_region_format(gz_fname), "bed")
+                    self.assertEqual(tabio.read_auto(gz_fname).start.iat[0], 100)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "named pipes unavailable")
+    def test_read_named_pipe(self):
+        """A named pipe, as from process substitution, is read whole."""
+        fname = "formats/amplicon.bed"
+        expect = tabio.read(fname, "bed")
+        with open(fname, "rb") as handle:
+            plain_bytes = handle.read()
+        for label, payload in (
+            ("plain", plain_bytes),
+            ("gzip", gzip.compress(plain_bytes)),
+        ):
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp_dir:
+                fifo = os.path.join(tmp_dir, "amplicon.bed")
+                os.mkfifo(fifo)
+                result = {}
+
+                def feed(path=fifo, data=payload):
+                    with open(path, "wb") as pipe:
+                        pipe.write(data)
+
+                def consume(path=fifo, out=result):
+                    try:
+                        out["data"] = tabio.read(path, "bed").data
+                    except Exception as exc:
+                        out["error"] = exc
+
+                # Daemon threads, so that a reader that opens the pipe twice
+                # fails this test after the timeout instead of hanging it.
+                writer = threading.Thread(target=feed, daemon=True)
+                reader = threading.Thread(target=consume, daemon=True)
+                writer.start()
+                reader.start()
+                reader.join(timeout=10)
+                self.assertFalse(reader.is_alive(), "Reading the pipe stalled")
+                if "error" in result:
+                    raise result["error"]
+                self.assertTrue(result["data"].equals(expect.data))
 
     def test_read_vcf(self):
         """Read the VCF format."""

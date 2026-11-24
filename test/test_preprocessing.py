@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from conftest import ast_calls_to, call_arg_names, linecount
+from conftest import ast_calls_to, call_arg_names, gzipped, linecount
 
 import cnvlib
 from cnvlib import (
@@ -86,6 +86,15 @@ class PreprocessingTests(unittest.TestCase):
         # Dropping chrM, keeping only chrY
         acc = commands.do_access(fasta, excludes, 10, skip_noncanonical=True)
         self.assertEqual(len(acc), 5)
+        # Gzipped FASTA and exclusion files give the same result as
+        # uncompressed ones
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            gz_fasta = gzipped(fasta, tmp_dir)
+            gz_excludes = [gzipped(fname, tmp_dir) for fname in excludes]
+            acc_gz = commands.do_access(
+                gz_fasta, gz_excludes, 10, skip_noncanonical=True
+            )
+        self.assertTrue(acc_gz.data.equals(acc.data))
 
     @pytest.mark.slow
     def test_antitarget(self):
@@ -621,6 +630,26 @@ class PreprocessingTests(unittest.TestCase):
             cna = commands.do_coverage(bed, bedgraph, no_overlap=True)
         self.assertTrue(any("no-overlap" in m.lower() for m in cm.output))
         self.assertGreater(len(cna), 0)
+
+    def test_coverage_gzipped_regions(self):
+        """Gzipped regions give the same coverage as uncompressed ones, for
+        BAM input by depth and by count, and for bedGraph input."""
+        bed = "formats/my-targets.bed"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            gz_bed = gzipped(bed, tmp_dir)
+            for sample, by_count in (
+                ("formats/na12878-chrM-Y-trunc.bam", False),
+                ("formats/na12878-chrM-Y-trunc.bam", True),
+                ("formats/na12878-chrM-Y-trunc.bed.gz", False),
+            ):
+                with self.subTest(sample=sample, by_count=by_count):
+                    expect = commands.do_coverage(bed, sample, by_count=by_count)
+                    observed = commands.do_coverage(gz_bed, sample, by_count=by_count)
+                    self.assertGreater(len(expect), 0)
+                    self.assertTrue(observed.data.equals(expect.data))
+            empty_gz = gzipped("formats/empty", tmp_dir)
+            cna = commands.do_coverage(empty_gz, "formats/na12878-chrM-Y-trunc.bam")
+            self.assertEqual(len(cna), 0)
 
     def test_coverage_no_overlap_cli_flag(self):
         """--no-overlap parses on both `coverage` and `batch`, default off."""
