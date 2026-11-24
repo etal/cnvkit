@@ -75,6 +75,10 @@ filterwarnings = [
     # bioframe <=0.8.0 uses df.groupby(['col']).groups with a single-element
     # list, which pandas 3.0 deprecates via Pandas4Warning.
     "ignore:In a future version, the keys of:Warning",
+    # bioframe <=0.8.0 also passes inplace=True to DataFrame methods, which
+    # pandas 3.1 deprecates via Pandas4Warning (PDEP-8). Scoped to bioframe's
+    # modules so that the same deprecation in CNVkit's own code still fails.
+    "ignore:The inplace keyword in DataFrame:Warning:bioframe",
     # Hypothesis internal warnings that would otherwise be promoted to errors
     "ignore::hypothesis.errors.NonInteractiveExampleWarning",
 ]

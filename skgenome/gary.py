@@ -187,8 +187,10 @@ class GenomicArray:
         Cases:
 
         - single integer: a row, as pd.Series
-        - string row name: a column, as pd.Series
+        - string: a column, as pd.Series
+        - (row, column) tuple: a single cell
         - a boolean array: masked rows, as_dataframe
+        - a slice: the selected rows, as_dataframe
         - tuple of integers: selected rows, as_dataframe
         """
         if isinstance(index, int):
@@ -226,7 +228,13 @@ class GenomicArray:
         index: str | tuple[int, str] | slice | int | tuple[pd.Series, str],
         value: Any,
     ) -> None:
-        """Assign to a portion of the data."""
+        """Assign to a portion of the data.
+
+        When `index` is a slice, `value` may be another GenomicArray with the
+        same number of rows and the same columns, in the same order, with the
+        same dtypes; its rows are then written positionally. A GenomicArray
+        that does not match raises ValueError.
+        """
         if isinstance(index, int):
             self.data.iloc[index] = value
         elif isinstance(index, str):
@@ -239,6 +247,27 @@ class GenomicArray:
             self.data.loc[index] = value
         else:
             assert isinstance(index, slice) or len(index) > 0
+            if isinstance(index, slice) and isinstance(value, GenomicArray):
+                # pandas 3.1 rejects the array itself, where it was previously
+                # coerced row by row from its string form. pandas writes a
+                # DataFrame into a slice by column position, broadcasting a
+                # single row, so the row count and the columns, their order
+                # and dtypes must agree. For a boolean mask pandas would align
+                # the DataFrame on row labels instead, so only a slice passes
+                # the DataFrame on.
+                n_rows = len(range(*index.indices(len(self.data))))
+                if len(value.data) != n_rows:
+                    raise ValueError(
+                        f"Cannot assign {len(value.data)} rows to a slice of "
+                        f"{n_rows} rows"
+                    )
+                if not value.data.dtypes.equals(self.data.dtypes):
+                    raise ValueError(
+                        "Cannot assign rows unless the columns, their order "
+                        f"and dtypes all match; got {dict(value.data.dtypes)} "
+                        f"into {dict(self.data.dtypes)}"
+                    )
+                value = value.data
             self.data[index] = value
 
     def __delitem__(self, index) -> None:
