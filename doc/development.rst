@@ -262,7 +262,9 @@ carries a development version** (``X.Y.Z.devN``), and a plain ``X.Y.Z`` version
 exists only transiently on the tagged release commit. The ``Version Guard``
 GitHub Actions workflow fails any master build or pull request whose
 ``cnvlib/_version.py`` is left on a plain release version, which prevents the
-post-release ``.dev0`` bump from being silently skipped. Check it locally with::
+post-release ``.dev0`` bump from being silently skipped. On a pushed ``vX.Y.Z``
+tag, the workflow also requires ``cnvlib/_version.py`` to equal the tag's
+version. Check the development-version rule locally with::
 
     make check-version
 
@@ -270,20 +272,45 @@ To cut a release, once the notes are written:
 
 1. Set ``cnvlib/_version.py`` to the plain release version ``X.Y.Z`` (drop the
    ``.devN`` suffix) and commit.
-2. Tag the commit with the summarized changelog as its message and push::
+2. Tag the commit with the summarized changelog as its message, but do not push
+   the tag yet::
 
        git tag vX.Y.Z -aF release-notes.md
-       git push --tags
 
-   GitHub Actions builds and publishes the Docker image for the tag.
-3. Build and upload the Python distributions to PyPI::
+3. Build the Python distributions and upload them to PyPI::
 
-       make build
        make release_version=X.Y.Z upload-pypi
 
-4. Bump ``cnvlib/_version.py`` to the next development version
-   ``X.Y.(Z+1).dev0``, commit, and push. (``Version Guard`` enforces that this
-   step is not forgotten.)
+   The ``upload-pypi`` target runs ``make build`` first, which empties
+   ``dist/`` and rebuilds it.
+4. Confirm that pip can resolve the new version, as the Docker build will after
+   the tag is pushed::
+
+       pip download --no-deps --no-cache-dir -d "$(mktemp -d)" cnvkit==X.Y.Z
+
+   PyPI serves its package index from a cache, so this can fail for some
+   minutes after a successful upload. Repeat the check rather than the upload.
+   The version-specific endpoint ``https://pypi.org/pypi/cnvkit/X.Y.Z/json``
+   can show whether the upload itself succeeded while pip still cannot resolve
+   the version.
+5. Push the tag::
+
+       git push origin vX.Y.Z
+
+   The tag starts the ``Docker Build and Push`` workflow, which installs
+   ``cnvkit==X.Y.Z`` from PyPI into the image, so the upload must precede the
+   tag push.
+6. Bump ``cnvlib/_version.py`` to the next development version
+   ``X.Y.(Z+1).dev0``, commit, and push ``master``, which also publishes the
+   release commit from step 1. (``Version Guard`` enforces that this step is not
+   forgotten.)
+7. Create the GitHub release from the tag::
+
+       gh release create vX.Y.Z --title "" --notes-file release-notes.md \
+           --latest --verify-tag
+
+   The title is left empty because the release notes begin with a
+   ``# Version X.Y.Z`` heading, and a title would duplicate it.
 
 
 Building and releasing Docker images
@@ -323,10 +350,9 @@ Docker images are built and pushed automatically:
 - On every tag ``vX.Y.Z``: ``etal/cnvkit:X.Y.Z``, ``etal/cnvkit:X.Y``, and
   ``etal/cnvkit:latest``
 
-To trigger a release build, push a version tag::
-
-    git tag v0.9.14
-    git push origin v0.9.14
+A release build starts when the version tag is pushed, following the steps in
+`Releasing to PyPI`_. The build installs the release from PyPI, so the upload
+must precede the tag push.
 
 Docker Hub credentials
 ~~~~~~~~~~~~~~~~~~~~~~~
