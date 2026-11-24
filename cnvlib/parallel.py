@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import atexit
-import gzip
 import math
 import os
 import tempfile
 from concurrent import futures
 from contextlib import contextmanager, suppress
 from typing import TYPE_CHECKING, Any
+
+from skgenome.tabio.util import as_text_handle
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -120,11 +121,8 @@ def rm(path: str) -> None:
 
 def _bed_lines(bed_fname: str) -> Iterator[str]:
     """Yield the content lines of a possibly gzipped BED, skipping comments."""
-    opener = gzip.open if bed_fname.endswith(".gz") else open
-    with opener(bed_fname) as infile:
+    with as_text_handle(bed_fname) as infile:
         for line in infile:
-            if isinstance(line, bytes):
-                line = line.decode()
             if line[0] == "#":
                 continue
             yield line

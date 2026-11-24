@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import gzip
 import logging
 import math
 import os.path
@@ -17,6 +16,7 @@ import pandas as pd
 from skgenome import tabio
 from skgenome._pysam import PYSAM_INSTALL_MSG
 from skgenome.chromnames import detect_chr_prefix
+from skgenome.tabio.util import as_text_handle
 
 from . import core, samutil
 from .cnary import CopyNumArray as CNA
@@ -272,6 +272,12 @@ def do_coverage(
     return cnarr
 
 
+def _has_regions(bed_fname: str) -> bool:
+    """Whether a possibly gzipped regions file has any non-blank line."""
+    with as_text_handle(bed_fname) as handle:
+        return any(line.strip() for line in handle)
+
+
 def interval_coverages(
     bed_fname: str,
     bam_fname: str,
@@ -285,18 +291,13 @@ def interval_coverages(
     meta = {"sample_id": core.fbase(bam_fname)}
     start_time = time.time()
 
-    # Skip processing if the BED file is empty
-    with open(bed_fname) as bed_handle:
-        for line in bed_handle:
-            if line.strip():
-                break
-        else:
-            logging.info(
-                "Skip processing %s with empty regions file %s",
-                os.path.basename(bam_fname),
-                bed_fname,
-            )
-            return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
+    if not _has_regions(bed_fname):
+        logging.info(
+            "Skip processing %s with empty regions file %s",
+            os.path.basename(bam_fname),
+            bed_fname,
+        )
+        return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
 
     # Calculate average read depth in each bin. The by-read-fetch engine is the
     # only path that sees both mates of a fragment, so overlap-aware mode has to
@@ -381,18 +382,13 @@ def interval_coverages_bedgraph(
     meta = {"sample_id": core.fbase(bedgraph_fname)}
     start_time = time.time()
 
-    # Skip processing if the BED file is empty
-    with open(regions_bed_fname) as bed_handle:
-        for line in bed_handle:
-            if line.strip():
-                break
-        else:
-            logging.info(
-                "Skip processing %s with empty regions file %s",
-                os.path.basename(bedgraph_fname),
-                regions_bed_fname,
-            )
-            return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
+    if not _has_regions(regions_bed_fname):
+        logging.info(
+            "Skip processing %s with empty regions file %s",
+            os.path.basename(bedgraph_fname),
+            regions_bed_fname,
+        )
+        return CNA.from_rows([], meta_dict=meta)  # type: ignore[return-value]
 
     # Calculate coverage from bedGraph
     logging.info("Processing bedGraph %s", os.path.basename(bedgraph_fname))
@@ -668,11 +664,10 @@ def _filter_bed_to_chroms(bed_fname: str, keep_chroms: set[str]) -> tuple[str, i
     The caller is responsible for removing the temporary file.
     """
     fd, tmp_path = tempfile.mkstemp(suffix=".bed", prefix="cnvkit-filt.")
-    opener = gzip.open if bed_fname.endswith(".gz") else open
     n_kept = 0
     # fdopen first so the temp fd is always closed even if opening the input
     # raises (e.g. a malformed .gz).
-    with os.fdopen(fd, "w") as out, opener(bed_fname, "rt") as infile:
+    with os.fdopen(fd, "w") as out, as_text_handle(bed_fname) as infile:
         for line in infile:
             if not line.strip() or line[0] == "#":
                 continue

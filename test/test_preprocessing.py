@@ -627,6 +627,26 @@ class PreprocessingTests(unittest.TestCase):
         self.assertTrue(any("no-overlap" in m.lower() for m in cm.output))
         self.assertGreater(len(cna), 0)
 
+    def test_coverage_gzipped_regions(self):
+        """Gzipped regions give the same coverage as uncompressed ones, for
+        BAM input by depth and by count, and for bedGraph input."""
+        bed = "formats/my-targets.bed"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            gz_bed = gzipped(bed, tmp_dir)
+            for sample, by_count in (
+                ("formats/na12878-chrM-Y-trunc.bam", False),
+                ("formats/na12878-chrM-Y-trunc.bam", True),
+                ("formats/na12878-chrM-Y-trunc.bed.gz", False),
+            ):
+                with self.subTest(sample=sample, by_count=by_count):
+                    expect = commands.do_coverage(bed, sample, by_count=by_count)
+                    observed = commands.do_coverage(gz_bed, sample, by_count=by_count)
+                    self.assertGreater(len(expect), 0)
+                    self.assertTrue(observed.data.equals(expect.data))
+            empty_gz = gzipped("formats/empty", tmp_dir)
+            cna = commands.do_coverage(empty_gz, "formats/na12878-chrM-Y-trunc.bam")
+            self.assertEqual(len(cna), 0)
+
     def test_coverage_no_overlap_cli_flag(self):
         """--no-overlap parses on both `coverage` and `batch`, default off."""
         args = commands.AP.parse_args(["coverage", "a.bam", "b.bed"])
