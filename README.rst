@@ -80,15 +80,14 @@ packages.
 
 This approach is preferred on Mac OS X, and is a solid choice on Linux, too.
 
-To download and install CNVkit and its Python dependencies in a clean
-environment::
+To install CNVkit and its Python dependencies in a clean environment, first
+configure the channels that Bioconda recommends::
 
-    # Configure the sources where conda will find packages
-    conda config --add channels defaults
     conda config --add channels bioconda
     conda config --add channels conda-forge
+    conda config --set channel_priority strict
 
-Then:
+Then::
 
     # Install CNVkit in a new environment named "cnvkit"
     conda create -n cnvkit cnvkit
@@ -187,24 +186,20 @@ Development
 For contributors and developers who want to modify CNVkit or run the latest
 development code, see ``CONTRIBUTING.md`` for complete setup instructions.
 
-Quick start for development::
+Quick start for development, using `pixi <https://pixi.sh>`_ to build the
+environment from the committed lockfile ``pixi.lock``::
 
     git clone https://github.com/etal/cnvkit.git
     cd cnvkit/
 
-    # Option 1: Using conda (recommended)
-    conda env create -f environment-dev.yml
-    conda activate cnvkit
-    pip install -e '.[test]'
-
-    # Option 2: Using pip
-    pip install -e '.[test]'
+    # Python, R with DNAcopy, and CNVkit in editable mode
+    pixi install
 
     # Install pre-commit hooks for code quality
-    pre-commit install
+    pixi run pre-commit install
 
     # Run tests
-    pytest test/
+    pixi run pytest test/
 
 The project uses modern development tools:
 
@@ -213,9 +208,8 @@ The project uses modern development tools:
 - **Docker**: Automated builds for reproducible execution
 - **GitHub Actions**: CI/CD with tests across Python 3.11-3.14
 
-For VS Code users, a DevContainer configuration is available with all
-dependencies pre-installed. Simply open the project and select "Reopen in
-Container".
+For VS Code users, a DevContainer configuration builds the pixi environment
+inside a container: open the project and select "Reopen in Container".
 
 Resources for developers:
 

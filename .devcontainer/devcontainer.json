@@ -1,14 +1,17 @@
 {
   "name": "CNVkit Dev",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
+  "image": "ghcr.io/prefix-dev/pixi:noble",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {}
   },
-  "postCreateCommand": "pip install -e '.[test]'",
+  "mounts": [
+    "source=${localWorkspaceFolderBasename}-pixi,target=${containerWorkspaceFolder}/.pixi,type=volume"
+  ],
+  "postCreateCommand": "pixi install --locked",
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/opt/conda/envs/cnvkit/bin/python",
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.pixi/envs/default/bin/python",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": [
           "test"

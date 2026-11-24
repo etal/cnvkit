@@ -24,10 +24,11 @@ setup, pre-commit hooks, code style, testing matrix, PR process, Docker
 release flow). The notes below are the AI-session-specific quirks not
 already in that guide.
 
-**Conda env quirk:** `conda run -n cnvkit <command>` is unreliable in
-this repo (the dev tools sometimes fail to find their dependencies).
-Use `conda activate cnvkit && <command>` instead — including inside
-scripts and parallel agent runs.
+**Running dev tools:** the environment is the pixi workspace declared in
+`pyproject.toml` and pinned by `pixi.lock`. Prefix commands with
+`pixi run` (e.g. `pixi run pytest -n auto test/`, `pixi run mypy`),
+which needs no shell activation and so also works inside scripts and
+parallel agent runs.
 
 **`# type: ignore` requirement:** `pyproject.toml` sets
 `enable_error_code = ["ignore-without-code"]`, so every `# type: ignore`

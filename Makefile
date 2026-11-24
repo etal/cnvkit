@@ -34,7 +34,6 @@ help:
 	@echo "  docker           Build 'devel' image from current source"
 	@echo "  docker-release   Build versioned release image (set release_version=X.Y.Z)"
 	@echo "  docker-push      Push versioned images to Docker Hub"
-	@echo "  docker-dev       Build DevContainer image for VS Code"
 	@echo "  docker-test      Test the built Docker image"
 	@echo "  Note: GHA automatically builds 'devel' on master, 'latest' on tags"
 	@echo ""
@@ -130,11 +129,6 @@ docker-push:
 	@echo "Pushing Docker images for version $(release_version)..."
 	$(DOCKER) push $(DOCKER_IMAGE):$(release_version)
 	$(DOCKER) push $(DOCKER_IMAGE):latest
-
-.PHONY: docker-dev
-docker-dev:
-	@echo "Building development DevContainer image..."
-	$(DOCKER) build -t $(DOCKER_IMAGE):devcontainer -f .devcontainer/Dockerfile .
 
 .PHONY: docker-test
 docker-test:

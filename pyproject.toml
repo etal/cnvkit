@@ -64,6 +64,28 @@ version = {attr = "cnvlib._version.__version__"}
 dependencies = {file = "requirements/core.txt"}
 optional-dependencies = {test = {file = "requirements/tests.txt"}}
 
+# The development environment: `pixi install`, then `pixi run <command>` or
+# `pixi shell`; doc/development.rst describes it. Conda supplies only what PyPI
+# cannot: the interpreter and R with DNAcopy. Every Python package arrives from
+# PyPI, and CNVkit's own dependencies arrive through its editable install, so
+# their version floors stay in requirements/*.txt alone. Python 3.12 matches
+# [tool.mypy] python_version; linux-aarch64 serves the devcontainer on an
+# Apple-silicon host.
+[tool.pixi.workspace]
+channels = ["conda-forge", "bioconda"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64"]
+
+[tool.pixi.dependencies]
+python = "3.12.*"
+bioconductor-dnacopy = "*"
+
+[tool.pixi.pypi-dependencies]
+cnvkit = { path = ".", editable = true, extras = ["test"] }
+build = "*"
+pre-commit = "*"
+tox = "*"
+twine = "*"
+
 [tool.pytest.ini_options]
 testpaths = ["test"]
 markers = [

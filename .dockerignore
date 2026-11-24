@@ -1,6 +1,7 @@
 # Git
 .git/
 .gitignore
+.gitattributes
 .github/
 
 # Development
@@ -10,6 +11,8 @@
 .claude/
 .pre-commit-config.yaml
 .tox/
+.pixi/
+pixi.lock
 .pytest_cache/
 .coverage
 coverage.xml

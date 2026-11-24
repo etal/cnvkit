@@ -1,7 +1,9 @@
+# Editing this file does not re-solve pixi.lock; see "Updating the lockfile"
+# in doc/development.rst.
 pytest
 pytest-cov
 pytest-xdist
-coverage[all]
+coverage
 hypothesis[numpy]
 mypy
 ruff

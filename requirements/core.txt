@@ -1,3 +1,5 @@
+# Editing this file does not re-solve pixi.lock; see "Updating the lockfile"
+# in doc/development.rst.
 bioframe >= 0.8.0
 biopython >= 1.87
 matplotlib >= 3.10.7

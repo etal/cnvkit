@@ -10,15 +10,18 @@ Thank you for your interest in contributing to CNVkit!
 
 ## Getting started
 
+The development environment is a [pixi](https://pixi.sh) workspace, declared in `pyproject.toml` and pinned by the committed lockfile `pixi.lock`.
+Install pixi, then:
+
 ```bash
 git clone https://github.com/YOUR_USERNAME/cnvkit.git
 cd cnvkit
-conda env create -f environment-dev.yml   # brings in R + DNAcopy
-conda activate cnvkit
-pip install -e '.[test]'
-pre-commit install                        # run quality checks on commit
-pytest test/                              # confirm the suite passes
+pixi install                     # Python, R with DNAcopy, and CNVkit in editable mode
+pixi run pre-commit install      # run quality checks on commit
+pixi run pytest test/            # confirm the suite passes
 ```
+
+`pixi shell` starts a shell inside the environment, after which the `pixi run` prefix is unnecessary.
 
 ## Full developer guide
 
