@@ -19,7 +19,13 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from conftest import ast_calls_to, ast_submit_calls, call_arg_names, linecount
+from conftest import (
+    ast_calls_to,
+    ast_submit_calls,
+    call_arg_names,
+    gzipped,
+    linecount,
+)
 
 import cnvlib
 from cnvlib import (
@@ -144,6 +150,88 @@ class BatchTests(unittest.TestCase):
         )
         cns = cnvlib.read("build/na12878-chrM-Y-trunc.cns")
         self.assertGreater(len(cns), 0)
+
+    def _make_reference(self, out_dir, **kwargs):
+        """Build a reference from the shared chrM-Y-trunc fixtures, with
+        `kwargs` overriding the WGS defaults."""
+        args = {
+            "normal_fnames": ["formats/na12878-chrM-Y-trunc.bam"],
+            "target_bed": None,
+            "antitarget_bed": None,
+            "is_haploid_x_reference": True,
+            "diploid_parx_genome": None,
+            "fasta": "formats/chrM-Y-trunc.hg19.fa",
+            "annotate": None,
+            "short_names": True,
+            "target_avg_size": 500,
+            "access_bed": None,
+            "antitarget_avg_size": None,
+            "antitarget_min_size": None,
+            "output_reference": None,
+            "output_dir": out_dir,
+            "processes": 1,
+            "by_count": False,
+            "min_mapq": 0,
+            "method": "wgs",
+            "do_cluster": False,
+        }
+        args |= kwargs
+        return batch.batch_make_reference(**args)
+
+    def assertSameFiles(self, expect_fnames, observed_fnames):
+        """Files have the same base names and the same contents."""
+        for expect_fname, observed_fname in zip(
+            expect_fnames, observed_fnames, strict=True
+        ):
+            self.assertEqual(
+                os.path.basename(observed_fname), os.path.basename(expect_fname)
+            )
+            with open(expect_fname) as e_handle, open(observed_fname) as o_handle:
+                self.assertEqual(o_handle.read(), e_handle.read())
+
+    def test_batch_wgs_compressed_fasta_names_outputs_like_plain(self):
+        """A WGS reference built from a compressed FASTA, with no targets or
+        access file, is named and computed as one built from the plain FASTA.
+
+        The target BED is named after the FASTA, so a '.gz' suffix must not
+        leak into it as 'chrM-Y-trunc.hg19.fa.target.bed'. The FASTA is
+        bgzip-compressed because the reference step reads it with pyfaidx,
+        which rejects plain gzip.
+        """
+        fasta = "formats/chrM-Y-trunc.hg19.fa"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            bgz_fasta = os.path.join(tmp_dir, "chrM-Y-trunc.hg19.fa.gz")
+            pysam.tabix_compress(fasta, bgz_fasta)
+            plain = self._make_reference(os.path.join(tmp_dir, "plain"))
+            self.assertEqual(os.path.basename(plain[1]), "chrM-Y-trunc.hg19.target.bed")
+            bgz = self._make_reference(os.path.join(tmp_dir, "bgzip"), fasta=bgz_fasta)
+            self.assertSameFiles(plain, bgz)
+
+    def test_batch_gzipped_regions_name_outputs_like_plain(self):
+        """Gzipped targets (hybrid) or access regions (WGS) are named and
+        processed as their uncompressed equivalents."""
+        region_fname = "formats/my-targets.bed"
+        for method, region_arg, kwargs in (
+            (
+                "hybrid",
+                "target_bed",
+                {"antitarget_avg_size": 10000, "antitarget_min_size": 100},
+            ),
+            ("wgs", "access_bed", {}),
+        ):
+            with self.subTest(method=method), tempfile.TemporaryDirectory() as tmp_dir:
+                kwargs = kwargs | {"method": method, "target_avg_size": 1000}
+                plain = self._make_reference(
+                    os.path.join(tmp_dir, "plain"),
+                    **{region_arg: region_fname},
+                    **kwargs,
+                )
+                self.assertEqual(os.path.basename(plain[1]), "my-targets.target.bed")
+                gz_fname = gzipped(region_fname, tmp_dir)
+                compressed = self._make_reference(
+                    os.path.join(tmp_dir, "gzip"), **{region_arg: gz_fname}, **kwargs
+                )
+                self.assertSameFiles(plain, compressed)
 
     def test_batch_hybrid_autobin(self):
         """Hybrid batch with autobin-determined bin sizes (issue #302)."""
