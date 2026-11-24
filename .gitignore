@@ -62,3 +62,6 @@ __pycache__/
 
 # Pre-commit
 .pre-commit-config.yaml.bak
+
+# Pixi environments (the lockfile, pixi.lock, is committed)
+.pixi/

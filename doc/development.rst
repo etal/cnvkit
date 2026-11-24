@@ -19,30 +19,91 @@ repository root.
 Development setup
 -----------------
 
-Prerequisites:
+The supported development environment is a `pixi <https://pixi.sh>`_
+workspace. Its manifest is the set of ``[tool.pixi.*]`` tables in
+``pyproject.toml``, and the committed lockfile ``pixi.lock`` records the exact
+build of every package for Linux (x86-64 and ARM) and for macOS on Apple
+silicon. Installations from the same lockfile on the same platform contain the
+same package builds, so when a test starts to fail, a change in the code or in
+``pixi.lock`` is the first place to look, rather than a dependency that changed
+without a record.
 
-- Python 3.11 or later
-- R with the DNAcopy package (for the default CBS segmentation)
-- Git
+Install pixi and Git, then, in the repository::
 
-Set up a development environment using one of the following options.
+    pixi install
+    pixi run pre-commit install
 
-**Option A: Conda (recommended).** This brings in R and DNAcopy as well::
+``pixi install`` creates the environment under ``.pixi/``. It contains
+Python 3.12; R with the Bioconductor package DNAcopy, which the default CBS
+segmentation method calls; CNVkit itself in editable mode, with its test
+dependencies (pytest, mypy and ruff among them); and the tox, pre-commit, build
+and twine tools. Run a single command in the environment with ``pixi run``, as
+in ``pixi run pytest test/``, or start a shell inside it with ``pixi shell``.
+The commands on the rest of this page assume such a shell.
 
-    conda env create -f environment-dev.yml
-    conda activate cnvkit
-    pip install -e '.[test]'
+Conda supplies only the Python interpreter and R with DNAcopy, from conda-forge
+and Bioconda; every Python package comes from PyPI. The version floors
+therefore remain in one place, ``requirements/*.txt``, which the package
+metadata, tox and Read the Docs also read.
 
-**Option B: pip.** You will need to install R and DNAcopy separately::
+VS Code DevContainer
+~~~~~~~~~~~~~~~~~~~~
 
-    pip install -e '.[test]'
+Open the project in VS Code and choose "Reopen in Container". The container
+runs ``pixi install --locked``, so it builds its environment from the same
+lockfile. Its ``.pixi/`` directory is a separate Docker volume rather than
+part of the source checkout, because an environment built for the host's
+operating system cannot be shared with the container's Linux environment. In
+the container's terminal, run ``pixi shell`` first, or prefix commands with
+``pixi run``.
 
-**Option C: VS Code DevContainer.** Open the project in VS Code and choose
-"Reopen in Container"; everything is pre-configured.
+Without pixi
+~~~~~~~~~~~~
 
-Finally, install the pre-commit hooks so quality checks run on every commit::
+An editable install into any Python 3.11 or later environment also works,
+although its dependency versions are not pinned. R and DNAcopy must then be
+installed separately, as described in the README::
 
+    pip install -e '.[test]' pre-commit
     pre-commit install
+
+Other Python versions
+~~~~~~~~~~~~~~~~~~~~~
+
+The pixi environment provides a single interpreter. The environments defined in
+``tox.ini`` cover Python 3.11 through 3.14, and ``py311-min`` runs the test
+suite with every dependency at its minimum supported version
+(``requirements/min.txt``); continuous integration runs a subset of them. tox
+is installed in the pixi environment, which provides no interpreter other than
+Python 3.12. For any other version, tox looks for an interpreter on the
+``PATH``; if it finds none, it reports that environment as skipped, and it
+exits with an error when every requested environment was skipped. With
+Python 3.11 installed::
+
+    tox -e py311-min
+
+Updating the lockfile
+~~~~~~~~~~~~~~~~~~~~~
+
+The lockfile changes when the manifest changes or when a re-solve is requested:
+
+- pixi detects an edit to the ``[tool.pixi.*]`` tables on its own. The next
+  ``pixi install`` or ``pixi run`` re-solves, and ``pixi install --locked``
+  refuses to proceed until it has.
+- ``pixi update`` re-solves every package to the newest version the manifest
+  and the floors permit, and ``pixi update <package>`` updates only the named
+  packages.
+- pixi 0.84.1 does not reliably detect an edit to
+  ``requirements/*.txt``. ``pixi lock`` reports the lockfile as up to date,
+  and ``pixi update cnvkit`` misses a newly added dependency until the
+  modification time of ``pyproject.toml`` changes. After changing a floor or
+  adding a dependency there, run ``touch pyproject.toml && pixi update cnvkit``.
+
+Commit the new ``pixi.lock`` in the same pull request as the change that
+required it. Git treats ``pixi.lock`` as a binary file when merging, so when
+two branches both change it, the merge stops with a conflict and no conflict
+markers; take either side's file (``git checkout --ours pixi.lock`` or
+``git checkout --theirs pixi.lock``), repeat the re-solve, and stage the result.
 
 
 Pre-commit hooks
@@ -238,7 +299,6 @@ Build and smoke-test images locally
 
     make docker        # Build the production image (etal/cnvkit:devel) from source
     make docker-test   # Run cnvkit.py version inside the image
-    make docker-dev    # Build the DevContainer image
 
 Build and push a release
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
