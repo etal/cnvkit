@@ -205,7 +205,7 @@ def batch_make_reference(
     ...     annotate='refFlat.txt',
     ...     short_names=False,
     ...     target_avg_size=5000,
-    ...     access_bed='access-5k.hg19.bed',
+    ...     access_bed='access-5k-mappable.hg19.bed',
     ...     antitarget_avg_size=None,
     ...     antitarget_min_size=None,
     ...     output_reference='flat_reference.cnn',

@@ -94,7 +94,7 @@ samples share the suffix "Normal.bam" and tumor samples "Tumor.bam", a complete
 
     cnvkit.py batch *Tumor.bam --normal *Normal.bam \
         --targets my_baits.bed --fasta hg38.fasta \
-        --access data/access-10kb.hg38.bed \
+        --access data/access-5k-mappable.hg38.bed \
         --output-reference my_reference.cnn --output-dir example/
 
 See the built-in help message to see what these options do, and for additional
@@ -107,7 +107,7 @@ If you have no normal samples to use for the :ref:`reference`, you can create a
 ``--normal/-n`` flag without specifying any additional BAM files::
 
     cnvkit.py batch *Tumor.bam -n -t my_baits.bed -f hg38.fasta \
-        --access data/access-10kb.hg38.bed \
+        --access data/access-5k-mappable.hg38.bed \
         --output-reference my_flat_reference.cnn -d example2/
 
 In either case, you should run this command with the reference genome sequence
@@ -119,7 +119,7 @@ If your targets are missing gene names, you can add them here with the
 ``--annotate`` argument::
 
     cnvkit.py batch *Tumor.bam -n *Normal.bam -t my_baits.bed -f hg38.fasta \
-        --annotate data/refFlat_hg38.txt --access data/access-10kb.hg38.bed \
+        --annotate data/refFlat_hg38.txt --access data/access-5k-mappable.hg38.bed \
         --output-reference my_reference.cnn -d example3/
 
 .. note:: **Which BED file should I use?**
