@@ -1,29 +1,27 @@
-# Usage:
-#   conda env create -f conda-env.yml
-# or:
-#   conda env update -v -n [base] -f conda-env.yml [--prune]
-# This does not install CNVkit itself. Use pip to install either a stable release from
-# PyPI (pip install cnvkit), or this local repo (pip install -e .).
-name: cnvkit
+# Runtime dependencies of the production Docker image. The Dockerfile installs
+# them into the image's base environment with
+#   conda env update -n base -f conda-env.yml
+# and then installs CNVkit itself with pip, which also brings in the remaining
+# Python dependencies, such as bioframe and statsmodels, from PyPI. The version
+# floors listed here repeat those in requirements/core.txt, so that conda
+# rather than pip satisfies them and no PyPI wheel replaces their conda builds.
+#
+# This file does not describe the development environment; that is the pixi
+# workspace declared in pyproject.toml and described in doc/development.rst.
+# To install a released CNVkit with conda, follow the Bioconda instructions in
+# README.rst instead.
 channels:
     - conda-forge
     - bioconda
-    - defaults
 dependencies:
     - python>=3.11
-    - atlas # [not osx]
     - bioconductor-dnacopy
     - biopython >=1.87
-    - hypothesis
     - matplotlib >=3.10.7
-    - mypy
     - numpy >=2.3.5
     - pandas >=2.3.3
     - pyfaidx >=0.8.1.3
     - pysam >=0.23.3
-    - pytest
     - reportlab >=4.4.10
-    - ruff
     - scikit-learn >=1.7.2
     - scipy >=1.16.3
-    - tox

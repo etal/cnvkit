@@ -292,6 +292,12 @@ Building and releasing Docker images
 End-user instructions for *running* the published images are in
 :doc:`docker`. The workflows below are for maintainers.
 
+The image does not use the pixi environment. Its ``Dockerfile`` installs the
+conda packages listed in ``conda-env.yml``, which are the runtime dependencies
+only, into the image's base environment, and then installs CNVkit with pip.
+A change to the image's dependencies is therefore an edit to
+``conda-env.yml``.
+
 Build and smoke-test images locally
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
