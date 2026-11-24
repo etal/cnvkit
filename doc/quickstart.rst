@@ -34,8 +34,8 @@ website and download:
 You probably already have the reference genome sequence. If your species' genome
 is not available from UCSC, use whatever reference sequence you have. CNVkit
 only requires that your reference genome sequence be in FASTA format.
-Both the reference genome sequence and the annotation database must be single,
-uncompressed files.
+The reference genome sequence must be a single, uncompressed file; the
+annotation database may be gzip-compressed.
 
 **Gene annotations:**
 The gene annotations file (refFlat.txt) is useful to apply gene names to your

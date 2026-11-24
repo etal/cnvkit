@@ -685,8 +685,8 @@ P_access.add_argument(
     "--exclude",
     action="append",
     default=[],
-    help="""Additional regions to exclude, in BED format. Can be used multiple
-            times.""",
+    help="""Additional regions to exclude, in BED format, optionally
+            gzip-compressed. Can be used multiple times.""",
 )
 P_access.add_argument(
     "-o",

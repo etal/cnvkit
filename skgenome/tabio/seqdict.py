@@ -10,7 +10,8 @@ Columns:
 """
 
 import pandas as pd
-from Bio.File import as_handle
+
+from .util import as_text_handle
 
 
 def read_dict(infile):
@@ -20,7 +21,7 @@ def read_dict(infile):
         "end",
         # "file", "md5"
     ]
-    with as_handle(infile, "r") as handle:
+    with as_text_handle(infile) as handle:
         rows = _parse_lines(handle)
         return pd.DataFrame.from_records(rows, columns=colnames)
 

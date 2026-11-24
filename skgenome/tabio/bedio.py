@@ -6,9 +6,8 @@ import shlex
 from typing import TYPE_CHECKING
 
 import pandas as pd
-from Bio.File import as_handle
 
-from .util import report_bad_line
+from .util import as_text_handle, report_bad_line
 
 if TYPE_CHECKING:
     from pandas.core.frame import DataFrame
@@ -52,7 +51,7 @@ def read_bed(infile: str) -> DataFrame:
                     break
                 yield line
 
-    with as_handle(infile, "r") as handle:
+    with as_text_handle(infile) as handle:
         rows = map(_parse_line, track2track(handle))
         return pd.DataFrame.from_records(
             rows, columns=["chromosome", "start", "end", "gene", "strand"]
@@ -98,7 +97,7 @@ def group_bed_tracks(bedfile):
     Yields (track_name, iterable_of_lines), much like itertools.groupby.
     """
     # ENH - make this memory-efficient w/ generators or something
-    with as_handle(bedfile, "r") as handle:
+    with as_text_handle(bedfile) as handle:
         curr_track = "DEFAULT"
         curr_lines: list[str] = []
         for line in handle:

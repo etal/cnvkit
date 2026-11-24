@@ -1,5 +1,8 @@
 import ast
+import gzip
 import inspect
+import os
+import shutil
 
 import matplotlib
 import pytest
@@ -22,6 +25,14 @@ def linecount(filename):
         for i, _line in enumerate(handle):
             pass
         return i + 1
+
+
+def gzipped(fname, dest_dir, basename=None):
+    """Copy `fname` into `dest_dir` gzip-compressed, and return the new path."""
+    out_fname = os.path.join(dest_dir, basename or os.path.basename(fname) + ".gz")
+    with open(fname, "rb") as infile, gzip.open(out_fname, "wb") as outfile:
+        shutil.copyfileobj(infile, outfile)
+    return out_fname
 
 
 def ast_calls_to(func, attr, obj=None):

@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 import numpy as np
 import pandas as pd
 import pysam
-from conftest import ast_calls_to, call_arg_names, linecount
+from conftest import ast_calls_to, call_arg_names, gzipped, linecount
 
 import cnvlib
 from cnvlib import (
@@ -86,6 +86,11 @@ class PreprocessingTests(unittest.TestCase):
         # Dropping chrM, keeping only chrY
         acc = commands.do_access(fasta, excludes, 10, skip_noncanonical=True)
         self.assertEqual(len(acc), 5)
+        # Gzipped exclusion files give the same result as uncompressed ones
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            gz_excludes = [gzipped(fname, tmp_dir) for fname in excludes]
+            acc_gz = commands.do_access(fasta, gz_excludes, 10, skip_noncanonical=True)
+        self.assertTrue(acc_gz.data.equals(acc.data))
 
     @pytest.mark.slow
     def test_antitarget(self):

@@ -11,7 +11,6 @@ import sys
 from typing import TYPE_CHECKING
 
 import pandas as pd
-from Bio.File import as_handle
 
 from ..gary import GenomicArray as GA
 from . import (
@@ -26,6 +25,7 @@ from . import (
     vcfio,
     vcfsimple,
 )
+from .util import as_text_handle
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -380,6 +380,9 @@ def get_filename(infile: _TemporaryFileWrapper | str) -> str | None:
 def sniff_region_format(infile: str) -> str | None:
     """Guess the format of the given file by reading the first line.
 
+    A gzip-compressed file is decompressed, and its compression suffix is
+    ignored when the file extension is used as a hint.
+
     Returns
     -------
     str or None
@@ -389,7 +392,10 @@ def sniff_region_format(infile: str) -> str | None:
     fname_fmt = None
     fname = get_filename(infile)
     if fname:
-        _base, ext = os.path.splitext(fname)
+        base, ext = os.path.splitext(fname)
+        if ext.lower() in (".gz", ".bgz"):
+            # A compressed file keeps the extension naming its format: x.bed.gz
+            _base, ext = os.path.splitext(base)
         ext = ext.removeprefix(".")
         # if ext in known_extensions:
         if ext in format_patterns:
@@ -397,7 +403,7 @@ def sniff_region_format(infile: str) -> str | None:
 
     # Fallback: regex detection
     # has_track = False
-    with as_handle(infile, "r") as handle:
+    with as_text_handle(infile) as handle:
         for line in handle:
             if not line.strip():
                 # Skip blank lines
