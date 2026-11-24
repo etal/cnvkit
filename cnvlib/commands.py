@@ -671,7 +671,9 @@ def _cmd_access(args: argparse.Namespace) -> None:
 
 
 P_access = AP_subparsers.add_parser("access", help=_cmd_access.__doc__)
-P_access.add_argument("fa_fname", help="Genome FASTA file name")
+P_access.add_argument(
+    "fa_fname", help="Genome FASTA file name, optionally gzip-compressed."
+)
 P_access.add_argument(
     "-s",
     "--min-gap-size",

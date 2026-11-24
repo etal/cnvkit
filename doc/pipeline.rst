@@ -342,13 +342,12 @@ hg19. To build a mappability-filtered access file for hg38 from the UCSC genome
 sequence::
 
     curl -LO https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz
-    gunzip hg38.fa.gz
     curl -LO https://github.com/Boyle-Lab/Blacklist/raw/v2.0/lists/hg38-blacklist.v2.bed.gz
-    cnvkit.py access hg38.fa -x hg38-blacklist.v2.bed.gz -o access-5k-mappable.hg38.bed
+    cnvkit.py access hg38.fa.gz -x hg38-blacklist.v2.bed.gz -o access-5k-mappable.hg38.bed
 
-The genome sequence must be an uncompressed FASTA file, while the exclusion
-files may be gzip-compressed. The ``access`` command omits mitochondrial and
-alternative contigs, so the result covers chr1--22, chrX and chrY.
+Both the genome sequence and the exclusion files may be gzip-compressed. The
+``access`` command omits mitochondrial and alternative contigs, so the result
+covers chr1--22, chrX and chrY.
 
 The same repository publishes the list for hg19 and other assemblies. The
 original DAC and Duke lists for hg19 remain available from `UCSC
