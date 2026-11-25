@@ -77,15 +77,20 @@ to extract the gene name (at most) from this column, the other features are
 ignored and the formats are effectively the same for the purpose of labeling
 genomic regions. These docs therefore refer to these formats collectively as GFF.
 
-To extract gene names, CNVkit's GFF reader checks for these tags in column 9 in order:
+To label each row with a gene name, CNVkit's GFF reader looks for these tags in column 9, in order of priority:
 
-    - ``Name``
-    - ``gene_id``
     - ``gene_name``
     - ``gene``
+    - ``Name``
+    - ``gene_id``
 
-It will take the value of the first match and use it as the "gene" in the
-internal data structures and in other output file formats.
+Each row takes the value of the first of these tags that it carries, regardless of where the tag appears in column 9, and a row with none of them is labeled ``-``.
+A tag must be a whole attribute key: ``gene`` does not match ``havana_gene``.
+This label becomes the "gene" in the internal data structures and in other output file formats.
+The tags holding gene symbols come first because the conventional tags often hold identifiers instead.
+In NCBI RefSeq GFF3 files, ``Name`` holds the transcript or protein accession (e.g. ``NM_004333.4``) on mRNA and CDS rows, while ``gene`` holds the symbol.
+In GTF files and GENCODE GFF3 files, ``gene_id`` holds the Ensembl gene ID, while ``gene_name`` holds the symbol.
+The ``--gff-tag`` option of ``skg_convert.py`` selects a single tag instead, given as the literal attribute key (e.g. ``gene_name``) rather than a regular expression.
 
 
 .. _genepredformat:

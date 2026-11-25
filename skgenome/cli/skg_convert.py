@@ -64,7 +64,10 @@ def argument_parsing():
 
     AP_fmt = AP.add_argument_group("Format-specific options")
     AP_fmt.add_argument(
-        "--gff-tag", help="""GFF attributes tag to use for gene names."""
+        "--gff-tag",
+        help=f"""GFF attribute key to take gene names from, e.g. 'gene_name'.
+                This is a literal key, not a regular expression. [Default: the
+                first present of {", ".join(tabio.gff.DEFAULT_TAGS)}]""",
     )
     AP_fmt.add_argument(
         "--gff-type",

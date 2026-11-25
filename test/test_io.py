@@ -18,7 +18,7 @@ from cnvlib import commands
 from cnvlib.cnary import CopyNumArray as CNA
 from skgenome import tabio
 from skgenome.cli import skg_convert
-from skgenome.tabio import bedio, vcfio
+from skgenome.tabio import bedio, gff, vcfio
 
 
 class IOTests(unittest.TestCase):
@@ -73,6 +73,82 @@ class IOTests(unittest.TestCase):
             list(braf[["chromosome", "start", "end"]].itertuples(index=False)),
             [("NC_000007.13", 140433811, 140624564)],
         )
+
+    def test_read_gff_ncbi_rows_use_gene_symbol(self):
+        """Every NCBI GFF3 row is labeled with its gene symbol, not an accession.
+
+        The mRNA, lnc_RNA and CDS rows carry the transcript or protein accession
+        in ``Name`` and the symbol in ``gene``.
+        """
+        regions = tabio.read("formats/GRCh37_BRAF.gff.gz", "gff").data
+        self.assertEqual(set(regions["gene"]), {"BANCR", "BRAF", "BRAFP1", "HMG20B"})
+        cds = regions[regions["type"] == "CDS"]
+        self.assertEqual(len(cds), 18)
+        self.assertEqual(set(cds["gene"]), {"BRAF"})
+
+    def test_read_gff_tag_priority(self):
+        """The first tag present in priority order wins, wherever it appears."""
+        attributes = [
+            # GENCODE GFF3: gene_id precedes gene_name
+            "ID=g1;gene_id=ENSG00000157764.14;gene_name=BRAF;"
+            "havana_gene=OTTHUMG00000157457.3",
+            # Ensembl/GENCODE GTF
+            'gene_id "ENSG00000189337"; gene_name "KAZN";',
+            # GTF row without gene_name falls back to gene_id
+            'gene_id "ENSG00000279493"; transcript_id "ENST00000623083";',
+            # Ensembl GFF3 gene row: Name holds the symbol, gene_id the ID
+            "ID=gene:ENSG00000157764;Name=BRAF;gene_id=ENSG00000157764",
+            # NCBI GFF3 mRNA row: Name holds the accession, gene the symbol
+            "ID=rna1;Name=NM_004333.4;gbkey=mRNA;gene=BRAF",
+            # A key that merely ends in a tag name is not that tag
+            "ID=x1;pseudogene=true;Name=X1",
+            # An empty value falls through to the next tag
+            'gene_id "E1"; transcript_id "T1"; gene_name "";',
+            "ID=x2;gene=;Name=N1",
+            # Extra spaces between GTF attributes
+            'transcript_id "T2";  gene_id "E2";',
+            # No recognized tag
+            "ID=exon1;Parent=rna1",
+        ]
+        self.assertEqual(
+            self._gff_genes(attributes),
+            [
+                "BRAF",
+                "KAZN",
+                "ENSG00000279493",
+                "BRAF",
+                "BRAF",
+                "X1",
+                "E1",
+                "N1",
+                "E2",
+                "-",
+            ],
+        )
+
+    def test_read_gff_explicit_tag(self):
+        """An explicit tag names one attribute key, matched at a key boundary."""
+        attributes = [
+            "ID=g1;gene_id=ENSG00000157764.14;gene_name=BRAF;"
+            "havana_gene=OTTHUMG00000157457.3",
+            "ID=g2;description=BRAF pseudogene 1;gene=BRAFP1",
+        ]
+        self.assertEqual(self._gff_genes(attributes, tag="gene"), ["-", "BRAFP1"])
+        self.assertEqual(
+            self._gff_genes(attributes, tag="gene_id"), ["ENSG00000157764.14", "-"]
+        )
+        with self.assertLogs(level="WARNING"):
+            genes = self._gff_genes(attributes, tag="(Name|gene)")
+        self.assertEqual(genes, ["-", "-"])
+
+    @staticmethod
+    def _gff_genes(attributes, **kwargs):
+        """Parse one GFF row per attribute string; return labels in input order."""
+        lines = "".join(
+            f"chr1\t.\tgene\t{100 * i + 1}\t{100 * i + 50}\t.\t+\t.\t{attr}\n"
+            for i, attr in enumerate(attributes)
+        )
+        return list(gff.read_gff(StringIO(lines), **kwargs)["gene"])
 
     def test_read_ilist(self):
         """Read the interval list format."""
