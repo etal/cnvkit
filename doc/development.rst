@@ -310,7 +310,9 @@ To cut a release, once the notes are written:
            --latest --verify-tag
 
    The title is left empty because the release notes begin with a
-   ``# Version X.Y.Z`` heading, and a title would duplicate it.
+   ``# Version X.Y.Z`` heading, and a title would duplicate it. For a release
+   that is not the highest version overall, pass ``--latest=false`` instead of
+   ``--latest``, so that GitHub continues to mark the highest release as latest.
 
 
 Building and releasing Docker images
@@ -341,18 +343,33 @@ Build and push a release
     make release_version=0.9.14 docker-release   # Build a tagged image from PyPI
     make release_version=0.9.14 docker-push      # Push to Docker Hub (needs auth)
 
+These targets tag and push only the exact version; the floating tags
+``latest`` and ``X.Y`` are published by the automated build below.
+
 Automated builds (GitHub Actions)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Docker images are built and pushed automatically:
 
 - On every commit to ``master``: ``etal/cnvkit:devel``
-- On every tag ``vX.Y.Z``: ``etal/cnvkit:X.Y.Z``, ``etal/cnvkit:X.Y``, and
-  ``etal/cnvkit:latest``
+- On every version tag: the exact version, that is, the tag without its
+  leading ``v`` (``v0.9.14`` publishes ``etal/cnvkit:0.9.14``). The highest
+  stable release in its minor series also publishes ``etal/cnvkit:X.Y``, and
+  the highest stable release overall also publishes ``etal/cnvkit:latest``.
+
+A stable release tag consists of three or more numeric components
+(``v0.9.14``, ``v0.9.14.1``), and releases are ranked by version, not by
+date, so the floating tags never move backward. A prerelease tag, or a tag
+that is not the highest in its series, publishes only its exact version.
 
 A release build starts when the version tag is pushed, following the steps in
 `Releasing to PyPI`_. The build installs the release from PyPI, so the upload
-must precede the tag push.
+must precede the tag push. GitHub Actions runs the workflow file as it exists
+in the tagged commit, so a maintenance branch cut from an older release must
+carry the current ``.github/workflows/docker-build.yml`` before its tag is
+pushed. The ``v0.9.14`` tag carries an older version of this file that moves
+``latest`` on every tag, so re-running its workflow uses that old rule, and
+earlier release tags carry no such file at all.
 
 Docker Hub credentials
 ~~~~~~~~~~~~~~~~~~~~~~~

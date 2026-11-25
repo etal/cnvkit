@@ -104,12 +104,17 @@ Image versioning
 
 CNVkit Docker images use the following tags:
 
-- ``latest`` -- the most recent stable release (built from git tags)
+- ``latest`` -- the highest stable release (built from git tags)
 - ``devel`` -- the development version (built from the ``master`` branch on
   each commit)
 - ``X.Y.Z`` -- a specific release (e.g. ``0.9.14``)
-- ``X.Y`` -- the latest patch for a minor version (e.g. ``0.9`` resolves to
-  ``0.9.14``)
+- ``X.Y`` -- the highest patch release in a minor version (e.g. ``0.9``
+  resolves to ``0.9.14``)
+
+Releases are ranked by version rather than release date, so neither floating
+tag moves backward. A prerelease, or a release that is not the highest in its
+series (for example, ``0.9.13.1`` published after ``0.9.14``), receives only
+its exact version tag.
 
 For reproducible analyses, pin a specific version tag rather than ``latest``::
 
