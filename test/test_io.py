@@ -78,6 +78,16 @@ class IOTests(unittest.TestCase):
         regions = tabio.read(fname, "refflat")
         self.assertEqual(len(regions), linecount(fname))
         self.assertEqual(13, regions.chromosome.nunique())
+        # Coordinates are taken as written: UCSC's are 0-based, as in BED
+        ddx = regions.data[regions.data["accession"] == "NR_046018"]
+        self.assertEqual(
+            list(ddx[["gene", "chromosome", "start", "end"]].itertuples(index=False)),
+            [("DDX11L1", "chr1", 11873, 14409)],
+        )
+        exons = tabio.read(fname, "refflat", exons=True).data
+        ddx_exons = exons[exons["accession"] == "NR_046018"]
+        self.assertEqual(list(ddx_exons["start"]), [11873, 12612, 13220])
+        self.assertEqual(list(ddx_exons["end"]), [12227, 12721, 14409])
 
     def test_read_seg(self):
         """Read the SEG format."""

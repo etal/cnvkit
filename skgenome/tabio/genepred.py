@@ -194,9 +194,9 @@ def _read_genepred(
         dframe["start"] = dframe["start"].astype("int")
         dframe["end"] = dframe["end"].astype("int")
 
+    # UCSC stores these coordinates 0-based and half-open, as in BED
     return (
         dframe[[*cols_shared, "start", "end"]]
-        .assign(start=dframe.start - 1)
         .sort_values(["chromosome", "start", "end"])
         .reset_index(drop=True)
     )
