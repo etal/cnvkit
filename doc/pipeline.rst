@@ -262,6 +262,8 @@ format from UCSC (e.g. `refFlat.txt for hg38
 <http://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/refFlat.txt.gz>`_).
 A pre-downloaded ``refFlat_hg38.txt`` is included in the CNVkit ``data/``
 directory.
+UCSC's ``refGene.txt.gz`` and GFF files work too; see :ref:`genepredformat` and
+:ref:`gffformat`.
 
 In other cases the region labels are a combination of human-readable gene names
 and database accession codes, separated by commas (e.g.

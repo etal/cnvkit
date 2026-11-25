@@ -3,11 +3,11 @@ Additional scripts
 
 ``cnv_annotate.py``
     Update gene names (the 'gene' column) in CNVkit .cnn/.cnr files,
-    using gene annotations from another UCSC RefFlat, BED, or GFF file (e.g.
-    refFlat.txt). This may be useful if you notice at the end of an analysis
-    that vendor-annotated targets are not the desired gene names, and want to
-    change the labeling without repeating the analysis with an updated target
-    BED file.
+    using gene annotations from another UCSC refGene or refFlat table (e.g.
+    refGene.txt), a BED file, or a GFF file. This may be useful if you notice
+    at the end of an analysis that vendor-annotated targets are not the
+    desired gene names, and want to change the labeling without repeating the
+    analysis with an updated target BED file.
 
 ``cnv_expression_correlate.py``
     Create a table of correlation coefficients between gene copy number and mRNA
@@ -82,9 +82,11 @@ Additional scripts
 
 ``skg_convert.py``
     Convert between any of the tabular data :doc:`formats <fileformats>`
-    supported by skgenome.tabio, including BED and UCSC RefFlat (e.g.
-    refFlat.txt from `UCSC Genome Bioinformatics
-    <http://hgdownload.soe.ucsc.edu/downloads.html>`_).
+    supported by skgenome.tabio, including BED and the UCSC gene tables
+    refGene and refFlat (e.g. refGene.txt from `UCSC Genome Bioinformatics
+    <http://hgdownload.soe.ucsc.edu/downloads.html>`_). For a UCSC gene
+    table, ``--refflat-type`` selects whole transcripts, coding regions or
+    individual exons.
 
 ``snpfilter.py``
     Genotype a sample, and optionally its matched normal, at a list of known

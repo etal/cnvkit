@@ -13,8 +13,8 @@ Every interval CNVkit reads must end at or after it starts. In a region file
 written by another tool, a reversed pair is taken to span the wider range and
 the repair is logged. For BED that is what the writer meant, since some
 primer-design tools record reverse-direction amplicons that way; for an
-annotation file carrying its own strand column, such as GFF or refFlat, it is
-instead the only usable interval left in a damaged row. In
+annotation file carrying its own strand column, such as GFF or a UCSC gene
+table, it is instead the only usable interval left in a damaged row. In
 CNVkit's own tables below, the ``.cnn``, ``.cnr``, ``.cns`` and SEG formats, a
 reversed row is refused: those coordinates came from a binner or a
 segmenter, so a reversed one means the file was damaged after it was written,
@@ -88,7 +88,60 @@ It will take the value of the first match and use it as the "gene" in the
 internal data structures and in other output file formats.
 
 
- .. _segformat:
+.. _genepredformat:
+
+UCSC gene tables (refGene, refFlat, genePredExt)
+------------------------------------------------
+
+CNVkit reads the gene annotation tables that the UCSC Genome Browser publishes
+for each genome assembly under ``goldenPath/<assembly>/database/`` (e.g.
+`refGene.txt.gz for hg38
+<https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/refGene.txt.gz>`_).
+These tables can be given to ``--annotate`` in the :ref:`target`, :ref:`autobin`
+and :ref:`batch` commands wherever a BED or GFF file is accepted, and the format
+is detected from the file's contents.
+
+Each row describes one transcript, so a gene with several isoforms, or one
+mapped to several loci, has several rows.
+All of these tables extend the ten columns of UCSC's `genePred format
+<https://genome.ucsc.edu/FAQ/FAQformat.html#format9>`_ (transcript name,
+chromosome, strand, transcription start and end, coding region start and end,
+exon count, and the comma-separated exon starts and ends), and differ in the
+columns around them and in which column CNVkit uses as the gene label:
+
+=============  ==========================================  ====================
+Format         Columns                                     Gene label
+=============  ==========================================  ====================
+refGene        ``bin``, the genePred columns, then          ``name2``
+               ``score``, ``name2``, ``cdsStartStat``,
+               ``cdsEndStat``, ``exonFrames``
+refFlat        ``geneName``, then the genePred columns      ``geneName``
+genePredExt    As refGene, without the leading ``bin``      ``name2``
+genePred       The genePred columns only                    ``name``
+=============  ==========================================  ====================
+
+Of the two tables with the extended columns, use refGene, which UCSC
+distributes for each assembly; a binless genePredExt table is rarely seen in
+practice.
+refFlat holds the same transcripts with the gene symbol in its first column,
+and works equally well.
+Plain genePred has no gene symbol, so its transcript names (e.g. RefSeq
+accessions) would become the gene labels; for this reason it is not detected
+automatically, and must be named explicitly where a format can be chosen, as in
+``skg_convert.py --from genepred``.
+
+Coordinates in these tables are 0-based and half-open, as in BED.
+Versions of CNVkit before 0.9.15 read each refFlat start one base too early, so
+a region ending exactly where a gene began was labeled with that gene.
+
+A table may begin with a line of field names prefixed with ``#``, as written by
+the UCSC Table Browser; that line is skipped.
+Apart from that line, every row must have exactly the columns listed above for its format;
+a table with more or fewer columns is refused with an error, rather than read
+with its fields assigned to the wrong columns.
+
+
+.. _segformat:
 
 SEG
 ---
