@@ -33,9 +33,9 @@ help:
 	@echo "Docker:"
 	@echo "  docker           Build 'devel' image from current source"
 	@echo "  docker-release   Build versioned release image (set release_version=X.Y.Z)"
-	@echo "  docker-push      Push versioned images to Docker Hub"
+	@echo "  docker-push      Push the versioned image to Docker Hub"
 	@echo "  docker-test      Test the built Docker image"
-	@echo "  Note: GHA automatically builds 'devel' on master, 'latest' on tags"
+	@echo "  Note: GHA builds 'devel' on master and versioned images on tags; see doc/development.rst"
 	@echo ""
 	@echo "Release:"
 	@echo "  check-version   Verify _version.py is consistent with the release workflow"
@@ -117,7 +117,6 @@ docker-release:
 	@echo "Building production Docker image for version $(release_version)..."
 	$(DOCKER) build --build-arg CNVKIT_VERSION=$(release_version) \
 		-t $(DOCKER_IMAGE):$(release_version) \
-		-t $(DOCKER_IMAGE):latest \
 		-f Dockerfile .
 
 .PHONY: docker-push
@@ -126,9 +125,8 @@ docker-push:
 		echo "ERROR: Please specify release_version (e.g., make release_version=0.9.13 docker-push)"; \
 		exit 1; \
 	fi
-	@echo "Pushing Docker images for version $(release_version)..."
+	@echo "Pushing Docker image for version $(release_version)..."
 	$(DOCKER) push $(DOCKER_IMAGE):$(release_version)
-	$(DOCKER) push $(DOCKER_IMAGE):latest
 
 .PHONY: docker-test
 docker-test:
