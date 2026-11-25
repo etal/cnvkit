@@ -61,9 +61,6 @@ def argument_parsing():
                     overlap. [Default: %(const)s]""",
     )
     # ENH combine --gff-type, --refflat-type
-    # AP.add_argument('-e', '--exons', action='store_true',
-    #                 help="""Emit each exon instead of the whole gene regions.
-    #                 (Applies to 'gff' and 'refflat' input formats.)""")
 
     AP_fmt = AP.add_argument_group("Format-specific options")
     AP_fmt.add_argument(
@@ -79,7 +76,9 @@ def argument_parsing():
         "--refflat-type",
         choices=("exon", "cds", "transcript"),
         default="transcript",
-        help="""Emit each exon instead of the whole gene regions.""",
+        help="""Emit each exon, or the coding region, instead of the whole
+                    transcribed region. (Applies to the UCSC refFlat, refGene,
+                    genePred and genePredExt input formats.)""",
     )
 
     return AP.parse_args()
@@ -102,7 +101,7 @@ def skg_convert(args) -> None:
             kwargs["tag"] = args.gff_tag
         if args.gff_type:
             kwargs["keep_type"] = args.gff_type
-    elif args.in_fmt == "refflat":
+    elif args.in_fmt in ("genepred", "genepredext", "refflat", "refgene"):
         if args.refflat_type == "exon":
             kwargs["exons"] = True
         elif args.refflat_type == "cds":

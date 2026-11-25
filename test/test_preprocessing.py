@@ -925,6 +925,24 @@ class PreprocessingTests(unittest.TestCase):
         self.assertTrue(all(g == "-" for g in out["gene"]))
         self.assertTrue(any("different genome build" in m for m in cm.output))
 
+    def test_target_annotate_half_open_gene_bounds(self):
+        """A bait ending where a gene starts takes no label from that gene.
+
+        refFlat coordinates are 0-based and half-open: DDX11L1 starts at
+        11873, so the bait chr1:11773-11873 lies wholly before it while
+        chr1:11873-11973 overlaps its first base.
+        """
+        baits = GA.from_columns(
+            {
+                "chromosome": ["chr1", "chr1"],
+                "start": [11773, 11873],
+                "end": [11873, 11973],
+                "gene": ["-", "-"],
+            }
+        )
+        out = commands.do_target(baits, annotate="formats/refflat-mini.txt")
+        self.assertEqual(list(out["gene"]), ["-", "DDX11L1"])
+
     def test_target(self):
         """The 'target' command."""
         annot_fname = "formats/refflat-mini.txt"

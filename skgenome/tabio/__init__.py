@@ -397,12 +397,10 @@ def sniff_region_format(infile: str) -> str | None:
             # A compressed file keeps the extension naming its format: x.bed.gz
             _base, ext = os.path.splitext(base)
         ext = ext.removeprefix(".")
-        # if ext in known_extensions:
         if ext in format_patterns:
             fname_fmt = ext
 
     # Fallback: regex detection
-    # has_track = False
     with as_text_handle(infile) as handle:
         for line in handle:
             if not line.strip():
@@ -410,7 +408,6 @@ def sniff_region_format(infile: str) -> str | None:
                 continue
             if line.startswith(("track", "browser ")):
                 # NB: Could be UCSC BED or Ensembl GFF
-                # has_track = True
                 continue
             if fname_fmt and format_patterns[fname_fmt].match(line):
                 return fname_fmt
@@ -428,6 +425,15 @@ def sniff_region_format(infile: str) -> str | None:
                 return "tab"
             if line.startswith("@") or format_patterns["interval"].match(line):
                 return "interval"
+            # refGene's first 11 columns fit the refFlat pattern too; only its
+            # 5 extra trailing columns differ, and that pattern's '$' rejects
+            # them. The refGene and genePredExt patterns require the first of
+            # those, an integer score. Plain genePred is not detected: its only
+            # name is a transcript accession, which would become the gene label.
+            if format_patterns["refgene"].match(line):
+                return "refgene"
+            if format_patterns["genepredext"].match(line):
+                return "genepredext"
             if format_patterns["refflat"].match(line):
                 return "refflat"
             if format_patterns["bed"].match(line):
@@ -442,36 +448,33 @@ def sniff_region_format(infile: str) -> str | None:
     return None
 
 
+#: genePred's ten columns, from the transcript name through exonEnds. refFlat
+#: adds a gene symbol before them and refGene a bin number, while genePredExt
+#: and refGene add five more after them, the first an integer score.
+_GENEPRED_CORE = (
+    r"\S+",
+    r"\S+",
+    r"[+-]",
+    r"\d+",
+    r"\d+",
+    r"\d+",
+    r"\d+",
+    r"\d+",
+    r"(\d+,)+",
+    r"(\d+,)+",
+)
+
 format_patterns = collections.OrderedDict(
     [
-        #  ('genepred', re.compile()),
-        #  ('genepredext', re.compile()),
         ("text", re.compile(r"\w+:\d*-\d*.*")),
         ("tab", re.compile("\t".join(("chromosome", "start", "end")))),
         (
             "interval",
             re.compile("\t".join((r"\w+", r"\d+", r"\d+", r"[.+-]", r"\S+$"))),
         ),
-        (
-            "refflat",
-            re.compile(
-                "\t".join(
-                    (
-                        r"\S+",
-                        r"\S+",
-                        r"\w+",
-                        r"[+-]",
-                        r"\d+",
-                        r"\d+",
-                        r"\d+",
-                        r"\d+",
-                        r"\d+",
-                        r"(\d+,)+",
-                        r"(\d+,)+$",
-                    )
-                )
-            ),
-        ),
+        ("refgene", re.compile("\t".join((r"\d+", *_GENEPRED_CORE, r"-?\d+\t")))),
+        ("genepredext", re.compile("\t".join((*_GENEPRED_CORE, r"-?\d+\t")))),
+        ("refflat", re.compile("\t".join((r"\S+", *_GENEPRED_CORE)) + "$")),
         (
             "gff",
             re.compile(

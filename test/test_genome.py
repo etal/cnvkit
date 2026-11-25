@@ -341,7 +341,7 @@ class GaryTests(unittest.TestCase):
             ("formats/my-targets.bed", 103),
             ("formats/dac-my.bed", 148),
             ("formats/example.gff", 7951),
-            ("formats/refflat-mini.txt", 719715),
+            ("formats/refflat-mini.txt", 719654),
         ):
             regions = tabio.read_auto(fname)
             self.assertEqual(regions.total_range_size(), area)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Unit tests for the CNVkit library, cnvlib."""
 
+import argparse
 import gzip
 import math
 import os
@@ -16,6 +17,7 @@ from conftest import gzipped, linecount
 from cnvlib import commands
 from cnvlib.cnary import CopyNumArray as CNA
 from skgenome import tabio
+from skgenome.cli import skg_convert
 from skgenome.tabio import bedio, vcfio
 
 
@@ -36,6 +38,8 @@ class IOTests(unittest.TestCase):
             ("formats/amplicon.text", 1433),
             ("formats/nv2_baits.interval_list", 6809),
             ("formats/refflat-mini.txt", 100),
+            ("formats/refgene-mini.txt", 100),
+            ("formats/genepredext-mini.txt", 100),
             ("formats/example.gff", 6),
         ):
             self.assertEqual(len(tabio.read_auto(fname)), nrows)
@@ -59,6 +63,17 @@ class IOTests(unittest.TestCase):
             self.assertEqual(len(regions), nrows)
             self.assertEqual(regions.sample_id, sample_id)
 
+    def test_read_gff_ncbi_genes(self):
+        """NCBI's RefSeq GFF3 parses to gene symbols and 0-based starts (#259)."""
+        genes = tabio.read("formats/GRCh37_BRAF.gff.gz", "gff", keep_type="gene").data
+        self.assertEqual(sorted(genes["gene"]), ["BANCR", "BRAF", "BRAFP1", "HMG20B"])
+        braf = genes[genes["gene"] == "BRAF"]
+        # Column 4 of the BRAF gene record is 140433812, 1-based
+        self.assertEqual(
+            list(braf[["chromosome", "start", "end"]].itertuples(index=False)),
+            [("NC_000007.13", 140433811, 140624564)],
+        )
+
     def test_read_ilist(self):
         """Read the interval list format."""
         regions = tabio.read("formats/nv2_baits.interval_list", "interval")
@@ -78,6 +93,197 @@ class IOTests(unittest.TestCase):
         regions = tabio.read(fname, "refflat")
         self.assertEqual(len(regions), linecount(fname))
         self.assertEqual(13, regions.chromosome.nunique())
+        # Coordinates are taken as written: UCSC's are 0-based, as in BED
+        ddx = regions.data[regions.data["accession"] == "NR_046018"]
+        self.assertEqual(
+            list(ddx[["gene", "chromosome", "start", "end"]].itertuples(index=False)),
+            [("DDX11L1", "chr1", 11873, 14409)],
+        )
+        exons = tabio.read(fname, "refflat", exons=True).data
+        ddx_exons = exons[exons["accession"] == "NR_046018"]
+        self.assertEqual(list(ddx_exons["start"]), [11873, 12612, 13220])
+        self.assertEqual(list(ddx_exons["end"]), [12227, 12721, 14409])
+
+    def test_read_refflat_cds(self):
+        """CDS mode emits coding regions and omits noncoding transcripts."""
+        fname = "formats/refflat-mini.txt"
+        regions = tabio.read(fname, "refflat", cds=True).data
+        # 42 of the 100 transcripts are noncoding (cdsStart == cdsEnd)
+        self.assertEqual(len(regions), 58)
+        self.assertTrue((regions["start"] < regions["end"]).all())
+        self.assertNotIn("NR_046018", set(regions["accession"]))
+        fbxl22 = regions[regions["accession"] == "NM_203373"]
+        self.assertEqual(list(fbxl22["start"]), [63889591])
+        self.assertEqual(list(fbxl22["end"]), [63893885])
+
+    def test_read_refgene(self):
+        """Read the UCSC 'refGene' format, with a Table Browser header (#259)."""
+        fname = "formats/refgene-mini.txt"
+        regions = tabio.read(fname, "refgene")
+        self.assertEqual(len(regions), linecount(fname) - 1)
+        self.assertEqual(regions.sample_id, "refgene-mini")
+        # Gene symbol from name2, accession from name, coordinates as written
+        wash7p = regions.data[regions.data["accession"] == "NR_024540"]
+        self.assertEqual(
+            list(
+                wash7p[["gene", "chromosome", "strand", "start", "end"]].itertuples(
+                    index=False
+                )
+            ),
+            [("WASH7P", "chr1", "-", 14361, 29370)],
+        )
+        # Starts and ends are not swapped, which the inverted-interval repair
+        # would otherwise hide behind a warning
+        with self.assertNoLogs(level="WARNING"):
+            exons = tabio.read(fname, "refgene", exons=True).data
+            cds = tabio.read(fname, "refgene", cds=True).data
+        fam138a = exons[exons["accession"] == "NR_026818"]
+        self.assertEqual(
+            list(fam138a[["gene", "start", "end"]].itertuples(index=False)),
+            [
+                ("FAM138A", 34610, 35174),
+                ("FAM138A", 35276, 35481),
+                ("FAM138A", 35720, 36081),
+            ],
+        )
+        fabp3 = cds[cds["accession"] == "NM_001320996"]
+        self.assertEqual(
+            list(fabp3[["gene", "start", "end"]].itertuples(index=False)),
+            [("FABP3", 31365885, 31373014)],
+        )
+        # Headerless input reads the same
+        with open(fname) as handle:
+            header, *rows = handle
+        self.assertTrue(header.startswith("#bin\tname\t"))
+        headerless = tabio.read(StringIO("".join(rows)), "refgene")
+        self.assertTrue(headerless.data.equals(regions.data))
+
+    def test_genepred_family_agrees(self):
+        """Each genePred-family layout of the same transcripts reads the same.
+
+        The refFlat and genePred layouts are cut from the refGene fixture, so
+        a column mapped to the wrong output in any reader shows up here.
+        """
+        with open("formats/refgene-mini.txt") as handle:
+            rows = [line.rstrip("\n").split("\t") for line in handle][1:]
+        others = {
+            "genepredext": "formats/genepredext-mini.txt",
+            # geneName (= name2), then name through exonEnds
+            "refflat": [[r[12], *r[1:11]] for r in rows],
+            # name through exonEnds
+            "genepred": [r[1:11] for r in rows],
+        }
+        for kwargs in ({}, {"cds": True}, {"exons": True}):
+            expect = tabio.read("formats/refgene-mini.txt", "refgene", **kwargs).data
+            self.assertGreater(len(expect), 0)
+            for fmt, source in others.items():
+                with self.subTest(fmt=fmt, **kwargs):
+                    infile = (
+                        source
+                        if isinstance(source, str)
+                        else StringIO("".join("\t".join(r) + "\n" for r in source))
+                    )
+                    observed = tabio.read(infile, fmt, **kwargs).data
+                    if fmt == "genepred":
+                        # No gene symbol in this layout; the accession stands in
+                        self.assertTrue(
+                            (observed["gene"] == observed["accession"]).all()
+                        )
+                        observed = observed.assign(gene=expect["gene"])
+                    self.assertTrue(observed.equals(expect))
+
+    def test_read_genepred_family_header_only(self):
+        """A table with only a '#' line and no rows reads as empty.
+
+        The header line may be narrower than the table, and the Table Browser
+        writes a one-field comment line when a query matches nothing.
+        """
+        for fmt, header in (
+            ("refgene", "#bin\tname\tchrom\tstrand\ttxStart\n"),
+            ("genepredext", "#name\tchrom\tstrand\ttxStart\n"),
+            ("refflat", "#geneName\tname\tchrom\tstrand\ttxStart\n"),
+            ("genepred", "# No results returned from query.\n"),
+        ):
+            with self.subTest(fmt=fmt):
+                self.assertEqual(len(tabio.read(StringIO(header), fmt)), 0)
+
+    def test_read_genepred_family_wrong_width(self):
+        """A table wider or narrower than its format is refused, not misread."""
+        with open("formats/refgene-mini.txt") as handle:
+            rows = handle.read().splitlines()[1:4]
+        # One trailing tab per row: still detected as refGene
+        wide = "".join(row + "\t\n" for row in rows)
+        with self.assertRaisesRegex(ValueError, "found more"):
+            tabio.read_auto(StringIO(wide))
+        with open("formats/refflat-mini.txt") as handle:
+            narrow = handle.read()
+        for kwargs in ({}, {"cds": True}, {"exons": True}):
+            with (
+                self.subTest(**kwargs),
+                self.assertRaisesRegex(ValueError, "found fewer"),
+            ):
+                tabio.read(StringIO(narrow), "refgene", **kwargs)
+
+    def test_read_refflat_with_header(self):
+        """A leading Table Browser header line is skipped, and only that line.
+
+        A '#' later in the table is part of the data, not a comment.
+        """
+        fname = "formats/refflat-mini.txt"
+        with open(fname) as handle:
+            first, rest = handle.readline(), handle.read()
+        header = "#geneName\tname\tchrom\tstrand\ttxStart\ttxEnd\tcdsStart\n"
+        observed = tabio.read(StringIO(header + first + rest), "refflat")
+        self.assertTrue(observed.data.equals(tabio.read(fname, "refflat").data))
+        hashed = tabio.read(StringIO(header + first + "#" + rest), "refflat")
+        self.assertEqual(len(hashed), len(observed))
+        self.assertIn("#WASH7P", set(hashed["gene"]))
+
+    def test_sniff_genepred_family(self):
+        """Each UCSC gene table is detected as its own format, header or not."""
+        for fname, fmt in (
+            ("formats/refgene-mini.txt", "refgene"),
+            ("formats/genepredext-mini.txt", "genepredext"),
+            ("formats/refflat-mini.txt", "refflat"),
+        ):
+            with self.subTest(fname=fname):
+                self.assertEqual(tabio.sniff_region_format(fname), fmt)
+                with open(fname) as handle:
+                    first_row = next(line for line in handle if line[0] != "#")
+                for other in ("refgene", "genepredext", "refflat"):
+                    self.assertEqual(
+                        bool(tabio.format_patterns[other].match(first_row)),
+                        other == fmt,
+                        other,
+                    )
+        # Chromosome names need not be word characters, e.g. NCBI accessions
+        with open("formats/refgene-mini.txt") as handle:
+            _header, first_row, *_rows = handle
+        ncbi_row = first_row.replace("\tchr1\t", "\tNC_000001.11\t", 1)
+        self.assertNotEqual(ncbi_row, first_row)
+        self.assertEqual(tabio.sniff_region_format(StringIO(ncbi_row)), "refgene")
+
+    def test_skg_convert_gene_model_type(self):
+        """skg_convert --refflat-type applies to refGene input too."""
+        fname = "formats/refgene-mini.txt"
+        n_exons = len(tabio.read(fname, "refgene", exons=True))
+        n_transcripts = len(tabio.read(fname, "refgene"))
+        self.assertGreater(n_exons, n_transcripts)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            out_fname = os.path.join(tmp_dir, "exons.bed")
+            args = argparse.Namespace(
+                infile=fname,
+                output=out_fname,
+                in_fmt="auto",
+                out_fmt="bed4",
+                flatten=False,
+                merge=None,
+                gff_tag=None,
+                gff_type=None,
+                refflat_type="exon",
+            )
+            skg_convert.skg_convert(args)
+            self.assertEqual(linecount(out_fname), n_exons)
 
     def test_read_seg(self):
         """Read the SEG format."""
@@ -164,6 +370,8 @@ class IOTests(unittest.TestCase):
             "formats/example.gff",
             "formats/nv2_baits.interval_list",
             "formats/refflat-mini.txt",
+            "formats/refgene-mini.txt",
+            "formats/genepredext-mini.txt",
         ):
             with self.subTest(fname=fname):
                 expect = tabio.read_auto(fname)

@@ -511,8 +511,8 @@ P_batch_newref.add_argument(
     "--annotate",
     metavar="FILENAME",
     help="""Use gene models from this file to assign names to the target regions.
-            Format: UCSC refFlat.txt or ensFlat.txt file (preferred), or BED, interval
-            list, GFF, or similar.""",
+            Format: UCSC refGene.txt, refFlat.txt or ensFlat.txt (preferred), or
+            BED, interval list, GFF, or similar.""",
 )
 P_batch_newref.add_argument(
     "--short-names",
@@ -627,8 +627,8 @@ P_target.add_argument(
 P_target.add_argument(
     "--annotate",
     help="""Use gene models from this file to assign names to the target regions.
-            Format: UCSC refFlat.txt or ensFlat.txt file (preferred), or BED, interval
-            list, GFF, or similar.""",
+            Format: UCSC refGene.txt, refFlat.txt or ensFlat.txt (preferred), or
+            BED, interval list, GFF, or similar.""",
 )
 P_target.add_argument(
     "--short-names",
@@ -902,8 +902,8 @@ P_autobin.add_argument(
     "--annotate",
     metavar="FILENAME",
     help="""Use gene models from this file to assign names to the target regions.
-            Format: UCSC refFlat.txt or ensFlat.txt file (preferred), or BED, interval
-            list, GFF, or similar.""",
+            Format: UCSC refGene.txt, refFlat.txt or ensFlat.txt (preferred), or
+            BED, interval list, GFF, or similar.""",
 )
 P_autobin.add_argument(
     "--short-names",
