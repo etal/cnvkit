@@ -89,6 +89,18 @@ class IOTests(unittest.TestCase):
         self.assertEqual(list(ddx_exons["start"]), [11873, 12612, 13220])
         self.assertEqual(list(ddx_exons["end"]), [12227, 12721, 14409])
 
+    def test_read_refflat_cds(self):
+        """CDS mode emits coding regions and omits noncoding transcripts."""
+        fname = "formats/refflat-mini.txt"
+        regions = tabio.read(fname, "refflat", cds=True).data
+        # 42 of the 100 transcripts are noncoding (cdsStart == cdsEnd)
+        self.assertEqual(len(regions), 58)
+        self.assertTrue((regions["start"] < regions["end"]).all())
+        self.assertNotIn("NR_046018", set(regions["accession"]))
+        fbxl22 = regions[regions["accession"] == "NM_203373"]
+        self.assertEqual(list(fbxl22["start"]), [63889591])
+        self.assertEqual(list(fbxl22["end"]), [63893885])
+
     def test_read_seg(self):
         """Read the SEG format."""
         for fname, header_len, args in (

@@ -18,6 +18,7 @@ See:
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, NoReturn
 
 import pandas as pd
@@ -120,7 +121,8 @@ def read_refflat(infile: str, cds: bool = False, exons: bool = False) -> DataFra
     ----------
     cds : bool
         Emit each gene's CDS region (coding and introns, but not UTRs) instead
-        of the full transcript region (default).
+        of the full transcript region (default). Noncoding transcripts, whose
+        CDS is empty, are omitted.
     exons : bool
         Emit individual exonic regions for each gene instead of the full
         transcribed genomic region (default). Mutually exclusive with `cds`.
@@ -193,6 +195,16 @@ def _read_genepred(
         )
         dframe["start"] = dframe["start"].astype("int")
         dframe["end"] = dframe["end"].astype("int")
+    elif cds:
+        # UCSC marks a noncoding transcript with cdsStart == cdsEnd
+        is_coding = dframe["start"] != dframe["end"]
+        if not is_coding.all():
+            logging.info(
+                "Skipping %d noncoding transcripts of %d",
+                int((~is_coding).sum()),
+                len(dframe),
+            )
+            dframe = dframe[is_coding]
 
     # UCSC stores these coordinates 0-based and half-open, as in BED
     return (
