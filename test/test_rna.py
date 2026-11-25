@@ -261,10 +261,10 @@ class RNAImportTests(unittest.TestCase):
         # Should have one CNR per sample
         self.assertEqual(len(cnrs), 3)
 
-        # Check that gene2 (all NaN) has been filled with NULL_LOG2_COVERAGE
+        # Check that gene2 (all NaN) has been filled with NULL_LOG2_EXPRESSION
         for cnr in cnrs:
             gene2_log2 = cnr.data[cnr.data["gene"] == "GENE2"]["log2"].to_numpy()[0]
-            self.assertEqual(gene2_log2, rna.NULL_LOG2_COVERAGE)
+            self.assertEqual(gene2_log2, rna.NULL_LOG2_EXPRESSION)
 
     def test_safe_log2_zero_handling(self):
         """Test that safe_log2 handles zeros correctly."""
@@ -679,7 +679,7 @@ class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
         With one normal sample, the per-gene "median of normals" reduces to
         that single column, so the anchor divide is a self-divide. The normal
         sample's resulting log2 row collapses to ``safe_log2(1.0)`` = a small
-        positive offset from the NULL_LOG2_COVERAGE shift, with vanishing
+        positive offset from the NULL_LOG2_EXPRESSION shift, with vanishing
         per-gene variance. This pins the polish's single-normal degeneracy as a
         regression baseline.
         """
@@ -691,7 +691,7 @@ class NormalizeReadDepthsNormalAnchorTests(unittest.TestCase):
 
         normal_log2 = log2[normal_ids[0]]
         # All values are within numerical noise of the safe_log2 floor offset.
-        expected_offset = np.log2(1.0 + 2**rna.NULL_LOG2_COVERAGE)
+        expected_offset = np.log2(1.0 + 2**rna.NULL_LOG2_EXPRESSION)
         self.assertLess(abs(normal_log2.median() - expected_offset), 1e-3)
         self.assertLess(normal_log2.std(), 1e-3)
         # And the chrX-altered region in tumors is recovered at ~+1.0 (2x gain)

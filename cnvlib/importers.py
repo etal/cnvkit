@@ -45,8 +45,8 @@ def do_import_picard(fname, too_many_no_coverage=100):
 
     Notes
     -----
-    Bins with zero coverage are assigned the NULL_LOG2_COVERAGE value to avoid
-    math domain errors in log2 transformation.
+    Bins with zero coverage have no finite log2 value, so they are assigned
+    `params.NULL_LOG2_COVERAGE` instead (see `params.log2_depth`).
 
     Gene names from overlapping intervals are deduplicated (see `unpipe_name`).
 
@@ -56,17 +56,15 @@ def do_import_picard(fname, too_many_no_coverage=100):
     """
     garr = tabio.read(fname, "picardhs")
     garr["gene"] = garr["gene"].apply(unpipe_name)
-    # Create log2 column from coverages, avoiding math domain error
-    coverages = garr["ratio"].copy()
-    no_cvg_idx = coverages == 0
+    # Create log2 column from coverages; a zero has no finite logarithm
+    no_cvg_idx = garr["ratio"] == 0
     if no_cvg_idx.sum() > too_many_no_coverage:
         logging.warning(
             "WARNING: Sample %s has >%d bins with no coverage",
             garr.sample_id,
             too_many_no_coverage,
         )
-    coverages[no_cvg_idx] = 2**params.NULL_LOG2_COVERAGE
-    garr["log2"] = np.log2(coverages)
+    garr["log2"] = params.log2_depth(garr["ratio"])
     return garr
 
 

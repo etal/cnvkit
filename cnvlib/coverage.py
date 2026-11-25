@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import logging
-import math
 import os.path
 import tempfile
 import time
 from io import StringIO
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pandas as pd
 
 from skgenome import tabio
@@ -21,7 +19,7 @@ from skgenome.tabio.util import as_text_handle
 from . import core, samutil
 from .cnary import CopyNumArray as CNA
 from .parallel import effective_procs, pick_pool, rm, to_chunks
-from .params import NULL_LOG2_COVERAGE
+from .params import log2_depth
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -403,10 +401,9 @@ def interval_coverages_bedgraph(
     # Calculate depth and log2 (same logic as interval_coverages_pileup)
     spans = table.end - table.start
     ok_idx = spans > 0
-    table = table.assign(depth=0.0, log2=NULL_LOG2_COVERAGE)
+    table = table.assign(depth=0.0)
     table.loc[ok_idx, "depth"] = table.loc[ok_idx, "basecount"] / spans[ok_idx]
-    ok_idx = table["depth"] > 0
-    table.loc[ok_idx, "log2"] = np.log2(table.loc[ok_idx, "depth"])
+    table["log2"] = log2_depth(table["depth"])
 
     # Remove basecount column before creating CNA
     table = table.drop("basecount", axis=1)
@@ -586,7 +583,7 @@ def region_depth_count(
         start,
         end,
         gene,
-        math.log(depth, 2) if depth else NULL_LOG2_COVERAGE,
+        float(log2_depth(depth)),
         depth,
     )
     return count, row
@@ -637,10 +634,9 @@ def interval_coverages_pileup(
     # User-supplied bins might be zero-width or reversed -- skip those
     spans = table.end - table.start
     ok_idx = spans > 0
-    table = table.assign(depth=0.0, log2=NULL_LOG2_COVERAGE)
+    table = table.assign(depth=0.0)
     table.loc[ok_idx, "depth"] = table.loc[ok_idx, "basecount"] / spans[ok_idx]
-    ok_idx = table["depth"] > 0
-    table.loc[ok_idx, "log2"] = np.log2(table.loc[ok_idx, "depth"])
+    table["log2"] = log2_depth(table["depth"])
     return table
 
 

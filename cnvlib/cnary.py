@@ -368,6 +368,21 @@ class CopyNumArray(GenomicArray):
             logging.info("Dropped %d low-coverage bins", drop_idx.sum())
         return self[~drop_idx]
 
+    def mostly_low_coverage(self) -> bool:
+        """Test whether at most half of the bins have usable log2 coverage.
+
+        The `fix` and `reference` commands apply this to a sample's centered
+        log2 read depths, to skip bias corrections where coverage was probably
+        calculated over the wrong regions.
+
+        Only the log2 values are read, with the same threshold as
+        `low_coverage_mask` but not its depth and NaN clauses. A bin whose log2
+        value has been reassigned therefore counts as usable even at a depth of
+        zero, as chrY does for a female sample in `reference`.
+        """
+        min_cvg = params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+        return bool((self.data["log2"] > min_cvg).sum() <= len(self) // 2)
+
     # Chromosomal sex
 
     def shift_xx(

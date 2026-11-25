@@ -906,6 +906,23 @@ class OtherTests(unittest.TestCase):
         # The three good bins remain (0.1, 0.2, -0.1)
         self.assertEqual(len(kept), 3)
 
+    def test_log2_depth_floors_only_zero(self):
+        """log2_depth floors a zero depth and transforms every other value.
+
+        A NaN depth is unknown, not absent, so it must not be reported as the
+        zero-coverage placeholder: `fix` drops a NaN log2, but would keep the
+        placeholder as a bin with no reads.
+        """
+        depth = np.array([0.0, 2**-30, 0.25, 1.0, 96.0, np.nan])
+        log2 = params.log2_depth(depth)
+        self.assertEqual(log2[0], params.NULL_LOG2_COVERAGE)
+        np.testing.assert_array_equal(log2[1:5], np.log2(depth[1:5]))
+        self.assertTrue(np.isnan(log2[5]))
+        # A depth below 2**NULL_LOG2_COVERAGE is still a measurement
+        self.assertLess(log2[1], params.NULL_LOG2_COVERAGE)
+        self.assertEqual(float(params.log2_depth(0)), params.NULL_LOG2_COVERAGE)
+        self.assertEqual(params.log2_depth([]).shape, (0,))
+
     def test_mask_bad_bins_flags_nan(self):
         """mask_bad_bins treats NaN log2/spread reference bins as bad (#521)."""
         n = 5
