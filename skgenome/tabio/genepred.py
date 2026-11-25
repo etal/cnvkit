@@ -126,45 +126,47 @@ def read_refflat(infile: str, cds: bool = False, exons: bool = False) -> DataFra
         transcribed genomic region (default). Mutually exclusive with `cds`.
 
     """
+    return _read_genepred(infile, before=("gene",), cds=cds, exons=exons)
+
+
+def _read_genepred(
+    infile: str,
+    *,
+    before: tuple[str, ...] = (),
+    after: tuple[str, ...] = (),
+    cds: bool = False,
+    exons: bool = False,
+) -> DataFrame:
+    """Read one of UCSC's genePred-family tables.
+
+    Every format in the family is genePred's ten columns with extra columns
+    before, after, or both: `before` names those preceding the transcript
+    name, `after` those following exonEnds. A name starting with "_" is parsed
+    and dropped. One of the two must supply the "gene" column.
+    """
     # ENH: choice of regions=('transcript', 'cds', 'exons') instead of flags?
     if cds and exons:
         raise ValueError("Arguments 'cds' and 'exons' are mutually exclusive")
 
-    cols_shared = ["gene", "accession", "chromosome", "strand"]
-    converters = None
+    # Each mode takes the emitted region from a different pair of columns
     if exons:
-        cols_rest = [
-            "_start_tx",
-            "_end_tx",  # Transcription
-            "_start_cds",
-            "_end_cds",  # Coding region
-            "_exon_count",
-            "exon_starts",
-            "exon_ends",
-        ]
-        converters = {"exon_starts": _split_commas, "exon_ends": _split_commas}
+        region = ("_start_tx", "_end_tx", "_start_cds", "_end_cds")
     elif cds:
-        # Use CDS instead of transcription region
-        cols_rest = [
-            "_start_tx",
-            "_end_tx",
-            "start",
-            "end",
-            "_exon_count",
-            "_exon_starts",
-            "_exon_ends",
-        ]
+        region = ("_start_tx", "_end_tx", "start", "end")
     else:
-        cols_rest = [
-            "start",
-            "end",
-            "_start_cds",
-            "_end_cds",
-            "_exon_count",
-            "_exon_starts",
-            "_exon_ends",
-        ]
-    colnames = cols_shared + cols_rest
+        region = ("start", "end", "_start_cds", "_end_cds")
+    colnames = [
+        *before,
+        "accession",
+        "chromosome",
+        "strand",
+        *region,
+        "_exon_count",
+        "exon_starts" if exons else "_exon_starts",
+        "exon_ends" if exons else "_exon_ends",
+        *after,
+    ]
+    cols_shared = ["gene", "accession", "chromosome", "strand"]
     usecols = [c for c in colnames if not c.startswith("_")]
     # Parse the file contents
     dframe = pd.read_csv(
@@ -175,19 +177,26 @@ def read_refflat(infile: str, cds: bool = False, exons: bool = False) -> DataFra
         names=colnames,
         usecols=usecols,
         dtype=dict.fromkeys(cols_shared, str),
-        converters=converters,
+        converters=(
+            {"exon_starts": _split_commas, "exon_ends": _split_commas}
+            if exons
+            else None
+        ),
     )
 
     # Calculate values for output columns
     if exons:
+        # _split_exons takes the shared columns positionally, so put them first
         dframe = pd.DataFrame.from_records(
-            _split_exons(dframe), columns=[*cols_shared, "start", "end"]
+            _split_exons(dframe[[*cols_shared, "exon_starts", "exon_ends"]]),
+            columns=[*cols_shared, "start", "end"],
         )
         dframe["start"] = dframe["start"].astype("int")
         dframe["end"] = dframe["end"].astype("int")
 
     return (
-        dframe.assign(start=dframe.start - 1)
+        dframe[[*cols_shared, "start", "end"]]
+        .assign(start=dframe.start - 1)
         .sort_values(["chromosome", "start", "end"])
         .reset_index(drop=True)
     )
