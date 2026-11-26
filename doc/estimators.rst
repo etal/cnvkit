@@ -91,17 +91,18 @@ Zero-coverage bins
 ------------------
 
 A bin is treated as having no usable coverage if its read depth is zero or
-missing, or if its log2 value is below -15. The second condition identifies the
-placeholder in a .cnr file, where normalization to the reference has shifted it
-from -20 by at most 5 (see :doc:`tumor`), and in files that lack a ``depth``
-column.
+missing, or if its log2 value is missing or below -15. The last condition
+identifies the placeholder in a .cnr file, where normalization to the reference
+has shifted it from -20 by at most 5 (see :doc:`tumor`), and in files that lack
+a ``depth`` column.
 
 Each site handles these bins as follows:
 
 - :ref:`reference`: a bin without coverage in most of the pooled samples
-  receives a pooled log2 value below -5, and is then excluded from every
-  sample normalized to that reference. Where only a minority of the pooled
-  samples lack coverage in a bin, the biweight location disregards them.
+  receives a pooled depth of 0 and a pooled log2 value below -5, and is then
+  excluded from every sample normalized to that reference. Where only a
+  minority of the pooled samples lack coverage in a bin, the biweight location
+  disregards them.
 - :ref:`fix`: the final centering of each sample and the variance used for bin
   weights are calculated without these bins. The bins themselves remain in the
   .cnr file.
@@ -110,16 +111,18 @@ Each site handles these bins as follows:
   warning when at least 1% of the autosomal bins are affected. The
   ``--drop-low-coverage`` option excludes them.
 - :ref:`genemetrics`, :ref:`segmetrics` and :ref:`metrics`: the bins are
-  included by default. The ``--drop-low-coverage`` option excludes them from the
-  log2 value and from every statistic reported with it.
+  included by default. The ``--drop-low-coverage`` option excludes them from
+  every statistic these commands compute, and :ref:`genemetrics` without
+  segments also excludes them from its ``log2`` value.
 
-The bins are kept by default because they can be the signal. In a germline
-sample or a tumor sample of high purity, a homozygous deletion leaves bins with
-no reads, and excluding those bins would report the deleted gene as copy-neutral
-within a longer segment, or omit it from the :ref:`genemetrics` table. In a
-bulk tumor sample, where normal cells contribute reads to every deleted region,
-a bin with no reads more often reflects a region that could not be sequenced or
-mapped, and :doc:`tumor` recommends ``--drop-low-coverage`` for that case.
+The bins are kept by default because they can be the only evidence of a
+homozygous deletion. In a germline sample or a tumor sample of high purity,
+such a deletion leaves bins with no reads, and excluding those bins would
+report the deleted gene as copy-neutral within a longer segment, or omit it
+from the :ref:`genemetrics` table. In a bulk tumor sample, where normal cells
+contribute reads to every deleted region, a bin with no reads more often
+reflects a region that could not be sequenced or mapped, and :doc:`tumor`
+recommends ``--drop-low-coverage`` for that case.
 
 Where bins lack reads because they are too small for the sequencing depth, as
 in shallow whole-genome sequencing, neither choice is satisfactory: the empty
@@ -141,10 +144,14 @@ pooled samples left empty, because the pooled depth of that bin is 0.
 Reading gene-level values
 -------------------------
 
-Beside each gene's ``probes`` count, the :ref:`genemetrics` table reports
-``low_probes``, the number of the gene's bins that are treated as having no
-usable coverage. Comparing the two shows how far the placeholder accounts for
-the gene's ``log2`` value:
+This section describes the :ref:`genemetrics` table computed without segments.
+With segments (``-s``), the ``log2`` column is the value of the segment that
+covers the gene, while ``low_probes`` and the optional statistics still
+describe the gene's own bins.
+
+In addition to ``probes``, the table reports ``low_probes``, the number of the
+gene's bins that are treated as having no usable coverage. Comparing the two
+shows how much of the gene's ``log2`` value the placeholder accounts for:
 
 - Where ``low_probes`` is 0, every bin of the gene is a measurement.
 - Where ``low_probes`` equals ``probes``, no bin of the gene has coverage. This
@@ -152,8 +159,8 @@ the gene's ``log2`` value:
   a gene that cannot be sequenced or mapped in this assay.
 - Where ``low_probes`` lies between the two, ``log2`` combines measurements
   with placeholder values, and its magnitude reflects the fraction of empty
-  bins more than a copy number. This is the pattern of a partial deletion, and
-  also that of a few bins that cannot be sequenced or mapped. The bin-level
+  bins rather than a copy number. This is the pattern of a partial deletion,
+  and also that of a few bins that cannot be sequenced or mapped. The bin-level
   values in the .cnr file distinguish the two, and repeating the command with
   ``--drop-low-coverage`` reports the weighted mean of the remaining bins.
 

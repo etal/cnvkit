@@ -74,7 +74,8 @@ whether or not segments were provided. Without segments (.cnr alone):
 - *log2*: Weighted mean of log2 ratios of all the gene's bins, including any
   off-target intronic bins. A bin with no coverage enters this mean at its
   placeholder value unless ``--drop-low-coverage`` is given; see
-  :doc:`estimators` for how to read the column in that case.
+  :doc:`estimators` for how to interpret a value that includes placeholder
+  bins.
 - *depth*: Weighted mean of un-normalized read depths across all this gene's
   bins.
 - *weight*: Sum of this gene's bins' weights.
