@@ -1001,6 +1001,32 @@ class OtherTests(unittest.TestCase):
         null = params.NULL_LOG2_COVERAGE
         np.testing.assert_array_equal(log2, [null, null, 2.0])
 
+    def test_mostly_low_coverage_boundary(self):
+        """The gate on bias corrections fires once half of the bins are empty.
+
+        It reads log2 values alone. A depth of zero beside a usable log2 value
+        does not count as empty, because `reference` assigns such values to
+        chrY of a female sample.
+        """
+
+        def _cna(n_empty, n_bins=10):
+            return cnary.CopyNumArray(
+                pd.DataFrame(
+                    {
+                        "chromosome": "chr1",
+                        "start": np.arange(n_bins) * 1000,
+                        "end": np.arange(n_bins) * 1000 + 500,
+                        "gene": "-",
+                        "log2": [params.NULL_LOG2_COVERAGE] * n_empty
+                        + [0.0] * (n_bins - n_empty),
+                        "depth": 0.0,
+                    }
+                )
+            )
+
+        self.assertFalse(_cna(4).mostly_low_coverage())
+        self.assertTrue(_cna(5).mostly_low_coverage())
+
     def test_log2_depth_per_bin_floor(self):
         """A floor given per bin replaces the zero depths and nothing else."""
         depth = np.array([0.0, 0.25, 0.0, 96.0, np.nan])
