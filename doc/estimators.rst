@@ -132,19 +132,26 @@ data.
 Reading gene-level values
 -------------------------
 
-The :ref:`genemetrics` ``log2`` column and the ``--median`` column respond
-differently to zero-coverage and outlier bins, so the two are informative
-together:
+Beside each gene's ``probes`` count, the :ref:`genemetrics` table reports
+``low_probes``, the number of the gene's bins that are treated as having no
+usable coverage. Comparing the two shows how far the placeholder accounts for
+the gene's ``log2`` value:
 
-- Where the two agree, the bins of the gene are consistent with each other.
-- Where ``log2`` is far below ``median``, a minority of the gene's bins have
-  very low or zero coverage. This is the pattern of a partial deletion, and
-  also that of a few bins that cannot be sequenced or mapped. The ``depth``
-  column and the bin-level values in the .cnr file distinguish the two, and
-  repeating the command with ``--drop-low-coverage`` shows the value without
-  the zero-coverage bins.
-- Where both are far below zero, most of the gene's bins have very low or zero
-  coverage.
+- Where ``low_probes`` is 0, every bin of the gene is a measurement.
+- Where ``low_probes`` equals ``probes``, no bin of the gene has coverage. This
+  is the pattern of a homozygous deletion of the whole gene, and also that of
+  a gene that cannot be sequenced or mapped in this assay.
+- Where ``low_probes`` lies between the two, ``log2`` combines measurements
+  with placeholder values, and its magnitude reflects the fraction of empty
+  bins more than a copy number. This is the pattern of a partial deletion, and
+  also that of a few bins that cannot be sequenced or mapped. The bin-level
+  values in the .cnr file distinguish the two, and repeating the command with
+  ``--drop-low-coverage`` reports the weighted mean of the remaining bins.
+
+The ``--median`` option adds a value that does not respond to a minority of
+the gene's bins. A ``log2`` far below the ``median`` indicates that a minority
+of the bins are much lower than the rest, whether they are empty and counted
+in ``low_probes`` or hold only a few reads and are not.
 
 The ``--ci`` interval is calculated from the same bins as ``log2``, so an
 interval that is wide relative to those of other genes with a similar number of

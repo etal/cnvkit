@@ -79,12 +79,16 @@ whether or not segments were provided. Without segments (.cnr alone):
   bins.
 - *weight*: Sum of this gene's bins' weights.
 - *probes*: The number of bins assigned to this gene.
+- *low_probes*: The number of those bins that have no usable coverage, by the
+  criteria of ``--drop-low-coverage``. The count is the same with and without
+  that option: without it, this many placeholder values entered *log2*; with
+  it, this many bins were left out.
 
 With segments (``-s``):
 
 - *log2*: The log2 ratio value of the segment covering the gene, i.e. weighted
   mean of all bins covered by the whole segment, not just this gene.
-- *depth*, *weight*, *probes*: As above.
+- *depth*, *weight*, *probes*, *low_probes*: As above.
 - *segment_weight*: The sum of the weights of the bins supporting the segment.
 - *segment_probes*: The number of probes supporting the segment.
 

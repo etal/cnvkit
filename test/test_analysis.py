@@ -236,6 +236,36 @@ class AnalysisTests(unittest.TestCase):
         self.assertLessEqual(row.log2, row.ci_hi)
         self.assertAlmostEqual(row.pi_lo, 0.4, places=1)
 
+    def test_genemetrics_counts_low_coverage_bins(self):
+        """The low_probes column counts a gene's zero-coverage bins.
+
+        The count is the same whether or not those bins are dropped, so it
+        shows how many placeholder values a default log2 includes, and how
+        many of the gene's bins --drop-low-coverage left out.
+        """
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": np.arange(8) * 1000,
+                    "end": np.arange(8) * 1000 + 500,
+                    "gene": ["HOLEY"] * 5 + ["WHOLE"] * 3,
+                    "log2": [0.5, -20.0, 0.5, -20.0, 0.5, 0.5, 0.5, 0.5],
+                    "depth": [100.0, 0.0, 100.0, 0.0, 100.0, 90.0, 90.0, 90.0],
+                    "weight": 1.0,
+                }
+            )
+        )
+        for skip_low in (False, True):
+            with self.subTest(skip_low=skip_low):
+                table = commands.do_genemetrics(
+                    cnarr, threshold=0, min_probes=1, skip_low=skip_low
+                ).set_index("gene")
+                self.assertEqual(table.loc["HOLEY", "probes"], 5)
+                self.assertEqual(table.loc["HOLEY", "low_probes"], 2)
+                self.assertEqual(table.loc["WHOLE", "probes"], 3)
+                self.assertEqual(table.loc["WHOLE", "low_probes"], 0)
+
     @pytest.mark.slow
     def test_genemetrics_with_stats(self):
         """The 'genemetrics' command with statistics options."""

@@ -448,7 +448,8 @@ def group_by_genes(
         if not rows or gene in ignore:
             continue
         # One bin set for the log2 value and every statistic about it
-        bins = rows.drop_low_coverage() if skip_low else rows
+        is_low = rows.low_coverage_mask()
+        bins = rows[~is_low] if skip_low else rows
         segmean = segment_mean(bins)
         if segmean is None:
             continue  # type: ignore[unreachable]
@@ -457,6 +458,7 @@ def group_by_genes(
         outrow["gene"] = gene
         outrow["log2"] = segmean
         outrow["probes"] = len(rows)
+        outrow["low_probes"] = int(is_low.sum())
         if "weight" in rows:
             wt = rows["weight"]
             outrow["weight"] = float(np.nansum(wt.to_numpy()))
