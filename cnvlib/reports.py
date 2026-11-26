@@ -447,7 +447,9 @@ def group_by_genes(
     for gene, rows in cnarr.by_gene():
         if not rows or gene in ignore:
             continue
-        segmean = segment_mean(rows, skip_low)
+        # One bin set for the log2 value and every statistic about it
+        bins = rows.drop_low_coverage() if skip_low else rows
+        segmean = segment_mean(bins)
         if segmean is None:
             continue  # type: ignore[unreachable]
         outrow = rows[0].copy()
@@ -472,7 +474,7 @@ def group_by_genes(
         # Compute statistics if requested
         if any((location_stats, spread_stats, interval_stats)):
             gene_stats = compute_gene_stats(
-                rows,
+                bins,
                 segmean,  # type: ignore[arg-type]
                 location_stats,
                 spread_stats,

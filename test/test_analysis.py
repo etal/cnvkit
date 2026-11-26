@@ -195,6 +195,47 @@ class AnalysisTests(unittest.TestCase):
         )
         self.assertGreater(len(rows), 0)
 
+    def test_genemetrics_drop_low_coverage_applies_to_stats(self):
+        """With skip_low, a gene's statistics cover the bins its log2 does.
+
+        The log2 column excludes zero-coverage bins under --drop-low-coverage.
+        Statistics computed over all of the gene's bins instead would describe
+        a different set: a mean and an interval pulled toward the placeholder
+        value, around a log2 that never saw it.
+        """
+        log2 = [0.4, 0.5, 0.6, 0.5, 0.4, 0.6, -20.0, -20.0]
+        n_bins = len(log2)
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": np.arange(n_bins) * 1000,
+                    "end": np.arange(n_bins) * 1000 + 500,
+                    "gene": "GENE",
+                    "log2": log2,
+                    "depth": [100.0] * 6 + [0.0] * 2,
+                    "weight": 1.0,
+                }
+            )
+        )
+        (row,) = commands.do_genemetrics(
+            cnarr,
+            threshold=0,
+            min_probes=1,
+            skip_low=True,
+            location_stats=["mean", "median"],
+            spread_stats=["stdev"],
+            interval_stats=["ci", "pi"],
+        ).itertuples()
+        self.assertAlmostEqual(row.log2, 0.5)
+        self.assertAlmostEqual(row.mean, 0.5)
+        self.assertAlmostEqual(row.median, 0.5)
+        self.assertLess(row.stdev, 0.2)
+        self.assertGreater(row.ci_lo, 0.3)
+        self.assertLessEqual(row.ci_lo, row.log2)
+        self.assertLessEqual(row.log2, row.ci_hi)
+        self.assertAlmostEqual(row.pi_lo, 0.4, places=1)
+
     @pytest.mark.slow
     def test_genemetrics_with_stats(self):
         """The 'genemetrics' command with statistics options."""
