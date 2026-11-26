@@ -22,10 +22,11 @@ ZERO_COVERAGE_FLOORS = ("fixed", "half-read")
 def log2_depth(depth: ArrayLike, floor: ArrayLike = NULL_LOG2_COVERAGE) -> np.ndarray:
     """Convert read depths to log2 scale, with a hard floor at zero depth.
 
-    A depth of exactly zero becomes `floor`; every other value is transformed
-    exactly, so a NaN depth stays NaN instead of being reported as zero
-    coverage. Compare `safe_log2`, the soft floor of the RNA path, which also
-    shifts the small nonzero values near its floor.
+    A depth of zero becomes `floor`, as does a negative value, which is not a
+    depth. Every positive value is transformed exactly, and a NaN depth stays
+    NaN instead of being reported as zero coverage. Compare `safe_log2`, the
+    soft floor of the RNA path, which also shifts the small nonzero values near
+    its floor.
 
     Parameters
     ----------
@@ -42,7 +43,8 @@ def log2_depth(depth: ArrayLike, floor: ArrayLike = NULL_LOG2_COVERAGE) -> np.nd
     """
     depth = np.asarray(depth, dtype=float)
     log2 = np.full(depth.shape, floor, dtype=float)
-    np.log2(depth, out=log2, where=depth != 0)
+    # Written so that NaN, for which every comparison is False, is transformed
+    np.log2(depth, out=log2, where=~(depth <= 0))
     return log2
 
 
@@ -79,9 +81,9 @@ def safe_log2(values, min_log2):
     """Transform values to log2 scale, with a soft floor at `min_log2`.
 
     Unlike `log2_depth`, this adds a constant to every value before the
-    transform, so the result is smooth through zero but is exact nowhere. The
-    constant is absolute, so the values should already be normalized to a
-    common scale, as the RNA path does to a median of 1.
+    transform, so the result is smooth through zero but is not the exact log2
+    of any input. The constant is absolute, so the values should already be
+    normalized to a common scale, as the RNA path does to a median of 1.
 
     Parameters
     ----------
