@@ -293,9 +293,9 @@ already lost. Where genes and off-target bins share a point the genes decide
 the color, because a target is a few hundred bases inside an off-target bin of
 hundreds of kilobases and averaging the two would report the background. A
 combined feature is summarized by the biweight location of its bins rather
-than their mean, since bins with no coverage are recorded at a floor of -20
-and a mean over those reads as a deletion (see :doc:`estimators`); the gene
-labels still name every gene that passed the threshold, one label apiece.
+than their mean, since bins with no coverage are recorded at a floor of -20 by
+default and a mean over those reads as a deletion (see :doc:`estimators`); the
+gene labels still name every gene that passed the threshold, one label apiece.
 
 ``--no-squash-genes`` draws one feature per bin instead. That is legible only
 where a chromosome carries few enough bins to tell apart, such as a small

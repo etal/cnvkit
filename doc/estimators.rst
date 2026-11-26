@@ -128,6 +128,15 @@ Recomputing coverage with larger bins (see :ref:`autobin`) restores the
 condition under which the weighted mean is appropriate, without discarding
 data.
 
+The size of the placeholder's effect on a mean follows from its distance from
+the data, which is arbitrary. The ``--zero-coverage-floor half-read`` option of
+the :ref:`coverage` command (see :ref:`zero_coverage_floor`) records an empty
+bin one log2 unit below a bin that holds a single read instead, so that its
+effect on a mean is in proportion to the depth of the data. Such bins are
+still recognized by their depth of 0, and each site above handles them in the
+same way. A pooled :ref:`reference` still excludes a bin that most of the
+pooled samples left empty, because the pooled depth of that bin is 0.
+
 
 Reading gene-level values
 -------------------------

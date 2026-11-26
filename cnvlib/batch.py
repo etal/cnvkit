@@ -53,6 +53,7 @@ def batch_make_reference(
     cluster_method: str = "hierarchical",
     bias_smoother: str = "median",
     no_overlap: bool = False,
+    zero_coverage_floor: str = "fixed",
 ) -> tuple[str, str, str]:
     """Build a complete copy number reference from normal samples.
 
@@ -117,6 +118,10 @@ def batch_make_reference(
         Count each mate-pair fragment's overlapping bases once (avoids FFPE
         short-insert double-counting), for every normal sample's coverage.
         Default is False.
+    zero_coverage_floor : str, optional
+        The log2 value recorded for a bin that no read overlaps, in every
+        normal sample's coverage: 'fixed' (default) or 'half-read'. See
+        `coverage.do_coverage`.
 
     Returns
     -------
@@ -393,6 +398,7 @@ def batch_make_reference(
                         procs_per_cnn,
                         fasta,
                         no_overlap=no_overlap,
+                        zero_coverage_floor=zero_coverage_floor,
                     )
                 )
                 anti_futures.append(
@@ -406,6 +412,7 @@ def batch_make_reference(
                         procs_per_cnn,
                         fasta,
                         no_overlap=no_overlap,
+                        zero_coverage_floor=zero_coverage_floor,
                     )
                 )
 
@@ -442,10 +449,18 @@ def batch_write_coverage(
     processes: int,
     fasta: str | None,
     no_overlap: bool,
+    zero_coverage_floor: str,
 ) -> str:
     """Run coverage on one sample (BAM or bedGraph), write to file."""
     cnarr = coverage.do_coverage(
-        bed_fname, sample_fname, by_count, min_mapq, processes, fasta, no_overlap
+        bed_fname,
+        sample_fname,
+        by_count,
+        min_mapq,
+        processes,
+        fasta,
+        no_overlap,
+        zero_coverage_floor,
     )
     tabio.write(cnarr, out_fname)
     return out_fname
@@ -474,6 +489,7 @@ def batch_run_sample(
     bias_smoother: str = "median",
     reuse_coverage: bool = False,
     no_overlap: bool = False,
+    zero_coverage_floor: str = "fixed",
 ) -> None:
     """Run the pipeline on one sample (BAM or bedGraph file).
 
@@ -490,6 +506,10 @@ def batch_run_sample(
     ``no_overlap`` counts each fragment's mate-overlap bases once instead of once
     per mate when computing this sample's (anti)target coverage; see
     ``--no-overlap`` on the ``coverage`` subcommand (#999).
+
+    ``zero_coverage_floor`` selects the log2 value recorded for a bin that no
+    read overlaps in this sample's (anti)target coverage; see
+    ``--zero-coverage-floor`` on the ``coverage`` subcommand.
     """
     # ENH - return probes, segments (cnarr, segarr)
     logging.info("Running the CNVkit pipeline on %s ...", sample_fname)
@@ -511,6 +531,7 @@ def batch_run_sample(
             processes,
             fasta,
             no_overlap=no_overlap,
+            zero_coverage_floor=zero_coverage_floor,
         )
         tabio.write(raw_tgt, tgt_cnn)
 
@@ -522,6 +543,7 @@ def batch_run_sample(
             processes,
             fasta,
             no_overlap=no_overlap,
+            zero_coverage_floor=zero_coverage_floor,
         )
         tabio.write(raw_anti, anti_cnn)
 

@@ -184,6 +184,16 @@ toward the female default. A pooled reference is not treated this way, because
 its depth column summarizes samples of both sexes. Versions of CNVkit before
 0.9.15 used the log2 value in every case.
 
+The same rule keeps the chrY check a test of presence for coverage computed
+with ``--zero-coverage-floor half-read`` (see :ref:`zero_coverage_floor`),
+where an empty bin has a finite log2 value: bin-level files (.cnn and .cnr)
+give the same chrY vote at either floor. A segmented .cns file does not. The
+depth of a segment is 0 only if none of its bins holds a read; otherwise the
+mean of a mostly empty chrY segment lies near the finite floor instead of near
+-20, and the chrY axis may vote male for a female sample, leaving the call to
+chrX alone. Where the sex of such a sample is known, specify it with
+``--sample-sex``.
+
 When no chromosome-Y data is present at all -- for example, a female
 reference profile that excluded chrY from the panel, or a target list with
 no chrY bins -- the AND-gate naturally collapses to a chrX-only check

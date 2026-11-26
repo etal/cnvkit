@@ -57,6 +57,7 @@ from . import (
     importers,
     metrics,
     parallel,
+    params,
     purity,
     reference,
     reports,
@@ -185,6 +186,20 @@ def add_no_overlap(P: argparse._ActionsContainer) -> None:
                 by-count coverage algorithm, since samtools bedcov has no
                 overlap-aware mode: bases spanned by a read deletion are not
                 counted, and the output column order follows the --count path.""",
+    )
+
+
+def add_zero_coverage_floor(P: argparse._ActionsContainer) -> None:
+    P.add_argument(
+        "--zero-coverage-floor",
+        choices=params.ZERO_COVERAGE_FLOORS,
+        default="fixed",
+        help="""The log2 value recorded for a bin that no read overlaps.
+                'fixed': the placeholder -20. 'half-read': the log2 depth that
+                half of one read aligned across the bin would give, so that an
+                empty bin lies one log2 unit below a bin holding a single read
+                at any bin size and sequencing depth. Applies to BAM/CRAM
+                input only. [Default: %(default)s]""",
     )
 
 
@@ -348,6 +363,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             args.cluster_method,
             bias_smoother=args.bias_smoother,
             no_overlap=args.no_overlap,
+            zero_coverage_floor=args.zero_coverage_floor,
         )
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
@@ -399,6 +415,7 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                     bias_smoother=args.bias_smoother,
                     reuse_coverage=core.fbase(bam) in reusable_sids,
                     no_overlap=args.no_overlap,
+                    zero_coverage_floor=args.zero_coverage_floor,
                 )
                 futures.append((bam, future))
             # Wait for all tasks to complete and raise any exceptions
@@ -474,6 +491,7 @@ P_batch.add_argument(
 add_processes(P_batch)
 add_min_mapq(P_batch)
 add_no_overlap(P_batch)
+add_zero_coverage_floor(P_batch)
 P_batch.add_argument(
     "--rscript-path",
     metavar="PATH",
@@ -939,6 +957,7 @@ def _cmd_coverage(args: argparse.Namespace) -> None:
         args.processes,
         args.fasta,
         no_overlap=args.no_overlap,
+        zero_coverage_floor=args.zero_coverage_floor,
     )
     if not args.output:
         # Create an informative but unique name for the coverage output file
@@ -972,6 +991,7 @@ P_coverage.add_argument(
 )
 add_min_mapq(P_coverage)
 add_no_overlap(P_coverage)
+add_zero_coverage_floor(P_coverage)
 P_coverage.add_argument(
     "-o", "--output", metavar="FILENAME", help="""Output file name."""
 )

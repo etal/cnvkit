@@ -342,6 +342,51 @@ class ReferenceTests(unittest.TestCase):
         cnr = commands.do_fix(tgt_bins, blank_bins, ref[~is_bg])
         self.assertTrue(0 < len(cnr) <= len(tgt_bins))
 
+    def test_fix_half_read_floor_moves_only_empty_bins(self):
+        """A sample's zero-depth floor does not reach its other bins in 'fix'.
+
+        A sample whose empty bins were recorded at a half-read floor can be
+        normalized to a reference built at the fixed floor: only the empty
+        bins differ from the same sample at the fixed floor, and their zero
+        depth still identifies them.
+        """
+        ref = cnvlib.read("formats/reference-tr.cnn")
+        is_bg = ref["gene"] == "Background"
+        rng = np.random.default_rng(42)
+        tgt_bins = ref[~is_bg]
+        tgt_bins.log2 += rng.standard_normal(len(tgt_bins)) / 5
+        tgt_bins["depth"] = np.exp2(tgt_bins["log2"] + 7)
+        anti_bins = ref[is_bg]
+        anti_bins.log2 += rng.standard_normal(len(anti_bins)) / 5
+        anti_bins["depth"] = np.exp2(anti_bins["log2"] + 1)
+        empty_idx = rng.choice(len(tgt_bins), 25, replace=False)
+
+        def with_empty_bins(floor):
+            out = tgt_bins.copy()
+            depth = out["depth"].to_numpy(copy=True)
+            depth[empty_idx] = 0.0
+            out["depth"] = depth
+            out["log2"] = params.log2_depth(depth, floor) - 7
+            return out
+
+        cnr_fixed = commands.do_fix(
+            with_empty_bins(params.NULL_LOG2_COVERAGE), anti_bins, ref
+        )
+        cnr_half = commands.do_fix(with_empty_bins(-2.0), anti_bins, ref)
+        self.assertEqual(len(cnr_half), len(cnr_fixed))
+        is_empty = (cnr_fixed["depth"] == 0).to_numpy()
+        self.assertGreater(is_empty.sum(), 0)
+        for col in ("start", "log2", "weight"):
+            np.testing.assert_array_equal(
+                cnr_half[col][~is_empty], cnr_fixed[col][~is_empty]
+            )
+        self.assertTrue((cnr_half["log2"][is_empty] > -15).all())
+        self.assertTrue((cnr_fixed["log2"][is_empty] < -15).all())
+        np.testing.assert_array_equal(
+            cnr_half.low_coverage_mask(), cnr_fixed.low_coverage_mask()
+        )
+        np.testing.assert_array_equal(cnr_half.low_coverage_mask(), is_empty)
+
     def test_fix_bias_smoother_loess(self):
         """do_fix accepts bias_smoother='loess' end-to-end (#1028).
 

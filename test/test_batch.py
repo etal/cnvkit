@@ -634,6 +634,27 @@ class BatchTests(unittest.TestCase):
                 "in both the reference-building and per-sample paths (#999).",
             )
 
+    def test_batch_passes_zero_coverage_floor_to_every_coverage_call(self):
+        """``batch --zero-coverage-floor`` must reach each coverage calculation.
+
+        A call that dropped the argument would record that sample's empty bins
+        at the fixed placeholder while the others in the run used the
+        requested floor. AST-level guard, as for ``no_overlap`` above.
+        """
+        invocations = ast_calls_to(commands._cmd_batch, "batch_make_reference")
+        invocations += ast_submit_calls(commands._cmd_batch, "batch_run_sample")
+        invocations += ast_submit_calls(
+            batch.batch_make_reference, "batch_write_coverage"
+        )
+        invocations += ast_calls_to(batch.batch_run_sample, "do_coverage", "coverage")
+        invocations += ast_calls_to(
+            batch.batch_write_coverage, "do_coverage", "coverage"
+        )
+        # The count is pinned because the helpers cannot see an aliased call
+        self.assertEqual(len(invocations), 7)
+        for inv in invocations:
+            self.assertIn("zero_coverage_floor", call_arg_names(inv))
+
     # -- batch coverage-dedup / self-reference (#48) --
 
     def test_resolve_batch_sample_ids_self_reference_building(self):

@@ -988,6 +988,32 @@ class OtherTests(unittest.TestCase):
         self.assertEqual(float(params.log2_depth(0)), params.NULL_LOG2_COVERAGE)
         self.assertEqual(params.log2_depth([]).shape, (0,))
 
+    def test_log2_depth_per_bin_floor(self):
+        """A floor given per bin replaces the zero depths and nothing else."""
+        depth = np.array([0.0, 0.25, 0.0, 96.0, np.nan])
+        floor = np.array([-3.0, -4.0, -5.0, -6.0, -7.0])
+        log2 = params.log2_depth(depth, floor)
+        np.testing.assert_array_equal(log2[:4], [-3.0, -2.0, -5.0, np.log2(96.0)])
+        self.assertTrue(np.isnan(log2[4]))
+
+    def test_half_read_log2(self):
+        """The half-read floor is half a read's depth, capped at the bin width.
+
+        A bin of no width, or a read length that is not a positive number, as
+        from a BAM file without reads, leaves nothing to size the floor by, and
+        the placeholder must be kept instead of a NaN or an infinite value.
+        """
+        null = params.NULL_LOG2_COVERAGE
+        bin_sizes = [50, 100, 400, 0]
+        np.testing.assert_array_equal(
+            params.half_read_log2(100, bin_sizes), [-1.0, -1.0, -3.0, null]
+        )
+        for read_len in (np.nan, 0.0):
+            with self.subTest(read_len=read_len):
+                np.testing.assert_array_equal(
+                    params.half_read_log2(read_len, bin_sizes), [null] * 4
+                )
+
     def test_mask_bad_bins_flags_nan(self):
         """mask_bad_bins treats NaN log2/spread reference bins as bad (#521)."""
         n = 5

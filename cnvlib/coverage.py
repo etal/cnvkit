@@ -19,7 +19,7 @@ from skgenome.tabio.util import as_text_handle
 from . import core, samutil
 from .cnary import CopyNumArray as CNA
 from .parallel import effective_procs, pick_pool, rm, to_chunks
-from .params import log2_depth
+from .params import ZERO_COVERAGE_FLOORS, half_read_log2, log2_depth
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -196,6 +196,7 @@ def do_coverage(
     processes: int = 1,
     fasta: str | None = None,
     no_overlap: bool = False,
+    zero_coverage_floor: str = "fixed",
 ) -> CNA:
     """Calculate coverage in the given regions from BAM read depths or a bedGraph.
 
@@ -222,6 +223,11 @@ def do_coverage(
         once per mate (``samtools depth -s`` semantics), avoiding inflated
         depth from short-insert (e.g. FFPE) fragments. Default is False
         (matches historical behavior). Ignored for bedGraph input.
+    zero_coverage_floor : str, optional
+        The log2 value recorded for a bin that no read overlaps: 'fixed' for
+        the placeholder -20 (default), or 'half-read' for the log2 depth that
+        half of one read aligned across the bin would give. The bin's depth is
+        0 in both cases. Ignored for bedGraph input, which has no reads.
 
     Returns
     -------
@@ -234,7 +240,14 @@ def do_coverage(
         If the BAM file is not sorted by coordinates.
     FileNotFoundError
         If bedGraph file lacks required tabix index.
+    ValueError
+        If `zero_coverage_floor` is not a recognized choice.
     """
+    if zero_coverage_floor not in ZERO_COVERAGE_FLOORS:
+        raise ValueError(
+            f"zero_coverage_floor must be one of {ZERO_COVERAGE_FLOORS}, "
+            f"got {zero_coverage_floor!r}"
+        )
     # Detect input format
     if is_bedgraph_format(bam_or_bg_fname):
         # bedGraph format - use simplified processing
@@ -255,6 +268,11 @@ def do_coverage(
                 "Option --no-overlap is not applicable to bedGraph input "
                 "(no per-read pair information) and will be ignored"
             )
+        if zero_coverage_floor != "fixed":
+            logging.warning(
+                "Option --zero-coverage-floor is not applicable to bedGraph "
+                "input (no reads to size the floor by) and will be ignored"
+            )
         cnarr = interval_coverages_bedgraph(bed_fname, bam_or_bg_fname)
     else:
         # BAM format - use existing logic
@@ -264,7 +282,14 @@ def do_coverage(
             )
         samutil.ensure_bam_index(bam_or_bg_fname)
         cnarr = interval_coverages(
-            bed_fname, bam_or_bg_fname, by_count, min_mapq, processes, fasta, no_overlap
+            bed_fname,
+            bam_or_bg_fname,
+            by_count,
+            min_mapq,
+            processes,
+            fasta,
+            no_overlap,
+            zero_coverage_floor,
         )
 
     return cnarr
@@ -284,6 +309,7 @@ def interval_coverages(
     processes: int,
     fasta: str | None = None,
     no_overlap: bool = False,
+    zero_coverage_floor: str = "fixed",
 ) -> CNA:
     """Calculate log2 coverages in the BAM file at each interval."""
     meta = {"sample_id": core.fbase(bam_fname)}
@@ -328,6 +354,12 @@ def interval_coverages(
         read_counts = table["basecount"] / read_len
         table = table.drop("basecount", axis=1)
         cnarr = CNA(table, meta)
+
+    if zero_coverage_floor == "half-read":
+        read_len = samutil.get_read_length(bam_fname, fasta=fasta)
+        cnarr["log2"] = log2_depth(
+            cnarr["depth"], half_read_log2(read_len, cnarr.end - cnarr.start)
+        )
 
     # Log some stats
     tot_time = time.time() - start_time
