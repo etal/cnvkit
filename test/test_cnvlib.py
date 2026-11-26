@@ -525,6 +525,72 @@ class CNATests(unittest.TestCase):
         cna = _make(chrx_ratio=-1.0, chry_ratio=-1.0)
         self.assertIs(cna.guess_xx(verbose=False), np.False_)
 
+    def test_sex_inference_reads_zero_depth_chry_as_absent(self):
+        """A sample's chrY bin without reads is absent, whatever its log2 value.
+
+        The chrY test places an absent chromosome at the placeholder for zero
+        depth, but not every path leaves it there: centering a sample of very
+        low depth raises it, and `import-rna` records a gene without reads at
+        an expression floor of -5. A chrY with no reads at all could then lie on
+        the male side of the boundary, where a haploid-looking chrX was enough
+        to call a female sample male. The zero depth has to decide.
+        """
+
+        def _make(chry_log2, chrx_log2=-1.0, chry_depth=0.0, **extra_cols):
+            n_auto, n_x, n_y = 400, 50, 50
+            rng = np.random.default_rng(0)
+            log2 = np.concatenate(
+                [
+                    rng.normal(0.0, 0.1, n_auto),
+                    rng.normal(chrx_log2, 0.1, n_x),
+                    np.full(n_y, chry_log2),
+                ]
+            )
+            depth = np.exp2(log2 + 7)
+            depth[-n_y:] = chry_depth
+            n_bins = len(log2)
+            return CopyNumArray(
+                pd.DataFrame(
+                    {
+                        "chromosome": ["chr1"] * n_auto
+                        + ["chrX"] * n_x
+                        + ["chrY"] * n_y,
+                        "start": np.arange(n_bins) * 1000,
+                        "end": np.arange(n_bins) * 1000 + 200,
+                        "gene": "-",
+                        "log2": log2,
+                        "depth": depth,
+                        **extra_cols,
+                    }
+                )
+            )
+
+        absent = _make(params.NULL_LOG2_COVERAGE).compare_sex_chromosomes()
+        self.assertFalse(absent[0])
+        # A shallow sample after centering, then two finite floors
+        for chry_log2 in (-13.9, -5.0, -2.0):
+            with self.subTest(chry_log2=chry_log2):
+                sample = _make(chry_log2)
+                self.assertEqual(sample.compare_sex_chromosomes(), absent)
+                self.assertIs(sample.guess_xx(verbose=False), np.True_)
+        # Against a haploid-X reference, chrX at 0 is the male position, yet
+        # the absent chrY keeps the call female
+        self.assertIs(
+            _make(-5.0, chrx_log2=0.0).guess_xx(True, verbose=False), np.True_
+        )
+        # A value that already marks the bin as empty is kept, so results for
+        # files where it does are unchanged
+        _is_xy, stats = _make(-24.0).compare_sex_chromosomes()
+        self.assertAlmostEqual(stats["chry_ratio"], -24.0, places=1)
+        # Reads on chrY at the same log2 value are evidence of presence
+        present = _make(-5.0, chry_depth=0.25)
+        self.assertIs(present.guess_xx(verbose=False), np.False_)
+        # A pooled reference is not a sample: its depth is the center of all
+        # samples' depths, zero on chrY where most are female, beside the log2
+        # value of -1 that pooling assigns to a female sample's chrY
+        pooled = _make(-1.0, spread=0.1)
+        self.assertIs(pooled.guess_xx(verbose=False), np.False_)
+
     def test_guess_xx_no_chry_data_falls_back_to_chrx_alone(self):
         """When chrY is entirely absent (e.g. a female reference excluded chrY
         from the panel, or a target list with no chrY bins), the decision
@@ -906,6 +972,89 @@ class OtherTests(unittest.TestCase):
         # The three good bins remain (0.1, 0.2, -0.1)
         self.assertEqual(len(kept), 3)
 
+    def test_log2_depth_floors_zero_and_keeps_nan(self):
+        """log2_depth floors a zero depth and transforms every positive value.
+
+        A NaN depth is unknown, not absent, so it must not be reported as the
+        zero-coverage placeholder: `fix` drops a NaN log2, but would keep the
+        placeholder as a bin with no reads.
+        """
+        depth = np.array([0.0, 2**-30, 0.25, 1.0, 96.0, np.nan])
+        log2 = params.log2_depth(depth)
+        self.assertEqual(log2[0], params.NULL_LOG2_COVERAGE)
+        np.testing.assert_array_equal(log2[1:5], np.log2(depth[1:5]))
+        self.assertTrue(np.isnan(log2[5]))
+        # A depth below 2**NULL_LOG2_COVERAGE is still a measurement
+        self.assertLess(log2[1], params.NULL_LOG2_COVERAGE)
+        self.assertEqual(float(params.log2_depth(0)), params.NULL_LOG2_COVERAGE)
+        self.assertEqual(params.log2_depth([]).shape, (0,))
+
+    def test_log2_depth_floors_a_negative_depth(self):
+        """A negative value is not a depth and takes the floor, without a warning.
+
+        Only malformed input reaches this, such as a bedGraph with negative
+        values. The bin is then recorded as having no coverage, which stays
+        visible in the output, where a NaN log2 would be dropped by `fix`.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            log2 = params.log2_depth([-3.0, 0.0, 4.0])
+        null = params.NULL_LOG2_COVERAGE
+        np.testing.assert_array_equal(log2, [null, null, 2.0])
+
+    def test_mostly_low_coverage_boundary(self):
+        """The gate on bias corrections fires once half of the bins are empty.
+
+        It reads log2 values alone. A depth of zero beside a usable log2 value
+        does not count as empty, because `reference` assigns such values to
+        chrY of a female sample.
+        """
+
+        def _cna(n_empty):
+            n_bins = 10
+            return cnary.CopyNumArray(
+                pd.DataFrame(
+                    {
+                        "chromosome": "chr1",
+                        "start": np.arange(n_bins) * 1000,
+                        "end": np.arange(n_bins) * 1000 + 500,
+                        "gene": "-",
+                        "log2": [params.NULL_LOG2_COVERAGE] * n_empty
+                        + [0.0] * (n_bins - n_empty),
+                        "depth": 0.0,
+                    }
+                )
+            )
+
+        self.assertFalse(_cna(4).mostly_low_coverage())
+        self.assertTrue(_cna(5).mostly_low_coverage())
+
+    def test_log2_depth_per_bin_floor(self):
+        """A floor given per bin replaces the zero depths and nothing else."""
+        depth = np.array([0.0, 0.25, 0.0, 96.0, np.nan])
+        floor = np.array([-3.0, -4.0, -5.0, -6.0, -7.0])
+        log2 = params.log2_depth(depth, floor)
+        np.testing.assert_array_equal(log2[:4], [-3.0, -2.0, -5.0, np.log2(96.0)])
+        self.assertTrue(np.isnan(log2[4]))
+
+    def test_half_read_log2(self):
+        """The floor is the log2 depth of half a read, capped at the bin width.
+
+        A bin of no width, or a read length that is not a positive number, as
+        from a BAM file without reads, leaves nothing to size the floor by, and
+        the placeholder must be kept instead of a NaN or an infinite value.
+        """
+        null = params.NULL_LOG2_COVERAGE
+        bin_sizes = [50, 100, 400, 0]
+        np.testing.assert_array_equal(
+            params.half_read_log2(100, bin_sizes), [-1.0, -1.0, -3.0, null]
+        )
+        for read_len in (np.nan, 0.0):
+            with self.subTest(read_len=read_len):
+                np.testing.assert_array_equal(
+                    params.half_read_log2(read_len, bin_sizes), [null] * 4
+                )
+
     def test_mask_bad_bins_flags_nan(self):
         """mask_bad_bins treats NaN log2/spread reference bins as bad (#521)."""
         n = 5
@@ -950,11 +1099,13 @@ class OtherTests(unittest.TestCase):
         self.assertIn("ci_lo", stats)
         self.assertFalse(np.isnan(stats["ci_lo"]))
 
-        # All NaN: should return empty stats (no crash)
+        # All NaN: the interval is undefined, reported as NaN (no crash), so
+        # that the gene's row keeps the fields other genes have
         bins_allnan = bins.copy()
         bins_allnan["weight"] = np.nan
         stats2 = reports.compute_gene_stats(bins_allnan, 0.15, interval_stats=["ci"])
-        self.assertNotIn("ci_lo", stats2)
+        self.assertTrue(np.isnan(stats2["ci_lo"]))
+        self.assertTrue(np.isnan(stats2["ci_hi"]))
 
 
 class CNAryByGeneTests(unittest.TestCase):

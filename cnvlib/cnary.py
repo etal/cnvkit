@@ -368,6 +368,21 @@ class CopyNumArray(GenomicArray):
             logging.info("Dropped %d low-coverage bins", drop_idx.sum())
         return self[~drop_idx]
 
+    def mostly_low_coverage(self) -> bool:
+        """Test whether at most half of the bins have usable log2 coverage.
+
+        The `fix` and `reference` commands apply this to a sample's centered
+        log2 read depths, to skip bias corrections where coverage was probably
+        calculated over the wrong regions.
+
+        Only the log2 values are read, with the same threshold as
+        `low_coverage_mask` but not its depth and NaN clauses. A bin whose log2
+        value has been reassigned therefore counts as usable even at a depth of
+        zero, as chrY does for a female sample in `reference`.
+        """
+        min_cvg = params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+        return bool((self.data["log2"] > min_cvg).sum() <= len(self) // 2)
+
     # Chromosomal sex
 
     def shift_xx(
@@ -471,9 +486,12 @@ class CopyNumArray(GenomicArray):
         haploid/diploid conventions for chrX (depending on
         ``is_haploid_x_reference``) and an absent-versus-present convention
         for chrY (female chrY at ``params.NULL_LOG2_COVERAGE``, male chrY
-        at autosome-median). A ratio > 1 means the male hypothesis fits
-        better; the 1.0 boundary is the midpoint between the two expected
-        positions, so the decision is threshold-free up to that geometry.
+        at autosome-median). A sample's chrY bin with a depth of zero is
+        placed at the female position unless its log2 value is already near
+        it (a pooled reference is exempt), since not every path leaves an
+        empty bin there. A ratio > 1 means the male hypothesis fits better;
+        the 1.0 boundary is the midpoint between the two expected positions,
+        so the decision is threshold-free up to that geometry.
 
         The two ratios combine with an AND-gate: the sample is male only
         when *both* chrX and chrY independently look more male than female.
@@ -578,6 +596,20 @@ class CopyNumArray(GenomicArray):
             chry = chry.drop_low_coverage()
         if len(chry):
             chry_l = chry["log2"].to_numpy()
+            if "depth" in chry and "spread" not in chry:
+                # A sample's chrY bin without reads is absent, but its log2
+                # value does not always say so: centering a shallow sample
+                # raises the placeholder, and other floors are finite (the
+                # expression floor of `import-rna`, a half-read floor). The
+                # zero depth then marks the absence. A value that already
+                # marks it is kept as it is. A pooled reference is exempt: its
+                # depth is the center of all samples' depths, zero where most
+                # are female, beside the log2 value of -1 that pooling assigns
+                # to a female sample's chrY, which is not that of an empty bin.
+                is_unmarked = (chry["depth"].to_numpy() == 0) & (
+                    chry_l >= params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+                )
+                chry_l = np.where(is_unmarked, params.NULL_LOG2_COVERAGE, chry_l)
             chry_w = chry["weight"].to_numpy() if use_weight else None
             chry_med = _median(chry_l, chry_w)
             chry_male_lr = _maleness(chry_med, -params.NULL_LOG2_COVERAGE, 0.0)

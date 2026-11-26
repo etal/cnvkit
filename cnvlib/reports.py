@@ -365,14 +365,32 @@ def compute_gene_stats(
     Returns
     -------
     dict
-        Dictionary of computed statistics.
+        The requested statistics by name, with the ci and pi bounds always in
+        that order. A statistic is NaN where the gene's bins do not support it,
+        as none does for a gene with no usable bins.
     """
     warnings.simplefilter("ignore", RuntimeWarning)
 
-    stats_dict: dict[str, float] = {}
     if not any((location_stats, spread_stats, interval_stats)):
-        return stats_dict
+        return {}
 
+    # A gene left with no usable bins reports every requested statistic as
+    # NaN, so that each row of the table carries the same fields. The ci and
+    # pi names are generated in this fixed order, not the order of
+    # `interval_stats`, which follows the command line.
+    stats_dict: dict[str, float] = dict.fromkeys(
+        (
+            *location_stats,
+            *spread_stats,
+            *(
+                f"{name}_{bound}"
+                for name in ("ci", "pi")
+                if name in interval_stats
+                for bound in ("lo", "hi")
+            ),
+        ),
+        np.nan,
+    )
     bins_log2 = bins["log2"].to_numpy()
     if len(bins_log2) == 0:
         return stats_dict
@@ -438,23 +456,22 @@ def group_by_genes(
 
     Bins with NaN weights are excluded from weight sums and depth averages.
 
-    Return an iterable of genes, in chromosomal order, associated with their
-    location and coverages:
-
-        [(gene, chrom, start, end, [coverages]), ...]
+    Return an iterator of one row per gene, in chromosomal order.
     """
     ignore = ("", *params.ANTITARGET_ALIASES)
     for gene, rows in cnarr.by_gene():
         if not rows or gene in ignore:
             continue
-        segmean = segment_mean(rows, skip_low)
-        if segmean is None:
-            continue  # type: ignore[unreachable]
+        # One bin set for the log2 value and every statistic about it
+        is_low = rows.low_coverage_mask()
+        bins = rows[~is_low] if skip_low else rows
+        segmean = segment_mean(bins)
         outrow = rows[0].copy()
         outrow["end"] = rows.end.iat[-1]
         outrow["gene"] = gene
         outrow["log2"] = segmean
         outrow["probes"] = len(rows)
+        outrow["low_probes"] = int(is_low.sum())
         if "weight" in rows:
             wt = rows["weight"]
             outrow["weight"] = float(np.nansum(wt.to_numpy()))
@@ -472,8 +489,8 @@ def group_by_genes(
         # Compute statistics if requested
         if any((location_stats, spread_stats, interval_stats)):
             gene_stats = compute_gene_stats(
-                rows,
-                segmean,  # type: ignore[arg-type]
+                bins,
+                segmean,
                 location_stats,
                 spread_stats,
                 interval_stats,

@@ -77,6 +77,7 @@ FAQ
     fileformats
     baf
     bias
+    estimators
     sex
 
 

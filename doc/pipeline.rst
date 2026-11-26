@@ -518,6 +518,54 @@ Summary statistics of read counts and their binning are printed to standard
 error when CNVkit finishes calculating the coverage of each sample (through
 either the :ref:`batch` or :ref:`coverage` commands).
 
+.. _zero_coverage_floor:
+
+Bins without reads
+``````````````````
+
+A bin that no read overlaps has no finite log2 depth. By default it is written
+with a depth of 0 and a placeholder log2 value of -20, far below any measured
+value, and the later commands treat it as described in :doc:`estimators`.
+
+The ``--zero-coverage-floor half-read`` option, available on both the
+:ref:`coverage` and :ref:`batch` commands, writes instead the log2 depth that
+half of one read aligned across the bin would give. The value is then in the
+units of the data: an empty bin lies one log2 unit below a bin that holds a
+single read, at any bin size and sequencing depth. With 100-base reads and
+250-base bins, for example, the floor is a depth of 0.2. Relative to an average
+depth of 200, that is 10 log2 units below the typical bin; relative to an
+average of two reads per bin (a depth of 0.8), it is 2 log2 units below. Empty
+bins scattered among sparsely covered bins then lower a segment mean by a
+fraction of a log2 unit where the placeholder lowers it by several, while an
+empty bin in a deeply sequenced panel remains far below a single-copy loss.
+
+Every bin with reads keeps its exact value, and an empty bin keeps its depth of
+0, by which ``--drop-low-coverage`` and the other commands continue to
+recognize it. A sample processed with this option can be normalized to an
+existing reference. The sample's empty bins take different values from those
+at the default setting, and its bins with reads can change slightly where the
+floor lies within the range of their values, because the bias corrections in
+:ref:`fix`, and the centering of the antitarget bins, include the empty bins.
+A reference built from normal samples processed with the option is a different
+reference: its values differ in the bins where some of those samples have no
+reads, and so do the samples normalized to it.
+
+The option has these limits:
+
+- It takes the read length from the alignments, so it does not apply to
+  :ref:`bedGraph <bedgraph_input>` input, where it is ignored with a warning,
+  or to :ref:`import-picard`. Both keep the placeholder.
+- The floor is not a lower bound on measured values: a bin that a single read
+  overlaps by a few bases has a depth below it.
+- At very low depth the floor approaches the values of the bins that hold
+  reads, so a run of empty bins is less clearly distinguished as a deletion.
+  Larger bins (see :ref:`autobin`) remain the remedy for bins that are too
+  small for the sequencing depth.
+- Sex inference from a segmented .cns file loses part of its chromosome Y
+  check; see :doc:`sex`.
+
+The default, ``fixed``, keeps the placeholder.
+
 BAM file preparation
 ````````````````````
 
@@ -679,6 +727,8 @@ chromosome names that differ only by a ``chr`` prefix are matched.
 The depths are those that the program writing the bedGraph counted, so the
 options that select reads -- ``-q``/``--min-mapq``, ``-c``/``--count``, and
 ``--no-overlap`` -- have no effect on a bedGraph and are ignored with a warning.
+``--zero-coverage-floor`` is likewise ignored with a warning, because a depth
+profile carries no reads to size the floor by (see :ref:`zero_coverage_floor`).
 For coverage comparable to that from a BAM file, exclude the same reads that
 CNVkit excludes: unmapped, secondary, QC-failed, and duplicate reads (SAM flag
 0x704). mosdepth excludes these by default (``-F 1796``), and also counts the
@@ -983,6 +1033,7 @@ Additional filters:
   in shallow whole-genome sequencing; recomputing coverage with larger bins
   (see :ref:`autobin`) avoids it without discarding data, whereas this option
   also removes genuine homozygous deletions (see :doc:`germline`).
+  :doc:`estimators` describes how each command treats these bins.
 - ``--drop-outliers`` -- drop bins with log2 value too far from a rolling
   average, taking local variability into account. Applied by default.
 

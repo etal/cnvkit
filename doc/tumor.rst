@@ -26,7 +26,10 @@ are available to support this use case:
       (for bins with 1/32 the average coverage; bins below this are masked out
       by the reference). In a .cnr file, any bins with log2 value below -15 are
       probably based on dummy values corresponding to zero-coverage (perhaps
-      unmappable) bins, and not real observations.
+      unmappable) bins, and not real observations. A bin with a read depth of
+      0 is treated the same way whatever its log2 value, which covers coverage
+      computed with ``--zero-coverage-floor half-read`` (see
+      :ref:`zero_coverage_floor`).
 
     - The rationale above assumes contaminating normal cells. In a sample of
       very high tumor purity, such as a flow-sorted population or some cell

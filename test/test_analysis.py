@@ -195,6 +195,131 @@ class AnalysisTests(unittest.TestCase):
         )
         self.assertGreater(len(rows), 0)
 
+    def test_genemetrics_drop_low_coverage_applies_to_stats(self):
+        """With skip_low, a gene's statistics cover the bins its log2 does.
+
+        The log2 column excludes zero-coverage bins under --drop-low-coverage.
+        Statistics computed over all of the gene's bins instead would describe
+        a different set: a mean and an interval pulled toward the placeholder
+        value, around a log2 that never saw it.
+        """
+        log2 = [0.4, 0.5, 0.6, 0.5, 0.4, 0.6, -20.0, -20.0]
+        n_bins = len(log2)
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": np.arange(n_bins) * 1000,
+                    "end": np.arange(n_bins) * 1000 + 500,
+                    "gene": "GENE",
+                    "log2": log2,
+                    "depth": [100.0] * 6 + [0.0] * 2,
+                    "weight": 1.0,
+                }
+            )
+        )
+        (row,) = commands.do_genemetrics(
+            cnarr,
+            threshold=0,
+            min_probes=1,
+            skip_low=True,
+            location_stats=["mean", "median"],
+            spread_stats=["stdev"],
+            interval_stats=["ci", "pi"],
+        ).itertuples()
+        self.assertAlmostEqual(row.log2, 0.5)
+        self.assertAlmostEqual(row.mean, 0.5)
+        self.assertAlmostEqual(row.median, 0.5)
+        self.assertLess(row.stdev, 0.2)
+        self.assertGreater(row.ci_lo, 0.3)
+        self.assertLessEqual(row.ci_lo, row.log2)
+        self.assertLessEqual(row.log2, row.ci_hi)
+        self.assertAlmostEqual(row.pi_lo, 0.4, places=1)
+
+    def test_genemetrics_counts_low_coverage_bins(self):
+        """The low_probes column counts a gene's zero-coverage bins.
+
+        The count is the same whether or not those bins are dropped, so it
+        shows how many placeholder values a default log2 includes, and how
+        many of the gene's bins --drop-low-coverage left out.
+        """
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": np.arange(8) * 1000,
+                    "end": np.arange(8) * 1000 + 500,
+                    "gene": ["HOLEY"] * 5 + ["WHOLE"] * 3,
+                    "log2": [0.5, -20.0, 0.5, -20.0, 0.5, 0.5, 0.5, 0.5],
+                    "depth": [100.0, 0.0, 100.0, 0.0, 100.0, 90.0, 90.0, 90.0],
+                    "weight": 1.0,
+                }
+            )
+        )
+        for skip_low in (False, True):
+            with self.subTest(skip_low=skip_low):
+                table = commands.do_genemetrics(
+                    cnarr, threshold=0, min_probes=1, skip_low=skip_low
+                ).set_index("gene")
+                self.assertEqual(table.loc["HOLEY", "probes"], 5)
+                self.assertEqual(table.loc["HOLEY", "low_probes"], 2)
+                self.assertEqual(table.loc["WHOLE", "probes"], 3)
+                self.assertEqual(table.loc["WHOLE", "low_probes"], 0)
+
+    def test_genemetrics_statistics_survive_a_gene_without_usable_bins(self):
+        """A gene with no usable bins reports NaN statistics, not missing columns.
+
+        With segments and --drop-low-coverage, a fully deleted gene is still
+        reported, at its segment's log2 value, although none of its own bins
+        remain. The table takes its columns from its first row, so a first
+        gene without the statistic fields would remove them from every gene.
+        """
+        log2 = [-20.0, -20.0, -20.0, 1.0, 1.2, 0.8, 1.0]
+        n_bins = len(log2)
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": np.arange(n_bins) * 1000,
+                    "end": np.arange(n_bins) * 1000 + 500,
+                    "gene": ["DEL"] * 3 + ["AMP"] * 4,
+                    "log2": log2,
+                    "depth": [0.0] * 3 + [50.0] * 4,
+                    "weight": 1.0,
+                }
+            )
+        )
+        segments = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": [0, 3000],
+                    "end": [2500, 6500],
+                    "gene": ["DEL", "AMP"],
+                    "log2": [-5.0, 1.0],
+                    "probes": [3, 4],
+                    "weight": [3.0, 4.0],
+                }
+            )
+        )
+        table = commands.do_genemetrics(
+            cnarr,
+            segments,
+            min_probes=1,
+            skip_low=True,
+            is_sample_female=True,
+            location_stats=["mean"],
+            spread_stats=["stdev"],
+            interval_stats=["pi", "ci"],
+        ).set_index("gene")
+        stat_cols = ["mean", "stdev", "ci_lo", "ci_hi", "pi_lo", "pi_hi"]
+        # The interval columns keep one order, whatever order they were
+        # requested in
+        self.assertEqual([col for col in table.columns if col in stat_cols], stat_cols)
+        self.assertTrue(table.loc["DEL", stat_cols].isna().all())
+        self.assertAlmostEqual(table.loc["AMP", "mean"], 1.0)
+        self.assertTrue(table.loc["AMP", stat_cols].notna().all())
+
     @pytest.mark.slow
     def test_genemetrics_with_stats(self):
         """The 'genemetrics' command with statistics options."""

@@ -395,10 +395,8 @@ def _bca_correct_alpha(values, weights, bootstrap_dist, alphas):
     return new_alphas
 
 
-def segment_mean(cnarr: CopyNumArray, skip_low: bool = False) -> float64 | float:
+def segment_mean(cnarr: CopyNumArray) -> float64 | float:
     """Weighted average of bin log2 values."""
-    if skip_low:
-        cnarr = cnarr.drop_low_coverage()
     if len(cnarr) == 0:
         return np.nan
     if "weight" in cnarr and cnarr["weight"].any():

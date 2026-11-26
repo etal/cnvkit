@@ -13,8 +13,12 @@ from skgenome import tabio
 
 from .cnary import CopyNumArray as CNA
 from .fix import center_by_window
+from .params import safe_log2
 
-NULL_LOG2_COVERAGE = -5
+# The soft floor of normalized expression on the log2 scale: `safe_log2` maps a
+# gene with no reads here. It is unrelated to `params.NULL_LOG2_COVERAGE`, the
+# hard floor of DNA read depth, which is not normalized before the transform.
+NULL_LOG2_EXPRESSION = -5
 
 
 def before(char):
@@ -499,7 +503,7 @@ def normalize_read_depths(sample_depths, normal_ids, normalize_method="polish"):
             "expected 'polish' or 'size-factors'"
         )
     # Finally, convert normalized read depths to log2 scale
-    return safe_log2(normalized, NULL_LOG2_COVERAGE)
+    return safe_log2(normalized, NULL_LOG2_EXPRESSION)
 
 
 def _polish_normalize(sample_depths, normal_ids):
@@ -597,22 +601,6 @@ def _size_factor_normalize(sample_depths, normal_ids):
     return norm
 
 
-def safe_log2(values, min_log2):
-    """Transform values to log2 scale, safely handling zeros.
-
-    Parameters
-    ----------
-    values : np.array
-        Absolute-scale values to transform. Should be non-negative.
-    min_log2 : float
-        Assign input zeros this log2-scaled value instead of -inf. Rather than
-        hard-clipping, input values near 0 (especially below 2^min_log2) will be
-        squeezed a bit above `min_log2` in the log2-scale output.
-    """
-    absolute_shift = 2**min_log2
-    return np.log2(values + absolute_shift)
-
-
 def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len=100):
     """Join gene info to each sample's log2 expression ratios.
 
@@ -627,10 +615,10 @@ def attach_gene_info_to_cnr(sample_counts, sample_data_log2, gene_info, read_len
     cnr_info = gene_info.loc[:, gi_cols].copy()
     cnr_info["gene"] = cnr_info["gene"].fillna("-")
     # Fill NA fields with the lowest finite value in the same row.
-    # Only use NULL_LOG2_COVERAGE if all samples are NA / zero-depth.
+    # Only use NULL_LOG2_EXPRESSION if all samples are NA / zero-depth.
     gene_minima = sample_data_log2.min(axis=1, skipna=True)
-    # If a gene has NaN across all samples, fill with NULL_LOG2_COVERAGE
-    gene_minima = gene_minima.fillna(NULL_LOG2_COVERAGE)
+    # If a gene has NaN across all samples, fill with NULL_LOG2_EXPRESSION
+    gene_minima = gene_minima.fillna(NULL_LOG2_EXPRESSION)
     assert not gene_minima.hasnans, gene_minima.head()
     for (sample_id, sample_col), (_sid_log2, sample_log2) in zip(
         sample_counts.items(), sample_data_log2.items(), strict=True

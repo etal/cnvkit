@@ -72,19 +72,31 @@ The remaining output columns have slightly different meaning depending on
 whether or not segments were provided. Without segments (.cnr alone):
 
 - *log2*: Weighted mean of log2 ratios of all the gene's bins, including any
-  off-target intronic bins.
+  off-target intronic bins. A bin with no coverage enters this mean at its
+  placeholder value unless ``--drop-low-coverage`` is given; see
+  :doc:`estimators` for how to interpret a value that includes placeholder
+  bins.
 - *depth*: Weighted mean of un-normalized read depths across all this gene's
   bins.
 - *weight*: Sum of this gene's bins' weights.
 - *probes*: The number of bins assigned to this gene.
+- *low_probes*: The number of those bins that have no usable coverage, by the
+  criteria of ``--drop-low-coverage``. The count is the same with and without
+  that option: without it, this many placeholder values entered *log2*; with
+  it, this many bins were left out.
 
 With segments (``-s``):
 
 - *log2*: The log2 ratio value of the segment covering the gene, i.e. weighted
   mean of all bins covered by the whole segment, not just this gene.
-- *depth*, *weight*, *probes*: As above.
+- *depth*, *weight*, *probes*, *low_probes*: As above.
 - *segment_weight*: The sum of the weights of the bins supporting the segment.
 - *segment_probes*: The number of probes supporting the segment.
+
+Versions of CNVkit before 0.9.15 wrote no *low_probes* column, so every column
+after *probes* was one position to the left, and ``--drop-low-coverage`` did
+not apply to the statistics requested with ``--mean``, ``--ci`` and the other
+statistic options.
 
 The ``-t``/``--threshold`` and ``-m``/``--min-probes`` options are used to
 control which genes are reported:

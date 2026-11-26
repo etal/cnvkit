@@ -641,9 +641,7 @@ def bias_correct_logr(
     cnarr.center_all(skip_low=skip_low, diploid_parx_genome=diploid_parx_genome)
     shift_sex_chroms(cnarr, sexes, ref_flat_logr, is_chr_x, is_chr_y)
     # Skip bias corrections if most bins have no coverage (e.g. user error)
-    if (
-        cnarr["log2"] > params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
-    ).sum() <= len(cnarr) // 2:
+    if cnarr.mostly_low_coverage():
         logging.warning(
             "WARNING: most bins have no or very low coverage; "
             "check that the right BED file was used"

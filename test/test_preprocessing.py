@@ -677,6 +677,26 @@ class PreprocessingTests(unittest.TestCase):
                 "_cmd_coverage must pass args.no_overlap to do_coverage",
             )
 
+    def test_coverage_zero_coverage_floor_option(self):
+        """--zero-coverage-floor parses on `coverage` and `batch`, default fixed,
+        and `_cmd_coverage` forwards it instead of dropping it."""
+        args = commands.AP.parse_args(["coverage", "a.bam", "b.bed"])
+        self.assertEqual(args.zero_coverage_floor, "fixed")
+        for argv in (
+            ["coverage", "a.bam", "b.bed"],
+            ["batch", "a.bam", "-r", "ref.cnn", "-d", "out"],
+        ):
+            args = commands.AP.parse_args([*argv, "--zero-coverage-floor", "half-read"])
+            self.assertEqual(args.zero_coverage_floor, "half-read")
+        (inv,) = ast_calls_to(commands._cmd_coverage, "do_coverage", "coverage")
+        self.assertIn("zero_coverage_floor", call_arg_names(inv))
+        with self.assertRaises(ValueError):
+            commands.do_coverage(
+                "formats/dac-my.bed",
+                "formats/na12878-chrM-Y-trunc.bam",
+                zero_coverage_floor="bogus",
+            )
+
     def test_coverage_partial_chrom_mismatch(self):
         """coverage tolerates a BED mixing present and absent contigs,
         returning only the present-contig regions, for any process count and
@@ -766,6 +786,52 @@ class PreprocessingTests(unittest.TestCase):
                 np.testing.assert_array_equal(
                     cna_cram["depth"].values, cna_bam["depth"].values
                 )
+
+    def test_coverage_half_read_floor(self):
+        """The half-read floor changes the bins without reads and no others.
+
+        An empty bin is recorded at the log2 depth that half of one read
+        aligned across it would give, a bin narrower than a read counting only
+        its own width. Its depth stays zero, which keeps it recognizable to
+        --drop-low-coverage now that its log2 value is not the placeholder.
+        """
+        bam = "formats/na12878-chrM-Y-trunc.bam"
+        bed = "formats/dac-my.bed"
+        read_len = samutil.get_read_length(bam)
+        for by_count in (False, True):
+            with self.subTest(by_count=by_count):
+                fixed = commands.do_coverage(bed, bam, by_count=by_count)
+                half_read = commands.do_coverage(
+                    bed, bam, by_count=by_count, zero_coverage_floor="half-read"
+                )
+                np.testing.assert_array_equal(half_read["depth"], fixed["depth"])
+                is_empty = (fixed["depth"] == 0).to_numpy()
+                spans = (fixed.end - fixed.start).to_numpy()
+                # The fixture has empty bins both narrower and wider than a read
+                self.assertTrue((spans[is_empty] < read_len).any())
+                self.assertTrue((spans[is_empty] > read_len).any())
+                np.testing.assert_array_equal(
+                    half_read["log2"][~is_empty], fixed["log2"][~is_empty]
+                )
+                np.testing.assert_allclose(
+                    half_read["log2"][is_empty],
+                    np.log2(
+                        0.5 * np.minimum(read_len, spans[is_empty]) / spans[is_empty]
+                    ),
+                )
+                self.assertTrue(half_read.low_coverage_mask()[is_empty].all())
+
+    def test_coverage_half_read_floor_ignored_for_bedgraph(self):
+        """A bedGraph has no reads to size the floor by, so it keeps -20."""
+        bed = "formats/dac-my.bed"
+        bedgraph = "formats/na12878-chrM-Y-trunc.bed.gz"
+        fixed = commands.do_coverage(bed, bedgraph)
+        with self.assertLogs(level="WARNING") as cm:
+            half_read = commands.do_coverage(
+                bed, bedgraph, zero_coverage_floor="half-read"
+            )
+        self.assertTrue(any("zero-coverage-floor" in m for m in cm.output))
+        pd.testing.assert_frame_equal(half_read.data, fixed.data)
 
     def test_coverage_bedgraph(self):
         """The 'coverage' command with bedGraph input."""
