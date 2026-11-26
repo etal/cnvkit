@@ -983,6 +983,7 @@ Additional filters:
   in shallow whole-genome sequencing; recomputing coverage with larger bins
   (see :ref:`autobin`) avoids it without discarding data, whereas this option
   also removes genuine homozygous deletions (see :doc:`germline`).
+  :doc:`estimators` describes how each command treats these bins.
 - ``--drop-outliers`` -- drop bins with log2 value too far from a rolling
   average, taking local variability into account. Applied by default.
 
