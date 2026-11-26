@@ -542,10 +542,13 @@ empty bin in a deeply sequenced panel remains far below a single-copy loss.
 Every bin with reads keeps its exact value, and an empty bin keeps its depth of
 0, by which ``--drop-low-coverage`` and the other commands continue to
 recognize it. A sample processed with this option can be normalized to an
-existing reference; only the sample's own empty bins differ from the result at
-the default setting. A reference built from normal samples processed with the
-option is a different reference: its values differ in the bins where some of
-those samples have no reads, and so do the samples normalized to it.
+existing reference. The sample's empty bins take different values from those
+at the default setting, and its bins with reads can change slightly where the
+floor lies within the range of their values, because the bias corrections in
+:ref:`fix`, and the centering of the antitarget bins, include the empty bins.
+A reference built from normal samples processed with the option is a different
+reference: its values differ in the bins where some of those samples have no
+reads, and so do the samples normalized to it.
 
 The option has these limits:
 
@@ -724,12 +727,13 @@ chromosome names that differ only by a ``chr`` prefix are matched.
 The depths are those that the program writing the bedGraph counted, so the
 options that select reads -- ``-q``/``--min-mapq``, ``-c``/``--count``, and
 ``--no-overlap`` -- have no effect on a bedGraph and are ignored with a warning.
+``--zero-coverage-floor`` is likewise ignored with a warning, because a depth
+profile carries no reads to size the floor by (see :ref:`zero_coverage_floor`).
 For coverage comparable to that from a BAM file, exclude the same reads that
 CNVkit excludes: unmapped, secondary, QC-failed, and duplicate reads (SAM flag
 0x704). mosdepth excludes these by default (``-F 1796``), and also counts the
 overlapping bases of a read pair once, as ``--no-overlap`` does, unless run with
-``--fast-mode``. The ``--zero-coverage-floor`` option is likewise ignored with
-a warning (see :ref:`zero_coverage_floor`).
+``--fast-mode``.
 
 
 .. _reference:

@@ -93,6 +93,11 @@ With segments (``-s``):
 - *segment_weight*: The sum of the weights of the bins supporting the segment.
 - *segment_probes*: The number of probes supporting the segment.
 
+Versions of CNVkit before 0.9.15 wrote no *low_probes* column, so every column
+after *probes* was one position to the left, and ``--drop-low-coverage`` did
+not apply to the statistics requested with ``--mean``, ``--ci`` and the other
+statistic options.
+
 The ``-t``/``--threshold`` and ``-m``/``--min-probes`` options are used to
 control which genes are reported:
 

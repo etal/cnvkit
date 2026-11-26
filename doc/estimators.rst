@@ -20,8 +20,8 @@ by its reliability improves the estimate further.
 The approximation fails as the number of reads per bin falls. Read counts are
 discrete and bounded at zero, so the log2 values of bins that hold only a few
 reads are skewed toward low values, and a bin with no reads has no finite log2
-value at all. CNVkit records such a bin at a placeholder log2 value of -20 in
-the output of the :ref:`coverage` command. The placeholder is not a
+value at all. By default, CNVkit records such a bin at a placeholder log2 value
+of -20 in the output of the :ref:`coverage` command. The placeholder is not a
 measurement: it marks a value as censored, somewhere below what a single read
 would have shown.
 
@@ -91,7 +91,7 @@ Zero-coverage bins
 ------------------
 
 A bin is treated as having no usable coverage if its read depth is zero or
-missing, or if its log2 value is missing or below -15. The last condition
+missing, or if its log2 value is missing or below -15. The threshold of -15
 identifies the placeholder in a .cnr file, where normalization to the reference
 has shifted it from -20 by at most 5 (see :doc:`tumor`), and in files that lack
 a ``depth`` column.
@@ -110,10 +110,13 @@ Each site handles these bins as follows:
   lowers the mean of each segment that contains them. The command logs a
   warning when at least 1% of the autosomal bins are affected. The
   ``--drop-low-coverage`` option excludes them.
-- :ref:`genemetrics`, :ref:`segmetrics` and :ref:`metrics`: the bins are
-  included by default. The ``--drop-low-coverage`` option excludes them from
-  every statistic these commands compute, and :ref:`genemetrics` without
-  segments also excludes them from its ``log2`` value.
+- :ref:`segmetrics` and :ref:`metrics`: the bins are included by default. The
+  ``--drop-low-coverage`` option excludes them from every statistic these
+  commands compute.
+- :ref:`genemetrics`: the bins are included by default. The
+  ``--drop-low-coverage`` option excludes them from the optional statistics,
+  and from the ``log2`` value where no segments are given. The ``depth``,
+  ``weight``, ``probes`` and ``low_probes`` columns count every bin either way.
 
 The bins are kept by default because they can be the only evidence of a
 homozygous deletion. In a germline sample or a tumor sample of high purity,
