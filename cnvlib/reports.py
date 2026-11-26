@@ -369,10 +369,24 @@ def compute_gene_stats(
     """
     warnings.simplefilter("ignore", RuntimeWarning)
 
-    stats_dict: dict[str, float] = {}
     if not any((location_stats, spread_stats, interval_stats)):
-        return stats_dict
+        return {}
 
+    # A gene left with no usable bins reports every requested statistic as
+    # NaN, so that each row of the table carries the same fields
+    stats_dict: dict[str, float] = dict.fromkeys(
+        (
+            *location_stats,
+            *spread_stats,
+            *(
+                f"{name}_{bound}"
+                for name in ("ci", "pi")
+                if name in interval_stats
+                for bound in ("lo", "hi")
+            ),
+        ),
+        np.nan,
+    )
     bins_log2 = bins["log2"].to_numpy()
     if len(bins_log2) == 0:
         return stats_dict
@@ -451,8 +465,6 @@ def group_by_genes(
         is_low = rows.low_coverage_mask()
         bins = rows[~is_low] if skip_low else rows
         segmean = segment_mean(bins)
-        if segmean is None:
-            continue  # type: ignore[unreachable]
         outrow = rows[0].copy()
         outrow["end"] = rows.end.iat[-1]
         outrow["gene"] = gene

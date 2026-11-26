@@ -266,6 +266,57 @@ class AnalysisTests(unittest.TestCase):
                 self.assertEqual(table.loc["WHOLE", "probes"], 3)
                 self.assertEqual(table.loc["WHOLE", "low_probes"], 0)
 
+    def test_genemetrics_statistics_survive_a_gene_without_usable_bins(self):
+        """A gene with no usable bins reports NaN statistics, not missing columns.
+
+        With segments and --drop-low-coverage, a fully deleted gene is still
+        reported, at its segment's log2 value, although none of its own bins
+        remain. The table takes its columns from its first row, so a first
+        gene without the statistic fields would remove them from every gene.
+        """
+        log2 = [-20.0, -20.0, -20.0, 1.0, 1.2, 0.8, 1.0]
+        n_bins = len(log2)
+        cnarr = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": np.arange(n_bins) * 1000,
+                    "end": np.arange(n_bins) * 1000 + 500,
+                    "gene": ["DEL"] * 3 + ["AMP"] * 4,
+                    "log2": log2,
+                    "depth": [0.0] * 3 + [50.0] * 4,
+                    "weight": 1.0,
+                }
+            )
+        )
+        segments = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": [0, 3000],
+                    "end": [2500, 6500],
+                    "gene": ["DEL", "AMP"],
+                    "log2": [-5.0, 1.0],
+                    "probes": [3, 4],
+                    "weight": [3.0, 4.0],
+                }
+            )
+        )
+        table = commands.do_genemetrics(
+            cnarr,
+            segments,
+            min_probes=1,
+            skip_low=True,
+            is_sample_female=True,
+            location_stats=["mean"],
+            spread_stats=["stdev"],
+            interval_stats=["ci", "pi"],
+        ).set_index("gene")
+        stat_cols = ["mean", "stdev", "ci_lo", "ci_hi", "pi_lo", "pi_hi"]
+        self.assertTrue(table.loc["DEL", stat_cols].isna().all())
+        self.assertAlmostEqual(table.loc["AMP", "mean"], 1.0)
+        self.assertTrue(table.loc["AMP", stat_cols].notna().all())
+
     @pytest.mark.slow
     def test_genemetrics_with_stats(self):
         """The 'genemetrics' command with statistics options."""

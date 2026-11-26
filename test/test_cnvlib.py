@@ -967,11 +967,13 @@ class OtherTests(unittest.TestCase):
         self.assertIn("ci_lo", stats)
         self.assertFalse(np.isnan(stats["ci_lo"]))
 
-        # All NaN: should return empty stats (no crash)
+        # All NaN: the interval is undefined, reported as NaN (no crash), so
+        # that the gene's row keeps the fields other genes have
         bins_allnan = bins.copy()
         bins_allnan["weight"] = np.nan
         stats2 = reports.compute_gene_stats(bins_allnan, 0.15, interval_stats=["ci"])
-        self.assertNotIn("ci_lo", stats2)
+        self.assertTrue(np.isnan(stats2["ci_lo"]))
+        self.assertTrue(np.isnan(stats2["ci_hi"]))
 
 
 class CNAryByGeneTests(unittest.TestCase):
