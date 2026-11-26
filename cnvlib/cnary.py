@@ -593,6 +593,19 @@ class CopyNumArray(GenomicArray):
             chry = chry.drop_low_coverage()
         if len(chry):
             chry_l = chry["log2"].to_numpy()
+            if "depth" in chry and "spread" not in chry:
+                # A sample's chrY bin without reads is absent, but its log2
+                # value does not always say so: centering a shallow sample
+                # raises the placeholder, and other floors are finite (the
+                # expression floor of `import-rna`, a half-read floor). The
+                # zero depth then marks the absence. A value that already
+                # marks it is kept as it is. A pooled reference is exempt: its
+                # depth is the center of all samples' depths, zero where most
+                # are female, beside a log2 value taken from the males.
+                is_unmarked = (chry["depth"].to_numpy() == 0) & (
+                    chry_l >= params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
+                )
+                chry_l = np.where(is_unmarked, params.NULL_LOG2_COVERAGE, chry_l)
             chry_w = chry["weight"].to_numpy() if use_weight else None
             chry_med = _median(chry_l, chry_w)
             chry_male_lr = _maleness(chry_med, -params.NULL_LOG2_COVERAGE, 0.0)

@@ -525,6 +525,71 @@ class CNATests(unittest.TestCase):
         cna = _make(chrx_ratio=-1.0, chry_ratio=-1.0)
         self.assertIs(cna.guess_xx(verbose=False), np.False_)
 
+    def test_sex_inference_reads_zero_depth_chry_as_absent(self):
+        """A sample's chrY bin without reads is absent, whatever its log2 value.
+
+        The chrY test places an absent chromosome at the placeholder for zero
+        depth, but not every path leaves it there: centering a sample of very
+        low depth raises it, and `import-rna` records a gene without reads at
+        an expression floor of -5. A chrY with no reads at all then lay on the
+        male side of the boundary, and a haploid-looking chrX was enough to
+        call a female sample male. The zero depth has to decide.
+        """
+
+        def _make(chry_log2, chrx_log2=-1.0, chry_depth=0.0, **extra_cols):
+            n_auto, n_x, n_y = 400, 50, 50
+            rng = np.random.default_rng(0)
+            log2 = np.concatenate(
+                [
+                    rng.normal(0.0, 0.1, n_auto),
+                    rng.normal(chrx_log2, 0.1, n_x),
+                    np.full(n_y, chry_log2),
+                ]
+            )
+            depth = np.exp2(log2 + 7)
+            depth[-n_y:] = chry_depth
+            n_bins = len(log2)
+            return CopyNumArray(
+                pd.DataFrame(
+                    {
+                        "chromosome": ["chr1"] * n_auto
+                        + ["chrX"] * n_x
+                        + ["chrY"] * n_y,
+                        "start": np.arange(n_bins) * 1000,
+                        "end": np.arange(n_bins) * 1000 + 200,
+                        "gene": "-",
+                        "log2": log2,
+                        "depth": depth,
+                        **extra_cols,
+                    }
+                )
+            )
+
+        absent = _make(params.NULL_LOG2_COVERAGE).compare_sex_chromosomes()
+        self.assertFalse(absent[0])
+        # A shallow sample after centering, then two finite floors
+        for chry_log2 in (-13.9, -5.0, -2.0):
+            with self.subTest(chry_log2=chry_log2):
+                sample = _make(chry_log2)
+                self.assertEqual(sample.compare_sex_chromosomes(), absent)
+                self.assertIs(sample.guess_xx(verbose=False), np.True_)
+        # Against a haploid-X reference, chrX at 0 is the male position
+        self.assertIs(
+            _make(-5.0, chrx_log2=0.0).guess_xx(True, verbose=False), np.True_
+        )
+        # A value that already marks the bin as empty is kept, so results for
+        # files where it does are unchanged
+        _is_xy, stats = _make(-24.0).compare_sex_chromosomes()
+        self.assertAlmostEqual(stats["chry_ratio"], -24.0, places=1)
+        # Reads on chrY at the same log2 value are evidence of presence
+        present = _make(-5.0, chry_depth=0.25)
+        self.assertIs(present.guess_xx(verbose=False), np.False_)
+        # A pooled reference is not a sample: its depth is the center of all
+        # samples' depths, zero on chrY where most are female, while its log2
+        # comes from the male samples
+        pooled = _make(-1.0, spread=0.1)
+        self.assertIs(pooled.guess_xx(verbose=False), np.False_)
+
     def test_guess_xx_no_chry_data_falls_back_to_chrx_alone(self):
         """When chrY is entirely absent (e.g. a female reference excluded chrY
         from the panel, or a target list with no chrY bins), the decision

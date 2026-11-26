@@ -174,6 +174,16 @@ female default. The 1.0 boundary is the midpoint between the two expected
 positions in log-space, so the decision is threshold-free up to that
 geometry.
 
+A chrY bin of a sample with a read depth of 0 is evaluated at the sentinel
+unless its log2 value already lies near it, below -15. The log2 value alone
+does not always mark such a bin as empty: centering a sample of very low depth
+raises the sentinel toward the boundary, and :ref:`import-rna` records a gene
+without reads at a floor of -5. A chrY with no reads at all could then lie on
+the male side of the boundary, so the depth decides. The effect is one-way,
+toward the female default. A pooled reference is not treated this way, because
+its depth column summarizes samples of both sexes. Versions of CNVkit before
+0.9.15 used the log2 value in every case.
+
 When no chromosome-Y data is present at all -- for example, a female
 reference profile that excluded chrY from the panel, or a target list with
 no chrY bins -- the AND-gate naturally collapses to a chrX-only check
