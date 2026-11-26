@@ -33,8 +33,8 @@ def log2_depth(depth: ArrayLike, floor: ArrayLike = NULL_LOG2_COVERAGE) -> np.nd
     depth : array-like or float
         Absolute-scale read depths, or coverage ratios as Picard reports them.
     floor : array-like or float, optional
-        The log2 value for a zero depth: one value, or one per element of
-        `depth`. Default is `NULL_LOG2_COVERAGE`.
+        The log2 value for a depth of zero or below: one value, or one per
+        element of `depth`. Default is `NULL_LOG2_COVERAGE`.
 
     Returns
     -------
@@ -43,7 +43,8 @@ def log2_depth(depth: ArrayLike, floor: ArrayLike = NULL_LOG2_COVERAGE) -> np.nd
     """
     depth = np.asarray(depth, dtype=float)
     log2 = np.full(depth.shape, floor, dtype=float)
-    # Written so that NaN, for which every comparison is False, is transformed
+    # Not `depth > 0`: NaN fails both comparisons, so only the negated form
+    # selects it, giving NaN rather than `floor`
     np.log2(depth, out=log2, where=~(depth <= 0))
     return log2
 
@@ -66,8 +67,8 @@ def half_read_log2(read_len: float, bin_sizes: ArrayLike) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        The floor of each bin; `NULL_LOG2_COVERAGE` for a bin of no width, and
-        for every bin if `read_len` is not a positive number.
+        The floor of each bin; `NULL_LOG2_COVERAGE` for a bin whose width is
+        not positive, and for every bin if `read_len` is not a positive number.
     """
     bin_sizes = np.asarray(bin_sizes, dtype=float)
     floor = np.full(bin_sizes.shape, NULL_LOG2_COVERAGE)

@@ -346,7 +346,8 @@ class ReferenceTests(unittest.TestCase):
         """A sample's zero-depth floor does not reach its other bins in 'fix'.
 
         A sample whose empty bins were recorded at a half-read floor can be
-        normalized to a reference built at the fixed floor: only the empty
+        normalized to a reference built at the fixed floor. Where that floor
+        lies below the values of the bins with reads, as here, only the empty
         bins differ from the same sample at the fixed floor, and their zero
         depth still identifies them.
         """

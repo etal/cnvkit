@@ -310,9 +310,12 @@ class AnalysisTests(unittest.TestCase):
             is_sample_female=True,
             location_stats=["mean"],
             spread_stats=["stdev"],
-            interval_stats=["ci", "pi"],
+            interval_stats=["pi", "ci"],
         ).set_index("gene")
         stat_cols = ["mean", "stdev", "ci_lo", "ci_hi", "pi_lo", "pi_hi"]
+        # The interval columns keep one order, whatever order they were
+        # requested in
+        self.assertEqual([col for col in table.columns if col in stat_cols], stat_cols)
         self.assertTrue(table.loc["DEL", stat_cols].isna().all())
         self.assertAlmostEqual(table.loc["AMP", "mean"], 1.0)
         self.assertTrue(table.loc["AMP", stat_cols].notna().all())

@@ -2213,9 +2213,9 @@ P_genemetrics.add_argument(
 P_genemetrics.add_argument(
     "--drop-low-coverage",
     action="store_true",
-    help="""Exclude very-low-coverage bins from each gene's log2 value and
-            statistics, to avoid false-positive deletions in poor-quality tumor
-            samples.""",
+    help="""Exclude very-low-coverage bins from each gene's optional
+            statistics, and from its log2 value where no segments are given, to
+            avoid false-positive deletions in poor-quality tumor samples.""",
 )
 add_haploid_x_reference(P_genemetrics)
 add_sample_sex(P_genemetrics)

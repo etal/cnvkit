@@ -486,9 +486,12 @@ class CopyNumArray(GenomicArray):
         haploid/diploid conventions for chrX (depending on
         ``is_haploid_x_reference``) and an absent-versus-present convention
         for chrY (female chrY at ``params.NULL_LOG2_COVERAGE``, male chrY
-        at autosome-median). A ratio > 1 means the male hypothesis fits
-        better; the 1.0 boundary is the midpoint between the two expected
-        positions, so the decision is threshold-free up to that geometry.
+        at autosome-median). A sample's chrY bin with a depth of zero is
+        placed at the female position unless its log2 value is already near
+        it (a pooled reference is exempt), since not every path leaves an
+        empty bin there. A ratio > 1 means the male hypothesis fits better;
+        the 1.0 boundary is the midpoint between the two expected positions,
+        so the decision is threshold-free up to that geometry.
 
         The two ratios combine with an AND-gate: the sample is male only
         when *both* chrX and chrY independently look more male than female.
@@ -601,7 +604,8 @@ class CopyNumArray(GenomicArray):
                 # zero depth then marks the absence. A value that already
                 # marks it is kept as it is. A pooled reference is exempt: its
                 # depth is the center of all samples' depths, zero where most
-                # are female, beside a log2 value taken from the males.
+                # are female, beside the log2 value of -1 that pooling assigns
+                # to a female sample's chrY, which is not that of an empty bin.
                 is_unmarked = (chry["depth"].to_numpy() == 0) & (
                     chry_l >= params.NULL_LOG2_COVERAGE - params.MIN_REF_COVERAGE
                 )

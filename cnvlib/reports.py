@@ -365,7 +365,9 @@ def compute_gene_stats(
     Returns
     -------
     dict
-        Dictionary of computed statistics.
+        The requested statistics by name, with the ci and pi bounds always in
+        that order. A statistic is NaN where the gene's bins do not support it,
+        as none does for a gene with no usable bins.
     """
     warnings.simplefilter("ignore", RuntimeWarning)
 
@@ -373,7 +375,9 @@ def compute_gene_stats(
         return {}
 
     # A gene left with no usable bins reports every requested statistic as
-    # NaN, so that each row of the table carries the same fields
+    # NaN, so that each row of the table carries the same fields. The ci and
+    # pi names are generated in this fixed order, not the order of
+    # `interval_stats`, which follows the command line.
     stats_dict: dict[str, float] = dict.fromkeys(
         (
             *location_stats,
@@ -452,10 +456,7 @@ def group_by_genes(
 
     Bins with NaN weights are excluded from weight sums and depth averages.
 
-    Return an iterable of genes, in chromosomal order, associated with their
-    location and coverages:
-
-        [(gene, chrom, start, end, [coverages]), ...]
+    Return an iterator of one row per gene, in chromosomal order.
     """
     ignore = ("", *params.ANTITARGET_ALIASES)
     for gene, rows in cnarr.by_gene():
@@ -489,7 +490,7 @@ def group_by_genes(
         if any((location_stats, spread_stats, interval_stats)):
             gene_stats = compute_gene_stats(
                 bins,
-                segmean,  # type: ignore[arg-type]
+                segmean,
                 location_stats,
                 spread_stats,
                 interval_stats,

@@ -531,9 +531,9 @@ class CNATests(unittest.TestCase):
         The chrY test places an absent chromosome at the placeholder for zero
         depth, but not every path leaves it there: centering a sample of very
         low depth raises it, and `import-rna` records a gene without reads at
-        an expression floor of -5. A chrY with no reads at all then lay on the
-        male side of the boundary, and a haploid-looking chrX was enough to
-        call a female sample male. The zero depth has to decide.
+        an expression floor of -5. A chrY with no reads at all could then lie on
+        the male side of the boundary, where a haploid-looking chrX was enough
+        to call a female sample male. The zero depth has to decide.
         """
 
         def _make(chry_log2, chrx_log2=-1.0, chry_depth=0.0, **extra_cols):
@@ -573,7 +573,8 @@ class CNATests(unittest.TestCase):
                 sample = _make(chry_log2)
                 self.assertEqual(sample.compare_sex_chromosomes(), absent)
                 self.assertIs(sample.guess_xx(verbose=False), np.True_)
-        # Against a haploid-X reference, chrX at 0 is the male position
+        # Against a haploid-X reference, chrX at 0 is the male position, yet
+        # the absent chrY keeps the call female
         self.assertIs(
             _make(-5.0, chrx_log2=0.0).guess_xx(True, verbose=False), np.True_
         )
@@ -585,8 +586,8 @@ class CNATests(unittest.TestCase):
         present = _make(-5.0, chry_depth=0.25)
         self.assertIs(present.guess_xx(verbose=False), np.False_)
         # A pooled reference is not a sample: its depth is the center of all
-        # samples' depths, zero on chrY where most are female, while its log2
-        # comes from the male samples
+        # samples' depths, zero on chrY where most are female, beside the log2
+        # value of -1 that pooling assigns to a female sample's chrY
         pooled = _make(-1.0, spread=0.1)
         self.assertIs(pooled.guess_xx(verbose=False), np.False_)
 
@@ -971,7 +972,7 @@ class OtherTests(unittest.TestCase):
         # The three good bins remain (0.1, 0.2, -0.1)
         self.assertEqual(len(kept), 3)
 
-    def test_log2_depth_floors_only_zero(self):
+    def test_log2_depth_floors_zero_and_keeps_nan(self):
         """log2_depth floors a zero depth and transforms every positive value.
 
         A NaN depth is unknown, not absent, so it must not be reported as the
@@ -1009,7 +1010,8 @@ class OtherTests(unittest.TestCase):
         chrY of a female sample.
         """
 
-        def _cna(n_empty, n_bins=10):
+        def _cna(n_empty):
+            n_bins = 10
             return cnary.CopyNumArray(
                 pd.DataFrame(
                     {
@@ -1036,7 +1038,7 @@ class OtherTests(unittest.TestCase):
         self.assertTrue(np.isnan(log2[4]))
 
     def test_half_read_log2(self):
-        """The half-read floor is half a read's depth, capped at the bin width.
+        """The floor is the log2 depth of half a read, capped at the bin width.
 
         A bin of no width, or a read length that is not a positive number, as
         from a BAM file without reads, leaves nothing to size the floor by, and
