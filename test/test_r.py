@@ -344,6 +344,45 @@ class RTests(unittest.TestCase):
         for arm, sent in part.items():
             self.assertEqual(sent, whole[arm])
 
+    @pytest.mark.slow
+    def test_cbs_threshold_sets_significance_level(self):
+        """The segment threshold reaches DNAcopy as its significance level (#905).
+
+        The arm holds a single 0.2 log2 step in noise of standard deviation 0.3.
+        With this noise draw and DNAcopy's fixed permutation seed, the step's
+        p-value lies between 0.001 and 0.003, so the default threshold of 0.0001
+        rejects the breakpoint and 0.01 accepts it. A threshold that failed to
+        reach R would give one segment for both values. At 200 bins the arm is
+        tested by permutation alone; DNAcopy adds its analytic approximation
+        only above 200, and alpha enters both paths through the same argument.
+        """
+        n_bins = 200
+        rng = np.random.default_rng(1)
+        log2 = rng.normal(0, 0.3, n_bins)
+        log2[n_bins // 2 :] += 0.2
+        starts = np.arange(n_bins) * 1000
+        arm = cnary.CopyNumArray(
+            pd.DataFrame(
+                {
+                    "chromosome": "chr1",
+                    "start": starts,
+                    "end": starts + 1000,
+                    "gene": "-",
+                    "log2": log2,
+                    "weight": 1.0,
+                }
+            ),
+            {"sample_id": "step"},
+        )
+        strict = segmentation._do_segmentation(
+            arm, "cbs", None, 0.0001, skip_outliers=0
+        )
+        self.assertEqual(len(strict), 1)
+        lenient = segmentation._do_segmentation(arm, "cbs", None, 0.01, skip_outliers=0)
+        self.assertEqual(len(lenient), 2)
+        # The accepted breakpoint is the planted step, not a noise excursion.
+        self.assertLess(abs(lenient["end"].iat[0] - starts[n_bins // 2]), 5000)
+
 
 def _test_method(self, method):
     for cnr in (

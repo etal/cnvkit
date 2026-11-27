@@ -55,14 +55,17 @@ def do_segmentation(
     cnarr : CopyNumArray
         Bin-level copy number ratios (.cnr file).
     method : str
-        Segmentation algorithm: 'cbs', 'haar', 'hmm', 'hmm-tumor',
+        Segmentation algorithm: 'cbs', 'haar', 'none', 'hmm', 'hmm-tumor',
         or 'hmm-germline'.
     diploid_parx_genome : str, optional
         Reference genome name for pseudo-autosomal region handling, as
         registered in `skgenome.genomebuild` (e.g., 'grch38').
     threshold : float, optional
-        Significance threshold (for CBS/haar) or smoothing window size
-        (for HMM methods). If None, uses method-specific defaults.
+        For 'cbs', the significance level (alpha) passed to DNAcopy; for
+        'haar', the false discovery rate (q-value); for the HMM methods, the
+        smoothing window width in bins, truncated to an integer of at least 2.
+        Unused by 'none'. If None, 'cbs' and 'haar' use 0.0001 and the HMM
+        methods estimate the window width from the data.
     variants : VariantArray, optional
         Variant allele frequencies to incorporate into HMM segmentation.
     skip_low : bool, optional
