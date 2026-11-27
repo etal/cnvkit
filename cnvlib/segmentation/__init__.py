@@ -27,6 +27,12 @@ SEGMENT_METHODS = ("cbs", "haar", "none", "hmm", "hmm-tumor", "hmm-germline")
 # HMM method variants, for dispatch (replaces scattered method.startswith("hmm"))
 _HMM_METHODS = frozenset({"hmm", "hmm-tumor", "hmm-germline"})
 
+#: Methods that read `threshold` as a significance level (DNAcopy's alpha for
+#: 'cbs', the FDR q-value for 'haar'), mapped to the level used when the caller
+#: gives none. The HMM methods read `threshold` as a smoothing window width in
+#: bins instead, and 'none' ignores it.
+DEFAULT_SIGNIFICANCE_THRESHOLDS = {"cbs": 0.0001, "haar": 0.0001}
+
 #: Warn when at least this fraction of autosomal bins have no or near-zero
 #: coverage. At 1%, placeholder values injected into a clean WGS profile already
 #: shift CBS segment means by about 0.2 log2 and multiply the haar segment count
@@ -63,9 +69,10 @@ def do_segmentation(
     threshold : float, optional
         For 'cbs', the significance level (alpha) passed to DNAcopy; for
         'haar', the false discovery rate (q-value); for the HMM methods, the
-        smoothing window width in bins, truncated to an integer of at least 2.
-        Unused by 'none'. If None, 'cbs' and 'haar' use 0.0001 and the HMM
-        methods estimate the window width from the data.
+        smoothing window width in bins, which must be a finite number of at
+        least 2 and is truncated to an integer. Unused by 'none'. If None,
+        'cbs' and 'haar' use 0.0001 and the HMM methods estimate the window
+        width from the data.
     variants : VariantArray, optional
         Variant allele frequencies to incorporate into HMM segmentation.
     skip_low : bool, optional
@@ -93,7 +100,9 @@ def do_segmentation(
     Raises
     ------
     ValueError
-        If method is not one of the supported segmentation methods.
+        If method is not one of the supported segmentation methods, or if an
+        HMM method is given a smoothing window width that is below 2 bins or
+        not finite.
     """
     if method not in SEGMENT_METHODS:
         raise ValueError(
@@ -101,6 +110,16 @@ def do_segmentation(
             + ", ".join(SEGMENT_METHODS)
             + "; got: "
             + repr(method)
+        )
+    if method in _HMM_METHODS and threshold is not None and not 2 <= threshold < np.inf:
+        # The window width is truncated to an integer before smoothing, so a
+        # significance level such as 1e-6 would arrive there as 0. The chained
+        # comparison refuses NaN and infinity as well.
+        raise ValueError(
+            f"For method {method!r}, 'threshold' is the width in bins of the "
+            "log2 smoothing window and must be a finite number of at least 2; "
+            f"got {threshold!r}. A significance level applies only to: "
+            + ", ".join(DEFAULT_SIGNIFICANCE_THRESHOLDS)
         )
 
     # Handle empty input (e.g., CNR file with only header row)
@@ -129,16 +148,17 @@ def do_segmentation(
         variants.sort()
 
     if threshold is None:
-        threshold = {
-            "cbs": 0.0001,
-            "haar": 0.0001,
-        }.get(method)
+        threshold = DEFAULT_SIGNIFICANCE_THRESHOLDS.get(method)
     msg = "Segmenting with method " + repr(method)
     if threshold is not None:
         if method in _HMM_METHODS:
-            msg += f", smoothing window size {threshold},"
-        else:
+            msg += f", smoothing window size {int(threshold)},"
+        elif method in DEFAULT_SIGNIFICANCE_THRESHOLDS:
             msg += f", significance threshold {threshold},"
+        else:
+            logging.warning(
+                "Method %r ignores the given threshold %s", method, threshold
+            )
     msg += f" in {processes} processes"
     logging.info(msg)
 

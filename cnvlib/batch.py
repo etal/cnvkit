@@ -570,14 +570,23 @@ def batch_run_sample(
     )
 
     logging.info("Segmenting %s.cnr ...", sample_pfx)
+    # Whole-genome data is segmented at a stricter significance level than the
+    # method default. Only methods that read the threshold as a significance
+    # level receive it; the HMM methods read it as a smoothing window width.
+    segment_threshold = (
+        1e-6
+        if seq_method == "wgs"
+        and segment_method in segmentation.DEFAULT_SIGNIFICANCE_THRESHOLDS
+        else None
+    )
     segments = segmentation.do_segmentation(
         cnarr,
         segment_method,
         diploid_parx_genome,
+        threshold=segment_threshold,
         rscript_path=rscript_path,
         skip_low=skip_low,
         processes=processes,
-        **({"threshold": 1e-6} if seq_method == "wgs" else {}),  # type: ignore[arg-type]
     )
 
     logging.info("Post-processing %s.cns ...", sample_pfx)
