@@ -1369,9 +1369,15 @@ P_segment.add_argument(
     "-t",
     "--threshold",
     type=float,
-    help="""Significance threshold (p-value or FDR, depending on method) to accept
-            breakpoints during segmentation. For HMM methods, this is the smoothing
-            window size.""",
+    help="""Method-specific sensitivity parameter for segmentation. For 'cbs', it
+            is the significance level (alpha) of DNAcopy's test for accepting a
+            breakpoint, and for 'haar', the false discovery rate (q-value); for
+            both, smaller values yield fewer, larger segments. CBS output often
+            changes little at values below 0.01. For the HMM methods, it is the
+            width in bins of the smoothing window applied to log2 ratios, an
+            integer of at least 2. This option is unrelated to the log2 ratio
+            cutoffs of 'call --thresholds'. [Default: 0.0001 for 'cbs' and
+            'haar'; estimated from the data for the HMM methods]""",
 )
 P_segment.add_argument(
     "--drop-low-coverage",

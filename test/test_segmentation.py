@@ -224,6 +224,46 @@ class SegmentationTests(unittest.TestCase):
         self.assertIn("significance threshold 0.0,", msg)
         self.assertNotIn("0.0001", msg)
 
+    def test_hmm_threshold_below_two_is_refused(self):
+        """An HMM window width below 2 bins, or not finite, is refused with the
+        value as given.
+
+        For the HMM methods the threshold is a smoothing window width, which
+        is truncated to an integer. A significance level such as 1e-6 used to
+        reach the smoother as a width of 0 and fail with a message that
+        reported the truncated value and offered fractional widths, which this
+        path cannot accept.
+        """
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        for method in ("hmm", "hmm-tumor", "hmm-germline"):
+            for threshold in (1e-6, 1.9, float("nan"), float("inf")):
+                with self.subTest(method=method, threshold=threshold):
+                    with self.assertRaisesRegex(
+                        ValueError, rf"at least 2; got {threshold!r}"
+                    ) as cm:
+                        segmentation.do_segmentation(
+                            cnarr, method, threshold=threshold, processes=1
+                        )
+                    self.assertNotIn("fraction", str(cm.exception))
+
+    def test_none_warns_that_threshold_is_ignored(self):
+        """Method 'none' warns about a given threshold instead of logging it
+        as a significance threshold, and its output does not depend on it."""
+        cnarr = cnvlib.read("formats/amplicon.cnr")
+        with self.assertLogs(level="INFO") as cm:
+            given = segmentation.do_segmentation(
+                cnarr, "none", threshold=1e-6, processes=1
+            )
+        self.assertTrue(
+            any(
+                rec.levelno == logging.WARNING and "ignores" in rec.getMessage()
+                for rec in cm.records
+            )
+        )
+        self.assertFalse(any("significance threshold" in line for line in cm.output))
+        default = segmentation.do_segmentation(cnarr, "none", processes=1)
+        pd.testing.assert_frame_equal(given.data, default.data)
+
     def test_haar_vcf_detects_copy_neutral_loh(self):
         """`-m haar --vcf` unions depth+BAF breakpoints -> catches copy-neutral
         LOH (flat depth, BAF shift), and adds a 'baf' column."""

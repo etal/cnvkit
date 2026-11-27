@@ -207,6 +207,82 @@ class BatchTests(unittest.TestCase):
             bgz = self._make_reference(os.path.join(tmp_dir, "bgzip"), fasta=bgz_fasta)
             self.assertSameFiles(plain, bgz)
 
+    def _run_sample(self, ref_files, out_dir, seq_method, segment_method):
+        """Run batch_run_sample on the chrM-Y-trunc BAM with `ref_files`, the
+        (reference, target BED, antitarget BED) triple of _make_reference."""
+        ref_fname, tgt_bed_fname, anti_bed_fname = ref_files
+        batch.batch_run_sample(
+            "formats/na12878-chrM-Y-trunc.bam",
+            tgt_bed_fname,
+            anti_bed_fname,
+            ref_fname,
+            out_dir,
+            is_haploid_x_reference=True,
+            diploid_parx_genome=None,
+            plot_scatter=False,
+            plot_diagram=False,
+            rscript_path="Rscript",
+            by_count=False,
+            min_mapq=0,
+            skip_low=False,
+            seq_method=seq_method,
+            segment_method=segment_method,
+            processes=1,
+            do_cluster=False,
+        )
+
+    def test_batch_wgs_segments_with_hmm_methods(self):
+        """``batch -m wgs`` completes with every HMM segmentation method.
+
+        Whole-genome batch runs segment at a significance level of 1e-6. The
+        HMM methods read the segmentation threshold as a smoothing window
+        width in bins instead, where 1e-6 truncated to a width of 0 and
+        segmentation failed, so they must receive their own default.
+        """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ref_files = self._make_reference(tmp_dir)
+            for method in ("hmm", "hmm-tumor", "hmm-germline"):
+                with self.subTest(method=method):
+                    out_dir = os.path.join(tmp_dir, method)
+                    self._run_sample(ref_files, out_dir, "wgs", method)
+                    cns = cnvlib.read(os.path.join(out_dir, "na12878-chrM-Y-trunc.cns"))
+                    self.assertGreater(len(cns), 0)
+
+    def test_batch_wgs_threshold_reaches_significance_methods_only(self):
+        """Whole-genome batch runs pass 1e-6 to 'cbs' and 'haar' and nothing to
+        the other methods; amplicon runs pass nothing to any method.
+
+        The 1e-6 sets the significance level of whole-genome 'cbs' and 'haar'
+        segmentation, so dropping it would change their output. Segmentation
+        is stopped at the call, so 'cbs' needs no R installation.
+        """
+
+        class _StopAtSegmentation(Exception):
+            pass
+
+        cases = [
+            ("wgs", "cbs", 1e-6),
+            ("wgs", "haar", 1e-6),
+            ("wgs", "none", None),
+            ("wgs", "hmm", None),
+            ("amplicon", "cbs", None),
+            ("amplicon", "haar", None),
+        ]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ref_files = self._make_reference(tmp_dir)
+            for seq_method, segment_method, expected in cases:
+                with self.subTest(seq_method=seq_method, segment_method=segment_method):
+                    with (
+                        mock.patch.object(
+                            batch.segmentation,
+                            "do_segmentation",
+                            side_effect=_StopAtSegmentation,
+                        ) as spy,
+                        self.assertRaises(_StopAtSegmentation),
+                    ):
+                        self._run_sample(ref_files, tmp_dir, seq_method, segment_method)
+                    self.assertEqual(spy.call_args.kwargs["threshold"], expected)
+
     def test_batch_gzipped_regions_name_outputs_like_plain(self):
         """Gzipped targets (hybrid) or access regions (WGS) are named and
         processed as their uncompressed equivalents."""

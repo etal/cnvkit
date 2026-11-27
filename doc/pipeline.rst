@@ -935,10 +935,54 @@ Infer discrete copy number segments from the given coverage table::
 Segmentation runs independently on each chromosome arm, and can be parallelized
 with the ``-p`` option (except for the HMM methods), similar to ``batch``.
 
-The significance threshold to accept a segment or breakpoint is passed to the
-underlying method with the option ``--threshold``/``-t``. This is typically the
-p-value or q-value cutoff, or whatever parameter the underlying method uses to
-adjust its sensitivity.
+The option ``--threshold``/``-t`` adjusts the sensitivity of the segmentation
+method, and its meaning depends on the method:
+
+- ``cbs``: the significance level (``alpha``) of DNAcopy's test for accepting a
+  breakpoint. Default 1e-4.
+- ``haar``: the false discovery rate (q-value) for accepting a breakpoint.
+  Default 1e-4.
+- ``hmm``, ``hmm-tumor``, ``hmm-germline``: the width, in bins, of the
+  smoothing window applied to the log2 ratios before segmentation. The value is
+  truncated to an integer, which must be at least 2. By default the width is
+  estimated from the data.
+- ``none``: not used.
+
+For ``cbs`` and ``haar``, a smaller value yields fewer, larger segments. When
+``batch`` processes whole-genome data (``-m wgs``) with either of these methods,
+it segments with a threshold of 1e-6 rather than the default; ``batch`` has no
+option to change the threshold, so to use another value, run ``segment`` on the
+``.cnr`` file afterward. This option is unrelated to the log2 ratio cutoffs
+that ``call --thresholds`` assigns to copy number states.
+
+.. note::
+   **CBS sensitivity.** CBS segmentation often changes little across a wide
+   range of ``--threshold`` values. On three samples from CNVkit's test data
+   (1,433 to 165,626 bins), every value from 1e-10 up to the default 1e-4
+   produced the same number of segments; 0.01 added 2 to 7 segments per sample,
+   and 0.05 added 5 to 26.
+
+   Two effects account for the lower end of that range. First, a breakpoint
+   supported by many bins tends to have a p-value far below any threshold from
+   1e-10 to 1e-4. Second, in an interval of 200 bins or fewer, DNAcopy tests
+   each candidate breakpoint by 10,000 random permutations alone, without an
+   analytic approximation, and 10,000 permutations cannot resolve a p-value
+   smaller than 1e-4. In such an interval, every threshold below 1e-4 gives the
+   same result, which differs from the result at the default of 1e-4 only for
+   a breakpoint for which exactly one permuted statistic equals or exceeds the
+   observed statistic. This limit applies to every interval of 200 bins or
+   fewer that CBS tests, including those it reaches by splitting a long
+   chromosome arm. On longer intervals, smaller values can still remove
+   breakpoints.
+
+   To detect more, smaller segments, raise the threshold to 0.01 or more.
+   Higher values also admit more breakpoints that reflect noise, and they make
+   more of the segmentation depend on DNAcopy's random permutations. On the
+   47-arm exome fixture described under *Permutation significance* below, 16
+   different random seeds gave more than one segmentation for 1 arm at 1e-4 and
+   for 4 arms at 0.01. Trying more seeds can reveal more such arms, as the
+   note below reports for the default. At 0.05, CBS was also several times
+   slower on the three samples above.
 
 
 Segmentation methods
@@ -952,8 +996,7 @@ The following segmentation algorithms can be specified with the ``-m`` option:
 - ``haar`` -- a pure-Python implementation of `HaarSeg
   <https://doi.org/10.1093/bioinformatics/btn272>`_,
   a wavelet-based method. Very fast and dependency-free, making it a good
-  fallback when R is unavailable. Sensitivity is controlled by the FDR
-  q-value (``--threshold``); smaller values yield fewer, larger segments.
+  fallback when R is unavailable.
 - ``hmm`` -- Hidden Markov Model with distance-dependent transitions and joint
   log2/BAF emissions. Estimates tumor purity and ploidy via grid search over
   marginal likelihood. Suitable for most samples.
