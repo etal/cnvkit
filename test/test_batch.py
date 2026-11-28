@@ -207,6 +207,108 @@ class BatchTests(unittest.TestCase):
             bgz = self._make_reference(os.path.join(tmp_dir, "bgzip"), fasta=bgz_fasta)
             self.assertSameFiles(plain, bgz)
 
+    def _make_split_reference(self, out_dir, **kwargs):
+        """Build a flat WGS reference over chr1:0-1500000 with 1 kb genic bins,
+        and return its bins."""
+        access_bed = os.path.join(out_dir, "access.bed")
+        with open(access_bed, "w") as handle:
+            handle.write("chr1\t0\t1500000\n")
+        args = {
+            "normal_fnames": [],
+            "fasta": None,
+            "access_bed": access_bed,
+            "annotate": "formats/refflat-mini.txt",
+            "short_names": False,
+            "target_avg_size": 1000,
+        }
+        args |= kwargs
+        _ref_fname, tgt_bed, _anti_bed = self._make_reference(out_dir, **args)
+        return tabio.read(tgt_bed, "bed4")
+
+    def test_batch_wgs_intergenic_bin_scale_cli(self):
+        """``batch --intergenic-bin-scale`` builds a reference of fine genic
+        bins and coarse intergenic bins, with no antitargets, and is rejected
+        alongside ``-r``."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            access_bed = os.path.join(tmp_dir, "access.bed")
+            with open(access_bed, "w") as handle:
+                handle.write("chr1\t0\t1500000\n")
+            ref_fname = os.path.join(tmp_dir, "reference.cnn")
+            args = commands.parse_args(
+                [
+                    *("batch", "-m", "wgs", "-n", "-g", access_bed),
+                    *("--annotate", "formats/refflat-mini.txt"),
+                    *("--target-avg-size", "1000", "--intergenic-bin-scale", "10"),
+                    *("-d", tmp_dir),
+                ]
+            )
+            args.func(args)
+            bins = tabio.read(os.path.join(tmp_dir, "access.target.bed"), "bed4")
+            anti_bed = os.path.join(tmp_dir, "access.antitarget.bed")
+            self.assertEqual(os.path.getsize(anti_bed), 0)
+            self.assertEqual(len(cnvlib.read(ref_fname)), len(bins))
+
+            args = commands.parse_args(
+                [
+                    *("batch", "formats/na12878-chrM-Y-trunc.bam", "-m", "wgs"),
+                    *("-r", ref_fname, "--intergenic-bin-scale", "10", "-d", tmp_dir),
+                ]
+            )
+            with self.assertRaises(SystemExit):
+                args.func(args)
+        # Bin widths are tested in test_preprocessing; here, that the scale
+        # reached the binning, and the annotation labeled the bins
+        self.assertGreater((bins.end - bins.start).max(), 7500)
+        genic = bins.in_range("chr1", 134772, 140566)
+        self.assertTrue((genic["gene"] == "LOC729737").all())
+        gap = bins.in_range("chr1", 141566, 322891, mode="inner")
+        self.assertTrue((gap["gene"] == "-").all())
+
+    def test_batch_wgs_genic_regions_subset(self):
+        """``--genic-regions`` limits the fine bins to the given genes; other
+        genes in the annotation are binned coarsely but still labeled."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            genic_bed = os.path.join(tmp_dir, "panel.bed")
+            with open(genic_bed, "w") as handle:
+                handle.write("chr1\t134772\t140566\tLOC729737\n")
+            bins = self._make_split_reference(
+                tmp_dir, intergenic_bin_scale=10, genic_regions=genic_bed
+            )
+        panel_gene = bins.in_range("chr1", 133772, 141566, mode="inner")
+        self.assertTrue(((panel_gene.end - panel_gene.start).between(750, 1500)).all())
+        # SAMD11 (chr1:861120-879961) is annotated but not in the panel
+        samd11 = bins.in_range("chr1", 861120, 879961)
+        self.assertTrue(((samd11.end - samd11.start) >= 7500).all())
+        self.assertTrue(samd11["gene"].str.contains("SAMD11").any())
+
+    def test_batch_intergenic_bin_scale_rejects_bad_options(self):
+        """Invalid combinations fail before any file is written."""
+        cases = {
+            "hybrid method": (
+                {"method": "hybrid", "intergenic_bin_scale": 10},
+                "applies only to 'wgs'",
+            ),
+            "no genes": (
+                {"annotate": None, "intergenic_bin_scale": 10},
+                "needs genic regions",
+            ),
+            "scale of 1": ({"intergenic_bin_scale": 1}, "greater than 1"),
+            "NaN scale": ({"intergenic_bin_scale": float("nan")}, "greater than 1"),
+            "infinite scale": (
+                {"intergenic_bin_scale": float("inf")},
+                "greater than 1",
+            ),
+            "genic regions alone": (
+                {"genic_regions": "formats/my-refflat.bed"},
+                "only with intergenic bin scaling",
+            ),
+        }
+        for label, (kwargs, message) in cases.items():
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp_dir:
+                with self.assertRaisesRegex(ValueError, message):
+                    self._make_split_reference(tmp_dir, **kwargs)
+                self.assertEqual(os.listdir(tmp_dir), ["access.bed"])
+
     def _run_sample(self, ref_files, out_dir, seq_method, segment_method):
         """Run batch_run_sample on the chrM-Y-trunc BAM with `ref_files`, the
         (reference, target BED, antitarget BED) triple of _make_reference."""

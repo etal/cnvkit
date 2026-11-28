@@ -107,7 +107,7 @@ class GenomicArray:
             arr = np.zeros(0, dtype=spec)
             return pd.DataFrame(arr)
         except TypeError as exc:
-            raise TypeError(r"{exc}: {spec}") from exc
+            raise TypeError(f"{exc}: {spec}") from exc
 
     @classmethod
     def from_columns(

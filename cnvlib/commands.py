@@ -303,6 +303,8 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                 (args.annotate, "--annotate"),
                 (args.short_names, "--short-names"),
                 (args.target_avg_size, "--target-avg-size"),
+                (args.intergenic_bin_scale, "--intergenic-bin-scale"),
+                (args.genic_regions, "--genic-regions"),
                 (args.antitarget_avg_size, "--antitarget-avg-size"),
                 (args.antitarget_min_size, "--antitarget-min-size"),
             )
@@ -364,6 +366,8 @@ def _cmd_batch(args: argparse.Namespace) -> None:
             bias_smoother=args.bias_smoother,
             no_overlap=args.no_overlap,
             zero_coverage_floor=args.zero_coverage_floor,
+            intergenic_bin_scale=args.intergenic_bin_scale,
+            genic_regions=args.genic_regions,
         )
     elif args.targets is None and args.antitargets is None:
         # Extract (anti)target BEDs from the given, existing CN reference
@@ -541,6 +545,22 @@ P_batch_newref.add_argument(
     "--target-avg-size",
     type=int,
     help="Average size of split target bins (results are approximate).",
+)
+P_batch_newref.add_argument(
+    "--intergenic-bin-scale",
+    metavar="N",
+    type=float,
+    help="""For '-m wgs': make bins between genes N times the average size of
+            the bins in and near genes (e.g. 10), so that fewer bins cover the
+            intergenic genome. Genes are taken from --genic-regions if given,
+            else from --annotate. [Default: same size everywhere]""",
+)
+P_batch_newref.add_argument(
+    "--genic-regions",
+    metavar="FILENAME",
+    help="""With --intergenic-bin-scale, the regions to bin at the finer size
+            (.bed, refFlat, GFF, or similar), e.g. a set of cancer-related genes.
+            [Default: every gene in --annotate]""",
 )
 # For antitargets:
 P_batch_newref.add_argument(
