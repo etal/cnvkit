@@ -224,7 +224,7 @@ def batch_make_reference(
     if method in ("wgs", "amplicon"):
         if antitarget_bed:
             raise ValueError(
-                r"{method!r} protocol: antitargets should not be given/specified."
+                f"{method!r} protocol: antitargets should not be given/specified."
             )
         if access_bed and target_bed and access_bed != target_bed:
             raise ValueError(
