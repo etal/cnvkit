@@ -53,6 +53,7 @@ from cnvlib import (
     segmentation,
     segmetrics,
     smoothing,
+    target,
     vary,
 )
 from skgenome import GenomicArray as GA
@@ -1170,3 +1171,155 @@ class PreprocessingTests(unittest.TestCase):
                     set(str(bait_labels).split(",")),
                     bait_fname,
                 )
+
+    @staticmethod
+    def _chr1(*spans, **columns):
+        """A GenomicArray of chr1 intervals given as (start, end) pairs."""
+        return GA.from_columns(
+            {
+                "chromosome": ["chr1"] * len(spans),
+                "start": [s for s, _ in spans],
+                "end": [e for _, e in spans],
+                **columns,
+            }
+        )
+
+    def test_split_genic_bin_sizes(self):
+        """Bins in and within 1 kb of genes have the genic size, bins between
+        genes about 10 times that, and together they tile the regions."""
+        genes = tabio.read_auto("formats/refflat-mini.txt")
+        bins = target.split_genic(self._chr1((0, 1_500_000)), genes, 1000, 10)
+        widths = bins.end - bins.start
+        self.assertEqual(bins.start.iat[0], 0)
+        self.assertEqual(bins.end.iat[-1], 1_500_000)
+        self.assertTrue((bins.start.to_numpy()[1:] == bins.end.to_numpy()[:-1]).all())
+        # The access region is contiguous, so no bin is narrower than a genic bin
+        self.assertGreaterEqual(widths.min(), 750)
+        # LOC729737 (chr1:134772-140566), including its 1 kb flanks
+        genic = bins.in_range("chr1", 133772, 141566)
+        self.assertTrue(((genic.end - genic.start) <= 1500).all())
+        # The gene-free gap between LOC729737 and LOC100132287, flanks excluded
+        gap = bins.in_range("chr1", 141566, 322891, mode="inner")
+        self.assertGreater(len(gap), 10)
+        self.assertTrue(((gap.end - gap.start).between(7500, 15000)).all())
+
+    def test_split_genic_joins_bookended_regions(self):
+        """Regions given as contiguous tiles are binned as one region."""
+        genes = self._chr1((134772, 140566))
+        whole = target.split_genic(self._chr1((0, 1_500_000)), genes, 1000, 10)
+        tiles = self._chr1(*[(s, s + 1500) for s in range(0, 1_500_000, 1500)])
+        tiled = target.split_genic(tiles, genes, 1000, 10)
+        self.assertTrue(whole.data.equals(tiled.data))
+        self.assertGreater((whole.end - whole.start).max(), 7500)
+
+    def test_split_genic_has_no_narrow_genic_bins(self):
+        """A gene narrower than one genic bin still fills one, and a gene's
+        flank clipped to a sliver by a region boundary joins the coarse bins."""
+        # The first gene's flank reaches 10 bp into the region. With its 1 kb
+        # flanks, the second gene spans 2100 bp or 4999 bp, short of the 5 kb
+        # genic size by an even or an odd number of bases.
+        for gene_size in (100, 2999):
+            with self.subTest(gene_size=gene_size):
+                genes = self._chr1((90_000, 99_010), (700_000, 700_000 + gene_size))
+                bins = target.split_genic(
+                    self._chr1((100_000, 1_500_000)), genes, 5000, 10
+                )
+                widths = bins.end - bins.start
+                self.assertGreaterEqual(widths.min(), 0.75 * 5000)
+                small_gene = bins.in_range("chr1", 700_000, 700_000 + gene_size)
+                self.assertEqual(len(small_gene), 1)
+                self.assertLessEqual(
+                    small_gene.end.iat[0] - small_gene.start.iat[0], 7500
+                )
+
+    def test_split_genic_keeps_genes_near_region_ends_fine(self):
+        """A small gene whose widened span a region boundary cuts still gets
+        a bin of about the genic size, not a coarse one."""
+        cases = [((100_000, 1_500_000), (102_000, 102_500)), ((0, 1_500_000), (0, 10))]
+        for region, gene in cases:
+            with self.subTest(gene=gene):
+                bins = target.split_genic(
+                    self._chr1(region), self._chr1(gene), 5000, 10
+                )
+                gene_bins = bins.in_range("chr1", *gene)
+                self.assertEqual(len(gene_bins), 1)
+                self.assertLessEqual(
+                    gene_bins.end.iat[0] - gene_bins.start.iat[0], 7500
+                )
+
+    def test_split_genic_ignores_gff_sequence_regions(self):
+        """A GFF 'region' row spanning the chromosome is not a gene."""
+        regions = self._chr1((0, 1_500_000))
+        genes = self._chr1((0, 1_500_000), (134772, 140566), type=["region", "gene"])
+        bins = target.split_genic(regions, genes, 1000, 10)
+        self.assertGreater((bins.end - bins.start).max(), 7500)
+        with self.assertRaisesRegex(ValueError, "No genic regions were given"):
+            target.split_genic(regions, genes[:1], 1000, 10)
+
+    def test_split_genic_rejects_bad_scale(self):
+        """The intergenic bin scale must be a finite number greater than 1."""
+        for scale in (1, 0.5, float("nan"), float("inf")):
+            with self.subTest(scale=scale):
+                with self.assertRaisesRegex(ValueError, "finite number"):
+                    target.split_genic(
+                        self._chr1((0, 100_000)), self._chr1((0, 10)), 1000, scale
+                    )
+
+    def test_split_genic_warns_when_one_bin_size_is_missing(self):
+        """Genic regions that leave no bins of one of the two sizes say so."""
+        regions = self._chr1((100_000, 200_000))
+        cases = [
+            # Genes cover the region: no intergenic bins
+            (self._chr1((100_000, 200_000)), "No bins have the intergenic size"),
+            # A gene's flank reaches 10 bp into the region: no genic bins
+            (self._chr1((90_000, 99_010)), "No bins have the genic size"),
+        ]
+        for genes, message in cases:
+            with self.subTest(message):
+                with self.assertLogs(level="WARNING") as cm:
+                    target.split_genic(regions, genes, 1000, 10)
+                self.assertIn(message, " ".join(cm.output))
+
+    def test_target_intergenic_bin_scale_needs_split_and_genes(self):
+        """Intergenic bin scaling is an error without splitting or genes; the
+        missing split is reported before any annotation file is read."""
+        regions = self._chr1((0, 100_000))
+        with self.assertRaisesRegex(ValueError, "only with do_split"):
+            commands.do_target(
+                regions, annotate="nonexistent.refflat", intergenic_bin_scale=10
+            )
+        with self.assertRaisesRegex(ValueError, "needs genic regions"):
+            commands.do_target(regions, do_split=True, intergenic_bin_scale=10)
+
+    def test_split_genic_rejects_genes_elsewhere(self):
+        """Genic regions that overlap none of the regions are an error."""
+        with self.assertRaisesRegex(ValueError, "No genic region overlaps"):
+            target.split_genic(
+                self._chr1((0, 1_500_000)),
+                tabio.read_auto("formats/my-refflat.bed"),
+                1000,
+                10,
+            )
+
+    def test_target_intergenic_bin_scale_labels_and_idempotence(self):
+        """Without an annotation, each bin is named for the regions it covers,
+        and binning the output again reproduces it."""
+        regions = self._chr1(
+            (0, 400_000),
+            (400_000, 510_000),
+            (510_000, 1_500_000),
+            gene=["A", "B", "C"],
+        )
+        kwargs = {
+            "do_split": True,
+            "avg_size": 1000,
+            "intergenic_bin_scale": 10,
+            "genic": self._chr1((134772, 140566)),
+        }
+        once = commands.do_target(regions, **kwargs)
+        covering = regions.into_ranges(once, "gene", "-")
+        for bin_label, region_labels in zip(once["gene"], covering, strict=True):
+            self.assertEqual(bin_label, region_labels)
+        self.assertEqual(set(once["gene"]), {"A", "B", "C", "A,B", "B,C"})
+        twice = commands.do_target(once, **kwargs)
+        self.assertTrue(once.data.equals(twice.data))

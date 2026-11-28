@@ -34,7 +34,8 @@ following:
 - Instead of analyzing the whole genome, use the "target" BED file
   to limit the analysis to just the genic regions. You can get such a BED file
   from the `UCSC Genome Browser <https://genome.ucsc.edu/cgi-bin/hgTables>`_, for
-  example.
+  example. Or keep the whole genome but bin it coarsely between genes, as
+  described below.
 - Increase the "target" average bin size (``--target-avg-size``), e.g. to at
   least 1000 bases for 30x coverage, or proportionally more for lower-coverage
   sequencing.
@@ -48,6 +49,51 @@ following:
   commands (`--no-edge`).
 
 The ``batch -m wgs`` option does all of these except the first automatically.
+
+Coarser bins between genes
+``````````````````````````
+
+To keep the whole genome in the analysis with fewer bins, the ``batch`` option
+``--intergenic-bin-scale N`` bins the regions in and near genes at the usual
+WGS bin size and the regions between genes at ``N`` times that size::
+
+    cnvkit.py batch Sample1.bam -n Control*.bam -m wgs -f hg38.fasta \
+            --annotate data/refFlat_hg38.txt --intergenic-bin-scale 10
+
+The genic regions are the transcribed spans of every gene in ``--annotate``.
+To bin only a chosen set of genes finely, such as the genes of a cancer gene
+panel, give those regions with ``--genic-regions`` (a BED file, or a gene model
+in any format ``--annotate`` accepts); the other genes are then binned coarsely,
+but still labeled from ``--annotate``.
+Each genic region is extended by 1 kb on each side, and a gene narrower than one
+bin is extended further so that it fills one, unless the end of an accessible
+region cuts it short.
+GFF rows that describe a whole chromosome or contig, such as the ``region`` rows
+of NCBI RefSeq files, are not treated as genes.
+The bin size in and near genes is the one ``--target-avg-size`` sets, or else
+the one ``batch`` estimates from the normal samples' read depth (5000 bases for
+a flat reference).
+An intergenic stretch narrower than two genic bins is binned at the genic size,
+and a genic region that the end of an accessible region cuts to less than half
+a genic bin is binned with the intergenic regions beside it, since a single bin
+that narrow would be much noisier than its neighbors.
+
+The bins remain ordinary WGS bins: together they cover the accessible regions
+exactly, with no antitargets, and every bin receives the same bias corrections.
+Only their sizes differ, so a copy number change between genes is resolved
+about ``N`` times more coarsely than one within a gene.
+
+How many bins this saves depends on how much of the genome the genic regions
+cover.
+The transcribed spans of all annotated human genes cover nearly half of the
+accessible genome, so with every gene the total number of bins falls by at most
+about half, however large ``N`` is; a smaller gene set saves more.
+Reads are still counted across the whole genome, so the time spent reading the
+BAM files changes little; the saving is mainly in the steps that process bins,
+such as ``fix`` and ``segment``.
+The reference records the bins, so analyze each sample against it with ``-r``
+as usual; ``--intergenic-bin-scale`` and ``--genic-regions``, like the other
+options that construct a reference, are rejected when ``-r`` is given.
 
 
 Distributing a cohort across a cluster

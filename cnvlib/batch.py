@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 
 from matplotlib import pyplot
@@ -54,6 +55,8 @@ def batch_make_reference(
     bias_smoother: str = "median",
     no_overlap: bool = False,
     zero_coverage_floor: str = "fixed",
+    intergenic_bin_scale: float | None = None,
+    genic_regions: str | None = None,
 ) -> tuple[str, str, str]:
     """Build a complete copy number reference from normal samples.
 
@@ -122,6 +125,15 @@ def batch_make_reference(
         The log2 value recorded for a bin that no read overlaps, in every
         normal sample's coverage: 'fixed' (default) or 'half-read'. See
         `coverage.do_coverage`.
+    intergenic_bin_scale : float, optional
+        WGS only. Bin the genome finely near genes and coarsely between them:
+        intergenic bins are this many times the size of the bins in and near
+        genic regions. Requires `genic_regions` or `annotate`. By default all
+        bins have the same size.
+    genic_regions : str, optional
+        Path to the regions binned finely when `intergenic_bin_scale` is
+        given (BED, interval list, refFlat, GFF, etc.), e.g. the genes of a
+        cancer gene panel. Default: every gene in `annotate`.
 
     Returns
     -------
@@ -167,6 +179,9 @@ def batch_make_reference(
         If method='wgs' or 'amplicon' but antitargets are specified.
         If method='wgs' and neither targets, access, nor fasta provided.
         If method='wgs' and targets != access (when both given).
+        If intergenic_bin_scale is given with a method other than 'wgs', is
+        not greater than 1, or has neither genic_regions nor annotate.
+        If genic_regions is given without intergenic_bin_scale.
 
     See Also
     --------
@@ -230,6 +245,24 @@ def batch_make_reference(
             raise ValueError(
                 f"{method!r} protocol: targets and access should not be different."
             )
+
+    if intergenic_bin_scale is not None:
+        if method != "wgs":
+            raise ValueError(
+                f"{method!r} protocol: intergenic bin scaling applies only to 'wgs'."
+            )
+        if not 1 < intergenic_bin_scale < math.inf:
+            raise ValueError(
+                "Intergenic bin scale must be a finite number greater than 1, "
+                f"not {intergenic_bin_scale}."
+            )
+        if not (genic_regions or annotate):
+            raise ValueError(
+                "Intergenic bin scaling needs genic regions or a gene annotation "
+                "(--annotate) to locate the genes."
+            )
+    elif genic_regions:
+        raise ValueError("Genic regions are used only with intergenic bin scaling.")
 
     bait_arr = None
     access_arr = None
@@ -343,8 +376,10 @@ def batch_make_reference(
         bait_arr,
         annotate,
         short_names,
-        True,
+        do_split=True,
         **({"avg_size": target_avg_size} if target_avg_size else {}),
+        intergenic_bin_scale=intergenic_bin_scale,
+        genic=tabio.read_auto(genic_regions) if genic_regions else None,
     )
     tabio.write(target_arr, new_target_fname, "bed4")
     target_bed = new_target_fname
